@@ -1,0 +1,15 @@
+button:
+  about: Acerca de
+  back: Atrás
+  go: Ir
+  home: Inicio
+  tabs: Pestañas
+  toggle_dark: Alternar modo oscuro
+  toggle_langs: Cambiar idiomas
+intro:
+  aka: También conocido como
+  desc: Plantilla de Inicio de Vite Dogmática
+  dynamic-route: Demo de ruta dinámica
+  hi: ¡Hola, {name}!
+  whats-your-name: ¿Cómo te llamas?
+not-found: No se ha encontrado

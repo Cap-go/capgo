@@ -1,0 +1,88 @@
+button:
+  about: About
+  tabs: Tabs
+  back: Back
+  go: GO
+  home: Home
+  toggle_dark: Toggle dark mode
+  toggle_langs: Change languages
+intro:
+  desc: Opinionated Vite Starter Template
+  dynamic-route: Demo of dynamic route
+  hi: Hi, {name}!
+  aka: Also known as
+  whats-your-name: What's your name?
+not-found: Not found
+projects:
+  recentdev: Recently in development
+  recentopen: Recently in production
+  title: Projects
+login:
+  connexion: Login
+  create-new: Create new account
+  withemail: With email adress
+  andpass: And password
+  email: Email
+  forgot: forgot
+  hello: Hello
+  login-in: Login in
+  password: Password
+  or: or
+forgot:
+  heading: Forgot password
+  check_email: Check your email to get the link to reset your password
+  success: Password updated successfully
+  email: Email
+register:
+  heading: Registration
+  password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
+  already-account: You already have an account?
+  desc: Fill the following fields to complete your registration
+  first-name: first name
+  last-name: last name
+  email: Email
+  password: password
+  confirm-password: Confirm password
+  confirm-email: Confirm email
+  check-email: Please check your email and verify
+  next: Next
+  upperCaseError: Should contain uppercase letters
+  lowerCaseError: Should contain lowercase letters
+  specialError: Should contain special characters
+account:
+  heading: Account
+  personalInformation: Personal information
+  changePassword: Change password
+  preferences: Notifications
+  logout: Logout
+  backButton: Back
+  legal: See legal mentions
+  privacy: See privacy policy
+notificationSettings:
+  heading: Account
+  validate: Validate
+activation: 
+  headline: My settings
+  desc: Fill the following fields to complete your registration
+  notification: Notifications
+  notification-desc: I accept to receive notification when new app version are available
+  heading: activation
+  legal: Legal mentions
+  legal-desc: I accept capacitor Go app privacy policy and terms of use
+  doi: Optional consent
+  doi-desc: I accept Email newsletter and future marketing offers
+  validate: Validate
+accountProfile:
+  heading: Personal information
+  first-name: First name
+  last-name: Last name
+  email: Email
+  country: Country
+  update: Update
+accountPassword:
+  heading: Change my password
+  password: New password
+  confirmPassword: Confirm password
+  errorMsg: Error happened, please try again
+  validate: Validate
+  success: Changed password successfully

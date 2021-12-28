@@ -1,0 +1,15 @@
+button:
+  about: À propos de
+  back: Retour
+  go: Essayer
+  home: Accueil
+  tabs: Onglets
+  toggle_dark: Basculer en mode sombre
+  toggle_langs: Changer de langue
+intro:
+  aka: Aussi connu sous le nom de
+  desc: Exemple d'application Vite
+  dynamic-route: Démo de route dynamique
+  hi: Salut, {name}!
+  whats-your-name: Comment t'appelles-tu ?
+not-found: Page non trouvée
