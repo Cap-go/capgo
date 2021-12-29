@@ -7,6 +7,18 @@
   command = "npx pnpm i --store=node_modules/.pnpm-store && npx pnpm run build"
 
 [[redirects]]
+  force = true
+  from = '/.well-known/*'
+  status = 200
+  to = '/deepLink/:splat'
+
+[[redirects]]
+  force = true
+  from = '/api/*'
+  status = 200
+  to = '/.netlify/functions/:splat'
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
@@ -15,3 +27,14 @@
   for = "/manifest.webmanifest"
   [headers.values]
     Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/.well-known/*"
+  [headers.values]
+    Content-Type = "application/json"
+
+[dev]
+  command = "pnpm front"
+  autoLaunch = false
+  functionsPort = 8885
+  targetPort = 3333

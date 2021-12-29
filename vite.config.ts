@@ -14,6 +14,7 @@ import VueI18n from '@intlify/vite-plugin-vue-i18n'
 import Inspect from 'vite-plugin-inspect'
 import Prism from 'markdown-it-prism'
 import LinkAttributes from 'markdown-it-link-attributes'
+import EnvironmentPlugin from 'vite-plugin-environment'
 
 const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
 
@@ -27,6 +28,11 @@ export default defineConfig({
     Vue({
       include: [/\.vue$/, /\.md$/],
     }),
+
+    EnvironmentPlugin({
+      VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : ''}neufmoispourtoi.app`,
+      VITE_NETLIFY_URL: process.env.VITE_NETLIFY_URL ? process.env.VITE_NETLIFY_URL : '/api',
+    }, { defineOn: 'import.meta.env' }),
 
     // https://github.com/hannoeru/vite-plugin-pages
     Pages({
