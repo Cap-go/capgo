@@ -20,6 +20,7 @@ export interface paths {
           created_at?: parameters["rowFilter.apikeys.created_at"];
           user_id?: parameters["rowFilter.apikeys.user_id"];
           key?: parameters["rowFilter.apikeys.key"];
+          mode?: parameters["rowFilter.apikeys.mode"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -74,6 +75,7 @@ export interface paths {
           created_at?: parameters["rowFilter.apikeys.created_at"];
           user_id?: parameters["rowFilter.apikeys.user_id"];
           key?: parameters["rowFilter.apikeys.key"];
+          mode?: parameters["rowFilter.apikeys.mode"];
         };
         header: {
           /** Preference */
@@ -92,6 +94,7 @@ export interface paths {
           created_at?: parameters["rowFilter.apikeys.created_at"];
           user_id?: parameters["rowFilter.apikeys.user_id"];
           key?: parameters["rowFilter.apikeys.key"];
+          mode?: parameters["rowFilter.apikeys.mode"];
         };
         body: {
           /** apikeys */
@@ -340,6 +343,11 @@ export interface definitions {
     user_id: string;
     /** Format: character varying */
     key: string;
+    /**
+     * Format: public.key_mode
+     * @default read
+     */
+    mode: "read" | "write" | "all";
   };
   apps: {
     /**
@@ -425,6 +433,8 @@ export interface parameters {
   "rowFilter.apikeys.user_id": string;
   /** Format: character varying */
   "rowFilter.apikeys.key": string;
+  /** Format: public.key_mode */
+  "rowFilter.apikeys.mode": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: bigint */

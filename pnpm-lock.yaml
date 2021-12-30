@@ -54,6 +54,7 @@ specifiers:
   capacitor-native-audio: ^3.0.2
   capacitor-rate-app: ^2.0.0
   capacitor-updater: ^1.0.23
+  copy-text-to-clipboard: ^3.0.1
   critters: 0.0.15
   cross-env: ^7.0.3
   cypress: ^8.7.0
@@ -128,6 +129,7 @@ dependencies:
   capacitor-native-audio: 3.0.2_@capacitor+core@3.3.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.3.3
   capacitor-updater: 1.0.23_@capacitor+core@3.3.3
+  copy-text-to-clipboard: 3.0.1
   firebase: 9.6.1
   mime: 3.0.0
   nprogress: 1.0.0-0
@@ -5925,6 +5927,11 @@ packages:
       readdirp: 2.2.1
       run-parallel: 1.2.0
     dev: true
+
+  /copy-text-to-clipboard/3.0.1:
+    resolution: {integrity: sha512-rvVsHrpFcL4F2P8ihsoLdFHmd404+CMg71S756oRSeQgqk51U3kicGdnvfkrxva0xXH92SjGS62B0XIJsbh+9Q==}
+    engines: {node: '>=12'}
+    dev: false
 
   /core-js-compat/3.17.3:
     resolution: {integrity: sha512-+in61CKYs4hQERiADCJsdgewpdl/X0GhEX77pjKgbeibXviIt2oxEjTc8O2fqHX8mDdBrDvX8MYD/RYsBv4OiA==}

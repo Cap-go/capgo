@@ -58,6 +58,7 @@ account:
   backButton: Back
   legal: See legal mentions
   privacy: See privacy policy
+  keys: API keys
 notificationSettings:
   heading: Account
   validate: Validate
@@ -86,3 +87,7 @@ accountPassword:
   errorMsg: Error happened, please try again
   validate: Validate
   success: Changed password successfully
+apikeys:
+  keyCopied: Keys copied to your clipboard
+  title: API keys
+  all: all your keys

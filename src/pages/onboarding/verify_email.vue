@@ -49,12 +49,22 @@ const updateDb = async() => {
         image_url: '',
       },
     )
-  const { error: error2 } = await supabase
+  await supabase
     .from('apikeys')
     .insert(
       {
         user_id: user.value?.id,
         key: uuidv4(),
+        mode: 'all',
+      },
+    )
+  await supabase
+    .from('apikeys')
+    .insert(
+      {
+        user_id: user.value?.id,
+        key: uuidv4(),
+        mode: 'read',
       },
     )
   if (error)
