@@ -30,7 +30,7 @@ export default defineConfig({
     }),
 
     EnvironmentPlugin({
-      VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : ''}neufmoispourtoi.app`,
+      VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : ''}capacitorgo.com`,
       VITE_NETLIFY_URL: process.env.VITE_NETLIFY_URL ? process.env.VITE_NETLIFY_URL : '/api',
     }, { defineOn: 'import.meta.env' }),
 
@@ -157,6 +157,13 @@ export default defineConfig({
   server: {
     fs: {
       strict: true,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8887/.netlify/functions',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api/, ''),
+      },
     },
   },
 

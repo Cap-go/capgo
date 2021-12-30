@@ -36,5 +36,5 @@
 [dev]
   command = "pnpm front"
   autoLaunch = false
-  functionsPort = 8885
-  targetPort = 3333
+  functionsPort = 8887
+  targetPort = 3334

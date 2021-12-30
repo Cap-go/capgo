@@ -2,15 +2,16 @@ import type { Handler } from '@netlify/functions'
 import { v4 as uuidv4 } from 'uuid'
 import type { User } from '@supabase/supabase-js'
 import { useSupabase } from '../services/supabase'
-import { parseMultipartForm } from './../services/upload'
+import multipart from'parse-multipart-data'
+// import { parseMultipartForm } from '../services/upload'
 import type { definitions } from '~/types/supabase'
 
-interface AppUpload {
-  name: string
-  type: string
-  version: string
-  app: { filename: string; type: string; content: Buffer }
-}
+// interface AppUpload {
+//   name: string
+//   type: string
+//   version: string
+//   app: { filename: string; type: string; content: Buffer }
+// }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
   if (event.httpMethod === 'OPTIONS') {
@@ -63,7 +64,7 @@ export const handler: Handler = async(event) => {
     isVerified = false
     console.error(error)
   }
-  if (!isVerified || !auth) {
+  if (!isVerified || !auth || !event.body) {
     return {
       statusCode: 400,
       headers,
@@ -74,7 +75,10 @@ export const handler: Handler = async(event) => {
   }
 
   try {
-    const fields = await parseMultipartForm(event) as AppUpload
+    // console.log('headers', event.headers)
+    const fields = multipart.parse(event.body, '----WebKitFormBoundary');
+    // fields[0]
+    // const fields = await parseMultipartForm(event) as AppUpload
     const fileName = uuidv4()
     const { error } = await supabase.storage
       .from(`apps/${auth.id}`)

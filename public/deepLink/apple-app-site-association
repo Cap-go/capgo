@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "7STH5RB5ZP.com.neufmoispourtoi.app",
+        "paths": ["*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+        "7STH5RB5ZP.com.neufmoispourtoi.app"
+    ]
+  }
+}
