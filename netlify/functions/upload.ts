@@ -9,6 +9,7 @@ interface AppUpload {
   type: string
   version: string
   app: string
+  mode: 'dev' | 'prod'
 }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
@@ -91,7 +92,7 @@ export const handler: Handler = async(event) => {
         user_id: apikey.user_id,
         name: body.name,
         icon: body.icon,
-        mode: 'dev',
+        mode: body.mode || 'dev',
         version: body.version,
       })
     if (dbError) {
