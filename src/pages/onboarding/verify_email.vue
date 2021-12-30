@@ -5,6 +5,7 @@ import type { User } from '@supabase/gotrue-js'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from '~/services/supabase'
 
 const supabase = useSupabase()
@@ -48,8 +49,18 @@ const updateDb = async() => {
         image_url: '',
       },
     )
+  const { error: error2 } = await supabase
+    .from('apikeys')
+    .insert(
+      {
+        user_id: user.value?.id,
+        key: uuidv4(),
+      },
+    )
   if (error)
     console.log('updateDb', error)
+  if (error2)
+    console.log('updateDb', error2)
   router.push('/onboarding/activation')
 
   isLoading.value = false
