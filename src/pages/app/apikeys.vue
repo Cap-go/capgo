@@ -38,7 +38,7 @@ watchEffect(async() => {
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
-      <TitleHead :big="true" :title="t('button.back')" />
+      <TitleHead :big="false" />
       <ion-header collapse="condense">
         <ion-toolbar>
           <ion-title size="large">

@@ -56,8 +56,8 @@ account:
   preferences: Notifications
   logout: Logout
   backButton: Back
-  legal: See legal mentions
-  privacy: See privacy policy
+  legal: Legal mentions
+  privacy: Privacy policy
   keys: API keys
 notificationSettings:
   heading: Account

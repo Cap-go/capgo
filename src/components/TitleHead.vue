@@ -4,7 +4,7 @@ import { chevronBackOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 defineProps({
-  title: { type: String, default: 'Title' },
+  title: { type: String, default: '' },
   big: { type: Boolean, default: false },
 })
 const { t } = useI18n()
