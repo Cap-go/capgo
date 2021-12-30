@@ -1,17 +1,15 @@
 import type { Handler } from '@netlify/functions'
 import { v4 as uuidv4 } from 'uuid'
-import type { User } from '@supabase/supabase-js'
 import { useSupabase } from '../services/supabase'
-import multipart from'parse-multipart-data'
-// import { parseMultipartForm } from '../services/upload'
 import type { definitions } from '~/types/supabase'
 
-// interface AppUpload {
-//   name: string
-//   type: string
-//   version: string
-//   app: { filename: string; type: string; content: Buffer }
-// }
+interface AppUpload {
+  icon: string
+  name: string
+  type: string
+  version: string
+  app: string
+}
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
   if (event.httpMethod === 'OPTIONS') {
@@ -36,11 +34,10 @@ export const handler: Handler = async(event) => {
   }
 
   let isVerified = false
-  let apikey: definitions['apikeys']
+  let apikey: definitions['apikeys'] | null = null
   const supabase = useSupabase()
-  let auth: User | null = null
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from<definitions['apikeys']>('apikeys')
       .select()
       .eq('key', authorization)
@@ -54,17 +51,13 @@ export const handler: Handler = async(event) => {
       }
     }
     apikey = data[0]
-    const { user, error } = await supabase.auth.api.getUser(
-      apikey.user_id,
-    )
-    isVerified = !!user && !error
-    auth = user
+    isVerified = !!apikey && !error
   }
   catch (error) {
     isVerified = false
     console.error(error)
   }
-  if (!isVerified || !auth || !event.body) {
+  if (!isVerified || !apikey || !event.body) {
     return {
       statusCode: 400,
       headers,
@@ -75,15 +68,12 @@ export const handler: Handler = async(event) => {
   }
 
   try {
-    // console.log('headers', event.headers)
-    const fields = multipart.parse(event.body, '----WebKitFormBoundary');
-    // fields[0]
-    // const fields = await parseMultipartForm(event) as AppUpload
+    const body = JSON.parse(event.body || '{}') as AppUpload
     const fileName = uuidv4()
     const { error } = await supabase.storage
-      .from(`apps/${auth.id}`)
-      .upload(`${fileName}`, fields.app.content, {
-        contentType: fields.app.type,
+      .from(`apps/${apikey.user_id}`)
+      .upload(`${fileName}`, body.app, {
+        contentType: 'application/zip',
       })
     if (error) {
       return {
@@ -98,16 +88,19 @@ export const handler: Handler = async(event) => {
       .from('apps')
       .insert({
         bucket_id: fileName,
-        user_id: auth.id,
-        name: fields.name,
-        version: fields.version,
+        user_id: apikey.user_id,
+        name: body.name,
+        icon: body.icon,
+        mode: 'dev',
+        version: body.version,
       })
     if (dbError) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: 'cannot add app',
+          message: 'cannot add app ',
+          err: dbError
         }),
       }
     }

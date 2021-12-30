@@ -50,7 +50,6 @@ specifiers:
   '@vueuse/core': 7.3.0
   '@vueuse/head': 0.7.4
   base64-arraybuffer: ^1.0.1
-  busboy: ^1.0.0
   capacitor-crisp: ^1.0.15
   capacitor-native-audio: ^3.0.2
   capacitor-rate-app: ^2.0.0
@@ -67,7 +66,6 @@ specifiers:
   mime: ^3.0.0
   netlify-cli: ^8.6.0
   nprogress: 1.0.0-0
-  parse-multipart-data: ^1.2.1
   pinia: 2.0.6
   pnpm: 6.24.1
   prism-theme-vars: ^0.2.2
@@ -126,7 +124,6 @@ dependencies:
   '@vueuse/core': 7.3.0_vue@3.2.26
   '@vueuse/head': 0.7.4_vue@3.2.26
   base64-arraybuffer: 1.0.1
-  busboy: 1.0.0
   capacitor-crisp: 1.0.15_@capacitor+core@3.3.3
   capacitor-native-audio: 3.0.2_@capacitor+core@3.3.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.3.3
@@ -134,7 +131,6 @@ dependencies:
   firebase: 9.6.1
   mime: 3.0.0
   nprogress: 1.0.0-0
-  parse-multipart-data: 1.2.1
   pinia: 2.0.6_typescript@4.4.4+vue@3.2.26
   prism-theme-vars: 0.2.2
   vite-plugin-environment: 1.0.1_vite@2.6.13
@@ -4002,10 +3998,6 @@ packages:
       form-data: 3.0.1
     dev: true
 
-  /@types/node/10.17.60:
-    resolution: {integrity: sha512-F0KIgDJfy2nA3zMLmWGKxcH2ZVEtCZXHHdOQs2gSaQ27+lNeEfGxzkIw90aXswATX7AZ33tahPbzy6KAfUreVw==}
-    dev: false
-
   /@types/node/14.17.32:
     resolution: {integrity: sha512-JcII3D5/OapPGx+eJ+Ik1SQGyt6WvuqdRfh9jUwL6/iHGjmyOriBDciBUu7lEIBTL2ijxwrR70WUnw5AEDmFvQ==}
     dev: true
@@ -5301,13 +5293,6 @@ packages:
     dependencies:
       semver: 7.3.5
     dev: true
-
-  /busboy/1.0.0:
-    resolution: {integrity: sha512-/rUt5teTUrAFv6Gq2mD3UIqZnD3YDWoFuLWmLCQvy3cQmk0q/8O/L8V7yJtDIBR34ZifQCKQcu4zhPmXvzYjqQ==}
-    engines: {node: '>=10.16.0'}
-    dependencies:
-      streamsearch: 1.1.0
-    dev: false
 
   /byline/5.0.0:
     resolution: {integrity: sha1-dBxSFkaOrcRXsDQQEYrXfejB3bE=}
@@ -11337,13 +11322,6 @@ packages:
     engines: {node: '>=6'}
     dev: true
 
-  /parse-multipart-data/1.2.1:
-    resolution: {integrity: sha512-R5X4KciY9tTsB9QEFDpx2dDrcvK8P06MbMML7CYoIt4RcGgMEgmxv54dEP2NANOd29JGA60uQ/P9UcaH/XE6oQ==}
-    dependencies:
-      '@types/node': 10.17.60
-      typescript: 2.9.2
-    dev: false
-
   /parse5-htmlparser2-tree-adapter/6.0.1:
     resolution: {integrity: sha512-qPuWvbLgvDGilKc5BoicRovlT4MtYT6JfJyBOMDsKoiT+GiuP5qyrPCnR9HcPECIJJmZh5jRndyNThnhhb/vlA==}
     dependencies:
@@ -12805,11 +12783,6 @@ packages:
     engines: {node: '>= 0.6'}
     dev: true
 
-  /streamsearch/1.1.0:
-    resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
-    engines: {node: '>=10.0.0'}
-    dev: false
-
   /strict-uri-encode/1.1.0:
     resolution: {integrity: sha1-J5siXfHVgrH1TmWt3UNS4Y+qBxM=}
     engines: {node: '>=0.10.0'}
@@ -13504,12 +13477,6 @@ packages:
     resolution: {integrity: sha512-zdu8XMNEDepKKR+XYOXAVPtWui0ly0NtohUscw+UmaHiAWT8hrV1rr//H6V+0DvJ3OQ19S979M0laLfX8rm82Q==}
     dependencies:
       is-typedarray: 1.0.0
-
-  /typescript/2.9.2:
-    resolution: {integrity: sha512-Gr4p6nFNaoufRIY4NMdpQRNmgxVIGMs4Fcu/ujdYk3nAZqk7supzBE9idmvfZIlH/Cuj//dvi+019qEue9lV0w==}
-    engines: {node: '>=4.2.0'}
-    hasBin: true
-    dev: false
 
   /typescript/3.9.10:
     resolution: {integrity: sha512-w6fIxVE/H1PkLKcCPsFqKE7Kv7QUwhU8qQY2MueZXWx5cPZdwFupLgKK3vntcK98BtNHZtAF4LA/yl2a7k8R6Q==}
