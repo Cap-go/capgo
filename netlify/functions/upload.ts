@@ -72,7 +72,7 @@ export const handler: Handler = async(event) => {
     const fileName = uuidv4()
     const { error } = await supabase.storage
       .from(`apps/${apikey.user_id}`)
-      .upload(`${fileName}`, body.app, {
+      .upload(`${fileName}`, Buffer.from(body.app, 'base64'), {
         contentType: 'application/zip',
       })
     if (error) {
