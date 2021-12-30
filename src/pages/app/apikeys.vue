@@ -3,6 +3,7 @@ import { IonContent, IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonP
 import copy from 'copy-text-to-clipboard'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
+import TitleHead from '~/components/TitleHead.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -37,6 +38,7 @@ watchEffect(async() => {
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
+      <TitleHead :big="true" :title="t('button.back')" />
       <ion-header collapse="condense">
         <ion-toolbar>
           <ion-title size="large">

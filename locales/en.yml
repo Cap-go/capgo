@@ -91,3 +91,5 @@ apikeys:
   keyCopied: Keys copied to your clipboard
   title: API keys
   all: all your keys
+onboarding:
+  loading: Loading

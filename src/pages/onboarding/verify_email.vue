@@ -69,8 +69,6 @@ const updateDb = async() => {
     )
   if (error)
     console.log('updateDb', error)
-  if (error2)
-    console.log('updateDb', error2)
   router.push('/onboarding/activation')
 
   isLoading.value = false
