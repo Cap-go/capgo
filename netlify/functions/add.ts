@@ -88,7 +88,7 @@ export const handler: Handler = async(event) => {
       }
       const res = await supabase
         .storage
-        .from(`images/${apikey.user_id}`)
+        .from(`images/${apikey.user_id}/${body.appid}`)
         .getPublicUrl(fileName)
       signedURL = res.data?.publicURL || signedURL
     }
