@@ -14,7 +14,7 @@ const appsDev = ref<definitions['app_versions'][]>()
 const openUrl = async(app: definitions['app_versions']) => {
   const res = await supabase
     .storage
-    .from(`apps/${auth?.id}`)
+    .from(`apps/${auth?.id}/versions/${app.app_id}`)
     .createSignedUrl(app.bucket_id, 60)
 
   const signedURL = res.data?.signedURL
