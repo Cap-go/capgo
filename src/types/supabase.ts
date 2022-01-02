@@ -111,18 +111,122 @@ export interface paths {
       };
     };
   };
+  "/app_versions": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.app_versions.id"];
+          created_at?: parameters["rowFilter.app_versions.created_at"];
+          app_id?: parameters["rowFilter.app_versions.app_id"];
+          name?: parameters["rowFilter.app_versions.name"];
+          mode?: parameters["rowFilter.app_versions.mode"];
+          bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
+          user_id?: parameters["rowFilter.app_versions.user_id"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["app_versions"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** app_versions */
+          app_versions?: definitions["app_versions"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.app_versions.id"];
+          created_at?: parameters["rowFilter.app_versions.created_at"];
+          app_id?: parameters["rowFilter.app_versions.app_id"];
+          name?: parameters["rowFilter.app_versions.name"];
+          mode?: parameters["rowFilter.app_versions.mode"];
+          bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
+          user_id?: parameters["rowFilter.app_versions.user_id"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.app_versions.id"];
+          created_at?: parameters["rowFilter.app_versions.created_at"];
+          app_id?: parameters["rowFilter.app_versions.app_id"];
+          name?: parameters["rowFilter.app_versions.name"];
+          mode?: parameters["rowFilter.app_versions.mode"];
+          bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
+          user_id?: parameters["rowFilter.app_versions.user_id"];
+        };
+        body: {
+          /** app_versions */
+          app_versions?: definitions["app_versions"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/apps": {
     get: {
       parameters: {
         query: {
-          id?: parameters["rowFilter.apps.id"];
           created_at?: parameters["rowFilter.apps.created_at"];
-          name?: parameters["rowFilter.apps.name"];
-          version?: parameters["rowFilter.apps.version"];
-          bucket_id?: parameters["rowFilter.apps.bucket_id"];
-          icon?: parameters["rowFilter.apps.icon"];
-          mode?: parameters["rowFilter.apps.mode"];
+          app_id?: parameters["rowFilter.apps.app_id"];
+          current_prod?: parameters["rowFilter.apps.current_prod"];
+          icon_url?: parameters["rowFilter.apps.icon_url"];
           user_id?: parameters["rowFilter.apps.user_id"];
+          current_dev?: parameters["rowFilter.apps.current_dev"];
+          name?: parameters["rowFilter.apps.name"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -173,14 +277,13 @@ export interface paths {
     delete: {
       parameters: {
         query: {
-          id?: parameters["rowFilter.apps.id"];
           created_at?: parameters["rowFilter.apps.created_at"];
-          name?: parameters["rowFilter.apps.name"];
-          version?: parameters["rowFilter.apps.version"];
-          bucket_id?: parameters["rowFilter.apps.bucket_id"];
-          icon?: parameters["rowFilter.apps.icon"];
-          mode?: parameters["rowFilter.apps.mode"];
+          app_id?: parameters["rowFilter.apps.app_id"];
+          current_prod?: parameters["rowFilter.apps.current_prod"];
+          icon_url?: parameters["rowFilter.apps.icon_url"];
           user_id?: parameters["rowFilter.apps.user_id"];
+          current_dev?: parameters["rowFilter.apps.current_dev"];
+          name?: parameters["rowFilter.apps.name"];
         };
         header: {
           /** Preference */
@@ -195,14 +298,13 @@ export interface paths {
     patch: {
       parameters: {
         query: {
-          id?: parameters["rowFilter.apps.id"];
           created_at?: parameters["rowFilter.apps.created_at"];
-          name?: parameters["rowFilter.apps.name"];
-          version?: parameters["rowFilter.apps.version"];
-          bucket_id?: parameters["rowFilter.apps.bucket_id"];
-          icon?: parameters["rowFilter.apps.icon"];
-          mode?: parameters["rowFilter.apps.mode"];
+          app_id?: parameters["rowFilter.apps.app_id"];
+          current_prod?: parameters["rowFilter.apps.current_prod"];
+          icon_url?: parameters["rowFilter.apps.icon_url"];
           user_id?: parameters["rowFilter.apps.user_id"];
+          current_dev?: parameters["rowFilter.apps.current_dev"];
+          name?: parameters["rowFilter.apps.name"];
         };
         body: {
           /** apps */
@@ -349,7 +451,7 @@ export interface definitions {
      */
     mode: "read" | "write" | "all";
   };
-  apps: {
+  app_versions: {
     /**
      * Format: bigint
      * @description Note:
@@ -361,18 +463,46 @@ export interface definitions {
      * @default now()
      */
     created_at?: string;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
     /** Format: character varying */
     name: string;
-    /** Format: character varying */
-    version?: string;
+    /**
+     * Format: public.app_mode
+     * @default dev
+     */
+    mode: "prod" | "dev" | "livereload";
     /** Format: character varying */
     bucket_id: string;
-    /** Format: character varying */
-    icon: string;
-    /** Format: public.app_mode */
-    mode: "prod" | "dev" | "livereload";
     /** Format: uuid */
     user_id: string;
+  };
+  apps: {
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    app_id: string;
+    /** Format: character varying */
+    current_prod?: string;
+    /** Format: character varying */
+    icon_url: string;
+    /** Format: uuid */
+    user_id: string;
+    /** Format: character varying */
+    current_dev?: string;
+    /** Format: character varying */
+    name?: string;
   };
   users: {
     /**
@@ -435,24 +565,38 @@ export interface parameters {
   "rowFilter.apikeys.key": string;
   /** Format: public.key_mode */
   "rowFilter.apikeys.mode": string;
+  /** @description app_versions */
+  "body.app_versions": definitions["app_versions"];
+  /** Format: bigint */
+  "rowFilter.app_versions.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_versions.created_at": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.app_id": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.name": string;
+  /** Format: public.app_mode */
+  "rowFilter.app_versions.mode": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.bucket_id": string;
+  /** Format: uuid */
+  "rowFilter.app_versions.user_id": string;
   /** @description apps */
   "body.apps": definitions["apps"];
-  /** Format: bigint */
-  "rowFilter.apps.id": string;
   /** Format: timestamp with time zone */
   "rowFilter.apps.created_at": string;
   /** Format: character varying */
-  "rowFilter.apps.name": string;
+  "rowFilter.apps.app_id": string;
   /** Format: character varying */
-  "rowFilter.apps.version": string;
+  "rowFilter.apps.current_prod": string;
   /** Format: character varying */
-  "rowFilter.apps.bucket_id": string;
-  /** Format: character varying */
-  "rowFilter.apps.icon": string;
-  /** Format: public.app_mode */
-  "rowFilter.apps.mode": string;
+  "rowFilter.apps.icon_url": string;
   /** Format: uuid */
   "rowFilter.apps.user_id": string;
+  /** Format: character varying */
+  "rowFilter.apps.current_dev": string;
+  /** Format: character varying */
+  "rowFilter.apps.name": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

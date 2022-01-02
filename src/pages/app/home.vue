@@ -1,30 +1,16 @@
 <script setup lang="ts">
-import { IonContent, IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar, isPlatform } from '@ionic/vue'
-import { CapacitorUpdater } from 'capacitor-updater'
+import { IonContent, IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar } from '@ionic/vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const apps = ref<definitions['apps'][]>()
-const openUrl = async(app: definitions['apps']) => {
-  const res = await supabase
-    .storage
-    .from(`apps/${app.user_id}`)
-    .createSignedUrl(app.bucket_id, 60)
-
-  const signedURL = res.data?.signedURL
-  if (signedURL && isPlatform('capacitor')) {
-    const newFolder = await CapacitorUpdater.download({
-      url: signedURL,
-    })
-    console.log('newFolder', newFolder)
-    CapacitorUpdater.set(newFolder).then(() => {
-      console.log('done update', newFolder)
-    })
-  }
+const openVersion = (appId: string) => {
+  router.push(`/app/versions/${appId}`)
 }
 watchEffect(async() => {
   if (route.path === '/app/home') {
@@ -53,20 +39,14 @@ watchEffect(async() => {
         </ion-toolbar>
       </ion-header>
       <ion-list>
-        <!-- <ion-item-divider>
-          <ion-label>
-            {{ t('projects.recentopen') }}
-          </ion-label>
-        </ion-item-divider> -->
-        <!-- Add app in prod -->
         <ion-item-divider>
           <ion-label>
-            {{ t('projects.recentdev') }}
+            {{ t('projects.list') }}
           </ion-label>
         </ion-item-divider>
-        <IonItem v-for="(app, index) in apps" :key="index" @click="openUrl(app)">
+        <IonItem v-for="(app, index) in apps" :key="index" @click="openVersion(app.app_id)">
           <div slot="start" class="col-span-2 relative py-4">
-            <img :src="app.icon" alt="bebe" class="rounded-xl h-15 w-15 object-cover">
+            <img :src="app.icon_url" alt="bebe" class="rounded-xl h-15 w-15 object-cover">
           </div>
           <IonLabel>
             <div class="col-span-6 flex flex-col">
@@ -76,9 +56,14 @@ watchEffect(async() => {
                 </h2>
               </div>
               <div class="flex justify-between items-center">
-                <h3 class="text-true-gray-800 py-1 font-bold">
-                  {{
-                    app.version
+                <h3 v-if="app.current_prod" class="text-true-gray-800 py-1 font-bold">
+                  Prod: {{
+                    app.current_prod
+                  }}
+                </h3>
+                <h3 v-if="app.current_dev" class="text-true-gray-800 py-1 font-bold">
+                  dev: {{
+                    app.current_dev
                   }}
                 </h3>
               </div>

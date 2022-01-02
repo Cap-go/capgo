@@ -14,9 +14,12 @@ intro:
   whats-your-name: What's your name?
 not-found: Not found
 projects:
-  recentdev: Recently in development
-  recentopen: Recently in production
+  list: All your projects
   title: Projects
+versions:
+  dev_list: Recently in development
+  prod_list: Recently in production
+  title: App versions
 login:
   connexion: Login
   create-new: Create new account
