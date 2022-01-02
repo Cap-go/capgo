@@ -97,6 +97,7 @@ export const handler: Handler = async(event) => {
       .from('apps')
       .insert({
         icon_url: signedURL,
+        user_id: apikey.user_id,
         name: body.name,
         app_id: body.appid,
       })
