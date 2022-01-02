@@ -4,9 +4,7 @@ import { useSupabase } from '../services/supabase'
 import type { definitions } from '~/types/supabase'
 
 interface AppUpload {
-  icon: string
-  name: string
-  type: string
+  appid: string
   version: string
   app: string
   mode: 'dev' | 'prod'
@@ -86,12 +84,11 @@ export const handler: Handler = async(event) => {
       }
     }
     const { error: dbError } = await supabase
-      .from('apps')
+      .from('app_versions')
       .insert({
         bucket_id: fileName,
         user_id: apikey.user_id,
-        name: body.name,
-        icon: body.icon,
+        name: body.appid,
         mode: body.mode || 'dev',
         version: body.version,
       })
@@ -101,7 +98,7 @@ export const handler: Handler = async(event) => {
         headers,
         body: JSON.stringify({
           message: 'cannot add app ',
-          err: dbError
+          err: dbError,
         }),
       }
     }
