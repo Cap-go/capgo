@@ -7,7 +7,7 @@ interface AppUpload {
   appid: string
   name: string
   icon: string
-  contentType: string
+  iconType: string
 }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
@@ -69,26 +69,30 @@ export const handler: Handler = async(event) => {
   try {
     const body = JSON.parse(event.body || '{}') as AppUpload
     const fileName = `icon_${uuidv4()}`
-    const { error } = await supabase.storage
-      .from(`images/${apikey.user_id}/${body.appid}`)
-      .upload(fileName, Buffer.from(body.icon, 'base64'), {
-        contentType: body.contentType,
-      })
-    const res = await supabase
-      .storage
-      .from(`images/${apikey.user_id}`)
-      .getPublicUrl(fileName)
-
-    const signedURL = res.data?.publicURL
-    if (error) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          message: 'cannot Upload File',
-        }),
+    let signedURL = 'https://xvwzpoazmxkqosrdewyv.supabase.in/storage/v1/object/public/images/caplogo.png'
+    if (body.icon && body.iconType) {
+      const buff = Buffer.from(body.icon, 'base64')
+      const { error } = await supabase.storage
+        .from(`images/${apikey.user_id}/${body.appid}`)
+        .upload(fileName, buff, {
+          contentType: body.iconType,
+        })
+      if (error) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({
+            message: 'cannot Upload File',
+          }),
+        }
       }
+      const res = await supabase
+        .storage
+        .from(`images/${apikey.user_id}`)
+        .getPublicUrl(fileName)
+      signedURL = res.data?.publicURL || signedURL
     }
+
     const { error: dbError } = await supabase
       .from('apps')
       .insert({
