@@ -70,7 +70,7 @@ export const handler: Handler = async(event) => {
     const body = JSON.parse(event.body || '{}') as AppUpload
     const fileName = uuidv4()
     const { error } = await supabase.storage
-      .from(`apps/${apikey.user_id}`)
+      .from(`apps/${apikey.user_id}/versions/${body.appid}`)
       .upload(`${fileName}`, Buffer.from(body.app, 'base64'), {
         contentType: 'application/zip',
       })
@@ -88,9 +88,9 @@ export const handler: Handler = async(event) => {
       .insert({
         bucket_id: fileName,
         user_id: apikey.user_id,
-        name: body.appid,
         mode: body.mode || 'dev',
-        version: body.version,
+        name: body.version,
+        app_id: body.appid,
       })
     if (dbError) {
       return {
@@ -98,7 +98,7 @@ export const handler: Handler = async(event) => {
         headers,
         body: JSON.stringify({
           message: 'cannot add app ',
-          err: dbError,
+          err: JSON.stringify(dbError),
         }),
       }
     }
