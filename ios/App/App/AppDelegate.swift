@@ -22,7 +22,6 @@ extension UIWindow {
                 DispatchQueue.main.async {
                     let alert = UIAlertController(title: title, message: message, preferredStyle: UIAlertController.Style.alert)
                     alert.addAction(UIAlertAction(title: okButtonTitle, style: UIAlertAction.Style.default, handler: { (_) -> Void in
-                        
                         updater.reset()
                         let pathPersist = updater.getLastPathPersist()
                         vc.setServerBasePath(path: pathPersist)
@@ -30,6 +29,7 @@ extension UIWindow {
                         DispatchQueue.main.async {
                             vc.loadView()
                             vc.viewDidLoad()
+                            updater.delete(version: serverBasePath)
                         }
                     }))
                     alert.addAction(UIAlertAction(title: cancelButtonTitle, style: UIAlertAction.Style.default))

@@ -19,7 +19,7 @@ projects:
 versions:
   dev_list: Recently in development
   prod_list: Recently in production
-  title: App versions
+  title: Versions
 login:
   connexion: Login
   create-new: Create new account
