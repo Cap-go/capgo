@@ -1,9 +1,10 @@
 <p align='center'>
   <img src='https://user-images.githubusercontent.com/11247099/111864893-a457fd00-899e-11eb-9f05-f4b88987541d.png' alt='Vitesse - Opinionated Vite Starter Template' width='600'/>
 </p>
-TODO: create cli to upload app to netlify function
 TODO: create page in app to get/create/delete apikey, can have read only or read and write rights
+
 TODO: add netlify function for get current prod version
+
 TODO: add autopull system in capacitor-updater
 
 <p align='center'>
