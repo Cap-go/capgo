@@ -119,7 +119,6 @@ export interface paths {
           created_at?: parameters["rowFilter.app_versions.created_at"];
           app_id?: parameters["rowFilter.app_versions.app_id"];
           name?: parameters["rowFilter.app_versions.name"];
-          mode?: parameters["rowFilter.app_versions.mode"];
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
           /** Filtering Columns */
@@ -176,7 +175,6 @@ export interface paths {
           created_at?: parameters["rowFilter.app_versions.created_at"];
           app_id?: parameters["rowFilter.app_versions.app_id"];
           name?: parameters["rowFilter.app_versions.name"];
-          mode?: parameters["rowFilter.app_versions.mode"];
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
         };
@@ -197,7 +195,6 @@ export interface paths {
           created_at?: parameters["rowFilter.app_versions.created_at"];
           app_id?: parameters["rowFilter.app_versions.app_id"];
           name?: parameters["rowFilter.app_versions.name"];
-          mode?: parameters["rowFilter.app_versions.mode"];
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
         };
@@ -222,11 +219,10 @@ export interface paths {
         query: {
           created_at?: parameters["rowFilter.apps.created_at"];
           app_id?: parameters["rowFilter.apps.app_id"];
-          current_prod?: parameters["rowFilter.apps.current_prod"];
           icon_url?: parameters["rowFilter.apps.icon_url"];
           user_id?: parameters["rowFilter.apps.user_id"];
-          current_dev?: parameters["rowFilter.apps.current_dev"];
           name?: parameters["rowFilter.apps.name"];
+          last_version?: parameters["rowFilter.apps.last_version"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -279,11 +275,10 @@ export interface paths {
         query: {
           created_at?: parameters["rowFilter.apps.created_at"];
           app_id?: parameters["rowFilter.apps.app_id"];
-          current_prod?: parameters["rowFilter.apps.current_prod"];
           icon_url?: parameters["rowFilter.apps.icon_url"];
           user_id?: parameters["rowFilter.apps.user_id"];
-          current_dev?: parameters["rowFilter.apps.current_dev"];
           name?: parameters["rowFilter.apps.name"];
+          last_version?: parameters["rowFilter.apps.last_version"];
         };
         header: {
           /** Preference */
@@ -300,15 +295,116 @@ export interface paths {
         query: {
           created_at?: parameters["rowFilter.apps.created_at"];
           app_id?: parameters["rowFilter.apps.app_id"];
-          current_prod?: parameters["rowFilter.apps.current_prod"];
           icon_url?: parameters["rowFilter.apps.icon_url"];
           user_id?: parameters["rowFilter.apps.user_id"];
-          current_dev?: parameters["rowFilter.apps.current_dev"];
           name?: parameters["rowFilter.apps.name"];
+          last_version?: parameters["rowFilter.apps.last_version"];
         };
         body: {
           /** apps */
           apps?: definitions["apps"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
+  "/channels": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.channels.id"];
+          created_at?: parameters["rowFilter.channels.created_at"];
+          name?: parameters["rowFilter.channels.name"];
+          app_id?: parameters["rowFilter.channels.app_id"];
+          version?: parameters["rowFilter.channels.version"];
+          users?: parameters["rowFilter.channels.users"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["channels"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** channels */
+          channels?: definitions["channels"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.channels.id"];
+          created_at?: parameters["rowFilter.channels.created_at"];
+          name?: parameters["rowFilter.channels.name"];
+          app_id?: parameters["rowFilter.channels.app_id"];
+          version?: parameters["rowFilter.channels.version"];
+          users?: parameters["rowFilter.channels.users"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.channels.id"];
+          created_at?: parameters["rowFilter.channels.created_at"];
+          name?: parameters["rowFilter.channels.name"];
+          app_id?: parameters["rowFilter.channels.app_id"];
+          version?: parameters["rowFilter.channels.version"];
+          users?: parameters["rowFilter.channels.users"];
+        };
+        body: {
+          /** channels */
+          channels?: definitions["channels"];
         };
         header: {
           /** Preference */
@@ -471,11 +567,6 @@ export interface definitions {
     app_id: string;
     /** Format: character varying */
     name: string;
-    /**
-     * Format: public.app_mode
-     * @default dev
-     */
-    mode: "prod" | "dev" | "livereload";
     /** Format: character varying */
     bucket_id: string;
     /** Format: uuid */
@@ -494,15 +585,38 @@ export interface definitions {
      */
     app_id: string;
     /** Format: character varying */
-    current_prod?: string;
-    /** Format: character varying */
     icon_url: string;
     /** Format: uuid */
     user_id: string;
     /** Format: character varying */
-    current_dev?: string;
+    name?: string;
+    /** Format: character varying */
+    last_version?: string;
+  };
+  channels: {
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: number;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
     /** Format: character varying */
     name?: string;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id?: string;
+    /** Format: character varying */
+    version?: string;
+    /** Format: ARRAY */
+    users?: unknown[];
   };
   users: {
     /**
@@ -575,8 +689,6 @@ export interface parameters {
   "rowFilter.app_versions.app_id": string;
   /** Format: character varying */
   "rowFilter.app_versions.name": string;
-  /** Format: public.app_mode */
-  "rowFilter.app_versions.mode": string;
   /** Format: character varying */
   "rowFilter.app_versions.bucket_id": string;
   /** Format: uuid */
@@ -588,15 +700,27 @@ export interface parameters {
   /** Format: character varying */
   "rowFilter.apps.app_id": string;
   /** Format: character varying */
-  "rowFilter.apps.current_prod": string;
-  /** Format: character varying */
   "rowFilter.apps.icon_url": string;
   /** Format: uuid */
   "rowFilter.apps.user_id": string;
   /** Format: character varying */
-  "rowFilter.apps.current_dev": string;
-  /** Format: character varying */
   "rowFilter.apps.name": string;
+  /** Format: character varying */
+  "rowFilter.apps.last_version": string;
+  /** @description channels */
+  "body.channels": definitions["channels"];
+  /** Format: bigint */
+  "rowFilter.channels.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.channels.created_at": string;
+  /** Format: character varying */
+  "rowFilter.channels.name": string;
+  /** Format: character varying */
+  "rowFilter.channels.app_id": string;
+  /** Format: character varying */
+  "rowFilter.channels.version": string;
+  /** Format: ARRAY */
+  "rowFilter.channels.users": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

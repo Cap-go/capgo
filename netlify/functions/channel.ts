@@ -72,7 +72,7 @@ export const handler: Handler = async(event) => {
   }
   try {
     const { error: dbError } = await supabase
-      .from('apps')
+      .from('channels')
       .update(channel)
     if (dbError) {
       await supabase

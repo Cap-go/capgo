@@ -9,8 +9,8 @@ const router = useRouter()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const apps = ref<definitions['apps'][]>()
-const openVersion = (appId: string) => {
-  router.push(`/app/versions/${appId}`)
+const openPackage = (appId: string) => {
+  router.push(`/app/package/${appId}`)
 }
 watchEffect(async() => {
   if (route.path === '/app/home') {
@@ -44,7 +44,7 @@ watchEffect(async() => {
             {{ t('projects.list') }}
           </ion-label>
         </ion-item-divider>
-        <IonItem v-for="(app, index) in apps" :key="index" @click="openVersion(app.app_id)">
+        <IonItem v-for="(app, index) in apps" :key="index" @click="openPackage(app.app_id)">
           <div slot="start" class="col-span-2 relative py-4">
             <img :src="app.icon_url" alt="bebe" class="rounded-xl h-15 w-15 object-cover">
           </div>
@@ -56,15 +56,13 @@ watchEffect(async() => {
                 </h2>
               </div>
               <div class="flex justify-between items-center">
-                <h3 v-if="app.current_prod" class="text-true-gray-800 py-1 font-bold">
-                  Prod: {{
-                    app.current_prod
+                <h3 v-if="app.last_version" class="text-true-gray-800 py-1 font-bold">
+                  Last version: {{
+                    app.last_version
                   }}
                 </h3>
-                <h3 v-if="app.current_dev" class="text-true-gray-800 py-1 font-bold">
-                  dev: {{
-                    app.current_dev
-                  }}
+                <h3 v-else class="text-true-gray-800 py-1 font-bold">
+                  No version upload yet
                 </h3>
               </div>
             </div>

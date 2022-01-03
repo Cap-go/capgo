@@ -91,12 +91,17 @@ export const handler: Handler = async(event) => {
         name: body.version,
         app_id: body.appid,
       })
-    if (dbError) {
+    const { error: dbError2 } = await supabase
+      .from('apps')
+      .update({
+        last_version: body.version,
+      }).eq('app_id', body.appid)
+    if (dbError || dbError2) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: 'cannot add app',
+          message: 'cannot add version',
           err: JSON.stringify(dbError),
         }),
       }

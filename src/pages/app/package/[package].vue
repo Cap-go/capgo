@@ -12,9 +12,9 @@ const supabase = useSupabase()
 const auth = supabase.auth.user()
 const id = ref('')
 const app = ref<definitions['apps']>()
-const appsProd = ref<definitions['app_versions'][]>()
-const appsDev = ref<definitions['app_versions'][]>()
-const openUrl = async(app: definitions['app_versions']) => {
+const channels = ref<definitions['channels'][]>()
+const versions = ref<definitions['app_versions'][]>()
+const openVersion = async(app: definitions['app_versions']) => {
   const res = await supabase
     .storage
     .from(`apps/${auth?.id}/versions/${app.app_id}`)
@@ -32,29 +32,27 @@ const openUrl = async(app: definitions['app_versions']) => {
   }
 }
 watchEffect(async() => {
-  if (route.path.startsWith('/app/version')) {
-    id.value = route.params.version as string
+  if (route.path.startsWith('/app/package')) {
+    id.value = route.params.package as string
     try {
       const { data: dataApp } = await supabase
         .from<definitions['apps']>('apps')
         .select()
         .eq('app_id', id.value)
-      const { data: dataProd } = await supabase
+      const { data: dataVersions } = await supabase
         .from<definitions['app_versions']>('app_versions')
         .select()
         .eq('app_id', id.value)
-        .eq('mode', 'prod')
-      const { data: dataDev } = await supabase
-        .from<definitions['app_versions']>('app_versions')
+      const { data: dataChannel } = await supabase
+        .from<definitions['channels']>('channels')
         .select()
         .eq('app_id', id.value)
-        .eq('mode', 'dev')
       if (dataApp && dataApp.length)
         app.value = dataApp[0]
-      if (dataProd && dataProd.length)
-        appsProd.value = dataProd
-      if (dataDev && dataDev.length)
-        appsDev.value = dataDev
+      if (dataVersions && dataVersions.length)
+        versions.value = dataVersions
+      if (dataChannel && dataChannel.length)
+        channels.value = dataChannel
     }
     catch (error) {
       console.error(error)
@@ -92,39 +90,39 @@ const back = () => {
       <ion-header>
         <ion-toolbar>
           <ion-title size="large">
-            {{ t('versions.title') }}
+            {{ t('package.title') }}
           </ion-title>
         </ion-toolbar>
       </ion-header>
       <ion-list>
-        <ion-item-divider v-if="appsProd?.length">
+        <ion-item-divider v-if="versions?.length">
           <ion-label>
-            {{ t('versions.prod_list') }}
+            {{ t('package.versions') }}
           </ion-label>
         </ion-item-divider>
-        <IonItem v-for="(ap, index) in appsProd" :key="index" @click="openUrl(app)">
+        <IonItem v-for="(v, index) in versions" :key="index" @click="openVersion(v)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
                 <h2 class="text-sm text-bright-cerulean-500">
-                  {{ ap.name }}
+                  {{ v.name }}
                 </h2>
               </div>
             </div>
           </IonLabel>
         </IonItem>
         <!-- Add app in prod -->
-        <ion-item-divider v-if="appsDev?.length">
+        <ion-item-divider v-if="channels?.length">
           <ion-label>
-            {{ t('versions.dev_list') }}
+            {{ t('package.channels') }}
           </ion-label>
         </ion-item-divider>
-        <IonItem v-for="(ap, index) in appsDev" :key="index" @click="openUrl(app)">
+        <IonItem v-for="(ch, index) in channels" :key="index">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
                 <h2 class="text-sm text-bright-cerulean-500">
-                  {{ ap.name }}
+                  {{ ch.name }}
                 </h2>
               </div>
             </div>

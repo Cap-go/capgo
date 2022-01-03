@@ -16,10 +16,10 @@ not-found: Not found
 projects:
   list: All your projects
   title: Projects
-versions:
-  dev_list: Recently in development
-  prod_list: Recently in production
-  title: Versions
+package:
+  versions: Version list
+  channels: Channels list
+  title: Package info
 login:
   connexion: Login
   create-new: Create new account
