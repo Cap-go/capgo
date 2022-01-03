@@ -2,10 +2,10 @@ import type { Handler } from '@netlify/functions'
 import { useSupabase } from '../services/supabase'
 import type { definitions } from '~/types/supabase'
 
-interface VersionSet {
+interface ChannelSet {
   appid: string
   version: string
-  mode: 'dev' | 'prod'
+  channel: string
 }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
@@ -59,34 +59,41 @@ export const handler: Handler = async(event) => {
       statusCode: 400,
       headers,
       body: JSON.stringify({
-        message: 'cannot Verify User',
+        message: 'Cannot Verify User',
       }),
     }
   }
-
+  const body = JSON.parse(event.body || '{}') as ChannelSet
+  const channel = {
+    user_id: apikey.user_id,
+    app_id: body.appid,
+    channel: body.channel,
+    version: body.version,
+  }
   try {
-    const body = JSON.parse(event.body || '{}') as VersionSet
-    const update: any = {}
-    if (body.mode === 'prod')
-      update.current_prod = body.version
-    else
-      update.current_dev = body.version
     const { error: dbError } = await supabase
       .from('apps')
-      .update(update)
-      .match({ app_id: body.appid })
+      .update(channel)
     if (dbError) {
+      await supabase
+        .from('channels')
+        .insert(channel)
+    }
+  }
+  catch (e) {
+    const { error: dbError2 } = await supabase
+      .from('channels')
+      .insert(channel)
+    if (dbError2) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: 'cannot set version',
-          err: JSON.stringify(dbError),
+          message: 'cannot set channels',
+          err: JSON.stringify(dbError2),
         }),
       }
     }
-  }
-  catch (e) {
     return {
       statusCode: 500,
       headers,

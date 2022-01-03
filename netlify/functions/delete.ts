@@ -1,13 +1,12 @@
 import type { Handler } from '@netlify/functions'
-import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from '../services/supabase'
 import type { definitions } from '~/types/supabase'
 
-interface AppUpload {
+interface AppDelete {
   appid: string
-  version: string
-  app: string
-  channel: string
+  name: string
+  icon: string
+  iconType: string
 }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
@@ -67,78 +66,24 @@ export const handler: Handler = async(event) => {
   }
 
   try {
-    const body = JSON.parse(event.body || '{}') as AppUpload
-    const fileName = uuidv4()
-    const { error } = await supabase.storage
-      .from(`apps/${apikey.user_id}/${body.appid}/versions`)
-      .upload(fileName, Buffer.from(body.app, 'base64'), {
-        contentType: 'application/zip',
-      })
-    if (error) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          message: 'cannot Upload File',
-        }),
-      }
-    }
-    const { error: dbError } = await supabase
+    const body = JSON.parse(event.body || '{}') as AppDelete
+
+    const { error } = await supabase
       .from('app_versions')
-      .insert({
-        bucket_id: fileName,
-        user_id: apikey.user_id,
-        name: body.version,
-        app_id: body.appid,
-      })
-    if (dbError) {
+      .delete()
+      .eq('app_id', body.appid)
+    const { error: dbError } = await supabase
+      .from('apps')
+      .delete()
+      .eq('app_id', body.appid)
+    if (dbError || error) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: 'cannot add app',
+          message: 'cannot delete app',
           err: JSON.stringify(dbError),
         }),
-      }
-    }
-    try {
-      const { error: dbError2 } = await supabase
-        .from('channels')
-        .update({
-          channel: body.channel,
-          app_id: body.appid,
-          user_id: apikey.user_id,
-          version: body.version,
-        })
-      if (dbError2) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({
-            message: 'cannot update channels',
-            err: JSON.stringify(dbError),
-          }),
-        }
-      }
-    }
-    catch {
-      const { error: dbError2 } = await supabase
-        .from('channels')
-        .insert({
-          channel: body.channel,
-          app_id: body.appid,
-          user_id: apikey.user_id,
-          version: body.version,
-        })
-      if (dbError2) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({
-            message: 'cannot add channels',
-            err: JSON.stringify(dbError),
-          }),
-        }
       }
     }
   }

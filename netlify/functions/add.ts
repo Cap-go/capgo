@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from '../services/supabase'
 import type { definitions } from '~/types/supabase'
 
-interface AppUpload {
+interface AppAdd {
   appid: string
   name: string
   icon: string
@@ -67,7 +67,7 @@ export const handler: Handler = async(event) => {
   }
 
   try {
-    const body = JSON.parse(event.body || '{}') as AppUpload
+    const body = JSON.parse(event.body || '{}') as AppAdd
     const fileName = `icon_${uuidv4()}`
     let signedURL = 'https://xvwzpoazmxkqosrdewyv.supabase.in/storage/v1/object/public/images/caplogo.png'
     if (body.icon && body.iconType) {
@@ -82,7 +82,7 @@ export const handler: Handler = async(event) => {
           statusCode: 400,
           headers,
           body: JSON.stringify({
-            message: 'cannot Upload File',
+            message: 'Cannot Add App',
           }),
         }
       }
@@ -106,7 +106,7 @@ export const handler: Handler = async(event) => {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: 'cannot add app',
+          message: 'Cannot add app',
           err: JSON.stringify(dbError),
         }),
       }
