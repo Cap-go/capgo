@@ -7,6 +7,10 @@ interface AppUpload {
   appid: string
   version: string
   app: string
+  fileName?: string
+  isMultipart?: boolean
+  chunk?: number
+  totalChunks?: number
   channel: string
 }
 export const handler: Handler = async(event) => {
@@ -68,19 +72,64 @@ export const handler: Handler = async(event) => {
 
   try {
     const body = JSON.parse(event.body || '{}') as AppUpload
-    const fileName = uuidv4()
-    const { error } = await supabase.storage
-      .from(`apps/${apikey.user_id}/${body.appid}/versions`)
-      .upload(fileName, Buffer.from(body.app, 'base64'), {
-        contentType: 'application/zip',
-      })
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { app, ...newObject } = body
+    console.log('body', newObject)
+    let fileName = uuidv4()
+    let error
+    if (body.isMultipart && body.fileName) {
+      fileName = body.fileName
+      const { data, error: dnError } = await supabase
+        .storage
+        .from(`apps/${apikey.user_id}/${body.appid}/versions`)
+        .download(fileName)
+      if (dnError || !data) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({
+            message: 'cannot download partial File to concat',
+          }),
+        }
+      }
+      const arrayBuffer = await data?.arrayBuffer()
+      const buffOld = Buffer.from(arrayBuffer)
+      const buffNew = Buffer.from(body.app, 'base64')
+      const bufAll = Buffer.concat([buffOld, buffNew], buffOld.length + buffNew.length)
+      const { error: upError } = await supabase
+        .storage
+        .from(`apps/${apikey.user_id}/${body.appid}/versions`)
+        .update(fileName, bufAll, {
+          contentType: 'application/zip',
+          upsert: false,
+        })
+      error = upError
+    }
+    else {
+      const { error: upError } = await supabase.storage
+        .from(`apps/${apikey.user_id}/${body.appid}/versions`)
+        .upload(fileName, Buffer.from(body.app, 'base64'), {
+          contentType: 'application/zip',
+        })
+      error = upError
+    }
     if (error) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
           message: 'cannot Upload File',
+          error,
         }),
+      }
+    }
+    if (body.isMultipart) {
+      // send filename to allow partial upload
+      const isDone = (body.chunk || 0) === (body.totalChunks || 0) && body.fileName
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ status: isDone ? 'multipart' : 'ok', fileName }),
       }
     }
     const { error: dbError } = await supabase
@@ -110,41 +159,46 @@ export const handler: Handler = async(event) => {
       const { error: dbError2 } = await supabase
         .from('channels')
         .update({
-          channel: body.channel,
-          app_id: body.appid,
-          user_id: apikey.user_id,
           version: body.version,
         })
+        .eq('app_id', body.appid)
+        .eq('channel', body.channel)
+        .eq('user_id', apikey.user_id)
       if (dbError2) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({
-            message: 'cannot update channels',
-            err: JSON.stringify(dbError),
-          }),
+        const { error: dbError3 } = await supabase
+          .from('channels')
+          .insert({
+            channel: body.channel,
+            app_id: body.appid,
+            user_id: apikey.user_id,
+            version: body.version,
+          })
+        if (dbError3) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({
+              message: 'cannot update or add channel',
+              err: JSON.stringify(dbError),
+            }),
+          }
         }
       }
     }
-    catch {
-      const { error: dbError2 } = await supabase
-        .from('channels')
-        .insert({
-          channel: body.channel,
-          app_id: body.appid,
-          user_id: apikey.user_id,
-          version: body.version,
-        })
-      if (dbError2) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({
-            message: 'cannot add channels',
-            err: JSON.stringify(dbError),
-          }),
-        }
+    catch (err) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          message: 'error channel',
+          err: JSON.stringify(err),
+        }),
       }
+    }
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ status: 'ok' }),
     }
   }
   catch (e) {
@@ -155,10 +209,5 @@ export const handler: Handler = async(event) => {
         message: `${e}!`,
       }),
     }
-  }
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify({ status: 'ok' }),
   }
 }

@@ -613,8 +613,12 @@ export interface definitions {
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id?: string;
-    /** Format: character varying */
-    version?: string;
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
+     */
+    version?: number;
     /** Format: ARRAY */
     users?: unknown[];
   };
@@ -717,7 +721,7 @@ export interface parameters {
   "rowFilter.channels.name": string;
   /** Format: character varying */
   "rowFilter.channels.app_id": string;
-  /** Format: character varying */
+  /** Format: bigint */
   "rowFilter.channels.version": string;
   /** Format: ARRAY */
   "rowFilter.channels.users": string;
