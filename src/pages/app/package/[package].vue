@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar, actionSheetController, isPlatform } from '@ionic/vue'
+import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar, actionSheetController, isPlatform, toastController } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { CapacitorUpdater } from 'capacitor-updater'
 import { useSupabase } from '~/services/supabase'
@@ -50,9 +50,9 @@ const loadData = async() => {
     console.error(error)
   }
 }
-const openChannel = async(channel: definitions['channels']) => {
-  // router.push(`/app/package/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
-}
+// const openChannel = async(channel: definitions['channels']) => {
+//   router.push(`/app/package/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
+// }
 
 const openVersion = async(app: definitions['app_versions']) => {
   isLoading.value = true
@@ -74,6 +74,16 @@ const openVersion = async(app: definitions['app_versions']) => {
     }
     isLoading.value = false
   }
+  else {
+    isLoading.value = false
+    console.error('no signedURL')
+    const toast = await toastController
+      .create({
+        message: 'Cannot test in web browser',
+        duration: 2000,
+      })
+    await toast.present()
+  }
 }
 const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
@@ -83,7 +93,7 @@ const setChannel = async(v: definitions['app_versions'], channel: definitions['c
     })
     .eq('id', channel.id)
 }
-const ASChannel = async(v: definitions['app_versions']) => {
+const ASChannelChooser = async(v: definitions['app_versions']) => {
   // const buttons
   const buttons = []
   for (const channel of channels.value) {
@@ -97,6 +107,12 @@ const ASChannel = async(v: definitions['app_versions']) => {
         }
         catch (error) {
           console.error(error)
+          const toast = await toastController
+            .create({
+              message: 'Cannot test app something wrong happened',
+              duration: 2000,
+            })
+          await toast.present()
         }
         isLoading.value = false
       },
@@ -115,7 +131,37 @@ const ASChannel = async(v: definitions['app_versions']) => {
   })
   await actionSheet.present()
 }
-
+const ASChannel = async(ch: definitions['channels']) => {
+  const actionSheet = await actionSheetController.create({
+    buttons: [
+      {
+        text: 'Test channel version',
+        handler: () => {
+          actionSheet.dismiss()
+          versions.value.forEach((v) => {
+            if (v.id === ch.version)
+              return openVersion(v)
+          })
+        },
+      },
+      // {
+      //   text: 'Info channel',
+      //   handler: () => {
+      //     actionSheet.dismiss()
+      //     openChannel(v)
+      //   },
+      // },
+      {
+        text: 'Cancel',
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+    ],
+  })
+  await actionSheet.present()
+}
 const ASVersion = async(v: definitions['app_versions']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
@@ -130,7 +176,7 @@ const ASVersion = async(v: definitions['app_versions']) => {
         text: 'Set version to channel',
         handler: () => {
           actionSheet.dismiss()
-          ASChannel(v)
+          ASChannelChooser(v)
         },
       },
       {
@@ -197,7 +243,7 @@ const back = () => {
               {{ t('package.channels') }}
             </ion-label>
           </ion-item-divider>
-          <IonItem v-for="(ch, index) in channels" :key="index" @click="openChannel(ch)">
+          <IonItem v-for="(ch, index) in channels" :key="index" @click="ASChannel(ch)">
             <IonLabel>
               <div class="col-span-6 flex flex-col">
                 <div class="flex justify-between items-center">
