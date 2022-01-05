@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar, actionSheetController, isPlatform, toastController } from '@ionic/vue'
+import {
+  IonButton, IonButtons, IonContent,
+  IonHeader, IonIcon, IonItem, IonItemDivider,
+  IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent,
+  IonTitle,
+  IonToolbar,
+  actionSheetController, isPlatform, toastController,
+} from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { CapacitorUpdater } from 'capacitor-updater'
 import { useSupabase } from '~/services/supabase'
@@ -27,6 +34,7 @@ const loadData = async() => {
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', id.value)
+      .order('created_at', { ascending: false })
     const { data: dataChannel } = await supabase
       .from<definitions['channels'] & Channel>('channels')
       .select(`
@@ -36,9 +44,11 @@ const loadData = async() => {
             name,
             created_at
           ),
-          created_at
+          created_at,
+          updated_at
           `)
       .eq('app_id', id.value)
+      .order('updated_at', { ascending: false })
     if (dataApp && dataApp.length)
       app.value = dataApp[0]
     if (dataVersions && dataVersions.length)
@@ -58,7 +68,7 @@ const openVersion = async(app: definitions['app_versions']) => {
   isLoading.value = true
   const res = await supabase
     .storage
-    .from(`apps/${auth?.id}/versions/${app.app_id}`)
+    .from(`apps/${auth?.id}/${app.app_id}/versions`)
     .createSignedUrl(app.bucket_id, 60)
 
   const signedURL = res.data?.signedURL
@@ -71,6 +81,12 @@ const openVersion = async(app: definitions['app_versions']) => {
     }
     catch (error) {
       console.error(error)
+      const toast = await toastController
+        .create({
+          message: 'Cannot set this version',
+          duration: 2000,
+        })
+      await toast.present()
     }
     isLoading.value = false
   }
@@ -79,7 +95,7 @@ const openVersion = async(app: definitions['app_versions']) => {
     console.error('no signedURL')
     const toast = await toastController
       .create({
-        message: 'Cannot test in web browser',
+        message: isPlatform('capacitor') ? 'Cannot get the test version' : 'Cannot test in web browser',
         duration: 2000,
       })
     await toast.present()
@@ -197,13 +213,21 @@ interface Channel {
     created_at: string
   }
 }
+const refreshData = async() => {
+  isLoading.value = true
+  try {
+    await loadData()
+  }
+  catch (error) {
+    console.error(error)
+  }
+  isLoading.value = false
+}
 watchEffect(async() => {
   if (route.path.startsWith('/app/package')) {
-    isLoading.value = true
     id.value = route.params.package as string
     id.value = id.value.replaceAll('--', '.')
-    await loadData()
-    isLoading.value = false
+    await refreshData()
   }
 })
 const back = () => {
@@ -222,6 +246,9 @@ const back = () => {
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
+      <ion-refresher slot="fixed" @ionRefresh="refreshData()">
+        <ion-refresher-content />
+      </ion-refresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
         <Spinner />
       </div>

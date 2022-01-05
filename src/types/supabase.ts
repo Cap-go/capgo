@@ -21,6 +21,7 @@ export interface paths {
           user_id?: parameters["rowFilter.apikeys.user_id"];
           key?: parameters["rowFilter.apikeys.key"];
           mode?: parameters["rowFilter.apikeys.mode"];
+          updated_at?: parameters["rowFilter.apikeys.updated_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -76,6 +77,7 @@ export interface paths {
           user_id?: parameters["rowFilter.apikeys.user_id"];
           key?: parameters["rowFilter.apikeys.key"];
           mode?: parameters["rowFilter.apikeys.mode"];
+          updated_at?: parameters["rowFilter.apikeys.updated_at"];
         };
         header: {
           /** Preference */
@@ -95,6 +97,7 @@ export interface paths {
           user_id?: parameters["rowFilter.apikeys.user_id"];
           key?: parameters["rowFilter.apikeys.key"];
           mode?: parameters["rowFilter.apikeys.mode"];
+          updated_at?: parameters["rowFilter.apikeys.updated_at"];
         };
         body: {
           /** apikeys */
@@ -121,6 +124,7 @@ export interface paths {
           name?: parameters["rowFilter.app_versions.name"];
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
+          updated_at?: parameters["rowFilter.app_versions.updated_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -177,6 +181,7 @@ export interface paths {
           name?: parameters["rowFilter.app_versions.name"];
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
+          updated_at?: parameters["rowFilter.app_versions.updated_at"];
         };
         header: {
           /** Preference */
@@ -197,6 +202,7 @@ export interface paths {
           name?: parameters["rowFilter.app_versions.name"];
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
+          updated_at?: parameters["rowFilter.app_versions.updated_at"];
         };
         body: {
           /** app_versions */
@@ -223,6 +229,8 @@ export interface paths {
           user_id?: parameters["rowFilter.apps.user_id"];
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
+          users?: parameters["rowFilter.apps.users"];
+          updated_at?: parameters["rowFilter.apps.updated_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -279,6 +287,8 @@ export interface paths {
           user_id?: parameters["rowFilter.apps.user_id"];
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
+          users?: parameters["rowFilter.apps.users"];
+          updated_at?: parameters["rowFilter.apps.updated_at"];
         };
         header: {
           /** Preference */
@@ -299,6 +309,8 @@ export interface paths {
           user_id?: parameters["rowFilter.apps.user_id"];
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
+          users?: parameters["rowFilter.apps.users"];
+          updated_at?: parameters["rowFilter.apps.updated_at"];
         };
         body: {
           /** apps */
@@ -326,6 +338,7 @@ export interface paths {
           version?: parameters["rowFilter.channels.version"];
           users?: parameters["rowFilter.channels.users"];
           created_by?: parameters["rowFilter.channels.created_by"];
+          updated_at?: parameters["rowFilter.channels.updated_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -383,6 +396,7 @@ export interface paths {
           version?: parameters["rowFilter.channels.version"];
           users?: parameters["rowFilter.channels.users"];
           created_by?: parameters["rowFilter.channels.created_by"];
+          updated_at?: parameters["rowFilter.channels.updated_at"];
         };
         header: {
           /** Preference */
@@ -404,6 +418,7 @@ export interface paths {
           version?: parameters["rowFilter.channels.version"];
           users?: parameters["rowFilter.channels.users"];
           created_by?: parameters["rowFilter.channels.created_by"];
+          updated_at?: parameters["rowFilter.channels.updated_at"];
         };
         body: {
           /** channels */
@@ -431,6 +446,7 @@ export interface paths {
           country?: parameters["rowFilter.users.country"];
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
+          updated_at?: parameters["rowFilter.users.updated_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -488,6 +504,7 @@ export interface paths {
           country?: parameters["rowFilter.users.country"];
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
+          updated_at?: parameters["rowFilter.users.updated_at"];
         };
         header: {
           /** Preference */
@@ -509,6 +526,7 @@ export interface paths {
           country?: parameters["rowFilter.users.country"];
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
+          updated_at?: parameters["rowFilter.users.updated_at"];
         };
         body: {
           /** users */
@@ -549,6 +567,8 @@ export interface definitions {
      * @default read
      */
     mode: "read" | "write" | "all";
+    /** Format: timestamp with time zone */
+    updated_at?: string;
   };
   app_versions: {
     /**
@@ -574,6 +594,8 @@ export interface definitions {
     bucket_id: string;
     /** Format: uuid */
     user_id: string;
+    /** Format: timestamp with time zone */
+    updated_at?: string;
   };
   apps: {
     /**
@@ -595,6 +617,10 @@ export interface definitions {
     name?: string;
     /** Format: character varying */
     last_version?: string;
+    /** Format: ARRAY */
+    users?: unknown[];
+    /** Format: timestamp with time zone */
+    updated_at?: string;
   };
   channels: {
     /**
@@ -630,6 +656,8 @@ export interface definitions {
      * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
      */
     created_by?: string;
+    /** Format: timestamp with time zone */
+    updated_at?: string;
   };
   users: {
     /**
@@ -653,6 +681,8 @@ export interface definitions {
      * This is a Primary Key.<pk/>
      */
     id: string;
+    /** Format: timestamp with time zone */
+    updated_at?: string;
   };
 }
 
@@ -692,6 +722,8 @@ export interface parameters {
   "rowFilter.apikeys.key": string;
   /** Format: public.key_mode */
   "rowFilter.apikeys.mode": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.apikeys.updated_at": string;
   /** @description app_versions */
   "body.app_versions": definitions["app_versions"];
   /** Format: bigint */
@@ -706,6 +738,8 @@ export interface parameters {
   "rowFilter.app_versions.bucket_id": string;
   /** Format: uuid */
   "rowFilter.app_versions.user_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_versions.updated_at": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: timestamp with time zone */
@@ -720,6 +754,10 @@ export interface parameters {
   "rowFilter.apps.name": string;
   /** Format: character varying */
   "rowFilter.apps.last_version": string;
+  /** Format: ARRAY */
+  "rowFilter.apps.users": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.apps.updated_at": string;
   /** @description channels */
   "body.channels": definitions["channels"];
   /** Format: bigint */
@@ -736,6 +774,8 @@ export interface parameters {
   "rowFilter.channels.users": string;
   /** Format: uuid */
   "rowFilter.channels.created_by": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.channels.updated_at": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */
@@ -752,6 +792,8 @@ export interface parameters {
   "rowFilter.users.email": string;
   /** Format: uuid */
   "rowFilter.users.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.users.updated_at": string;
 }
 
 export interface operations {}

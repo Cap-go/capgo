@@ -38,9 +38,9 @@ export default defineConfig({
     // https://github.com/hannoeru/vite-plugin-pages
     Pages({
       extensions: ['vue', 'md'],
-      onRoutesGenerated(routes) {
-        console.log('routes', routes)
-      },
+      // onRoutesGenerated(routes) {
+      //   console.log('routes', routes)
+      // },
       extendRoute: (route) => {
         if (guestPath.includes(route.path))
           return route
