@@ -83,7 +83,7 @@ export const handler: Handler = async(event) => {
     isVerified = false
     console.error(error)
   }
-  if (!isVerified || !apikey || !event.body)
+  if (!isVerified || !apikey || apikey.mode === 'read' || !event.body)
     return sendRes({ status: 'Cannot Verify User' }, 400)
 
   try {
@@ -143,6 +143,7 @@ export const handler: Handler = async(event) => {
       .update({
         last_version: body.version,
       }).eq('app_id', body.appid)
+      .eq('user_id', apikey.user_id)
     if (dbError || dbError2 || !version || !version.length) {
       return sendRes({
         status: 'Cannot add version',

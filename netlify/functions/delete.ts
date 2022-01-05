@@ -55,7 +55,7 @@ export const handler: Handler = async(event) => {
     isVerified = false
     console.error(error)
   }
-  if (!isVerified || !apikey || !event.body) {
+  if (!isVerified || !apikey || apikey.mode === 'read' || !event.body) {
     return {
       statusCode: 400,
       headers,
@@ -72,10 +72,12 @@ export const handler: Handler = async(event) => {
       .from('app_versions')
       .delete()
       .eq('app_id', body.appid)
+      .eq('user_id', apikey.user_id)
     const { error: dbError } = await supabase
       .from('apps')
       .delete()
       .eq('app_id', body.appid)
+      .eq('user_id', apikey.user_id)
     if (dbError || error) {
       return {
         statusCode: 400,
