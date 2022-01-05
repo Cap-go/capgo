@@ -325,6 +325,7 @@ export interface paths {
           app_id?: parameters["rowFilter.channels.app_id"];
           version?: parameters["rowFilter.channels.version"];
           users?: parameters["rowFilter.channels.users"];
+          created_by?: parameters["rowFilter.channels.created_by"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -381,6 +382,7 @@ export interface paths {
           app_id?: parameters["rowFilter.channels.app_id"];
           version?: parameters["rowFilter.channels.version"];
           users?: parameters["rowFilter.channels.users"];
+          created_by?: parameters["rowFilter.channels.created_by"];
         };
         header: {
           /** Preference */
@@ -401,6 +403,7 @@ export interface paths {
           app_id?: parameters["rowFilter.channels.app_id"];
           version?: parameters["rowFilter.channels.version"];
           users?: parameters["rowFilter.channels.users"];
+          created_by?: parameters["rowFilter.channels.created_by"];
         };
         body: {
           /** channels */
@@ -621,6 +624,12 @@ export interface definitions {
     version?: number;
     /** Format: ARRAY */
     users?: unknown[];
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
+    created_by?: string;
   };
   users: {
     /**
@@ -725,6 +734,8 @@ export interface parameters {
   "rowFilter.channels.version": string;
   /** Format: ARRAY */
   "rowFilter.channels.users": string;
+  /** Format: uuid */
+  "rowFilter.channels.created_by": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

@@ -20,6 +20,10 @@ package:
   versions: Version list
   channels: Channels list
   title: Package info
+  link_channel: Link to channel
+channel:
+  title: Channel info
+  users: Users list
 login:
   connexion: Login
   create-new: Create new account

@@ -17,6 +17,7 @@ import LinkAttributes from 'markdown-it-link-attributes'
 import EnvironmentPlugin from 'vite-plugin-environment'
 
 const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
+const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/veriy_email', '/onboarding/activation']
 
 export default defineConfig({
   resolve: {
@@ -37,11 +38,17 @@ export default defineConfig({
     // https://github.com/hannoeru/vite-plugin-pages
     Pages({
       extensions: ['vue', 'md'],
+      onRoutesGenerated(routes) {
+        console.log('routes', routes)
+      },
       extendRoute: (route) => {
-        console.log(route.path)
-        if (route.path === '/tabs')
-          return { ...route, redirect: '/tabs/tab1' }
-        return route
+        if (guestPath.includes(route.path))
+          return route
+        // Augment the route with meta that indicates that the route requires authentication.
+        return {
+          ...route,
+          meta: { ...route.meta, middleware: 'auth' },
+        }
       },
     }),
 

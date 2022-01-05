@@ -10,7 +10,7 @@ const supabase = useSupabase()
 const auth = supabase.auth.user()
 const apps = ref<definitions['apps'][]>()
 const openPackage = (appId: string) => {
-  router.push(`/app/package/${appId}`)
+  router.push(`/app/package/${appId.replaceAll('.', '--')}`)
 }
 watchEffect(async() => {
   if (route.path === '/app/home') {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar, isPlatform } from '@ionic/vue'
+import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar, actionSheetController, isPlatform } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { CapacitorUpdater } from 'capacitor-updater'
 import { useSupabase } from '~/services/supabase'
@@ -12,8 +12,46 @@ const supabase = useSupabase()
 const auth = supabase.auth.user()
 const id = ref('')
 const app = ref<definitions['apps']>()
-const channels = ref<definitions['channels'][]>()
-const versions = ref<definitions['app_versions'][]>()
+const channels = ref<(definitions['channels'] & Channel)[]>([])
+const versions = ref<definitions['app_versions'][]>([])
+
+const loadData = async() => {
+  try {
+    const { data: dataApp } = await supabase
+      .from<definitions['apps']>('apps')
+      .select()
+      .eq('app_id', id.value)
+    const { data: dataVersions } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', id.value)
+    const { data: dataChannel } = await supabase
+      .from<definitions['channels'] & Channel>('channels')
+      .select(`
+          id,
+          name,
+          version (
+            name,
+            created_at
+          ),
+          created_at
+          `)
+      .eq('app_id', id.value)
+    if (dataApp && dataApp.length)
+      app.value = dataApp[0]
+    if (dataVersions && dataVersions.length)
+      versions.value = dataVersions
+    if (dataChannel && dataChannel.length)
+      channels.value = dataChannel
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+const openChannel = async(channel: definitions['channels']) => {
+  // router.push(`/app/package/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
+}
+
 const openVersion = async(app: definitions['app_versions']) => {
   const res = await supabase
     .storage
@@ -25,38 +63,86 @@ const openVersion = async(app: definitions['app_versions']) => {
     const newFolder = await CapacitorUpdater.download({
       url: signedURL,
     })
-    console.log('newFolder', newFolder)
+    // console.log('newFolder', newFolder)
     CapacitorUpdater.set(newFolder).then(() => {
       console.log('done update', newFolder)
     })
   }
 }
+const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
+  return supabase
+    .from<definitions['channels']>('channels')
+    .update({
+      version: v.id,
+    })
+    .eq('id', channel.id)
+}
+const ASChannel = async(v: definitions['app_versions']) => {
+  // const buttons
+  const buttons = []
+  for (const channel of channels.value) {
+    buttons.push({
+      text: channel.name,
+      handler: async() => {
+        await setChannel(v, channel)
+        await loadData()
+      },
+    })
+  }
+  buttons.push({
+    text: 'Cancel',
+    role: 'cancel',
+    handler: () => {
+      console.log('Cancel clicked')
+    },
+  })
+  const actionSheet = await actionSheetController.create({
+    header: t('package.link_channel'),
+    buttons,
+  })
+  await actionSheet.present()
+}
+
+const ASVersion = async(v: definitions['app_versions']) => {
+  const actionSheet = await actionSheetController.create({
+    buttons: [
+      {
+        text: 'Test version',
+        handler: () => {
+          actionSheet.dismiss()
+          openVersion(v)
+        },
+      },
+      {
+        text: 'Set version to channel',
+        handler: () => {
+          actionSheet.dismiss()
+          ASChannel(v)
+        },
+      },
+      {
+        text: 'Cancel',
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+    ],
+  })
+  await actionSheet.present()
+}
+interface Channel {
+  id: string
+  version: {
+    name: string
+    created_at: string
+  }
+}
 watchEffect(async() => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
-    try {
-      const { data: dataApp } = await supabase
-        .from<definitions['apps']>('apps')
-        .select()
-        .eq('app_id', id.value)
-      const { data: dataVersions } = await supabase
-        .from<definitions['app_versions']>('app_versions')
-        .select()
-        .eq('app_id', id.value)
-      const { data: dataChannel } = await supabase
-        .from<definitions['channels']>('channels')
-        .select()
-        .eq('app_id', id.value)
-      if (dataApp && dataApp.length)
-        app.value = dataApp[0]
-      if (dataVersions && dataVersions.length)
-        versions.value = dataVersions
-      if (dataChannel && dataChannel.length)
-        channels.value = dataChannel
-    }
-    catch (error) {
-      console.error(error)
-    }
+    id.value = id.value.replaceAll('--', '.')
+    await loadData()
   }
 })
 const back = () => {
@@ -95,12 +181,29 @@ const back = () => {
         </ion-toolbar>
       </ion-header>
       <ion-list>
+        <ion-item-divider v-if="channels?.length">
+          <ion-label>
+            {{ t('package.channels') }}
+          </ion-label>
+        </ion-item-divider>
+        <IonItem v-for="(ch, index) in channels" :key="index" @click="openChannel(ch)">
+          <IonLabel>
+            <div class="col-span-6 flex flex-col">
+              <div class="flex justify-between items-center">
+                <h2 class="text-sm text-bright-cerulean-500">
+                  {{ ch.name }}
+                </h2>
+                <p>{{ ch.version.name }}</p>
+              </div>
+            </div>
+          </IonLabel>
+        </IonItem>
         <ion-item-divider v-if="versions?.length">
           <ion-label>
             {{ t('package.versions') }}
           </ion-label>
         </ion-item-divider>
-        <IonItem v-for="(v, index) in versions" :key="index" @click="openVersion(v)">
+        <IonItem v-for="(v, index) in versions" :key="index" @click="ASVersion(v)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
@@ -111,29 +214,7 @@ const back = () => {
             </div>
           </IonLabel>
         </IonItem>
-        <!-- Add app in prod -->
-        <ion-item-divider v-if="channels?.length">
-          <ion-label>
-            {{ t('package.channels') }}
-          </ion-label>
-        </ion-item-divider>
-        <IonItem v-for="(ch, index) in channels" :key="index">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col">
-              <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
-                  {{ ch.name }}
-                </h2>
-              </div>
-            </div>
-          </IonLabel>
-        </IonItem>
       </ion-list>
     </ion-content>
   </ion-page>
 </template>
-
-<route lang="yaml">
-meta:
-  option: tabs
-</route>
