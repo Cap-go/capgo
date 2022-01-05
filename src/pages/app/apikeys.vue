@@ -19,6 +19,9 @@ const copyKey = async(app: definitions['apikeys']) => {
     })
   await toast.present()
 }
+const openLink = (link: string) => {
+  window.open(link, '_system')
+}
 watchEffect(async() => {
   if (route.path === '/app/apikeys') {
     const { data } = await supabase
@@ -46,7 +49,32 @@ watchEffect(async() => {
           </ion-title>
         </ion-toolbar>
       </ion-header>
+      <p class="m-3">
+        {{ t('apikeys.explain') }}
+      </p>
+      <p class="m-3">
+        {{ t('apikeys.checkbelow') }}
+      </p>
       <ion-list>
+        <ion-item-divider>
+          <ion-label>
+            {{ t('apikeys.links') }}
+          </ion-label>
+        </ion-item-divider>
+        <IonItem @click="openLink('https://www.npmjs.com/package/capgo')">
+          <IonLabel>
+            <h2 class="text-sm text-bright-cerulean-500">
+              {{ t('apikeys.cli') }}
+            </h2>
+          </IonLabel>
+        </IonItem>
+        <IonItem @click="openLink('https://www.npmjs.com/package/capacitor-updater')">
+          <IonLabel>
+            <h2 class="text-sm text-bright-cerulean-500">
+              {{ t('apikeys.updater') }}
+            </h2>
+          </IonLabel>
+        </IonItem>
         <ion-item-divider>
           <ion-label>
             {{ t('apikeys.all') }}

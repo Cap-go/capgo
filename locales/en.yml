@@ -97,6 +97,11 @@ accountPassword:
 apikeys:
   keyCopied: Keys copied to your clipboard
   title: API keys
-  all: all your keys
+  all: keys
+  links: Links
+  cli: capgo CLI
+  updater: capacitor-updater
+  explain: All thoses api keys are made to be use with the capacitor Go CLI tool, or capacitor-updater plugin 
+  checkbelow: check below the link to get more informations
 onboarding:
   loading: Loading
