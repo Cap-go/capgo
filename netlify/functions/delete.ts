@@ -19,7 +19,7 @@ export const handler: Handler = async(event) => {
         'Access-Control-Allow-Methods': 'POST',
       },
       body: JSON.stringify({
-        message: 'Requires Authorization',
+        message: 'ok',
       }),
     }
   }
