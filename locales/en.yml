@@ -17,9 +17,9 @@ projects:
   list: All your projects
   title: Projects
 package:
-  versions: Version list
-  channels: Channels list
-  title: Package info
+  versions: Versions
+  channels: Channels
+  title: info
   link_channel: Link to channel
 channel:
   title: Channel info

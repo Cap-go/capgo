@@ -4,6 +4,7 @@ import { chevronBack } from 'ionicons/icons'
 import { CapacitorUpdater } from 'capacitor-updater'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
+import Spinner from '~/components/Spinner.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -11,6 +12,7 @@ const route = useRoute()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const id = ref('')
+const isLoading = ref(false)
 const app = ref<definitions['apps']>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
@@ -53,6 +55,7 @@ const openChannel = async(channel: definitions['channels']) => {
 }
 
 const openVersion = async(app: definitions['app_versions']) => {
+  isLoading.value = true
   const res = await supabase
     .storage
     .from(`apps/${auth?.id}/versions/${app.app_id}`)
@@ -60,13 +63,16 @@ const openVersion = async(app: definitions['app_versions']) => {
 
   const signedURL = res.data?.signedURL
   if (signedURL && isPlatform('capacitor')) {
-    const newFolder = await CapacitorUpdater.download({
-      url: signedURL,
-    })
-    // console.log('newFolder', newFolder)
-    CapacitorUpdater.set(newFolder).then(() => {
-      console.log('done update', newFolder)
-    })
+    try {
+      const newFolder = await CapacitorUpdater.download({
+        url: signedURL,
+      })
+      await CapacitorUpdater.set(newFolder)
+    }
+    catch (error) {
+      console.error(error)
+    }
+    isLoading.value = false
   }
 }
 const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
@@ -84,8 +90,15 @@ const ASChannel = async(v: definitions['app_versions']) => {
     buttons.push({
       text: channel.name,
       handler: async() => {
-        await setChannel(v, channel)
-        await loadData()
+        isLoading.value = true
+        try {
+          await setChannel(v, channel)
+          await loadData()
+        }
+        catch (error) {
+          console.error(error)
+        }
+        isLoading.value = false
       },
     })
   }
@@ -140,9 +153,11 @@ interface Channel {
 }
 watchEffect(async() => {
   if (route.path.startsWith('/app/package')) {
+    isLoading.value = true
     id.value = route.params.package as string
     id.value = id.value.replaceAll('--', '.')
     await loadData()
+    isLoading.value = false
   }
 })
 const back = () => {
@@ -155,66 +170,63 @@ const back = () => {
       <IonToolbar class="toolbar-no-border">
         <IonButtons slot="start" class="mx-3">
           <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" />
+            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
           </IonButton>
         </IonButtons>
-        <div class="flex justify-between items-center">
-          <div class="flex">
-            <div class="relative">
-              <img :src="app?.icon_url" class="h-15 w-15 object-cover bg-grey rounded-xl mr-4">
-            </div>
-            <div class="flex flex-col justify-center">
-              <p class="text-left text-bright-cerulean-500 text-sm font-bold">
-                {{ app?.name }}
-              </p>
-            </div>
-          </div>
-        </div>
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title size="large">
-            {{ t('package.title') }}
-          </ion-title>
-        </ion-toolbar>
-      </ion-header>
-      <ion-list>
-        <ion-item-divider v-if="channels?.length">
-          <ion-label>
-            {{ t('package.channels') }}
-          </ion-label>
-        </ion-item-divider>
-        <IonItem v-for="(ch, index) in channels" :key="index" @click="openChannel(ch)">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col">
-              <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
-                  {{ ch.name }}
-                </h2>
-                <p>{{ ch.version.name }}</p>
+      <div v-if="isLoading" class="chat-items flex justify-center">
+        <Spinner />
+      </div>
+      <div v-else>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title size="large">
+              {{ app?.name }}
+            </ion-title>
+          </ion-toolbar>
+        </ion-header>
+        <img
+          class="my-8 mx-auto w-30 h-30 object-cover rounded-5xl"
+          :src="app?.icon_url"
+        >
+        <ion-list>
+          <ion-item-divider v-if="channels?.length">
+            <ion-label>
+              {{ t('package.channels') }}
+            </ion-label>
+          </ion-item-divider>
+          <IonItem v-for="(ch, index) in channels" :key="index" @click="openChannel(ch)">
+            <IonLabel>
+              <div class="col-span-6 flex flex-col">
+                <div class="flex justify-between items-center">
+                  <h2 class="text-sm text-bright-cerulean-500">
+                    {{ ch.name }}
+                  </h2>
+                  <p>{{ ch.version.name }}</p>
+                </div>
               </div>
-            </div>
-          </IonLabel>
-        </IonItem>
-        <ion-item-divider v-if="versions?.length">
-          <ion-label>
-            {{ t('package.versions') }}
-          </ion-label>
-        </ion-item-divider>
-        <IonItem v-for="(v, index) in versions" :key="index" @click="ASVersion(v)">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col">
-              <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
-                  {{ v.name }}
-                </h2>
+            </IonLabel>
+          </IonItem>
+          <ion-item-divider v-if="versions?.length">
+            <ion-label>
+              {{ t('package.versions') }}
+            </ion-label>
+          </ion-item-divider>
+          <IonItem v-for="(v, index) in versions" :key="index" @click="ASVersion(v)">
+            <IonLabel>
+              <div class="col-span-6 flex flex-col">
+                <div class="flex justify-between items-center">
+                  <h2 class="text-sm text-bright-cerulean-500">
+                    {{ v.name }}
+                  </h2>
+                </div>
               </div>
-            </div>
-          </IonLabel>
-        </IonItem>
-      </ion-list>
+            </IonLabel>
+          </IonItem>
+        </ion-list>
+      </div>
     </ion-content>
   </ion-page>
 </template>
