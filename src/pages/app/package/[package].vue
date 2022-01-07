@@ -9,6 +9,7 @@ import {
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { CapacitorUpdater } from 'capacitor-updater'
+import { SplashScreen } from '@capacitor/splash-screen'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
@@ -74,6 +75,7 @@ const openVersion = async(app: definitions['app_versions']) => {
   const signedURL = res.data?.signedURL
   if (signedURL && isPlatform('capacitor')) {
     try {
+      SplashScreen.show()
       const newFolder = await CapacitorUpdater.download({
         url: signedURL,
       })
@@ -88,6 +90,7 @@ const openVersion = async(app: definitions['app_versions']) => {
         })
       await toast.present()
     }
+    SplashScreen.show()
     isLoading.value = false
   }
   else {
@@ -213,7 +216,14 @@ interface Channel {
     created_at: string
   }
 }
-const refreshData = async() => {
+interface RefresherEventDetail {
+  complete(): void
+}
+interface RefresherCustomEvent extends CustomEvent {
+  detail: RefresherEventDetail
+  target: HTMLIonRefresherElement
+}
+const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await loadData()
@@ -222,7 +232,9 @@ const refreshData = async() => {
     console.error(error)
   }
   isLoading.value = false
+  evt?.target?.complete()
 }
+
 watchEffect(async() => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
@@ -246,7 +258,7 @@ const back = () => {
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData()">
+      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
