@@ -53,7 +53,7 @@ specifiers:
   capacitor-crisp: ^1.0.15
   capacitor-native-audio: ^3.0.2
   capacitor-rate-app: ^2.0.0
-  capacitor-updater: 1.0.25
+  capacitor-updater: 1.0.26
   copy-text-to-clipboard: ^3.0.1
   critters: 0.0.16
   cross-env: ^7.0.3
@@ -129,7 +129,7 @@ dependencies:
   capacitor-crisp: 1.0.15_@capacitor+core@3.3.4
   capacitor-native-audio: 3.0.2_@capacitor+core@3.3.4
   capacitor-rate-app: 2.0.0_@capacitor+core@3.3.4
-  capacitor-updater: 1.0.25_@capacitor+core@3.3.4
+  capacitor-updater: 1.0.26_@capacitor+core@3.3.4
   copy-text-to-clipboard: 3.0.1
   firebase: 9.6.2
   mime: 3.0.0
@@ -5468,8 +5468,8 @@ packages:
       '@capacitor/core': 3.3.4
     dev: false
 
-  /capacitor-updater/1.0.25_@capacitor+core@3.3.4:
-    resolution: {integrity: sha512-D8Fk+6C2LFyADrSYdBOq/zgPiq6VM2HecvQA+uNQAVEwO7n0bfwBQz20iFZNAGUe+nACmSi4TgOoxMbXIlM6TQ==}
+  /capacitor-updater/1.0.26_@capacitor+core@3.3.4:
+    resolution: {integrity: sha512-QvbU8WbA4WlKnFBIYnWQ4hWgyM6sIyjUyEjp8gl7PadHadQRX1klunQBSPutLT93EjvO6bRFV6BmJ6v9Confcg==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:

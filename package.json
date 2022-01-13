@@ -52,7 +52,7 @@
     "capacitor-crisp": "^1.0.15",
     "capacitor-native-audio": "^3.0.2",
     "capacitor-rate-app": "^2.0.0",
-    "capacitor-updater": "1.0.25",
+    "capacitor-updater": "1.0.26",
     "copy-text-to-clipboard": "^3.0.1",
     "firebase": "9.6.2",
     "mime": "^3.0.0",

@@ -78,4 +78,4 @@ include ':capacitor-rate-app'
 project(':capacitor-rate-app').projectDir = new File('../node_modules/.pnpm/capacitor-rate-app@2.0.0_@capacitor+core@3.3.4/node_modules/capacitor-rate-app/android')
 
 include ':capacitor-updater'
-project(':capacitor-updater').projectDir = new File('../node_modules/.pnpm/capacitor-updater@1.0.25_@capacitor+core@3.3.4/node_modules/capacitor-updater/android')
+project(':capacitor-updater').projectDir = new File('../node_modules/.pnpm/capacitor-updater@1.0.26_@capacitor+core@3.3.4/node_modules/capacitor-updater/android')

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "767796994084",
+    "project_id": "capacitor-go",
+    "storage_bucket": "capacitor-go.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:767796994084:android:ee29b5d17d3948cd80f8b1",
+        "android_client_info": {
+          "package_name": "ee.forgr.capacitor_go"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "767796994084-qf395jdelmmvb4q17egti43v17uoaq6a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB004RdBRGKU5e7vkzBtJXMon1vFPgqvZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "767796994084-qf395jdelmmvb4q17egti43v17uoaq6a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

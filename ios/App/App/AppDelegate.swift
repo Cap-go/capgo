@@ -29,7 +29,8 @@ extension UIWindow {
                         DispatchQueue.main.async {
                             vc.loadView()
                             vc.viewDidLoad()
-                            updater.delete(version: serverBasePath)
+                            let res = updater.delete(version: serverBasePath)
+                            Print(res)
                         }
                     }))
                     alert.addAction(UIAlertAction(title: cancelButtonTitle, style: UIAlertAction.Style.default))

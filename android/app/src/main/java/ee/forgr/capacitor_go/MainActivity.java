@@ -3,6 +3,8 @@ package ee.forgr.capacitor_go;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.hardware.SensorManager;
+import ee.forgr.capacitor_updater.CapacitorUpdater;
+import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -11,6 +13,8 @@ import com.squareup.seismic.ShakeDetector;
 import java.text.MessageFormat;
 
 public class MainActivity extends BridgeActivity implements ShakeDetector.Listener {
+
+    Boolean isShow = false;
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -21,33 +25,46 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
 
     @Override public void hearShake() {
         Log.i("Capacitor Go", "hearShake");
+        CapacitorUpdater updater = new CapacitorUpdater(this.bridge.getContext());
+        if (updater.getLastPathHot() == "" || isShow) {
+            return;
+        }
+        isShow = true;
+        Bridge brd = this.bridge;
         Object[] params = new Object[]{"app", "!"};
         String msg = MessageFormat.format("Preview {0} Menu", params);
         String message = "What would you like to do ?";
         String okButtonTitle = "Go Home";
         String reloadButtonTitle = "Reload app";
         String cancelButtonTitle = "Close menu";
-//        Object updater = CapacitorUpdater()
         AlertDialog.Builder builder = new AlertDialog.Builder(this.bridge.getActivity());
         builder.setMessage(message);
         builder.setTitle(msg);
         builder.setPositiveButton(okButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 // User clicked OK button
-                Log.i("Capacitor Go", "okButtonTitle");
+                Log.i("Capacitor Go", okButtonTitle);
+                updater.reset();
+                String pathHot = updater.getLastPathHot();
+                brd.setServerAssetPath(pathHot);
                 dialog.dismiss();
+                isShow = false;
             }
         });
         builder.setNeutralButton(reloadButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
-                Log.i("Capacitor Go", "reloadButtonTitle");
+                Log.i("Capacitor Go", reloadButtonTitle);
+                String pathHot = updater.getLastPathHot();
+                brd.setServerBasePath(pathHot);
                 dialog.dismiss();
+                isShow = false;
             }
         });
         builder.setNegativeButton(cancelButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
-                Log.i("Capacitor Go", "cancelButtonTitle");
+                Log.i("Capacitor Go", cancelButtonTitle);
                 dialog.dismiss();
+                isShow = false;
             }
         });
         AlertDialog dialog = builder.create();
