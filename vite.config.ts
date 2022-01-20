@@ -1,4 +1,4 @@
-import path from 'path'
+import path, { resolve } from 'path'
 import { defineConfig } from 'vite'
 import Vue from '@vitejs/plugin-vue'
 import Pages from 'vite-plugin-pages'
@@ -15,6 +15,8 @@ import Inspect from 'vite-plugin-inspect'
 import Prism from 'markdown-it-prism'
 import LinkAttributes from 'markdown-it-link-attributes'
 import EnvironmentPlugin from 'vite-plugin-environment'
+import fs from 'fs-extra'
+import matter from 'gray-matter'
 
 const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
 const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/veriy_email', '/onboarding/activation']
@@ -42,6 +44,13 @@ export default defineConfig({
       //   console.log('routes', routes)
       // },
       extendRoute: (route) => {
+        const path = resolve(__dirname, route.component.slice(1))
+        if (path.endsWith('.md')) {
+          const md = fs.readFileSync(path, 'utf-8')
+          const { data } = matter(md)
+          route.meta = Object.assign(route.meta || {}, { frontmatter: data })
+        }
+
         if (guestPath.includes(route.path))
           return route
         // Augment the route with meta that indicates that the route requires authentication.

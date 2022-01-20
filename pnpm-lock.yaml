@@ -37,6 +37,7 @@ specifiers:
   '@ionic/vue-router': 6.0.2
   '@netlify/functions': ^0.10.0
   '@supabase/supabase-js': 1.29.1
+  '@types/fs-extra': ^9.0.13
   '@types/markdown-it-link-attributes': ^3.0.1
   '@types/mime': ^2.0.3
   '@types/node': 17.0.8
@@ -149,6 +150,7 @@ devDependencies:
   '@iconify-json/ion': 1.0.3
   '@iconify-json/ls': 1.0.1
   '@intlify/vite-plugin-vue-i18n': 3.2.1_vite@2.7.11+vue-i18n@9.1.9
+  '@types/fs-extra': 9.0.13
   '@types/markdown-it-link-attributes': 3.0.1
   '@types/mime': 2.0.3
   '@types/node': 17.0.8
@@ -3894,6 +3896,12 @@ packages:
 
   /@types/estree/0.0.39:
     resolution: {integrity: sha512-EYNwp3bU+98cpU4lAWYYL7Zz+2gryWH1qbdDTidVd6hkiR6weksdbMadyXKXNPEkQFhXM+hVO9ZygomHXp+AIw==}
+    dev: true
+
+  /@types/fs-extra/9.0.13:
+    resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
+    dependencies:
+      '@types/node': 17.0.8
     dev: true
 
   /@types/glob/7.2.0:

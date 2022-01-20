@@ -5,11 +5,13 @@ import { email, required } from '@vuelidate/validators'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+// import { initBlog } from '~/services/blog'
 import { useSupabase } from '~/services/supabase'
 
 const supabase = useSupabase()
 const isLoading = ref(false)
 const router = useRouter()
+// const blogs = initBlog()
 const { t } = useI18n()
 
 const form = reactive({
@@ -24,6 +26,8 @@ const rules = {
   password: { required },
 
 }
+// console.log('blogs', blogs)
+
 const v$ = useVuelidate(rules, form)
 const showToastMessage = async(message: string) => {
   const toast = await toastController
