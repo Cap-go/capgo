@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { IonContent, IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar } from '@ionic/vue'
+import { ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
+import Spinner from '~/components/Spinner.vue'
 
 const { t } = useI18n()
+const isLoading = ref(false)
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
@@ -14,12 +17,14 @@ const openPackage = (appId: string) => {
 }
 watchEffect(async() => {
   if (route.path === '/app/home') {
+    isLoading.value = true
     const { data } = await supabase
       .from<definitions['apps']>('apps')
       .select()
       .eq('user_id', auth?.id)
     if (data && data.length)
       apps.value = data
+    isLoading.value = false
   }
 })
 </script>
@@ -44,7 +49,10 @@ watchEffect(async() => {
             {{ t('projects.list') }}
           </ion-label>
         </ion-item-divider>
-        <IonItem v-for="(app, index) in apps" :key="index" @click="openPackage(app.app_id)">
+        <div v-if="isLoading" class="flex justify-center">
+          <Spinner />
+        </div>
+        <IonItem v-for="(app, index) in apps" v-else-if="apps?.length" :key="index" @click="openPackage(app.app_id)">
           <div slot="start" class="col-span-2 relative py-4">
             <img :src="app.icon_url" alt="bebe" class="rounded-xl h-15 w-15 object-cover">
           </div>
@@ -63,6 +71,22 @@ watchEffect(async() => {
                 </h3>
                 <h3 v-else class="text-true-gray-800 py-1 font-bold">
                   No version upload yet
+                </h3>
+              </div>
+            </div>
+          </IonLabel>
+        </IonItem>
+        <IonItem v-else>
+          <IonLabel>
+            <div class="col-span-6 flex flex-col">
+              <div class="flex justify-between items-center">
+                <h2 class="text-sm text-bright-cerulean-500">
+                  No app yet
+                </h2>
+              </div>
+              <div class="flex justify-between items-center">
+                <h3 class="text-true-gray-800 py-1 font-bold">
+                  To create one use the <a href="/app/apikeys" class="cursor-pointer underline">CLI</a> capgo with your APIKEY
                 </h3>
               </div>
             </div>
