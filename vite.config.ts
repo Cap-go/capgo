@@ -49,6 +49,8 @@ export default defineConfig({
           const md = fs.readFileSync(path, 'utf-8')
           const { data } = matter(md)
           route.meta = Object.assign(route.meta || {}, { frontmatter: data })
+          if (path.includes('/blog/'))
+            route.meta = Object.assign(route.meta, { layout: 'blog' })
         }
 
         if (guestPath.includes(route.path))
