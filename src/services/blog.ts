@@ -8,5 +8,5 @@ export const initBlog = () => {
       acc.push(route)
     return acc
   }, [] as RouteRecordNormalized[])
-  return markdowns
+  return { blogs: markdowns }
 }
