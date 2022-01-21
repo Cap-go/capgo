@@ -68,11 +68,33 @@ export const handler: Handler = async(event) => {
   try {
     const body = JSON.parse(event.body || '{}') as AppDelete
 
-    const { error } = await supabase
-      .from('app_versions')
-      .delete()
+    const { data, error: vError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
+
+    if (data && data.length && !vError) {
+      const { error: delError } = await supabase
+        .storage
+        .from(`apps/${apikey.user_id}/${body.appid}/versions`)
+        .remove(data.map(v => v.bucket_id))
+      if (delError) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            message: `${delError}!`,
+          }),
+        }
+      }
+      await supabase
+        .from('app_versions')
+        .delete()
+        .eq('app_id', body.appid)
+        .eq('user_id', apikey.user_id)
+    }
+
     const { error: dbError } = await supabase
       .from('apps')
       .delete()
