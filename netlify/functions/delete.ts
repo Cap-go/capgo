@@ -100,7 +100,7 @@ export const handler: Handler = async(event) => {
       .delete()
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
-    if (dbError || error) {
+    if (dbError) {
       return {
         statusCode: 400,
         headers,
