@@ -30,7 +30,6 @@ extension UIWindow {
                             vc.loadView()
                             vc.viewDidLoad()
                             let res = updater.delete(version: serverBasePath)
-                            Print(res)
                         }
                     }))
                     alert.addAction(UIAlertAction(title: cancelButtonTitle, style: UIAlertAction.Style.default))

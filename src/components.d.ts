@@ -4,6 +4,8 @@
 
 declare module 'vue' {
   export interface GlobalComponents {
+    IonContent: typeof import('~icons/ion/content')['default']
+    IonPage: typeof import('~icons/ion/page')['default']
     README: typeof import('./components/README.md')['default']
     Spinner: typeof import('./components/Spinner.vue')['default']
     TitleHead: typeof import('./components/TitleHead.vue')['default']

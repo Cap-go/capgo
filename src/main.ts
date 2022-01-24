@@ -36,7 +36,8 @@ import 'virtual:windi-devtools'
 const app = createApp(App)
 
 // setup up pages with layouts
-const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }]
+
+const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: isPlatform('capacitor') ? '/login' : '/home' }]
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 app.use(router)
 
