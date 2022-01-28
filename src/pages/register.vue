@@ -81,7 +81,7 @@ const submit = async() => {
       },
       redirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/verify_email`,
     },
-    // http://localhost:3333/onboarding/verify_email,http://localhost:3333/forgot_password?step=2,https://capacitorgo.com/onboarding/verify_email,https://capacitorgo.com/forgot_password?step=2,https://capacitorgo.com/onboarding/first_password,https://development.neufmoispourtoi.app/onboarding/verify_email,https://development.capacitorgo.com/forgot_password?step=2
+    // http://localhost:3333/onboarding/verify_email,http://localhost:3333/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.neufmoispourtoi.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
   )
   isLoading.value = false
   if (error) {

@@ -33,7 +33,7 @@ export default defineConfig({
     }),
 
     EnvironmentPlugin({
-      VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : ''}capacitorgo.com`,
+      VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : ''}capgo.app`,
       VITE_NETLIFY_URL: process.env.VITE_NETLIFY_URL ? process.env.VITE_NETLIFY_URL : '/api',
     }, { defineOn: 'import.meta.env' }),
 

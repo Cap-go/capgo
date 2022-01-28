@@ -14,7 +14,7 @@ Mocking up web app with <b>Vitesse</b><sup><em>(speed)</em></sup><br>
 <br>
 
 <p align='center'>
-<a href="https://capacitorgo.com/">App</a>
+<a href="https://capgo.app/">App</a>
 </p>
 
 <br>
