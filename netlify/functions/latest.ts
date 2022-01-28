@@ -84,7 +84,7 @@ export const handler: Handler = async(event) => {
         )
       `)
       .eq('app_id', body.appid)
-      .eq('name', body.appid)
+      .eq('name', body.channel)
     if (dbError || !channels || !channels.length) {
       return {
         statusCode: 400,
