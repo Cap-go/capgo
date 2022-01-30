@@ -1,4 +1,3 @@
-import { version } from 'os'
 import type { Handler } from '@netlify/functions'
 import { useSupabase } from '../services/supabase'
 import type { definitions } from '~/types/supabase'
@@ -74,12 +73,12 @@ export const handler: Handler = async(event) => {
     const channel = channels[0]
     const res = await supabase
       .storage
-      .from(`apps/${channel.version.user_id}/versions/${channel.app_id}`)
+      .from(`apps/${channel.version.user_id}/${channel.app_id}/versions`)
       .createSignedUrl(channel.version.bucket_id, 60)
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ version: version.name, url: res.signedURL }),
+      body: JSON.stringify({ version: channel.version.name, url: res.signedURL }),
     }
   }
   catch (e) {
