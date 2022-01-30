@@ -7,16 +7,14 @@
   command = "npx pnpm i --store=node_modules/.pnpm-store && npx pnpm run build"
 
 [[redirects]]
-  force = true
   from = '/.well-known/*'
   status = 200
   to = '/deepLink/:splat'
 
 [[redirects]]
-  force = true
-  from = '/api/*'
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
-  to = '/.netlify/functions/:splat'
 
 [[redirects]]
   from = "/*"
