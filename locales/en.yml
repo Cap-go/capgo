@@ -16,6 +16,7 @@ not-found: Not found
 projects:
   list: All your projects
   title: Projects
+  sharedlist: Projects shared with you
 package:
   versions: Versions
   channels: Channels
@@ -23,7 +24,8 @@ package:
   link_channel: Link to channel
 channel:
   title: Channel info
-  users: Users list
+  users: Shared with users
+  public: Capacitor-updater Public link
 login:
   connexion: Login
   create-new: Create new account

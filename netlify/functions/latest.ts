@@ -10,6 +10,12 @@ interface GetLatest {
   appid: string
   channel: string
 }
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+}
+
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
   if (event.httpMethod === 'OPTIONS') {
@@ -26,47 +32,6 @@ export const handler: Handler = async(event) => {
     }
   }
 
-  const { authorization } = event.headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-
-  let isVerified = false
-  let apikey: definitions['apikeys'] | null = null
-  const supabase = useSupabase()
-  try {
-    const { data, error } = await supabase
-      .from<definitions['apikeys']>('apikeys')
-      .select()
-      .eq('key', authorization)
-    if (!data || !data.length) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          message: 'Requires Authorization',
-        }),
-      }
-    }
-    apikey = data[0]
-    isVerified = !!apikey && !error
-  }
-  catch (error) {
-    isVerified = false
-    console.error(error)
-  }
-  if (!isVerified || !apikey || apikey.mode === 'write' || !event.body) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({
-        message: 'cannot Verify User',
-      }),
-    }
-  }
-
   try {
     const body = event.queryStringParameters as any as GetLatest
     if (!body.appid || !body.channel) {
@@ -78,6 +43,7 @@ export const handler: Handler = async(event) => {
         }),
       }
     }
+    const supabase = useSupabase()
 
     const { data: channels, error: dbError } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -94,6 +60,7 @@ export const handler: Handler = async(event) => {
       `)
       .eq('app_id', body.appid)
       .eq('name', body.channel)
+      .eq('public', true)
     if (dbError || !channels || !channels.length) {
       return {
         statusCode: 400,
@@ -120,7 +87,8 @@ export const handler: Handler = async(event) => {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        message: `${e}!`,
+        message: 'Cannot get latest version',
+        err: `${e}!`,
       }),
     }
   }

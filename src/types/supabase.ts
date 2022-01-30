@@ -229,7 +229,6 @@ export interface paths {
           user_id?: parameters["rowFilter.apps.user_id"];
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
-          users?: parameters["rowFilter.apps.users"];
           updated_at?: parameters["rowFilter.apps.updated_at"];
           /** Filtering Columns */
           select?: parameters["select"];
@@ -287,7 +286,6 @@ export interface paths {
           user_id?: parameters["rowFilter.apps.user_id"];
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
-          users?: parameters["rowFilter.apps.users"];
           updated_at?: parameters["rowFilter.apps.updated_at"];
         };
         header: {
@@ -309,12 +307,110 @@ export interface paths {
           user_id?: parameters["rowFilter.apps.user_id"];
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
-          users?: parameters["rowFilter.apps.users"];
           updated_at?: parameters["rowFilter.apps.updated_at"];
         };
         body: {
           /** apps */
           apps?: definitions["apps"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
+  "/channel_users": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.channel_users.id"];
+          created_at?: parameters["rowFilter.channel_users.created_at"];
+          user_id?: parameters["rowFilter.channel_users.user_id"];
+          channel_id?: parameters["rowFilter.channel_users.channel_id"];
+          app_id?: parameters["rowFilter.channel_users.app_id"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["channel_users"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** channel_users */
+          channel_users?: definitions["channel_users"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.channel_users.id"];
+          created_at?: parameters["rowFilter.channel_users.created_at"];
+          user_id?: parameters["rowFilter.channel_users.user_id"];
+          channel_id?: parameters["rowFilter.channel_users.channel_id"];
+          app_id?: parameters["rowFilter.channel_users.app_id"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.channel_users.id"];
+          created_at?: parameters["rowFilter.channel_users.created_at"];
+          user_id?: parameters["rowFilter.channel_users.user_id"];
+          channel_id?: parameters["rowFilter.channel_users.channel_id"];
+          app_id?: parameters["rowFilter.channel_users.app_id"];
+        };
+        body: {
+          /** channel_users */
+          channel_users?: definitions["channel_users"];
         };
         header: {
           /** Preference */
@@ -336,9 +432,9 @@ export interface paths {
           name?: parameters["rowFilter.channels.name"];
           app_id?: parameters["rowFilter.channels.app_id"];
           version?: parameters["rowFilter.channels.version"];
-          users?: parameters["rowFilter.channels.users"];
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
+          public?: parameters["rowFilter.channels.public"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -394,9 +490,9 @@ export interface paths {
           name?: parameters["rowFilter.channels.name"];
           app_id?: parameters["rowFilter.channels.app_id"];
           version?: parameters["rowFilter.channels.version"];
-          users?: parameters["rowFilter.channels.users"];
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
+          public?: parameters["rowFilter.channels.public"];
         };
         header: {
           /** Preference */
@@ -416,9 +512,9 @@ export interface paths {
           name?: parameters["rowFilter.channels.name"];
           app_id?: parameters["rowFilter.channels.app_id"];
           version?: parameters["rowFilter.channels.version"];
-          users?: parameters["rowFilter.channels.users"];
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
+          public?: parameters["rowFilter.channels.public"];
         };
         body: {
           /** channels */
@@ -565,6 +661,7 @@ export interface definitions {
     /**
      * Format: public.key_mode
      * @default read
+     * @enum {string}
      */
     mode: "read" | "write" | "all";
     /** Format: timestamp with time zone */
@@ -617,10 +714,39 @@ export interface definitions {
     name?: string;
     /** Format: character varying */
     last_version?: string;
-    /** Format: ARRAY */
-    users?: unknown[];
     /** Format: timestamp with time zone */
     updated_at?: string;
+  };
+  channel_users: {
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: number;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
+    user_id: string;
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Foreign Key to `channels.id`.<fk table='channels' column='id'/>
+     */
+    channel_id: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
   };
   channels: {
     /**
@@ -648,8 +774,6 @@ export interface definitions {
      * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
      */
     version?: number;
-    /** Format: ARRAY */
-    users?: unknown[];
     /**
      * Format: uuid
      * @description Note:
@@ -658,6 +782,8 @@ export interface definitions {
     created_by?: string;
     /** Format: timestamp with time zone */
     updated_at?: string;
+    /** Format: boolean */
+    public: boolean;
   };
   users: {
     /**
@@ -687,11 +813,20 @@ export interface definitions {
 }
 
 export interface parameters {
-  /** @description Preference */
+  /**
+   * @description Preference
+   * @enum {string}
+   */
   preferParams: "params=single-object";
-  /** @description Preference */
+  /**
+   * @description Preference
+   * @enum {string}
+   */
   preferReturn: "return=representation" | "return=minimal" | "return=none";
-  /** @description Preference */
+  /**
+   * @description Preference
+   * @enum {string}
+   */
   preferCount: "count=none";
   /** @description Filtering Columns */
   select: string;
@@ -754,10 +889,20 @@ export interface parameters {
   "rowFilter.apps.name": string;
   /** Format: character varying */
   "rowFilter.apps.last_version": string;
-  /** Format: ARRAY */
-  "rowFilter.apps.users": string;
   /** Format: timestamp with time zone */
   "rowFilter.apps.updated_at": string;
+  /** @description channel_users */
+  "body.channel_users": definitions["channel_users"];
+  /** Format: bigint */
+  "rowFilter.channel_users.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.channel_users.created_at": string;
+  /** Format: uuid */
+  "rowFilter.channel_users.user_id": string;
+  /** Format: bigint */
+  "rowFilter.channel_users.channel_id": string;
+  /** Format: character varying */
+  "rowFilter.channel_users.app_id": string;
   /** @description channels */
   "body.channels": definitions["channels"];
   /** Format: bigint */
@@ -770,12 +915,12 @@ export interface parameters {
   "rowFilter.channels.app_id": string;
   /** Format: bigint */
   "rowFilter.channels.version": string;
-  /** Format: ARRAY */
-  "rowFilter.channels.users": string;
   /** Format: uuid */
   "rowFilter.channels.created_by": string;
   /** Format: timestamp with time zone */
   "rowFilter.channels.updated_at": string;
+  /** Format: boolean */
+  "rowFilter.channels.public": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

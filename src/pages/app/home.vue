@@ -92,6 +92,11 @@ watchEffect(async() => {
             </div>
           </IonLabel>
         </IonItem>
+        <ion-item-divider>
+          <ion-label>
+            {{ t('projects.sharedlist') }}
+          </ion-label>
+        </ion-item-divider>
       </ion-list>
     </ion-content>
   </ion-page>

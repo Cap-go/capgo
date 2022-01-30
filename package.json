@@ -54,6 +54,7 @@
     "capacitor-rate-app": "^2.0.0",
     "capacitor-updater": "1.0.26",
     "copy-text-to-clipboard": "^3.0.1",
+    "copy-to-clipboard": "^3.3.1",
     "firebase": "9.6.4",
     "mime": "^3.0.0",
     "nprogress": "1.0.0-1",

@@ -61,9 +61,9 @@ const loadData = async() => {
     console.error(error)
   }
 }
-// const openChannel = async(channel: definitions['channels']) => {
-//   router.push(`/app/package/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
-// }
+const openChannel = async(channel: definitions['channels']) => {
+  router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
+}
 
 const openVersion = async(app: definitions['app_versions']) => {
   isLoading.value = true
@@ -163,13 +163,13 @@ const ASChannel = async(ch: definitions['channels']) => {
           })
         },
       },
-      // {
-      //   text: 'Info channel',
-      //   handler: () => {
-      //     actionSheet.dismiss()
-      //     openChannel(v)
-      //   },
-      // },
+      {
+        text: 'Info channel',
+        handler: () => {
+          actionSheet.dismiss()
+          openChannel(ch)
+        },
+      },
       {
         text: 'Cancel',
         role: 'cancel',
@@ -284,7 +284,7 @@ const back = () => {
           </ion-item-divider>
           <IonItem v-for="(ch, index) in channels" :key="index" @click="ASChannel(ch)">
             <IonLabel>
-              <div class="col-span-6 flex flex-col">
+              <div class="col-span-6 flex flex-col cursor-pointer">
                 <div class="flex justify-between items-center">
                   <h2 class="text-sm text-bright-cerulean-500">
                     {{ ch.name }}
@@ -301,7 +301,7 @@ const back = () => {
           </ion-item-divider>
           <IonItem v-for="(v, index) in versions" :key="index" @click="ASVersion(v)">
             <IonLabel>
-              <div class="col-span-6 flex flex-col">
+              <div class="col-span-6 flex flex-col cursor-pointer">
                 <div class="flex justify-between items-center">
                   <h2 class="text-sm text-bright-cerulean-500">
                     {{ v.name }}
