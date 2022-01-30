@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage, toastController } from '@ionic/vue'
+import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage, isPlatform, toastController } from '@ionic/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { email, required } from '@vuelidate/validators'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-// import { initBlog } from '~/services/blog'
+import { SplashScreen } from '@capacitor/splash-screen'
 import { useSupabase } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
 
 const supabase = useSupabase()
+const main = useMainStore()
 const isLoading = ref(false)
 const router = useRouter()
-// const blogs = initBlog()
 const { t } = useI18n()
 
 const form = reactive({
@@ -26,8 +27,6 @@ const rules = {
   password: { required },
 
 }
-// console.log('blogs', blogs)
-
 const v$ = useVuelidate(rules, form)
 const showToastMessage = async(message: string) => {
   const toast = await toastController
@@ -56,14 +55,22 @@ const submit = async() => {
   }
 }
 
-const checkLogin = () => {
+const checkLogin = async() => {
+  main.auth = null
+  isLoading.value = true
   const user = supabase.auth.user()
-
-  console.log('user', user)
-  if (user)
-    router.push('/app')
-  else
-    router.push('/')
+  if (user) {
+    router.push('/app/home')
+    setTimeout(async() => {
+      isLoading.value = false
+      if (isPlatform('capacitor'))
+        SplashScreen.hide()
+    }, 500)
+  }
+  else {
+    isLoading.value = false
+    SplashScreen.hide()
+  }
 }
 
 onMounted(checkLogin)
@@ -91,7 +98,7 @@ onMounted(checkLogin)
             <IonLabel>
               <img src="/person.png" alt="person">
             </IonLabel>
-            <IonInput v-model="form.email" type="email" :placeholder="t('login.email')" required="true" />
+            <IonInput v-model="form.email" type="email" :disabled="isLoading" :placeholder="t('login.email')" required="true" />
           </IonItem>
           <div v-for="(error, index) of v$.email.$errors" :key="index">
             <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
@@ -102,7 +109,7 @@ onMounted(checkLogin)
             <IonLabel>
               <img src="/lock.png" alt="password">
             </IonLabel>
-            <IonInput v-model="form.password" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " required="true" />
+            <IonInput v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " required="true" />
             <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
             <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
           </IonItem>

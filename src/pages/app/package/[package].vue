@@ -5,20 +5,18 @@ import {
   IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent,
   IonTitle,
   IonToolbar,
-  actionSheetController, isPlatform, toastController,
+  actionSheetController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
-import { CapacitorUpdater } from 'capacitor-updater'
-import { SplashScreen } from '@capacitor/splash-screen'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import { openVersion } from '~/services/versions'
 
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
 const id = ref('')
 const isLoading = ref(false)
 const app = ref<definitions['apps']>()
@@ -65,45 +63,6 @@ const openChannel = async(channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
 }
 
-const openVersion = async(app: definitions['app_versions']) => {
-  isLoading.value = true
-  const res = await supabase
-    .storage
-    .from(`apps/${auth?.id}/${app.app_id}/versions`)
-    .createSignedUrl(app.bucket_id, 60)
-
-  const signedURL = res.data?.signedURL
-  if (signedURL && isPlatform('capacitor')) {
-    try {
-      SplashScreen.show()
-      const newFolder = await CapacitorUpdater.download({
-        url: signedURL,
-      })
-      await CapacitorUpdater.set(newFolder)
-    }
-    catch (error) {
-      console.error(error)
-      const toast = await toastController
-        .create({
-          message: 'Cannot set this version',
-          duration: 2000,
-        })
-      await toast.present()
-    }
-    SplashScreen.show()
-    isLoading.value = false
-  }
-  else {
-    isLoading.value = false
-    console.error('no signedURL')
-    const toast = await toastController
-      .create({
-        message: isPlatform('capacitor') ? 'Cannot get the test version' : 'Cannot test in web browser',
-        duration: 2000,
-      })
-    await toast.present()
-  }
-}
 const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
     .from<definitions['channels']>('channels')
@@ -147,37 +106,6 @@ const ASChannelChooser = async(v: definitions['app_versions']) => {
   const actionSheet = await actionSheetController.create({
     header: t('package.link_channel'),
     buttons,
-  })
-  await actionSheet.present()
-}
-const ASChannel = async(ch: definitions['channels']) => {
-  const actionSheet = await actionSheetController.create({
-    buttons: [
-      {
-        text: 'Test channel version',
-        handler: () => {
-          actionSheet.dismiss()
-          versions.value.forEach((v) => {
-            if (v.id === ch.version)
-              return openVersion(v)
-          })
-        },
-      },
-      {
-        text: 'Info channel',
-        handler: () => {
-          actionSheet.dismiss()
-          openChannel(ch)
-        },
-      },
-      {
-        text: 'Cancel',
-        role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
-        },
-      },
-    ],
   })
   await actionSheet.present()
 }
@@ -282,7 +210,7 @@ const back = () => {
               {{ t('package.channels') }}
             </ion-label>
           </ion-item-divider>
-          <IonItem v-for="(ch, index) in channels" :key="index" @click="ASChannel(ch)">
+          <IonItem v-for="(ch, index) in channels" :key="index" @click="openChannel(ch)">
             <IonLabel>
               <div class="col-span-6 flex flex-col cursor-pointer">
                 <div class="flex justify-between items-center">

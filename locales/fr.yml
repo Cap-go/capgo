@@ -1,3 +1,53 @@
+account:
+  backButton: Retour
+  changePassword: Changer le mot de passe
+  heading: Compte
+  keys: Clés API
+  legal: Conditions de services
+  logout: Se déconnecter
+  personalInformation: Informations personnelles
+  preferences: Avis
+  privacy: Politique de confidentialité
+accountPassword:
+  confirmPassword: Confirmez le mot de passe
+  errorMsg: Une erreur s'est produite, veuillez réessayer
+  heading: Changer mon mot de passe
+  password: Nouveau mot de passe
+  success: Mot de passe changé avec succès
+  validate: Valider
+accountProfile:
+  country: Pays
+  email: E-mail
+  first-name: Prénom
+  heading: Informations personnelles
+  last-name: Nom de famille
+  update: Mettre à jour
+activation:
+  desc: Remplissez les champs suivants pour finaliser votre inscription
+  doi: Consentement facultatif
+  doi-desc: J'accepte la newsletter par e-mail et les futures offres marketing
+  heading: Activation
+  headline: Mes paramètres
+  legal: Conditions de services
+  legal-desc: >-
+    J'accepte la politique de confidentialité et les conditions d'utilisation de
+    l'application condensateur Go
+  notification: Avis
+  notification-desc: >-
+    J'accepte de recevoir une notification lorsqu'une nouvelle version de
+    l'application est disponible
+  validate: Valider
+apikeys:
+  all: clés
+  checkbelow: vérifier ci-dessous le lien pour obtenir plus d'informations
+  cli: capgo CLI
+  explain: >-
+    Toutes ces clés API sont conçues pour être utilisées avec l'outil CLI de
+    condensateur Go ou le plugin de mise à jour de condensateur
+  keyCopied: Clés copiées dans votre presse-papiers
+  links: Liens
+  title: Clés API
+  updater: condensateur de mise à jour
 button:
   about: À propos de
   back: Retour
@@ -6,10 +56,66 @@ button:
   tabs: Onglets
   toggle_dark: Basculer en mode sombre
   toggle_langs: Changer de langue
+channel:
+  makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
+  makepublic: Votre chaîne est privée, cliquez pour la rendre publique
+  public: Liaison condensateur-updater
+  title: Informations sur la chaîne
+  users: Partagé avec les utilisateurs
+forgot:
+  check_email: >-
+    Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
+    passe
+  email: E-mail
+  heading: Mot de passe oublié
+  success: Mot de passe mis à jour avec succès
 intro:
   aka: Aussi connu sous le nom de
   desc: Exemple d'application Vite
   dynamic-route: Démo de route dynamique
   hi: Salut, {name}!
   whats-your-name: Comment t'appelles-tu ?
+login:
+  andpass: Et mot de passe
+  connexion: Connexion
+  create-new: Créer un nouveau compte
+  email: E-mail
+  forgot: oublié
+  hello: Bonjour
+  login-in: Se connecter
+  or: ou
+  password: Mot de passe
+  withemail: Avec adresse e-mail
 not-found: Page non trouvée
+notificationSettings:
+  heading: Compte
+  validate: Valider
+onboarding:
+  loading: Chargement
+package:
+  channels: Chaînes
+  link_channel: Lien vers la chaîne
+  title: Info
+  versions: Versions
+projects:
+  list: Tous vos projets
+  sharedlist: Projets partagés avec vous
+  title: Projets
+register:
+  already-account: Avez vous déjà un compte?
+  check-email: Veuillez vérifier votre e-mail et vérifier
+  confirm-email: Confirmez votre e-mail
+  confirm-password: Confirmez le mot de passe
+  desc: Remplissez les champs suivants pour finaliser votre inscription
+  email: E-mail
+  first-name: Prénom
+  heading: Inscription
+  last-name: nom de famille
+  lowerCaseError: Doit contenir des lettres minuscules
+  next: Suivant
+  password: le mot de passe
+  password-hint: >-
+    Entrez une combinaison d'au moins 6 chiffres, lettres et signes de
+    ponctuation.
+  specialError: Doit contenir des caractères spéciaux
+  upperCaseError: Doit contenir des lettres majuscules

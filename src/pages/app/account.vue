@@ -251,14 +251,14 @@ const presentActionSheet = async() => {
         </ul>
         <a
           class="block text-center text-sm text-brink-pink-500 underline mt-4"
-          href="https://9moispourtoi.com/mentions-legales/"
+          href="https://capgo.app/tos/"
           target="_blank"
         >
           {{ t("account.legal") }}
         </a>
         <a
           class="block text-center text-sm text-brink-pink-500 underline mt-4"
-          href="https://9moispourtoi.com/mentions-legales/"
+          href="https://capgo.app/privacy/"
           target="_blank"
         >
           {{ t("account.privacy") }}

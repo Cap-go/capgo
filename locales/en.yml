@@ -14,18 +14,24 @@ intro:
   whats-your-name: What's your name?
 not-found: Not found
 projects:
-  list: All your projects
+  list: Yours
   title: Projects
-  sharedlist: Projects shared with you
+  sharedlist: Shared with you
 package:
   versions: Versions
   channels: Channels
   title: info
   link_channel: Link to channel
 channel:
-  title: Channel info
+  title: Channel
   users: Shared with users
-  public: Capacitor-updater Public link
+  invit: Type email to invite
+  user_no_found: User not found, ask to register first
+  public: Capacitor-updater link
+  open: Open
+  add: Add
+  makeprivate: Your channel is public, click to make it private
+  makepublic: Your channel is private, click to make it public
 login:
   connexion: Login
   create-new: Create new account
@@ -65,7 +71,7 @@ account:
   preferences: Notifications
   logout: Logout
   backButton: Back
-  legal: Legal mentions
+  legal: Terms of services
   privacy: Privacy policy
   keys: API keys
 notificationSettings:
@@ -77,7 +83,7 @@ activation:
   notification: Notifications
   notification-desc: I accept to receive notification when new app version are available
   heading: activation
-  legal: Legal mentions
+  legal: Terms of services
   legal-desc: I accept capacitor Go app privacy policy and terms of use
   doi: Optional consent
   doi-desc: I accept Email newsletter and future marketing offers

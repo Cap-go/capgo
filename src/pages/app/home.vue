@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import { openVersion } from '~/services/versions'
 
 const { t } = useI18n()
 const isLoading = ref(false)
@@ -12,18 +13,57 @@ const router = useRouter()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const apps = ref<definitions['apps'][]>()
+const sharedApps = ref<(definitions['channel_users'] & ChannelUserApp)[]>()
 const openPackage = (appId: string) => {
   router.push(`/app/package/${appId.replaceAll('.', '--')}`)
+}
+
+interface ChannelUserApp {
+  app_id: definitions['apps']
+  channel_id: definitions['channels'] & {
+    version: definitions['app_versions']
+  }
+}
+const getMyApps = async() => {
+  const { data } = await supabase
+    .from<definitions['apps']>('apps')
+    .select()
+    .eq('user_id', auth?.id)
+  if (data && data.length)
+    apps.value = data
+}
+const getSharedWithMe = async() => {
+  const { data } = await supabase
+    .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
+    .select(`
+      id,
+      app_id (
+        app_id,
+        name,
+        icon_url,
+        last_version,
+        created_at
+      ),
+      channel_id (
+        version (
+          bucket_id,
+          app_id,
+          name
+        ),
+        name,
+        created_at
+      ),
+      user_id
+      `)
+    .eq('user_id', auth?.id)
+  if (data && data.length)
+    sharedApps.value = data
 }
 watchEffect(async() => {
   if (route.path === '/app/home') {
     isLoading.value = true
-    const { data } = await supabase
-      .from<definitions['apps']>('apps')
-      .select()
-      .eq('user_id', auth?.id)
-    if (data && data.length)
-      apps.value = data
+    await getMyApps()
+    await getSharedWithMe()
     isLoading.value = false
   }
 })
@@ -52,9 +92,9 @@ watchEffect(async() => {
         <div v-if="isLoading" class="flex justify-center">
           <Spinner />
         </div>
-        <IonItem v-for="(app, index) in apps" v-else-if="apps?.length" :key="index" @click="openPackage(app.app_id)">
+        <IonItem v-for="(app, index) in apps" v-else-if="apps?.length" :key="index" class="cursor-pointer" @click="openPackage(app.app_id)">
           <div slot="start" class="col-span-2 relative py-4">
-            <img :src="app.icon_url" alt="bebe" class="rounded-xl h-15 w-15 object-cover">
+            <img :src="app.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
           </div>
           <IonLabel>
             <div class="col-span-6 flex flex-col">
@@ -97,6 +137,27 @@ watchEffect(async() => {
             {{ t('projects.sharedlist') }}
           </ion-label>
         </ion-item-divider>
+        <IonItem v-for="(app, index) in sharedApps" :key="index" class="cursor-pointer" @click="openVersion(app.channel_id.version)">
+          <div slot="start" class="col-span-2 relative py-4">
+            <img :src="app.app_id.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
+          </div>
+          <IonLabel>
+            <div class="col-span-6 flex flex-col">
+              <div class="flex justify-between items-center">
+                <h2 class="text-sm text-bright-cerulean-500">
+                  {{ app.app_id.name }}
+                </h2>
+              </div>
+              <div class="flex justify-between items-center">
+                <h3 v-if="app.channel_id" class="text-true-gray-800 py-1 font-bold">
+                  {{ app.channel_id.name }}: {{
+                    app.channel_id.version.name
+                  }}
+                </h3>
+              </div>
+            </div>
+          </IonLabel>
+        </IonItem>
       </ion-list>
     </ion-content>
   </ion-page>

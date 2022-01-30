@@ -3,7 +3,7 @@
 import { IonButton, IonContent, IonInput, IonItem, IonPage, IonSpinner, toastController } from '@ionic/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { email, minLength, required, sameAs } from '@vuelidate/validators'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
@@ -16,10 +16,6 @@ const supabase = useSupabase()
 const showPassword = ref(false)
 const showPassword2 = ref(false)
 const step = ref(1)
-onMounted(() => {
-  if (router.currentRoute.value.query && router.currentRoute.value.query.step)
-    step.value = parseInt(router.currentRoute.value.query.step as string)
-})
 
 const form = reactive({
   email: '',
@@ -81,6 +77,15 @@ const submit = async() => {
   }
 }
 
+watchEffect(() => {
+  isLoading.value = true
+  if (route && route.path === '/forgot_password') {
+    if (router.currentRoute.value.query && router.currentRoute.value.query.step)
+      step.value = parseInt(router.currentRoute.value.query.step as string)
+    isLoading.value = false
+  }
+})
+
 </script>
 
 <template>
@@ -99,6 +104,7 @@ const submit = async() => {
           <div v-if="step === 1" class="py-1">
             <IonInput
               v-model="form.email"
+              :disabled="isLoading"
               required
               inputmode="email"
               class="text-left border-b-2 z-0 ion-padding-start"
@@ -114,7 +120,7 @@ const submit = async() => {
           <div v-if="step === 2">
             <div class="py-1">
               <IonItem class="ion-no-padding">
-                <IonInput v-model="form.password" required class="text-left border-b-2 z-0 ion-padding-start" :placeholder="t('login.password')" :type="showPassword ? 'text' : 'password'" />
+                <IonInput v-model="form.password" :disabled="isLoading" required class="text-left border-b-2 z-0 ion-padding-start" :placeholder="t('login.password')" :type="showPassword ? 'text' : 'password'" />
                 <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
                 <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
               </IonItem>
@@ -126,7 +132,7 @@ const submit = async() => {
             </div>
             <div class="py-1">
               <IonItem class="ion-no-padding">
-                <IonInput v-model="form.repeatPassword" required class="text-left border-b-2 z-0 ion-padding-start" :placeholder="t('register.confirm-password')" :type="showPassword2 ? 'text' : 'password'" />
+                <IonInput v-model="form.repeatPassword" :disabled="isLoading" required class="text-left border-b-2 z-0 ion-padding-start" :placeholder="t('register.confirm-password')" :type="showPassword2 ? 'text' : 'password'" />
                 <img v-if="showPassword2" src="/eye-open.png" alt="password" @click="showPassword2 = !showPassword2">
                 <img v-else src="/eye-close.png" alt="password" @click="showPassword2 = !showPassword2">
               </IonItem>
