@@ -54,7 +54,7 @@ export const handler: Handler = async(event) => {
         app_id,
         version (
           name,
-          uuser_id,
+          user_id,
           bucket_id
         )
       `)
