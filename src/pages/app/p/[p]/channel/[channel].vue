@@ -67,6 +67,7 @@ const getChannel = async() => {
       .select(`
           id,
           name,
+          public,
           version (
             name,
             app_id,
@@ -129,7 +130,7 @@ const addUser = async() => {
 const back = () => {
   router.go(-1)
 }
-const publicLink = computed(() => channel.value ? `https://capgp.app/api/latest?appid=${channel.value.app_id}&channel=${channel.value.name}` : '')
+const publicLink = computed(() => channel.value ? `https://capgp.app/api/latest?appid=${channel.value.version.app_id}&channel=${channel.value.name}` : '')
 const copyPublicLink = () => {
   copy(publicLink.value)
 }
