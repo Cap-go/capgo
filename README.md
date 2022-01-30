@@ -1,5 +1,5 @@
 <p align='center'>
-  <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/public/caplogo.png' alt='Vitesse - Opinionated Vite Starter Template' width='200'/>
+  <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/public/capgo.png' alt='Vitesse - Opinionated Vite Starter Template' width='200'/>
 </p>
 TODO: create page in app to get/create/delete apikey, can have read only or read and write rights
 

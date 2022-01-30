@@ -75,7 +75,7 @@ onMounted(checkLogin)
   <IonPage>
     <IonContent :fullscreen="true">
       <div class="grid place-content-center w-full h-full min-h-screen p-8">
-        <img src="/caplogo.png" alt="logo" class="mx-auto rounded w-1/3 mb-6">
+        <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/3 mb-6">
         <h1 class="text-3xl text-left font-medium text-black-light">
           {{ t('login.hello') }} !
         </h1>

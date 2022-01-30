@@ -69,7 +69,7 @@ export const handler: Handler = async(event) => {
   try {
     const body = JSON.parse(event.body || '{}') as AppAdd
     const fileName = `icon_${uuidv4()}`
-    let signedURL = 'https://xvwzpoazmxkqosrdewyv.supabase.in/storage/v1/object/public/images/caplogo.png'
+    let signedURL = 'https://xvwzpoazmxkqosrdewyv.supabase.in/storage/v1/object/public/images/capgo.png'
     if (body.icon && body.iconType) {
       const buff = Buffer.from(body.icon, 'base64')
       const { error } = await supabase.storage
