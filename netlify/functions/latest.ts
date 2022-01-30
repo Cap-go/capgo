@@ -68,7 +68,16 @@ export const handler: Handler = async(event) => {
   }
 
   try {
-    const body = JSON.parse(event.body || '{}') as GetLatest
+    const body = event.queryStringParameters as any as GetLatest
+    if (!body.appid || !body.channel) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          message: 'missing appid or channel',
+        }),
+      }
+    }
 
     const { data: channels, error: dbError } = await supabase
       .from<definitions['channels'] & Channel>('channels')
