@@ -30,6 +30,10 @@ channel:
   public: Capacitor-updater link
   open: Open
   add: Add
+  copy: Copy URL
+  private_desc: Private
+  public_desc: Public
+  make_it: Make it
   makeprivate: Your channel is public, click to make it private
   makepublic: Your channel is private, click to make it public
 login:

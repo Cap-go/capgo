@@ -2,7 +2,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target" : {
         "namespace": "android_app",
-        "package_name": "com.neufmoispourtoi.app",
+        "package_name": "ee.forgr.capacitor_go",
         "sha256_cert_fingerprints": ["2F:DC:FD:AB:D4:E0:EB:23:C8:D9:A4:B4:17:DD:F2:86:45:B6:A2:80:05:A5:A2:88:B8:B7:D3:A3:9B:B3:D3:AC"]
     }
 }]

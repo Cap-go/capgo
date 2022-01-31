@@ -1,3 +1,55 @@
+account:
+  backButton: atrás
+  changePassword: Cambia la contraseña
+  heading: Cuenta
+  keys: claves API
+  legal: Términos de servicios
+  logout: Cerrar sesión
+  personalInformation: Informacion personal
+  preferences: Notificaciones
+  privacy: Política de privacidad
+accountPassword:
+  confirmPassword: Confirmar contraseña
+  errorMsg: Ocurrió un error, inténtalo de nuevo
+  heading: cambiar mi contraseña
+  password: Nueva contraseña
+  success: Contraseña cambiada con éxito
+  validate: Validar
+accountProfile:
+  country: País
+  email: Correo electrónico
+  first-name: Nombre de pila
+  heading: Informacion personal
+  last-name: Apellido
+  update: Actualizar
+activation:
+  desc: Rellene los siguientes campos para completar su registro
+  doi: Consentimiento opcional
+  doi-desc: >-
+    Acepto el boletín de noticias por correo electrónico y futuras ofertas de
+    marketing
+  heading: activación
+  headline: Mi configuración
+  legal: Términos de servicios
+  legal-desc: >-
+    Acepto la política de privacidad y los términos de uso de la aplicación
+    capacitor Go
+  notification: Notificaciones
+  notification-desc: >-
+    Acepto recibir notificaciones cuando haya una nueva versión de la aplicación
+    disponible
+  validate: Validar
+apikeys:
+  all: teclas
+  checkbelow: verifique debajo del enlace para obtener más información
+  cli: CLI de capgo
+  explain: >-
+    Todas esas claves api están hechas para usarse con la herramienta
+    condensador Go CLI o el complemento condensador-actualizador
+  keyCopied: Claves copiadas a su portapapeles
+  links: Enlaces
+  title: claves API
+  updater: actualizador de condensadores
 button:
   about: Acerca de
   back: Atrás
@@ -6,10 +58,70 @@ button:
   tabs: Pestañas
   toggle_dark: Alternar modo oscuro
   toggle_langs: Cambiar idiomas
+channel:
+  add: Agregar
+  invit: Escriba el correo electrónico para invitar
+  makeprivate: Tu canal es público, haz clic para hacerlo privado
+  makepublic: Tu canal es privado, haz clic para hacerlo público
+  open: Abierto
+  public: Enlace condensador-actualizador
+  title: Canal
+  user_no_found: Usuario no encontrado, solicite registrarse primero
+  users: Compartido con los usuarios
+forgot:
+  check_email: >-
+    Revise su correo electrónico para obtener el enlace para restablecer su
+    contraseña
+  email: Correo electrónico
+  heading: Se te olvidó tu contraseña
+  success: Contraseña actualizada exitosamente
 intro:
   aka: También conocido como
   desc: Plantilla de Inicio de Vite Dogmática
   dynamic-route: Demo de ruta dinámica
   hi: ¡Hola, {name}!
   whats-your-name: ¿Cómo te llamas?
+login:
+  andpass: Y contraseña
+  connexion: Acceso
+  create-new: Crear una nueva cuenta
+  email: Correo electrónico
+  forgot: olvidó
+  hello: Hola
+  login-in: Iniciar sesión en
+  or: o
+  password: Contraseña
+  withemail: con dirección de correo electrónico
 not-found: No se ha encontrado
+notificationSettings:
+  heading: Cuenta
+  validate: Validar
+onboarding:
+  loading: Cargando
+package:
+  channels: Canales
+  link_channel: Enlace al canal
+  title: información
+  versions: Versiones
+projects:
+  list: Tuya
+  sharedlist: Compartido con usted
+  title: Proyectos
+register:
+  already-account: ¿Ya tienes una cuenta?
+  check-email: Por favor revise su correo electrónico y verifique
+  confirm-email: Confirmar correo electrónico
+  confirm-password: Confirmar contraseña
+  desc: Rellene los siguientes campos para completar su registro
+  email: Correo electrónico
+  first-name: primer nombre
+  heading: Registro
+  last-name: apellido
+  lowerCaseError: Debe contener letras minúsculas
+  next: próximo
+  password: contraseña
+  password-hint: >-
+    Introduzca una combinación de al menos 6 números, letras y signos de
+    puntuación.
+  specialError: Debe contener caracteres especiales
+  upperCaseError: Debe contener letras mayúsculas

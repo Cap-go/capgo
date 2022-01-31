@@ -27,6 +27,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="@string/custom_url_scheme" />
+                <data android:scheme="https" android:host="capgo.app" />
+                <data android:scheme="https" android:host="xvwzpoazmxkqosrdewyv.supabase.co" />
             </intent-filter>
         </activity>
 
@@ -38,6 +40,7 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
+
         </provider>
     </application>
     <queries>

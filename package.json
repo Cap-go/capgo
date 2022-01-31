@@ -6,6 +6,7 @@
     "preview": "vite preview",
     "preview-https": "serve dist",
     "mobile": "vite build --mode mobile && cap copy",
+    "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
     "sync": "cap sync",
     "front": "vite --port 3334",
     "dev": "netlify dev",
@@ -14,6 +15,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor-community/http": "^1.4.1",
     "@capacitor/action-sheet": "1.0.7",
     "@capacitor/android": "3.4.0",
     "@capacitor/app": "1.1.0",

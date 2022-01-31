@@ -1,3 +1,53 @@
+account:
+  backButton: Zurück
+  changePassword: Kennwort ändern
+  heading: Konto
+  keys: API-Schlüssel
+  legal: Nutzungsbedingungen
+  logout: Ausloggen
+  personalInformation: Persönliche Informationen
+  preferences: Benachrichtigungen
+  privacy: Datenschutz-Bestimmungen
+accountPassword:
+  confirmPassword: Kennwort bestätigen
+  errorMsg: Fehler aufgetreten, bitte versuchen Sie es erneut
+  heading: Ändere mein Passwort
+  password: Neues Passwort
+  success: Passwort erfolgreich geändert
+  validate: Bestätigen
+accountProfile:
+  country: Land
+  email: Email
+  first-name: Vorname
+  heading: Persönliche Informationen
+  last-name: Nachname
+  update: Aktualisieren
+activation:
+  desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
+  doi: Optionale Zustimmung
+  doi-desc: Ich akzeptiere E-Mail-Newsletter und zukünftige Marketingangebote
+  heading: Aktivierung
+  headline: Meine Einstellungen
+  legal: Nutzungsbedingungen
+  legal-desc: >-
+    Ich akzeptiere die Datenschutzrichtlinien und Nutzungsbedingungen der
+    Capacitor Go-App
+  notification: Benachrichtigungen
+  notification-desc: >-
+    Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
+    verfügbar sind
+  validate: Bestätigen
+apikeys:
+  all: Schlüssel
+  checkbelow: Überprüfen Sie unter dem Link, um weitere Informationen zu erhalten
+  cli: capgo-CLI
+  explain: >-
+    Alle diese API-Schlüssel sind für die Verwendung mit dem Capacitor Go
+    CLI-Tool oder dem Capacitor-Updater-Plugin vorgesehen
+  keyCopied: Schlüssel in Ihre Zwischenablage kopiert
+  links: Verknüpfungen
+  title: API-Schlüssel
+  updater: Kondensator-Updater
 button:
   about: Über
   back: Zurück
@@ -6,10 +56,70 @@ button:
   tabs: Registerkarten
   toggle_dark: Dunkelmodus umschalten
   toggle_langs: Sprachen ändern
+channel:
+  add: Hinzufügen
+  invit: Geben Sie die einzuladende E-Mail-Adresse ein
+  makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen
+  makepublic: Dein Kanal ist privat, klicke hier, um ihn öffentlich zu machen
+  open: Offen
+  public: Kondensator-Updater-Link
+  title: Kanal
+  user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
+  users: Mit Benutzern geteilt
+forgot:
+  check_email: >-
+    Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
+    erhalten
+  email: Email
+  heading: Passwort vergessen
+  success: Passwort erfolgreich aktualisiert
 intro:
   aka: Auch bekannt als
   desc: Vite Startvorlage mit Vorlieben
   dynamic-route: Demo einer dynamischen Route
   hi: Hi, {name}!
   whats-your-name: Wie heißt du?
+login:
+  andpass: Und Passwort
+  connexion: Anmeldung
+  create-new: Neuen Account erstellen
+  email: Email
+  forgot: vergessen
+  hello: Hallo
+  login-in: Einloggen in
+  or: oder
+  password: Passwort
+  withemail: Mit E-Mail-Adresse
 not-found: Nicht gefunden
+notificationSettings:
+  heading: Konto
+  validate: Bestätigen
+onboarding:
+  loading: Wird geladen
+package:
+  channels: Kanäle
+  link_channel: Link zum Kanal
+  title: die Info
+  versions: Versionen
+projects:
+  list: Deine
+  sharedlist: Mit dir geteilt
+  title: Projekte
+register:
+  already-account: Sie haben schon ein Konto?
+  check-email: Bitte überprüfen Sie Ihre E-Mail und bestätigen Sie
+  confirm-email: Bestätigungs-E-Mail
+  confirm-password: Kennwort bestätigen
+  desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
+  email: Email
+  first-name: Vorname
+  heading: Anmeldung
+  last-name: Nachname
+  lowerCaseError: Sollte Kleinbuchstaben enthalten
+  next: Nächste
+  password: Passwort
+  password-hint: >-
+    Geben Sie eine Kombination aus mindestens 6 Zahlen, Buchstaben und
+    Satzzeichen ein.
+  specialError: Sollte Sonderzeichen enthalten
+  upperCaseError: Sollte Großbuchstaben enthalten

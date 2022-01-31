@@ -2,6 +2,7 @@ lockfileVersion: 5.3
 
 specifiers:
   '@antfu/eslint-config': 0.16.0
+  '@capacitor-community/http': ^1.4.1
   '@capacitor/action-sheet': 1.0.7
   '@capacitor/android': 3.4.0
   '@capacitor/app': 1.1.0
@@ -93,6 +94,7 @@ specifiers:
   vue-tsc: 0.30.6
 
 dependencies:
+  '@capacitor-community/http': 1.4.1
   '@capacitor/action-sheet': 1.0.7_@capacitor+core@3.4.0
   '@capacitor/android': 3.4.0_@capacitor+core@3.4.0
   '@capacitor/app': 1.1.0_@capacitor+core@3.4.0
@@ -1843,6 +1845,15 @@ packages:
   /@bugsnag/safe-json-stringify/6.0.0:
     resolution: {integrity: sha512-htzFO1Zc57S8kgdRK9mLcPVTW1BY2ijfH7Dk2CeZmspTWKdKqSo1iwmqrq2WtRjFlo8aRZYgLX0wFrDXF/9DLA==}
     dev: true
+
+  /@capacitor-community/http/1.4.1:
+    resolution: {integrity: sha512-+pCkBXrwfm97UfjOgjV950H/qZ8SE36Mrcb46BlL1ps3VIsGuIO+AulL8GqTC6LewheRVtGJpRspNtneXQotNA==}
+    dependencies:
+      '@capacitor/android': 3.4.0_@capacitor+core@3.4.0
+      '@capacitor/core': 3.4.0
+      '@capacitor/filesystem': 1.1.0_@capacitor+core@3.4.0
+      '@capacitor/ios': 3.4.0_@capacitor+core@3.4.0
+    dev: false
 
   /@capacitor/action-sheet/1.0.7_@capacitor+core@3.4.0:
     resolution: {integrity: sha512-10H/kUiO8RcS/Gwl35DHpJXbvW9tBlR2qgRoldJLzKM+CXE2kGtD2AhmzEcEYy/OXhB6lgA/IGtk7bYKURpyEw==}

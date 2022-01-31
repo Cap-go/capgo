@@ -57,10 +57,14 @@ button:
   toggle_dark: Basculer en mode sombre
   toggle_langs: Changer de langue
 channel:
+  add: Ajouter
+  invit: Tapez l'e-mail pour inviter
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
   makepublic: Votre chaîne est privée, cliquez pour la rendre publique
+  open: Ouvert
   public: Liaison condensateur-updater
   title: Informations sur la chaîne
+  user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Partagé avec les utilisateurs
 forgot:
   check_email: >-

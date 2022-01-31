@@ -9,27 +9,33 @@ const guard = async(next: any, to: string, from: string) => {
 
   const main = useMainStore()
 
-  if (auth) {
+  if (auth && !main.auth) {
     main.auth = auth
     if (!main.user) {
-      const { data, error } = await supabase
-        .from<definitions['users']>('users')
-        .select(`
+      try {
+        const { data, error } = await supabase
+          .from<definitions['users']>('users')
+          .select(`
         id,
         country,
         image_url,
         first_name,
-        last_name
+        last_name,
+        image_url
       `)
-        .match({ id: auth?.id })
-      if (!error && data && data.length)
-        main.user = data[0]
+          .match({ id: auth?.id })
+        if (!error && data && data.length)
+          main.user = data[0]
+      }
+      catch (error) {
+        console.log('error', error)
+      }
     }
 
     if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding')) next('/onboarding/activation')
     else next()
   }
-  else if (from !== 'login') {
+  else if (from !== 'login' && !auth) {
     main.auth = null
     next('/login')
   }

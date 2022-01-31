@@ -1,3 +1,54 @@
+account:
+  backButton: Indietro
+  changePassword: Cambiare la password
+  heading: Account
+  keys: Chiavi API
+  legal: Termini di servizio
+  logout: Disconnettersi
+  personalInformation: Informazione personale
+  preferences: Notifiche
+  privacy: Politica sulla riservatezza
+accountPassword:
+  confirmPassword: Conferma password
+  errorMsg: Si è verificato un errore, riprova
+  heading: Cambia la mia password
+  password: Nuova password
+  success: Password modificata con successo
+  validate: Convalidare
+accountProfile:
+  country: Nazione
+  email: E-mail
+  first-name: Nome di battesimo
+  heading: Informazione personale
+  last-name: Cognome
+  update: Aggiornare
+activation:
+  desc: Compila i seguenti campi per completare la registrazione
+  doi: Consenso facoltativo
+  doi-desc: Accetto newsletter via e-mail e future offerte di marketing
+  heading: Attivazione
+  headline: Le mie impostazioni
+  legal: Termini di servizio
+  legal-desc: >-
+    Accetto l'informativa sulla privacy e i termini di utilizzo dell'app
+    capacitor Go
+  notification: Notifiche
+  notification-desc: >-
+    Accetto di ricevere una notifica quando sono disponibili nuove versioni
+    dell'app
+  validate: Convalidare
+apikeys:
+  all: chiavi
+  checkbelow: controlla sotto il link per avere maggiori informazioni
+  cli: capgo CLI
+  explain: >-
+    Tutte queste chiavi API sono realizzate per essere utilizzate con lo
+    strumento CLI del condensatore Go o il plug-in di aggiornamento del
+    condensatore
+  keyCopied: Chiavi copiate negli appunti
+  links: Collegamenti
+  title: Chiavi API
+  updater: condensatore di aggiornamento
 button:
   about: Su di me
   back: Indietro
@@ -6,6 +57,19 @@ button:
   tabs: schede
   toggle_dark: Attiva/disattiva modalità scura
   toggle_langs: Cambia lingua
+channel:
+  add: Aggiungere
+  invit: Digita email per invitare
+  makeprivate: Il tuo canale è pubblico, fai clic per renderlo privato
+  makepublic: Il tuo canale è privato, clicca per renderlo pubblico
+  open: Aprire
+  public: Collegamento condensatore-aggiornamento
+  title: Canale
+  user_no_found: Utente non trovato, chiedi prima di registrarti
+  users: Condiviso con gli utenti
+forgot:
+  check_email: Controlla la tua email per ottenere il link per reimpostare la tua password
+  email: E-mail
 intro:
   desc: Modello per una Applicazione Vite
   dynamic-route: Demo di rotta dinamica

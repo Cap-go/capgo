@@ -6,6 +6,7 @@ import { useSupabase } from '~/services/supabase'
 
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | null>()
+  const path = ref('')
   const user = ref<definitions['users']>()
 
   const logout = async() => {
@@ -27,6 +28,7 @@ export const useMainStore = defineStore('main', () => {
   return {
     auth,
     user,
+    path,
     logout,
   }
 })

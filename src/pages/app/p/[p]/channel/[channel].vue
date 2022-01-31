@@ -203,7 +203,10 @@ const presentActionSheet = async(usr: definitions['users']) => {
       <ion-header>
         <ion-toolbar>
           <ion-title size="large">
-            {{ t('channel.title') }} {{ channel?.name }}
+            {{ t('channel.title') }}
+            <span class="text-vista-blue-500">
+              {{ channel?.name }} {{ t(channel?.public ? 'channel.public_desc' : 'channel.private_desc') }}
+            </span>
           </ion-title>
           <IonButtons v-if="channel" slot="end">
             <IonButton color="danger" @click="openApp()">
@@ -221,31 +224,20 @@ const presentActionSheet = async(usr: definitions['users']) => {
         <IonItem v-if="channel && channel.public" @click="copyPublicLink()">
           <IonLabel>
             <div class="col-span-6 flex flex-col cursor-pointer">
-              <div class="flex justify-between items-center">
+              <div class="flex justify-between items-center truncate pr-4">
                 <h2 class="text-sm text-bright-cerulean-500">
-                  {{ publicLink }}
+                  {{ t('channel.copy') }} {{ publicLink }}
                 </h2>
               </div>
             </div>
           </IonLabel>
         </IonItem>
-        <IonItem v-if="channel && channel.public" @click="makePublic(false)">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col cursor-pointer">
-              <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
-                  {{ t('channel.makeprivate') }}
-                </h2>
-              </div>
-            </div>
-          </IonLabel>
-        </IonItem>
-        <IonItem v-else @click="makePublic()">
+        <IonItem @click="makePublic(!channel?.public)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center cursor-pointer">
                 <h2 class="text-sm text-bright-cerulean-500">
-                  {{ t('channel.makepublic') }}
+                  {{ t('channel.make_it') }} {{ t(channel?.public ? 'channel.private_desc' : 'channel.public_desc') }}
                 </h2>
               </div>
             </div>

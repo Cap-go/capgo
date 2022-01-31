@@ -4,5 +4,12 @@
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:capgo.app</string>
+		<string>webcredentials:capgo.app</string>
+		<string>applinks:*.capgo.app</string>
+		<string>applinks:xvwzpoazmxkqosrdewyv.supabase.co</string>
+	</array>
 </dict>
 </plist>
