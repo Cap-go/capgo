@@ -1,6 +1,5 @@
 // register vue composition api globally
 import { createApp } from 'vue'
-import { SplashScreen } from '@capacitor/splash-screen'
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 import generatedRoutes from 'virtual:generated-pages'
 import { setupLayouts } from 'virtual:generated-layouts'
@@ -45,7 +44,5 @@ app.use(router)
 Object.values(import.meta.globEager('./modules/*.ts')).map(i => i.install?.({ app, router, routes }))
 
 router.isReady().then(() => {
-  if (isPlatform('capacitor'))
-    SplashScreen.hide()
   app.mount('#app')
 })
