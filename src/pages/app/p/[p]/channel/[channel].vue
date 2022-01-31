@@ -2,7 +2,7 @@
 import {
   IonButton, IonButtons, IonContent,
   IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList,
-  IonPage, IonTitle, IonToolbar, actionSheetController,
+  IonListHeader, IonPage, IonTitle, IonToolbar, actionSheetController,
   toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
@@ -197,16 +197,14 @@ const presentActionSheet = async(usr: definitions['users']) => {
             <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
           </IonButton>
         </IonButtons>
+        <IonTitle>{{ t('channel.title') }}</IonTitle>
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
-      <ion-header>
+      <ion-header collapse="condense">
         <ion-toolbar>
           <ion-title size="large">
             {{ t('channel.title') }}
-            <span class="text-vista-blue-500">
-              {{ channel?.name }} {{ t(channel?.public ? 'channel.public_desc' : 'channel.private_desc') }}
-            </span>
           </ion-title>
           <IonButtons v-if="channel" slot="end">
             <IonButton color="danger" @click="openApp()">
@@ -216,6 +214,11 @@ const presentActionSheet = async(usr: definitions['users']) => {
         </ion-toolbar>
       </ion-header>
       <ion-list>
+        <ion-list-header>
+          <span class="text-vista-blue-500">
+            {{ channel?.name }} {{ t(channel?.public ? 'channel.public_desc' : 'channel.private_desc') }}
+          </span>
+        </ion-list-header>
         <ion-item-divider>
           <ion-label>
             {{ t('channel.public') }}
