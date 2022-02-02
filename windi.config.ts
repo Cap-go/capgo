@@ -1,17 +1,33 @@
 import { defineConfig } from 'windicss/helpers'
 
+import colors from 'windicss/colors'
+import defaultTheme from 'windicss/defaultTheme'
+
 export default defineConfig({
   darkMode: 'media',
   // https://windicss.org/posts/v30.html#attributify-mode
   attributify: true,
   plugins: [
     require('windicss/plugin/line-clamp'),
+    require('windicss/plugin/forms'),
     require('windicss/plugin/typography'),
     require('windicss/plugin/aspect-ratio'),
   ],
+  variants: {
+    aspectRatio: ['responsive'],
+  },
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
+      },
       colors: {
+        'gray': colors.gray,
+        'amber': colors.amber,
+        'rose': colors.rose,
+        'emerald': colors.emerald,
+        'orange': colors.orange,
+        'teal': colors.teal,
         'sweet-pink': {
           50: '#ffd4d0',
           100: '#ffcac6',
