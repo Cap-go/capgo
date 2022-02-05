@@ -1,6 +1,6 @@
-import { App } from 'vue'
-import { Router, RouteRecordRaw } from 'vue-router'
-import { HeadClient } from '@vueuse/head'
+import type { App } from 'vue'
+import type { RouteRecordRaw, Router } from 'vue-router'
+import type { HeadClient } from '@vueuse/head'
 
 interface AppContext<HasRouter extends boolean = true> {
   app: App<Element>
