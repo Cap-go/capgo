@@ -1,15 +1,6 @@
 <p align='center'>
   <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/public/capgo.png' alt='Vitesse - Opinionated Vite Starter Template' width='200'/>
 </p>
-TODO: create page in app to get/create/delete apikey, can have read only or read and write rights
-
-TODO: add netlify function for get current prod version
-
-TODO: add autopull system in capacitor-updater
-
-<p align='center'>
-Mocking up web app with <b>Vitesse</b><sup><em>(speed)</em></sup><br>
-</p>
 
 <br>
 
@@ -25,7 +16,13 @@ Mocking up web app with <b>Vitesse</b><sup><em>(speed)</em></sup><br>
 
 - 😃 Share your dev with your teamate
 
+- ↕️ Manage your channels for auto update system.
+
 <br>
+
+## Documentation
+
+https://doc.capgo.app
 
 ## Plugins
 
