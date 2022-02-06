@@ -19,7 +19,7 @@ import fs from 'fs-extra'
 import matter from 'gray-matter'
 
 const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
-const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/veriy_email', '/onboarding/activation']
+const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
 
 export default defineConfig({
   resolve: {

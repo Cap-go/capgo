@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from '~/services/supabase'
+import Spinner from '~/components/Spinner.vue'
 
 const supabase = useSupabase()
 const route = useRoute()
@@ -86,7 +87,9 @@ watchEffect(() => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      {{ t('onboarding.loading') }}
+      <section class="flex justify-center">
+        <Spinner />
+      </section>
     </IonContent>
   </IonPage>
 </template>
