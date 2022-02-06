@@ -97,7 +97,7 @@ const ASChannelChooser = async(v: definitions['app_versions']) => {
     })
   }
   buttons.push({
-    text: 'Cancel',
+    text: t('button.cancel'),
     role: 'cancel',
     handler: () => {
       console.log('Cancel clicked')
@@ -113,21 +113,21 @@ const ASVersion = async(v: definitions['app_versions']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
-        text: 'Test version',
+        text: t('package.test'),
         handler: () => {
           actionSheet.dismiss()
           openVersion(v)
         },
       },
       {
-        text: 'Set version to channel',
+        text: t('package.set'),
         handler: () => {
           actionSheet.dismiss()
           ASChannelChooser(v)
         },
       },
       {
-        text: 'Cancel',
+        text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
           console.log('Cancel clicked')

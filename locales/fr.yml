@@ -51,6 +51,10 @@ apikeys:
 button:
   about: À propos de
   back: Retour
+  browse: Parcourir
+  camera: Caméra
+  cancel: Annuler
+  delete: Supprimer
   go: Essayer
   home: Accueil
   tabs: Onglets
@@ -58,11 +62,15 @@ button:
   toggle_langs: Changer de langue
 channel:
   add: Ajouter
+  copy: Copier le lien
   invit: Tapez l'e-mail pour inviter
+  make_it: Fais-le
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
   makepublic: Votre chaîne est privée, cliquez pour la rendre publique
   open: Ouvert
+  private_desc: Privé
   public: Liaison condensateur-updater
+  public_desc: Publique
   title: Informations sur la chaîne
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Partagé avec les utilisateurs
@@ -99,6 +107,8 @@ onboarding:
 package:
   channels: Chaînes
   link_channel: Lien vers la chaîne
+  set: Définir la version sur le canal
+  test: Version de lancement
   title: Info
   versions: Versions
 projects:

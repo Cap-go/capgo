@@ -46,7 +46,7 @@ const updloadPhoto = async(data: string, fileName: string, contentType: string) 
   isLoading.value = false
 
   if (error || urlError || dbError || !publicURL || !usr || !usr.length) {
-    errorMessage.value = 'Something went wrong! Try again later.'
+    errorMessage.value = t('something-went-wrong-try-again-later')
     console.error('upload error', error, urlError, dbError)
     return
   }
@@ -119,21 +119,21 @@ const presentActionSheet = async() => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
-        text: 'Camera',
+        text: t('button.camera'),
         handler: () => {
           actionSheet.dismiss()
           takePhoto()
         },
       },
       {
-        text: 'Browse',
+        text: t('button.browse'),
         handler: () => {
           actionSheet.dismiss()
           pickPhoto()
         },
       },
       {
-        text: 'Cancel',
+        text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
           console.log('Cancel clicked')

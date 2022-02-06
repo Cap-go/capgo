@@ -52,6 +52,10 @@ apikeys:
 button:
   about: Su di me
   back: Indietro
+  browse: Navigare
+  camera: Telecamera
+  cancel: Annulla
+  delete: Eliminare
   go: Vai
   home: Home
   tabs: schede
@@ -59,20 +63,72 @@ button:
   toggle_langs: Cambia lingua
 channel:
   add: Aggiungere
+  copy: Copia URL
   invit: Digita email per invitare
+  make_it: Fallo
   makeprivate: Il tuo canale è pubblico, fai clic per renderlo privato
   makepublic: Il tuo canale è privato, clicca per renderlo pubblico
   open: Aprire
+  private_desc: Privato
   public: Collegamento condensatore-aggiornamento
+  public_desc: Pubblico
   title: Canale
   user_no_found: Utente non trovato, chiedi prima di registrarti
   users: Condiviso con gli utenti
 forgot:
   check_email: Controlla la tua email per ottenere il link per reimpostare la tua password
   email: E-mail
+  heading: Ha dimenticato la password
+  success: Password aggiornata correttamente
 intro:
+  aka: Conosciuto anche come
   desc: Modello per una Applicazione Vite
   dynamic-route: Demo di rotta dinamica
   hi: Ciao, {name}!
   whats-your-name: Come ti chiami?
+login:
+  andpass: E password
+  connexion: Login
+  create-new: Crea un nuovo account
+  email: E-mail
+  forgot: dimenticato
+  hello: Ciao
+  login-in: Accedi
+  or: o
+  password: Parola d'ordine
+  withemail: Con indirizzo email
 not-found: Non trovato
+notificationSettings:
+  heading: Account
+  validate: Convalidare
+onboarding:
+  loading: Caricamento in corso
+package:
+  channels: Canali
+  link_channel: Link al canale
+  set: Imposta la versione sul canale
+  test: Versione di lancio
+  title: Informazioni
+  versions: Versioni
+projects:
+  list: Il tuo
+  sharedlist: Condiviso con te
+  title: Progetti
+register:
+  already-account: Hai già un account?
+  check-email: Si prega di controllare la posta elettronica e verificare
+  confirm-email: Conferma email
+  confirm-password: Conferma password
+  desc: Compila i seguenti campi per completare la registrazione
+  email: E-mail
+  first-name: nome di battesimo
+  heading: Registrazione
+  last-name: cognome
+  lowerCaseError: Dovrebbe contenere lettere minuscole
+  next: Prossimo
+  password: parola d'ordine
+  password-hint: >-
+    Inserisci una combinazione di almeno 6 numeri, lettere e segni di
+    punteggiatura.
+  specialError: Dovrebbe contenere caratteri speciali
+  upperCaseError: Dovrebbe contenere lettere maiuscole

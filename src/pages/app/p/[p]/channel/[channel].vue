@@ -170,14 +170,14 @@ const presentActionSheet = async(usr: definitions['users']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
-        text: 'Delete from list',
+        text: t('button.delete'),
         handler: () => {
           actionSheet.dismiss()
           deleteUser(usr)
         },
       },
       {
-        text: 'Cancel',
+        text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
           console.log('Cancel clicked')

@@ -1,15 +1,131 @@
+account:
+  backButton: Kembali
+  changePassword: Ganti kata sandi
+  heading: Akun
+  keys: kunci API
+  legal: Persyaratan layanan
+  logout: Keluar
+  personalInformation: Informasi pribadi
+  preferences: Pemberitahuan
+  privacy: Rahasia pribadi
+accountPassword:
+  confirmPassword: Setujui password
+  errorMsg: Terjadi kesalahan, silakan coba lagi
+  heading: Ubah kata sandi saya
+  password: Kata sandi baru
+  success: Berhasil mengubah kata sandi
+  validate: Mengesahkan
+accountProfile:
+  country: Negara
+  email: Surel
+  first-name: Nama depan
+  heading: Informasi pribadi
+  last-name: nama keluarga
+  update: Memperbarui
+activation:
+  desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
+  doi: Persetujuan opsional
+  doi-desc: Saya menerima buletin Email dan penawaran pemasaran di masa mendatang
+  heading: pengaktifan
+  headline: Pengaturan saya
+  legal: Persyaratan layanan
+  legal-desc: >-
+    Saya menerima kebijakan privasi aplikasi kapasitor Go dan persyaratan
+    penggunaan
+  notification: Pemberitahuan
+  notification-desc: >-
+    Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru
+    tersedia
+  validate: Mengesahkan
+apikeys:
+  all: kunci
+  checkbelow: cek di bawah link untuk mendapatkan informasi lebih lanjut
+  cli: capgo CLI
+  explain: >-
+    Semua kunci api tersebut dibuat untuk digunakan dengan alat CLI kapasitor
+    Go, atau plugin pembaru kapasitor
+  keyCopied: Kunci disalin ke papan klip Anda
+  links: Tautan
+  title: kunci API
+  updater: kapasitor-pembaru
 button:
   about: Tentang
   back: Kembali
+  browse: Jelajahi
+  camera: Kamera
+  cancel: Membatalkan
+  delete: Menghapus
   go: Pergi
   home: Beranda
   tabs: tab
   toggle_dark: Ubah ke mode gelap
   toggle_langs: Ubah bahasa
+channel:
+  add: Menambahkan
+  copy: Salin URL
+  invit: Ketik email untuk mengundang
+  make_it: Buat itu
+  makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi
+  makepublic: Saluran Anda bersifat pribadi, klik untuk menjadikannya publik
+  open: Membuka
+  private_desc: Pribadi
+  public: Tautan pemutakhiran kapasitor
+  public_desc: Publik
+  title: Saluran
+  user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
+  users: Dibagikan dengan pengguna
+forgot:
+  check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
+  email: Surel
+  heading: Tidak ingat kata sandi
+  success: Kata sandi berhasil diperbarui
 intro:
   aka: Juga diketahui sebagai
   desc: Template awal vite
   dynamic-route: Contoh rute dinamik
   hi: Halo, {name}!
   whats-your-name: Siapa nama anda?
+login:
+  andpass: Dan kata sandi
+  connexion: Gabung
+  create-new: Buat akun baru
+  email: Surel
+  forgot: lupa
+  hello: Halo
+  login-in: Masuk
+  or: atau
+  password: Kata sandi
+  withemail: Dengan alamat email
 not-found: Tidak ditemukan
+notificationSettings:
+  heading: Akun
+  validate: Mengesahkan
+onboarding:
+  loading: Memuat
+package:
+  channels: saluran
+  link_channel: Tautan ke saluran
+  set: Setel versi ke saluran
+  test: Luncurkan versi
+  title: informasi
+  versions: Versi
+projects:
+  list: Milikmu
+  sharedlist: Dibagikan dengan Anda
+  title: Proyek
+register:
+  already-account: Anda sudah memiliki akun?
+  check-email: Silakan periksa email Anda dan verifikasi
+  confirm-email: Konfirmasi email
+  confirm-password: Setujui password
+  desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
+  email: Surel
+  first-name: nama depan
+  heading: Registrasi
+  last-name: nama keluarga
+  lowerCaseError: Harus mengandung huruf kecil
+  next: Berikutnya
+  password: kata sandi
+  password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
+  specialError: Harus mengandung karakter khusus
+  upperCaseError: Harus mengandung huruf besar

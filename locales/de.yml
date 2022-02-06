@@ -51,6 +51,10 @@ apikeys:
 button:
   about: Über
   back: Zurück
+  browse: Durchsuche
+  camera: Kamera
+  cancel: Abbrechen
+  delete: Löschen
   go: Los
   home: Startseite
   tabs: Registerkarten
@@ -58,11 +62,15 @@ button:
   toggle_langs: Sprachen ändern
 channel:
   add: Hinzufügen
+  copy: URL kopieren
   invit: Geben Sie die einzuladende E-Mail-Adresse ein
+  make_it: Mach es
   makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen
   makepublic: Dein Kanal ist privat, klicke hier, um ihn öffentlich zu machen
   open: Offen
+  private_desc: Privatgelände
   public: Kondensator-Updater-Link
+  public_desc: Allgemein
   title: Kanal
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
   users: Mit Benutzern geteilt
@@ -99,6 +107,8 @@ onboarding:
 package:
   channels: Kanäle
   link_channel: Link zum Kanal
+  set: Version auf Kanal setzen
+  test: Version starten
   title: die Info
   versions: Versionen
 projects:

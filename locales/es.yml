@@ -53,6 +53,10 @@ apikeys:
 button:
   about: Acerca de
   back: Atrás
+  browse: Navegar
+  camera: Cámara
+  cancel: Cancelar
+  delete: Borrar
   go: Ir
   home: Inicio
   tabs: Pestañas
@@ -60,11 +64,15 @@ button:
   toggle_langs: Cambiar idiomas
 channel:
   add: Agregar
+  copy: Copiar URL
   invit: Escriba el correo electrónico para invitar
+  make_it: Hazlo
   makeprivate: Tu canal es público, haz clic para hacerlo privado
   makepublic: Tu canal es privado, haz clic para hacerlo público
   open: Abierto
+  private_desc: Privado
   public: Enlace condensador-actualizador
+  public_desc: Público
   title: Canal
   user_no_found: Usuario no encontrado, solicite registrarse primero
   users: Compartido con los usuarios
@@ -101,6 +109,8 @@ onboarding:
 package:
   channels: Canales
   link_channel: Enlace al canal
+  set: Establecer versión para el canal
+  test: Versión de lanzamiento
   title: información
   versions: Versiones
 projects:

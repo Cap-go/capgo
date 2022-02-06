@@ -30,15 +30,15 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Test camera feature </string>
+	<string>Allow Camera feature  to test in dev app</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Test geolocation feature in your app</string>
+	<string>Allow Location feature  to test in dev app</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Test geolocation feature in your app</string>
+	<string>Allow Location feature  to test in dev app</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Test get photo from library</string>
+	<string>Allow Phone library feature  to test in dev app</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Test get photo from library</string>
+	<string>Allow Library feature  to test in dev app</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
