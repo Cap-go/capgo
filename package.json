@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@capacitor-community/http": "^1.4.1",
+    "@capacitor-community/keep-awake": "^2.1.1",
     "@capacitor/action-sheet": "1.0.7",
     "@capacitor/android": "3.4.0",
     "@capacitor/app": "1.1.0",

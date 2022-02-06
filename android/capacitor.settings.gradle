@@ -5,6 +5,9 @@ project(':capacitor-android').projectDir = new File('../node_modules/.pnpm/@capa
 include ':capacitor-community-http'
 project(':capacitor-community-http').projectDir = new File('../node_modules/.pnpm/@capacitor-community+http@1.4.1/node_modules/@capacitor-community/http/android')
 
+include ':capacitor-community-keep-awake'
+project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/.pnpm/@capacitor-community+keep-awake@2.1.1_@capacitor+core@3.4.0/node_modules/@capacitor-community/keep-awake/android')
+
 include ':capacitor-action-sheet'
 project(':capacitor-action-sheet').projectDir = new File('../node_modules/.pnpm/@capacitor+action-sheet@1.0.7_@capacitor+core@3.4.0/node_modules/@capacitor/action-sheet/android')
 

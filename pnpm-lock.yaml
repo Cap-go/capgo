@@ -3,6 +3,7 @@ lockfileVersion: 5.3
 specifiers:
   '@antfu/eslint-config': 0.16.1
   '@capacitor-community/http': ^1.4.1
+  '@capacitor-community/keep-awake': ^2.1.1
   '@capacitor/action-sheet': 1.0.7
   '@capacitor/android': 3.4.0
   '@capacitor/app': 1.1.0
@@ -103,6 +104,7 @@ specifiers:
 
 dependencies:
   '@capacitor-community/http': 1.4.1
+  '@capacitor-community/keep-awake': 2.1.1_@capacitor+core@3.4.0
   '@capacitor/action-sheet': 1.0.7_@capacitor+core@3.4.0
   '@capacitor/android': 3.4.0_@capacitor+core@3.4.0
   '@capacitor/app': 1.1.0_@capacitor+core@3.4.0
@@ -1875,6 +1877,14 @@ packages:
       '@capacitor/core': 3.4.0
       '@capacitor/filesystem': 1.1.0_@capacitor+core@3.4.0
       '@capacitor/ios': 3.4.0_@capacitor+core@3.4.0
+    dev: false
+
+  /@capacitor-community/keep-awake/2.1.1_@capacitor+core@3.4.0:
+    resolution: {integrity: sha512-rgx6z6o4uQbB1VWRiifBx+rmS8ab9cynlq3YY2/xWaMbxOWXENlL2s58hmlIrFHxBGLkOMPh5i73HLUzHmiesQ==}
+    peerDependencies:
+      '@capacitor/core': ^3.0.0
+    dependencies:
+      '@capacitor/core': 3.4.0
     dev: false
 
   /@capacitor/action-sheet/1.0.7_@capacitor+core@3.4.0:
