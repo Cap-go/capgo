@@ -32,10 +32,18 @@ def capacitor_pods
   pod 'CapacitorStorage', :path => '../../node_modules/.pnpm/@capacitor+storage@1.2.4_@capacitor+core@3.4.0/node_modules/@capacitor/storage'
   pod 'CapacitorTextZoom', :path => '../../node_modules/.pnpm/@capacitor+text-zoom@1.0.8_@capacitor+core@3.4.0/node_modules/@capacitor/text-zoom'
   pod 'CapacitorToast', :path => '../../node_modules/.pnpm/@capacitor+toast@1.0.7_@capacitor+core@3.4.0/node_modules/@capacitor/toast'
+  pod 'RobingenzCapacitorFilePicker', :path => '../../node_modules/.pnpm/@robingenz+capacitor-file-picker@0.2.3_@capacitor+core@3.4.0/node_modules/@robingenz/capacitor-file-picker'
+  pod 'RobingenzCapacitorScreenOrientation', :path => '../../node_modules/.pnpm/@robingenz+capacitor-screen-orientation@1.1.4_@capacitor+core@3.4.0/node_modules/@robingenz/capacitor-screen-orientation'
+  pod 'TeamhiveCapacitorVideoRecorder', :path => '../../node_modules/.pnpm/@teamhive+capacitor-video-recorder@5.0.0_@capacitor+core@3.4.0/node_modules/@teamhive/capacitor-video-recorder'
   pod 'CapacitorCrisp', :path => '../../node_modules/.pnpm/capacitor-crisp@1.0.18_@capacitor+core@3.4.0/node_modules/capacitor-crisp'
+  pod 'CapacitorFlash', :path => '../../node_modules/.pnpm/capacitor-flash@1.0.5_@capacitor+core@3.4.0/node_modules/capacitor-flash'
+  pod 'CapacitorMute', :path => '../../node_modules/.pnpm/capacitor-mute@0.0.4_@capacitor+core@3.4.0/node_modules/capacitor-mute'
   pod 'CapacitorNativeAudio', :path => '../../node_modules/.pnpm/capacitor-native-audio@3.0.2_@capacitor+core@3.4.0/node_modules/capacitor-native-audio'
+  pod 'CapacitorNativeBiometric', :path => '../../node_modules/.pnpm/capacitor-native-biometric@3.0.3/node_modules/capacitor-native-biometric'
+  pod 'CapacitorPurchases', :path => '../../node_modules/.pnpm/capacitor-purchases@0.1.1_@capacitor+core@3.4.0/node_modules/capacitor-purchases'
   pod 'CapacitorRateApp', :path => '../../node_modules/.pnpm/capacitor-rate-app@2.0.0_@capacitor+core@3.4.0/node_modules/capacitor-rate-app'
-  pod 'CapacitorUpdater', :path => '../../node_modules/.pnpm/capacitor-updater@1.0.26_@capacitor+core@3.4.0/node_modules/capacitor-updater'
+  pod 'CapacitorScreenRecorder', :path => '../../node_modules/.pnpm/capacitor-screen-recorder@1.1.3_@capacitor+core@3.4.0/node_modules/capacitor-screen-recorder'
+  pod 'CapacitorUpdater', :path => '../../node_modules/.pnpm/capacitor-updater@1.1.4_@capacitor+core@3.4.0/node_modules/capacitor-updater'
 end
 
 target 'App' do
