@@ -4,7 +4,7 @@ import { IonContent, IonPage } from '@ionic/vue'
 import type { User } from '@supabase/gotrue-js'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useSupabase } from '~/services/supabase'
+import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { createKeys } from '~/services/apikeys'
 
@@ -20,13 +20,10 @@ const updateDb = async() => {
   console.log('update db')
   let session = supabase.auth.session()!
 
-  if (!session && route.hash) {
-    const queryString = route.hash.replace('#', '')
-    const urlParams = new URLSearchParams(queryString)
-    const refresh_token = urlParams.get('refresh_token')
-    const logSession = await supabase.auth.signIn({
-      refreshToken: refresh_token || '',
-    })
+  if (!session) {
+    const logSession = await autoAuth()
+    if (!logSession)
+      return
     if (logSession.session)
       session = logSession.session
     if (logSession.user)

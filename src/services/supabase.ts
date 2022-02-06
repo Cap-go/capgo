@@ -35,3 +35,19 @@ export const useSupabase = () => {
   }
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }
+
+export const autoAuth = async() => {
+  const supabase = useSupabase()
+  const route = useRoute()
+  const session = supabase.auth.session()!
+  if (session || !route.hash)
+    return null
+  const queryString = route.hash.replace('#', '')
+  const urlParams = new URLSearchParams(queryString)
+  const refresh_token = urlParams.get('refresh_token')
+  if (!refresh_token) return null
+  const logSession = await supabase.auth.signIn({
+    refreshToken: refresh_token || '',
+  })
+  return logSession
+}

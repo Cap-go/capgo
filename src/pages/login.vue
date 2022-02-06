@@ -6,7 +6,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { SplashScreen } from '@capacitor/splash-screen'
-import { useSupabase } from '~/services/supabase'
+import { autoAuth, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
 const supabase = useSupabase()
@@ -55,17 +55,31 @@ const submit = async() => {
   }
 }
 
+const nextLogin = () => {
+  router.push('/app/home')
+  setTimeout(async() => {
+    isLoading.value = false
+    if (isPlatform('capacitor'))
+      SplashScreen.hide()
+  }, 500)
+}
+
 const checkLogin = async() => {
   main.auth = null
   isLoading.value = true
   const user = supabase.auth.user()
+  let session = supabase.auth.session()!
   if (user) {
-    router.push('/app/home')
-    setTimeout(async() => {
-      isLoading.value = false
-      if (isPlatform('capacitor'))
-        SplashScreen.hide()
-    }, 500)
+    nextLogin()
+  }
+  else if (!session) {
+    const logSession = await autoAuth()
+    if (!logSession)
+      return
+    if (logSession.session)
+      session = logSession.session
+    if (logSession.user)
+      nextLogin()
   }
   else {
     isLoading.value = false
@@ -74,7 +88,6 @@ const checkLogin = async() => {
 }
 
 onMounted(checkLogin)
-
 </script>
 
 <template>
