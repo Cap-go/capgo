@@ -81,7 +81,8 @@ const submit = async() => {
       },
       redirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/verify_email`,
     },
-    // http://localhost:3333/onboarding/verify_email,http://localhost:3333/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.neufmoispourtoi.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
+    // supabase auth config
+    // http://localhost:3334/onboarding/verify_email,http://localhost:3334/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
   )
   isLoading.value = false
   if (error) {

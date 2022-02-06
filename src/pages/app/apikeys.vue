@@ -6,6 +6,7 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 import Spinner from '~/components/Spinner.vue'
+import { createKeys } from '~/services/apikeys'
 
 const { t } = useI18n()
 const isLoading = ref(false)
@@ -25,17 +26,24 @@ const copyKey = async(app: definitions['apikeys']) => {
 const openLink = (link: string) => {
   window.open(link, '_system')
 }
-watchEffect(async() => {
-  if (route.path === '/app/apikeys') {
-    isLoading.value = true
-    const { data } = await supabase
-      .from<definitions['apikeys']>('apikeys')
-      .select()
-      .eq('user_id', auth?.id)
-    if (data && data.length)
-      apps.value = data
-    isLoading.value = false
+const geKeys = async(retry = true): Promise<void> => {
+  isLoading.value = true
+  const { data } = await supabase
+    .from<definitions['apikeys']>('apikeys')
+    .select()
+    .eq('user_id', auth?.id)
+  if (data && data.length) {
+    apps.value = data
   }
+  else if (retry && auth?.id) {
+    await createKeys(auth?.id)
+    return geKeys(false)
+  }
+  isLoading.value = false
+}
+watchEffect(async() => {
+  if (route.path === '/app/apikeys')
+    await geKeys()
 })
 </script>
 <template>

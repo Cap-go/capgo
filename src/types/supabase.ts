@@ -543,6 +543,9 @@ export interface paths {
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
           updated_at?: parameters["rowFilter.users.updated_at"];
+          enableNotifications?: parameters["rowFilter.users.enableNotifications"];
+          optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
+          legalAccepted?: parameters["rowFilter.users.legalAccepted"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -601,6 +604,9 @@ export interface paths {
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
           updated_at?: parameters["rowFilter.users.updated_at"];
+          enableNotifications?: parameters["rowFilter.users.enableNotifications"];
+          optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
+          legalAccepted?: parameters["rowFilter.users.legalAccepted"];
         };
         header: {
           /** Preference */
@@ -623,6 +629,9 @@ export interface paths {
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
           updated_at?: parameters["rowFilter.users.updated_at"];
+          enableNotifications?: parameters["rowFilter.users.enableNotifications"];
+          optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
+          legalAccepted?: parameters["rowFilter.users.legalAccepted"];
         };
         body: {
           /** users */
@@ -660,10 +669,9 @@ export interface definitions {
     key: string;
     /**
      * Format: public.key_mode
-     * @default read
      * @enum {string}
      */
-    mode: "read" | "write" | "all";
+    mode: "read" | "write" | "all" | "upload";
     /** Format: timestamp with time zone */
     updated_at?: string;
   };
@@ -809,6 +817,12 @@ export interface definitions {
     id: string;
     /** Format: timestamp with time zone */
     updated_at?: string;
+    /** Format: boolean */
+    enableNotifications: boolean;
+    /** Format: boolean */
+    optForNewsletters: boolean;
+    /** Format: boolean */
+    legalAccepted: boolean;
   };
 }
 
@@ -939,6 +953,12 @@ export interface parameters {
   "rowFilter.users.id": string;
   /** Format: timestamp with time zone */
   "rowFilter.users.updated_at": string;
+  /** Format: boolean */
+  "rowFilter.users.enableNotifications": string;
+  /** Format: boolean */
+  "rowFilter.users.optForNewsletters": string;
+  /** Format: boolean */
+  "rowFilter.users.legalAccepted": string;
 }
 
 export interface operations {}

@@ -4,10 +4,9 @@ import { IonContent, IonPage } from '@ionic/vue'
 import type { User } from '@supabase/gotrue-js'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
+import { createKeys } from '~/services/apikeys'
 
 const supabase = useSupabase()
 const route = useRoute()
@@ -15,7 +14,6 @@ const router = useRouter()
 
 const isLoading = ref(true)
 
-const { t } = useI18n()
 const user = ref<User | null>(null)
 
 const updateDb = async() => {
@@ -38,6 +36,8 @@ const updateDb = async() => {
     console.log('session user', session?.user)
     user.value = session.user
   }
+  if (!user.value?.id)
+    return
 
   const { error } = await supabase
     .from('users')
@@ -50,24 +50,7 @@ const updateDb = async() => {
         image_url: '',
       },
     )
-  await supabase
-    .from('apikeys')
-    .insert(
-      {
-        user_id: user.value?.id,
-        key: uuidv4(),
-        mode: 'all',
-      },
-    )
-  await supabase
-    .from('apikeys')
-    .insert(
-      {
-        user_id: user.value?.id,
-        key: uuidv4(),
-        mode: 'read',
-      },
-    )
+  await createKeys(user.value?.id)
   if (error)
     console.log('updateDb', error)
   router.push('/onboarding/activation')

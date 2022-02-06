@@ -55,7 +55,7 @@ export const handler: Handler = async(event) => {
     isVerified = false
     console.error(error)
   }
-  if (!isVerified || !apikey || apikey.mode === 'read' || !event.body) {
+  if (!isVerified || !apikey || apikey.mode === 'read' || apikey.mode === 'upload' || !event.body) {
     return {
       statusCode: 400,
       headers,
