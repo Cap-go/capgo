@@ -14,7 +14,7 @@ const isTab = computed(() => {
   <ion-page>
     <ion-tabs>
       <ion-router-outlet />
-      <ion-tab-bar v-if="isTab" slot="bottom">
+      <ion-tab-bar v-if="isTab" slot="bottom" color="secondary">
         <ion-tab-button tab="home" href="/app/home">
           <ion-icon :icon="list" />
           <ion-label>Projects</ion-label>

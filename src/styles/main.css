@@ -12,12 +12,12 @@ http://ionicframework.com/docs/theming/ */
     --ion-color-primary-tint: theme('colors.dusk.700');
   
     /** secondary **/
-    --ion-color-secondary: theme('colors.bright-cerulean.500');
+    --ion-color-secondary: theme('colors.azure.500');
     --ion-color-secondary-rgb: 42, 182, 205;
     --ion-color-secondary-contrast: theme('colors.white.DEFAULT');
     --ion-color-secondary-contrast-rgb: 255, 255, 255;
-    --ion-color-secondary-shade: theme('colors.bright-cerulean.300');
-    --ion-color-secondary-tint: theme('colors.bright-cerulean.700');
+    --ion-color-secondary-shade: theme('colors.azure.300');
+    --ion-color-secondary-tint: theme('colors.azure.700');
   
     /** tertiary **/
     --ion-color-tertiary: theme('colors.cornflower.500');
@@ -36,20 +36,20 @@ http://ionicframework.com/docs/theming/ */
     --ion-color-success-tint: theme('colors.vista-blue.700');
   
     /** warning **/
-    --ion-color-warning: theme('colors.sweet-pink.500');
+    --ion-color-warning: theme('colors.pumpkin-orange.500');
     --ion-color-warning-rgb: 250, 162, 158;
     --ion-color-warning-contrast: theme('colors.white.DEFAULT');
     --ion-color-warning-contrast-rgb: 255, 255, 255;
-    --ion-color-warning-shade: theme('colors.sweet-pink.300');
-    --ion-color-warning-tint: theme('colors.sweet-pink.700');
+    --ion-color-warning-shade: theme('colors.pumpkin-orange.300');
+    --ion-color-warning-tint: theme('colors.pumpkin-orange.700');
   
     /** danger **/
-    --ion-color-danger: theme('colors.brink-pink.500');
+    --ion-color-danger: theme('colors.muted-blue.500');
     --ion-color-danger-rgb: 244, 110, 113;
     --ion-color-danger-contrast: theme('colors.white.DEFAULT');
     --ion-color-danger-contrast-rgb: 255, 255, 255;
-    --ion-color-danger-shade: theme('colors.brink-pink.300');
-    --ion-color-danger-tint: theme('colors.brink-pink.700');
+    --ion-color-danger-shade: theme('colors.muted-blue.300');
+    --ion-color-danger-tint: theme('colors.muted-blue.700');
   
     /** dark **/
     --ion-color-dark: #222428;
@@ -92,12 +92,12 @@ http://ionicframework.com/docs/theming/ */
     --ion-color-primary-tint: theme('colors.dusk.700');
   
     /** secondary **/
-    --ion-color-secondary: theme('colors.bright-cerulean.500');
+    --ion-color-secondary: theme('colors.azure.500');
     --ion-color-secondary-rgb: 42, 182, 205;
     --ion-color-secondary-contrast: theme('colors.white.DEFAULT');
     --ion-color-secondary-contrast-rgb: 255, 255, 255;
-    --ion-color-secondary-shade: theme('colors.bright-cerulean.300');
-    --ion-color-secondary-tint: theme('colors.bright-cerulean.700');
+    --ion-color-secondary-shade: theme('colors.azure.300');
+    --ion-color-secondary-tint: theme('colors.azure.700');
   
     /** tertiary **/
     --ion-color-tertiary: theme('colors.cornflower.500');
@@ -116,20 +116,20 @@ http://ionicframework.com/docs/theming/ */
     --ion-color-success-tint: theme('colors.vista-blue.700');
   
     /** warning **/
-    --ion-color-warning: theme('colors.sweet-pink.500');
+    --ion-color-warning: theme('colors.pumpkin-orange.500');
     --ion-color-warning-rgb: 250, 162, 158;
     --ion-color-warning-contrast: theme('colors.white.DEFAULT');
     --ion-color-warning-contrast-rgb: 255, 255, 255;
-    --ion-color-warning-shade: theme('colors.sweet-pink.300');
-    --ion-color-warning-tint: theme('colors.sweet-pink.700');
+    --ion-color-warning-shade: theme('colors.pumpkin-orange.300');
+    --ion-color-warning-tint: theme('colors.pumpkin-orange.700');
   
     /** danger **/
-    --ion-color-danger: theme('colors.brink-pink.500');
+    --ion-color-danger: theme('colors.muted-blue.500');
     --ion-color-danger-rgb: 244, 110, 113;
     --ion-color-danger-contrast: theme('colors.white.DEFAULT');
     --ion-color-danger-contrast-rgb: 255, 255, 255;
-    --ion-color-danger-shade: theme('colors.brink-pink.300');
-    --ion-color-danger-tint: theme('colors.brink-pink.700');
+    --ion-color-danger-shade: theme('colors.muted-blue.300');
+    --ion-color-danger-tint: theme('colors.muted-blue.700');
 
     --ion-color-dark: #f4f5f8;
     --ion-color-dark-rgb: 244, 245, 248;

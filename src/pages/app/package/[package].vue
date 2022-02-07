@@ -195,7 +195,7 @@ const back = () => {
       <div v-else>
         <ion-header>
           <ion-toolbar>
-            <ion-title size="large">
+            <ion-title color="warning" size="large">
               {{ app?.name }}
             </ion-title>
           </ion-toolbar>
@@ -214,7 +214,7 @@ const back = () => {
             <IonLabel>
               <div class="col-span-6 flex flex-col cursor-pointer">
                 <div class="flex justify-between items-center">
-                  <h2 class="text-sm text-bright-cerulean-500">
+                  <h2 class="text-sm text-azure-500">
                     {{ ch.name }}
                   </h2>
                   <p>{{ ch.version.name }}</p>
@@ -231,7 +231,7 @@ const back = () => {
             <IonLabel>
               <div class="col-span-6 flex flex-col cursor-pointer">
                 <div class="flex justify-between items-center">
-                  <h2 class="text-sm text-bright-cerulean-500">
+                  <h2 class="text-sm text-azure-500">
                     {{ v.name }}
                   </h2>
                 </div>

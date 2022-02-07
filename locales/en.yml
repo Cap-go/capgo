@@ -94,7 +94,7 @@ login:
   withemail: With email adress
 not-found: Not found
 notificationSettings:
-  heading: Account
+  heading: Notification settings
   validate: Validate
 onboarding:
   loading: Loading

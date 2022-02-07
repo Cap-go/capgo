@@ -72,13 +72,15 @@ watchEffect(async() => {
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>{{ t('projects.title') }}</ion-title>
+        <ion-title color="warning">
+          {{ t('projects.title') }}
+        </ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
       <ion-header collapse="condense">
         <ion-toolbar>
-          <ion-title size="large">
+          <ion-title color="warning" size="large">
             {{ t('projects.title') }}
           </ion-title>
         </ion-toolbar>
@@ -99,7 +101,7 @@ watchEffect(async() => {
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
+                <h2 class="text-sm text-azure-500">
                   {{ app.name }}
                 </h2>
               </div>
@@ -120,7 +122,7 @@ watchEffect(async() => {
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
+                <h2 class="text-sm text-azure-500">
                   No app yet
                 </h2>
               </div>
@@ -144,7 +146,7 @@ watchEffect(async() => {
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
+                <h2 class="text-sm text-azure-500">
                   {{ app.app_id.name }}
                 </h2>
               </div>

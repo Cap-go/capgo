@@ -65,7 +65,7 @@ const submit = async() => {
         <TitleHead :big="false" :title="t('accountPassword.heading')" />
         <form @submit.prevent="submit">
           <div v-if="errorMessage" class="text-center">
-            <p class="text-brink-pink-500 text-xs italic mt-2 mb-4">
+            <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
               {{ errorMessage }}
             </p>
           </div>
@@ -76,7 +76,7 @@ const submit = async() => {
               <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
             </IonItem>
             <div v-for="(error, index) of v$.password.$errors" :key="index" class="text-center">
-              <p class="text-brink-pink-500 text-xs italic mt-2 mb-4">
+              <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
                 {{ error.$message }}
               </p>
             </div>
@@ -86,7 +86,7 @@ const submit = async() => {
               <img v-else src="/eye-close.png" alt="password" @click="showPassword2 = !showPassword2">
             </IonItem>
             <div v-for="(error, index) of v$.confirmPassword.$errors" :key="index" class="text-center">
-              <p class="text-brink-pink-500 text-xs italic mt-2 mb-4">
+              <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
                 {{ error.$message }}
               </p>
             </div>

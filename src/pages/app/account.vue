@@ -149,13 +149,15 @@ const presentActionSheet = async() => {
   <IonPage>
     <IonHeader>
       <IonToolbar>
-        <IonTitle>{{ t("account.heading") }}</IonTitle>
+        <IonTitle color="warning">
+          {{ t("account.heading") }}
+        </IonTitle>
       </IonToolbar>
     </IonHeader>
     <IonContent :fullscreen="true">
       <IonHeader collapse="condense">
         <IonToolbar>
-          <IonTitle size="large">
+          <IonTitle color="warning" size="large">
             {{ t("account.heading") }}
           </IonTitle>
         </IonToolbar>
@@ -163,7 +165,7 @@ const presentActionSheet = async() => {
       <div class="py-16 px-6">
         <div
           v-if="!main.user?.image_url"
-          class="mt-8 mx-auto w-40 h-40 bg-sweet-pink-500 rounded-5xl grid place-content-center"
+          class="mt-8 mx-auto w-40 h-40 bg-pumpkin-orange-500 rounded-5xl grid place-content-center"
           @click="presentActionSheet"
         >
           <svg
@@ -199,7 +201,7 @@ const presentActionSheet = async() => {
         <h2 class="text-center mt-4 text-2xl text-black-light">
           {{ main.user?.first_name + " " + main.user?.last_name }}
         </h2>
-        <p class="text-center text-bright-cerulean-500 font-bold">
+        <p class="text-center text-azure-500 font-bold">
           <span class="uppercase">{{ main.user?.country }}</span>
         </p>
 
@@ -212,7 +214,7 @@ const presentActionSheet = async() => {
               <span class="font-bold">
                 {{ t("account.personalInformation") }}
               </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-bright-cerulean-500" />
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </router-link>
           </li>
           <li>
@@ -223,7 +225,7 @@ const presentActionSheet = async() => {
               <span class="font-bold">
                 {{ t("account.changePassword") }}
               </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-bright-cerulean-500" />
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </router-link>
           </li>
           <li>
@@ -234,7 +236,7 @@ const presentActionSheet = async() => {
               <span class="font-bold">
                 {{ t("account.keys") }}
               </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-bright-cerulean-500" />
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </router-link>
           </li>
           <li>
@@ -245,19 +247,19 @@ const presentActionSheet = async() => {
               <span class="font-bold">
                 {{ t("account.preferences") }}
               </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-bright-cerulean-500" />
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </router-link>
           </li>
         </ul>
         <a
-          class="block text-center text-sm text-brink-pink-500 underline mt-4"
+          class="block text-center text-sm text-muted-blue-500 underline mt-4"
           href="https://capgo.app/tos/"
           target="_blank"
         >
           {{ t("account.legal") }}
         </a>
         <a
-          class="block text-center text-sm text-brink-pink-500 underline mt-4"
+          class="block text-center text-sm text-muted-blue-500 underline mt-4"
           href="https://capgo.app/privacy/"
           target="_blank"
         >
@@ -265,7 +267,7 @@ const presentActionSheet = async() => {
         </a>
         <div class="mx-auto text-center mt-4">
           <button
-            class="mx-auto font-bold text-sweet-pink-500"
+            class="mx-auto font-bold text-pumpkin-orange-500"
             @click="main.logout().then(() => router.replace('/login'))"
           >
             {{ t("account.logout") }}

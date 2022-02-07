@@ -97,7 +97,7 @@ watchEffect(() => {
           class="mt-8 relative grid item-center"
           @submit.prevent="submit"
         >
-          <p v-if="errorMessage" class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+          <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
             {{ errorMessage }}
           </p>
 
@@ -112,7 +112,7 @@ watchEffect(() => {
               type="email"
             />
             <div v-for="(error, index) of v$.email.$errors" :key="index">
-              <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+              <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                 {{ t('forgot.email') }}: {{ error.$message }}
               </p>
             </div>
@@ -125,7 +125,7 @@ watchEffect(() => {
                 <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
               </IonItem>
               <div v-for="(error, index) of v$.password.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t('register.password') }}: {{ error.$message }}
                 </p>
               </div>
@@ -137,7 +137,7 @@ watchEffect(() => {
                 <img v-else src="/eye-close.png" alt="password" @click="showPassword2 = !showPassword2">
               </IonItem>
               <div v-for="(error, index) of v$.repeatPassword.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t('register.confirm-password') }}: {{ error.$message }}
                 </p>
               </div>
@@ -163,7 +163,7 @@ watchEffect(() => {
                 font-bold
                 text-sm
                 text-center
-                text-sweet-pink-500
+                text-pumpkin-orange-500
                 hover:underline
                 mt-4"
             href="/login"

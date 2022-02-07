@@ -100,7 +100,7 @@ login:
   withemail: Avec adresse e-mail
 not-found: Page non trouvée
 notificationSettings:
-  heading: Compte
+  heading: Réglages des notifications
   validate: Valider
 onboarding:
   loading: Chargement

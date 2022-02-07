@@ -197,13 +197,15 @@ const presentActionSheet = async(usr: definitions['users']) => {
             <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
           </IonButton>
         </IonButtons>
-        <IonTitle>{{ t('channel.title') }}</IonTitle>
+        <IonTitle color="warning">
+          {{ t('channel.title') }}
+        </IonTitle>
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
       <ion-header collapse="condense">
         <ion-toolbar>
-          <ion-title size="large">
+          <ion-title color="warning" size="large">
             {{ t('channel.title') }}
           </ion-title>
           <IonButtons v-if="channel" slot="end">
@@ -228,7 +230,7 @@ const presentActionSheet = async(usr: definitions['users']) => {
           <IonLabel>
             <div class="col-span-6 flex flex-col cursor-pointer">
               <div class="flex justify-between items-center truncate pr-4">
-                <h2 class="text-sm text-bright-cerulean-500">
+                <h2 class="text-sm text-azure-500">
                   {{ t('channel.copy') }} {{ publicLink }}
                 </h2>
               </div>
@@ -239,7 +241,7 @@ const presentActionSheet = async(usr: definitions['users']) => {
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center cursor-pointer">
-                <h2 class="text-sm text-bright-cerulean-500">
+                <h2 class="text-sm text-azure-500">
                   {{ t('channel.make_it') }} {{ t(channel?.public ? 'channel.private_desc' : 'channel.public_desc') }}
                 </h2>
               </div>
@@ -256,15 +258,17 @@ const presentActionSheet = async(usr: definitions['users']) => {
             {{ t('channel.invit') }}
           </ion-label>
           <ion-input v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
-          <ion-button slot="end" @click="addUser()">
-            {{ t('channel.add') }}
-          </ion-button>
+          <div slot="end" class="h-full flex items-center justify-center">
+            <ion-button slot="end" color="secondary" @click="addUser()">
+              {{ t('channel.add') }}
+            </ion-button>
+          </div>
         </ion-item>
         <IonItem v-for="(usr, index) in users" :key="index" @click="presentActionSheet(usr.user_id)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">
-                <h2 class="text-sm text-bright-cerulean-500">
+                <h2 class="text-sm text-azure-500">
                   {{ usr.user_id.first_name }}  {{ usr.user_id.last_name }}
                 </h2>
                 <p>{{ usr.user_id.email }}</p>

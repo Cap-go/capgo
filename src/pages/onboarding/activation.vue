@@ -49,7 +49,7 @@ const submit = async() => {
     <IonContent :fullscreen="true">
       <form class="grid mx-auto w-full lg:w-1/2 p-8" @submit.prevent="submit">
         <TitleHead :big="true" :title="t('activation.heading')" />
-        <p class="mt-12 mb-6 text-sweet-pink-500 text-left text-lg font-medium leading-snug">
+        <p class="mt-12 mb-6 text-pumpkin-orange-500 text-left text-lg font-medium leading-snug">
           {{ t('activation.desc') }}
         </p>
         <div class="w-full mt-6 mb-8 mx-auto">

@@ -103,7 +103,7 @@ onMounted(checkLogin)
         <h2 class="text-3xl text-left font-medium text-black-light">
           {{ t('login.login-in') }}
         </h2>
-        <p class="text-sweet-pink-500 text-1xl text-left ion-margin-vertical font-light leading-5 font-semibold">
+        <p class="text-pumpkin-orange-500 text-1xl text-left ion-margin-vertical font-light leading-5 font-semibold">
           {{ t('login.withemail') }} <br> {{ t('login.andpass') }}
         </p>
         <form class="place-content-center w-full h-full" @submit.prevent="submit">
@@ -115,7 +115,7 @@ onMounted(checkLogin)
             <IonInput v-model="form.email" type="email" :disabled="isLoading" :placeholder="t('login.email')" required="true" />
           </IonItem>
           <div v-for="(error, index) of v$.email.$errors" :key="index">
-            <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+            <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
               {{ t('login.email') }}: {{ error.$message }}
             </p>
           </div>
@@ -129,7 +129,7 @@ onMounted(checkLogin)
           </IonItem>
           <div>
             <div v-for="(error, index) of v$.password.$errors" :key="index">
-              <p class="text-brink-pink-500 text-xs italic mt-2 mb-4">
+              <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
                 {{ t('login.password') }}: {{ error.$message }}
               </p>
             </div>
@@ -161,7 +161,7 @@ onMounted(checkLogin)
               <div>
                 <router-link
                   to="/forgot_password"
-                  class="ion-margin-top inline-block align-baseline font-medium text-sm text-bright-cerulean-500 hover:text-black"
+                  class="ion-margin-top inline-block align-baseline font-medium text-sm text-azure-500 hover:text-black"
                 >
                   {{ t('login.password') }} {{ t('login.forgot') }} ?
                 </router-link>
@@ -174,7 +174,7 @@ onMounted(checkLogin)
               <div>
                 <router-link
                   to="/register"
-                  class="ion-margin-top text-brink-pink-500 font-semibold font-light underline"
+                  class="ion-margin-top text-muted-blue-500 font-semibold font-light underline"
                 >
                   {{ t('login.create-new') }}
                 </router-link>

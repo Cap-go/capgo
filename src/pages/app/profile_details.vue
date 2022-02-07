@@ -99,7 +99,7 @@ watchEffect(async() => {
           class="mt-12 w-full"
           @submit.prevent="submit"
         >
-          <p v-if="errorMessage" class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+          <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
             {{ errorMessage }}
           </p>
           <div class="w-full grid item-center">
@@ -115,7 +115,7 @@ watchEffect(async() => {
               />
 
               <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t('accountProfile.first-name') }}: {{ error.$message }}
                 </p>
               </div>
@@ -130,7 +130,7 @@ watchEffect(async() => {
                 type="text"
               />
               <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t('accountProfile.last-name') }}: {{ error.$message }}
                 </p>
               </div>

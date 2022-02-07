@@ -55,7 +55,7 @@ const submitDoi = async() => {
     <IonContent :fullscreen="true">
       <div class="mx-auto w-full lg:w-1/2">
         <div class="py-16 px-6">
-          <TitleHead :big="true" :title="t('notificationSettings.heading')" />
+          <TitleHead :title="t('notificationSettings.heading')" />
           <div class="flex justify-between items-center my-2">
             <label for="notification" class="justify-self-start text-xl">{{ t('activation.notification') }}</label>
             <IonToggle v-model="form.enableNotifications" color="success" @ionChange="submitNotif()" />

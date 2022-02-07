@@ -102,12 +102,12 @@ const submit = async() => {
           <h1 class="text-3xl font-bold text-left">
             {{ t("register.heading") }}
           </h1>
-          <p class="mt-1 text-sweet-pink-500 text-left font-bold text-sm">
+          <p class="mt-1 text-pumpkin-orange-500 text-left font-bold text-sm">
             {{ t("register.desc") }}
           </p>
         </div>
         <form class="mt-2 relative" @submit.prevent="submit">
-          <p v-if="errorMessage" class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+          <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
             {{ errorMessage }}
           </p>
           <div class="mx-auto max-w-lg grid item-cente">
@@ -122,7 +122,7 @@ const submit = async() => {
               />
 
               <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t("register.first-name") }}: {{ error.$message }}
                 </p>
               </div>
@@ -136,7 +136,7 @@ const submit = async() => {
                 type="text"
               />
               <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t("register.last-name") }}: {{ error.$message }}
                 </p>
               </div>
@@ -151,7 +151,7 @@ const submit = async() => {
                 type="email"
               />
               <div v-for="(error, index) of v$.email.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t("register.email") }}: {{ error.$message }}
                 </p>
               </div>
@@ -165,7 +165,7 @@ const submit = async() => {
                 type="password"
               />
               <div v-for="(error, index) of v$.password.$errors" :key="index">
-                <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
                   {{ t("register.password") }}: {{ error.$message }}
                 </p>
               </div>
@@ -185,7 +185,7 @@ const submit = async() => {
               </div>
             </div>
             <p
-              class="font-light text-bright-cerulean-500 text-left text-sm font-semibold"
+              class="font-light text-azure-500 text-left text-sm font-semibold"
             >
               {{ t("register.password-hint") }}
             </p>
@@ -202,7 +202,7 @@ const submit = async() => {
               <IonSpinner v-else name="crescent" color="light" />
             </IonButton>
             <a
-              class="block text-center text-sm text-brink-pink-500 underline mt-4"
+              class="block text-center text-sm text-muted-blue-500 underline mt-4"
               href="/login"
             >
               {{ t("register.already-account") }}
