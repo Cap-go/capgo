@@ -97,10 +97,10 @@ onMounted(checkLogin)
     <IonContent :fullscreen="true">
       <div class="grid place-content-center w-full h-full min-h-screen p-8">
         <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/4 mb-6">
-        <h1 class="text-3xl text-left font-medium text-black-light">
+        <h1 class="text-3xl text-left font-medium text-cornflower-500">
           {{ t('login.hello') }} !
         </h1>
-        <h2 class="text-3xl text-left font-medium text-black-light">
+        <h2 class="text-3xl text-left font-medium text-cornflower-500">
           {{ t('login.login-in') }}
         </h2>
         <p class="text-pumpkin-orange-500 text-1xl text-left ion-margin-vertical font-light leading-5 font-semibold">
