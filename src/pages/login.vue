@@ -9,6 +9,7 @@ import { SplashScreen } from '@capacitor/splash-screen'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
+const route = useRoute()
 const supabase = useSupabase()
 const main = useMainStore()
 const isLoading = ref(false)
@@ -72,7 +73,7 @@ const checkLogin = async() => {
   if (user) {
     nextLogin()
   }
-  else if (!session) {
+  else if (!session && route.hash) {
     const logSession = await autoAuth()
     if (!logSession)
       return
