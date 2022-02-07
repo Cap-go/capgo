@@ -5,7 +5,7 @@ import { useHead } from '@vueuse/head'
 // https://github.com/vueuse/head
 // you can use this to manipulate the document head in any components,
 useHead({
-  title: 'Capacitor go',
+  title: 'Capgo',
   meta: [
     { name: 'description', content: 'App to test your capacitor app without store hassle' },
   ],

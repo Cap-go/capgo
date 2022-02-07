@@ -134,7 +134,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt', 'safari-pinned-tab.svg'],
       manifest: {
-        name: 'Capacitor Go',
+        name: 'Capgo',
         short_name: 'CapGo',
         theme_color: '#ffffff',
         icons: [

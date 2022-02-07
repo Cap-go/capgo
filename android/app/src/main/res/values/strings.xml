@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Capacitor Go</string>
-    <string name="title_activity_main">Capacitor Go</string>
+    <string name="app_name">Capgo</string>
+    <string name="title_activity_main">Capgo</string>
     <string name="package_name">ee.forgr.capacitor_go</string>
     <string name="custom_url_scheme">ee.forgr.capacitor_go</string>
 </resources>

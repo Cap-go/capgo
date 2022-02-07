@@ -24,7 +24,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
     }
 
     @Override public void hearShake() {
-        Log.i("Capacitor Go", "hearShake");
+        Log.i("Capgo", "hearShake");
         CapacitorUpdater updater = new CapacitorUpdater(this.bridge.getContext());
         if (updater.getLastPathHot() == "" || isShow) {
             return;
@@ -43,7 +43,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         builder.setPositiveButton(okButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 // User clicked OK button
-                Log.i("Capacitor Go", okButtonTitle);
+                Log.i("Capgo", okButtonTitle);
                 updater.reset();
                 String pathHot = updater.getLastPathHot();
                 brd.setServerAssetPath(pathHot);
@@ -53,7 +53,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         });
         builder.setNeutralButton(reloadButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
-                Log.i("Capacitor Go", reloadButtonTitle);
+                Log.i("Capgo", reloadButtonTitle);
                 String pathHot = updater.getLastPathHot();
                 brd.setServerBasePath(pathHot);
                 dialog.dismiss();
@@ -62,7 +62,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         });
         builder.setNegativeButton(cancelButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
-                Log.i("Capacitor Go", cancelButtonTitle);
+                Log.i("Capgo", cancelButtonTitle);
                 dialog.dismiss();
                 isShow = false;
             }

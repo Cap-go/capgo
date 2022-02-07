@@ -31,7 +31,7 @@ activation:
   legal: Nutzungsbedingungen
   legal-desc: >-
     Ich akzeptiere die Datenschutzrichtlinien und Nutzungsbedingungen der
-    Capacitor Go-App
+    Capgo-App
   notification: Benachrichtigungen
   notification-desc: >-
     Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
@@ -42,7 +42,7 @@ apikeys:
   checkbelow: Überprüfen Sie unter dem Link, um weitere Informationen zu erhalten
   cli: capgo-CLI
   explain: >-
-    Alle diese API-Schlüssel sind für die Verwendung mit dem Capacitor Go
+    Alle diese API-Schlüssel sind für die Verwendung mit dem Capgo
     CLI-Tool oder dem Capacitor-Updater-Plugin vorgesehen
   keyCopied: Schlüssel in Ihre Zwischenablage kopiert
   links: Verknüpfungen

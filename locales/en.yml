@@ -29,7 +29,7 @@ activation:
   heading: activation
   headline: My settings
   legal: Terms of services
-  legal-desc: I accept capacitor Go app privacy policy and terms of use
+  legal-desc: I accept Capgo app privacy policy and terms of use
   notification: Notifications
   notification-desc: I accept to receive notification when new app version are available
   validate: Validate
@@ -38,7 +38,7 @@ apikeys:
   checkbelow: check below the link to get more informations
   cli: capgo CLI
   explain: >-
-    All thoses api keys are made to be use with the capacitor Go CLI tool, or
+    All thoses api keys are made to be use with the Capgo CLI tool, or
     capacitor-updater plugin
   keyCopied: Keys copied to your clipboard
   links: Links
