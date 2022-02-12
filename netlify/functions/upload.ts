@@ -1,7 +1,7 @@
 import type { Handler } from '@netlify/functions'
 import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from '../services/supabase'
-import { sendRes } from './../services/utils'
+import { checkKey, sendRes } from './../services/utils'
 import type { definitions } from '~/types/supabase'
 
 interface AppUpload {
@@ -64,26 +64,9 @@ export const handler: Handler = async(event) => {
   if (event.httpMethod === 'OPTIONS')
     return sendRes()
 
-  const { authorization } = event.headers
-
-  let isVerified = false
-  let apikey: definitions['apikeys'] | null = null
-  try {
-    const { data, error } = await supabase
-      .from<definitions['apikeys']>('apikeys')
-      .select()
-      .eq('key', authorization)
-    if (!data || !data.length)
-      return sendRes({ status: 'Requires Authorization' }, 400)
-
-    apikey = data[0]
-    isVerified = !!apikey && !error
-  }
-  catch (error) {
-    isVerified = false
-    console.error(error)
-  }
-  if (!isVerified || !apikey || apikey.mode === 'read' || !event.body)
+  const supabase = useSupabase()
+  const apikey: definitions['apikeys'] | null = await checkKey(event.headers.authorization, supabase, ['read'])
+  if (!apikey || !event.body)
     return sendRes({ status: 'Cannot Verify User' }, 400)
 
   try {

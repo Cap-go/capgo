@@ -1,5 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { useSupabase } from '../services/supabase'
+import { sendRes } from './../services/utils'
 import type { definitions } from '~/types/supabase'
 
 interface Channel {
@@ -17,19 +18,8 @@ const headers = {
 
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': '*',
-        'Access-Control-Allow-Methods': 'POST',
-      },
-      body: JSON.stringify({
-        message: 'ok',
-      }),
-    }
-  }
+  if (event.httpMethod === 'OPTIONS')
+    return sendRes()
 
   try {
     const body = event.queryStringParameters as any as GetLatest

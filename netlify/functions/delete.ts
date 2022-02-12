@@ -1,5 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { useSupabase } from '../services/supabase'
+import { checkKey, sendRes } from './../services/utils'
 import type { definitions } from '~/types/supabase'
 
 interface AppDelete {
@@ -10,60 +11,13 @@ interface AppDelete {
 }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': '*',
-        'Access-Control-Allow-Methods': 'POST',
-      },
-      body: JSON.stringify({
-        message: 'ok',
-      }),
-    }
-  }
-
-  const { authorization } = event.headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-
-  let isVerified = false
-  let apikey: definitions['apikeys'] | null = null
+  if (event.httpMethod === 'OPTIONS')
+    return sendRes()
   const supabase = useSupabase()
-  try {
-    const { data, error } = await supabase
-      .from<definitions['apikeys']>('apikeys')
-      .select()
-      .eq('key', authorization)
-    if (!data || !data.length) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          message: 'Requires Authorization',
-        }),
-      }
-    }
-    apikey = data[0]
-    isVerified = !!apikey && !error
-  }
-  catch (error) {
-    isVerified = false
-    console.error(error)
-  }
-  if (!isVerified || !apikey || apikey.mode === 'read' || apikey.mode === 'upload' || !event.body) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({
-        message: 'cannot Verify User',
-      }),
-    }
-  }
+
+  const apikey: definitions['apikeys'] | null = await checkKey(event.headers.authorization, supabase, ['read', 'upload'])
+  if (!apikey || !event.body)
+    return sendRes({ status: 'Cannot Verify User' }, 400)
 
   try {
     const body = JSON.parse(event.body || '{}') as AppDelete
@@ -79,15 +33,9 @@ export const handler: Handler = async(event) => {
         .storage
         .from(`apps/${apikey.user_id}/${body.appid}/versions`)
         .remove(data.map(v => v.bucket_id))
-      if (delError) {
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({
-            message: `${delError}!`,
-          }),
-        }
-      }
+      if (delError)
+        return sendRes({ status: 'Cannot delete version from storage', error: delError }, 400)
+
       await supabase
         .from('app_versions')
         .delete()
@@ -100,29 +48,11 @@ export const handler: Handler = async(event) => {
       .delete()
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
-    if (dbError) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          message: 'cannot delete app',
-          err: JSON.stringify(dbError),
-        }),
-      }
-    }
+    if (dbError)
+      return sendRes({ status: 'Cannot delete version from database', error: dbError }, 400)
   }
   catch (e) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        message: `${e}!`,
-      }),
-    }
+    return sendRes({ status: 'Cannot delete', error: e }, 500)
   }
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify({ status: 'ok' }),
-  }
+  return sendRes()
 }
