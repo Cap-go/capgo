@@ -27,7 +27,7 @@ export const handler: Handler = async(event) => {
   if (data && data.length && !error)
     body.version = data[0].id
   delete body.version_name
-
+  console.log('body', body)
   await supabase
     .from('stats')
     .insert(body)
