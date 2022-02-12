@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions'
+import { useSupabase } from '../services/supabase'
 import { sendRes } from './../services/utils'
-import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 
 interface AppStats {
