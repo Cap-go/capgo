@@ -26,6 +26,8 @@ export const handler: Handler = async(event) => {
     .eq('name', body.version_name)
   if (data && data.length && !error)
     body.version = data[0].id
+  else
+    return sendRes({ status: 'ko', error: error || 'version not found' }, 400)
   delete body.version_name
   console.log('body', body)
   await supabase
