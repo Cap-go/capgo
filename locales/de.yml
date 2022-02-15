@@ -42,8 +42,8 @@ apikeys:
   checkbelow: Überprüfen Sie unter dem Link, um weitere Informationen zu erhalten
   cli: capgo-CLI
   explain: >-
-    Alle diese API-Schlüssel sind für die Verwendung mit dem Capgo
-    CLI-Tool oder dem Capacitor-Updater-Plugin vorgesehen
+    Alle diese API-Schlüssel sind für die Verwendung mit dem Capgo CLI-Tool oder
+    dem Capacitor-Updater-Plugin vorgesehen
   keyCopied: Schlüssel in Ihre Zwischenablage kopiert
   links: Verknüpfungen
   title: API-Schlüssel
@@ -106,6 +106,7 @@ onboarding:
   loading: Wird geladen
 package:
   channels: Kanäle
+  download: Download-Version
   link_channel: Link zum Kanal
   set: Version auf Kanal setzen
   test: Version starten
@@ -133,3 +134,6 @@ register:
     Satzzeichen ein.
   specialError: Sollte Sonderzeichen enthalten
   upperCaseError: Sollte Großbuchstaben enthalten
+something-went-wrong-try-again-later: |-
+  Etwas ist schief gelaufen! 
+  Versuchen Sie es später noch einmal.

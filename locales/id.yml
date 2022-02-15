@@ -104,6 +104,7 @@ onboarding:
   loading: Memuat
 package:
   channels: saluran
+  download: Unduh versi
   link_channel: Tautan ke saluran
   set: Setel versi ke saluran
   test: Luncurkan versi
@@ -129,3 +130,6 @@ register:
   password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
   specialError: Harus mengandung karakter khusus
   upperCaseError: Harus mengandung huruf besar
+something-went-wrong-try-again-later: |-
+  Ada yang salah! 
+  Coba lagi nanti.

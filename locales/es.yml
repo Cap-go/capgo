@@ -108,6 +108,7 @@ onboarding:
   loading: Cargando
 package:
   channels: Canales
+  download: Descargar versión
   link_channel: Enlace al canal
   set: Establecer versión para el canal
   test: Versión de lanzamiento
@@ -135,3 +136,6 @@ register:
     puntuación.
   specialError: Debe contener caracteres especiales
   upperCaseError: Debe contener letras mayúsculas
+something-went-wrong-try-again-later: |-
+  ¡Algo salió mal! 
+  Vuelva a intentarlo más tarde.

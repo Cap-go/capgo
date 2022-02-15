@@ -29,9 +29,7 @@ activation:
   heading: Attivazione
   headline: Le mie impostazioni
   legal: Termini di servizio
-  legal-desc: >-
-    Accetto l'informativa sulla privacy e i termini di utilizzo dell'app
-    Capgo
+  legal-desc: Accetto l'informativa sulla privacy e i termini di utilizzo dell'app Capgo
   notification: Notifiche
   notification-desc: >-
     Accetto di ricevere una notifica quando sono disponibili nuove versioni
@@ -105,6 +103,7 @@ onboarding:
   loading: Caricamento in corso
 package:
   channels: Canali
+  download: Scarica versione
   link_channel: Link al canale
   set: Imposta la versione sul canale
   test: Versione di lancio
@@ -132,3 +131,6 @@ register:
     punteggiatura.
   specialError: Dovrebbe contenere caratteri speciali
   upperCaseError: Dovrebbe contenere lettere maiuscole
+something-went-wrong-try-again-later: |-
+  Qualcosa è andato storto! 
+  Riprovare più tardi.

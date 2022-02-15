@@ -5,7 +5,7 @@ import {
   IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent,
   IonTitle,
   IonToolbar,
-  actionSheetController, toastController,
+  actionSheetController, toastController, isPlatform,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { useSupabase } from '~/services/supabase'
@@ -113,7 +113,7 @@ const ASVersion = async(v: definitions['app_versions']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
-        text: t('package.test'),
+        text: isPlatform('capacitor') ? t('package.test') : t('package.download'),
         handler: () => {
           actionSheet.dismiss()
           openVersion(v)

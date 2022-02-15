@@ -42,13 +42,18 @@ export const openVersion = async(app: definitions['app_versions']) => {
     await loading.dismiss()
   }
   else {
-    await loading.dismiss()
-    console.error('no signedURL')
-    const toast = await toastController
-      .create({
-        message: isPlatform('capacitor') ? 'Cannot get the test version' : 'Cannot test in web browser',
-        duration: 2000,
-      })
-    await toast.present()
+    if (!signedURL) {
+      await loading.dismiss()
+      const toast = await toastController
+        .create({
+          message: 'Cannot get the test version',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      window.location.assign(signedURL)
+      await loading.dismiss()
+    }
   }
 }

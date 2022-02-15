@@ -103,6 +103,7 @@ package:
   link_channel: Link to channel
   set: Set version to channel
   test: Launch version
+  download: Download version
   title: info
   versions: Versions
 projects:

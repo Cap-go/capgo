@@ -106,6 +106,7 @@ onboarding:
   loading: Chargement
 package:
   channels: Chaînes
+  download: Télécharger la version
   link_channel: Lien vers la chaîne
   set: Définir la version sur le canal
   test: Version de lancement
@@ -133,3 +134,4 @@ register:
     ponctuation.
   specialError: Doit contenir des caractères spéciaux
   upperCaseError: Doit contenir des lettres majuscules
+something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
