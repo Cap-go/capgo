@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import com.squareup.seismic.ShakeDetector;
 
+import java.io.File;
 import java.text.MessageFormat;
 
 public class MainActivity extends BridgeActivity implements ShakeDetector.Listener {
@@ -44,9 +45,18 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
             public void onClick(DialogInterface dialog, int id) {
                 // User clicked OK button
                 Log.i("Capgo", okButtonTitle);
+                String serverBasePath = updater.getLastPathHot();
+                File fHot = new File(serverBasePath);
+                String versionName = updater.getVersionName();
                 updater.reset();
                 String pathHot = updater.getLastPathHot();
                 brd.setServerAssetPath(pathHot);
+                try {
+                    String name = fHot.getName();
+                    updater.delete(name, versionName);
+                } catch (Exception err) {
+                    Log.i("Capgo", "Cannot delete version", err);
+                }
                 dialog.dismiss();
                 isShow = false;
             }

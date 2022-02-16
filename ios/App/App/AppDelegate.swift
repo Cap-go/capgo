@@ -17,6 +17,7 @@ extension UIWindow {
             if let vc = (rootViewController as? CAPBridgeViewController) {
                 print("getServerBasePath", vc.getServerBasePath())
                 let serverBasePath = defaults.object(forKey:"serverBasePath") as? String ?? ""
+                let versionName = defaults.object(forKey:"versionName") as? String ?? ""
                 if (serverBasePath == "") {
                     return
                 }
@@ -30,7 +31,7 @@ extension UIWindow {
                         DispatchQueue.main.async {
                             vc.loadView()
                             vc.viewDidLoad()
-                            let res = updater.delete(version: serverBasePath)
+                            _ = updater.delete(version: serverBasePath, versionName: versionName)
                         }
                     }))
                     alert.addAction(UIAlertAction(title: cancelButtonTitle, style: UIAlertAction.Style.default))

@@ -4,6 +4,10 @@ import { CapacitorUpdater } from 'capacitor-updater'
 import { useSupabase } from './supabase'
 import type { definitions } from '~/types/supabase'
 
+interface versionSet {
+    version: string;
+    versionName?: string | undefined;
+}
 export const openVersion = async(app: definitions['app_versions']) => {
   const supabase = useSupabase()
   const auth = supabase.auth.user()
@@ -24,9 +28,10 @@ export const openVersion = async(app: definitions['app_versions']) => {
   if (signedURL && isPlatform('capacitor')) {
     try {
       SplashScreen.show()
-      const newFolder = await CapacitorUpdater.download({
+      const newFolder: versionSet = await CapacitorUpdater.download({
         url: signedURL,
       })
+      newFolder.versionName = app.name
       await CapacitorUpdater.set(newFolder)
     }
     catch (error) {

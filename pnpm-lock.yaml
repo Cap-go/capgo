@@ -35,8 +35,8 @@ specifiers:
   '@iconify-json/ion': 1.1.0
   '@iconify-json/ls': 1.1.0
   '@intlify/vite-plugin-vue-i18n': 3.3.0
-  '@ionic/vue': 6.0.7
-  '@ionic/vue-router': 6.0.7
+  '@ionic/vue': 6.0.8
+  '@ionic/vue-router': 6.0.8
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': ^0.2.3
   '@robingenz/capacitor-screen-orientation': ^1.1.4
@@ -131,8 +131,8 @@ dependencies:
   '@capacitor/storage': 1.2.4_@capacitor+core@3.4.1
   '@capacitor/text-zoom': 1.0.8_@capacitor+core@3.4.1
   '@capacitor/toast': 1.0.8_@capacitor+core@3.4.1
-  '@ionic/vue': 6.0.7
-  '@ionic/vue-router': 6.0.7
+  '@ionic/vue': 6.0.8
+  '@ionic/vue-router': 6.0.8
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.2.3_@capacitor+core@3.4.1
   '@robingenz/capacitor-screen-orientation': 1.1.4_@capacitor+core@3.4.1
@@ -2849,8 +2849,8 @@ packages:
       - supports-color
     dev: true
 
-  /@ionic/core/6.0.7:
-    resolution: {integrity: sha512-Yl6itMcddfwfNNa6BjCxXxrIS+vPsrYSTfCmQwVfB4AiuZ5ZgE/jaZ9lMN7b0WIAy56bfX9etRlW+EjnK1znyQ==}
+  /@ionic/core/6.0.8:
+    resolution: {integrity: sha512-sfkms6Rj8MPuZOo+bdjL75ewTmr8oKsMepFL3MM7Nfu+GfNsAuauf1fRYwoD34f0jVgfUnJvhvT3V3NVVTQwHQ==}
     dependencies:
       '@stencil/core': 2.13.0
       ionicons: 6.0.0
@@ -2944,16 +2944,16 @@ packages:
       - supports-color
     dev: true
 
-  /@ionic/vue-router/6.0.7:
-    resolution: {integrity: sha512-pVp+dMADdMYdJDEINRQQNyV74xOIxRr4y1FuC58T4pREC1puQFeb1AsOAb7c5Cwg9xObnDjBw0FFw612FpsprA==}
+  /@ionic/vue-router/6.0.8:
+    resolution: {integrity: sha512-aMo9PqD83RvTX51qjrGb0gL5OS4B+yE238P424a4ELdKrLgaJ68aZNFPmE1H1Mu7TwNclb2+U8+4TLNSzytKJg==}
     dependencies:
-      '@ionic/vue': 6.0.7
+      '@ionic/vue': 6.0.8
     dev: false
 
-  /@ionic/vue/6.0.7:
-    resolution: {integrity: sha512-4KZNI4HlMwDvJ9HFkit34pqNABlPIjvLy46AeS0OvwjD4C1dmj1pjqu2fHaLy/QSXmDfGv8uyes5biZJZ+b1Aw==}
+  /@ionic/vue/6.0.8:
+    resolution: {integrity: sha512-hpnNWeVQytjYZbpV3UsjtVGyM1mCBztzCJ8IcejHsRWVaEt5oYbXKK2H3NLMitqv3VkzGNDGu6VP6yJE9jvn7A==}
     dependencies:
-      '@ionic/core': 6.0.7
+      '@ionic/core': 6.0.8
       ionicons: 6.0.0
     dev: false
 

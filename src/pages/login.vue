@@ -112,7 +112,7 @@ onMounted(checkLogin)
             <IonLabel>
               <img src="/person.png" alt="person">
             </IonLabel>
-            <IonInput v-model="form.email" :disabled="isLoading" :placeholder="t('login.email')" required="true" />
+            <IonInput v-model="form.email" type="email" :disabled="isLoading" :placeholder="t('login.email')" required="true" />
           </IonItem>
           <div v-for="(error, index) of v$.email.$errors" :key="index">
             <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
