@@ -64,7 +64,7 @@ specifiers:
   capacitor-purchases: 1.0.0
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: ^1.1.3
-  capacitor-updater: 1.3.4
+  capacitor-updater: 1.3.12
   copy-text-to-clipboard: ^3.0.1
   copy-to-clipboard: ^3.3.1
   critters: 0.0.16
@@ -151,7 +151,7 @@ dependencies:
   capacitor-purchases: 1.0.0_@capacitor+core@3.4.1
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.1
   capacitor-screen-recorder: 1.1.3_@capacitor+core@3.4.1
-  capacitor-updater: 1.3.4_@capacitor+core@3.4.1
+  capacitor-updater: 1.3.12_@capacitor+core@3.4.1
   copy-text-to-clipboard: 3.0.1
   copy-to-clipboard: 3.3.1
   firebase: 9.6.6
@@ -5662,8 +5662,8 @@ packages:
       '@capacitor/core': 3.4.1
     dev: false
 
-  /capacitor-updater/1.3.4_@capacitor+core@3.4.1:
-    resolution: {integrity: sha512-rK6Tgf0j9Hqqxqrlxf1KeskylmWNEFIbxyLWaOXgmKdue0yWhTWo52wrl8Fcim++cLRKRUbFOdNdWMhKNBGyXQ==}
+  /capacitor-updater/1.3.12_@capacitor+core@3.4.1:
+    resolution: {integrity: sha512-dnrrex+GaVxIBOgcBGjDBjG+cc+vGzIQxVMrfCW3ZAC9BH/9rQPLne1VKEVkmaxseteIvHUskH34F7P+7yeRUw==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:

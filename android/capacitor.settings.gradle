@@ -105,4 +105,4 @@ include ':capacitor-screen-recorder'
 project(':capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/capacitor-screen-recorder@1.1.3_@capacitor+core@3.4.1/node_modules/capacitor-screen-recorder/android')
 
 include ':capacitor-updater'
-project(':capacitor-updater').projectDir = new File('../node_modules/.pnpm/capacitor-updater@1.3.4_@capacitor+core@3.4.1/node_modules/capacitor-updater/android')
+project(':capacitor-updater').projectDir = new File('../node_modules/.pnpm/capacitor-updater@1.3.9_@capacitor+core@3.4.1/node_modules/capacitor-updater/android')
