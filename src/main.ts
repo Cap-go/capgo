@@ -31,15 +31,16 @@ import './styles/main.css'
 import 'virtual:windi-utilities.css'
 // windicss devtools support (dev only)
 import 'virtual:windi-devtools'
+import { initCrisp } from './services/crips'
 
 const app = createApp(App)
 
 // setup up pages with layouts
 
-const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: isPlatform('capacitor') ? '/login' : '/login' }]
+const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: isPlatform('capacitor') ? '/login' : '/home' }]
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 app.use(router)
-
+initCrisp()
 // install all modules under `modules/`
 Object.values(import.meta.globEager('./modules/*.ts')).map(i => i.install?.({ app, router, routes }))
 

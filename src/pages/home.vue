@@ -1,6 +1,7 @@
 
 <script setup lang="ts">
 import { IonContent, IonPage } from '@ionic/vue'
+import { openChat } from '../services/crips'
 </script>
 <template>
   <IonPage>
@@ -11,7 +12,7 @@ import { IonContent, IonPage } from '@ionic/vue'
             <div class="relative flex items-center justify-between">
               <div class="flex-shrink-0">
                 <a href="#" title="" class="flex rounded outline-none focus:ring-1 focus:ring-gray-900 focus:ring-offset-2">
-                  <img class="w-auto h-8" src="https://d33wubrfki0l68.cloudfront.net/682a555ec15382f2c6e7457ca1ef48d8dbb179ac/f8cd3/images/logo.svg" alt="">
+                  <img class="w-auto h-8" alt="Capgo logo" src="/capgo.png">
                 </a>
               </div>
 
@@ -23,20 +24,18 @@ import { IonContent, IonPage } from '@ionic/vue'
                 </button>
               </div>
 
-              <div class="hidden lg:absolute lg:inset-y-0 lg:flex lg:items-center lg:justify-center lg:space-x-12 lg:-translate-x-1/2 lg:left-1/2">
-                <a href="#" title="" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Experts </a>
-
-                <a href="#" title="" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Community Groups </a>
-
-                <a href="#" title="" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Support </a>
+              <div class="hidden lg:absolute lg:inset-y-0 lg:flex lg:items-center lg:justify-center lg:space-x-12 lg:-translate-x-1/2 lg:left-3/5">
+                <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Documentation </a>
+                <a href="#" title="Support" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2" @click="openChat"> Support </a>
               </div>
 
               <div class="hidden lg:flex lg:items-center lg:justify-center lg:space-x-10">
-                <a href="#" title="" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Login </a>
+                <a href="/login" title="" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Login </a>
 
                 <a
-                  href="#"
-                  title=""
+                  href="https://discord.com/invite/VnYRvBfgA6"
+                  target="_blank"
+                  title="Join discord"
                   class="
                             px-5
                             py-2
@@ -70,16 +69,16 @@ import { IonContent, IonPage } from '@ionic/vue'
                 Made by Developers, for Developers
               </p>
               <h1 class="mt-5 text-4xl font-bold leading-tight sm:text-5xl sm:leading-tight lg:text-6xl lg:leading-tight font-pj">
-                Quality resources shared by the community
+                Make one webapp, run it everywhere
               </h1>
               <p class="max-w-md mx-auto mt-6 text-base leading-7 text-gray-600 font-inter">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vehicula massa in enim luctus. Rutrum arcu.
+                Build one project that runs on all your users' devices with native features.
               </p>
 
               <div class="relative inline-flex mt-10 group">
                 <div class="absolute transitiona-all duration-1000 opacity-70 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg group-hover:opacity-100 group-hover:-inset-1 group-hover:duration-200 animate-tilt" />
-                <a href="#" title="" class="relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gray-900 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900" role="button">
-                  Get access to 4,958 resources
+                <a href="/register" title="" class="relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gray-900 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900" role="button">
+                  Get access now
                 </a>
               </div>
             </div>
@@ -89,8 +88,7 @@ import { IonContent, IonPage } from '@ionic/vue'
             <blockquote class="mt-10">
               <div class="mx-3 md:mx-10 lg:mx-auto max-w-3xl mx-auto text-center text-2xl leading-9 font-medium">
                 <p>
-                  &ldquo;Lorem ipsum dolor sit amet consectetur adipisicing elit. Nemo expedita voluptas culpa sapiente
-                  alias molestiae. Numquam corrupti in laborum sed rerum et corporis.&rdquo;
+                  &ldquo;The community really needs this and you are doing something really important!&rdquo;
                 </p>
               </div>
               <footer class="mt-8">
@@ -135,15 +133,15 @@ import { IonContent, IonPage } from '@ionic/vue'
           </svg>
           <div class="text-center">
             <h1 class="text-5xl font-semibold">
-              Try it out
+              From webapp to mobile with live updates in 5 mins !
             </h1>
             <p class="my-10 text-xl">
-              Get started by editing the code below,<br>
+              Get started by installing the plugin<br>
               then see your changes on your own device.
             </p>
             <img
-              class="mx-auto h-32 rounded-lg"
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+              class="mx-auto h-62 rounded-lg"
+              src="/seeit.png"
               alt=""
             >
             <p class="mt-10">
@@ -162,15 +160,15 @@ import { IonContent, IonPage } from '@ionic/vue'
               </p>
             </div>
             <img
-              class="mx-auto h-full rounded-lg"
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+              class="mx-auto h-62 rounded-lg"
+              src="/undraw_dev_productivity_umsq.svg"
               alt=""
             >
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-10 py-20">
             <img
-              class="mx-auto h-full rounded-lg"
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+              class="mx-auto h-62 rounded-lg"
+              src="/undraw_develop_app_re_bi4i.svg"
               alt=""
             >
             <div>
@@ -178,7 +176,7 @@ import { IonContent, IonPage } from '@ionic/vue'
                 Build
               </h2>
               <p class="text-lg lg:w-2/3">
-                Ready to ship? Let us do the heavy lifting. Expo handles the gritty parts of building for each app store so you don't need Xcode or Android Studio to get your app into people's hands.
+                Ready to ship? Let us do the heavy lifting. Capgo handles the gritty parts of building for each app store so you don't need Xcode or Android Studio to get your app into people's hands.
               </p>
             </div>
           </div>
@@ -192,8 +190,8 @@ import { IonContent, IonPage } from '@ionic/vue'
               </p>
             </div>
             <img
-              class="mx-auto h-full rounded-lg"
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+              class="mx-auto h-62 rounded-lg"
+              src="/undraw_pull_request_gld8.svg"
               alt=""
             >
           </div>
@@ -218,18 +216,18 @@ import { IonContent, IonPage } from '@ionic/vue'
                   <path class="text-gray-800 text-opacity-40" fill="currentColor" d="M-217.088 544.086L1544.761 72l134.327 501.316-1761.849 472.086z" />
                 </svg>
               </div>
-              <div class="relative">
+              <div class="relative flex flex-col">
                 <div class="sm:text-center">
                   <h2 class="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">
-                    Create an amazing app
+                    Create amazing app
                   </h2>
                   <p class="mt-6 mx-auto max-w-2xl text-lg text-gray-100">
-                    in a record time
+                    in a record time, with capgo and capacitor
                   </p>
                 </div>
-                <button class="block mt-5 mx-auto rounded-md border border-transparent px-5 py-3 bg-gray-900 text-base font-medium text-white shadow hover:bg-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-rose-500 sm:px-10">
+                <router-link to="/register" class="w-auto inline-block mt-5 mx-auto rounded-md border border-transparent px-5 py-3 bg-gray-900 text-base font-medium text-white shadow hover:bg-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-rose-500 sm:px-10">
                   Get started &RightArrow;
-                </button>
+                </router-link>
               </div>
             </div>
           </div>
