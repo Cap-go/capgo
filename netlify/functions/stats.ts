@@ -19,20 +19,31 @@ export const handler: Handler = async(event) => {
   const supabase = useSupabase()
   console.log('event.body', event.body)
   const body = JSON.parse(event.body || '{}') as AppStats
+  const device = {
+    device_id: body.device_id,
+    updated_at: new Date().toISOString(),
+  } as definitions['devices']
 
   const { data, error } = await supabase
     .from<definitions['app_versions']>('app_versions')
     .select()
     .eq('app_id', body.app_id)
     .eq('name', body.version_name)
-  if (data && data.length && !error)
+  if (data && data.length && !error) {
     body.version = data[0].id
-  else
+    device.version = data[0].id
+  }
+  else {
     return sendRes({ status: 'ko', error: error || 'version not found' }, 400)
+  }
   delete body.version_name
   console.log('body', body)
   await supabase
-    .from('stats')
+    .from<definitions['devices']>('devices')
+    .update(device)
+    .eq('device_id', body.device_id)
+  await supabase
+    .from<definitions['stats']>('stats')
     .insert(body)
   return sendRes()
 }

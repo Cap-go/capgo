@@ -531,6 +531,210 @@ export interface paths {
       };
     };
   };
+  "/devices": {
+    get: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.devices.created_at"];
+          updated_at?: parameters["rowFilter.devices.updated_at"];
+          device_id?: parameters["rowFilter.devices.device_id"];
+          version?: parameters["rowFilter.devices.version"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["devices"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** devices */
+          devices?: definitions["devices"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.devices.created_at"];
+          updated_at?: parameters["rowFilter.devices.updated_at"];
+          device_id?: parameters["rowFilter.devices.device_id"];
+          version?: parameters["rowFilter.devices.version"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.devices.created_at"];
+          updated_at?: parameters["rowFilter.devices.updated_at"];
+          device_id?: parameters["rowFilter.devices.device_id"];
+          version?: parameters["rowFilter.devices.version"];
+        };
+        body: {
+          /** devices */
+          devices?: definitions["devices"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
+  "/stats": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.stats.id"];
+          created_at?: parameters["rowFilter.stats.created_at"];
+          platform?: parameters["rowFilter.stats.platform"];
+          action?: parameters["rowFilter.stats.action"];
+          device_id?: parameters["rowFilter.stats.device_id"];
+          version_build?: parameters["rowFilter.stats.version_build"];
+          version?: parameters["rowFilter.stats.version"];
+          app_id?: parameters["rowFilter.stats.app_id"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["stats"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** stats */
+          stats?: definitions["stats"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.stats.id"];
+          created_at?: parameters["rowFilter.stats.created_at"];
+          platform?: parameters["rowFilter.stats.platform"];
+          action?: parameters["rowFilter.stats.action"];
+          device_id?: parameters["rowFilter.stats.device_id"];
+          version_build?: parameters["rowFilter.stats.version_build"];
+          version?: parameters["rowFilter.stats.version"];
+          app_id?: parameters["rowFilter.stats.app_id"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.stats.id"];
+          created_at?: parameters["rowFilter.stats.created_at"];
+          platform?: parameters["rowFilter.stats.platform"];
+          action?: parameters["rowFilter.stats.action"];
+          device_id?: parameters["rowFilter.stats.device_id"];
+          version_build?: parameters["rowFilter.stats.version_build"];
+          version?: parameters["rowFilter.stats.version"];
+          app_id?: parameters["rowFilter.stats.app_id"];
+        };
+        body: {
+          /** stats */
+          stats?: definitions["stats"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/users": {
     get: {
       parameters: {
@@ -793,6 +997,63 @@ export interface definitions {
     /** Format: boolean */
     public: boolean;
   };
+  devices: {
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /**
+     * Format: text
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    device_id: string;
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
+     */
+    version: number;
+  };
+  stats: {
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: number;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /** Format: text */
+    platform: string;
+    /** Format: text */
+    action: string;
+    /** Format: text */
+    device_id: string;
+    /** Format: text */
+    version_build: string;
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
+     */
+    version: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
+  };
   users: {
     /**
      * Format: timestamp with time zone
@@ -935,6 +1196,34 @@ export interface parameters {
   "rowFilter.channels.updated_at": string;
   /** Format: boolean */
   "rowFilter.channels.public": string;
+  /** @description devices */
+  "body.devices": definitions["devices"];
+  /** Format: timestamp with time zone */
+  "rowFilter.devices.created_at": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.devices.updated_at": string;
+  /** Format: text */
+  "rowFilter.devices.device_id": string;
+  /** Format: bigint */
+  "rowFilter.devices.version": string;
+  /** @description stats */
+  "body.stats": definitions["stats"];
+  /** Format: bigint */
+  "rowFilter.stats.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.stats.created_at": string;
+  /** Format: text */
+  "rowFilter.stats.platform": string;
+  /** Format: text */
+  "rowFilter.stats.action": string;
+  /** Format: text */
+  "rowFilter.stats.device_id": string;
+  /** Format: text */
+  "rowFilter.stats.version_build": string;
+  /** Format: bigint */
+  "rowFilter.stats.version": string;
+  /** Format: character varying */
+  "rowFilter.stats.app_id": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */
