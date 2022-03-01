@@ -18,11 +18,11 @@ import EnvironmentPlugin from 'vite-plugin-environment'
 import fs from 'fs-extra'
 import matter from 'gray-matter'
 import generateSitemap from 'vite-plugin-pages-sitemap'
-import ViteImagemin from 'vite-plugin-imagemin'
+// import ViteImagemin from 'vite-plugin-imagemin'
 
 const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
-const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
-const sitemapIgnore = ['/eula', '/privacy', '/tos', '/disclaimer', '/return', '/404']
+const guestPath = ['/home', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
+const sitemapIgnore = ['/eula', '/privacy', '/tos', '/disclaimer', '/return', '/404', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
 
 export default defineConfig({
   resolve: {
@@ -174,33 +174,33 @@ export default defineConfig({
       // change this to enable inspect for debugging
       enabled: false,
     }),
-    ViteImagemin({
-      gifsicle: {
-        optimizationLevel: 7,
-        interlaced: false,
-      },
-      optipng: {
-        optimizationLevel: 7,
-      },
-      mozjpeg: {
-        quality: 20,
-      },
-      pngquant: {
-        quality: [0.8, 0.9],
-        speed: 4,
-      },
-      svgo: {
-        plugins: [
-          {
-            name: 'removeViewBox',
-          },
-          {
-            name: 'removeEmptyAttrs',
-            active: false,
-          },
-        ],
-      },
-    }),
+    // ViteImagemin({
+    //   gifsicle: {
+    //     optimizationLevel: 7,
+    //     interlaced: false,
+    //   },
+    //   optipng: {
+    //     optimizationLevel: 7,
+    //   },
+    //   mozjpeg: {
+    //     quality: 20,
+    //   },
+    //   pngquant: {
+    //     quality: [0.8, 0.9],
+    //     speed: 4,
+    //   },
+    //   svgo: {
+    //     plugins: [
+    //       {
+    //         name: 'removeViewBox',
+    //       },
+    //       {
+    //         name: 'removeEmptyAttrs',
+    //         active: false,
+    //       },
+    //     ],
+    //   },
+    // }),
   ],
 
   server: {
