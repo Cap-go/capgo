@@ -9,6 +9,13 @@ import { SplashScreen } from '@capacitor/splash-screen'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
+useHead({
+  title: 'Capgo | Login',
+  meta: [
+    { name: 'description', content: 'Login' },
+    { name: 'robots', content: 'noindex, nofollow' },
+  ],
+})
 const route = useRoute()
 const supabase = useSupabase()
 const main = useMainStore()

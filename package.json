@@ -72,6 +72,8 @@
     "pinia": "2.0.11",
     "prism-theme-vars": "^0.2.2",
     "vite-plugin-environment": "1.1.0",
+    "vite-plugin-imagemin": "^0.6.1",
+    "vite-plugin-pages-sitemap": "^1.1.11",
     "vue": "3.2.31",
     "vue-demi": "^0.12.1",
     "vue-i18n": "^9.1.9",

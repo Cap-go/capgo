@@ -97,7 +97,7 @@ import { openChat } from '../services/crips'
                     <img
                       class="mx-auto h-10 w-10 rounded-full"
                       src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                      alt=""
+                      alt="Judith Black"
                     >
                   </div>
                   <div class="mt-3 text-center md:mt-0 md:ml-4 md:flex md:items-center">
@@ -142,7 +142,7 @@ import { openChat } from '../services/crips'
             <img
               class="mx-auto h-62 rounded-lg"
               src="/seeit.png"
-              alt=""
+              alt="see it in device illustration"
             >
             <p class="mt-10">
               See it on device &uArr;
@@ -162,14 +162,14 @@ import { openChat } from '../services/crips'
             <img
               class="mx-auto h-62 rounded-lg"
               src="/undraw_dev_productivity_umsq.svg"
-              alt=""
+              alt="productivity illustration"
             >
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-10 py-20">
             <img
               class="mx-auto h-62 rounded-lg"
               src="/undraw_develop_app_re_bi4i.svg"
-              alt=""
+              alt="build illustration"
             >
             <div>
               <h2 class="text-4xl md:text-6xl font-extrabold my-10">
@@ -192,7 +192,7 @@ import { openChat } from '../services/crips'
             <img
               class="mx-auto h-62 rounded-lg"
               src="/undraw_pull_request_gld8.svg"
-              alt=""
+              alt="send update illustration"
             >
           </div>
         </section>
