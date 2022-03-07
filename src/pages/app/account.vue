@@ -26,6 +26,7 @@ const main = useMainStore()
 const isLoading = ref(false)
 const errorMessage = ref('')
 const auth = supabase.auth.user()
+const version = ref(import.meta.env.VITE_APP_VERSION)
 
 const updloadPhoto = async(data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
@@ -251,6 +252,9 @@ const presentActionSheet = async() => {
             </router-link>
           </li>
         </ul>
+        <p class="text-center">
+          {{ version }}
+        </p>
         <a
           class="block text-center text-sm text-muted-blue-500 underline mt-4"
           href="https://capgo.app/tos/"

@@ -18,7 +18,7 @@ import EnvironmentPlugin from 'vite-plugin-environment'
 import fs from 'fs-extra'
 import matter from 'gray-matter'
 import generateSitemap from 'vite-plugin-pages-sitemap'
-// import ViteImagemin from 'vite-plugin-imagemin'
+import pack from './package.json'
 
 const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
 const guestPath = ['/home', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
@@ -36,6 +36,7 @@ export default defineConfig({
     }),
 
     EnvironmentPlugin({
+      VITE_APP_VERSION: pack.version,
       VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : ''}capgo.app`,
       VITE_NETLIFY_URL: process.env.VITE_NETLIFY_URL ? process.env.VITE_NETLIFY_URL : '/api',
     }, { defineOn: 'import.meta.env' }),
