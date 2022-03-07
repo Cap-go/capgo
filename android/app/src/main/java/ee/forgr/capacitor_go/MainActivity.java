@@ -48,7 +48,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
                 String serverBasePath = updater.getLastPathHot();
                 File fHot = new File(serverBasePath);
                 String versionName = updater.getVersionName();
-                updater.reset();
+                updater.reset(true);
                 String pathHot = updater.getLastPathHot();
                 brd.setServerAssetPath(pathHot);
                 try {

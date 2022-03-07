@@ -64,7 +64,7 @@ specifiers:
   capacitor-purchases: 1.0.3
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: 1.1.4
-  capacitor-updater: 1.4.7
+  capacitor-updater: ^2.0.1
   copy-text-to-clipboard: ^3.0.1
   copy-to-clipboard: ^3.3.1
   critters: 0.0.16
@@ -154,7 +154,7 @@ dependencies:
   capacitor-purchases: 1.0.3_@capacitor+core@3.4.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.3
   capacitor-screen-recorder: 1.1.4_@capacitor+core@3.4.3
-  capacitor-updater: 1.4.7_@capacitor+core@3.4.3
+  capacitor-updater: 2.0.1_@capacitor+core@3.4.3
   copy-text-to-clipboard: 3.0.1
   copy-to-clipboard: 3.3.1
   dayjs: 1.10.8
@@ -5744,8 +5744,8 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /capacitor-updater/1.4.7_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-nujjf/fPEslTuuI7GMLqVsFtp3vngOzzwgOt5g+gx68PEpQjOb9nzTU+POM64jKUxdLFiX995jERDfUbpZ9uQg==}
+  /capacitor-updater/2.0.1_@capacitor+core@3.4.3:
+    resolution: {integrity: sha512-GP7Cc1954phEjhIfzmFnDT1G8DCLbgAAgNuQHjGvLlng33RbKlpfx2vLUutxuUp1arYOHj/H795LYbK/IeLoUg==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:

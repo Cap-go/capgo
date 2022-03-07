@@ -21,14 +21,14 @@ extension UIWindow {
                 if (serverBasePath == "") {
                     return
                 }
-                DispatchQueue.main.async {
+                DispatchQueue.global(qos: .background).async {
                     let alert = UIAlertController(title: title, message: message, preferredStyle: UIAlertController.Style.alert)
                     alert.addAction(UIAlertAction(title: okButtonTitle, style: UIAlertAction.Style.default, handler: { (_) -> Void in
-                        updater.reset()
+                        updater.reset(true)
                         let pathPersist = updater.getLastPathPersist()
                         vc.setServerBasePath(path: pathPersist)
                         defaults.set("", forKey: "serverBasePath")
-                        DispatchQueue.main.async {
+                        DispatchQueue.global(qos: .background).async {
                             vc.loadView()
                             vc.viewDidLoad()
                             _ = updater.delete(version: serverBasePath, versionName: versionName)
@@ -36,7 +36,7 @@ extension UIWindow {
                     }))
                     alert.addAction(UIAlertAction(title: cancelButtonTitle, style: UIAlertAction.Style.default))
                     alert.addAction(UIAlertAction(title: reloadButtonTitle, style: UIAlertAction.Style.default, handler: { (_) -> Void in
-                        DispatchQueue.main.async {
+                        DispatchQueue.global(qos: .background).async {
                             vc.bridge?.webView?.reload()
                         }
                     }))
@@ -57,15 +57,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-       return ScreenOrientation.getSupportedInterfaceOrientations()
+        return ScreenOrientation.getSupportedInterfaceOrientations()
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-      NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-      NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
     
     func applicationWillResignActive(_ application: UIApplication) {
