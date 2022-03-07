@@ -13,6 +13,9 @@ const config: CapacitorConfig = {
       launchAutoHide: false,
       androidScaleType: 'CENTER_CROP',
     },
+    CapacitorUpdater: {
+      autoUpdateUrl: 'https://capgo.app/api/latest?appid=ee.forgr.capacitor_go&channel=production',
+    },
   },
 }
 

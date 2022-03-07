@@ -55,6 +55,7 @@ const getSharedWithMe = async() => {
           name
         ),
         name,
+        updated_at,
         created_at
       ),
       user_id
@@ -162,7 +163,11 @@ watchEffect(async() => {
                 <h3 v-if="app.channel_id" class="text-true-gray-800 py-1 font-bold">
                   {{ app.channel_id.name }}: {{
                     app.channel_id.version.name
-                  }}
+                  }}<p>
+                    Last upload: {{
+                      formatDate(app.channel_id.updated_at)
+                    }}
+                  </p>
                 </h3>
               </div>
             </div>
