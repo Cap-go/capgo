@@ -5,8 +5,9 @@ import {
   IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent,
   IonTitle,
   IonToolbar,
-  actionSheetController, toastController, isPlatform,
+  actionSheetController, isPlatform, toastController,
 } from '@ionic/vue'
+import dayjs from 'dayjs'
 import { chevronBack } from 'ionicons/icons'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
@@ -61,6 +62,9 @@ const loadData = async() => {
 }
 const openChannel = async(channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
+}
+const formatDate = (date: string | undefined) => {
+  return dayjs(date).format('HH:mm YYYY-MM-DD')
 }
 
 const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
@@ -217,7 +221,10 @@ const back = () => {
                   <h2 class="text-sm text-azure-500">
                     {{ ch.name }}
                   </h2>
-                  <p>{{ ch.version.name }}</p>
+                  <div class="text-right">
+                    <p>{{ ch.version.name }}</p>
+                    {{ formatDate(ch.updated_at) }}
+                  </div>
                 </div>
               </div>
             </IonLabel>
@@ -234,6 +241,7 @@ const back = () => {
                   <h2 class="text-sm text-azure-500">
                     {{ v.name }}
                   </h2>
+                  <p>{{ formatDate(v.created_at) }}</p>
                 </div>
               </div>
             </IonLabel>

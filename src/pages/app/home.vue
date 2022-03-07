@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { IonContent, IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar } from '@ionic/vue'
 import { ref } from 'vue'
+import dayjs from 'dayjs'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
@@ -23,6 +24,9 @@ interface ChannelUserApp {
   channel_id: definitions['channels'] & {
     version: definitions['app_versions']
   }
+}
+const formatDate = (date: string | undefined) => {
+  return dayjs(date).format('HH:mm YYYY-MM-DD')
 }
 const getMyApps = async() => {
   const { data } = await supabase
@@ -109,7 +113,11 @@ watchEffect(async() => {
                 <h3 v-if="app.last_version" class="text-true-gray-800 py-1 font-bold">
                   Last version: {{
                     app.last_version
-                  }}
+                  }} <p>
+                    Last upload: {{
+                      formatDate(app.updated_at)
+                    }}
+                  </p>
                 </h3>
                 <h3 v-else class="text-true-gray-800 py-1 font-bold">
                   No version upload yet
