@@ -26,7 +26,7 @@ interface ChannelUserApp {
   }
 }
 const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('HH:mm YYYY-MM-DD')
+  return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 const getMyApps = async() => {
   const { data } = await supabase

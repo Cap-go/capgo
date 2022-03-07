@@ -64,7 +64,7 @@ const openChannel = async(channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
 }
 const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('HH:mm YYYY-MM-DD')
+  return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
 const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
