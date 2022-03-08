@@ -83,7 +83,7 @@ export const handler: Handler = async(event) => {
         .from(`apps/${apikey.user_id}/${body.appid}/versions`)
         .download(fileName)
       if (dnError || !data)
-        return sendRes({ status: 'Cannot download partial File to concat' }, 400)
+        return sendRes({ status: 'Cannot download partial File to concat', error: JSON.stringify(dnError || { err: 'unknow error' }) }, 400)
 
       const arrayBuffer = await data?.arrayBuffer()
       const buffOld = Buffer.from(arrayBuffer)
@@ -107,7 +107,7 @@ export const handler: Handler = async(event) => {
       error = upError
     }
     if (error)
-      return sendRes({ status: 'Cannot Upload File' }, 400)
+      return sendRes({ status: 'Cannot Upload File', error: JSON.stringify(error) }, 400)
 
     if (body.isMultipart) {
       // send filename to allow partial upload
@@ -143,14 +143,14 @@ export const handler: Handler = async(event) => {
       if (dbError2) {
         return sendRes({
           status: 'Cannot update or add channel',
-          err: JSON.stringify(dbError2),
+          error: JSON.stringify(dbError2),
         }, 400)
       }
     }
     catch (err) {
       return sendRes({
         status: 'Error channel',
-        err: JSON.stringify(err),
+        error: JSON.stringify(err),
       }, 400)
     }
     return sendRes()
@@ -158,7 +158,7 @@ export const handler: Handler = async(event) => {
   catch (e) {
     return sendRes({
       status: 'Error unknow',
-      err: JSON.stringify(e),
+      error: JSON.stringify(e),
     }, 500)
   }
 }
