@@ -40,7 +40,7 @@ specifiers:
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.3.0
   '@robingenz/capacitor-screen-orientation': ^1.1.4
-  '@supabase/supabase-js': 1.31.0
+  '@supabase/supabase-js': 1.31.1
   '@teamhive/capacitor-video-recorder': ^5.0.0
   '@types/fs-extra': ^9.0.13
   '@types/markdown-it-link-attributes': ^3.0.1
@@ -64,7 +64,7 @@ specifiers:
   capacitor-purchases: 1.0.3
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: 1.1.4
-  capacitor-updater: ^2.0.1
+  capacitor-updater: 2.0.6
   copy-text-to-clipboard: ^3.0.1
   copy-to-clipboard: ^3.3.1
   critters: 0.0.16
@@ -139,7 +139,7 @@ dependencies:
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.3.0_@capacitor+core@3.4.3
   '@robingenz/capacitor-screen-orientation': 1.1.4_@capacitor+core@3.4.3
-  '@supabase/supabase-js': 1.31.0
+  '@supabase/supabase-js': 1.31.1
   '@teamhive/capacitor-video-recorder': 5.0.0_@capacitor+core@3.4.3
   '@vuelidate/core': 2.0.0-alpha.34_vue@3.2.31
   '@vuelidate/validators': 2.0.0-alpha.26_vue@3.2.31
@@ -154,7 +154,7 @@ dependencies:
   capacitor-purchases: 1.0.3_@capacitor+core@3.4.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.3
   capacitor-screen-recorder: 1.1.4_@capacitor+core@3.4.3
-  capacitor-updater: 2.0.1_@capacitor+core@3.4.3
+  capacitor-updater: 2.0.6_@capacitor+core@3.4.3
   copy-text-to-clipboard: 3.0.1
   copy-to-clipboard: 3.3.1
   dayjs: 1.10.8
@@ -2744,8 +2744,8 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/message-compiler': 9.2.0-beta.31
-      '@intlify/shared': 9.2.0-beta.31
+      '@intlify/message-compiler': 9.2.0-beta.32
+      '@intlify/shared': 9.2.0-beta.32
       jsonc-eslint-parser: 1.4.1
       source-map: 0.6.1
       vue-i18n: 9.1.9_vue@3.2.31
@@ -2780,11 +2780,11 @@ packages:
       source-map: 0.6.1
     dev: false
 
-  /@intlify/message-compiler/9.2.0-beta.31:
-    resolution: {integrity: sha512-5ZZBAW8I8046LG/X0jqL8C8HTmuoCgjrv1ANnlQgVc+gzP3qVWQVjHOwHeS3FO5ahCZ5cOByFvDS7f6PGbZrow==}
+  /@intlify/message-compiler/9.2.0-beta.32:
+    resolution: {integrity: sha512-7OOHIhOmOM4nqe3KfEuE65xLwawwBGg/pCFByzayf0jARoHkeaA7v/eKsUJVJMEakeF2pNstx06AvfecijgPzg==}
     engines: {node: '>= 12'}
     dependencies:
-      '@intlify/shared': 9.2.0-beta.31
+      '@intlify/shared': 9.2.0-beta.32
       source-map: 0.6.1
     dev: true
 
@@ -2807,8 +2807,8 @@ packages:
     engines: {node: '>= 10'}
     dev: false
 
-  /@intlify/shared/9.2.0-beta.31:
-    resolution: {integrity: sha512-grc/wPNA7vGTduXWRDTED+yte/kbTVRpH/WRgLKNaakIHPyAU4oemFSOeUHoTlufU0Rv3SP1b4v8B0NVmzERGw==}
+  /@intlify/shared/9.2.0-beta.32:
+    resolution: {integrity: sha512-lVaHnKFNg16eWlfDLzDFLapurrf0WK7xLWEkz8DMYNIXJshRQOZCkH7sQaqtONPoOT0LqjyPo1+sV0Wq85/HRQ==}
     engines: {node: '>= 12'}
     dev: true
 
@@ -2826,7 +2826,7 @@ packages:
         optional: true
     dependencies:
       '@intlify/bundle-utils': 2.2.0_vue-i18n@9.1.9
-      '@intlify/shared': 9.2.0-beta.31
+      '@intlify/shared': 9.2.0-beta.32
       '@rollup/pluginutils': 4.1.2
       debug: 4.3.3
       fast-glob: 3.2.11
@@ -3896,8 +3896,8 @@ packages:
       cross-fetch: 3.1.4
     dev: false
 
-  /@supabase/supabase-js/1.31.0:
-    resolution: {integrity: sha512-eBBtxnCozHAiCMAWvLqFrlPyYpLziMET6+6LO/CSmXJAz0WTvu7XPcAoA0xZ73Jk8bTU8GBpAz76FTeNK63XGA==}
+  /@supabase/supabase-js/1.31.1:
+    resolution: {integrity: sha512-9NMoW9DGf4TjBsvtyLVu3Br972E8yfjpEowEnWP0jMlF4J4zjHLSdgG9GLn/WZ0whlEugAo2QvwiWYKuENKRCw==}
     dependencies:
       '@supabase/gotrue-js': 1.22.3
       '@supabase/postgrest-js': 0.37.1
@@ -5744,8 +5744,8 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /capacitor-updater/2.0.1_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-GP7Cc1954phEjhIfzmFnDT1G8DCLbgAAgNuQHjGvLlng33RbKlpfx2vLUutxuUp1arYOHj/H795LYbK/IeLoUg==}
+  /capacitor-updater/2.0.6_@capacitor+core@3.4.3:
+    resolution: {integrity: sha512-Y+zJVojOcNIJ/CXuww0klYSvGmr0DhcWGvMkIkaBmR4dYzn9VSxLFB48P7BfdfY3M7X9cyKHWYIFbDOu713qrg==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:
