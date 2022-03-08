@@ -252,9 +252,6 @@ const presentActionSheet = async() => {
             </router-link>
           </li>
         </ul>
-        <p class="text-center">
-          {{ version }}
-        </p>
         <a
           class="block text-center text-sm text-muted-blue-500 underline mt-4"
           href="https://capgo.app/tos/"
@@ -275,6 +272,11 @@ const presentActionSheet = async() => {
             @click="main.logout().then(() => router.replace('/login'))"
           >
             {{ t("account.logout") }}
+          </button>
+        </div>
+        <div class="mx-auto text-center mt-4">
+          <button class="mx-auto font-bold text-dusk-500">
+            Version {{ version }}
           </button>
         </div>
       </div>
