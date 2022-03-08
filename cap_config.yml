@@ -2,7 +2,7 @@ vars:
   CI_BUILD_NUMBER:
     default: 30504
   VERSION_NUMBER:
-    default: "0.1.7"
+    default: "0.1.8"
 
 platforms:
   ios:
