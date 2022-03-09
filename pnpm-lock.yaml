@@ -65,7 +65,7 @@ specifiers:
   capacitor-purchases: 1.0.3
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: 1.1.4
-  capacitor-updater: 2.0.6
+  capacitor-updater: 2.0.7
   copy-text-to-clipboard: ^3.0.1
   copy-to-clipboard: ^3.3.1
   critters: 0.0.16
@@ -156,7 +156,7 @@ dependencies:
   capacitor-purchases: 1.0.3_@capacitor+core@3.4.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.3
   capacitor-screen-recorder: 1.1.4_@capacitor+core@3.4.3
-  capacitor-updater: 2.0.6_@capacitor+core@3.4.3
+  capacitor-updater: 2.0.7_@capacitor+core@3.4.3
   copy-text-to-clipboard: 3.0.1
   copy-to-clipboard: 3.3.1
   dayjs: 1.10.8
@@ -5490,7 +5490,7 @@ packages:
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
     dependencies:
-      caniuse-lite: 1.0.30001258
+      caniuse-lite: 1.0.30001314
       colorette: 1.4.0
       electron-to-chromium: 1.3.842
       escalade: 3.1.1
@@ -5688,8 +5688,8 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /caniuse-lite/1.0.30001258:
-    resolution: {integrity: sha512-RBByOG6xWXUp0CR2/WU2amXz3stjKpSl5J1xU49F1n2OxD//uBZO4wCKUiG+QMGf7CHGfDDcqoKriomoGVxTeA==}
+  /caniuse-lite/1.0.30001314:
+    resolution: {integrity: sha512-0zaSO+TnCHtHJIbpLroX7nsD+vYuOVjl3uzFbJO1wMVbuveJA0RK2WcQA9ZUIOiO0/ArMiMgHJLxfEZhQiC0kw==}
     dev: true
 
   /capacitor-crisp/1.0.18_@capacitor+core@3.4.3:
@@ -5754,8 +5754,8 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /capacitor-updater/2.0.6_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-Y+zJVojOcNIJ/CXuww0klYSvGmr0DhcWGvMkIkaBmR4dYzn9VSxLFB48P7BfdfY3M7X9cyKHWYIFbDOu713qrg==}
+  /capacitor-updater/2.0.7_@capacitor+core@3.4.3:
+    resolution: {integrity: sha512-2zUBTGKkn5l417sdpm2JsSg5wg0/ejnlU5AgvD5DMwaecps8MTXdH6lbpajg400tbCAOi3+3xQGmWLfhOCINyQ==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:
