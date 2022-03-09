@@ -4,6 +4,7 @@ import { Http } from '@capacitor-community/http'
 import type { URLOpenListenerEvent } from '@capacitor/app'
 import { App } from '@capacitor/app'
 import { SplashScreen } from '@capacitor/splash-screen'
+import { CapacitorUpdater } from 'capacitor-updater'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 
@@ -32,6 +33,7 @@ export const install: UserModule = ({ app, router }) => {
   // const regexpToken = /#access_token=(.+?)&/
 
   if (isPlatform('capacitor')) {
+    CapacitorUpdater.notifyAppReady()
     App.addListener('appUrlOpen', async(event: URLOpenListenerEvent) => {
       const loading = await loadingController.create({
         message: 'Please wait...',
