@@ -1,3 +1,11 @@
+## 0.1.12 (2022-03-09)
+
+### Fix
+
+- update package
+- build issue missing env
+- ios auto login
+
 ## 0.1.11 (2022-03-09)
 
 ### Fix
