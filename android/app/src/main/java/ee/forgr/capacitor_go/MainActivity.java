@@ -1,7 +1,9 @@
 package ee.forgr.capacitor_go;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.hardware.SensorManager;
 import ee.forgr.capacitor_updater.CapacitorUpdater;
 import com.getcapacitor.Bridge;
@@ -15,13 +17,22 @@ import java.text.MessageFormat;
 
 public class MainActivity extends BridgeActivity implements ShakeDetector.Listener {
 
+    private SharedPreferences prefs;
+    private SharedPreferences.Editor editor;
     Boolean isShow = false;
+
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         ShakeDetector sd = new ShakeDetector(this);
         sd.start(sensorManager);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        this.prefs = this.bridge.getContext().getSharedPreferences("CapWebViewSettings", Activity.MODE_PRIVATE);
+        this.editor = prefs.edit();
     }
 
     @Override public void hearShake() {
@@ -44,18 +55,30 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         builder.setPositiveButton(okButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 // User clicked OK button
-                Log.i("Capgo", okButtonTitle);
                 String serverBasePath = updater.getLastPathHot();
                 File fHot = new File(serverBasePath);
                 String versionName = updater.getVersionName();
-                updater.reset(true);
-                String pathHot = updater.getLastPathHot();
-                brd.setServerAssetPath(pathHot);
+                String LatestVersionAutoUpdate = prefs.getString("LatestVersionAutoUpdate", "");
+                String LatestVersionNameAutoUpdate = prefs.getString("LatestVersionNameAutoUpdate", "");
+                Boolean isAssets = true;
+                if (!LatestVersionAutoUpdate.equals("") && !LatestVersionNameAutoUpdate.equals("")) {
+                    isAssets = !updater.set(LatestVersionAutoUpdate, LatestVersionNameAutoUpdate);
+                } else {
+                    updater.reset();
+                }
+                if (isAssets) {
+                    updater.reset();
+                    String pathHot = updater.getLastPathHot();
+                    brd.setServerAssetPath(pathHot);
+                } else {
+                    String pathHot = updater.getLastPathHot();
+                    brd.setServerBasePath(pathHot);
+                }
                 try {
                     String name = fHot.getName();
                     updater.delete(name, versionName);
                 } catch (Exception err) {
-                    Log.i("Capgo", "Cannot delete version", err);
+                    Log.i("Capgo", "Cannot delete version " + versionName, err);
                 }
                 dialog.dismiss();
                 isShow = false;
