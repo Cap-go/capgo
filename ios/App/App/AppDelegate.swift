@@ -38,7 +38,7 @@ extension UIWindow {
 
                             }
                         } else {
-                            updater.reset(true)
+                            updater.reset()
                             let pathPersist = updater.getLastPathPersist()
                             vc.setServerBasePath(path: pathPersist)
                             defaults.set("", forKey: "serverBasePath")

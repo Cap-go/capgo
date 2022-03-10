@@ -80,6 +80,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
                 } catch (Exception err) {
                     Log.i("Capgo", "Cannot delete version " + versionName, err);
                 }
+                Log.i("Capgo", "Capgo: Reload app done");
                 dialog.dismiss();
                 isShow = false;
             }
