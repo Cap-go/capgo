@@ -27,8 +27,8 @@ export const handler: Handler = async(event) => {
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
 
-    if (!data || !data.length || !vError)
-      return sendRes({ status: `App ${body.appid} not found in databse`, error: vError }, 400)
+    if (!data || !data.length || vError)
+      return sendRes({ status: `App ${body.appid} not found in database`, error: vError }, 400)
 
     const { error: delChanError } = await supabase
       .from<definitions['channels']>('channels')
@@ -38,7 +38,7 @@ export const handler: Handler = async(event) => {
     if (delChanError)
       return sendRes({ status: `Cannot delete channel version for app ${body.appid} from database`, error: delChanError }, 400)
 
-    const filesToRemove = (data as definitions['app_versions'][]).map(x => `/${apikey.user_id}/${body.appid}/versions/${x.bucket_id}`)
+    const filesToRemove = (data as definitions['app_versions'][]).map(x => `${apikey.user_id}/${body.appid}/versions/${x.bucket_id}`)
     const { error: delError } = await supabase
       .storage
       .from('apps')
