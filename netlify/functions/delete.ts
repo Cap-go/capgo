@@ -21,35 +21,42 @@ export const handler: Handler = async(event) => {
 
   try {
     const body = JSON.parse(event.body || '{}') as AppDelete
-
     const { data, error: vError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
 
-    if (data && data.length && !vError) {
-      const { error: delError } = await supabase
-        .storage
-        .from(`apps/${apikey.user_id}/${body.appid}/versions`)
-        .remove(data.map(v => v.bucket_id))
-      if (delError)
-        return sendRes({ status: 'Cannot delete version from storage', error: delError }, 400)
+    if (!data || !data.length || !vError)
+      return sendRes({ status: 'Version not found in databse' }, 400)
 
-      await supabase
-        .from('app_versions')
-        .delete()
-        .eq('app_id', body.appid)
-        .eq('user_id', apikey.user_id)
-    }
+    const filesToRemove = (data as definitions['app_versions'][]).map(x => x.bucket_id)
+    const { error: delError } = await supabase
+      .storage
+      .from(`apps/${apikey.user_id}/${body.appid}/versions`)
+      .remove(filesToRemove)
+    if (delError)
+      return sendRes({ status: 'Cannot delete version from storage', error: delError }, 400)
 
     const { error: dbError } = await supabase
-      .from('apps')
+      .from<definitions['apps']>('apps')
       .delete()
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
-    if (dbError)
-      return sendRes({ status: 'Cannot delete version from database', error: dbError }, 400)
+
+    const { error: delAppError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .delete()
+      .eq('app_id', body.appid)
+      .eq('user_id', apikey.user_id)
+
+    const { error: delChanError } = await supabase
+      .from<definitions['channels']>('channels')
+      .delete()
+      .eq('app_id', body.appid)
+
+    if (dbError || delAppError || delChanError)
+      return sendRes({ status: 'Cannot delete version from database', error: dbError || delAppError || delChanError }, 400)
   }
   catch (e) {
     return sendRes({ status: 'Cannot delete', error: e }, 500)
