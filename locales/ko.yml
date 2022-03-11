@@ -1,14 +1,130 @@
+account:
+  backButton: 뒤
+  changePassword: 비밀번호 변경
+  discord: 불화
+  heading: 계정
+  keys: API 키
+  legal: 서비스 약관
+  logout: 로그 아웃
+  personalInformation: 개인 정보
+  preferences: 알림
+  privacy: 개인 정보 정책
+accountPassword:
+  confirmPassword: 비밀번호 확인
+  errorMsg: 오류가 발생했습니다. 다시 시도해 주세요.
+  heading: 내 비밀번호 변경
+  password: 새 비밀번호
+  success: 비밀번호가 성공적으로 변경되었습니다.
+  validate: 확인
+accountProfile:
+  country: 국가
+  email: 이메일
+  first-name: 이름
+  heading: 개인 정보
+  last-name: 성
+  update: 업데이트
+activation:
+  desc: 다음 필드를 작성하여 등록을 완료하십시오.
+  doi: 선택적 동의
+  doi-desc: 이메일 뉴스레터 및 향후 마케팅 제안을 수락합니다.
+  heading: 활성화
+  headline: 내 설정
+  legal: 서비스 약관
+  legal-desc: Capgo 앱 개인정보 보호정책 및 이용약관에 동의합니다.
+  notification: 알림
+  notification-desc: 새 앱 버전을 사용할 수 있을 때 알림 수신에 동의합니다.
+  validate: 확인
+apikeys:
+  all: 열쇠
+  checkbelow: 더 많은 정보를 얻으려면 링크 아래를 확인하십시오
+  cli: 캡고 CLI
+  explain: 모든 API 키는 Capgo CLI 도구 또는 capacitor-updater 플러그인과 함께 사용하도록 만들어졌습니다.
+  keyCopied: 클립보드에 복사된 키
+  links: 연결
+  title: API 키
+  updater: 커패시터 업데이터
 button:
   about: 소개
   back: 뒤로가기
+  browse: 검색
+  camera: 카메라
+  cancel: 취소
+  delete: 삭제
   go: 이동
   home: 홈
   tabs: 탭
   toggle_dark: 다크모드 토글
   toggle_langs: 언어 변경
+channel:
+  add: 추가하다
+  copy: URL 복사
+  invit: 초대할 이메일 입력
+  make_it: 만들어
+  makeprivate: 채널이 공개되어 있습니다. 비공개로 설정하려면 클릭하세요.
+  makepublic: 채널이 비공개입니다. 공개하려면 클릭하세요.
+  open: 열려있는
+  private_desc: 사적인
+  public: 커패시터 업데이터 링크
+  public_desc: 공공의
+  title: 채널
+  user_no_found: 사용자를 찾을 수 없습니다. 먼저 등록을 요청하세요.
+  users: 사용자와 공유
+forgot:
+  check_email: 이메일을 확인하여 비밀번호 재설정 링크를 받으세요
+  email: 이메일
+  heading: 비밀번호를 잊으 셨나요
+  success: 비밀번호가 성공적으로 업데이트되었습니다.
 intro:
+  aka: 또한 ~으로 알려진
   desc: Vite 애플리케이션 템플릿
   dynamic-route: 다이나믹 라우트 데모
   hi: 안녕, {name}!
   whats-your-name: 이름이 뭐예요?
+login:
+  andpass: 그리고 비밀번호
+  connexion: 로그인
+  create-new: 새 계정을 만들
+  email: 이메일
+  forgot: 잊어 버렸다
+  hello: 안녕하세요
+  login-in: 로그인
+  or: 또는
+  password: 비밀번호
+  withemail: 이메일 주소로
 not-found: 찾을 수 없습니다
+notificationSettings:
+  heading: 알림 설정
+  validate: 확인
+onboarding:
+  loading: 로딩 중
+package:
+  channels: 채널
+  download: 버전 다운로드
+  link_channel: 채널 링크
+  set: 버전을 채널로 설정
+  test: 출시 버전
+  title: 정보
+  versions: 버전
+projects:
+  list: 당신 것
+  sharedlist: 나와 공유됨
+  title: 프로젝트
+register:
+  already-account: 이미 계정이 있습니까?
+  check-email: 이메일을 확인하고 확인하십시오
+  confirm-email: 이메일 확인
+  confirm-password: 비밀번호 확인
+  desc: 다음 필드를 작성하여 등록을 완료하십시오.
+  email: 이메일
+  first-name: 이름
+  heading: 등록
+  last-name: 성
+  lowerCaseError: 소문자를 포함해야 합니다.
+  next: 다음
+  password: 비밀번호
+  password-hint: 6개 이상의 숫자, 문자, 구두점 조합을 입력하세요.
+  specialError: 특수 문자를 포함해야 합니다.
+  upperCaseError: 대문자를 포함해야 합니다.
+something-went-wrong-try-again-later: |-
+  문제가 발생했습니다! 
+  나중에 다시 시도하세요.

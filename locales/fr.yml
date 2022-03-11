@@ -1,6 +1,7 @@
 account:
   backButton: Retour
   changePassword: Changer le mot de passe
+  discord: Discorde
   heading: Compte
   keys: Clés API
   legal: Conditions de services

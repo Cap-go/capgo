@@ -1,14 +1,130 @@
+account:
+  backButton: 戻る
+  changePassword: パスワードを変更する
+  discord: 不和
+  heading: アカウント
+  keys: APIキー
+  legal: 利用規約
+  logout: ログアウト
+  personalInformation: 個人情報
+  preferences: 通知
+  privacy: プライバシーポリシー
+accountPassword:
+  confirmPassword: パスワードを認証する
+  errorMsg: エラーが発生しました。再試行してください
+  heading: パスワードを変更する
+  password: 新しいパスワード
+  success: パスワードが正常に変更されました
+  validate: 検証
+accountProfile:
+  country: 国
+  email: Eメール
+  first-name: ファーストネーム
+  heading: 個人情報
+  last-name: 苗字
+  update: アップデート
+activation:
+  desc: 以下のフィールドに入力して登録を完了してください
+  doi: オプションの同意
+  doi-desc: メールマガジンと将来のマーケティングオファーを受け入れます
+  heading: アクティベーション
+  headline: 私の設定
+  legal: 利用規約
+  legal-desc: Capgoアプリのプライバシーポリシーと利用規約に同意します
+  notification: 通知
+  notification-desc: 新しいアプリのバージョンが利用可能になったときに通知を受け取ることに同意します
+  validate: 検証
+apikeys:
+  all: キー
+  checkbelow: 詳細については、リンクの下を確認してください
+  cli: capgo CLI
+  explain: これらのAPIキーはすべて、CapgoCLIツールまたはコンデンサーアップデータプラグインで使用できるように作成されています。
+  keyCopied: クリップボードにコピーされたキー
+  links: リンク
+  title: APIキー
+  updater: コンデンサアップデータ
 button:
   about: これは？
   back: 戻る
+  browse: ブラウズ
+  camera: カメラ
+  cancel: キャンセル
+  delete: 消去
   go: 進む
   home: ホーム
   tabs: タブ
   toggle_dark: ダークモード切り替え
   toggle_langs: 言語切り替え
+channel:
+  add: 追加
+  copy: URLをコピー
+  invit: 招待するメールアドレスを入力
+  make_it: 成功する
+  makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします
+  makepublic: チャンネルは非公開です。クリックして公開してください
+  open: 開ける
+  private_desc: プライベート
+  public: コンデンサ-アップデータリンク
+  public_desc: 公衆
+  title: チャネル
+  user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
+  users: ユーザーと共有
+forgot:
+  check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
+  email: Eメール
+  heading: パスワードをお忘れですか
+  success: パスワードが正常に更新されました
 intro:
+  aka: としても知られている
   desc: 固執された Vite スターターテンプレート
   dynamic-route: 動的ルートのデモ
   hi: こんにちは、{name}!
   whats-your-name: 君の名は。
+login:
+  andpass: そしてパスワード
+  connexion: ログイン
+  create-new: 新しいアカウントを作成する
+  email: Eメール
+  forgot: 忘れた
+  hello: こんにちは
+  login-in: ログイン
+  or: また
+  password: パスワード
+  withemail: メールアドレス付き
 not-found: 見つかりませんでした
+notificationSettings:
+  heading: 通知設定
+  validate: 検証
+onboarding:
+  loading: 読み込み中
+package:
+  channels: チャネル
+  download: ダウンロード版
+  link_channel: チャネルへのリンク
+  set: バージョンをチャネルに設定
+  test: 起動バージョン
+  title: 情報
+  versions: バージョン
+projects:
+  list: あなたのもの
+  sharedlist: あなたと共有
+  title: プロジェクト
+register:
+  already-account: すでにアカウントをお持ちですか？
+  check-email: メールをチェックして確認してください
+  confirm-email: Eメール確認
+  confirm-password: パスワードを認証する
+  desc: 以下のフィールドに入力して登録を完了してください
+  email: Eメール
+  first-name: ファーストネーム
+  heading: 登録
+  last-name: 苗字
+  lowerCaseError: 小文字を含める必要があります
+  next: 次
+  password: パスワード
+  password-hint: 少なくとも6つの数字、文字、句読点の組み合わせを入力してください。
+  specialError: 特殊文字を含める必要があります
+  upperCaseError: 大文字を含める必要があります
+something-went-wrong-try-again-later: |-
+  何かがうまくいかなかった！
+  あとでもう一度試してみてください。

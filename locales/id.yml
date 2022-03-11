@@ -1,6 +1,7 @@
 account:
   backButton: Kembali
   changePassword: Ganti kata sandi
+  discord: Perselisihan
   heading: Akun
   keys: kunci API
   legal: Persyaratan layanan

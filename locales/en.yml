@@ -7,6 +7,7 @@ account:
   logout: Logout
   personalInformation: Personal information
   preferences: Notifications
+  discord: Discord
   privacy: Privacy policy
 accountPassword:
   confirmPassword: Confirm password

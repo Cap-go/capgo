@@ -251,6 +251,18 @@ const presentActionSheet = async() => {
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </router-link>
           </li>
+          <li>
+            <a
+              class="flex justify-between items-center"
+              href="https://discord.com/invite/VnYRvBfgA6"
+              target="_blank"
+            >
+              <span class="font-bold">
+                {{ t("account.discord") }}
+              </span>
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </a>
+          </li>
         </ul>
         <a
           class="block text-center text-sm text-muted-blue-500 underline mt-4"

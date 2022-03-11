@@ -1,6 +1,7 @@
 account:
   backButton: atrás
   changePassword: Cambia la contraseña
+  discord: Discordia
   heading: Cuenta
   keys: claves API
   legal: Términos de servicios
