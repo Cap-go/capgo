@@ -1,3 +1,9 @@
+## 0.3.0 (2022-03-11)
+
+### Feat
+
+- add discord link in the app and translate Korean
+
 ## 0.2.5 (2022-03-11)
 
 ### Fix
