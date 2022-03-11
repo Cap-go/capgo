@@ -30,10 +30,10 @@ export const handler: Handler = async(event) => {
     if (!data || !data.length || !vError)
       return sendRes({ status: 'Version not found in databse' }, 400)
 
-    const filesToRemove = (data as definitions['app_versions'][]).map(x => x.bucket_id)
+    const filesToRemove = (data as definitions['app_versions'][]).map(x => `/${apikey.user_id}/${body.appid}/versions/${x.bucket_id}`)
     const { error: delError } = await supabase
       .storage
-      .from(`apps/${apikey.user_id}/${body.appid}/versions`)
+      .from('apps')
       .remove(filesToRemove)
     if (delError)
       return sendRes({ status: 'Cannot delete version from storage', error: delError }, 400)
