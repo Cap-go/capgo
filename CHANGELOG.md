@@ -1,3 +1,9 @@
+## 0.2.5 (2022-03-11)
+
+### Fix
+
+- delete issue change order
+
 ## 0.2.4 (2022-03-11)
 
 ### Fix
