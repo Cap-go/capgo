@@ -5,6 +5,7 @@ import type { definitions } from '~/types/supabase'
 
 interface AppDelete {
   appid: string
+  version?: string
   name: string
   icon: string
   iconType: string
@@ -21,6 +22,18 @@ export const handler: Handler = async(event) => {
 
   try {
     const body = JSON.parse(event.body || '{}') as AppDelete
+    if (body.version) {
+      // Delete only a specific version
+      const { error: delAppSpecVersionError } = await supabase
+        .from<definitions['app_versions']>('app_versions')
+        .delete()
+        .eq('app_id', body.appid)
+        .eq('name', body.version)
+        .eq('user_id', apikey.user_id)
+      if (delAppSpecVersionError)
+        return sendRes({ status: `App ${body.appid}@${body.version} not found in database`, error: delAppSpecVersionError }, 400)
+      return sendRes()
+    }
     const { data, error: vError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
