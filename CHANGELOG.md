@@ -1,3 +1,9 @@
+## 0.6.4 (2022-03-14)
+
+### Fix
+
+- cache put 60 sec to handle spam
+
 ## 0.6.3 (2022-03-14)
 
 ### Fix
