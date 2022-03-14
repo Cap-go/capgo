@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import {
   IonButton, IonButtons, IonContent,
-  IonHeader, IonIcon, IonItem, IonItemDivider,
-  IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent,
+  IonHeader,
+  IonIcon,
+  IonItem,
+  IonItemDivider,
+  IonItemOption, IonItemOptions, IonItemSliding, IonLabel,
+  IonList, IonNote, IonPage, IonRefresher, IonRefresherContent,
   IonTitle,
   IonToolbar,
   actionSheetController, isPlatform, toastController,
@@ -23,6 +27,80 @@ const isLoading = ref(false)
 const app = ref<definitions['apps']>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
+
+const deleteChannel = async(channel: definitions['channels'] & Channel) => {
+  console.log('deleteChannel', channel)
+  try {
+    const { error: delChanError } = await supabase
+      .from<definitions['channels']>('channels')
+      .delete()
+      .eq('app_id', channel.app_id)
+      .eq('id', channel.id)
+    if (delChanError) {
+      const toast = await toastController
+        .create({
+          message: 'Cannot delete channel',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      const toast = await toastController
+        .create({
+          message: 'Channel deleted',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: 'Cannot delete channel',
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
+
+const deleteVersion = async(version: definitions['app_versions']) => {
+  console.log('deleteVersion', version)
+  try {
+    const { error: delError } = await supabase
+      .storage
+      .from('apps')
+      .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
+    const { error: delAppError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .delete()
+      .eq('app_id', version.app_id)
+      .eq('id', version.id)
+    if (delAppError || delError) {
+      const toast = await toastController
+        .create({
+          message: 'Cannot delete version',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      const toast = await toastController
+        .create({
+          message: 'Version deleted',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: 'Cannot delete channel',
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
 
 const loadData = async() => {
   try {
@@ -209,43 +287,51 @@ const back = () => {
           :src="app?.icon_url"
         >
         <ion-list>
-          <ion-item-divider v-if="channels?.length">
-            <ion-label>
+          <IonItemDivider v-if="channels?.length">
+            <IonLabel>
               {{ t('package.channels') }}
-            </ion-label>
-          </ion-item-divider>
-          <IonItem v-for="(ch, index) in channels" :key="index" @click="openChannel(ch)">
-            <IonLabel>
-              <div class="col-span-6 flex flex-col cursor-pointer">
-                <div class="flex justify-between items-center">
-                  <h2 class="text-sm text-azure-500">
-                    {{ ch.name }}
-                  </h2>
-                  <div class="text-right">
-                    <p>{{ ch.version.name }}</p>
-                    {{ formatDate(ch.updated_at) }}
-                  </div>
-                </div>
-              </div>
             </IonLabel>
-          </IonItem>
-          <ion-item-divider v-if="versions?.length">
-            <ion-label>
+          </IonItemDivider>
+          <IonItemSliding v-for="(ch, index) in channels" :key="index">
+            <IonItem @click="openChannel(ch)">
+              <IonLabel>
+                <h2 class="text-sm text-azure-500">
+                  {{ ch.name }}
+                </h2>
+              </IonLabel>
+              <IonNote slot="end">
+                <p>{{ ch.version.name }}</p>
+                {{ formatDate(ch.created_at) }}
+              </IonNote>
+              <IonItemOptions side="end">
+                <IonItemOption color="warning" @click="deleteChannel(ch)">
+                  Delete
+                </IonItemOption>
+              </IonItemOptions>
+            </IonItem>
+          </IonItemSliding>
+          <IonItemDivider v-if="versions?.length">
+            <IonLabel>
               {{ t('package.versions') }}
-            </ion-label>
-          </ion-item-divider>
-          <IonItem v-for="(v, index) in versions" :key="index" @click="ASVersion(v)">
-            <IonLabel>
-              <div class="col-span-6 flex flex-col cursor-pointer">
-                <div class="flex justify-between items-center">
-                  <h2 class="text-sm text-azure-500">
-                    {{ v.name }}
-                  </h2>
-                  <p>{{ formatDate(v.created_at) }}</p>
-                </div>
-              </div>
             </IonLabel>
-          </IonItem>
+          </IonItemDivider>
+          <IonItemSliding v-for="(v, index) in versions" :key="index">
+            <IonItem @click="ASVersion(v)">
+              <IonLabel>
+                <h2 class="text-sm text-azure-500">
+                  {{ v.name }}
+                </h2>
+              </IonLabel>
+              <IonNote slot="end">
+                {{ formatDate(v.created_at) }}
+              </IonNote>
+              <IonItemOptions side="end">
+                <IonItemOption color="warning" @click="deleteVersion(v)">
+                  Delete
+                </IonItemOption>
+              </IonItemOptions>
+            </IonItem>
+          </IonItemSliding>
         </ion-list>
       </div>
     </ion-content>
