@@ -1,3 +1,9 @@
+## 0.4.0 (2022-03-14)
+
+### Feat
+
+- add delete only one version
+
 ## 0.3.1 (2022-03-11)
 
 ### Fix
