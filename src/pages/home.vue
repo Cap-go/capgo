@@ -2,22 +2,24 @@
 <script setup lang="ts">
 import { IonContent, IonPage } from '@ionic/vue'
 import { openChat } from '../services/crips'
+
+const menuMobile = ref(false)
 </script>
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
       <div class="overflow-x-hidden bg-gray-900 text-white">
         <header class="relative py-4 md:py-6">
-          <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+          <div class="px-4 pb-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
             <div class="relative flex items-center justify-between">
               <div class="flex-shrink-0">
                 <a href="#" title="" class="flex rounded outline-none focus:ring-1 focus:ring-gray-900 focus:ring-offset-2">
-                  <img class="w-auto h-8" alt="Capgo logo" src="/capgo.png">
+                  <img class="w-auto h-8 rounded-lg" alt="Capgo logo" src="/capgo.png">
                 </a>
               </div>
 
               <div class="flex lg:hidden">
-                <button type="button" class="text-gray-900">
+                <button type="button" class="text-white" @click="menuMobile = !menuMobile">
                   <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
@@ -59,6 +61,25 @@ import { openChat } from '../services/crips'
                 </a>
               </div>
             </div>
+          </div>
+          <div class="py-4 flex flex-wrap justify-center space-x-6 bg-gray-700" :class="{'hidden': !menuMobile}">
+            <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-base font-medium text-white hover:text-indigo-50">
+              Docummentation
+            </a>
+            <a
+              href="https://discord.com/invite/VnYRvBfgA6"
+              target="_blank"
+              title="Join discord"
+              class="text-base font-medium text-white hover:text-indigo-50"
+            >
+              Community
+            </a>
+            <a href="#" title="Support" class="text-base font-medium text-white hover:text-indigo-50" @click="openChat">
+              Support
+            </a>
+            <a href="/login" title="Login" class="text-base font-medium text-white hover:text-indigo-50">
+              Login
+            </a>
           </div>
         </header>
 
