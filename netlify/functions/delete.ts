@@ -23,6 +23,11 @@ export const handler: Handler = async(event) => {
   try {
     const body = JSON.parse(event.body || '{}') as AppDelete
     if (body.version) {
+      const { error: delAppStatsVersionError } = await supabase
+        .from<definitions['stats']>('stats')
+        .delete()
+        .eq('app_id', body.appid)
+        .eq('version_build', body.version)
       // Delete only a specific version
       const { error: delAppSpecVersionError } = await supabase
         .from<definitions['app_versions']>('app_versions')
@@ -30,7 +35,7 @@ export const handler: Handler = async(event) => {
         .eq('app_id', body.appid)
         .eq('name', body.version)
         .eq('user_id', apikey.user_id)
-      if (delAppSpecVersionError)
+      if (delAppSpecVersionError || delAppStatsVersionError)
         return sendRes({ status: `App ${body.appid}@${body.version} not found in database`, error: delAppSpecVersionError }, 400)
       return sendRes()
     }
@@ -60,13 +65,17 @@ export const handler: Handler = async(event) => {
       if (delError)
         return sendRes({ status: `Cannot delete stored version for app ${body.appid} from storage`, error: delError }, 400)
     }
+    const { error: delAppStatsVersionError } = await supabase
+      .from<definitions['stats']>('stats')
+      .delete()
+      .eq('app_id', body.appid)
     const { error: delAppVersionError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .delete()
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
 
-    if (delAppVersionError)
+    if (delAppVersionError || delAppStatsVersionError)
       return sendRes({ status: `Cannot delete version for app ${body.appid} from database`, error: delAppVersionError }, 400)
 
     const { error: dbAppError } = await supabase
