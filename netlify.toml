@@ -16,6 +16,8 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+[[headers]]
+  for = "/api/*"
   [headers.values]
     cache-control = '''
     max-age=0,
