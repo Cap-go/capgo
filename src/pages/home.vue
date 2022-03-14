@@ -69,16 +69,16 @@ import { openChat } from '../services/crips'
                 Made by Developers, for Developers
               </p>
               <h1 class="mt-5 text-4xl font-bold leading-tight sm:text-5xl sm:leading-tight lg:text-6xl lg:leading-tight font-pj">
-                Make one webapp, run it everywhere
+                Add live update to your capacitor app in second
               </h1>
               <p class="max-w-md mx-auto mt-6 text-base leading-7 text-gray-600 font-inter">
-                Build one project that runs on all your users' devices with native features.
+                Test your app, fix bug and add features without struggle with the store review
               </p>
 
               <div class="relative inline-flex mt-10 group">
                 <div class="absolute transitiona-all duration-1000 opacity-70 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg group-hover:opacity-100 group-hover:-inset-1 group-hover:duration-200 animate-tilt" />
                 <a href="/register" title="" class="relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gray-900 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900" role="button">
-                  Get access now
+                  Get it now
                 </a>
               </div>
             </div>
@@ -133,11 +133,12 @@ import { openChat } from '../services/crips'
           </svg>
           <div class="text-center">
             <h1 class="text-5xl font-semibold">
-              From webapp to mobile with live updates in 5 mins !
+              From webapp to mobile app in 5 mins !
             </h1>
             <p class="my-10 text-xl">
-              Get started by installing the plugin<br>
-              then see your changes on your own device.
+              Build, send and test<br>
+              try your app on your own device.<br>
+              Without any native knowlegde
             </p>
             <img
               class="mx-auto h-62 rounded-lg"
