@@ -72,7 +72,7 @@ import { openChat } from '../services/crips'
                 Add live update to your capacitor app in second
               </h1>
               <p class="max-w-md mx-auto mt-6 text-base leading-7 text-gray-600 font-inter">
-                Test your app, fix bug and add features without struggle with the store review
+                Fix bugs, add features or AB test without struggle with the store review
               </p>
 
               <div class="relative inline-flex mt-10 group">
