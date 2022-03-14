@@ -19,11 +19,7 @@
 [[headers]]
   for = "/api/*"
   [headers.values]
-    cache-control = '''
-    max-age=0,
-    no-cache,
-    no-store,
-    must-revalidate'''
+    cache-control = "public, s-max-age=60"
 
 [[redirects]]
   from = "/*"
