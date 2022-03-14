@@ -51,14 +51,15 @@ export const handler: Handler = async(event) => {
     if (delChanError)
       return sendRes({ status: `Cannot delete channel version for app ${body.appid} from database`, error: delChanError }, 400)
 
-    const filesToRemove = (data as definitions['app_versions'][]).map(x => `${apikey.user_id}/${body.appid}/versions/${x.bucket_id}`)
-    const { error: delError } = await supabase
-      .storage
-      .from('apps')
-      .remove(filesToRemove)
-    if (delError)
-      return sendRes({ status: `Cannot delete stored version for app ${body.appid} from storage`, error: delError }, 400)
-
+    if (data && data.length) {
+      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${apikey.user_id}/${body.appid}/versions/${x.bucket_id}`)
+      const { error: delError } = await supabase
+        .storage
+        .from('apps')
+        .remove(filesToRemove)
+      if (delError)
+        return sendRes({ status: `Cannot delete stored version for app ${body.appid} from storage`, error: delError }, 400)
+    }
     const { error: delAppVersionError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .delete()

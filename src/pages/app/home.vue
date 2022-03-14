@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { IonContent, IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonTitle, IonToolbar } from '@ionic/vue'
+import type { RefresherCustomEvent } from '@ionic/vue'
+import {
+  IonContent,
+  IonHeader, IonItem, IonItemDivider,
+  // IonItemOption, IonItemOptions, toastController,
+  IonItemSliding,
+  IonLabel,
+  IonList,
+  IonPage, IonRefresher, IonRefresherContent, IonTitle, IonToolbar,
+} from '@ionic/vue'
 import { ref } from 'vue'
 import dayjs from 'dayjs'
 import { useSupabase } from '~/services/supabase'
@@ -7,6 +16,7 @@ import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { openVersion } from '~/services/versions'
 
+const listRef = ref()
 const { t } = useI18n()
 const isLoading = ref(false)
 const route = useRoute()
@@ -36,6 +46,76 @@ const getMyApps = async() => {
   if (data && data.length)
     apps.value = data
 }
+
+// const deleteApp = async(app: definitions['apps']) => {
+//   console.log('deleteApp', app)
+//   if (listRef.value)
+//     listRef.value.$el.closeSlidingItems()
+//   try {
+//     const { data, error: vError } = await supabase
+//       .from<definitions['app_versions']>('app_versions')
+//       .select()
+//       .eq('app_id', app.app_id)
+//       .eq('user_id', app.user_id)
+//     const { error: delChanError } = await supabase
+//       .from<definitions['channels']>('channels')
+//       .delete()
+//       .eq('app_id', app.app_id)
+
+//     if (data && data.length) {
+//       const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
+//       const { error: delError } = await supabase
+//         .storage
+//         .from('apps')
+//         .remove(filesToRemove)
+//       if (delError) {
+//         const toast = await toastController
+//           .create({
+//             message: 'Cannot delete channel',
+//             duration: 2000,
+//           })
+//         await toast.present()
+//         return
+//       }
+//     }
+
+//     const { error: delAppVersionError } = await supabase
+//       .from<definitions['app_versions']>('app_versions')
+//       .delete()
+//       .eq('app_id', app.app_id)
+//       .eq('user_id', app.user_id)
+
+//     const { error: dbAppError } = await supabase
+//       .from<definitions['apps']>('apps')
+//       .delete()
+//       .eq('app_id', app.app_id)
+//       .eq('user_id', app.user_id)
+//     if (delChanError || vError || delAppVersionError || dbAppError) {
+//       const toast = await toastController
+//         .create({
+//           message: 'Cannot delete channel',
+//           duration: 2000,
+//         })
+//       await toast.present()
+//     }
+//     else {
+//       const toast = await toastController
+//         .create({
+//           message: 'App deleted',
+//           duration: 2000,
+//         })
+//       await toast.present()
+//     }
+//   }
+//   catch (error) {
+//     const toast = await toastController
+//       .create({
+//         message: 'Cannot delete app',
+//         duration: 2000,
+//       })
+//     await toast.present()
+//   }
+// }
 const getSharedWithMe = async() => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
@@ -72,6 +152,18 @@ watchEffect(async() => {
     isLoading.value = false
   }
 })
+const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+  isLoading.value = true
+  try {
+    await getMyApps()
+    await getSharedWithMe()
+  }
+  catch (error) {
+    console.error(error)
+  }
+  isLoading.value = false
+  evt?.target?.complete()
+}
 </script>
 <template>
   <ion-page>
@@ -90,7 +182,10 @@ watchEffect(async() => {
           </ion-title>
         </ion-toolbar>
       </ion-header>
-      <ion-list>
+      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
+        <ion-refresher-content />
+      </ion-refresher>
+      <ion-list ref="listRef">
         <ion-item-divider>
           <ion-label>
             {{ t('projects.list') }}
@@ -99,34 +194,43 @@ watchEffect(async() => {
         <div v-if="isLoading" class="flex justify-center">
           <Spinner />
         </div>
-        <IonItem v-for="(app, index) in apps" v-else-if="apps?.length" :key="index" class="cursor-pointer" @click="openPackage(app.app_id)">
-          <div slot="start" class="col-span-2 relative py-4">
-            <img :src="app.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
-          </div>
-          <IonLabel>
-            <div class="col-span-6 flex flex-col">
-              <div class="flex justify-between items-center">
-                <h2 class="text-sm text-azure-500">
-                  {{ app.name }}
-                </h2>
+        <template v-for="app in apps" v-else-if="apps?.length" :key="app.id">
+          <IonItemSliding>
+            <IonItem @click="openPackage(app.app_id)">
+              <div slot="start" class="col-span-2 relative py-4">
+                <img :src="app.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
               </div>
-              <div class="flex justify-between items-center">
-                <h3 v-if="app.last_version" class="text-true-gray-800 py-1 font-bold">
-                  Last version: {{
-                    app.last_version
-                  }} <p>
-                    Last upload: {{
-                      formatDate(app.updated_at)
-                    }}
-                  </p>
-                </h3>
-                <h3 v-else class="text-true-gray-800 py-1 font-bold">
-                  No version upload yet
-                </h3>
-              </div>
-            </div>
-          </IonLabel>
-        </IonItem>
+              <IonLabel>
+                <div class="col-span-6 flex flex-col">
+                  <div class="flex justify-between items-center">
+                    <h2 class="text-sm text-azure-500">
+                      {{ app.name }}
+                    </h2>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <h3 v-if="app.last_version" class="text-true-gray-800 py-1 font-bold">
+                      Last version: {{
+                        app.last_version
+                      }} <p>
+                        Last upload: {{
+                          formatDate(app.updated_at)
+                        }}
+                      </p>
+                    </h3>
+                    <h3 v-else class="text-true-gray-800 py-1 font-bold">
+                      No version upload yet
+                    </h3>
+                  </div>
+                </div>
+              </IonLabel>
+              <!-- <IonItemOptions side="end">
+                <IonItemOption color="warning" @click="deleteApp(app)">
+                  Delete
+                </IonItemOption>
+              </IonItemOptions> -->
+            </IonItem>
+          </IonItemSliding>
+        </template>
         <IonItem v-else>
           <IonLabel>
             <div class="col-span-6 flex flex-col">
