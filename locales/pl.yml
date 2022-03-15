@@ -1,15 +1,135 @@
+account:
+  backButton: Plecy
+  changePassword: Zmień hasło
+  discord: Niezgoda
+  heading: Rachunek
+  keys: Klucze API
+  legal: Warunki korzystania z usług
+  logout: Wyloguj
+  personalInformation: Informacje osobiste
+  preferences: Powiadomienia
+  privacy: Polityka prywatności
+  support: Wsparcie
+accountPassword:
+  confirmPassword: Potwierdź hasło
+  errorMsg: Wystąpił błąd, spróbuj ponownie
+  heading: Zmień moje hasło
+  password: Nowe hasło
+  success: Pomyślnie zmieniono hasło
+  validate: Uprawomocnić
+accountProfile:
+  country: Kraj
+  email: E-mail
+  first-name: Imię
+  heading: Informacje osobiste
+  last-name: Nazwisko
+  update: Aktualizacja
+activation:
+  desc: Wypełnij poniższe pola, aby zakończyć rejestrację
+  doi: Opcjonalna zgoda
+  doi-desc: Akceptuję biuletyn e-mailowy i przyszłe oferty marketingowe
+  heading: aktywacja
+  headline: Moje ustawienia
+  legal: Warunki korzystania z usług
+  legal-desc: Akceptuję politykę prywatności i warunki użytkowania aplikacji Capgo
+  notification: Powiadomienia
+  notification-desc: >-
+    Zgadzam się na otrzymywanie powiadomień, gdy nowa wersja aplikacji będzie
+    dostępna
+  validate: Uprawomocnić
+apikeys:
+  all: Klucze
+  checkbelow: sprawdź poniższy link, aby uzyskać więcej informacji
+  cli: capgo CLI
+  explain: >-
+    Wszystkie te klucze API są przeznaczone do użytku z narzędziem Capgo CLI lub
+    wtyczką do aktualizacji kondensatorów
+  keyCopied: Klucze skopiowane do schowka
+  links: Spinki do mankietów
+  title: Klucze API
+  updater: aktualizacja kondensatorów
 button:
   about: O nas
   back: Wróć
+  browse: Przeglądaj
+  camera: Kamera
+  cancel: Anulować
+  delete: Usunąć
   go: WEJDŹ
   home: Strona główna
   tabs: Karty
   toggle_dark: Ustaw tryb nocny
   toggle_langs: Zmień język
+channel:
+  add: Dodać
+  copy: Kopiuj URL
+  invit: Wpisz e-mail, aby zaprosić
+  make_it: Zrób to
+  makeprivate: Twój kanał jest publiczny, kliknij, aby ustawić go jako prywatny
+  makepublic: Twój kanał jest prywatny, kliknij, aby upublicznić
+  open: otwarty
+  private_desc: Prywatny
+  public: Łącze do aktualizacji kondensatorów
+  public_desc: Publiczny
+  title: Kanał
+  user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
+  users: Udostępnione użytkownikom
+forgot:
+  check_email: Sprawdź pocztę, aby uzyskać link do zresetowania hasła
+  email: E-mail
+  heading: Zapomniałeś hasła
+  success: Hasło zostało zmienione
 intro:
   aka: Znany też jako
   desc: Opiniowany szablon startowy Vite
   dynamic-route: Demonstracja dynamicznego route
   hi: Cześć, {name}!
   whats-your-name: Jak masz na imię?
+login:
+  andpass: I hasło
+  connexion: Zaloguj sie
+  create-new: Stwórz nowe konto
+  email: E-mail
+  forgot: zapomniałem
+  hello: cześć
+  login-in: Zaloguj się
+  or: lub
+  password: Hasło
+  withemail: Z adresem e-mail
 not-found: Nie znaleziono
+notificationSettings:
+  heading: Ustawienia powiadomień
+  validate: Uprawomocnić
+onboarding:
+  loading: Ładowanie
+package:
+  channels: Kanały
+  download: Pobierz wersję
+  link_channel: Link do kanału
+  set: Ustaw wersję na kanał
+  test: Uruchom wersję
+  title: informacje
+  versions: Wersje
+projects:
+  list: Twój
+  sharedlist: Dzielone z Tobą
+  title: Projektowanie
+register:
+  already-account: Posiadasz już konto?
+  check-email: Sprawdź swoją pocztę e-mail i zweryfikuj
+  confirm-email: Potwierdź email
+  confirm-password: Potwierdź hasło
+  desc: Wypełnij poniższe pola, aby zakończyć rejestrację
+  email: E-mail
+  first-name: Imię
+  heading: Rejestracja
+  last-name: nazwisko
+  lowerCaseError: Powinien zawierać małe litery
+  next: Następny
+  password: hasło
+  password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
+  specialError: Powinien zawierać znaki specjalne
+  upperCaseError: Powinien zawierać wielkie litery
+something-went-wrong-try-again-later: |-
+  Coś poszło nie tak! 
+  Spróbuj ponownie później.

@@ -9,6 +9,7 @@ account:
   personalInformation: Informations personnelles
   preferences: Avis
   privacy: Politique de confidentialité
+  support: Support
 accountPassword:
   confirmPassword: Confirmez le mot de passe
   errorMsg: Une erreur s'est produite, veuillez réessayer

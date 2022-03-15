@@ -9,6 +9,7 @@ account:
   personalInformation: Informasi pribadi
   preferences: Pemberitahuan
   privacy: Rahasia pribadi
+  support: Mendukung
 accountPassword:
   confirmPassword: Setujui password
   errorMsg: Terjadi kesalahan, silakan coba lagi

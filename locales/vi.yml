@@ -1,14 +1,135 @@
+account:
+  backButton: Trở lại
+  changePassword: Đổi mật khẩu
+  discord: Bất hòa
+  heading: Tài khoản
+  keys: Khóa API
+  legal: Điều khoản dịch vụ
+  logout: Đăng xuất
+  personalInformation: Thông tin cá nhân
+  preferences: Thông báo
+  privacy: Chính sách bảo mật
+  support: Hỗ trợ
+accountPassword:
+  confirmPassword: Xác nhận mật khẩu
+  errorMsg: Đã xảy ra lỗi, vui lòng thử lại
+  heading: Thay đổi mật khẩu của tôi
+  password: Mật khẩu mới
+  success: Đã thay đổi mật khẩu thành công
+  validate: Xác thực
+accountProfile:
+  country: Quốc gia
+  email: E-mail
+  first-name: Tên đầu tiên
+  heading: Thông tin cá nhân
+  last-name: Họ
+  update: Cập nhật
+activation:
+  desc: Điền vào các trường sau để hoàn tất đăng ký của bạn
+  doi: Sự đồng ý tùy chọn
+  doi-desc: Tôi chấp nhận bản tin Email và các đề nghị tiếp thị trong tương lai
+  heading: sự kích hoạt
+  headline: Cài đặt của tôi
+  legal: Điều khoản dịch vụ
+  legal-desc: >-
+    Tôi chấp nhận chính sách bảo mật của ứng dụng Capgo và các điều khoản sử
+    dụng
+  notification: Thông báo
+  notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
+  validate: Xác thực
+apikeys:
+  all: chìa khóa
+  checkbelow: kiểm tra bên dưới liên kết để nhận thêm thông tin
+  cli: capgo CLI
+  explain: >-
+    Tất cả các khóa api của thoses được tạo ra để sử dụng với công cụ Capgo CLI
+    hoặc plugin trình cập nhật tụ điện
+  keyCopied: Các phím đã được sao chép vào khay nhớ tạm của bạn
+  links: Liên kết
+  title: Khóa API
+  updater: trình cập nhật tụ điện
 button:
   about: Về
   back: Quay lại
+  browse: Duyệt qua
+  camera: Máy ảnh
+  cancel: Hủy bỏ
+  delete: Xóa bỏ
   go: Đi
   home: Khởi đầu
   tabs: Các tab
   toggle_dark: Chuyển đổi chế độ tối
   toggle_langs: Thay đổi ngôn ngữ
+channel:
+  add: Thêm vào
+  copy: Sao chép URL
+  invit: Nhập email để mời
+  make_it: Làm cho nó
+  makeprivate: Kênh của bạn ở chế độ công khai, hãy nhấp để đặt kênh đó ở chế độ riêng tư
+  makepublic: Kênh của bạn ở chế độ riêng tư, hãy nhấp để đặt kênh ở chế độ công khai
+  open: Mở
+  private_desc: Riêng tư
+  public: Liên kết trình cập nhật tụ điện
+  public_desc: Công cộng
+  title: Kênh truyền hình
+  user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
+  users: Được chia sẻ với người dùng
+forgot:
+  check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
+  email: E-mail
+  heading: Quên mật khẩu
+  success: Đã cập nhật mật khẩu thành công
 intro:
+  aka: Cũng được biết đến như là
   desc: Ý kiến cá nhân Vite Template để bắt đầu
   dynamic-route: Bản giới thiệu về dynamic route
   hi: Hi, {name}!
   whats-your-name: Tên bạn là gì?
+login:
+  andpass: Và mật khẩu
+  connexion: Đăng nhập
+  create-new: Tạo tài khoản mới
+  email: E-mail
+  forgot: quên mất
+  hello: xin chào
+  login-in: Đăng nhập
+  or: hoặc
+  password: Mật khẩu
+  withemail: Với địa chỉ email
 not-found: Không tìm thấy
+notificationSettings:
+  heading: Thiết lập thông báo
+  validate: Xác thực
+onboarding:
+  loading: Đang tải
+package:
+  channels: Kênh truyền hình
+  download: Tải xuống phiên bản
+  link_channel: Liên kết với kênh
+  set: Đặt phiên bản cho kênh
+  test: Phiên bản khởi chạy
+  title: thông tin
+  versions: Phiên bản
+projects:
+  list: Của bạn
+  sharedlist: Đã chia sẻ với bạn
+  title: Dự án
+register:
+  already-account: Bạn đã có tài khoản?
+  check-email: Vui lòng kiểm tra email của bạn và xác minh
+  confirm-email: Xác nhận email
+  confirm-password: Xác nhận mật khẩu
+  desc: Điền vào các trường sau để hoàn tất đăng ký của bạn
+  email: E-mail
+  first-name: tên đầu tiên
+  heading: Sự đăng ký
+  last-name: họ
+  lowerCaseError: Phải chứa các chữ cái thường
+  next: Tiếp theo
+  password: mật khẩu mở khóa
+  password-hint: Nhập kết hợp của ít nhất 6 số, chữ cái và dấu chấm câu.
+  specialError: Phải chứa các ký tự đặc biệt
+  upperCaseError: Nên chứa các chữ cái in hoa
+something-went-wrong-try-again-later: |-
+  Đã xảy ra lỗi! 
+  Thử lại sau.

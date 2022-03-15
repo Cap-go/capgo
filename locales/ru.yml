@@ -1,14 +1,135 @@
+account:
+  backButton: Назад
+  changePassword: Изменить пароль
+  discord: Раздор
+  heading: Счет
+  keys: ключи API
+  legal: Условия предоставления услуг
+  logout: Выйти
+  personalInformation: Личная информация
+  preferences: Уведомления
+  privacy: Политика конфиденциальности
+  support: Служба поддержки
+accountPassword:
+  confirmPassword: Подтвердить Пароль
+  errorMsg: Произошла ошибка, попробуйте еще раз
+  heading: Изменить свой пароль
+  password: Новый пароль
+  success: Пароль успешно изменен
+  validate: Подтвердить
+accountProfile:
+  country: Страна
+  email: Эл. адрес
+  first-name: Имя
+  heading: Личная информация
+  last-name: Фамилия
+  update: Обновлять
+activation:
+  desc: Заполните следующие поля, чтобы завершить регистрацию
+  doi: Необязательное согласие
+  doi-desc: Я принимаю рассылку по электронной почте и будущие маркетинговые предложения
+  heading: активация
+  headline: Мои настройки
+  legal: Условия предоставления услуг
+  legal-desc: >-
+    Я принимаю политику конфиденциальности и условия использования приложения
+    Capgo
+  notification: Уведомления
+  notification-desc: Я согласен получать уведомления о появлении новой версии приложения
+  validate: Подтвердить
+apikeys:
+  all: ключи
+  checkbelow: проверьте ссылку ниже, чтобы получить больше информации
+  cli: командная строка Capgo
+  explain: >-
+    Все эти API-ключи предназначены для использования с инструментом Capgo CLI
+    или плагином для обновления конденсаторов.
+  keyCopied: Ключи скопированы в буфер обмена
+  links: Ссылки
+  title: ключи API
+  updater: конденсатор-обновитель
 button:
   about: О шаблоне
   back: Назад
+  browse: Просматривать
+  camera: Камера
+  cancel: Отмена
+  delete: Удалить
   go: Перейти
   home: Главная
   tabs: Вкладки
   toggle_dark: Включить темный режим
   toggle_langs: Сменить язык
+channel:
+  add: Добавлять
+  copy: Скопировать URL
+  invit: Введите адрес электронной почты, чтобы пригласить
+  make_it: Сделай это
+  makeprivate: Ваш канал общедоступен. Нажмите, чтобы сделать его закрытым.
+  makepublic: Ваш канал является закрытым, нажмите, чтобы сделать его общедоступным
+  open: Открыть
+  private_desc: Частный
+  public: Ссылка на конденсатор-апдейтер
+  public_desc: Общественный
+  title: Канал
+  user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
+  users: Доступно пользователям
+forgot:
+  check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
+  email: Эл. адрес
+  heading: Забыл пароль
+  success: Пароль успешно обновлен
 intro:
+  aka: Также известен как
   desc: Самостоятельный начальный шаблон Vite
   dynamic-route: Демо динамического маршрута
   hi: Привет, {name}!
   whats-your-name: Как тебя зовут?
+login:
+  andpass: И пароль
+  connexion: Авторизоваться
+  create-new: Создать новый аккаунт
+  email: Эл. адрес
+  forgot: забыли
+  hello: Привет
+  login-in: Войти в систему
+  or: или
+  password: Пароль
+  withemail: С адресом электронной почты
 not-found: Не найден
+notificationSettings:
+  heading: Настройки уведомлений
+  validate: Подтвердить
+onboarding:
+  loading: Загрузка
+package:
+  channels: каналы
+  download: Скачать версию
+  link_channel: Ссылка на канал
+  set: Установить версию для канала
+  test: Запустить версию
+  title: Информация
+  versions: Версии
+projects:
+  list: Ваш
+  sharedlist: Поделился с вами
+  title: Проекты
+register:
+  already-account: У вас уже есть аккаунт?
+  check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
+  confirm-email: Подтвердите адрес электронной почты
+  confirm-password: Подтвердить Пароль
+  desc: Заполните следующие поля, чтобы завершить регистрацию
+  email: Эл. адрес
+  first-name: имя
+  heading: Регистрация
+  last-name: Фамилия
+  lowerCaseError: Должен содержать строчные буквы
+  next: Следующий
+  password: пароль
+  password-hint: Введите комбинацию не менее 6 цифр, букв и знаков препинания.
+  specialError: Должен содержать специальные символы
+  upperCaseError: Должен содержать заглавные буквы
+something-went-wrong-try-again-later: |-
+  Что-то пошло не так! 
+  Попробуйте позже.

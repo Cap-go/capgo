@@ -9,6 +9,7 @@ account:
   personalInformation: Persönliche Informationen
   preferences: Benachrichtigungen
   privacy: Datenschutz-Bestimmungen
+  support: Unterstützung
 accountPassword:
   confirmPassword: Kennwort bestätigen
   errorMsg: Fehler aufgetreten, bitte versuchen Sie es erneut

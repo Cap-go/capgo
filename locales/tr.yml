@@ -1,15 +1,135 @@
+account:
+  backButton: Geri
+  changePassword: Şifre değiştir
+  discord: anlaşmazlık
+  heading: Hesap
+  keys: API anahtarları
+  legal: Hizmet şartları
+  logout: Çıkış Yap
+  personalInformation: Kişisel bilgi
+  preferences: Bildirimler
+  privacy: Gizlilik Politikası
+  support: Destek
+accountPassword:
+  confirmPassword: Şifreyi Onayla
+  errorMsg: Hata oluştu, lütfen tekrar deneyin
+  heading: Şifremi Değiştir
+  password: Yeni Şifre
+  success: Şifre başarıyla değiştirildi
+  validate: Doğrula
+accountProfile:
+  country: Ülke
+  email: E-posta
+  first-name: İlk adı
+  heading: Kişisel bilgi
+  last-name: Soyadı
+  update: Güncelleme
+activation:
+  desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
+  doi: İsteğe bağlı izin
+  doi-desc: E-posta bültenini ve gelecekteki pazarlama tekliflerini kabul ediyorum
+  heading: aktivasyon
+  headline: Ayarlarım
+  legal: Hizmet şartları
+  legal-desc: >-
+    Capgo uygulaması gizlilik politikasını ve kullanım koşullarını kabul
+    ediyorum
+  notification: Bildirimler
+  notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
+  validate: Doğrula
+apikeys:
+  all: anahtarlar
+  checkbelow: daha fazla bilgi almak için aşağıdaki bağlantıyı kontrol edin
+  cli: capgo CLI
+  explain: >-
+    Tüm bu API anahtarları, Capgo CLI aracı veya kapasitör güncelleyici
+    eklentisi ile kullanılmak üzere yapılmıştır
+  keyCopied: Anahtarlar panonuza kopyalandı
+  links: Bağlantılar
+  title: API anahtarları
+  updater: kapasitör-güncelleyici
 button:
   about: Hakkımda
   back: Geri
+  browse: Araştır
+  camera: Kamera
+  cancel: İptal
+  delete: Silmek
   go: İLERİ
   home: Anasayfa
   tabs: Sekmeler
   toggle_dark: Karanlık modu değiştir
   toggle_langs: Dilleri değiştir
+channel:
+  add: Ekle
+  copy: Url'yi kopyala
+  invit: Davet etmek için e-posta yazın
+  make_it: Bunu yapmak
+  makeprivate: Kanalınız herkese açık, özel yapmak için tıklayın
+  makepublic: Kanalınız gizli, herkese açık yapmak için tıklayın
+  open: Açık
+  private_desc: Özel
+  public: Kapasitör-güncelleyici bağlantısı
+  public_desc: Halk
+  title: Kanal
+  user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
+  users: Kullanıcılarla paylaşıldı
+forgot:
+  check_email: Şifrenizi sıfırlamak için bağlantıyı almak için e-postanızı kontrol edin
+  email: E-posta
+  heading: Parolanızı mı unuttunuz
+  success: şifre başarıyla güncellendi
 intro:
   aka: Ayrıca şöyle bilinir
   desc: Görüşlü Vite Başlangıç Şablonu
   dynamic-route: Dinamik rota demosu
   hi: Merhaba, {name}!
   whats-your-name: Adınız nedir?
+login:
+  andpass: Ve şifre
+  connexion: Giriş yapmak
+  create-new: Yeni hesap oluştur
+  email: E-posta
+  forgot: Unuttun
+  hello: Merhaba
+  login-in: Giriş yap
+  or: veya
+  password: Şifre
+  withemail: e-posta adresi ile
 not-found: Bulunamadı
+notificationSettings:
+  heading: Bildirim ayarları
+  validate: Doğrula
+onboarding:
+  loading: Yükleniyor
+package:
+  channels: Kanallar
+  download: Sürümü indir
+  link_channel: kanala bağlantı
+  set: Sürümü kanala ayarla
+  test: Sürümü başlat
+  title: bilgi
+  versions: Sürümler
+projects:
+  list: senin
+  sharedlist: Seninle paylaştı
+  title: Projeler
+register:
+  already-account: Zaten bir hesabınız var mı?
+  check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
+  confirm-email: E-postanızı Onaylayın
+  confirm-password: Şifreyi Onayla
+  desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
+  email: E-posta
+  first-name: ilk adı
+  heading: kayıt
+  last-name: Soyadı
+  lowerCaseError: Küçük harfler içermelidir
+  next: Sonraki
+  password: şifre
+  password-hint: En az 6 rakam, harf ve noktalama işaretinden oluşan bir kombinasyon girin.
+  specialError: Özel karakterler içermelidir
+  upperCaseError: Büyük harfler içermelidir
+something-went-wrong-try-again-later: |-
+  Bir şeyler yanlış gitti! 
+  Daha sonra tekrar deneyin.

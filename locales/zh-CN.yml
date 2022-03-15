@@ -1,15 +1,131 @@
+account:
+  backButton: 后退
+  changePassword: 更改密码
+  discord: 不和谐
+  heading: 帐户
+  keys: API 密钥
+  legal: 服务条款
+  logout: 登出
+  personalInformation: 个人信息
+  preferences: 通知
+  privacy: 隐私政策
+  support: 支持
+accountPassword:
+  confirmPassword: 确认密码
+  errorMsg: 发生错误，请重试
+  heading: 修改我的密码
+  password: 新密码
+  success: 修改密码成功
+  validate: 证实
+accountProfile:
+  country: 国家
+  email: 电子邮件
+  first-name: 名
+  heading: 个人信息
+  last-name: 姓
+  update: 更新
+activation:
+  desc: 填写以下字段以完成您的注册
+  doi: 选择性同意
+  doi-desc: 我接受电子邮件通讯和未来的营销优惠
+  heading: 激活
+  headline: 我的设置
+  legal: 服务条款
+  legal-desc: 我接受 Capgo 应用程序的隐私政策和使用条款
+  notification: 通知
+  notification-desc: 我接受在有新应用版本可用时接收通知
+  validate: 证实
+apikeys:
+  all: 钥匙
+  checkbelow: 检查下面的链接以获取更多信息
+  cli: 卡哥 CLI
+  explain: 所有这些 api 密钥都与 Capgo CLI 工具或电容器更新器插件一起使用
+  keyCopied: 复制到剪贴板的键
+  links: 链接
+  title: API 密钥
+  updater: 电容更新器
 button:
   about: 关于
   back: 返回
+  browse: 浏览
+  camera: 相机
+  cancel: 取消
+  delete: 删除
   go: 确定
   home: 首页
   tabs: 标签
   toggle_dark: 切换深色模式
   toggle_langs: 切换语言
+channel:
+  add: 添加
+  copy: 复制网址
+  invit: 输入电子邮件以邀请
+  make_it: 做了
+  makeprivate: 您的频道是公开的，点击将其设为私密
+  makepublic: 您的频道是私人频道，点击将其设为公开
+  open: 打开
+  private_desc: 私人的
+  public: 电容器更新器链接
+  public_desc: 民众
+  title: 渠道
+  user_no_found: 未找到用户，请先注册
+  users: 与用户共享
+forgot:
+  check_email: 检查您的电子邮件以获取重置密码的链接
+  email: 电子邮件
+  heading: 忘记密码
+  success: 密码更新成功
 intro:
   aka: 也叫
   desc: 固执己见的 Vite 项目模板
   dynamic-route: 动态路由演示
   hi: 你好，{name}
   whats-your-name: 输入你的名字
+login:
+  andpass: 和密码
+  connexion: 登录
+  create-new: 建立新帐户
+  email: 电子邮件
+  forgot: 忘记
+  hello: 你好
+  login-in: 登录
+  or: 要么
+  password: 密码
+  withemail: 有电子邮件地址
 not-found: 未找到页面
+notificationSettings:
+  heading: 通知设置
+  validate: 证实
+onboarding:
+  loading: 正在加载
+package:
+  channels: 频道
+  download: 下载版本
+  link_channel: 链接到频道
+  set: 将版本设置为频道
+  test: 发布版本
+  title: 信息
+  versions: 版本
+projects:
+  list: 你的
+  sharedlist: 与您共享
+  title: 项目
+register:
+  already-account: 你已经有一个账户吗？
+  check-email: 请检查您的电子邮件并验证
+  confirm-email: 确认电子邮件
+  confirm-password: 确认密码
+  desc: 填写以下字段以完成您的注册
+  email: 电子邮件
+  first-name: 名
+  heading: 登记
+  last-name: 姓
+  lowerCaseError: 应包含小写字母
+  next: 下一个
+  password: 密码
+  password-hint: 输入至少 6 个数字、字母和标点符号的组合。
+  specialError: 应包含特殊字符
+  upperCaseError: 应包含大写字母
+something-went-wrong-try-again-later: |-
+  有些不对劲！
+  稍后再试。

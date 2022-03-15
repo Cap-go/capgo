@@ -9,6 +9,7 @@ account:
   personalInformation: 개인 정보
   preferences: 알림
   privacy: 개인 정보 정책
+  support: 지원하다
 accountPassword:
   confirmPassword: 비밀번호 확인
   errorMsg: 오류가 발생했습니다. 다시 시도해 주세요.

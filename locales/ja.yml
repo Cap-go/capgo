@@ -9,6 +9,7 @@ account:
   personalInformation: 個人情報
   preferences: 通知
   privacy: プライバシーポリシー
+  support: サポート
 accountPassword:
   confirmPassword: パスワードを認証する
   errorMsg: エラーが発生しました。再試行してください

@@ -9,6 +9,7 @@ account:
   personalInformation: Informazione personale
   preferences: Notifiche
   privacy: Politica sulla riservatezza
+  support: Supporto
 accountPassword:
   confirmPassword: Conferma password
   errorMsg: Si è verificato un errore, riprova
