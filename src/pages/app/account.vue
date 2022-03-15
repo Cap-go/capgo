@@ -16,6 +16,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
+import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 
@@ -262,6 +263,17 @@ const presentActionSheet = async() => {
               </span>
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </a>
+          </li>
+          <li>
+            <div
+              class="flex justify-between items-center"
+              @click="openChat"
+            >
+              <span class="font-bold">
+                {{ t("account.support") }}
+              </span>
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </div>
           </li>
         </ul>
         <a
