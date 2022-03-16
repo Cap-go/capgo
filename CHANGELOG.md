@@ -1,3 +1,9 @@
+## 0.8.4 (2022-03-16)
+
+### Fix
+
+- set issue data not present
+
 ## 0.8.3 (2022-03-16)
 
 ### Fix
