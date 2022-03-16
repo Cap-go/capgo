@@ -1,3 +1,9 @@
+## 0.8.2 (2022-03-16)
+
+### Fix
+
+- issue with incomplete account
+
 ## 0.8.1 (2022-03-16)
 
 ### Fix
