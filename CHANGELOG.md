@@ -1,3 +1,9 @@
+## 0.8.0 (2022-03-16)
+
+### Feat
+
+- add plausible analytics
+
 ## 0.7.0 (2022-03-15)
 
 ### Feat
