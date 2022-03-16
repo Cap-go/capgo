@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { createKeys } from '~/services/apikeys'
+import type { definitions } from '~/types/supabase'
 
 const supabase = useSupabase()
 const route = useRoute()
@@ -37,7 +38,7 @@ const updateDb = async() => {
     return
 
   const { error } = await supabase
-    .from('users')
+    .from<definitions['users']>('users')
     .insert(
       {
         id: user.value?.id,

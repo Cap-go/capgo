@@ -26,6 +26,8 @@ const guard = async(next: any, to: string, from: string) => {
           .match({ id: auth?.id })
         if (!error && data && data.length)
           main.user = data[0]
+        else
+          return next('/onboarding/verify_email')
       }
       catch (error) {
         console.log('error', error)

@@ -37,21 +37,21 @@ const updateOrCreateVersion = async(update: Partial<definitions['app_versions']>
   }
 }
 
-const updateOrCreateChannel = async(user_id: string, update: Partial<definitions['channels']>) => {
+const updateOrCreateChannel = async(update: Partial<definitions['channels']>) => {
   console.log('updateOrCreateChannel', update)
   const { data, error } = await supabase
     .from<definitions['channels']>('channels')
     .select()
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-    .eq('created_by', user_id)
+    .eq('created_by', update.created_by)
   if (data && data.length && !error) {
     return supabase
       .from<definitions['channels']>('channels')
       .update(update)
       .eq('app_id', update.app_id)
       .eq('name', update.name)
-      .eq('created_by', user_id)
+      .eq('created_by', update.created_by)
   }
   else {
     return supabase
@@ -134,7 +134,7 @@ export const handler: Handler = async(event) => {
       }, 400)
     }
     try {
-      const { error: dbError2 } = await updateOrCreateChannel(apikey.user_id, {
+      const { error: dbError2 } = await updateOrCreateChannel({
         name: body.channel,
         app_id: body.appid,
         created_by: apikey.user_id,
