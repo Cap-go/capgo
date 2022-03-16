@@ -1,5 +1,5 @@
 import type { Handler } from '@netlify/functions'
-import { useSupabase } from '../services/supabase'
+import { updateOrCreateChannel, useSupabase } from '../services/supabase'
 import { checkKey, sendRes } from './../services/utils'
 import type { definitions } from '~/types/supabase'
 
@@ -19,23 +19,24 @@ export const handler: Handler = async(event) => {
     return sendRes({ status: 'Cannot Verify User' }, 400)
 
   const body = JSON.parse(event.body || '{}') as ChannelSet
-  const channel = {
-    user_id: apikey.user_id,
+  const { data, error: vError } = await supabase
+    .from<definitions['app_versions']>('app_versions')
+    .select()
+    .eq('app_id', body.appid)
+    .eq('name', body.version)
+    .eq('user_id', apikey.user_id)
+  if (vError)
+    return sendRes({ status: `Cannot find version ${body.version}`, error: JSON.stringify(vError) }, 400)
+  const channel: Partial<definitions['channels']> = {
+    created_by: apikey.user_id,
     app_id: body.appid,
-    channel: body.channel,
-    version: body.version,
+    name: body.channel,
+    version: data[0].id,
   }
   try {
-    const { error: dbError } = await supabase
-      .from('channels')
-      .update(channel)
-    if (dbError) {
-      const { error: dbError2 } = await supabase
-        .from('channels')
-        .insert(channel)
-      if (dbError2)
-        return sendRes({ status: 'Cannot set channels', error: JSON.stringify(dbError2) }, 400)
-    }
+    const { error: dbError } = await updateOrCreateChannel(channel)
+    if (dbError)
+      return sendRes({ status: 'Cannot set channels', error: JSON.stringify(dbError) }, 400)
   }
   catch (e) {
     return sendRes({ status: 'Cannot set channels', error: e }, 500)
