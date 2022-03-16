@@ -31,7 +31,7 @@ const updateOrCreateVersion = async(update: Partial<definitions['app_versions']>
       .eq('name', update.name)
   }
   else {
-    return await supabase
+    return supabase
       .from<definitions['app_versions']>('app_versions')
       .insert(update)
   }
