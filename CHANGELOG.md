@@ -1,3 +1,10 @@
+## 0.7.0 (2022-03-15)
+
+### Feat
+
+- add translation in all misings langs
+- add support in app
+
 ## 0.6.4 (2022-03-14)
 
 ### Fix
