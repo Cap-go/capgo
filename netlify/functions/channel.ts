@@ -25,7 +25,7 @@ export const handler: Handler = async(event) => {
     .eq('app_id', body.appid)
     .eq('name', body.version)
     .eq('user_id', apikey.user_id)
-  if (vError)
+  if (vError || !data || !data.length)
     return sendRes({ status: `Cannot find version ${body.version}`, error: JSON.stringify(vError) }, 400)
   const channel: Partial<definitions['channels']> = {
     created_by: apikey.user_id,
