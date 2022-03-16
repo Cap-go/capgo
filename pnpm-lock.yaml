@@ -82,6 +82,7 @@ specifiers:
   netlify-cli: 9.13.0
   nprogress: 1.0.0-1
   pinia: 2.0.11
+  plausible-tracker: ^0.3.5
   pnpm: 6.32.3
   prism-theme-vars: ^0.2.2
   sass: 1.49.9
@@ -164,6 +165,7 @@ dependencies:
   mime: 3.0.0
   nprogress: 1.0.0-1
   pinia: 2.0.11_typescript@4.6.2+vue@3.2.31
+  plausible-tracker: 0.3.5
   prism-theme-vars: 0.2.2
   vite-plugin-environment: 1.1.0_vite@2.8.6
   vite-plugin-imagemin: 0.6.1_vite@2.8.6
@@ -12601,6 +12603,11 @@ packages:
     dependencies:
       find-up: 6.3.0
     dev: true
+
+  /plausible-tracker/0.3.5:
+    resolution: {integrity: sha512-6c6VPdPtI9KmIsfr8zLBViIDMt369eeaNA1J8JrAmAtrpSkeJWvjwcJ+cLn7gVJn5AtQWC8NgSEee2d/5RNytA==}
+    engines: {node: '>=10'}
+    dev: false
 
   /plist/3.0.4:
     resolution: {integrity: sha512-ksrr8y9+nXOxQB2osVNqrgvX/XQPOXaU4BQMKjYq8PvaY1U18mo+fKgBSwzK+luSyinOuPae956lSVcBwxlAMg==}

@@ -32,6 +32,7 @@ import 'virtual:windi-utilities.css'
 // windicss devtools support (dev only)
 import 'virtual:windi-devtools'
 import { initCrisp } from './services/crips'
+import { initPlausible } from './services/plausible'
 
 const app = createApp(App)
 
@@ -41,6 +42,7 @@ const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/ap
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 app.use(router)
 initCrisp()
+initPlausible('capgo.app')
 // install all modules under `modules/`
 Object.values(import.meta.globEager('./modules/*.ts')).map(i => i.install?.({ app, router, routes }))
 
