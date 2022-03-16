@@ -5,7 +5,7 @@ import {
   IonIcon,
   IonItem,
   IonItemDivider,
-  // IonItemOption, IonItemOptions,
+  IonItemOption, IonItemOptions,
   IonItemSliding, IonLabel,
   IonList, IonNote, IonPage, IonRefresher, IonRefresherContent,
   IonTitle,
@@ -30,84 +30,6 @@ const app = ref<definitions['apps']>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
 
-// const deleteChannel = async(channel: definitions['channels']) => {
-//   console.log('deleteChannel', channel)
-//   if (listRef.value)
-//     listRef.value.$el.closeSlidingItems()
-//   try {
-//     const { error: delChanError } = await supabase
-//       .from<definitions['channels']>('channels')
-//       .delete()
-//       .eq('app_id', channel.app_id)
-//       .eq('id', channel.id)
-//     if (delChanError) {
-//       const toast = await toastController
-//         .create({
-//           message: 'Cannot delete channel',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//     else {
-//       const toast = await toastController
-//         .create({
-//           message: 'Channel deleted',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//   }
-//   catch (error) {
-//     const toast = await toastController
-//       .create({
-//         message: 'Cannot delete channel',
-//         duration: 2000,
-//       })
-//     await toast.present()
-//   }
-// }
-
-// const deleteVersion = async(version: definitions['app_versions']) => {
-//   console.log('deleteVersion', version)
-//   if (listRef.value)
-//     listRef.value.$el.closeSlidingItems()
-//   try {
-//     const { error: delError } = await supabase
-//       .storage
-//       .from('apps')
-//       .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
-//     const { error: delAppError } = await supabase
-//       .from<definitions['app_versions']>('app_versions')
-//       .delete()
-//       .eq('app_id', version.app_id)
-//       .eq('id', version.id)
-//     if (delAppError || delError) {
-//       const toast = await toastController
-//         .create({
-//           message: 'Cannot delete version',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//     else {
-//       const toast = await toastController
-//         .create({
-//           message: 'Version deleted',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//   }
-//   catch (error) {
-//     const toast = await toastController
-//       .create({
-//         message: 'Cannot delete channel',
-//         duration: 2000,
-//       })
-//     await toast.present()
-//   }
-// }
-
 const loadData = async() => {
   try {
     const { data: dataApp } = await supabase
@@ -124,6 +46,7 @@ const loadData = async() => {
       .select(`
           id,
           name,
+          app_id,
           version (
             name,
             created_at
@@ -144,6 +67,98 @@ const loadData = async() => {
     console.error(error)
   }
 }
+const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+  isLoading.value = true
+  try {
+    await loadData()
+  }
+  catch (error) {
+    console.error(error)
+  }
+  isLoading.value = false
+  evt?.target?.complete()
+}
+
+const deleteChannel = async(channel: definitions['channels']) => {
+  console.log('deleteChannel', channel)
+  if (listRef.value)
+    listRef.value.$el.closeSlidingItems()
+  try {
+    const { error: delChanError } = await supabase
+      .from<definitions['channels']>('channels')
+      .delete()
+      .eq('app_id', channel.app_id)
+      .eq('id', channel.id)
+    if (delChanError) {
+      const toast = await toastController
+        .create({
+          message: 'Cannot delete channel',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      await refreshData()
+      const toast = await toastController
+        .create({
+          message: 'Channel deleted',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: 'Cannot delete channel',
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
+
+const deleteVersion = async(version: definitions['app_versions']) => {
+  console.log('deleteVersion', version)
+  if (listRef.value)
+    listRef.value.$el.closeSlidingItems()
+  try {
+    const { error: delError } = await supabase
+      .storage
+      .from('apps')
+      .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
+    const { error: delAppError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .delete()
+      .eq('app_id', version.app_id)
+      .eq('id', version.id)
+    if (delAppError || delError) {
+      const toast = await toastController
+        .create({
+          message: 'Cannot delete version',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      await refreshData()
+      const toast = await toastController
+        .create({
+          message: 'Version deleted',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: 'Cannot delete channel',
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
+
 const openChannel = async(channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
 }
@@ -239,17 +254,6 @@ interface RefresherCustomEvent extends CustomEvent {
   detail: RefresherEventDetail
   target: HTMLIonRefresherElement
 }
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
-  isLoading.value = true
-  try {
-    await loadData()
-  }
-  catch (error) {
-    console.error(error)
-  }
-  isLoading.value = false
-  evt?.target?.complete()
-}
 
 watchEffect(async() => {
   if (route.path.startsWith('/app/package')) {
@@ -310,12 +314,12 @@ const back = () => {
                   <p>{{ ch.version.name }}</p>
                   {{ formatDate(ch.created_at) }}
                 </IonNote>
-                <!-- <IonItemOptions side="end">
-                  <IonItemOption color="warning" @click="deleteChannel(ch)">
-                    Delete
-                  </IonItemOption>
-                </IonItemOptions> -->
               </IonItem>
+              <IonItemOptions side="end">
+                <IonItemOption color="warning" @click="deleteChannel(ch)">
+                  Delete
+                </IonItemOption>
+              </IonItemOptions>
             </IonItemSliding>
           </template>
           <IonItemDivider v-if="versions?.length">
@@ -334,12 +338,12 @@ const back = () => {
                 <IonNote slot="end">
                   {{ formatDate(v.created_at) }}
                 </IonNote>
-                <!-- <IonItemOptions side="end">
-                  <IonItemOption color="warning" @click="deleteVersion(v)">
-                    Delete
-                  </IonItemOption>
-                </IonItemOptions> -->
               </IonItem>
+              <IonItemOptions side="end">
+                <IonItemOption color="warning" @click="deleteVersion(v)">
+                  Delete
+                </IonItemOption>
+              </IonItemOptions>
             </IonItemSliding>
           </template>
         </ion-list>
