@@ -1,0 +1,30 @@
+---
+label: Article
+hide_body: false
+fields:
+- type: text
+  name: title
+  label: title
+- type: text
+  name: description
+  label: description
+- type: text
+  name: author
+  label: author
+- type: datetime
+  name: date
+  label: date
+- type: file
+  name: head_image
+  label: head_image
+- type: text
+  name: tag
+  label: tag
+- type: boolean
+  name: published
+  label: published
+pages:
+- src/pages/blog/alternative-to-appflow.md
+- src/pages/blog/how-to-bypass-app-store-review.md
+- src/pages/blog/moving-from-microsoft-app-center-to-ionic-appflow.md
+- src/pages/blog/update-your-capacitor-apps-seamlessly-using-capacitor-updater.md

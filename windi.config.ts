@@ -1,5 +1,4 @@
 import { defineConfig } from 'windicss/helpers'
-
 import colors from 'windicss/colors'
 import defaultTheme from 'windicss/defaultTheme'
 
@@ -17,9 +16,40 @@ export default defineConfig({
     aspectRatio: ['responsive'],
   },
   theme: {
+    fontFamily: {
+      light: ['AirbnbCerealLight', 'sans-serif', ...defaultTheme.fontFamily.sans],
+      medium: ['AirbnbCerealMedium', 'sans-serif', ...defaultTheme.fontFamily.sans],
+      bold: ['AirbnbCerealBold', 'sans-serif', ...defaultTheme.fontFamily.sans],
+    },
     extend: {
       fontFamily: {
         sans: ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: '65ch',
+            color: 'inherit',
+            a: {
+              'color': 'inherit',
+              'opacity': 0.75,
+              'fontWeight': '500',
+              'textDecoration': 'underline',
+              '&:hover': {
+                opacity: 1,
+                color: colors.teal[600],
+              },
+            },
+            b: { color: 'inherit' },
+            strong: { color: 'inherit' },
+            em: { color: 'inherit' },
+            h1: { color: 'inherit' },
+            h2: { color: 'inherit' },
+            h3: { color: 'inherit' },
+            h4: { color: 'inherit' },
+            code: { color: 'inherit' },
+          },
+        },
       },
       colors: {
         'gray': colors.gray,
@@ -145,11 +175,6 @@ export default defineConfig({
       green: {
         DEFAULT: '#88D4A6',
       },
-    },
-    fontFamily: {
-      light: ['AirbnbCerealLight', 'sans-serif'],
-      medium: ['AirbnbCerealMedium', 'sans-serif'],
-      bold: ['AirbnbCerealBold', 'sans-serif'],
     },
   },
 })

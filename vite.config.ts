@@ -21,7 +21,7 @@ import generateSitemap from 'vite-plugin-pages-sitemap'
 import pack from './package.json'
 
 const domain = 'capgo.app'
-const markdownWrapperClasses = 'prose prose-sm m-auto text-left'
+const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
 const guestPath = ['/home', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
 const sitemapIgnore = ['/eula', '/privacy', '/tos', '/disclaimer', '/return', '/404', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
 

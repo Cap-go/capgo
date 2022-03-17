@@ -346,6 +346,7 @@ import { IonContent, IonPage } from '@ionic/vue'
             </div>
           </div>
         </div>
+        <Footer />
       </div>
     </IonContent>
   </IonPage>

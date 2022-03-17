@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { openChat } from '../services/crips'
 
 const menuMobile = ref(false)
 </script>
@@ -9,7 +8,7 @@ const menuMobile = ref(false)
     <div class="px-4 pb-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="relative flex items-center justify-between">
         <div class="flex-shrink-0">
-          <a href="#" title="" class="flex rounded-lg overflow-hidden outline-none font-900 bg-azure-500 items-center focus:ring-1 focus:ring-gray-900 border focus:ring-offset-2 pr-3">
+          <a href="/" title="" class="flex rounded-lg overflow-hidden outline-none font-900 bg-azure-500 items-center focus:ring-1 focus:ring-gray-900 border focus:ring-offset-2 pr-3">
             <img class="w-auto h-8 pr-3" alt="Capgo logo" src="/capgo.png">
             Capgo
           </a>
@@ -23,10 +22,9 @@ const menuMobile = ref(false)
           </button>
         </div>
 
-        <div class="hidden lg:absolute lg:inset-y-0 lg:flex lg:items-center lg:justify-center lg:space-x-12 lg:-translate-x-1/2 lg:left-1/2">
-          <a href="/mobile_app" title="Sandbox App" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> App </a>
+        <div class="hidden lg:absolute lg:inset-y-0 lg:flex lg:items-center lg:justify-center lg:space-x-12 lg:-translate-x-1/2 lg:left-3/5">
+          <a href="/app_mobile" title="Sandbox App" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> App </a>
           <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Documentation </a>
-          <a href="#" title="Support" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2" @click="openChat"> Support </a>
         </div>
 
         <div class="hidden lg:flex lg:items-center lg:justify-center lg:space-x-10">
@@ -64,10 +62,8 @@ const menuMobile = ref(false)
       <div class="px-2 pt-2 pb-3 space-y-1 bg-gray-700">
         <!-- Current: "bg-gray-900 text-white", Default: "text-gray-300 hover:bg-gray-700 hover:text-white" -->
 
-        <a href="/mobile_app" title="App" target="_blank" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">App</a>
+        <a href="/app_mobile" title="App" target="_blank" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">App</a>
         <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Docummentation</a>
-
-        <a href="#" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium" @click="openChat">Support</a>
 
         <a href="/login" title="Login" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Login</a>
         <a href="https://discord.com/invite/VnYRvBfgA6" title="Communauty" target="_blank" class="bg-gray-900 text-white block px-3 py-2 rounded-md text-base font-medium">Join community</a>

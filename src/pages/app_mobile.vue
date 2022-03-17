@@ -9,7 +9,7 @@ import { IonContent, IonPage } from '@ionic/vue'
       <div class="overflow-x-hidden bg-gray-900 text-white">
         <Header />
         <section class="xl:mx-auto font-fira-sans mx-4 lg:max-w-[85%]">
-          <div class="md:mt-20 flex justify-between">
+          <div class="md:my-20 flex justify-between">
             <div class="w-full md:w-1/2">
               <div class="pr-4">
                 <h1 class="font-bold text-[2.504rem]">
@@ -76,6 +76,7 @@ import { IonContent, IonPage } from '@ionic/vue'
             </div>
           </div>
         </section>
+        <Footer />
       </div>
     </IonContent>
   </IonPage>
