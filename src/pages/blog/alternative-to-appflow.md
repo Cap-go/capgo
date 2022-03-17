@@ -1,12 +1,12 @@
 ---
-title: "alternative to Ionic Appflow"
+title: "Alternative to Ionic Appflow"
 description: "Ionic Appflow is the best complete set of tool for your app, sadly they price is not made for all."
 author: "Martin Donadieu"
 date: "2022-01-02"
-head_image: /appflow_alt.webp
+head_image: /capgo-feature-image.webp
 head_image_alt: Appflow alternative illustration
 tag: alternatives
-published: false
+published: true
 ---
 
 Ionic Appflow is the best complete set of tool for your app, sadly they price is not made for all.

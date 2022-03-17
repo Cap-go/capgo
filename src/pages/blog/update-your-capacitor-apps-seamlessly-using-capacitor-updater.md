@@ -5,8 +5,8 @@ author: "Martin Donadieu"
 date: "2022-02-27"
 head_image: /update_flow.webp
 head_image_alt: Capacitor Dev looking for alternative
-tag: How-to
-published: false
+tag: Tutorial
+published: true
 ---
 
 inspired by https://dev.to/karanpratapsingh/update-your-react-native-apps-seamlessly-using-microsoft-s-codepush-f61
