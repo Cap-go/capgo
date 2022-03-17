@@ -9,8 +9,9 @@ const menuMobile = ref(false)
     <div class="px-4 pb-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="relative flex items-center justify-between">
         <div class="flex-shrink-0">
-          <a href="#" title="" class="flex rounded outline-none focus:ring-1 focus:ring-gray-900 focus:ring-offset-2">
-            <img class="w-auto h-8 rounded-lg" alt="Capgo logo" src="/capgo.png">
+          <a href="#" title="" class="flex rounded-lg overflow-hidden outline-none font-900 bg-azure-500 items-center focus:ring-1 focus:ring-gray-900 border focus:ring-offset-2 pr-3">
+            <img class="w-auto h-8 pr-3" alt="Capgo logo" src="/capgo.png">
+            Capgo
           </a>
         </div>
 
