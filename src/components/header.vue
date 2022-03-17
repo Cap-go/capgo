@@ -22,7 +22,8 @@ const menuMobile = ref(false)
           </button>
         </div>
 
-        <div class="hidden lg:absolute lg:inset-y-0 lg:flex lg:items-center lg:justify-center lg:space-x-12 lg:-translate-x-1/2 lg:left-3/5">
+        <div class="hidden lg:absolute lg:inset-y-0 lg:flex lg:items-center lg:justify-center lg:space-x-12 lg:-translate-x-1/2 lg:left-1/2">
+          <a href="/mobile_app" title="Sandbox App" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> App </a>
           <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2"> Documentation </a>
           <a href="#" title="Support" class="text-base font-medium transition-all duration-200 rounded focus:outline-none font-pj hover:text-opacity-50 focus:ring-1 focus:ring-gray-900 focus:ring-offset-2" @click="openChat"> Support </a>
         </div>
@@ -58,24 +59,18 @@ const menuMobile = ref(false)
         </div>
       </div>
     </div>
-    <div class="py-4 flex flex-wrap justify-center space-x-6 bg-gray-700" :class="{'hidden': !menuMobile}">
-      <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-base font-medium text-white hover:text-indigo-50">
-        Docummentation
-      </a>
-      <a
-        href="https://discord.com/invite/VnYRvBfgA6"
-        target="_blank"
-        title="Join discord"
-        class="text-base font-medium text-white hover:text-indigo-50"
-      >
-        Community
-      </a>
-      <a href="#" title="Support" class="text-base font-medium text-white hover:text-indigo-50" @click="openChat">
-        Support
-      </a>
-      <a href="/login" title="Login" class="text-base font-medium text-white hover:text-indigo-50">
-        Login
-      </a>
+    <div :class="{'hidden': !menuMobile}">
+      <div class="px-2 pt-2 pb-3 space-y-1 bg-gray-700">
+        <!-- Current: "bg-gray-900 text-white", Default: "text-gray-300 hover:bg-gray-700 hover:text-white" -->
+
+        <a href="/mobile_app" title="App" target="_blank" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">App</a>
+        <a href="https://doc.capgo.app" title="Documentation" target="_blank" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Docummentation</a>
+
+        <a href="#" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium" @click="openChat">Support</a>
+
+        <a href="/login" title="Login" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Login</a>
+        <a href="https://discord.com/invite/VnYRvBfgA6" title="Communauty" target="_blank" class="bg-gray-900 text-white block px-3 py-2 rounded-md text-base font-medium">Join community</a>
+      </div>
     </div>
   </header>
 </template>

@@ -4,11 +4,11 @@
 
 declare module 'vue' {
   export interface GlobalComponents {
+    CarbonWarning: typeof import('~icons/carbon/warning')['default']
     Header: typeof import('./components/header.vue')['default']
     README: typeof import('./components/README.md')['default']
     Spinner: typeof import('./components/Spinner.vue')['default']
     TitleHead: typeof import('./components/TitleHead.vue')['default']
-    'TitleHead copy': typeof import('./components/TitleHead copy.vue')['default']
   }
 }
 
