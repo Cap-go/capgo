@@ -12,3 +12,5 @@ published: false
 # Tuto 1
 
 inspiration https://ionicframework.com/blog/moving-from-microsoft-app-center-to-ionic-appflow/
+
+For teams wondering how to replace Code Push in their Cordova apps, we hope you’ll take a look at Capgo. We’ve supported remote app updates (see docs) for Capacitor.
