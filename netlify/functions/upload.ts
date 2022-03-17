@@ -8,6 +8,7 @@ interface AppUpload {
   appid: string
   version: string
   app: string
+  format?: string
   fileName?: string
   isMultipart?: boolean
   chunk?: number
@@ -30,6 +31,7 @@ export const handler: Handler = async(event) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { app, ...newObject } = body
     console.log('body', newObject)
+    const dataFormat: BufferEncoding = (body.format || 'base64') as BufferEncoding
     let fileName = uuidv4()
     let error
     if (body.isMultipart && body.fileName) {
@@ -43,7 +45,7 @@ export const handler: Handler = async(event) => {
 
       const arrayBuffer = await data?.arrayBuffer()
       const buffOld = Buffer.from(arrayBuffer)
-      const buffNew = Buffer.from(body.app, 'base64')
+      const buffNew = Buffer.from(body.app, dataFormat)
       const bufAll = Buffer.concat([buffOld, buffNew], buffOld.length + buffNew.length)
       const { error: upError } = await supabase
         .storage

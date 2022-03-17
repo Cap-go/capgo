@@ -1,10 +1,10 @@
 import Plausible from 'plausible-tracker'
 import { isPlatform } from '@ionic/vue'
 
-export const trackEvent = (eventName: string, eventData: any = {}) => {
+export const trackEvent = (domain: string, eventName: string, eventData: any = {}) => {
   const { trackEvent } = Plausible({
     trackLocalhost: isPlatform('capacitor'),
-    domain: 'captime.app',
+    domain,
   })
   trackEvent(eventName, { props: eventData })
 }

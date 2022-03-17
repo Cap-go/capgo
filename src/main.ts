@@ -42,7 +42,7 @@ const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/ap
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 app.use(router)
 initCrisp()
-initPlausible('capgo.app')
+initPlausible(import.meta.env.domain as string)
 // install all modules under `modules/`
 Object.values(import.meta.globEager('./modules/*.ts')).map(i => i.install?.({ app, router, routes }))
 
