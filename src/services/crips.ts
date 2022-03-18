@@ -26,6 +26,9 @@ export const setDeviceInfo = (
 export const setPaidPlan = (planId: string): void => {
   CapacitorCrisp.setString({ key: 'paid-plan', value: planId })
 }
+export const setPaidOldPlan = (planId: string): void => {
+  CapacitorCrisp.setString({ key: 'paid-old-plan', value: planId })
+}
 export const sendMessage = (value: string): void => {
   CapacitorCrisp.sendMessage({ value })
 }
@@ -35,7 +38,7 @@ export const openChat = (): void => {
 export const initCrisp = (): void => {
   try {
     CapacitorCrisp.configure({
-      websiteID: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
+      websiteID: import.meta.env.crisp as string,
     })
   }
   catch (e) {
