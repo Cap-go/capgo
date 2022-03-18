@@ -1,12 +1,12 @@
 ---
-title: "Update your React Native apps seamlessly using Microsoft's CodePush"
+title: "Update your Capacitor apps seamlessly using Capacitor-updater"
 description: "Greetings Capacitor Community, today I'll be helping you setup Capacitor-updater into your app. So that you can do seamless releases."
 author: "Martin Donadieu"
 date: "2022-02-27"
 head_image: /update_flow.webp
 head_image_alt: Capacitor Dev looking for alternative
 tag: Tutorial
-published: true
+published: false
 ---
 
 inspired by https://dev.to/karanpratapsingh/update-your-react-native-apps-seamlessly-using-microsoft-s-codepush-f61
