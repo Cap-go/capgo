@@ -49,9 +49,9 @@ useHead({
           {{ frontmatter.description }}
         </p>
         <router-view class="pb-4 px-4 lg:max-w-1/2" />
-        <a v-if="random" :href="random.path" class="sm:flex py-8 lg:max-w-1/2 mx-auto lg:my-10 bg-true-gray-800 lg:rounded-lg">
-          <div class="relative mx-4 flex-shrink-0">
-            <div :title="random.meta.frontmatter.title" class="block aspect-w-4 aspect-h-3">
+        <a v-if="random" :href="random.path" class="flex flex-col sm:flex-row py-8 lg:max-w-1/2 mx-auto lg:my-10 bg-gray-800 lg:rounded-lg">
+          <div class="relative mx-4 flex">
+            <div :title="random.meta.frontmatter.title" class="block w-full">
               <img class="object-cover w-full sm:w-52 h-full rounded-lg" :src="random.meta.frontmatter.head_image" :alt="'blog illustration ' + random.meta.frontmatter.title">
             </div>
 

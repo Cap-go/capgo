@@ -3,7 +3,8 @@ import { defineComponent, h } from 'vue'
 
 const WILL_CHANGE = 'ionTabsWillChange'
 const DID_CHANGE = 'ionTabsDidChange'
-// This exist to handle the case where we don't use the ionic router but we still want to use the tabs
+const ALLOWED_ROUTER_OUTLET = ['IonRouterOutlet', 'RouterView']
+
 export const IonTabs = /* @__PURE__ */ defineComponent({
   name: 'IonTabs',
   emits: [WILL_CHANGE, DID_CHANGE],
@@ -13,15 +14,22 @@ export const IonTabs = /* @__PURE__ */ defineComponent({
     let routerOutlet
 
     /**
-     * Developers must pass an ion-router-outlet
+     * Developers must pass an ion-router-outlet or router-view
      * inside of ion-tabs.
      */
     if (slottedContent && slottedContent.length > 0)
-      // routerOutlet = slottedContent.find((child: VNode) => child.type && (child.type as any).name === 'IonRouterOutlet');
-      routerOutlet = slottedContent.find((child: VNode) => child.type && (child.type as any).name === 'RouterView')
+      routerOutlet = slottedContent.find((child: VNode) => child.type && ALLOWED_ROUTER_OUTLET.includes((child.type as any).name))
+    console.log('routerOutlet', routerOutlet?.type)
+    // routerOutlet
 
     if (!routerOutlet)
-      throw new Error('IonTabs must contain an IonRouterOutlet. See https://ionicframework.com/docs/vue/navigation#working-with-tabs for more information.')
+      throw new Error('IonTabs must contain an IonRouterOutlet at best or RouterView. See https://ionicframework.com/docs/vue/navigation#working-with-tabs for more information.')
+
+    if (routerOutlet.type.name !== 'RouterView')
+      console.warn('IonTabs must contain an IonRouterOutlet with RouterView transitions will not work as expected')
+
+    if (!inject('navManager'))
+      throw new Error('Your app must use `import { createRouter, createWebHistory } from \'@ionic/vue-router\'` as router. \n For best transition experience IonTabs must contain an IonRouterOutlet. See https://ionicframework.com/docs/vue/navigation#working-with-tabs for more information.')
 
     let childrenToRender = [
       h('div', {
@@ -46,8 +54,7 @@ export const IonTabs = /* @__PURE__ */ defineComponent({
        */
       const filteredContent = slottedContent.filter((child: VNode) => (
         !child.type
-        // || (child.type && (child.type as any).name !== 'IonRouterOutlet')
-        || (child.type && (child.type as any).name !== 'RouterView')
+        || (child.type && !ALLOWED_ROUTER_OUTLET.includes((child.type as any).name))
       ))
 
       const slottedTabBar = filteredContent.find((child: VNode) => child.type && (child.type as any).name === 'IonTabBar')

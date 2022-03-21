@@ -22,6 +22,9 @@ export default defineConfig({
       bold: ['AirbnbCerealBold', 'sans-serif', ...defaultTheme.fontFamily.sans],
     },
     extend: {
+      fontSize: {
+        tiny: '.4rem',
+      },
       fontFamily: {
         sans: ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
       },

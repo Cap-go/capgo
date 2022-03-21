@@ -107,6 +107,7 @@ specifiers:
   vue-i18n: ^9.1.9
   vue-router: 4.0.14
   vue-tsc: 0.33.2
+  windicss: ^3.5.1
 
 dependencies:
   '@capacitor-community/http': 1.4.1
@@ -217,6 +218,7 @@ devDependencies:
   vite-plugin-windicss: 1.8.3_vite@2.8.6
   vite-ssg: 0.17.11_06991454d28c6a3de3c4aa992a4c8636
   vue-tsc: 0.33.2_typescript@4.6.2
+  windicss: 3.5.1
 
 packages:
 
