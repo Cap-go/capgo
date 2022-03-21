@@ -1,3 +1,10 @@
+## 0.11.4 (2022-03-21)
+
+### Fix
+
+- remove useless inclusion
+- blog layout by hacking IonTab component
+
 ## 0.11.3 (2022-03-18)
 
 ### Fix
