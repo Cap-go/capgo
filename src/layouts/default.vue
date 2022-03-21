@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IonIcon, IonLabel, IonPage, IonRouterOutlet, IonTabBar, IonTabButton } from '@ionic/vue'
+import { IonIcon, IonLabel, IonPage, IonTabBar, IonTabButton } from '@ionic/vue'
 import { list, person } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'
