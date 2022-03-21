@@ -1,3 +1,9 @@
+## 0.11.5 (2022-03-21)
+
+### Fix
+
+- issue missing component ionic router
+
 ## 0.11.4 (2022-03-21)
 
 ### Fix
