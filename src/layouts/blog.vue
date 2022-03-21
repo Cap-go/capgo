@@ -22,8 +22,6 @@ const meta = [
 if (!frontmatter.published)
   meta.push({ name: 'robots', content: 'noindex, nofollow' })
 
-const Mdmodules = import.meta.glob('../pages/*.md')
-const MdComponent = Mdmodules[`../pages${router.currentRoute.value.path}.md`]
 useHead({
   meta,
 })
@@ -50,7 +48,7 @@ useHead({
         <p class="py-5 px-4 text-xl lg:max-w-1/2 mx-auto text-left">
           {{ frontmatter.description }}
         </p>
-        <MdComponent class="pb-4 px-4 lg:max-w-1/2" />
+        <router-view class="pb-4 px-4 lg:max-w-1/2" />
         <a v-if="random" :href="random.path" class="sm:flex py-8 lg:max-w-1/2 mx-auto lg:my-10 bg-true-gray-800 lg:rounded-lg">
           <div class="relative mx-4 flex-shrink-0">
             <div :title="random.meta.frontmatter.title" class="block aspect-w-4 aspect-h-3">

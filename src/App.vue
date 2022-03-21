@@ -27,6 +27,7 @@ useHead({
 
 <template>
   <ion-app>
-    <IonRouterOutlet />
+    <!-- <IonRouterOutlet /> -->
+    <router-view />
   </ion-app>
 </template>
