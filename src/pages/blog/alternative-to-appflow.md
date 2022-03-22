@@ -25,5 +25,7 @@ That where i started to work on Capgo as AppFlow alternative.
 
 The goal is to provide a simple and easy to use solution to push code updates to Capcitor apps.
 
-No Native build, no many tools like Ionic, just live updates, for the market they don't want.
+No Native build, not big toolbox like Ionic, just live updates, for the market they don't want.
+
+
 

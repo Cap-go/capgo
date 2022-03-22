@@ -11,6 +11,7 @@ export interface Frontmatter {
   published: boolean
   head_image: string
   head_image_alt: string
+  next_blog?: string
 }
 export interface Route extends RouteRecordNormalized {
   meta: {
@@ -30,9 +31,13 @@ export const initBlog = (): Route[] => {
   return blogs
 }
 
-export const randomBlog = (path: string): Route => {
+export const randomBlog = (path: string, nextBlog = 'undefined'): Route => {
   const blogs = initBlog()
+
   const filtered = blogs.filter(blog => blog.path !== path)
+  const nextBlogRoute = blogs.find(blog => blog.path === nextBlog)
+  if (nextBlogRoute)
+    return nextBlogRoute
   const blog = filtered[Math.floor(Math.random() * filtered.length)]
   return blog
 }

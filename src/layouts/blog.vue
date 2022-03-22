@@ -6,7 +6,7 @@ import { randomBlog, stringToDate } from '~/services/blog'
 
 const router = useRouter()
 const frontmatter: Frontmatter = router.currentRoute.value.meta.frontmatter as any
-const random = randomBlog(router.currentRoute.value.path)
+const random = randomBlog(router.currentRoute.value.path, frontmatter.next_blog)
 const meta = [
   { name: 'og:image:alt', content: frontmatter.head_image_alt },
   { name: 'og:alt', content: frontmatter.head_image_alt },
