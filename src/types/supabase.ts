@@ -543,6 +543,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices.device_id"];
           version?: parameters["rowFilter.devices.version"];
           app_id?: parameters["rowFilter.devices.app_id"];
+          platform?: parameters["rowFilter.devices.platform"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -598,6 +599,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices.device_id"];
           version?: parameters["rowFilter.devices.version"];
           app_id?: parameters["rowFilter.devices.app_id"];
+          platform?: parameters["rowFilter.devices.platform"];
         };
         header: {
           /** Preference */
@@ -617,6 +619,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices.device_id"];
           version?: parameters["rowFilter.devices.version"];
           app_id?: parameters["rowFilter.devices.app_id"];
+          platform?: parameters["rowFilter.devices.platform"];
         };
         body: {
           /** devices */
@@ -1049,6 +1052,11 @@ export interface definitions {
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id: string;
+    /**
+     * Format: public.platform_os
+     * @enum {string}
+     */
+    platform?: "ios" | "android";
   };
   stats: {
     /**
@@ -1062,8 +1070,11 @@ export interface definitions {
      * @default now()
      */
     created_at?: string;
-    /** Format: text */
-    platform: string;
+    /**
+     * Format: public.platform_os
+     * @enum {string}
+     */
+    platform: "ios" | "android";
     /** Format: text */
     action: string;
     /** Format: text */
@@ -1247,13 +1258,15 @@ export interface parameters {
   "rowFilter.devices.version": string;
   /** Format: character varying */
   "rowFilter.devices.app_id": string;
+  /** Format: public.platform_os */
+  "rowFilter.devices.platform": string;
   /** @description stats */
   "body.stats": definitions["stats"];
   /** Format: bigint */
   "rowFilter.stats.id": string;
   /** Format: timestamp with time zone */
   "rowFilter.stats.created_at": string;
-  /** Format: text */
+  /** Format: public.platform_os */
   "rowFilter.stats.platform": string;
   /** Format: text */
   "rowFilter.stats.action": string;

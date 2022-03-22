@@ -20,13 +20,15 @@ export const handler: Handler = async(event) => {
   console.log('event.body', event.body)
   const body = JSON.parse(event.body || '{}') as AppStats
   const device: definitions['devices'] = {
+    platform: body.platform as definitions['stats']['platform'],
     device_id: body.device_id,
     app_id: body.app_id,
     version: -1,
     updated_at: new Date().toISOString(),
   }
+
   const stat: Partial<definitions['stats']> = {
-    platform: body.platform,
+    platform: body.platform as definitions['stats']['platform'],
     device_id: body.device_id,
     action: body.action,
     app_id: body.app_id,
