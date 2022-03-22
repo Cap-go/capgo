@@ -542,6 +542,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.devices.updated_at"];
           device_id?: parameters["rowFilter.devices.device_id"];
           version?: parameters["rowFilter.devices.version"];
+          app_id?: parameters["rowFilter.devices.app_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -596,6 +597,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.devices.updated_at"];
           device_id?: parameters["rowFilter.devices.device_id"];
           version?: parameters["rowFilter.devices.version"];
+          app_id?: parameters["rowFilter.devices.app_id"];
         };
         header: {
           /** Preference */
@@ -614,6 +616,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.devices.updated_at"];
           device_id?: parameters["rowFilter.devices.device_id"];
           version?: parameters["rowFilter.devices.version"];
+          app_id?: parameters["rowFilter.devices.app_id"];
         };
         body: {
           /** devices */
@@ -1040,6 +1043,12 @@ export interface definitions {
      * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
      */
     version: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
   };
   stats: {
     /**
@@ -1236,6 +1245,8 @@ export interface parameters {
   "rowFilter.devices.device_id": string;
   /** Format: bigint */
   "rowFilter.devices.version": string;
+  /** Format: character varying */
+  "rowFilter.devices.app_id": string;
   /** @description stats */
   "body.stats": definitions["stats"];
   /** Format: bigint */

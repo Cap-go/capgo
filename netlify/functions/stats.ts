@@ -19,10 +19,21 @@ export const handler: Handler = async(event) => {
   const supabase = useSupabase()
   console.log('event.body', event.body)
   const body = JSON.parse(event.body || '{}') as AppStats
-  const device = {
+  const device: definitions['devices'] = {
     device_id: body.device_id,
+    app_id: body.app_id,
+    version: -1,
     updated_at: new Date().toISOString(),
-  } as definitions['devices']
+  }
+  const stat: Partial<definitions['stats']> = {
+    platform: body.platform,
+    device_id: body.device_id,
+    action: body.action,
+    app_id: body.app_id,
+    version_build: body.version_build,
+    version: -1,
+    updated_at: new Date().toISOString(),
+  }
 
   const { data, error } = await supabase
     .from<definitions['app_versions']>('app_versions')
@@ -30,20 +41,31 @@ export const handler: Handler = async(event) => {
     .eq('app_id', body.app_id)
     .eq('name', body.version_name)
   if (data && data.length && !error) {
-    body.version = data[0].id
+    stat.version = data[0].id
     device.version = data[0].id
   }
   else {
     return sendRes({ status: 'ko', error: error || 'version not found' }, 400)
   }
-  delete body.version_name
-  console.log('body', body)
-  await supabase
+  const { data: dataDevice, error: errorDevice } = await supabase
     .from<definitions['devices']>('devices')
-    .update(device)
+    .select()
+    .eq('app_id', body.app_id)
     .eq('device_id', body.device_id)
+  if (!dataDevice || !dataDevice.length || errorDevice) {
+    await supabase
+      .from<definitions['devices']>('devices')
+      .insert(device)
+  }
+  else {
+    await supabase
+      .from<definitions['devices']>('devices')
+      .update(device)
+      .eq('app_id', body.app_id)
+      .eq('device_id', body.device_id)
+  }
   await supabase
     .from<definitions['stats']>('stats')
-    .insert(body)
+    .insert(stat)
   return sendRes()
 }
