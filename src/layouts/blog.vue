@@ -32,7 +32,7 @@ useHead({
       <main class="text-center text-gray-700 dark:text-gray-200">
         <Header />
         <div class="relative lg:pt-10 pb-4 lg:max-w-1/2 mx-auto">
-          <div class="block aspect-w-4 aspect-h-3">
+          <div class="block aspect-w-4 aspect-h-2">
             <img class="object-cover w-full h-full lg:rounded-lg" :src="frontmatter.head_image" :alt="'blog illustration ' + frontmatter.title">
           </div>
 

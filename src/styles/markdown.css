@@ -9,6 +9,9 @@
   width: 100%;
   border-radius: 0.5rem;
 }
+.prose thead {
+  color: theme('colors.muted-blue.300');
+}
 
 html:not(.dark) .prose {
   --prism-foreground: #393a34;

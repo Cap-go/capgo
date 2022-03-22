@@ -1,5 +1,6 @@
 /* Ionic Variables and Theming. For more info, please see:
 http://ionicframework.com/docs/theming/ */
+@import './markdown.css';
 
 /** Ionic CSS Variables **/
 :root {
