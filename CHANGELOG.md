@@ -1,3 +1,10 @@
+## 0.11.6 (2022-03-21)
+
+### Fix
+
+- missing font inclusions css
+- blog section and font issue
+
 ## 0.11.5 (2022-03-21)
 
 ### Fix
