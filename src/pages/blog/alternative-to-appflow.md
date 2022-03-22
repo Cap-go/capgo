@@ -15,7 +15,7 @@ The only other alternative was Microsoft App Center, but they shut down support 
 
 If you are a solo developer, or a small team of developers, you will find that Ionic Appflow is not the best Price for you.
 
-Like you i was complaining about it, but Ionic even they understand the complain, there are not open to change it.
+Like you i was complaining about it, Ionic understand the complain, but there are not open to change the pricing tiny team is outside of they focus.
 
 Back in december 2021, i decided to try to fix my biggest pain in my Capacitor development workflow.
 
@@ -45,7 +45,9 @@ Feel free to join the community to build together, i use it for my own projects 
 | Affordable pricing            | ✅ Start at $9/mo                   | ❌ Start at $499/mo    |
 | Native build                  | ❌                                  | ✅                     |
 
+If you are a big team with big budget i still think Appflow is the best solution for you.
 
-# Register here to get a free account
+Otherwise :)
+# Register here to get your account
 
 [Capgo](https://capgo.app/register)
