@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import path, { resolve } from 'path'
 import { defineConfig } from 'vite'
 import Vue from '@vitejs/plugin-vue'
@@ -230,5 +231,13 @@ export default defineConfig({
     exclude: [
       'vue-demi',
     ],
+  },
+
+  test: {
+    include: ['test/**/*.test.ts'],
+    environment: 'jsdom',
+    deps: {
+      inline: ['@vue', '@vueuse', 'vue-demi'],
+    },
   },
 })
