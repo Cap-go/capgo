@@ -1,3 +1,10 @@
+## 0.14.5 (2022-03-23)
+
+### Fix
+
+- delete secret
+- delete secret from github
+
 ## 0.14.4 (2022-03-23)
 
 ### Fix
