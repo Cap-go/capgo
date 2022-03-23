@@ -1,25 +1,26 @@
 ---
-title: "Automatic build and release with Github actions"
-description: "Create your own CI/CD pipeline with Github actions for free, to deploy your app every time you push to main."
-author: "Martin Donadieu"
-date: "2022-03-23"
-head_image: /github_actions.webp
+title: Automatic build and release with Github actions
+description: Create your own CI/CD pipeline with Github actions for free, to deploy
+  your app every time you push to main.
+author: Martin Donadieu
+date: 2022-03-23
+head_image: "/github_actions.webp"
 head_image_alt: Github action illustration
 tag: CI/CD
 published: true
+
 ---
+This tutorial focuses on the GitHub hosting, but you can adapt it with little tweak to any other CI/CD platform.
 
-This tutorial focuses on the Github hosting but you can adapt it with little tweek to any other CI/CD platform.
+# Commit convention
 
-# Commit convetion
-
-First you need to start following the commit convention [`conventionalcommits`](https://www.conventionalcommits.org/en/v1.0.0/)` this will help the tooling understand how upgrade the version number, it's 5 min to learn it.
+First you need to start following the commit convention [`conventionalcommits`](https://www.conventionalcommits.org/en/v1.0.0/)\` this will help the tooling understand how upgrade the version number, it's 5 min to learn it.
 
 ![Conventional commits](/conventional_commits.webp)
 
-# Github actions for tag
+# GitHub actions for tag
 
-Then you need to create your first Github action to automatically build and create tag.
+Then you need to create your first GitHub action to automatically build and create tag.
 
 Create a file at this path: `.github/workflows/bump_version.yml`
 
@@ -51,20 +52,20 @@ jobs:
           branch: 'main'
 ```
 
-This will release a tag for every commit in yout main branch.
-And add a changelog entry for each commit in the main branch in `CHANGELOG.md`.
+This will release a tag for every commit in your main branch. And add a changelog entry for each commit in the main branch in `CHANGELOG.md`.
 
 Don't worry if you don't have this file it will be created for you.
 
-To make this work you need to create a [PERSONAL_ACCESS_TOKEN](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) and add it in the [secret of your github repository](https://docs.github.com/en/actions/security-guides/encrypted-secrets) as `PERSONAL_ACCESS_TOKEN`.
+To make this work, you need to create a [PERSONAL_ACCESS](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) _it in_ your GitHub [secret](https://docs.github.com/en/actions/security-guides/encrypted-secrets "GitHub secrets") as `PERSONAL_ACCESS_TOKEN`.
 
 This is necessary to let the CI commit the changelog.
 
-When you create the token choose expiration as `never` and the scope as `repo`.
+When you create the token, choose expiration as `never` and the scope as `repo`.
 
-Lastly, to let the tool understand where your version is saved you need to create the file `.cz.toml` at the root of your repository.
+Lastly, to let the tool understand where your version is saved you have to create the file `.cz.toml` at the root of your repository.
 
-and add this inside :
+And add this inside :
+
 ```toml
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -75,14 +76,14 @@ version_files = [
     ".cz.toml"
 ]
 ```
+
 Set the version in this file as the same you have in your `package.json` file.
 
-this is only necessary the first time, then the tools will keep it up to date.
+This is only necessary the first time, then the tools will keep it up to date.
 
-You can now commit this both file and see your first tag appear in github !
+You can now commit this both file and see your first tag appear in GitHub!
 
-
-# Github actions for build
+# GitHub actions for build
 
 Create a file at this path: `.github/workflows/build.yml`
 
@@ -120,13 +121,12 @@ This will install and build your dependency before sending it to Capgo.
 
 If your command for build is different you can change it in the `build_code` step.
 
-To make this work you need to get your API key for capgo add it in the [secret of your github repository](https://docs.github.com/en/actions/security-guides/encrypted-secrets) as `CAPGO_TOKEN`.
+To make this work, you need to get your API key for Capgo add it in the [secret of your GitHub repository](https://docs.github.com/en/actions/security-guides/encrypted-secrets) as `CAPGO_TOKEN`.
 
-You can now commit this both file and see your first tag appear in github !
+You can now commit this both file and see your first tag appear in GitHub!
 
 Add the commit will generate a new build for production channel.
 
 You should add your test in the build step to be sure your code is working.
 
-Go To your capgo dashboard and check your build who just appear, you know have you own CI/CD system.
-
+Go To your Capgo dashboard and check your build who just appear, you now have you own CI/CD system.
