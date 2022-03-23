@@ -36,8 +36,8 @@ specifiers:
   '@iconify-json/ion': 1.1.1
   '@iconify-json/ls': 1.1.1
   '@intlify/vite-plugin-vue-i18n': 3.3.1
-  '@ionic/vue': 6.0.11
-  '@ionic/vue-router': 6.0.11
+  '@ionic/vue': 6.0.12
+  '@ionic/vue-router': 6.0.12
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.3.0
   '@robingenz/capacitor-screen-orientation': ^1.1.4
@@ -55,10 +55,9 @@ specifiers:
   '@vue/server-renderer': 3.2.31
   '@vuelidate/core': 2.0.0-alpha.35
   '@vuelidate/validators': 2.0.0-alpha.27
-  '@vueuse/core': '7'
+  '@vueuse/core': 7.7.1
   '@vueuse/head': 0.7.5
   base64-arraybuffer: 1.0.2
-  capacitor-crisp: 1.0.18
   capacitor-flash: 1.1.1
   capacitor-mute: ^0.0.4
   capacitor-native-audio: ^3.0.2
@@ -140,8 +139,8 @@ dependencies:
   '@capacitor/storage': 1.2.5_@capacitor+core@3.4.3
   '@capacitor/text-zoom': 1.0.8_@capacitor+core@3.4.3
   '@capacitor/toast': 1.0.8_@capacitor+core@3.4.3
-  '@ionic/vue': 6.0.11
-  '@ionic/vue-router': 6.0.11
+  '@ionic/vue': 6.0.12
+  '@ionic/vue-router': 6.0.12
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.3.0_@capacitor+core@3.4.3
   '@robingenz/capacitor-screen-orientation': 1.1.4_@capacitor+core@3.4.3
@@ -153,7 +152,6 @@ dependencies:
   '@vueuse/core': 7.7.1_vue@3.2.31
   '@vueuse/head': 0.7.5_vue@3.2.31
   base64-arraybuffer: 1.0.2
-  capacitor-crisp: 1.0.18_@capacitor+core@3.4.3
   capacitor-flash: 1.1.1_@capacitor+core@3.4.3
   capacitor-mute: 0.0.4_@capacitor+core@3.4.3
   capacitor-native-audio: 3.0.2_@capacitor+core@3.4.3
@@ -2957,8 +2955,8 @@ packages:
       - supports-color
     dev: true
 
-  /@intlify/bundle-utils/2.2.0_vue-i18n@9.1.9:
-    resolution: {integrity: sha512-qVuN7+c84UB6rlLHSued2J9R86LG1rHg6ZibCghGMyPXnW0nOuIfkUFf1F7tXIqfMXjIPeJzlbpmzjWTI2z9Kw==}
+  /@intlify/bundle-utils/2.2.1_vue-i18n@9.1.9:
+    resolution: {integrity: sha512-8n8zhYEKypS+KP22KUAC6BnQifJDDWUGcn3OVPqsThqMMucU22MShGvOuiKqQ4AeT7XQ5O4pudlJmxv3L91JrQ==}
     engines: {node: '>= 12'}
     peerDependencies:
       petite-vue-i18n: '*'
@@ -3050,7 +3048,7 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/bundle-utils': 2.2.0_vue-i18n@9.1.9
+      '@intlify/bundle-utils': 2.2.1_vue-i18n@9.1.9
       '@intlify/shared': 9.2.0-beta.32
       '@rollup/pluginutils': 4.1.2
       debug: 4.3.3
@@ -3081,8 +3079,8 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/core/6.0.11:
-    resolution: {integrity: sha512-2gtyEoWN+CnfIHOUXctEYc9KHQiUapWJoo1AqCTxcsuXLrMnaPa4orrFpdkBXlT0gugVLM222TW+Stlt5Kq8yg==}
+  /@ionic/core/6.0.12:
+    resolution: {integrity: sha512-WpcVzSXBuvdHUZuNg1NTdnF4Ur7AGNCpgc4t4lyjPcEr0j//E855gd6GtUD7imNFERdtrvVC86JTpj5t0L+OMg==}
     dependencies:
       '@stencil/core': 2.14.2
       ionicons: 6.0.0
@@ -3169,16 +3167,16 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/vue-router/6.0.11:
-    resolution: {integrity: sha512-+Zx28Ux07o8TNxvNDwpIdUtyF7XJ/uJ+l58Dx5ey2g/0qqkXBmsZgMXl0wg8pShAkwMHUk4yfFQYSgkrhphMzQ==}
+  /@ionic/vue-router/6.0.12:
+    resolution: {integrity: sha512-yznqEkRfEsL3goDz/pzfT5TfsqR3vmKrTmcO4KLjdKjN1VQexzpCTyrUPIaEpC4dByZbly548T106Ad0ZVE7ig==}
     dependencies:
-      '@ionic/vue': 6.0.11
+      '@ionic/vue': 6.0.12
     dev: false
 
-  /@ionic/vue/6.0.11:
-    resolution: {integrity: sha512-BZb7cgOAWAtk0gUrhVaGYu8e8p9A80WoJcvCOPz0C5MdcqgrUE6fRkbLAMM5+C03fhLDnIgPmq4cF/aHSdFOyQ==}
+  /@ionic/vue/6.0.12:
+    resolution: {integrity: sha512-DH1eYCNYYj3pciBzAN0ZtFucXNFpOVi9ZvaTmPQn6c479qshoiYcboiSNItvfEr5tgJPHwKhZCID4OOhiephKg==}
     dependencies:
-      '@ionic/core': 6.0.11
+      '@ionic/core': 6.0.12
       ionicons: 6.0.0
     dev: false
 
@@ -6020,14 +6018,6 @@ packages:
   /caniuse-lite/1.0.30001314:
     resolution: {integrity: sha512-0zaSO+TnCHtHJIbpLroX7nsD+vYuOVjl3uzFbJO1wMVbuveJA0RK2WcQA9ZUIOiO0/ArMiMgHJLxfEZhQiC0kw==}
     dev: true
-
-  /capacitor-crisp/1.0.18_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-W1OKIz8JoNakufdse0KbubN0bi7gVbk7IfqYCJzsAH7qYBU1wrdUYE6zhlkcJMcEgBRd96k6Xp8OhBstyRIEfg==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 3.4.3
-    dev: false
 
   /capacitor-flash/1.1.1_@capacitor+core@3.4.3:
     resolution: {integrity: sha512-HpgCyhRsZYttk4Eoxc0iWJ93WPY4FlG9ByS0Cd0vRM5uJNyRJH3JNRVJbi3djZp7CgdYMDJBZJ/KGuT8cL8aXw==}
