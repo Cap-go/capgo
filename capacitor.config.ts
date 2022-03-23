@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'ee.forgr.capacitor_go',
-  appName: 'Capacitor-go',
+  appName: 'Capgo',
   webDir: 'dist',
   bundledWebRuntime: false,
   plugins: {
