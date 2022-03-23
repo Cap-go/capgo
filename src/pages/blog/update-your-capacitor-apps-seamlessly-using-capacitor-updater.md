@@ -11,8 +11,6 @@ published: true
 next_blog: ''
 
 ---
-Inspired by https://dev.to/karanpratapsingh/update-your-react-native-apps-seamlessly-using-microsoft-s-codepush-f61
-
 Greetings Capacitor Community, today I'll be helping you setup Capacitor-updater into your app. So that you can do seamless releases.
 
 # What is Capacitor-updater?
@@ -85,7 +83,7 @@ This command will use all variable defined in the Capacitor config file to creat
 ## Upload your first version
 
 Run the command to build your code and send it to Capgo with:
-`npx capgo upload -a YOURKEY -channel production` 
+`npx capgo upload -a YOURKEY -channel production`
 
 By default, the version name will be the one in your package.json file.
 
