@@ -11,13 +11,13 @@ published: true
 next_blog: ''
 
 ---
-Greetings Capacitor Community, today I'll be helping you setup Capacitor-updater into your app. So that you can do seamless releases.
+Greetings Capacitor Community, today I'll be helping you set up Capacitor-updater into your app. So that you can do seamless releases.
 
 # What is Capacitor-updater?
 
 Capacitor-updater a technology that helps in the delivery of app updates and improvements to the end users instantly.
 
-This is especially great if you want to do critical bug fixes and deliver instantly without going through the app store reviews.
+This is especially great if you want to do critical bug fixes and deliver instantly without going through the App Store reviews.
 
 You can think of it as "web-like" agility of side-loading updates as soon as they are available.
 
@@ -62,7 +62,7 @@ And then add to your app this code as replacement of CodePush one:
 
 This will tell the native plugin the installation as succeeded.
 
-## Insatall Capgo CLI
+## Install Capgo CLI
 
 The Capgo CLI is required to integrate and manage Capgo's Live Updates feature.
 
