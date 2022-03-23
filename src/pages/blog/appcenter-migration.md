@@ -74,7 +74,7 @@ Finally, commit the new files to your project:
 
 ### Migrate the Code [#](https://capgo.app/blog/appcenter-migration#migrate-the-code "Direct link to heading")
 
-Now that you have the new required Capgo files in place, you can turn our attention to the actual app itself. Capgo expects the entire built app to be inside a directory named `dist`. 
+Now that you have the new required Capgo files in place, you can turn our attention to the actual app itself. Capgo expects the entire built app to be inside a directory named `dist`.
 
 If your built code is not in a `dist` directory, change this value in the Capacitor config file.
 
@@ -117,7 +117,7 @@ Next, you need to send to Capgo this local project. Run this command to add your
 This command will use all variable defined in the Capacitor config file to create the app.
 
 Run the command to build your code and send it to Capgo with:
-`npx capgo upload -a YOURKEY -channel production` 
+`npx capgo upload -a YOURKEY -channel production`
 
 By default, the version name will be the one in your package.json file.
 
@@ -202,6 +202,6 @@ You've migrated from App Center to Capgo, utilizing the Live Updates and Native 
 
 ## Bonus: Automatic send app update [#](https://capgo.app/blog/appcenter-migration#bonus-automatic-send-app-updates "Direct link to heading")
 
-If your code is hosted on GitHub you can setup automatic build and release in few more step, thanks to GitHub actions.
+If your code is hosted on GitHub you can set up automatic build and release in few more step, thanks to GitHub actions.
 
 I have made a second article to allow you to so.
