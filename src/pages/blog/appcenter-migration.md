@@ -51,7 +51,7 @@ The Capgo CLI is required to integrate and manage Capgo's Live Updates feature.
 
 ##### note
 
-Before you begin, i recommend making changes on a fresh Git branch.
+Before you begin, I recommend making changes on a fresh Git branch.
 
 Since Capgo was created to automate capacitor apps, it requires one file that your app may not have. First, create a `capacitor.config.json` file. The easiest way to create it is to run in the root of your app:
 
@@ -66,7 +66,7 @@ Then, initialize Capacitor using the CLI questionnaire:
 npx cap init
 ```
 
-The CLI will ask you a few questions, starting with your app name, and the package id you would like to use for your app.
+The CLI will ask you a few questions, starting with your app name, and the package ID you would like to use for your app.
 
 Finally, commit the new files to your project:
 
@@ -198,10 +198,10 @@ Finally, within your app, remove any code references to App Center services, suc
 
 ## Next Steps [#](https://capgo.app/blog/appcenter-migration#next-steps "Direct link to heading")
 
-You've migrated from App Center to Capgo, utilizing the Live Updates and Native Builds features before removing all App Center dependencies. This is just the beginning of what you can use Capgo for. Explore the rest of the service includes Automations (multiple environments and native configurations), App Store Publishing (build native apps in the cloud then deploy them directly to the app stores), and the Cloud CLI (use Capgo inside your CI/CD platform of choice (such as Azure DevOps, GitLab, Jenkins, and more).
+You've migrated from App Center to Capgo, utilizing the Live Updates and Native Builds features before removing all App Center dependencies. This is just the beginning of what you can use Capgo for. Explore the rest of the service includes Automations (multiple environments and native configurations), App Store Publishing (build native apps in the cloud then deploy them directly to the app stores), and the Cloud CLI use Capgo inside your CI/CD platform of choice (such as Azure DevOps, GitLab, Jenkins, and more).
 
 ## Bonus: Automatic send app update [#](https://capgo.app/blog/appcenter-migration#bonus-automatic-send-app-updates "Direct link to heading")
 
-If your code is hosted on GitHub you can set up automatic build and release in few more step, thanks to GitHub actions.
+If your code is hosted on GitHub, you can set up automatic build and release in few more step, thanks to GitHub actions.
 
 I have made a second article to allow you to so.
