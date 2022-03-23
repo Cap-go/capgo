@@ -8,3 +8,5 @@ node_modules
 .env.mobile
 .env
 .netlify
+ios/App/App/GoogleService-Info.plist
+android/app/google-services.json
