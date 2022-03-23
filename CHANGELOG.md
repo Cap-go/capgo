@@ -1,3 +1,13 @@
+## 0.15.0 (2022-03-23)
+
+### Feat
+
+- add 2 more articles
+
+### Fix
+
+- add missing image for blog
+
 ## 0.14.6 (2022-03-23)
 
 ### Fix
