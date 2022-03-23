@@ -30,7 +30,7 @@ The second condition, no new features or functionality, is really up to you.
 
 Capgo isn't intended to push new features or functionality. It is meant to tweak or fix them, avoiding the minor releases needed to fix bugs, add logging or tracking, update messages, force users to upgrade, etc.
 
-For new features or functionality you need to release through the app store. FYI, Ionic Appflow (the alternative for big corporate) is installed on over 50 million iOS devices and there's never been an app rejected because it uses it.
+For new features or functionality you need to release through the app store. FYI, Ionic AppFlow (the alternative for big corporate) is installed on over 50 million iOS devices and there's never been an app rejected because it uses it.
 
 I'm just saying that because it's good to know that thousands of other developers are using live updates, so you're not alone.
 The relevant sections are here: 3.3.2 \[...\] The only exception to the foregoing is scripts and code downloaded and run by Apple's built-in WebKit framework or JavascriptCore \[...\] 3.3.3 \[...\] an Application may not provide, unlock or enable additional features or functionality through distribution mechanisms other than the App Store \[...\]
