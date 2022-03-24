@@ -1,3 +1,9 @@
+## 0.16.0 (2022-03-24)
+
+### Feat
+
+- allow set public state of channel from CLI
+
 ## 0.15.1 (2022-03-23)
 
 ### Fix
