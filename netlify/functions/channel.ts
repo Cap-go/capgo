@@ -5,8 +5,9 @@ import type { definitions } from '~/types/supabase'
 
 interface ChannelSet {
   appid: string
-  version: string
   channel: string
+  version?: string
+  public?: boolean
 }
 export const handler: Handler = async(event) => {
   console.log(event.httpMethod)
@@ -19,20 +20,25 @@ export const handler: Handler = async(event) => {
     return sendRes({ status: 'Cannot Verify User' }, 400)
 
   const body = JSON.parse(event.body || '{}') as ChannelSet
-  const { data, error: vError } = await supabase
-    .from<definitions['app_versions']>('app_versions')
-    .select()
-    .eq('app_id', body.appid)
-    .eq('name', body.version)
-    .eq('user_id', apikey.user_id)
-  if (vError || !data || !data.length)
-    return sendRes({ status: `Cannot find version ${body.version}`, error: JSON.stringify(vError) }, 400)
   const channel: Partial<definitions['channels']> = {
     created_by: apikey.user_id,
     app_id: body.appid,
     name: body.channel,
-    version: data[0].id,
   }
+  if (body.version) {
+    const { data, error: vError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', body.appid)
+      .eq('name', body.version)
+      .eq('user_id', apikey.user_id)
+    if (vError || !data || !data.length)
+      return sendRes({ status: `Cannot find version ${body.version}`, error: JSON.stringify(vError) }, 400)
+    channel.version = data[0].id
+  }
+  if (body.public !== undefined)
+    channel.public = body.public
+
   try {
     const { error: dbError } = await updateOrCreateChannel(channel)
     if (dbError)
