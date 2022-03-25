@@ -23,6 +23,19 @@ export const handler: Handler = async(event) => {
   try {
     const body = JSON.parse(event.body || '{}') as AppDelete
     if (body.version) {
+      const { data: versionId, error: versionIdError } = await supabase
+        .from<definitions['app_versions']>('app_versions')
+        .select('id')
+        .eq('name', body.version)
+      if (versionId && versionId.length) {
+        const { error: delDevicesVersionError } = await supabase
+          .from<definitions['devices']>('devices')
+          .delete()
+          .eq('version', versionId[0].id)
+
+        if (delDevicesVersionError || versionIdError)
+          return sendRes({ status: `Something went wrong when trying to delete ${body.appid}@${body.version}`, error: delDevicesVersionError }, 400)
+      }
       const { error: delAppStatsVersionError } = await supabase
         .from<definitions['stats']>('stats')
         .delete()
