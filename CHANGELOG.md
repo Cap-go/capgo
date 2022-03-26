@@ -1,3 +1,13 @@
+## 0.16.1 (2022-03-26)
+
+### Fix
+
+- order to refresh
+- delete app
+- delete and app back in web too
+- delete system for stats
+- delete causing issues due to foreign key in devices table
+
 ## 0.16.0 (2022-03-24)
 
 ### Feat
