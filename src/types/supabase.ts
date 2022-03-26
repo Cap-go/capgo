@@ -125,6 +125,7 @@ export interface paths {
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
+          deleted?: parameters["rowFilter.app_versions.deleted"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -182,6 +183,7 @@ export interface paths {
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
+          deleted?: parameters["rowFilter.app_versions.deleted"];
         };
         header: {
           /** Preference */
@@ -203,6 +205,7 @@ export interface paths {
           bucket_id?: parameters["rowFilter.app_versions.bucket_id"];
           user_id?: parameters["rowFilter.app_versions.user_id"];
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
+          deleted?: parameters["rowFilter.app_versions.deleted"];
         };
         body: {
           /** app_versions */
@@ -923,6 +926,8 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
+    /** Format: boolean */
+    deleted: boolean;
   };
   apps: {
     /**
@@ -1198,6 +1203,8 @@ export interface parameters {
   "rowFilter.app_versions.user_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.app_versions.updated_at": string;
+  /** Format: boolean */
+  "rowFilter.app_versions.deleted": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: timestamp with time zone */
