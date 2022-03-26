@@ -141,13 +141,13 @@ const deleteVersion = async(version: definitions['app_versions']) => {
       await toast.present()
     }
     else {
-      await refreshData()
       const toast = await toastController
         .create({
           message: 'Version deleted',
           duration: 2000,
         })
       await toast.present()
+      await refreshData()
     }
   }
   catch (error) {
