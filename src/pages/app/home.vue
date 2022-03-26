@@ -3,11 +3,12 @@ import type { RefresherCustomEvent } from '@ionic/vue'
 import {
   IonContent,
   IonHeader, IonItem, IonItemDivider,
-  // IonItemOption, IonItemOptions, toastController,
+  IonItemOption, IonItemOptions,
   IonItemSliding,
   IonLabel,
   IonList,
   IonPage, IonRefresher, IonRefresherContent, IonTitle, IonToolbar,
+  toastController,
 } from '@ionic/vue'
 import { ref } from 'vue'
 import dayjs from 'dayjs'
@@ -47,75 +48,84 @@ const getMyApps = async() => {
     apps.value = data
 }
 
-// const deleteApp = async(app: definitions['apps']) => {
-//   console.log('deleteApp', app)
-//   if (listRef.value)
-//     listRef.value.$el.closeSlidingItems()
-//   try {
-//     const { data, error: vError } = await supabase
-//       .from<definitions['app_versions']>('app_versions')
-//       .select()
-//       .eq('app_id', app.app_id)
-//       .eq('user_id', app.user_id)
-//     const { error: delChanError } = await supabase
-//       .from<definitions['channels']>('channels')
-//       .delete()
-//       .eq('app_id', app.app_id)
+const deleteApp = async(app: definitions['apps']) => {
+  console.log('deleteApp', app)
+  if (listRef.value)
+    listRef.value.$el.closeSlidingItems()
+  try {
+    await supabase
+      .from<definitions['stats']>('stats')
+      .delete()
+      .eq('app_id', app.app_id)
+    await supabase
+      .from<definitions['devices']>('devices')
+      .delete()
+      .eq('app_id', app.app_id)
 
-//     if (data && data.length) {
-//       const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
-//       const { error: delError } = await supabase
-//         .storage
-//         .from('apps')
-//         .remove(filesToRemove)
-//       if (delError) {
-//         const toast = await toastController
-//           .create({
-//             message: 'Cannot delete channel',
-//             duration: 2000,
-//           })
-//         await toast.present()
-//         return
-//       }
-//     }
+    const { data, error: vError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+    const { error: delChanError } = await supabase
+      .from<definitions['channels']>('channels')
+      .delete()
+      .eq('app_id', app.app_id)
 
-//     const { error: delAppVersionError } = await supabase
-//       .from<definitions['app_versions']>('app_versions')
-//       .delete()
-//       .eq('app_id', app.app_id)
-//       .eq('user_id', app.user_id)
+    if (data && data.length) {
+      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
+      const { error: delError } = await supabase
+        .storage
+        .from('apps')
+        .remove(filesToRemove)
+      if (delError) {
+        const toast = await toastController
+          .create({
+            message: 'Cannot delete channel',
+            duration: 2000,
+          })
+        await toast.present()
+        return
+      }
+    }
 
-//     const { error: dbAppError } = await supabase
-//       .from<definitions['apps']>('apps')
-//       .delete()
-//       .eq('app_id', app.app_id)
-//       .eq('user_id', app.user_id)
-//     if (delChanError || vError || delAppVersionError || dbAppError) {
-//       const toast = await toastController
-//         .create({
-//           message: 'Cannot delete channel',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//     else {
-//       const toast = await toastController
-//         .create({
-//           message: 'App deleted',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//   }
-//   catch (error) {
-//     const toast = await toastController
-//       .create({
-//         message: 'Cannot delete app',
-//         duration: 2000,
-//       })
-//     await toast.present()
-//   }
-// }
+    const { error: delAppVersionError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .delete()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+
+    const { error: dbAppError } = await supabase
+      .from<definitions['apps']>('apps')
+      .delete()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+    if (delChanError || vError || delAppVersionError || dbAppError) {
+      const toast = await toastController
+        .create({
+          message: 'Cannot delete App',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      const toast = await toastController
+        .create({
+          message: 'App deleted',
+          duration: 2000,
+        })
+      await toast.present()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: 'Cannot delete app',
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
 const getSharedWithMe = async() => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
@@ -223,12 +233,12 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
                   </div>
                 </div>
               </IonLabel>
-              <!-- <IonItemOptions side="end">
-                <IonItemOption color="warning" @click="deleteApp(app)">
-                  Delete
-                </IonItemOption>
-              </IonItemOptions> -->
             </IonItem>
+            <IonItemOptions side="end">
+              <IonItemOption color="warning" @click="deleteApp(app)">
+                Delete
+              </IonItemOption>
+            </IonItemOptions>
           </IonItemSliding>
         </template>
         <IonItem v-else>

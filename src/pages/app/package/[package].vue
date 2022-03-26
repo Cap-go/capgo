@@ -40,6 +40,7 @@ const loadData = async() => {
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', id.value)
+      .eq('deleted', false)
       .order('created_at', { ascending: false })
     const { data: dataChannel } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -128,7 +129,7 @@ const deleteVersion = async(version: definitions['app_versions']) => {
       .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
     const { error: delAppError } = await supabase
       .from<definitions['app_versions']>('app_versions')
-      .delete()
+      .update({ deleted: true })
       .eq('app_id', version.app_id)
       .eq('id', version.id)
     if (delAppError || delError) {

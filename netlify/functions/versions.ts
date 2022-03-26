@@ -25,6 +25,7 @@ export const handler: Handler = async(event) => {
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.appid)
+      .eq('deleted', false)
       .order('created_at', { ascending: false })
     if (dbError || !dataVersions || !dataVersions.length)
       return sendRes({ status: 'Cannot get latest version', error: dbError }, 400)

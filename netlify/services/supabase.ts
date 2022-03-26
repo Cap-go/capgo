@@ -25,6 +25,7 @@ export const updateOrCreateVersion = async(update: Partial<definitions['app_vers
       .update(update)
       .eq('app_id', update.app_id)
       .eq('name', update.name)
+      .eq('deleted', false)
   }
   else {
     return supabase

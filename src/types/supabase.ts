@@ -1082,7 +1082,11 @@ export interface definitions {
     platform: "ios" | "android";
     /** Format: text */
     action: string;
-    /** Format: text */
+    /**
+     * Format: text
+     * @description Note:
+     * This is a Foreign Key to `devices.device_id`.<fk table='devices' column='device_id'/>
+     */
     device_id: string;
     /** Format: text */
     version_build: string;
