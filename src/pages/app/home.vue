@@ -115,6 +115,7 @@ const deleteApp = async(app: definitions['apps']) => {
           duration: 2000,
         })
       await toast.present()
+      await getMyApps()
     }
   }
   catch (error) {
