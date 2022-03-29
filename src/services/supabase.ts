@@ -1,6 +1,7 @@
 import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 import { Http } from '@capacitor-community/http'
+import type { RouteLocationNormalizedLoaded } from 'vue-router'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -37,9 +38,8 @@ export const useSupabase = () => {
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }
 
-export const autoAuth = async() => {
+export const autoAuth = async(route: RouteLocationNormalizedLoaded) => {
   const supabase = useSupabase()
-  const route = useRoute()
   const session = supabase.auth.session()!
   if (session || !route.hash)
     return null

@@ -22,7 +22,7 @@ const updateDb = async() => {
   let session = supabase.auth.session()!
 
   if (!session) {
-    const logSession = await autoAuth()
+    const logSession = await autoAuth(route)
     if (!logSession)
       return
     if (logSession.session)

@@ -104,7 +104,7 @@ const checkLogin = async() => {
     nextLogin()
   }
   else if (!session && route.hash) {
-    const logSession = await autoAuth()
+    const logSession = await autoAuth(route)
     if (!logSession)
       return
     if (logSession.session)
