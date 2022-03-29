@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { IonContent, IonPage } from '@ionic/vue'
+import { useHead } from '@vueuse/head'
 import { initBlog, stringToDate } from '~/services/blog'
+import Header from '~/components/header.vue'
+import Footer from '~/components/footer.vue'
 
 useHead({
   title: 'Capgo | Capacitor Blog',

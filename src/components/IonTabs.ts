@@ -1,5 +1,5 @@
 import type { VNode } from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, inject } from 'vue'
 
 const WILL_CHANGE = 'ionTabsWillChange'
 const DID_CHANGE = 'ionTabsDidChange'

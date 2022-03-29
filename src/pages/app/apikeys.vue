@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { IonContent, IonItem, IonItemDivider, IonLabel, IonList, IonPage, toastController } from '@ionic/vue'
-import { ref } from 'vue'
+import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
+import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import TitleHead from '~/components/TitleHead.vue'

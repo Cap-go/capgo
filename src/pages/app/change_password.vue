@@ -38,7 +38,7 @@ const rules = computed(() => ({
   confirmPassword: { required, minLength: minLength(6), sameAsPassword: sameAs(form.password) },
 }))
 
-const v$ = useVuelidate(rules, form)
+const v$ = useVuelidate(rules as any, form)
 
 const router = useRouter()
 

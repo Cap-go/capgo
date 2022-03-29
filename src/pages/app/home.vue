@@ -10,8 +10,10 @@ import {
   IonPage, IonRefresher, IonRefresherContent, IonTitle, IonToolbar,
   toastController,
 } from '@ionic/vue'
-import { ref } from 'vue'
+import { ref, watchEffect } from 'vue'
 import dayjs from 'dayjs'
+import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { IonContent, IonPage } from '@ionic/vue'
 import { useRouter } from 'vue-router'
+import { useHead } from '@vueuse/head'
+import Header from '~/components/header.vue'
+import Footer from '~/components/footer.vue'
 import type { Frontmatter } from '~/services/blog'
 import { randomBlog, stringToDate } from '~/services/blog'
 

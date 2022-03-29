@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage, isPlatform, toastController } from '@ionic/vue'
+import { useHead } from '@vueuse/head'
 import { useVuelidate } from '@vuelidate/core'
 import { email, required } from '@vuelidate/validators'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
@@ -35,7 +36,7 @@ const rules = {
   password: { required },
 
 }
-const v$ = useVuelidate(rules, form)
+const v$ = useVuelidate(rules as any, form)
 const showToastMessage = async(message: string) => {
   const toast = await toastController
     .create({

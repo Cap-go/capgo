@@ -1,6 +1,7 @@
 <script setup lang="ts">
 
 import { IonButton, IonContent, IonInput, IonItem, IonPage, IonSpinner, toastController } from '@ionic/vue'
+import { useHead } from '@vueuse/head'
 import { useVuelidate } from '@vuelidate/core'
 import { email, minLength, required, sameAs } from '@vuelidate/validators'
 import { computed, reactive, ref, watchEffect } from 'vue'
