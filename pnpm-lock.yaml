@@ -8,7 +8,7 @@ specifiers:
   '@capacitor/android': 3.4.3
   '@capacitor/app': 1.1.1
   '@capacitor/app-launcher': 1.0.9
-  '@capacitor/assets': ^1.0.0-next.0
+  '@capacitor/assets': 1.0.0-next.5
   '@capacitor/browser': 1.0.7
   '@capacitor/camera': 1.3.1
   '@capacitor/cli': 3.4.3
@@ -62,7 +62,7 @@ specifiers:
   capacitor-mute: ^0.0.4
   capacitor-native-audio: ^3.0.2
   capacitor-native-biometric: ^3.0.3
-  capacitor-purchases: 1.0.3
+  capacitor-purchases: 1.0.7
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: 1.1.4
   capacitor-updater: 2.2.0
@@ -114,7 +114,7 @@ dependencies:
   '@capacitor/android': 3.4.3_@capacitor+core@3.4.3
   '@capacitor/app': 1.1.1_@capacitor+core@3.4.3
   '@capacitor/app-launcher': 1.0.9_@capacitor+core@3.4.3
-  '@capacitor/assets': 1.0.0-next.0_e79e62fe450383fd2d418267dc75e645
+  '@capacitor/assets': 1.0.0-next.5_e79e62fe450383fd2d418267dc75e645
   '@capacitor/browser': 1.0.7_@capacitor+core@3.4.3
   '@capacitor/camera': 1.3.1_@capacitor+core@3.4.3
   '@capacitor/clipboard': 1.0.8_@capacitor+core@3.4.3
@@ -154,7 +154,7 @@ dependencies:
   capacitor-mute: 0.0.4_@capacitor+core@3.4.3
   capacitor-native-audio: 3.0.2_@capacitor+core@3.4.3
   capacitor-native-biometric: 3.0.3
-  capacitor-purchases: 1.0.3_@capacitor+core@3.4.3
+  capacitor-purchases: 1.0.7_@capacitor+core@3.4.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.3
   capacitor-screen-recorder: 1.1.4_@capacitor+core@3.4.3
   capacitor-updater: 2.2.0_@capacitor+core@3.4.3
@@ -1918,8 +1918,8 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /@capacitor/assets/1.0.0-next.0_e79e62fe450383fd2d418267dc75e645:
-    resolution: {integrity: sha512-yGV7aHkLCymyOZmQ4Uld4q6QYq/e4pbv5pPJwIboohNQMLqHwLD5oaBwmAayXUgDsAU/VLmN3hzoQrJz39oqzA==}
+  /@capacitor/assets/1.0.0-next.5_e79e62fe450383fd2d418267dc75e645:
+    resolution: {integrity: sha512-xiOi5OXgW6+CjpM5wxBHh61cAUDuUXN7cDBxxxWptDLH9qVKycJVRArGSoPC1QnlFr9NLwiLEacKKdk0Y0Zcww==}
     engines: {node: '>=10.3.0'}
     hasBin: true
     dependencies:
@@ -1933,6 +1933,8 @@ packages:
       commander: 8.3.0
       debug: 4.3.3
       fs-extra: 10.0.1
+      node-fetch: 2.6.7
+      node-html-parser: 5.3.3
       sharp: 0.29.3
       tslib: 2.3.1
       yargs: 17.3.1
@@ -1940,6 +1942,7 @@ packages:
       - '@swc/core'
       - '@swc/wasm'
       - '@types/node'
+      - encoding
       - supports-color
       - typescript
     dev: false
@@ -6039,8 +6042,8 @@ packages:
       '@capacitor/core': 3.0.0
     dev: false
 
-  /capacitor-purchases/1.0.3_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-dmzf7kjtNqnMQ0gi6o7xwNciglR0QqRNH9iLw4kcfw+y5Mv1nuE5fBgmbk/3Z8O2iRvstBStWwy+dyFzx//pjw==}
+  /capacitor-purchases/1.0.7_@capacitor+core@3.4.3:
+    resolution: {integrity: sha512-+a7mVsoQj0v4jesHPXUNjm/TH87mNJh9cgAdXuRWt0moy/KYzPHhM1osvo79lWj/rJmYndhBIZ38+Mk+nnMD/Q==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:
@@ -9858,7 +9861,6 @@ packages:
   /he/1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
-    dev: true
 
   /highlight.js/10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
@@ -12410,6 +12412,13 @@ packages:
   /node-gyp-build/4.3.0:
     resolution: {integrity: sha512-iWjXZvmboq0ja1pUGULQBexmxq8CV4xBhX7VDOTbL7ZR4FOowwY/VOtRxBN/yKxmdGoIp4j5ysNT4u3S2pDQ3Q==}
     hasBin: true
+
+  /node-html-parser/5.3.3:
+    resolution: {integrity: sha512-ncg1033CaX9UexbyA7e1N0aAoAYRDiV8jkTvzEnfd1GDvzFdrsXLzR4p4ik8mwLgnaKP/jyUFWDy9q3jvRT2Jw==}
+    dependencies:
+      css-select: 4.2.1
+      he: 1.2.0
+    dev: false
 
   /node-pre-gyp/0.13.0:
     resolution: {integrity: sha512-Md1D3xnEne8b/HGVQkZZwV27WUi1ZRuZBij24TNaZwUPU3ZAFtvT6xxJGaUVillfmMKnn5oD1HoGsp2Ftik7SQ==}
