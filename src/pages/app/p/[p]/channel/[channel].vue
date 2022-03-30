@@ -2,8 +2,8 @@
 import {
   IonButton, IonButtons, IonContent,
   IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList,
-  IonListHeader, IonPage, IonTitle, IonToolbar, actionSheetController,
-  toastController,
+  IonListHeader, IonModal, IonPage, IonTitle, IonToolbar,
+  actionSheetController, modalController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import copy from 'copy-to-clipboard'
@@ -13,6 +13,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
+import NewUserModal from '~/components/NewUserModal.vue'
+import { setUserId } from '~/services/crips'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -29,6 +31,7 @@ const id = ref<number>()
 const channel = ref<definitions['channels'] & Channel>()
 const users = ref<(definitions['channel_users'] & ChannelUsers)[]>()
 const newUser = ref<string>()
+const newUserModalOpen = ref(false)
 
 const openApp = () => {
   if (!channel.value) return
@@ -110,12 +113,14 @@ const addUser = async() => {
     .eq('email', newUser.value)
   if (!data || !data.length || uError) {
     console.log('no user', uError)
-    const toast = await toastController
-      .create({
-        message: t('channel.user_no_found'),
-        duration: 2000,
-      })
-    await toast.present()
+    // const toast = await toastController
+    //   .create({
+    //     message: t('channel.user_no_found'),
+    //     duration: 2000,
+    //   })
+    // await toast.present()
+    newUserModalOpen.value = true
+
     return
   }
 
@@ -190,6 +195,22 @@ const presentActionSheet = async(usr: definitions['users']) => {
   })
   await actionSheet.present()
 }
+
+const inviteUser = async(userId: string) => {
+  const { error } = await supabase
+    .from<definitions['channel_users']>('channel_users')
+    .insert({
+      channel_id: id.value,
+      app_id: channel.value?.version.app_id,
+      user_id: userId,
+    })
+  if (error) { console.error(error) }
+  else {
+    newUser.value = ''
+    newUserModalOpen.value = false
+    await getUsers()
+  }
+}
 </script>
 <template>
   <ion-page>
@@ -262,7 +283,7 @@ const presentActionSheet = async(usr: definitions['users']) => {
           </ion-label>
           <ion-input v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
           <div slot="end" class="h-full flex items-center justify-center">
-            <ion-button slot="end" color="secondary" @click="addUser()">
+            <ion-button color="secondary" @click="addUser()">
               {{ t('channel.add') }}
             </ion-button>
           </div>
@@ -281,5 +302,8 @@ const presentActionSheet = async(usr: definitions['users']) => {
         </IonItem>
       </ion-list>
     </ion-content>
+    <ion-modal :is-open="newUserModalOpen" :swipe-to-close="true">
+      <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />
+    </ion-modal>
   </ion-page>
 </template>
