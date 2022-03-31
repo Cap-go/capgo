@@ -1,3 +1,9 @@
+## 0.17.1 (2022-03-31)
+
+### Fix
+
+- remove old useless ionTab
+
 ## 0.17.0 (2022-03-31)
 
 ### Feat
