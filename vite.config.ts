@@ -20,7 +20,7 @@ import pack from './package.json'
 
 const domain = 'capgo.app'
 const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
-const guestPath = ['/home', '/blogs', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
+const guestPath = ['/home', '/blogs', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 const sitemapIgnore = ['/eula', '/privacy', '/tos', '/disclaimer', '/return', '/404', '/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation']
 
 export default defineConfig({

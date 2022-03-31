@@ -114,6 +114,10 @@ package:
   test: Version de lancement
   title: Info
   versions: Versions
+password:
+  heading: Créer un mot de passe
+  new: nouveau mot de passe
+  validate: Valider
 projects:
   list: Tous vos projets
   sharedlist: Projets partagés avec vous
