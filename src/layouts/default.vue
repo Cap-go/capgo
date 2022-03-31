@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { IonIcon, IonLabel, IonPage, IonTabBar, IonTabButton } from '@ionic/vue'
+import { IonIcon, IonLabel, IonPage, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs } from '@ionic/vue'
 import { list, person } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'
-import { IonTabs } from '~/components/IonTabs'
 
 const router = useRouter()
 
@@ -14,7 +13,7 @@ const isTab = computed(() => {
 <template>
   <ion-page>
     <ion-tabs>
-      <router-view />
+      <IonRouterOutlet />
       <ion-tab-bar v-if="isTab" slot="bottom" color="secondary">
         <ion-tab-button tab="home" href="/app/home">
           <ion-icon :icon="list" />
