@@ -1,3 +1,9 @@
+## 0.17.3 (2022-03-31)
+
+### Fix
+
+- remove netlify function from capgo app
+
 ## 0.17.2 (2022-03-31)
 
 ### Fix
