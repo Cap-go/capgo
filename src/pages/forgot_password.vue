@@ -1,7 +1,6 @@
 <script setup lang="ts">
 
 import { IonButton, IonContent, IonInput, IonItem, IonPage, IonSpinner, toastController } from '@ionic/vue'
-import { useHead } from '@vueuse/head'
 import { useVuelidate } from '@vuelidate/core'
 import { email, minLength, required, sameAs } from '@vuelidate/validators'
 import { computed, reactive, ref, watchEffect } from 'vue'
@@ -10,13 +9,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 
-useHead({
-  title: 'Capgo | Forgot password',
-  meta: [
-    { name: 'description', content: 'Forgot password' },
-    { name: 'robots', content: 'noindex, nofollow' },
-  ],
-})
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
