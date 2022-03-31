@@ -5,7 +5,6 @@ import { createRouter, createWebHistory } from '@ionic/vue-router'
 // import { createRouter, createWebHistory } from 'vue-router'
 import generatedRoutes from 'virtual:generated-pages'
 import { setupLayouts } from 'virtual:generated-layouts'
-import { isPlatform } from '@ionic/vue'
 import App from './App.vue'
 
 /* Core CSS required for Ionic components to work properly */
