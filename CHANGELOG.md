@@ -1,3 +1,9 @@
+## 0.18.1 (2022-04-01)
+
+### Fix
+
+- try the new upload in the CI
+
 ## 0.18.0 (2022-04-01)
 
 ### Feat
