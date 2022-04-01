@@ -1,3 +1,10 @@
+## 0.18.0 (2022-04-01)
+
+### Feat
+
+- invited user can change password and signup to see apps shared with him
+- invite via email if not email not registered by using a modal to get the new user's detail
+
 ## 0.17.5 (2022-04-01)
 
 ### Fix
