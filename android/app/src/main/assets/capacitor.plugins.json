@@ -104,10 +104,6 @@
 		"classpath": "dev.robingenz.capacitor.screenorientation.ScreenOrientationPlugin"
 	},
 	{
-		"pkg": "capacitor-crisp",
-		"classpath": "ee.forgr.plugin.crisp.CapacitorCrispPlugin"
-	},
-	{
 		"pkg": "capacitor-flash",
 		"classpath": "ee.forgr.plugin.capacitor_flash.CapacitorFlashPlugin"
 	},

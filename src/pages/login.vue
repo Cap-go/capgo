@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage, isPlatform, toastController } from '@ionic/vue'
-import { useHead } from '@vueuse/head'
 import { useVuelidate } from '@vuelidate/core'
 import { email, required } from '@vuelidate/validators'
 import { onMounted, reactive, ref } from 'vue'
@@ -10,13 +9,6 @@ import { SplashScreen } from '@capacitor/splash-screen'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
-useHead({
-  title: 'Capgo | Login',
-  meta: [
-    { name: 'description', content: 'Login' },
-    { name: 'robots', content: 'noindex, nofollow' },
-  ],
-})
 const route = useRoute()
 const supabase = useSupabase()
 const main = useMainStore()

@@ -1,3 +1,51 @@
+## 0.17.5 (2022-04-01)
+
+### Fix
+
+- remove useless assets
+
+## 0.17.4 (2022-03-31)
+
+### Fix
+
+- issue register
+
+## 0.17.3 (2022-03-31)
+
+### Fix
+
+- remove netlify function from capgo app
+
+## 0.17.2 (2022-03-31)
+
+### Fix
+
+- useless include
+
+## 0.17.1 (2022-03-31)
+
+### Fix
+
+- remove old useless ionTab
+
+## 0.17.0 (2022-03-31)
+
+### Feat
+
+- remove website from app
+
+## 0.16.5 (2022-03-30)
+
+### Fix
+
+- remove useless splash
+
+## 0.16.4 (2022-03-30)
+
+### Fix
+
+- use last capacitor-assets
+
 ## 0.16.3 (2022-03-29)
 
 ### Fix

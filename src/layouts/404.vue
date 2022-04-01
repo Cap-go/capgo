@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { openChat } from '../services/crips'
-
 </script>
 
 <template>

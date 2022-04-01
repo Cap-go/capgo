@@ -5,7 +5,6 @@ import { createRouter, createWebHistory } from '@ionic/vue-router'
 // import { createRouter, createWebHistory } from 'vue-router'
 import generatedRoutes from 'virtual:generated-pages'
 import { setupLayouts } from 'virtual:generated-layouts'
-import { isPlatform } from '@ionic/vue'
 import App from './App.vue'
 
 /* Core CSS required for Ionic components to work properly */
@@ -40,7 +39,7 @@ const app = createApp(App)
 
 // setup up pages with layouts
 
-const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: isPlatform('capacitor') ? '/login' : '/home' }]
+const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }]
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 app.use(router)
 initCrisp()
