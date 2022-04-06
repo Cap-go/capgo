@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IonIcon, IonLabel, IonPage, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs } from '@ionic/vue'
-import { list, person } from 'ionicons/icons'
+import { hammerOutline, list, person } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'
 
@@ -18,6 +18,10 @@ const isTab = computed(() => {
         <ion-tab-button tab="home" href="/app/home">
           <ion-icon :icon="list" />
           <ion-label>Projects</ion-label>
+        </ion-tab-button>
+        <ion-tab-button tab="modules" href="/app/modules">
+          <ion-icon :icon="hammerOutline" />
+          <ion-label>Modules</ion-label>
         </ion-tab-button>
         <ion-tab-button tab="account" href="/app/account">
           <ion-icon :icon="person" />

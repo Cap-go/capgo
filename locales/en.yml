@@ -1,15 +1,15 @@
 account:
   backButton: Back
   changePassword: Change password
+  discord: Discord
   heading: Account
   keys: API keys
   legal: Terms of services
   logout: Logout
-  support: Support
   personalInformation: Personal information
   preferences: Notifications
-  discord: Discord
   privacy: Privacy policy
+  support: Support
 accountPassword:
   confirmPassword: Confirm password
   errorMsg: Error happened, please try again
@@ -94,24 +94,26 @@ login:
   or: or
   password: Password
   withemail: With email adress
+module:
+  heading: Modules
 not-found: Not found
 notificationSettings:
   heading: Notification settings
   validate: Validate
 onboarding:
   loading: Loading
+package:
+  channels: Channels
+  download: Download version
+  link_channel: Link to channel
+  set: Set version to channel
+  test: Launch version
+  title: info
+  versions: Versions
 password:
   heading: Create Password
   new: New Password
   validate: Validate
-package:
-  channels: Channels
-  link_channel: Link to channel
-  set: Set version to channel
-  test: Launch version
-  download: Download version
-  title: info
-  versions: Versions
 projects:
   list: Yours
   sharedlist: Shared with you

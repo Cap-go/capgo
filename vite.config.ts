@@ -29,6 +29,7 @@ export default defineConfig({
 
     EnvironmentPlugin({
       VITE_APP_VERSION: pack.version,
+      package_dependencies: JSON.stringify(pack.dependencies),
       domain,
       crisp: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
       VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : 'web'}capgo.app`,
