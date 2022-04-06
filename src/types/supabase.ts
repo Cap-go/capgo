@@ -126,6 +126,7 @@ export interface paths {
           user_id?: parameters["rowFilter.app_versions.user_id"];
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
+          external_url?: parameters["rowFilter.app_versions.external_url"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -184,6 +185,7 @@ export interface paths {
           user_id?: parameters["rowFilter.app_versions.user_id"];
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
+          external_url?: parameters["rowFilter.app_versions.external_url"];
         };
         header: {
           /** Preference */
@@ -206,6 +208,7 @@ export interface paths {
           user_id?: parameters["rowFilter.app_versions.user_id"];
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
+          external_url?: parameters["rowFilter.app_versions.external_url"];
         };
         body: {
           /** app_versions */
@@ -233,6 +236,7 @@ export interface paths {
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
           updated_at?: parameters["rowFilter.apps.updated_at"];
+          id?: parameters["rowFilter.apps.id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -290,6 +294,7 @@ export interface paths {
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
           updated_at?: parameters["rowFilter.apps.updated_at"];
+          id?: parameters["rowFilter.apps.id"];
         };
         header: {
           /** Preference */
@@ -311,6 +316,7 @@ export interface paths {
           name?: parameters["rowFilter.apps.name"];
           last_version?: parameters["rowFilter.apps.last_version"];
           updated_at?: parameters["rowFilter.apps.updated_at"];
+          id?: parameters["rowFilter.apps.id"];
         };
         body: {
           /** apps */
@@ -750,6 +756,108 @@ export interface paths {
       };
     };
   };
+  "/stripe_info": {
+    get: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.stripe_info.created_at"];
+          updated_at?: parameters["rowFilter.stripe_info.updated_at"];
+          subscription_id?: parameters["rowFilter.stripe_info.subscription_id"];
+          customer_id?: parameters["rowFilter.stripe_info.customer_id"];
+          status?: parameters["rowFilter.stripe_info.status"];
+          product_id?: parameters["rowFilter.stripe_info.product_id"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["stripe_info"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** stripe_info */
+          stripe_info?: definitions["stripe_info"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.stripe_info.created_at"];
+          updated_at?: parameters["rowFilter.stripe_info.updated_at"];
+          subscription_id?: parameters["rowFilter.stripe_info.subscription_id"];
+          customer_id?: parameters["rowFilter.stripe_info.customer_id"];
+          status?: parameters["rowFilter.stripe_info.status"];
+          product_id?: parameters["rowFilter.stripe_info.product_id"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.stripe_info.created_at"];
+          updated_at?: parameters["rowFilter.stripe_info.updated_at"];
+          subscription_id?: parameters["rowFilter.stripe_info.subscription_id"];
+          customer_id?: parameters["rowFilter.stripe_info.customer_id"];
+          status?: parameters["rowFilter.stripe_info.status"];
+          product_id?: parameters["rowFilter.stripe_info.product_id"];
+        };
+        body: {
+          /** stripe_info */
+          stripe_info?: definitions["stripe_info"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/users": {
     get: {
       parameters: {
@@ -765,6 +873,7 @@ export interface paths {
           enableNotifications?: parameters["rowFilter.users.enableNotifications"];
           optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
           legalAccepted?: parameters["rowFilter.users.legalAccepted"];
+          customer_id?: parameters["rowFilter.users.customer_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -826,6 +935,7 @@ export interface paths {
           enableNotifications?: parameters["rowFilter.users.enableNotifications"];
           optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
           legalAccepted?: parameters["rowFilter.users.legalAccepted"];
+          customer_id?: parameters["rowFilter.users.customer_id"];
         };
         header: {
           /** Preference */
@@ -851,6 +961,7 @@ export interface paths {
           enableNotifications?: parameters["rowFilter.users.enableNotifications"];
           optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
           legalAccepted?: parameters["rowFilter.users.legalAccepted"];
+          customer_id?: parameters["rowFilter.users.customer_id"];
         };
         body: {
           /** users */
@@ -918,7 +1029,7 @@ export interface definitions {
     /** Format: character varying */
     name: string;
     /** Format: character varying */
-    bucket_id: string;
+    bucket_id?: string;
     /** Format: uuid */
     user_id: string;
     /**
@@ -928,6 +1039,8 @@ export interface definitions {
     updated_at?: string;
     /** Format: boolean */
     deleted: boolean;
+    /** Format: character varying */
+    external_url?: string;
   };
   apps: {
     /**
@@ -951,6 +1064,11 @@ export interface definitions {
     last_version?: string;
     /** Format: timestamp with time zone */
     updated_at?: string;
+    /**
+     * Format: uuid
+     * @default extensions.uuid_generate_v4()
+     */
+    id?: string;
   };
   channel_users: {
     /**
@@ -1108,6 +1226,39 @@ export interface definitions {
      */
     updated_at?: string;
   };
+  stripe_info: {
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /** Format: character varying */
+    subscription_id?: string;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    customer_id: string;
+    /**
+     * Format: public.stripe_status
+     * @enum {string}
+     */
+    status?:
+      | "created"
+      | "succeeded"
+      | "updated"
+      | "failed"
+      | "deleted"
+      | "canceled";
+    /** Format: character varying */
+    product_id?: string;
+  };
   users: {
     /**
      * Format: timestamp with time zone
@@ -1141,6 +1292,8 @@ export interface definitions {
     optForNewsletters: boolean;
     /** Format: boolean */
     legalAccepted: boolean;
+    /** Format: character varying */
+    customer_id?: string;
   };
 }
 
@@ -1209,6 +1362,8 @@ export interface parameters {
   "rowFilter.app_versions.updated_at": string;
   /** Format: boolean */
   "rowFilter.app_versions.deleted": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.external_url": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: timestamp with time zone */
@@ -1225,6 +1380,8 @@ export interface parameters {
   "rowFilter.apps.last_version": string;
   /** Format: timestamp with time zone */
   "rowFilter.apps.updated_at": string;
+  /** Format: uuid */
+  "rowFilter.apps.id": string;
   /** @description channel_users */
   "body.channel_users": definitions["channel_users"];
   /** Format: bigint */
@@ -1291,6 +1448,20 @@ export interface parameters {
   "rowFilter.stats.app_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.stats.updated_at": string;
+  /** @description stripe_info */
+  "body.stripe_info": definitions["stripe_info"];
+  /** Format: timestamp with time zone */
+  "rowFilter.stripe_info.created_at": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.stripe_info.updated_at": string;
+  /** Format: character varying */
+  "rowFilter.stripe_info.subscription_id": string;
+  /** Format: character varying */
+  "rowFilter.stripe_info.customer_id": string;
+  /** Format: public.stripe_status */
+  "rowFilter.stripe_info.status": string;
+  /** Format: character varying */
+  "rowFilter.stripe_info.product_id": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */
@@ -1315,6 +1486,8 @@ export interface parameters {
   "rowFilter.users.optForNewsletters": string;
   /** Format: boolean */
   "rowFilter.users.legalAccepted": string;
+  /** Format: character varying */
+  "rowFilter.users.customer_id": string;
 }
 
 export interface operations {}
