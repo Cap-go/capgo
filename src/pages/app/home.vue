@@ -64,6 +64,10 @@ const deleteApp = async(app: definitions['apps']) => {
       .delete()
       .eq('app_id', app.app_id)
 
+    await supabase
+      .from<definitions['channel_users']>('channel_users')
+      .delete()
+      .eq('app_id', app.app_id)
     const { data, error: vError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()

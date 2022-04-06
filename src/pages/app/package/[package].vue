@@ -88,12 +88,16 @@ const deleteChannel = async(channel: definitions['channels']) => {
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   try {
+    const { error: delChannelUserError } = await supabase
+      .from<definitions['channel_users']>('channel_users')
+      .delete()
+      .eq('app_id', channel.app_id)
     const { error: delChanError } = await supabase
       .from<definitions['channels']>('channels')
       .delete()
       .eq('app_id', channel.app_id)
       .eq('id', channel.id)
-    if (delChanError) {
+    if (delChanError || delChannelUserError) {
       const toast = await toastController
         .create({
           message: 'Cannot delete channel',
