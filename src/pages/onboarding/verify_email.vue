@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { IonContent, IonPage } from '@ionic/vue'
 import type { User } from '@supabase/gotrue-js'

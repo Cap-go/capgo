@@ -3,7 +3,7 @@ import {
   IonButton, IonButtons, IonContent,
   IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList,
   IonListHeader, IonModal, IonPage, IonTitle, IonToolbar,
-  actionSheetController, modalController, toastController,
+  actionSheetController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import copy from 'copy-to-clipboard'
@@ -34,7 +34,8 @@ const newUser = ref<string>()
 const newUserModalOpen = ref(false)
 
 const openApp = () => {
-  if (!channel.value) return
+  if (!channel.value)
+    return
   openVersion(channel.value.version)
 }
 const getUsers = async() => {
@@ -131,7 +132,8 @@ const addUser = async() => {
       app_id: channel.value.version.app_id,
       user_id: data[0].id,
     })
-  if (error) console.error(error)
+  if (error)
+    console.error(error)
   else
     await getUsers()
 }
@@ -170,7 +172,8 @@ const deleteUser = async(usr: definitions['users']) => {
     .delete()
     .eq('app_id', channel.value.version.app_id)
     .eq('user_id', usr.id)
-  if (error) console.error(error)
+  if (error)
+    console.error(error)
   else
     await getUsers()
 }

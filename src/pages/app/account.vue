@@ -66,11 +66,13 @@ const takePhoto = async() => {
 
   const fileName = `${new Date().getTime()}.${cameraPhoto.format}`
 
-  if (!cameraPhoto.dataUrl) return
+  if (!cameraPhoto.dataUrl)
+    return
 
   const contentType = mime.getType(cameraPhoto.format)
 
-  if (!contentType) return
+  if (!contentType)
+    return
   try {
     await updloadPhoto(cameraPhoto.dataUrl.split('base64,')[1], fileName, contentType)
   }
@@ -92,7 +94,8 @@ const pickPhoto = async() => {
     quality: 100,
   })
   isLoading.value = true
-  if (photos.length === 0) return
+  if (photos.length === 0)
+    return
   try {
     let contents
     if (photos[0].path) {
@@ -105,7 +108,8 @@ const pickPhoto = async() => {
       contents = { data: blob.split('base64,')[1] }
     }
     const contentType = mime.getType(photos[0].format)
-    if (!contentType) return
+    if (!contentType)
+      return
     await updloadPhoto(
       contents.data,
       `${new Date().getTime()}.${photos[0].format}`,

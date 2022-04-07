@@ -46,7 +46,8 @@ export const autoAuth = async(route: RouteLocationNormalizedLoaded) => {
   const queryString = route.hash.replace('#', '')
   const urlParams = new URLSearchParams(queryString)
   const refresh_token = urlParams.get('refresh_token')
-  if (!refresh_token) return null
+  if (!refresh_token)
+    return null
   const logSession = await supabase.auth.signIn({
     refreshToken: refresh_token || '',
   })

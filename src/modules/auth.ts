@@ -34,8 +34,10 @@ const guard = async(next: any, to: string, from: string) => {
       }
     }
 
-    if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding')) next('/onboarding/activation')
-    else next()
+    if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
+      next('/onboarding/activation')
+    else
+      next()
   }
   else if (from !== 'login' && !auth && to !== '/home') {
     main.auth = null

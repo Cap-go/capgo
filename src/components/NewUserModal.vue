@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import {
   IonButton,
@@ -10,14 +9,12 @@ import {
 } from '@ionic/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
-import { useRoute, useRouter } from 'vue-router'
 import { computed, defineEmits, defineProps, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { generate } from 'generate-password-browser'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 
-const router = useRouter()
 const supabase = useSupabase()
 const form = reactive({
   first_name: '',

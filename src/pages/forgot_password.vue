@@ -58,7 +58,8 @@ const submit = async() => {
     const { error } = await supabase.auth.api
       .resetPasswordForEmail(form.email, { redirectTo })
     setTimeout(() => { isLoading.value = false }, 5000)
-    if (error) showToastMessage(error.message)
+    if (error)
+      showToastMessage(error.message)
     else showToastMessage(t('forgot.check_email'))
   }
   else if (step.value === 2 && route.hash) {

@@ -64,10 +64,12 @@ export class CapacitorCrispWeb {
     this.ifrm.style.backgroundColor = 'black'
     this.ifrm.style.padding
       = 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
-    if (!this.ifrm.contentWindow || !this.ifrm.contentDocument) return
+    if (!this.ifrm.contentWindow || !this.ifrm.contentDocument)
+      return
     this.ifrm.contentWindow.$crisp = []
     const s = this.ifrm.contentDocument.createElement('script')
-    if (!s) return
+    if (!s)
+      return
     s.src = 'https://client.crisp.chat/l.js'
     s.type = 'text/javascript'
     s.async = true
@@ -76,7 +78,8 @@ export class CapacitorCrispWeb {
   }
 
   private setAutoHide() {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push(
       ['safe', true],
       ['do', 'chat:hide'],
@@ -84,7 +87,8 @@ export class CapacitorCrispWeb {
         'on',
         'chat:closed',
         () => {
-          if (!this.ifrm.contentWindow) return
+          if (!this.ifrm.contentWindow)
+            return
           this.ifrm.style.zIndex = '-1'
           this.ifrm.contentWindow.$crisp.push(['do', 'chat:hide'])
         },
@@ -93,7 +97,8 @@ export class CapacitorCrispWeb {
         'on',
         'message:received',
         () => {
-          if (!this.ifrm.contentWindow) return
+          if (!this.ifrm.contentWindow)
+            return
           this.ifrm.contentWindow.$crisp.push(['do', 'chat:show'])
           this.ifrm.contentWindow.$crisp.push(['do', 'chat:open'])
           setTimeout(() => {
@@ -110,7 +115,8 @@ export class CapacitorCrispWeb {
   }
 
   async openMessenger(): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
 
     this.ifrm.contentWindow.$crisp.push(['do', 'chat:show'])
     this.ifrm.contentWindow.$crisp.push(['do', 'chat:open'])
@@ -131,7 +137,8 @@ export class CapacitorCrispWeb {
     email?: string
     avatar?: string
   }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     if (data.nickname) {
       this.ifrm.contentWindow.$crisp.push([
         'set',
@@ -150,7 +157,8 @@ export class CapacitorCrispWeb {
   }
 
   async pushEvent(data: { name: string; color: eventColor }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push([
       'set',
       'session:event',
@@ -165,7 +173,8 @@ export class CapacitorCrispWeb {
     employment?: [title: string, role: string]
     geolocation?: [country: string, city: string]
   }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     const meta: any = {}
     if (data.url)
       meta.url = data.url
@@ -187,7 +196,8 @@ export class CapacitorCrispWeb {
   }
 
   async setInt(data: { key: string; value: number }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push([
       'set',
       'session:data',
@@ -196,7 +206,8 @@ export class CapacitorCrispWeb {
   }
 
   async setString(data: { key: string; value: string }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push([
       'set',
       'session:data',
@@ -205,7 +216,8 @@ export class CapacitorCrispWeb {
   }
 
   async sendMessage(data: { value: string }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push([
       'do',
       'message:send',
@@ -214,7 +226,8 @@ export class CapacitorCrispWeb {
   }
 
   async setSegment(data: { segment: string }): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push([
       'set',
       'session:segments',
@@ -223,7 +236,8 @@ export class CapacitorCrispWeb {
   }
 
   async reset(): Promise<void> {
-    if (!this.ifrm.contentWindow) return
+    if (!this.ifrm.contentWindow)
+      return
     this.ifrm.contentWindow.$crisp.push(['do', 'session:reset'])
     this.setAutoHide()
   }
