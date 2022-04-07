@@ -59,11 +59,11 @@ specifiers:
   capacitor-flash: 1.1.1
   capacitor-mute: ^0.0.4
   capacitor-native-audio: ^3.0.2
-  capacitor-native-biometric: 3.1.0
+  capacitor-native-biometric: 3.0.3
   capacitor-purchases: 1.0.8
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: 1.1.4
-  capacitor-updater: 2.3.3
+  capacitor-updater: 3.0.0-beta.4
   copy-text-to-clipboard: ^3.0.1
   copy-to-clipboard: ^3.3.1
   critters: 0.0.16
@@ -146,11 +146,11 @@ dependencies:
   capacitor-flash: 1.1.1_@capacitor+core@3.4.3
   capacitor-mute: 0.0.4_@capacitor+core@3.4.3
   capacitor-native-audio: 3.0.2_@capacitor+core@3.4.3
-  capacitor-native-biometric: 3.1.0
+  capacitor-native-biometric: 3.0.3
   capacitor-purchases: 1.0.8_@capacitor+core@3.4.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.3
   capacitor-screen-recorder: 1.1.4_@capacitor+core@3.4.3
-  capacitor-updater: 2.3.3_@capacitor+core@3.4.3
+  capacitor-updater: 3.0.0-beta.4_@capacitor+core@3.4.3
   copy-text-to-clipboard: 3.0.1
   copy-to-clipboard: 3.3.1
   dayjs: 1.11.0
@@ -1975,6 +1975,12 @@ packages:
       '@capacitor/core': ^3.0.0
     dependencies:
       '@capacitor/core': 3.4.3
+    dev: false
+
+  /@capacitor/core/3.0.0:
+    resolution: {integrity: sha512-JmKE6QEayo8MqWcApwMP5YFimpVb2mcIEHBwgP/P9nSAOxOcbdpJyd9HhBt5pzZAE1MBngPADWWwZLrdNSjCnA==}
+    dependencies:
+      tslib: 2.3.1
     dev: false
 
   /@capacitor/core/3.4.3:
@@ -5934,10 +5940,10 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /capacitor-native-biometric/3.1.0:
-    resolution: {integrity: sha512-MQE0RKjqKbGJGPNon35LusbjV3bnazGxrrAnM7FCOkQlLiZWCy8A0aHx5iKr8iJo/LXoddY6IcykyB55xXSAaw==}
+  /capacitor-native-biometric/3.0.3:
+    resolution: {integrity: sha512-ewMxvMPZPAJH/5CFmezNUDOTS0pSP9sMLkM7bhxUBeSomYOdWiz42dN+gETCFSz7XrCfg+xPkN5tDHZekgy5lw==}
     dependencies:
-      '@capacitor/core': 3.4.3
+      '@capacitor/core': 3.0.0
     dev: false
 
   /capacitor-purchases/1.0.8_@capacitor+core@3.4.3:
@@ -5964,8 +5970,8 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /capacitor-updater/2.3.3_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-ZGjEnhyNrU9ejego2pDqa0cIIosO4PyfiBJbM7hvPRv7MBzBMc2Y+CpYK5EF/7C1YjJGlAPxWaRkGdh6Ef9omg==}
+  /capacitor-updater/3.0.0-beta.4_@capacitor+core@3.4.3:
+    resolution: {integrity: sha512-02nqbjjPKBtTL3xEYigCWOMS0tszgl/agX6AcWBkeVsnNzd0yFcRWc0yIGlmZetnYazHkIqBUreUU08KbT6n5Q==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:

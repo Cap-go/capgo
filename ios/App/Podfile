@@ -11,7 +11,7 @@ def capacitor_pods
   pod 'CapacitorCordova', :path => '../../node_modules/.pnpm/@capacitor+ios@3.4.3_@capacitor+core@3.4.3/node_modules/@capacitor/ios'
   pod 'CapacitorCommunityHttp', :path => '../../node_modules/.pnpm/@capacitor-community+http@1.4.1/node_modules/@capacitor-community/http'
   pod 'CapacitorCommunityKeepAwake', :path => '../../node_modules/.pnpm/@capacitor-community+keep-awake@2.1.1_@capacitor+core@3.4.3/node_modules/@capacitor-community/keep-awake'
-  pod 'CapacitorActionSheet', :path => '../../node_modules/.pnpm/@capacitor+action-sheet@1.0.7_@capacitor+core@3.4.3/node_modules/@capacitor/action-sheet'
+  pod 'CapacitorActionSheet', :path => '../../node_modules/.pnpm/@capacitor+action-sheet@1.0.8_@capacitor+core@3.4.3/node_modules/@capacitor/action-sheet'
   pod 'CapacitorApp', :path => '../../node_modules/.pnpm/@capacitor+app@1.1.1_@capacitor+core@3.4.3/node_modules/@capacitor/app'
   pod 'CapacitorAppLauncher', :path => '../../node_modules/.pnpm/@capacitor+app-launcher@1.0.9_@capacitor+core@3.4.3/node_modules/@capacitor/app-launcher'
   pod 'CapacitorBrowser', :path => '../../node_modules/.pnpm/@capacitor+browser@1.0.7_@capacitor+core@3.4.3/node_modules/@capacitor/browser'
@@ -40,10 +40,10 @@ def capacitor_pods
   pod 'CapacitorMute', :path => '../../node_modules/.pnpm/capacitor-mute@0.0.4_@capacitor+core@3.4.3/node_modules/capacitor-mute'
   pod 'CapacitorNativeAudio', :path => '../../node_modules/.pnpm/capacitor-native-audio@3.0.2_@capacitor+core@3.4.3/node_modules/capacitor-native-audio'
   pod 'CapacitorNativeBiometric', :path => '../../node_modules/.pnpm/capacitor-native-biometric@3.0.3/node_modules/capacitor-native-biometric'
-  pod 'CapacitorPurchases', :path => '../../node_modules/.pnpm/capacitor-purchases@1.0.7_@capacitor+core@3.4.3/node_modules/capacitor-purchases'
+  pod 'CapacitorPurchases', :path => '../../node_modules/.pnpm/capacitor-purchases@1.0.8_@capacitor+core@3.4.3/node_modules/capacitor-purchases'
   pod 'CapacitorRateApp', :path => '../../node_modules/.pnpm/capacitor-rate-app@2.0.0_@capacitor+core@3.4.3/node_modules/capacitor-rate-app'
   pod 'CapacitorScreenRecorder', :path => '../../node_modules/.pnpm/capacitor-screen-recorder@1.1.4_@capacitor+core@3.4.3/node_modules/capacitor-screen-recorder'
-  pod 'CapacitorUpdater', :path => '../../node_modules/.pnpm/capacitor-updater@2.2.0_@capacitor+core@3.4.3/node_modules/capacitor-updater'
+  pod 'CapacitorUpdater', :path => '../../node_modules/.pnpm/capacitor-updater@3.0.0-beta.4_@capacitor+core@3.4.3/node_modules/capacitor-updater'
 end
 
 target 'App' do
