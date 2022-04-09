@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.hardware.SensorManager;
 import ee.forgr.capacitor_updater.CapacitorUpdater;
 import com.getcapacitor.Bridge;
@@ -37,8 +38,17 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
 
     @Override public void hearShake() {
         Log.i("Capgo", "hearShake");
-        CapacitorUpdater updater = new CapacitorUpdater(this.bridge.getContext());
-        if (updater.getLastPathHot() == "" || isShow) {
+        CapacitorUpdater updater;
+        String LatestVersionAutoUpdate = prefs.getString("LatestVersionAutoUpdate", "");
+        try {
+            updater = new CapacitorUpdater(this.bridge.getContext());
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+            return;
+        }
+        Log.i("Capgo hearShake", updater.getLastPathHot());
+
+        if (updater.getLastPathHot() == "public" || isShow || updater.getLastPathHot().contains(LatestVersionAutoUpdate)) {
             return;
         }
         isShow = true;
@@ -58,7 +68,6 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
                 String serverBasePath = updater.getLastPathHot();
                 File fHot = new File(serverBasePath);
                 String versionName = updater.getVersionName();
-                String LatestVersionAutoUpdate = prefs.getString("LatestVersionAutoUpdate", "");
                 String LatestVersionNameAutoUpdate = prefs.getString("LatestVersionNameAutoUpdate", "");
                 Boolean isAssets = true;
                 if (!LatestVersionAutoUpdate.equals("") && !LatestVersionNameAutoUpdate.equals("")) {

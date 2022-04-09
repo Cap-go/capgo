@@ -18,13 +18,13 @@ extension UIWindow {
                 print("getServerBasePath", vc.getServerBasePath())
                 let serverBasePath = defaults.object(forKey:"serverBasePath") as? String ?? ""
                 let versionName = defaults.object(forKey:"versionName") as? String ?? ""
-                if (serverBasePath == "") {
+                let LatestVersionAutoUpdate = UserDefaults.standard.string(forKey: "LatestVersionAutoUpdate") ?? ""
+                if (serverBasePath == "" || serverBasePath.contains(versionName)) {
                     return
                 }
                 DispatchQueue.main.async {
                     let alert = UIAlertController(title: title, message: message, preferredStyle: UIAlertController.Style.alert)
                     alert.addAction(UIAlertAction(title: okButtonTitle, style: UIAlertAction.Style.default, handler: { (_) -> Void in
-                        let LatestVersionAutoUpdate = UserDefaults.standard.string(forKey: "LatestVersionAutoUpdate") ?? ""
                         let LatestVersionNameAutoUpdate = UserDefaults.standard.string(forKey: "LatestVersionNameAutoUpdate") ?? ""
                         if(LatestVersionAutoUpdate != "" && LatestVersionNameAutoUpdate != "") {
                             _ = updater.set(version: LatestVersionAutoUpdate, versionName: LatestVersionNameAutoUpdate)
@@ -42,7 +42,7 @@ extension UIWindow {
                             let pathPersist = updater.getLastPathPersist()
                             vc.setServerBasePath(path: pathPersist)
                             defaults.set("", forKey: "serverBasePath")
-                            DispatchQueue.global(qos: .background).async {
+                            DispatchQueue.main.async {
                                 vc.loadView()
                                 vc.viewDidLoad()
                                 _ = updater.delete(version: serverBasePath, versionName: versionName)
