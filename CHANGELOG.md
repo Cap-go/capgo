@@ -1,3 +1,9 @@
+## 0.23.0 (2022-04-09)
+
+### Feat
+
+- add devices chart and page
+
 ## 0.22.0 (2022-04-09)
 
 ### Feat
