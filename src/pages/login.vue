@@ -15,6 +15,7 @@ const main = useMainStore()
 const isLoading = ref(false)
 const router = useRouter()
 const { t } = useI18n()
+const version = ref(import.meta.env.VITE_APP_VERSION)
 
 const form = reactive({
   email: '',
@@ -203,6 +204,11 @@ onMounted(checkLogin)
                   {{ t('login.create-new') }}
                 </router-link>
               </div>
+            </div>
+            <div class="mx-auto text-center mt-4">
+              <button class="mx-auto font-bold text-dusk-500">
+                Version {{ version }}
+              </button>
             </div>
           </div>
         </form>
