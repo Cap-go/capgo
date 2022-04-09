@@ -13,7 +13,7 @@ import {
   actionSheetController, isPlatform, toastController,
 } from '@ionic/vue'
 import dayjs from 'dayjs'
-import { chevronBack } from 'ionicons/icons'
+import { chevronBack, chevronForwardOutline } from 'ionicons/icons'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -60,17 +60,15 @@ const loadData = async() => {
           `)
       .eq('app_id', id.value)
       .order('updated_at', { ascending: false })
-    if (dataApp && dataApp.length)
-      app.value = dataApp[0]
-    if (dataVersions && dataVersions.length)
-      versions.value = dataVersions
-    if (dataChannel && dataChannel.length)
-      channels.value = dataChannel
+    app.value = dataApp?.length ? dataApp[0] : app.value
+    versions.value = dataVersions || versions.value
+    channels.value = dataChannel || channels.value
   }
   catch (error) {
     console.error(error)
   }
 }
+
 const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
@@ -167,8 +165,11 @@ const deleteVersion = async(version: definitions['app_versions']) => {
   }
 }
 
-const openChannel = async(channel: definitions['channels']) => {
+const openChannel = (channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
+}
+const openDevices = () => {
+  router.push(`/app/p/${id.value.replaceAll('.', '--')}/devices`)
 }
 const formatDate = (date: string | undefined) => {
   return dayjs(date).format('YYYY-MM-DD HH:mm')
@@ -283,6 +284,9 @@ const back = () => {
             <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
           </IonButton>
         </IonButtons>
+        <IonTitle color="warning">
+          {{ app?.name }}
+        </IonTitle>
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
@@ -293,18 +297,17 @@ const back = () => {
         <Spinner />
       </div>
       <div v-else>
-        <ion-header>
-          <ion-toolbar>
-            <ion-title color="warning" size="large">
-              {{ app?.name }}
-            </ion-title>
-          </ion-toolbar>
-        </ion-header>
-        <img
-          class="my-8 mx-auto w-30 h-30 object-cover rounded-5xl"
-          :src="app?.icon_url"
-        >
         <ion-list ref="listRef">
+          <IonItem @click="openDevices()">
+            <IonLabel>
+              <h2 class="text-sm text-azure-500">
+                {{ t('package.devices') }}
+              </h2>
+            </IonLabel>
+            <IonNote slot="end">
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </IonNote>
+          </IonItem>
           <IonItemDivider v-if="channels?.length">
             <IonLabel>
               {{ t('package.channels') }}

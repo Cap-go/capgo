@@ -104,6 +104,7 @@ onboarding:
   loading: Loading
 package:
   channels: Channels
+  devices: See devices
   download: Download version
   link_channel: Link to channel
   set: Set version to channel

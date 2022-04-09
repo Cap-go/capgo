@@ -19,12 +19,19 @@ export const openVersion = async(app: definitions['app_versions']) => {
     })
 
   await loading.present()
-  const res = await supabase
-    .storage
-    .from(`apps/${auth?.id}/${app.app_id}/versions`)
-    .createSignedUrl(app.bucket_id, 60)
+  let signedURL
+  if (app.bucket_id) {
+    const res = await supabase
+      .storage
+      .from(`apps/${auth?.id}/${app.app_id}/versions`)
+      .createSignedUrl(app.bucket_id, 60)
 
-  const signedURL = res.data?.signedURL
+    signedURL = res.data?.signedURL
+  }
+  else {
+    signedURL = app.external_url
+  }
+
   if (signedURL && isPlatform('capacitor')) {
     try {
       SplashScreen.show()
