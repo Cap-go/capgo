@@ -8,6 +8,7 @@
     "preview-https": "serve dist",
     "mobile": "vite build --mode mobile && cap copy",
     "capacitor-assets": "capacitor-assets generate",
+    "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
     "sync": "cap sync",
     "dev": "vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
