@@ -1,3 +1,10 @@
+## 0.23.1 (2022-04-10)
+
+### Fix
+
+- issue missing file
+- icon issue ios
+
 ## 0.23.0 (2022-04-09)
 
 ### Feat
