@@ -297,6 +297,11 @@ const inviteUser = async(userId: string) => {
             </div>
           </IonLabel>
         </IonItem>
+        <ion-item-divider>
+          <ion-label>
+            {{ t('channel.v3') }}
+          </ion-label>
+        </ion-item-divider>
         <IonItem>
           <IonLabel>Disable auto downgrade under native</IonLabel>
           <IonToggle
