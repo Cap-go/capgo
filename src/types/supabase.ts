@@ -447,6 +447,8 @@ export interface paths {
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
           public?: parameters["rowFilter.channels.public"];
+          disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
+          disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -505,6 +507,8 @@ export interface paths {
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
           public?: parameters["rowFilter.channels.public"];
+          disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
+          disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
         };
         header: {
           /** Preference */
@@ -527,6 +531,8 @@ export interface paths {
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
           public?: parameters["rowFilter.channels.public"];
+          disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
+          disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
         };
         body: {
           /** channels */
@@ -553,6 +559,7 @@ export interface paths {
           version?: parameters["rowFilter.devices.version"];
           app_id?: parameters["rowFilter.devices.app_id"];
           platform?: parameters["rowFilter.devices.platform"];
+          plugin_version?: parameters["rowFilter.devices.plugin_version"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -609,6 +616,7 @@ export interface paths {
           version?: parameters["rowFilter.devices.version"];
           app_id?: parameters["rowFilter.devices.app_id"];
           platform?: parameters["rowFilter.devices.platform"];
+          plugin_version?: parameters["rowFilter.devices.plugin_version"];
         };
         header: {
           /** Preference */
@@ -629,6 +637,7 @@ export interface paths {
           version?: parameters["rowFilter.devices.version"];
           app_id?: parameters["rowFilter.devices.app_id"];
           platform?: parameters["rowFilter.devices.platform"];
+          plugin_version?: parameters["rowFilter.devices.plugin_version"];
         };
         body: {
           /** devices */
@@ -1117,9 +1126,9 @@ export interface definitions {
      * Format: timestamp with time zone
      * @default now()
      */
-    created_at?: string;
+    created_at: string;
     /** Format: character varying */
-    name?: string;
+    name: string;
     /**
      * Format: character varying
      * @description Note:
@@ -1131,7 +1140,7 @@ export interface definitions {
      * @description Note:
      * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
      */
-    version?: number;
+    version: number;
     /**
      * Format: uuid
      * @description Note:
@@ -1142,9 +1151,19 @@ export interface definitions {
      * Format: timestamp with time zone
      * @default now()
      */
-    updated_at?: string;
+    updated_at: string;
     /** Format: boolean */
     public: boolean;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    disableAutoUpdateUnderNative: boolean;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    disableAutoUpdateToMajor: boolean;
   };
   devices: {
     /**
@@ -1180,6 +1199,11 @@ export interface definitions {
      * @enum {string}
      */
     platform?: "ios" | "android";
+    /**
+     * Format: text
+     * @default 2.3.3
+     */
+    plugin_version: string;
   };
   stats: {
     /**
@@ -1414,6 +1438,10 @@ export interface parameters {
   "rowFilter.channels.updated_at": string;
   /** Format: boolean */
   "rowFilter.channels.public": string;
+  /** Format: boolean */
+  "rowFilter.channels.disableAutoUpdateUnderNative": string;
+  /** Format: boolean */
+  "rowFilter.channels.disableAutoUpdateToMajor": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */
@@ -1428,6 +1456,8 @@ export interface parameters {
   "rowFilter.devices.app_id": string;
   /** Format: public.platform_os */
   "rowFilter.devices.platform": string;
+  /** Format: text */
+  "rowFilter.devices.plugin_version": string;
   /** @description stats */
   "body.stats": definitions["stats"];
   /** Format: bigint */

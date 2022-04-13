@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {
-  IonButton, IonButtons, IonContent,
-  IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList,
-  IonListHeader, IonModal, IonPage, IonTitle, IonToolbar,
+  IonButton, IonButtons, IonContent, IonHeader,
+  IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader,
+  IonModal, IonPage, IonTitle, IonToggle, IonToolbar,
   actionSheetController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
@@ -14,7 +14,6 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
-import { setUserId } from '~/services/crips'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -67,7 +66,28 @@ const getUsers = async() => {
     console.error(error)
   }
 }
+const saveChannelChange = async() => {
+  if (!id.value || !channel.value)
+    return
+  try {
+    const update = {
+      disableAutoUpdateUnderNative: channel.value.disableAutoUpdateUnderNative,
+      disableAutoUpdateToMajor: channel.value.disableAutoUpdateToMajor,
+    }
+    const { error } = await supabase
+      .from<definitions['channels'] & Channel>('channels')
+      .update(update)
+      .eq('id', id.value)
+    if (error)
+      console.log('no channel update', error)
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
 const getChannel = async() => {
+  if (!id.value)
+    return
   try {
     const { data } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -82,6 +102,8 @@ const getChannel = async() => {
             created_at
           ),
           created_at,
+          disableAutoUpdateUnderNative,
+          disableAutoUpdateToMajor,
           updated_at
         `)
       .eq('id', id.value)
@@ -145,7 +167,7 @@ const copyPublicLink = () => {
   copy(publicLink.value)
 }
 const makePublic = async(val = true) => {
-  if (!channel.value)
+  if (!channel.value || !id.value)
     return
   const { error } = await supabase
     .from<definitions['channels']>('channels')
@@ -274,6 +296,22 @@ const inviteUser = async(userId: string) => {
               </div>
             </div>
           </IonLabel>
+        </IonItem>
+        <IonItem>
+          <IonLabel>Disable auto downgrade under native</IonLabel>
+          <IonToggle
+            color="secondary"
+            :checked="channel?.disableAutoUpdateUnderNative"
+            @ionChange="channel.disableAutoUpdateUnderNative = $event.target.checked; saveChannelChange()"
+          />
+        </IonItem>
+        <IonItem>
+          <IonLabel>Disable auto upgrade above major</IonLabel>
+          <IonToggle
+            color="secondary"
+            :checked="channel?.disableAutoUpdateToMajor"
+            @ionChange="channel.disableAutoUpdateToMajor = $event.target.checked; saveChannelChange()"
+          />
         </IonItem>
         <ion-item-divider>
           <ion-label>
