@@ -239,7 +239,7 @@ const presentActionSheet = async() => {
               class="flex justify-between items-center"
               to="/app/usage"
             >
-              <span class="font-bold">
+              <span class="font-bold first-letter:uppercase">
                 {{ t("account.usage") }}
               </span>
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
