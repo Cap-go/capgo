@@ -25,6 +25,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
+const auth = supabase.auth.user()
 const packageId = ref<string>('')
 const id = ref<number>()
 const channel = ref<definitions['channels'] & Channel>()
@@ -226,6 +227,7 @@ const inviteUser = async(userId: string) => {
     .from<definitions['channel_users']>('channel_users')
     .insert({
       channel_id: id.value,
+      created_by: auth?.id,
       app_id: channel.value?.version.app_id,
       user_id: userId,
     })

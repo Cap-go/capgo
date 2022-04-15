@@ -343,6 +343,7 @@ export interface paths {
           channel_id?: parameters["rowFilter.channel_users.channel_id"];
           app_id?: parameters["rowFilter.channel_users.app_id"];
           updated_at?: parameters["rowFilter.channel_users.updated_at"];
+          created_by?: parameters["rowFilter.channel_users.created_by"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -399,6 +400,7 @@ export interface paths {
           channel_id?: parameters["rowFilter.channel_users.channel_id"];
           app_id?: parameters["rowFilter.channel_users.app_id"];
           updated_at?: parameters["rowFilter.channel_users.updated_at"];
+          created_by?: parameters["rowFilter.channel_users.created_by"];
         };
         header: {
           /** Preference */
@@ -419,6 +421,7 @@ export interface paths {
           channel_id?: parameters["rowFilter.channel_users.channel_id"];
           app_id?: parameters["rowFilter.channel_users.app_id"];
           updated_at?: parameters["rowFilter.channel_users.updated_at"];
+          created_by?: parameters["rowFilter.channel_users.created_by"];
         };
         body: {
           /** channel_users */
@@ -987,6 +990,133 @@ export interface paths {
       };
     };
   };
+  "/version_count": {
+    get: {
+      parameters: {
+        query: {
+          max?: parameters["rowFilter.version_count.max"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["version_count"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** version_count */
+          version_count?: definitions["version_count"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          max?: parameters["rowFilter.version_count.max"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          max?: parameters["rowFilter.version_count.max"];
+        };
+        body: {
+          /** version_count */
+          version_count?: definitions["version_count"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
+  "/rpc/get_max_channel": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            user_id: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/get_max_version": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
 }
 
 export interface definitions {
@@ -1114,6 +1244,12 @@ export interface definitions {
      * @default now()
      */
     updated_at: string;
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
+    created_by?: string;
   };
   channels: {
     /**
@@ -1319,6 +1455,10 @@ export interface definitions {
     /** Format: character varying */
     customer_id?: string;
   };
+  version_count: {
+    /** Format: bigint */
+    max?: number;
+  };
 }
 
 export interface parameters {
@@ -1420,6 +1560,8 @@ export interface parameters {
   "rowFilter.channel_users.app_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.channel_users.updated_at": string;
+  /** Format: uuid */
+  "rowFilter.channel_users.created_by": string;
   /** @description channels */
   "body.channels": definitions["channels"];
   /** Format: bigint */
@@ -1518,6 +1660,10 @@ export interface parameters {
   "rowFilter.users.legalAccepted": string;
   /** Format: character varying */
   "rowFilter.users.customer_id": string;
+  /** @description version_count */
+  "body.version_count": definitions["version_count"];
+  /** Format: bigint */
+  "rowFilter.version_count.max": string;
 }
 
 export interface operations {}
