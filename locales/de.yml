@@ -10,6 +10,7 @@ account:
   preferences: Benachrichtigungen
   privacy: Datenschutz-Bestimmungen
   support: Unterstützung
+  usage: Verwendungszweck
 accountPassword:
   confirmPassword: Kennwort bestätigen
   errorMsg: Fehler aufgetreten, bitte versuchen Sie es erneut
@@ -76,6 +77,7 @@ channel:
   title: Kanal
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
   users: Mit Benutzern geteilt
+  v3: V3-Einstellungen
 forgot:
   check_email: >-
     Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
@@ -100,6 +102,8 @@ login:
   or: oder
   password: Passwort
   withemail: Mit E-Mail-Adresse
+module:
+  heading: Module
 not-found: Nicht gefunden
 notificationSettings:
   heading: Konto
@@ -108,12 +112,17 @@ onboarding:
   loading: Wird geladen
 package:
   channels: Kanäle
+  devices: Siehe Geräte
   download: Download-Version
   link_channel: Link zum Kanal
   set: Version auf Kanal setzen
   test: Version starten
   title: die Info
   versions: Versionen
+password:
+  heading: Passwort erstellen
+  new: Neues Kennwort
+  validate: Bestätigen
 projects:
   list: Deine
   sharedlist: Mit dir geteilt
@@ -139,3 +148,6 @@ register:
 something-went-wrong-try-again-later: |-
   Etwas ist schief gelaufen! 
   Versuchen Sie es später noch einmal.
+usage:
+  title: Verwendungszweck
+your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist

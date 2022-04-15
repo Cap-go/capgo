@@ -10,6 +10,7 @@ account:
   preferences: 通知
   privacy: プライバシーポリシー
   support: サポート
+  usage: 利用方法
 accountPassword:
   confirmPassword: パスワードを認証する
   errorMsg: エラーが発生しました。再試行してください
@@ -70,6 +71,7 @@ channel:
   title: チャネル
   user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
   users: ユーザーと共有
+  v3: V3設定
 forgot:
   check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
   email: Eメール
@@ -92,6 +94,8 @@ login:
   or: また
   password: パスワード
   withemail: メールアドレス付き
+module:
+  heading: モジュール
 not-found: 見つかりませんでした
 notificationSettings:
   heading: 通知設定
@@ -100,12 +104,17 @@ onboarding:
   loading: 読み込み中
 package:
   channels: チャネル
+  devices: デバイスを見る
   download: ダウンロード版
   link_channel: チャネルへのリンク
   set: バージョンをチャネルに設定
   test: 起動バージョン
   title: 情報
   versions: バージョン
+password:
+  heading: パスワードの作成
+  new: 新しいパスワード
+  validate: 検証
 projects:
   list: あなたのもの
   sharedlist: あなたと共有
@@ -129,3 +138,6 @@ register:
 something-went-wrong-try-again-later: |-
   何かがうまくいかなかった！
   あとでもう一度試してみてください。
+usage:
+  title: 使用法
+your-current-suggested-plan-is: 現在提案されている計画は

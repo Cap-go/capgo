@@ -10,6 +10,7 @@ account:
   preferences: Powiadomienia
   privacy: Polityka prywatności
   support: Wsparcie
+  usage: stosowanie
 accountPassword:
   confirmPassword: Potwierdź hasło
   errorMsg: Wystąpił błąd, spróbuj ponownie
@@ -74,6 +75,7 @@ channel:
   title: Kanał
   user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
   users: Udostępnione użytkownikom
+  v3: Ustawienia V3
 forgot:
   check_email: Sprawdź pocztę, aby uzyskać link do zresetowania hasła
   email: E-mail
@@ -96,6 +98,8 @@ login:
   or: lub
   password: Hasło
   withemail: Z adresem e-mail
+module:
+  heading: Moduły
 not-found: Nie znaleziono
 notificationSettings:
   heading: Ustawienia powiadomień
@@ -104,12 +108,17 @@ onboarding:
   loading: Ładowanie
 package:
   channels: Kanały
+  devices: Zobacz urządzenia
   download: Pobierz wersję
   link_channel: Link do kanału
   set: Ustaw wersję na kanał
   test: Uruchom wersję
   title: informacje
   versions: Wersje
+password:
+  heading: Stwórz hasło
+  new: nowe hasło
+  validate: Uprawomocnić
 projects:
   list: Twój
   sharedlist: Dzielone z Tobą
@@ -133,3 +142,6 @@ register:
 something-went-wrong-try-again-later: |-
   Coś poszło nie tak! 
   Spróbuj ponownie później.
+usage:
+  title: Stosowanie
+your-current-suggested-plan-is: Twój obecny sugerowany plan to

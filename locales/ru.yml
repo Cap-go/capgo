@@ -10,6 +10,7 @@ account:
   preferences: Уведомления
   privacy: Политика конфиденциальности
   support: Служба поддержки
+  usage: использование
 accountPassword:
   confirmPassword: Подтвердить Пароль
   errorMsg: Произошла ошибка, попробуйте еще раз
@@ -74,6 +75,7 @@ channel:
   title: Канал
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
   users: Доступно пользователям
+  v3: Настройки версии 3
 forgot:
   check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
   email: Эл. адрес
@@ -96,6 +98,8 @@ login:
   or: или
   password: Пароль
   withemail: С адресом электронной почты
+module:
+  heading: Модули
 not-found: Не найден
 notificationSettings:
   heading: Настройки уведомлений
@@ -104,12 +108,17 @@ onboarding:
   loading: Загрузка
 package:
   channels: каналы
+  devices: Посмотреть устройства
   download: Скачать версию
   link_channel: Ссылка на канал
   set: Установить версию для канала
   test: Запустить версию
   title: Информация
   versions: Версии
+password:
+  heading: Придумайте пароль
+  new: Новый пароль
+  validate: Подтвердить
 projects:
   list: Ваш
   sharedlist: Поделился с вами
@@ -133,3 +142,6 @@ register:
 something-went-wrong-try-again-later: |-
   Что-то пошло не так! 
   Попробуйте позже.
+usage:
+  title: использование
+your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'

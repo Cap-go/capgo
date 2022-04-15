@@ -63,7 +63,7 @@ specifiers:
   capacitor-purchases: 1.0.8
   capacitor-rate-app: ^2.0.0
   capacitor-screen-recorder: 1.1.4
-  capacitor-updater: 3.0.0-beta.15
+  capacitor-updater: 3.0.0-beta.16
   chart.js: ^3.7.1
   copy-text-to-clipboard: ^3.0.1
   copy-to-clipboard: ^3.3.1
@@ -152,7 +152,7 @@ dependencies:
   capacitor-purchases: 1.0.8_@capacitor+core@3.4.3
   capacitor-rate-app: 2.0.0_@capacitor+core@3.4.3
   capacitor-screen-recorder: 1.1.4_@capacitor+core@3.4.3
-  capacitor-updater: 3.0.0-beta.15_@capacitor+core@3.4.3
+  capacitor-updater: 3.0.0-beta.16_@capacitor+core@3.4.3
   chart.js: 3.7.1
   copy-text-to-clipboard: 3.0.1
   copy-to-clipboard: 3.3.1
@@ -2958,8 +2958,8 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/message-compiler': 9.2.0-beta.34
-      '@intlify/shared': 9.2.0-beta.34
+      '@intlify/message-compiler': 9.2.0-beta.35
+      '@intlify/shared': 9.2.0-beta.35
       jsonc-eslint-parser: 1.4.1
       source-map: 0.6.1
       vue-i18n: 9.2.0-beta.34_vue@3.2.31
@@ -2989,10 +2989,25 @@ packages:
     dependencies:
       '@intlify/shared': 9.2.0-beta.34
       source-map: 0.6.1
+    dev: false
+
+  /@intlify/message-compiler/9.2.0-beta.35:
+    resolution: {integrity: sha512-wYQCgnRtyJ40HK3bJTrszHDaxqDXZH+9Ps7RsXNuNwZ9hIb1cVkLiUNIbuJS/XSJ1kATJXA6K+4if6ZLb0Ozxw==}
+    engines: {node: '>= 12'}
+    dependencies:
+      '@intlify/shared': 9.2.0-beta.35
+      source-map: 0.6.1
+    dev: true
 
   /@intlify/shared/9.2.0-beta.34:
     resolution: {integrity: sha512-hbUKcVbTOkLVpnlSeZE1OPgEI7FpvhuZF/gb84xECTjXEImIa3u0fIcJKUUffv3dlAx8fMOE5xKgDzngidm0tw==}
     engines: {node: '>= 12'}
+    dev: false
+
+  /@intlify/shared/9.2.0-beta.35:
+    resolution: {integrity: sha512-DXf7xrwf08GKhr93XPQ8EgaEN0CIELl+mAS6SlRhi/aLtZv5HSGSMkz4M/ICwoWzFLSgOx/ZdBSasex19MMogg==}
+    engines: {node: '>= 12'}
+    dev: true
 
   /@intlify/vite-plugin-vue-i18n/4.0.0_c28e454bdb294ebb65e8fb37b6c0e7ce:
     resolution: {integrity: sha512-bX7WgJAnYAbhmfvMp17TjCzg4e4T68O7iqAcNo6TOS+oHK0kAJAN9AJfEMTdpDrAwURCw0VwZ0kgMFWDbJkY4g==}
@@ -3008,7 +3023,7 @@ packages:
         optional: true
     dependencies:
       '@intlify/bundle-utils': 3.0.0_vue-i18n@9.2.0-beta.34
-      '@intlify/shared': 9.2.0-beta.34
+      '@intlify/shared': 9.2.0-beta.35
       '@rollup/pluginutils': 4.1.2
       debug: 4.3.4
       fast-glob: 3.2.11
@@ -4725,7 +4740,7 @@ packages:
       '@volar/source-map': 0.33.9
       '@vue/compiler-core': 3.2.31
       '@vue/compiler-dom': 3.2.31
-      '@vue/shared': 3.2.31
+      '@vue/shared': 3.2.33
     dev: true
 
   /@volar/vue-typescript/0.33.9:
@@ -4795,6 +4810,12 @@ packages:
     dependencies:
       '@vue/shared': 3.2.31
 
+  /@vue/reactivity/3.2.33:
+    resolution: {integrity: sha512-62Sq0mp9/0bLmDuxuLD5CIaMG2susFAGARLuZ/5jkU1FCf9EDbwUuF+BO8Ub3Rbodx0ziIecM/NsmyjardBxfQ==}
+    dependencies:
+      '@vue/shared': 3.2.33
+    dev: false
+
   /@vue/runtime-core/3.2.31:
     resolution: {integrity: sha512-Kcog5XmSY7VHFEMuk4+Gap8gUssYMZ2+w+cmGI6OpZWYOEIcbE0TPzzPHi+8XTzAgx1w/ZxDFcXhZeXN5eKWsA==}
     dependencies:
@@ -4802,11 +4823,26 @@ packages:
       '@vue/shared': 3.2.31
     dev: false
 
+  /@vue/runtime-core/3.2.33:
+    resolution: {integrity: sha512-N2D2vfaXsBPhzCV3JsXQa2NECjxP3eXgZlFqKh4tgakp3iX6LCGv76DLlc+IfFZq+TW10Y8QUfeihXOupJ1dGw==}
+    dependencies:
+      '@vue/reactivity': 3.2.33
+      '@vue/shared': 3.2.33
+    dev: false
+
   /@vue/runtime-dom/3.2.31:
     resolution: {integrity: sha512-N+o0sICVLScUjfLG7u9u5XCjvmsexAiPt17GNnaWHJUfsKed5e85/A3SWgKxzlxx2SW/Hw7RQxzxbXez9PtY3g==}
     dependencies:
       '@vue/runtime-core': 3.2.31
       '@vue/shared': 3.2.31
+      csstype: 2.6.18
+    dev: false
+
+  /@vue/runtime-dom/3.2.33:
+    resolution: {integrity: sha512-LSrJ6W7CZTSUygX5s8aFkraDWlO6K4geOwA3quFF2O+hC3QuAMZt/0Xb7JKE3C4JD4pFwCSO7oCrZmZ0BIJUnw==}
+    dependencies:
+      '@vue/runtime-core': 3.2.33
+      '@vue/shared': 3.2.33
       csstype: 2.6.18
     dev: false
 
@@ -4821,6 +4857,9 @@ packages:
 
   /@vue/shared/3.2.31:
     resolution: {integrity: sha512-ymN2pj6zEjiKJZbrf98UM2pfDd6F2H7ksKw7NDt/ZZ1fh5Ei39X5tABugtT03ZRlWd9imccoK0hE8hpjpU7irQ==}
+
+  /@vue/shared/3.2.33:
+    resolution: {integrity: sha512-UBc1Pg1T3yZ97vsA2ueER0F6GbJebLHYlEi4ou1H5YL4KWvMOOWwpYo9/QpWq93wxKG6Wo13IY74Hcn/f7c7Bg==}
 
   /@vuelidate/core/2.0.0-alpha.40_vue@3.2.31:
     resolution: {integrity: sha512-f4Uo0yV2BHDi5+MXWDXRcqBv0u1Cqc/RudJLGqke3wLnIcH2r8sXEqRyuVoaN2KEPqbZiTFw/Uo50wx1J+ZDFQ==}
@@ -5937,8 +5976,8 @@ packages:
       '@capacitor/core': 3.4.3
     dev: false
 
-  /capacitor-updater/3.0.0-beta.15_@capacitor+core@3.4.3:
-    resolution: {integrity: sha512-BCI1GwgunW/7bz6J2NNVZ1rVmk4/KWJHnEspw/pssBx9+G5AiWBmli4s2tSjXTx2kKt3tzH3mvltCV1yA2eYfQ==}
+  /capacitor-updater/3.0.0-beta.16_@capacitor+core@3.4.3:
+    resolution: {integrity: sha512-FtPAtvO9tVEH/HZVu9aDB3+m8PZ5s3q7klC6PB6HDWlQIZPk3LB4z3yzz6Y74i1CJIEpxmY3z833VvWThvd+Cw==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:
@@ -16090,8 +16129,8 @@ packages:
       chart.js: '=> ^3.1.0'
       vue: '>= 3'
     dependencies:
-      '@vue/runtime-core': 3.2.31
-      '@vue/runtime-dom': 3.2.31
+      '@vue/runtime-core': 3.2.33
+      '@vue/runtime-dom': 3.2.33
       chart.js: 3.7.1
       csstype: 3.0.11
       lodash-es: 4.17.21

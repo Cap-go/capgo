@@ -10,6 +10,7 @@ account:
   preferences: Notificações
   privacy: Política de Privacidade
   support: Apoiar
+  usage: uso
 accountPassword:
   confirmPassword: Confirme a Senha
   errorMsg: Ocorreu um erro, tente novamente
@@ -74,6 +75,7 @@ channel:
   title: Canal
   user_no_found: Usuário não encontrado, peça para se registrar primeiro
   users: Compartilhado com usuários
+  v3: Configurações V3
 forgot:
   check_email: Verifique seu e-mail para obter o link para redefinir sua senha
   email: E-mail
@@ -96,6 +98,8 @@ login:
   or: ou
   password: Senha
   withemail: Com endereço de e-mail
+module:
+  heading: Módulos
 not-found: Não encontrado
 notificationSettings:
   heading: Configurações de notificação
@@ -104,12 +108,17 @@ onboarding:
   loading: Carregando
 package:
   channels: Canais
+  devices: Ver dispositivos
   download: Baixar versão
   link_channel: Link para o canal
   set: Definir versão para canal
   test: Versão de lançamento
   title: informação
   versions: Versões
+password:
+  heading: Criar senha
+  new: Nova Senha
+  validate: Validar
 projects:
   list: Seu
   sharedlist: Compartilhado com você
@@ -133,3 +142,6 @@ register:
 something-went-wrong-try-again-later: |-
   Algo deu errado! 
   Tente mais tarde.
+usage:
+  title: Uso
+your-current-suggested-plan-is: Seu plano sugerido atual é

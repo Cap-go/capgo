@@ -12,7 +12,7 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="sticky top-0 mt-safe z-50 bg-white dark:bg-black">
+  <div class="sticky top-0 mt-safe z-50 bg-transparent">
     <div class="absolute flex left-0 top-5 text-sm text-azure-500 items-center" @click="router.go(-1)">
       <IonIcon :icon="chevronBackOutline" />
       {{ t('button.back') }}

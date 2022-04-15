@@ -10,6 +10,7 @@ account:
   preferences: Thông báo
   privacy: Chính sách bảo mật
   support: Hỗ trợ
+  usage: cách sử dụng
 accountPassword:
   confirmPassword: Xác nhận mật khẩu
   errorMsg: Đã xảy ra lỗi, vui lòng thử lại
@@ -74,6 +75,7 @@ channel:
   title: Kênh truyền hình
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
   users: Được chia sẻ với người dùng
+  v3: Cài đặt V3
 forgot:
   check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
   email: E-mail
@@ -96,6 +98,8 @@ login:
   or: hoặc
   password: Mật khẩu
   withemail: Với địa chỉ email
+module:
+  heading: Mô-đun
 not-found: Không tìm thấy
 notificationSettings:
   heading: Thiết lập thông báo
@@ -104,12 +108,17 @@ onboarding:
   loading: Đang tải
 package:
   channels: Kênh truyền hình
+  devices: Xem các thiết bị
   download: Tải xuống phiên bản
   link_channel: Liên kết với kênh
   set: Đặt phiên bản cho kênh
   test: Phiên bản khởi chạy
   title: thông tin
   versions: Phiên bản
+password:
+  heading: Tạo mật khẩu
+  new: mật khẩu mới
+  validate: Xác thực
 projects:
   list: Của bạn
   sharedlist: Đã chia sẻ với bạn
@@ -133,3 +142,6 @@ register:
 something-went-wrong-try-again-later: |-
   Đã xảy ra lỗi! 
   Thử lại sau.
+usage:
+  title: Cách sử dụng
+your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

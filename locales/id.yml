@@ -10,6 +10,7 @@ account:
   preferences: Pemberitahuan
   privacy: Rahasia pribadi
   support: Mendukung
+  usage: penggunaan
 accountPassword:
   confirmPassword: Setujui password
   errorMsg: Terjadi kesalahan, silakan coba lagi
@@ -76,6 +77,7 @@ channel:
   title: Saluran
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
   users: Dibagikan dengan pengguna
+  v3: Pengaturan V3
 forgot:
   check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
   email: Surel
@@ -98,6 +100,8 @@ login:
   or: atau
   password: Kata sandi
   withemail: Dengan alamat email
+module:
+  heading: Modul
 not-found: Tidak ditemukan
 notificationSettings:
   heading: Akun
@@ -106,12 +110,17 @@ onboarding:
   loading: Memuat
 package:
   channels: saluran
+  devices: Lihat perangkat
   download: Unduh versi
   link_channel: Tautan ke saluran
   set: Setel versi ke saluran
   test: Luncurkan versi
   title: informasi
   versions: Versi
+password:
+  heading: Buat Kata Sandi
+  new: kata sandi baru
+  validate: Mengesahkan
 projects:
   list: Milikmu
   sharedlist: Dibagikan dengan Anda
@@ -135,3 +144,6 @@ register:
 something-went-wrong-try-again-later: |-
   Ada yang salah! 
   Coba lagi nanti.
+usage:
+  title: Penggunaan
+your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

@@ -237,6 +237,17 @@ const presentActionSheet = async() => {
           <li>
             <router-link
               class="flex justify-between items-center"
+              to="/app/usage"
+            >
+              <span class="font-bold">
+                {{ t("account.usage") }}
+              </span>
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </router-link>
+          </li>
+          <li>
+            <router-link
+              class="flex justify-between items-center"
               to="/app/apikeys"
             >
               <span class="font-bold">

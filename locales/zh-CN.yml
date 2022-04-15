@@ -10,6 +10,7 @@ account:
   preferences: 通知
   privacy: 隐私政策
   support: 支持
+  usage: 用法
 accountPassword:
   confirmPassword: 确认密码
   errorMsg: 发生错误，请重试
@@ -70,6 +71,7 @@ channel:
   title: 渠道
   user_no_found: 未找到用户，请先注册
   users: 与用户共享
+  v3: V3 设置
 forgot:
   check_email: 检查您的电子邮件以获取重置密码的链接
   email: 电子邮件
@@ -92,6 +94,8 @@ login:
   or: 要么
   password: 密码
   withemail: 有电子邮件地址
+module:
+  heading: 模块
 not-found: 未找到页面
 notificationSettings:
   heading: 通知设置
@@ -100,12 +104,17 @@ onboarding:
   loading: 正在加载
 package:
   channels: 频道
+  devices: 查看设备
   download: 下载版本
   link_channel: 链接到频道
   set: 将版本设置为频道
   test: 发布版本
   title: 信息
   versions: 版本
+password:
+  heading: 创建密码
+  new: 新密码
+  validate: 证实
 projects:
   list: 你的
   sharedlist: 与您共享
@@ -129,3 +138,6 @@ register:
 something-went-wrong-try-again-later: |-
   有些不对劲！
   稍后再试。
+usage:
+  title: 用法
+your-current-suggested-plan-is: 您目前建议的计划是

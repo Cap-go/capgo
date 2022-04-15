@@ -10,6 +10,7 @@ account:
   preferences: Bildirimler
   privacy: Gizlilik Politikası
   support: Destek
+  usage: kullanım
 accountPassword:
   confirmPassword: Şifreyi Onayla
   errorMsg: Hata oluştu, lütfen tekrar deneyin
@@ -74,6 +75,7 @@ channel:
   title: Kanal
   user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
   users: Kullanıcılarla paylaşıldı
+  v3: V3 ayarları
 forgot:
   check_email: Şifrenizi sıfırlamak için bağlantıyı almak için e-postanızı kontrol edin
   email: E-posta
@@ -96,6 +98,8 @@ login:
   or: veya
   password: Şifre
   withemail: e-posta adresi ile
+module:
+  heading: Modüller
 not-found: Bulunamadı
 notificationSettings:
   heading: Bildirim ayarları
@@ -104,12 +108,17 @@ onboarding:
   loading: Yükleniyor
 package:
   channels: Kanallar
+  devices: Cihazları görün
   download: Sürümü indir
   link_channel: kanala bağlantı
   set: Sürümü kanala ayarla
   test: Sürümü başlat
   title: bilgi
   versions: Sürümler
+password:
+  heading: Şifre oluştur
+  new: Yeni Şifre
+  validate: Doğrula
 projects:
   list: senin
   sharedlist: Seninle paylaştı
@@ -133,3 +142,6 @@ register:
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
+usage:
+  title: kullanım
+your-current-suggested-plan-is: 'Mevcut önerilen planınız:'

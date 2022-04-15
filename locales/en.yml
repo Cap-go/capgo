@@ -10,6 +10,7 @@ account:
   preferences: Notifications
   privacy: Privacy policy
   support: Support
+  usage: usage
 accountPassword:
   confirmPassword: Confirm password
   errorMsg: Error happened, please try again
@@ -72,6 +73,7 @@ channel:
   title: Channel
   user_no_found: User not found, ask to register first
   users: Shared with users
+  v3: V3 settings
 forgot:
   check_email: Check your email to get the link to reset your password
   email: Email
@@ -136,3 +138,6 @@ register:
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
 something-went-wrong-try-again-later: Something went wrong! Try again later.
+usage:
+  title: Usage
+your-current-suggested-plan-is: Your current suggested plan is
