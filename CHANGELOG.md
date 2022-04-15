@@ -1,3 +1,9 @@
+## 0.25.0 (2022-04-15)
+
+### Feat
+
+- add created_by in channel_user
+
 ## 0.24.1 (2022-04-13)
 
 ### Fix
