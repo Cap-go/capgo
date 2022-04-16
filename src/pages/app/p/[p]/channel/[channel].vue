@@ -6,7 +6,7 @@ import {
   actionSheetController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
-import copy from 'copy-to-clipboard'
+import copy from 'copy-text-to-clipboard'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
