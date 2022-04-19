@@ -69,6 +69,7 @@ specifiers:
   critters: 0.0.16
   cross-env: ^7.0.3
   cypress: 9.5.4
+  date-fn: ^0.0.2
   dayjs: 1.11.1
   eslint: 8.13.0
   eslint-plugin-cypress: ^2.12.1
@@ -154,6 +155,7 @@ dependencies:
   capacitor-updater: 3.0.0-beta.16_@capacitor+core@3.4.3
   chart.js: 3.7.1
   copy-text-to-clipboard: 3.0.1
+  date-fn: 0.0.2
   dayjs: 1.11.1
   firebase: 9.6.11
   generate-password-browser: 1.1.0
@@ -6891,6 +6893,10 @@ packages:
     resolution: {integrity: sha512-Vr3mLBA8qWmcuschSLAOogKgQ/Jwxulv3RNE4FXnYWRGujzrRWQI4m12fQqRkwX06C0KanhLr4hK+GydchZsaA==}
     engines: {node: '>= 12'}
     dev: true
+
+  /date-fn/0.0.2:
+    resolution: {integrity: sha512-DBIKrlB2w9d6UPZwYn6qqSeKLwHt5uRf9Mj/PiGWHGQ5CxnvMCx2KteO5owfiknkYzMngrDwz5nX4CGxYlr0uA==}
+    dev: false
 
   /date-fns/1.30.1:
     resolution: {integrity: sha512-hBSVCvSmWC+QypYObzwGOd9wqdDpOt+0wl0KbU+R+uuZBS1jN8VsD1ss3irQDknRj5NvxiTF6oj/nDRnN/UQNw==}

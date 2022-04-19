@@ -111,7 +111,9 @@ package:
   devices: Xem các thiết bị
   download: Tải xuống phiên bản
   link_channel: Liên kết với kênh
+  mobiles-stats: Số liệu thống kê về điện thoại di động
   set: Đặt phiên bản cho kênh
+  stats: số liệu thống kê
   test: Phiên bản khởi chạy
   title: thông tin
   versions: Phiên bản

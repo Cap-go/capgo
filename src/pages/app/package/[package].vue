@@ -301,7 +301,7 @@ const back = () => {
           <IonItem @click="openDevices()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
-                {{ t('package.devices') }}
+                {{ t('package.mobiles-stats') }}
               </h2>
             </IonLabel>
             <IonNote slot="end">

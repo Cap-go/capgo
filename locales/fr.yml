@@ -115,7 +115,9 @@ package:
   devices: Voir les appareils
   download: Télécharger la version
   link_channel: Lien vers la chaîne
+  mobiles-stats: Statistiques mobiles
   set: Définir la version sur le canal
+  stats: Statistiques
   test: Version de lancement
   title: Info
   versions: Versions

@@ -107,7 +107,9 @@ package:
   devices: デバイスを見る
   download: ダウンロード版
   link_channel: チャネルへのリンク
+  mobiles-stats: モバイル統計
   set: バージョンをチャネルに設定
+  stats: 統計
   test: 起動バージョン
   title: 情報
   versions: バージョン

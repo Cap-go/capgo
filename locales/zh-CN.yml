@@ -107,7 +107,9 @@ package:
   devices: 查看设备
   download: 下载版本
   link_channel: 链接到频道
+  mobiles-stats: 手机数据
   set: 将版本设置为频道
+  stats: 统计数据
   test: 发布版本
   title: 信息
   versions: 版本

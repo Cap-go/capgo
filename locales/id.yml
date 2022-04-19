@@ -113,7 +113,9 @@ package:
   devices: Lihat perangkat
   download: Unduh versi
   link_channel: Tautan ke saluran
+  mobiles-stats: Statistik ponsel
   set: Setel versi ke saluran
+  stats: statistik
   test: Luncurkan versi
   title: informasi
   versions: Versi

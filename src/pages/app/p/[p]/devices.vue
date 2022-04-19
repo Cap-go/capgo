@@ -16,6 +16,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { DoughnutChart, useDoughnutChart } from 'vue-chart-3'
 import type { ChartData, ChartOptions } from 'chart.js'
+import { subDays } from 'date-fns'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
@@ -61,6 +62,7 @@ const loadData = async() => {
         updated_at
       `)
       .eq('app_id', id.value)
+      .gt('updated_at', subDays(new Date(), 30).toUTCString())
     const { data: dataVersions } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
@@ -170,7 +172,30 @@ const back = () => {
         <Spinner />
       </div>
       <div v-else>
-        <DoughnutChart class="my-8 mx-auto md:w-100 md:h-100 w-50 h-50" v-bind="doughnutChartProps" />
+        <div class="grid h-32 grid-flow-row grid-cols-2 gap-2 sm:w-1/4 mx-auto w-full">
+          <div class="flex flex-col justify-center px-4 py-4 bg-white border border-gray-300 rounded">
+            <div>
+              <p class="text-3xl font-semibold text-center text-gray-800">
+                {{ devices.length }}
+              </p>
+              <p class="text-lg text-center text-gray-500">
+                Devices
+              </p>
+            </div>
+          </div>
+
+          <div class="flex flex-col justify-center px-4 py-4 bg-white border border-gray-300 rounded">
+            <div>
+              <p class="text-3xl font-semibold text-center text-gray-800">
+                {{ versions.length }}
+              </p>
+              <p class="text-lg text-center text-gray-500">
+                Versions
+              </p>
+            </div>
+          </div>
+        </div>
+        <DoughnutChart class="my-8 mx-auto w-100 h-100" v-bind="doughnutChartProps" />
         <ion-list ref="listRef">
           <template v-for="d in devices" :key="d.device_id">
             <IonItem @click="openDevice(d)">

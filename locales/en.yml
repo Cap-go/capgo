@@ -106,10 +106,12 @@ onboarding:
   loading: Loading
 package:
   channels: Channels
-  devices: See devices
+  devices: See devices statistics
   download: Download version
   link_channel: Link to channel
+  mobiles-stats: Mobiles stats
   set: Set version to channel
+  stats: stats
   test: Launch version
   title: info
   versions: Versions

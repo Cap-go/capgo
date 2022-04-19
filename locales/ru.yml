@@ -111,7 +111,9 @@ package:
   devices: Посмотреть устройства
   download: Скачать версию
   link_channel: Ссылка на канал
+  mobiles-stats: Мобильная статистика
   set: Установить версию для канала
+  stats: статистика
   test: Запустить версию
   title: Информация
   versions: Версии

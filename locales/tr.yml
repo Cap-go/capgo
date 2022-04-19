@@ -111,7 +111,9 @@ package:
   devices: Cihazları görün
   download: Sürümü indir
   link_channel: kanala bağlantı
+  mobiles-stats: cep telefonu istatistikleri
   set: Sürümü kanala ayarla
+  stats: istatistikler
   test: Sürümü başlat
   title: bilgi
   versions: Sürümler

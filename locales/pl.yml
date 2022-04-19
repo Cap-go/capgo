@@ -111,7 +111,9 @@ package:
   devices: Zobacz urządzenia
   download: Pobierz wersję
   link_channel: Link do kanału
+  mobiles-stats: Statystyki telefonów komórkowych
   set: Ustaw wersję na kanał
+  stats: statystyki
   test: Uruchom wersję
   title: informacje
   versions: Wersje

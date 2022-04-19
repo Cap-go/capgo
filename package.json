@@ -67,6 +67,7 @@
     "capacitor-updater": "3.0.0-beta.16",
     "chart.js": "^3.7.1",
     "copy-text-to-clipboard": "^3.0.1",
+    "date-fn": "^0.0.2",
     "dayjs": "1.11.1",
     "firebase": "9.6.11",
     "generate-password-browser": "^1.1.0",
