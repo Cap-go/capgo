@@ -140,6 +140,12 @@ register:
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
 something-went-wrong-try-again-later: Something went wrong! Try again later.
+stats:
+  devices: Devices
+  downloads: Downloads
+  subtitle: Last month
+  title: Stats
+  versions: Versions
 usage:
   title: Usage
 your-current-suggested-plan-is: Your current suggested plan is

@@ -144,6 +144,12 @@ register:
 something-went-wrong-try-again-later: |-
   Đã xảy ra lỗi! 
   Thử lại sau.
+stats:
+  devices: Thiết bị
+  downloads: Tải xuống
+  subtitle: Tháng trước
+  title: Số liệu thống kê
+  versions: Phiên bản
 usage:
   title: Cách sử dụng
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

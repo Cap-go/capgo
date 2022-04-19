@@ -146,6 +146,12 @@ register:
 something-went-wrong-try-again-later: |-
   Ada yang salah! 
   Coba lagi nanti.
+stats:
+  devices: Perangkat
+  downloads: Unduhan
+  subtitle: Bulan lalu
+  title: Statistik
+  versions: Versi
 usage:
   title: Penggunaan
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

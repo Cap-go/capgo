@@ -140,6 +140,12 @@ register:
 something-went-wrong-try-again-later: |-
   何かがうまくいかなかった！
   あとでもう一度試してみてください。
+stats:
+  devices: デバイス
+  downloads: ダウンロード
+  subtitle: 先月
+  title: 統計
+  versions: バージョン
 usage:
   title: 使用法
 your-current-suggested-plan-is: 現在提案されている計画は

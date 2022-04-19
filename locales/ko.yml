@@ -140,6 +140,12 @@ register:
 something-went-wrong-try-again-later: |-
   문제가 발생했습니다! 
   나중에 다시 시도하세요.
+stats:
+  devices: 장치
+  downloads: 다운로드
+  subtitle: 지난 달
+  title: 통계
+  versions: 버전
 usage:
   title: 용법
 your-current-suggested-plan-is: 현재 제안된 계획은

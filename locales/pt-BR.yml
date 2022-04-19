@@ -144,6 +144,12 @@ register:
 something-went-wrong-try-again-later: |-
   Algo deu errado! 
   Tente mais tarde.
+stats:
+  devices: Dispositivos
+  downloads: Transferências
+  subtitle: Mês passado
+  title: Estatísticas
+  versions: Versões
 usage:
   title: Uso
 your-current-suggested-plan-is: Seu plano sugerido atual é

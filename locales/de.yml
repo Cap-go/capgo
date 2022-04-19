@@ -150,6 +150,12 @@ register:
 something-went-wrong-try-again-later: |-
   Etwas ist schief gelaufen! 
   Versuchen Sie es später noch einmal.
+stats:
+  devices: Geräte
+  downloads: Downloads
+  subtitle: Letzten Monat
+  title: Statistiken
+  versions: Versionen
 usage:
   title: Verwendungszweck
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist

@@ -147,6 +147,12 @@ register:
 something-went-wrong-try-again-later: |-
   Qualcosa è andato storto! 
   Riprovare più tardi.
+stats:
+  devices: Dispositivi
+  downloads: Download
+  subtitle: Lo scorso mese
+  title: Statistiche
+  versions: Versioni
 usage:
   title: Utilizzo
 your-current-suggested-plan-is: Il tuo attuale piano suggerito è

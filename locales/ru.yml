@@ -144,6 +144,12 @@ register:
 something-went-wrong-try-again-later: |-
   Что-то пошло не так! 
   Попробуйте позже.
+stats:
+  devices: Устройства
+  downloads: Загрузки
+  subtitle: Прошлый месяц
+  title: Статистика
+  versions: Версии
 usage:
   title: использование
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'

@@ -144,6 +144,12 @@ register:
 something-went-wrong-try-again-later: |-
   Coś poszło nie tak! 
   Spróbuj ponownie później.
+stats:
+  devices: Urządzenia
+  downloads: Pliki do pobrania
+  subtitle: W zeszłym miesiącu
+  title: Statystyki
+  versions: Wersje
 usage:
   title: Stosowanie
 your-current-suggested-plan-is: Twój obecny sugerowany plan to

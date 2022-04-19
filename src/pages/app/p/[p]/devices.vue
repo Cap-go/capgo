@@ -4,6 +4,7 @@ import {
   IonHeader,
   IonIcon,
   IonItem,
+  IonItemDivider,
   IonLabel,
   IonList, IonNote, IonPage, IonRefresher, IonRefresherContent,
   IonTitle,
@@ -32,7 +33,8 @@ const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const id = ref('')
-const isLoading = ref(false)
+const isLoading = ref(true)
+const downloads = ref(0)
 const versions = ref<definitions['app_versions'][]>([])
 const devices = ref<(definitions['devices'] & Device)[]>([])
 const dataDevValues = ref([30, 40, 60, 70, 5])
@@ -78,10 +80,19 @@ const loadData = async() => {
   }
 }
 
+const getLastDownload = async() => {
+  const { data, error } = await supabase.rpc<number>('get_dl_by_month_by_app', { pastmonth: 0, appid: id.value })
+  if (error)
+    downloads.value = 0
+  else
+    downloads.value = Number(data)
+}
+
 const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await loadData()
+    await getLastDownload()
   }
   catch (error) {
     console.error(error)
@@ -160,7 +171,7 @@ const back = () => {
           </IonButton>
         </IonButtons>
         <IonTitle color="warning">
-          Devices
+          {{ t('stats.title') }}
         </IonTitle>
       </IonToolbar>
     </IonHeader>
@@ -172,13 +183,16 @@ const back = () => {
         <Spinner />
       </div>
       <div v-else>
-        <div class="grid h-32 grid-flow-row grid-cols-2 gap-2 sm:w-1/4 mx-auto w-full">
+        <p class="text-center">
+          {{ t('stats.subtitle') }}
+        </p>
+        <div class="grid h-32 grid-flow-row grid-cols-3 gap-2 sm:w-1/4 mx-auto w-full">
           <div class="flex flex-col justify-center px-4 py-4 bg-white border border-gray-300 rounded">
             <div>
               <p class="text-3xl font-semibold text-center text-gray-800">
                 {{ devices.length }}
               </p>
-              <p class="text-lg text-center text-gray-500">
+              <p class="text-sm text-center text-gray-500">
                 Devices
               </p>
             </div>
@@ -189,14 +203,30 @@ const back = () => {
               <p class="text-3xl font-semibold text-center text-gray-800">
                 {{ versions.length }}
               </p>
-              <p class="text-lg text-center text-gray-500">
-                Versions
+              <p class="text-sm text-center text-gray-500">
+                {{ t('stats.versions') }}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex flex-col justify-center px-4 py-4 bg-white border border-gray-300 rounded">
+            <div>
+              <p class="text-3xl font-semibold text-center text-gray-800">
+                {{ downloads }}
+              </p>
+              <p class="text-sm text-center text-gray-500">
+                {{ t('stats.downloads') }}
               </p>
             </div>
           </div>
         </div>
         <DoughnutChart class="my-8 mx-auto w-100 h-100" v-bind="doughnutChartProps" />
         <ion-list ref="listRef">
+          <ion-item-divider>
+            <ion-label>
+              {{ t('stats.devices') }}
+            </ion-label>
+          </ion-item-divider>
           <template v-for="d in devices" :key="d.device_id">
             <IonItem @click="openDevice(d)">
               <IonLabel>

@@ -140,6 +140,12 @@ register:
 something-went-wrong-try-again-later: |-
   有些不对劲！
   稍后再试。
+stats:
+  devices: 设备
+  downloads: 下载
+  subtitle: 上个月
+  title: 统计数据
+  versions: 版本
 usage:
   title: 用法
 your-current-suggested-plan-is: 您目前建议的计划是

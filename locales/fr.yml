@@ -148,6 +148,12 @@ register:
   specialError: Doit contenir des caractères spéciaux
   upperCaseError: Doit contenir des lettres majuscules
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
+stats:
+  devices: Dispositifs
+  downloads: Téléchargements
+  subtitle: Le mois dernier
+  title: Statistiques
+  versions: Versions
 usage:
   title: Usage
 your-current-suggested-plan-is: Votre plan suggéré actuel est

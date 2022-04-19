@@ -144,6 +144,12 @@ register:
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
+stats:
+  devices: cihazlar
+  downloads: İndirilenler
+  subtitle: Geçen ay
+  title: istatistikler
+  versions: Sürümler
 usage:
   title: kullanım
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'
