@@ -1,3 +1,9 @@
+## 0.29.2 (2022-04-22)
+
+### Fix
+
+- add os_version to device page
+
 ## 0.29.1 (2022-04-22)
 
 ### Fix
