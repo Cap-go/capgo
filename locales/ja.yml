@@ -85,6 +85,7 @@ device:
   link_version: デバイスにリンクされているバージョン
   no_channel: チャネルがありません。クリックして追加してください
   no_override: オーバーライドなし、クリックして追加
+  os_version: OSバージョン
   platform: プラットホーム
   plugin_version: プラグインバージョン
   title: 端末

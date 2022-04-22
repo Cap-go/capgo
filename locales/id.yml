@@ -91,6 +91,7 @@ device:
   link_version: versi yang ditautkan ke perangkat
   no_channel: Tidak ada saluran, klik untuk menambahkan
   no_override: Tidak ada penggantian, klik untuk menambahkan
+  os_version: versi OS
   platform: Platform
   plugin_version: Versi plugin
   title: Perangkat

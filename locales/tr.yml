@@ -89,6 +89,7 @@ device:
   link_version: cihaza bağlı sürüm
   no_channel: Kanal yok, eklemek için tıklayın
   no_override: Geçersiz kılma yok, eklemek için tıklayın
+  os_version: OS sürümü
   platform: platformu
   plugin_version: Eklenti sürümü
   title: Cihaz

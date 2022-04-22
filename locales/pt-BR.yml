@@ -89,6 +89,7 @@ device:
   link_version: versão vinculada ao dispositivo
   no_channel: Nenhum canal, clique para adicionar
   no_override: Sem substituição, clique para adicionar
+  os_version: Versão do SO
   platform: Plataforma
   plugin_version: Versão do plug-in
   title: Dispositivo

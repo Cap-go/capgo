@@ -85,6 +85,7 @@ device:
   link_version: 链接到设备的版本
   no_channel: 没有频道，点击添加
   no_override: 无覆盖，点击添加
+  os_version: 操作系统版本
   platform: 平台
   plugin_version: 插件版本
   title: 设备

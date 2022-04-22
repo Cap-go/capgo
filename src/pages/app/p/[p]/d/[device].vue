@@ -109,6 +109,7 @@ const getDevice = async() => {
           device_id,
           app_id,
           platform,
+          os_version,
           version (
             name,
             app_id,
@@ -381,6 +382,16 @@ const back = () => {
           </IonLabel>
           <IonNote slot="end">
             {{ formatDate(device.updated_at) }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('device.os_version') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ device.os_version || 'unknow' }}
           </IonNote>
         </IonItem>
         <IonItem v-if="device">

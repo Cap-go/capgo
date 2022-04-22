@@ -89,6 +89,7 @@ device:
   link_version: wersja połączona z urządzeniem
   no_channel: Brak kanału, kliknij, aby dodać
   no_override: Brak zastąpienia, kliknij, aby dodać
+  os_version: Wersja systemu operacyjnego
   platform: Platforma
   plugin_version: Wersja wtyczki
   title: Urządzenie

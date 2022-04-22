@@ -89,6 +89,7 @@ device:
   link_version: phiên bản được liên kết với thiết bị
   no_channel: Không có kênh, nhấp để thêm
   no_override: Không ghi đè, nhấp để thêm
+  os_version: phiên bản của hệ điều hành
   platform: Nền tảng
   plugin_version: Phiên bản plugin
   title: Thiết bị

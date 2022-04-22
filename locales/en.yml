@@ -87,6 +87,7 @@ device:
   link_version: version linked to device
   no_channel: No channel, click to add
   no_override: No override, click to add
+  os_version: OS version
   platform: Platform
   plugin_version: Plugin version
   title: Device

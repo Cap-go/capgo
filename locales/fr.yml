@@ -91,6 +91,7 @@ device:
   link_version: version liée à l'appareil
   no_channel: Aucune chaîne, cliquez pour ajouter
   no_override: Pas de remplacement, cliquez pour ajouter
+  os_version: Version du système d'exploitation
   platform: Plateforme
   plugin_version: Version du plug-in
   title: Appareil

@@ -93,6 +93,7 @@ device:
   link_version: versión vinculada al dispositivo
   no_channel: No hay canal, haga clic para agregar
   no_override: Sin anular, haga clic para agregar
+  os_version: versión del sistema operativo
   platform: Plataforma
   plugin_version: Versión del complemento
   title: Dispositivo

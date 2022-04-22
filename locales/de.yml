@@ -91,6 +91,7 @@ device:
   link_version: mit dem Gerät verknüpfte Version
   no_channel: Kein Kanal, zum Hinzufügen klicken
   no_override: Keine Überschreibung, zum Hinzufügen klicken
+  os_version: OS Version
   platform: Plattform
   plugin_version: Plugin-Version
   title: Gerät
