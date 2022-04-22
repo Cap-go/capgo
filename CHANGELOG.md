@@ -1,3 +1,9 @@
+## 0.27.0 (2022-04-19)
+
+### Feat
+
+- add download number in stats page
+
 ## 0.26.3 (2022-04-19)
 
 ### Fix
