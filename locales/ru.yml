@@ -76,6 +76,16 @@ channel:
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
   users: Доступно пользователям
   v3: Настройки версии 3
+device:
+  created_at: Создано на
+  info: информация
+  last_update: Последнее обновление
+  platform: Платформа
+  plugin_version: Версия плагина
+  title: Устройство
+  version: Версия
+devices:
+  title: Устройства
 forgot:
   check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
   email: Эл. адрес
@@ -108,6 +118,7 @@ onboarding:
   loading: Загрузка
 package:
   channels: каналы
+  device_list: Список устройств
   devices: Посмотреть устройства
   download: Скачать версию
   link_channel: Ссылка на канал

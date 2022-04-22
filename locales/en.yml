@@ -74,6 +74,16 @@ channel:
   user_no_found: User not found, ask to register first
   users: Shared with users
   v3: V3 settings
+device:
+  created_at: Created at
+  info: informations
+  last_update: Last update
+  platform: Platform
+  plugin_version: Plugin version
+  title: Device
+  version: Version
+devices:
+  title: Devices
 forgot:
   check_email: Check your email to get the link to reset your password
   email: Email
@@ -106,6 +116,7 @@ onboarding:
   loading: Loading
 package:
   channels: Channels
+  device_list: Devices list
   devices: See devices statistics
   download: Download version
   link_channel: Link to channel

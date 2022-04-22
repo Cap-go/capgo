@@ -72,6 +72,16 @@ channel:
   user_no_found: 未找到用户，请先注册
   users: 与用户共享
   v3: V3 设置
+device:
+  created_at: 创建于
+  info: 信息
+  last_update: 最后更新
+  platform: 平台
+  plugin_version: 插件版本
+  title: 设备
+  version: 版本
+devices:
+  title: 设备
 forgot:
   check_email: 检查您的电子邮件以获取重置密码的链接
   email: 电子邮件
@@ -104,6 +114,7 @@ onboarding:
   loading: 正在加载
 package:
   channels: 频道
+  device_list: 设备列表
   devices: 查看设备
   download: 下载版本
   link_channel: 链接到频道

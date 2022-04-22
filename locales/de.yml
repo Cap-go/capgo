@@ -78,6 +78,16 @@ channel:
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
   users: Mit Benutzern geteilt
   v3: V3-Einstellungen
+device:
+  created_at: Hergestellt in
+  info: Informationen
+  last_update: Letztes Update
+  platform: Plattform
+  plugin_version: Plugin-Version
+  title: Gerät
+  version: Ausführung
+devices:
+  title: Geräte
 forgot:
   check_email: >-
     Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
@@ -112,6 +122,7 @@ onboarding:
   loading: Wird geladen
 package:
   channels: Kanäle
+  device_list: Geräteliste
   devices: Siehe Geräte
   download: Download-Version
   link_channel: Link zum Kanal

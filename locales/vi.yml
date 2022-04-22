@@ -76,6 +76,16 @@ channel:
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
+device:
+  created_at: Được tạo lúc
+  info: thông tin
+  last_update: Cập nhật cuối cùng
+  platform: Nền tảng
+  plugin_version: Phiên bản plugin
+  title: Thiết bị
+  version: Phiên bản
+devices:
+  title: Thiết bị
 forgot:
   check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
   email: E-mail
@@ -108,6 +118,7 @@ onboarding:
   loading: Đang tải
 package:
   channels: Kênh truyền hình
+  device_list: Danh sách thiết bị
   devices: Xem các thiết bị
   download: Tải xuống phiên bản
   link_channel: Liên kết với kênh

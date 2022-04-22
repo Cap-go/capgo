@@ -78,6 +78,16 @@ channel:
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
+device:
+  created_at: Créé à
+  info: renseignements
+  last_update: Dernière mise à jour
+  platform: Plateforme
+  plugin_version: Version du plug-in
+  title: Appareil
+  version: Version
+devices:
+  title: Dispositifs
 forgot:
   check_email: >-
     Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
@@ -112,6 +122,7 @@ onboarding:
   loading: Chargement
 package:
   channels: Chaînes
+  device_list: Liste des appareils
   devices: Voir les appareils
   download: Télécharger la version
   link_channel: Lien vers la chaîne

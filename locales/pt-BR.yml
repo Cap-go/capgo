@@ -76,6 +76,16 @@ channel:
   user_no_found: Usuário não encontrado, peça para se registrar primeiro
   users: Compartilhado com usuários
   v3: Configurações V3
+device:
+  created_at: Criado em
+  info: informações
+  last_update: Última atualização
+  platform: Plataforma
+  plugin_version: Versão do plug-in
+  title: Dispositivo
+  version: Versão
+devices:
+  title: Dispositivos
 forgot:
   check_email: Verifique seu e-mail para obter o link para redefinir sua senha
   email: E-mail
@@ -108,6 +118,7 @@ onboarding:
   loading: Carregando
 package:
   channels: Canais
+  device_list: Lista de dispositivos
   devices: Ver dispositivos
   download: Baixar versão
   link_channel: Link para o canal

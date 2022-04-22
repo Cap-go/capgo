@@ -77,6 +77,16 @@ channel:
   user_no_found: Utente non trovato, chiedi prima di registrarti
   users: Condiviso con gli utenti
   v3: Impostazioni V3
+device:
+  created_at: Creato a
+  info: informazioni
+  last_update: Ultimo aggiornamento
+  platform: piattaforma
+  plugin_version: Versione plug-in
+  title: Dispositivo
+  version: Versione
+devices:
+  title: Dispositivi
 forgot:
   check_email: Controlla la tua email per ottenere il link per reimpostare la tua password
   email: E-mail
@@ -109,6 +119,7 @@ onboarding:
   loading: Caricamento in corso
 package:
   channels: Canali
+  device_list: Elenco dispositivi
   devices: Vedi dispositivi
   download: Scarica versione
   link_channel: Link al canale

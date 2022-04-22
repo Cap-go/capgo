@@ -80,6 +80,16 @@ channel:
   user_no_found: Usuario no encontrado, solicite registrarse primero
   users: Compartido con los usuarios
   v3: configuración V3
+device:
+  created_at: Creado en
+  info: informaciones
+  last_update: Última actualización
+  platform: Plataforma
+  plugin_version: Versión del complemento
+  title: Dispositivo
+  version: Versión
+devices:
+  title: Dispositivos
 forgot:
   check_email: >-
     Revise su correo electrónico para obtener el enlace para restablecer su
@@ -114,6 +124,7 @@ onboarding:
   loading: Cargando
 package:
   channels: Canales
+  device_list: lista de dispositivos
   devices: ver dispositivos
   download: Descargar versión
   link_channel: Enlace al canal

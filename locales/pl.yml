@@ -76,6 +76,16 @@ channel:
   user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
   users: Udostępnione użytkownikom
   v3: Ustawienia V3
+device:
+  created_at: Utworzono w
+  info: informacje
+  last_update: Ostatnia aktualizacja
+  platform: Platforma
+  plugin_version: Wersja wtyczki
+  title: Urządzenie
+  version: Wersja
+devices:
+  title: Urządzenia
 forgot:
   check_email: Sprawdź pocztę, aby uzyskać link do zresetowania hasła
   email: E-mail
@@ -108,6 +118,7 @@ onboarding:
   loading: Ładowanie
 package:
   channels: Kanały
+  device_list: Lista urządzeń
   devices: Zobacz urządzenia
   download: Pobierz wersję
   link_channel: Link do kanału

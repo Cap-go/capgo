@@ -171,6 +171,9 @@ const openChannel = (channel: definitions['channels']) => {
 const openDevices = () => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/devices`)
 }
+const openStats = () => {
+  router.push(`/app/p/${id.value.replaceAll('.', '--')}/stats`)
+}
 const formatDate = (date: string | undefined) => {
   return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
@@ -298,10 +301,20 @@ const back = () => {
       </div>
       <div v-else>
         <ion-list ref="listRef">
-          <IonItem @click="openDevices()">
+          <IonItem @click="openStats()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('package.mobiles-stats') }}
+              </h2>
+            </IonLabel>
+            <IonNote slot="end">
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </IonNote>
+          </IonItem>
+          <IonItem @click="openDevices()">
+            <IonLabel>
+              <h2 class="text-sm text-azure-500">
+                {{ t('package.device_list') }}
               </h2>
             </IonLabel>
             <IonNote slot="end">

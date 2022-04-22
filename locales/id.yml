@@ -78,6 +78,16 @@ channel:
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
+device:
+  created_at: Dibuat di
+  info: informasi
+  last_update: Pembaharuan Terakhir
+  platform: Platform
+  plugin_version: Versi plugin
+  title: Perangkat
+  version: 'Versi: kapan'
+devices:
+  title: Perangkat
 forgot:
   check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
   email: Surel
@@ -110,6 +120,7 @@ onboarding:
   loading: Memuat
 package:
   channels: saluran
+  device_list: Daftar perangkat
   devices: Lihat perangkat
   download: Unduh versi
   link_channel: Tautan ke saluran

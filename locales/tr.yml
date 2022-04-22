@@ -76,6 +76,16 @@ channel:
   user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
+device:
+  created_at: 'Şu saatte oluşturuldu:'
+  info: bilgi
+  last_update: Son Güncelleme
+  platform: platformu
+  plugin_version: Eklenti sürümü
+  title: Cihaz
+  version: sürüm
+devices:
+  title: cihazlar
 forgot:
   check_email: Şifrenizi sıfırlamak için bağlantıyı almak için e-postanızı kontrol edin
   email: E-posta
@@ -108,6 +118,7 @@ onboarding:
   loading: Yükleniyor
 package:
   channels: Kanallar
+  device_list: Cihaz listesi
   devices: Cihazları görün
   download: Sürümü indir
   link_channel: kanala bağlantı

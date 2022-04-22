@@ -72,6 +72,16 @@ channel:
   user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
   users: ユーザーと共有
   v3: V3設定
+device:
+  created_at: で作成
+  info: 情報
+  last_update: 最後の更新
+  platform: プラットホーム
+  plugin_version: プラグインバージョン
+  title: 端末
+  version: バージョン
+devices:
+  title: デバイス
 forgot:
   check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
   email: Eメール
@@ -104,6 +114,7 @@ onboarding:
   loading: 読み込み中
 package:
   channels: チャネル
+  device_list: デバイスリスト
   devices: デバイスを見る
   download: ダウンロード版
   link_channel: チャネルへのリンク
