@@ -1,3 +1,9 @@
+## 0.28.0 (2022-04-22)
+
+### Feat
+
+- add device page and split stats and devices
+
 ## 0.27.0 (2022-04-19)
 
 ### Feat
