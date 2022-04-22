@@ -1,3 +1,9 @@
+## 0.29.1 (2022-04-22)
+
+### Fix
+
+- channel remove old link system
+
 ## 0.29.0 (2022-04-22)
 
 ### Feat
