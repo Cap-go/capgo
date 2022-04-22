@@ -62,6 +62,7 @@ channel:
   add: 追加
   copy: URLをコピー
   invit: 招待するメールアドレスを入力
+  is_public: チャンネル公開
   make_it: 成功する
   makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします
   makepublic: チャンネルは非公開です。クリックして公開してください

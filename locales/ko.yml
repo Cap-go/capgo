@@ -62,6 +62,7 @@ channel:
   add: 추가하다
   copy: URL 복사
   invit: 초대할 이메일 입력
+  is_public: 채널 공개
   make_it: 만들어
   makeprivate: 채널이 공개되어 있습니다. 비공개로 설정하려면 클릭하세요.
   makepublic: 채널이 비공개입니다. 공개하려면 클릭하세요.

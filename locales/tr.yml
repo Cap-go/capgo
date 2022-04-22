@@ -66,6 +66,7 @@ channel:
   add: Ekle
   copy: Url'yi kopyala
   invit: Davet etmek için e-posta yazın
+  is_public: genel kanal
   make_it: Bunu yapmak
   makeprivate: Kanalınız herkese açık, özel yapmak için tıklayın
   makepublic: Kanalınız gizli, herkese açık yapmak için tıklayın

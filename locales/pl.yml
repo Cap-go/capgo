@@ -66,6 +66,7 @@ channel:
   add: Dodać
   copy: Kopiuj URL
   invit: Wpisz e-mail, aby zaprosić
+  is_public: Kanał publiczny
   make_it: Zrób to
   makeprivate: Twój kanał jest publiczny, kliknij, aby ustawić go jako prywatny
   makepublic: Twój kanał jest prywatny, kliknij, aby upublicznić

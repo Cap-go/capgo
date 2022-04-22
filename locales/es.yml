@@ -70,6 +70,7 @@ channel:
   add: Agregar
   copy: Copiar URL
   invit: Escriba el correo electrónico para invitar
+  is_public: canal publico
   make_it: Hazlo
   makeprivate: Tu canal es público, haz clic para hacerlo privado
   makepublic: Tu canal es privado, haz clic para hacerlo público

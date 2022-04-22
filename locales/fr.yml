@@ -68,6 +68,7 @@ channel:
   add: Ajouter
   copy: Copier le lien
   invit: Tapez l'e-mail pour inviter
+  is_public: Chaîne publique
   make_it: Fais-le
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
   makepublic: Votre chaîne est privée, cliquez pour la rendre publique

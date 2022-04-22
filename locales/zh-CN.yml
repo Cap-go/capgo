@@ -62,6 +62,7 @@ channel:
   add: 添加
   copy: 复制网址
   invit: 输入电子邮件以邀请
+  is_public: 公开频道
   make_it: 做了
   makeprivate: 您的频道是公开的，点击将其设为私密
   makepublic: 您的频道是私人频道，点击将其设为公开

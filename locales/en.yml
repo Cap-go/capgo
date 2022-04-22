@@ -64,6 +64,7 @@ channel:
   add: Add
   copy: Copy URL
   invit: Type email to invite
+  is_public: Channel public
   make_it: Make it
   makeprivate: Your channel is public, click to make it private
   makepublic: Your channel is private, click to make it public

@@ -68,6 +68,7 @@ channel:
   add: Menambahkan
   copy: Salin URL
   invit: Ketik email untuk mengundang
+  is_public: Saluran publik
   make_it: Buat itu
   makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi
   makepublic: Saluran Anda bersifat pribadi, klik untuk menjadikannya publik

@@ -6,8 +6,7 @@ import {
   actionSheetController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
-import copy from 'copy-text-to-clipboard'
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
@@ -163,10 +162,6 @@ const addUser = async() => {
 const back = () => {
   router.go(-1)
 }
-const publicLink = computed(() => channel.value ? `https://capgo.app/api/latest?appid=${channel.value.version.app_id}&channel=${channel.value.name}` : '')
-const copyPublicLink = () => {
-  copy(publicLink.value)
-}
 const makePublic = async(val = true) => {
   if (!channel.value || !id.value)
     return
@@ -269,36 +264,21 @@ const inviteUser = async(userId: string) => {
       <ion-list>
         <ion-list-header>
           <span class="text-vista-blue-500">
-            {{ channel?.name }} {{ t(channel?.public ? 'channel.public_desc' : 'channel.private_desc') }}
+            {{ channel?.name }}
           </span>
         </ion-list-header>
-        <ion-item-divider>
-          <ion-label>
-            {{ t('channel.public') }}
+        <ion-item>
+          <ion-label class="my-6 font-extrabold">
+            {{ t('channel.is_public') }}
           </ion-label>
-        </ion-item-divider>
-        <IonItem v-if="channel && channel.public" @click="copyPublicLink()">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col cursor-pointer">
-              <div class="flex justify-between items-center truncate pr-4">
-                <h2 class="text-sm text-azure-500">
-                  {{ t('channel.copy') }} {{ publicLink }}
-                </h2>
-              </div>
-            </div>
-          </IonLabel>
-        </IonItem>
-        <IonItem @click="makePublic(!channel?.public)">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col">
-              <div class="flex justify-between items-center cursor-pointer">
-                <h2 class="text-sm text-azure-500">
-                  {{ t('channel.make_it') }} {{ t(channel?.public ? 'channel.private_desc' : 'channel.public_desc') }}
-                </h2>
-              </div>
-            </div>
-          </IonLabel>
-        </IonItem>
+          <ion-buttons slot="end">
+            <ion-toggle
+              color="secondary"
+              :checked="channel?.public"
+              @ionChange="makePublic($event.detail.checked)"
+            />
+          </ion-buttons>
+        </ion-item>
         <ion-item-divider>
           <ion-label>
             {{ t('channel.v3') }}
