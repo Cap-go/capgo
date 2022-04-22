@@ -60,6 +60,7 @@ button:
   delete: Menghapus
   go: Pergi
   home: Beranda
+  remove: Menghapus
   tabs: tab
   toggle_dark: Ubah ke mode gelap
   toggle_langs: Ubah bahasa
@@ -79,12 +80,21 @@ channel:
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
 device:
+  channel: Tautan saluran
   created_at: Dibuat di
+  force_version: Versi paksa
   info: informasi
   last_update: Pembaharuan Terakhir
+  link_channel: Saluran tertaut ke perangkat
+  link_fail: Tidak dapat menghubungkan sesuatu yang salah terjadi
+  link_version: versi yang ditautkan ke perangkat
+  no_channel: Tidak ada saluran, klik untuk menambahkan
+  no_override: Tidak ada penggantian, klik untuk menambahkan
   platform: Platform
   plugin_version: Versi plugin
   title: Perangkat
+  unlink_channel: Putuskan tautan saluran ke perangkat
+  unlink_version: Versi batalkan tautan ke perangkat
   version: 'Versi: kapan'
 devices:
   title: Perangkat
@@ -124,6 +134,7 @@ package:
   devices: Lihat perangkat
   download: Unduh versi
   link_channel: Tautan ke saluran
+  link_version: Tautan ke versi
   mobiles-stats: Statistik ponsel
   set: Setel versi ke saluran
   stats: statistik

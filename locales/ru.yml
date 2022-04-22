@@ -58,6 +58,7 @@ button:
   delete: Удалить
   go: Перейти
   home: Главная
+  remove: Удалять
   tabs: Вкладки
   toggle_dark: Включить темный режим
   toggle_langs: Сменить язык
@@ -77,12 +78,21 @@ channel:
   users: Доступно пользователям
   v3: Настройки версии 3
 device:
+  channel: Ссылка на канал
   created_at: Создано на
+  force_version: Принудительная версия
   info: информация
   last_update: Последнее обновление
+  link_channel: Канал связан с устройством
+  link_fail: Не могу связать что-то не так
+  link_version: версия привязана к устройству
+  no_channel: Нет канала, нажмите, чтобы добавить
+  no_override: Нет переопределения, нажмите, чтобы добавить
   platform: Платформа
   plugin_version: Версия плагина
   title: Устройство
+  unlink_channel: Отменить связь канала с устройством
+  unlink_version: Отвязать версию от устройства
   version: Версия
 devices:
   title: Устройства
@@ -122,6 +132,7 @@ package:
   devices: Посмотреть устройства
   download: Скачать версию
   link_channel: Ссылка на канал
+  link_version: Ссылка на версию
   mobiles-stats: Мобильная статистика
   set: Установить версию для канала
   stats: статистика

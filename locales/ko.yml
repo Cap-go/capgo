@@ -54,6 +54,7 @@ button:
   delete: 삭제
   go: 이동
   home: 홈
+  remove: 제거하다
   tabs: 탭
   toggle_dark: 다크모드 토글
   toggle_langs: 언어 변경
@@ -73,12 +74,21 @@ channel:
   users: 사용자와 공유
   v3: V3 설정
 device:
+  channel: 채널 링크
   created_at: 만든 시간
+  force_version: 강제 버전
   info: 정보
   last_update: 마지막 업데이트
+  link_channel: 기기에 연결된 채널
+  link_fail: 링크할 수 없는 문제가 발생했습니다
+  link_version: 장치에 연결된 버전
+  no_channel: 채널이 없습니다. 추가하려면 클릭하세요.
+  no_override: 재정의가 없습니다. 추가하려면 클릭하세요.
   platform: 플랫폼
   plugin_version: 플러그인 버전
   title: 장치
+  unlink_channel: 장치에 대한 채널 연결 해제
+  unlink_version: 장치에 대한 버전 연결 해제
   version: 버전
 devices:
   title: 장치
@@ -118,6 +128,7 @@ package:
   devices: 기기 보기
   download: 버전 다운로드
   link_channel: 채널 링크
+  link_version: 버전에 대한 링크
   mobiles-stats: 모바일 통계
   set: 버전을 채널로 설정
   stats: 통계

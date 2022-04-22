@@ -60,6 +60,7 @@ button:
   delete: Löschen
   go: Los
   home: Startseite
+  remove: Entfernen
   tabs: Registerkarten
   toggle_dark: Dunkelmodus umschalten
   toggle_langs: Sprachen ändern
@@ -79,12 +80,21 @@ channel:
   users: Mit Benutzern geteilt
   v3: V3-Einstellungen
 device:
+  channel: Kanallink
   created_at: Hergestellt in
+  force_version: Force-Version
   info: Informationen
   last_update: Letztes Update
+  link_channel: Kanal mit Gerät verknüpft
+  link_fail: Kann nicht verlinken, es ist ein Fehler passiert
+  link_version: mit dem Gerät verknüpfte Version
+  no_channel: Kein Kanal, zum Hinzufügen klicken
+  no_override: Keine Überschreibung, zum Hinzufügen klicken
   platform: Plattform
   plugin_version: Plugin-Version
   title: Gerät
+  unlink_channel: Verknüpfung des Kanals mit dem Gerät aufheben
+  unlink_version: Version Verknüpfung zum Gerät aufheben
   version: Ausführung
 devices:
   title: Geräte
@@ -126,6 +136,7 @@ package:
   devices: Siehe Geräte
   download: Download-Version
   link_channel: Link zum Kanal
+  link_version: Version verlinken
   mobiles-stats: Mobile Statistiken
   set: Version auf Kanal setzen
   stats: Statistiken

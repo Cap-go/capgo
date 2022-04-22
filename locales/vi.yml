@@ -58,6 +58,7 @@ button:
   delete: Xóa bỏ
   go: Đi
   home: Khởi đầu
+  remove: Tẩy
   tabs: Các tab
   toggle_dark: Chuyển đổi chế độ tối
   toggle_langs: Thay đổi ngôn ngữ
@@ -77,12 +78,21 @@ channel:
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
 device:
+  channel: Liên kết kênh
   created_at: Được tạo lúc
+  force_version: Phiên bản buộc
   info: thông tin
   last_update: Cập nhật cuối cùng
+  link_channel: Kênh được liên kết với thiết bị
+  link_fail: Không thể liên kết đã xảy ra sự cố
+  link_version: phiên bản được liên kết với thiết bị
+  no_channel: Không có kênh, nhấp để thêm
+  no_override: Không ghi đè, nhấp để thêm
   platform: Nền tảng
   plugin_version: Phiên bản plugin
   title: Thiết bị
+  unlink_channel: Hủy liên kết kênh với thiết bị
+  unlink_version: Hủy liên kết phiên bản với thiết bị
   version: Phiên bản
 devices:
   title: Thiết bị
@@ -122,6 +132,7 @@ package:
   devices: Xem các thiết bị
   download: Tải xuống phiên bản
   link_channel: Liên kết với kênh
+  link_version: Liên kết đến phiên bản
   mobiles-stats: Số liệu thống kê về điện thoại di động
   set: Đặt phiên bản cho kênh
   stats: số liệu thống kê

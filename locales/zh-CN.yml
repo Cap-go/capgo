@@ -54,6 +54,7 @@ button:
   delete: 删除
   go: 确定
   home: 首页
+  remove: 消除
   tabs: 标签
   toggle_dark: 切换深色模式
   toggle_langs: 切换语言
@@ -73,12 +74,21 @@ channel:
   users: 与用户共享
   v3: V3 设置
 device:
+  channel: 频道链接
   created_at: 创建于
+  force_version: 强制版本
   info: 信息
   last_update: 最后更新
+  link_channel: 与设备关联的频道
+  link_fail: 无法链接发生错误
+  link_version: 链接到设备的版本
+  no_channel: 没有频道，点击添加
+  no_override: 无覆盖，点击添加
   platform: 平台
   plugin_version: 插件版本
   title: 设备
+  unlink_channel: 频道取消与设备的关联
+  unlink_version: 版本取消链接到设备
   version: 版本
 devices:
   title: 设备
@@ -118,6 +128,7 @@ package:
   devices: 查看设备
   download: 下载版本
   link_channel: 链接到频道
+  link_version: 链接到版本
   mobiles-stats: 手机数据
   set: 将版本设置为频道
   stats: 统计数据

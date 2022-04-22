@@ -58,6 +58,7 @@ button:
   delete: Usunąć
   go: WEJDŹ
   home: Strona główna
+  remove: Usunąć
   tabs: Karty
   toggle_dark: Ustaw tryb nocny
   toggle_langs: Zmień język
@@ -77,12 +78,21 @@ channel:
   users: Udostępnione użytkownikom
   v3: Ustawienia V3
 device:
+  channel: Link do kanału
   created_at: Utworzono w
+  force_version: Wersja życie
   info: informacje
   last_update: Ostatnia aktualizacja
+  link_channel: Kanał połączony z urządzeniem
+  link_fail: Nie można połączyć, że stało się coś złego
+  link_version: wersja połączona z urządzeniem
+  no_channel: Brak kanału, kliknij, aby dodać
+  no_override: Brak zastąpienia, kliknij, aby dodać
   platform: Platforma
   plugin_version: Wersja wtyczki
   title: Urządzenie
+  unlink_channel: Odłączenie kanału od urządzenia
+  unlink_version: Wersja odłącza się od urządzenia
   version: Wersja
 devices:
   title: Urządzenia
@@ -122,6 +132,7 @@ package:
   devices: Zobacz urządzenia
   download: Pobierz wersję
   link_channel: Link do kanału
+  link_version: Link do wersji
   mobiles-stats: Statystyki telefonów komórkowych
   set: Ustaw wersję na kanał
   stats: statystyki

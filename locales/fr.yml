@@ -60,6 +60,7 @@ button:
   delete: Supprimer
   go: Essayer
   home: Accueil
+  remove: Éliminer
   tabs: Onglets
   toggle_dark: Basculer en mode sombre
   toggle_langs: Changer de langue
@@ -79,12 +80,21 @@ channel:
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
 device:
+  channel: Lien de chaîne
   created_at: Créé à
+  force_version: Version forcée
   info: renseignements
   last_update: Dernière mise à jour
+  link_channel: Chaîne liée à l'appareil
+  link_fail: Impossible de lier quelque chose de mal s'est produit
+  link_version: version liée à l'appareil
+  no_channel: Aucune chaîne, cliquez pour ajouter
+  no_override: Pas de remplacement, cliquez pour ajouter
   platform: Plateforme
   plugin_version: Version du plug-in
   title: Appareil
+  unlink_channel: Chaîne dissociée de l'appareil
+  unlink_version: Dissocier la version de l'appareil
   version: Version
 devices:
   title: Dispositifs
@@ -126,6 +136,7 @@ package:
   devices: Voir les appareils
   download: Télécharger la version
   link_channel: Lien vers la chaîne
+  link_version: Lien vers la version
   mobiles-stats: Statistiques mobiles
   set: Définir la version sur le canal
   stats: Statistiques

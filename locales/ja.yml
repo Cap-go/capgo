@@ -54,6 +54,7 @@ button:
   delete: 消去
   go: 進む
   home: ホーム
+  remove: 削除する
   tabs: タブ
   toggle_dark: ダークモード切り替え
   toggle_langs: 言語切り替え
@@ -73,12 +74,21 @@ channel:
   users: ユーザーと共有
   v3: V3設定
 device:
+  channel: チャネルリンク
   created_at: で作成
+  force_version: 強制バージョン
   info: 情報
   last_update: 最後の更新
+  link_channel: デバイスにリンクされたチャネル
+  link_fail: 何か間違ったことが起こったリンクできません
+  link_version: デバイスにリンクされているバージョン
+  no_channel: チャネルがありません。クリックして追加してください
+  no_override: オーバーライドなし、クリックして追加
   platform: プラットホーム
   plugin_version: プラグインバージョン
   title: 端末
+  unlink_channel: デバイスへのチャネルリンク解除
+  unlink_version: バージョンはデバイスへのリンクを解除します
   version: バージョン
 devices:
   title: デバイス
@@ -118,6 +128,7 @@ package:
   devices: デバイスを見る
   download: ダウンロード版
   link_channel: チャネルへのリンク
+  link_version: バージョンへのリンク
   mobiles-stats: モバイル統計
   set: バージョンをチャネルに設定
   stats: 統計

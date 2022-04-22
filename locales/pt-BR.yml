@@ -58,6 +58,7 @@ button:
   delete: Excluir
   go: Ir
   home: Início
+  remove: Remover
   tabs: Abas
   toggle_dark: Alternar modo escuro
   toggle_langs: Mudar de idioma
@@ -77,12 +78,21 @@ channel:
   users: Compartilhado com usuários
   v3: Configurações V3
 device:
+  channel: Link do canal
   created_at: Criado em
+  force_version: Forçar versão
   info: informações
   last_update: Última atualização
+  link_channel: Canal vinculado ao dispositivo
+  link_fail: Não é possível vincular algo errado aconteceu
+  link_version: versão vinculada ao dispositivo
+  no_channel: Nenhum canal, clique para adicionar
+  no_override: Sem substituição, clique para adicionar
   platform: Plataforma
   plugin_version: Versão do plug-in
   title: Dispositivo
+  unlink_channel: Desvincular o canal do dispositivo
+  unlink_version: Versão desvinculada do dispositivo
   version: Versão
 devices:
   title: Dispositivos
@@ -122,6 +132,7 @@ package:
   devices: Ver dispositivos
   download: Baixar versão
   link_channel: Link para o canal
+  link_version: Link para a versão
   mobiles-stats: Estatísticas de celulares
   set: Definir versão para canal
   stats: Estatísticas

@@ -56,6 +56,7 @@ button:
   delete: Delete
   go: GO
   home: Home
+  remove: Remove
   tabs: Tabs
   toggle_dark: Toggle dark mode
   toggle_langs: Change languages
@@ -75,12 +76,21 @@ channel:
   users: Shared with users
   v3: V3 settings
 device:
+  channel: Channel link
   created_at: Created at
+  force_version: Force version
   info: informations
   last_update: Last update
+  link_channel: Channel linked to device
+  link_fail: Cannot link something wrong happened
+  link_version: version linked to device
+  no_channel: No channel, click to add
+  no_override: No override, click to add
   platform: Platform
   plugin_version: Plugin version
   title: Device
+  unlink_channel: Channel unlink to device
+  unlink_version: Version unlink to device
   version: Version
 devices:
   title: Devices
@@ -120,6 +130,7 @@ package:
   devices: See devices statistics
   download: Download version
   link_channel: Link to channel
+  link_version: Link to version
   mobiles-stats: Mobiles stats
   set: Set version to channel
   stats: stats

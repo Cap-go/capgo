@@ -59,6 +59,7 @@ button:
   delete: Eliminare
   go: Vai
   home: Home
+  remove: Rimuovere
   tabs: schede
   toggle_dark: Attiva/disattiva modalità scura
   toggle_langs: Cambia lingua
@@ -78,12 +79,21 @@ channel:
   users: Condiviso con gli utenti
   v3: Impostazioni V3
 device:
+  channel: Collegamento al canale
   created_at: Creato a
+  force_version: Versione forzata
   info: informazioni
   last_update: Ultimo aggiornamento
+  link_channel: Canale collegato al dispositivo
+  link_fail: Impossibile collegare qualcosa di sbagliato
+  link_version: versione collegata al dispositivo
+  no_channel: Nessun canale, clicca per aggiungere
+  no_override: Nessuna sostituzione, fai clic per aggiungere
   platform: piattaforma
   plugin_version: Versione plug-in
   title: Dispositivo
+  unlink_channel: Canale scollegato dal dispositivo
+  unlink_version: Versione scollegata al dispositivo
   version: Versione
 devices:
   title: Dispositivi
@@ -123,6 +133,7 @@ package:
   devices: Vedi dispositivi
   download: Scarica versione
   link_channel: Link al canale
+  link_version: Link alla versione
   mobiles-stats: Statistiche sui cellulari
   set: Imposta la versione sul canale
   stats: statistiche

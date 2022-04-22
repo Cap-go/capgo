@@ -58,6 +58,7 @@ button:
   delete: Silmek
   go: İLERİ
   home: Anasayfa
+  remove: Kaldırmak
   tabs: Sekmeler
   toggle_dark: Karanlık modu değiştir
   toggle_langs: Dilleri değiştir
@@ -77,12 +78,21 @@ channel:
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
 device:
+  channel: Kanal bağlantısı
   created_at: 'Şu saatte oluşturuldu:'
+  force_version: Zorla sürüm
   info: bilgi
   last_update: Son Güncelleme
+  link_channel: Cihaza bağlı kanal
+  link_fail: Yanlış bir şey oldu bağlantı kurulamıyor
+  link_version: cihaza bağlı sürüm
+  no_channel: Kanal yok, eklemek için tıklayın
+  no_override: Geçersiz kılma yok, eklemek için tıklayın
   platform: platformu
   plugin_version: Eklenti sürümü
   title: Cihaz
+  unlink_channel: Cihazla kanal bağlantısını kaldır
+  unlink_version: Cihazla sürüm bağlantısını kaldır
   version: sürüm
 devices:
   title: cihazlar
@@ -122,6 +132,7 @@ package:
   devices: Cihazları görün
   download: Sürümü indir
   link_channel: kanala bağlantı
+  link_version: sürüme bağlantı
   mobiles-stats: cep telefonu istatistikleri
   set: Sürümü kanala ayarla
   stats: istatistikler
