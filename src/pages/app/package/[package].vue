@@ -5,16 +5,17 @@ import {
   IonIcon,
   IonItem,
   IonItemDivider,
-  IonItemOption, IonItemOptions,
-  IonItemSliding, IonLabel,
-  IonList, IonNote, IonPage, IonRefresher, IonRefresherContent,
+  IonItemOption,
+  IonItemOptions, IonItemSliding,
+  IonLabel, IonList,
+  IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
   IonTitle,
   IonToolbar,
   actionSheetController, isPlatform, toastController,
 } from '@ionic/vue'
 import dayjs from 'dayjs'
 import { chevronBack, chevronForwardOutline } from 'ionicons/icons'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
@@ -28,11 +29,20 @@ const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const id = ref('')
+const search = ref('')
 const isLoading = ref(false)
 const app = ref<definitions['apps']>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
 
+const versionFilter = computed(() => {
+  const value = search.value
+  if (value) {
+    const filtered = versions.value.filter(version => version.name.toLowerCase().includes(value.toLowerCase()))
+    return filtered
+  }
+  return versions.value
+})
 const loadData = async() => {
   try {
     const { data: dataApp } = await supabase
@@ -351,7 +361,11 @@ const back = () => {
               {{ t('package.versions') }}
             </IonLabel>
           </IonItemDivider>
-          <template v-for="v in versions" :key="v.name">
+          <!-- add item with searchbar -->
+          <IonItem>
+            <IonSearchbar @IonChange="search = $event.detail.value" />
+          </IonItem>
+          <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>
               <IonItem @click="ASVersion(v)">
                 <IonLabel>
