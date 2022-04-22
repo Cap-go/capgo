@@ -1,3 +1,10 @@
+## 0.29.0 (2022-04-22)
+
+### Feat
+
+- allow device override
+- add searchbar in versions
+
 ## 0.28.0 (2022-04-22)
 
 ### Feat
