@@ -249,6 +249,18 @@ const presentActionSheet = async() => {
             </router-link>
           </li>
           <li>
+            <div
+              v-if="!isMobile"
+              class="flex justify-between items-center cursor-pointer"
+              @click="openPortal"
+            >
+              <span class="font-bold">
+                {{ t("account.billing") }}
+              </span>
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </div>
+          </li>
+          <li>
             <router-link
               class="flex justify-between items-center"
               to="/app/apikeys"
@@ -284,23 +296,11 @@ const presentActionSheet = async() => {
           </li>
           <li>
             <div
-              class="flex justify-between items-center"
+              class="flex justify-between items-center cursor-pointer"
               @click="openChat"
             >
               <span class="font-bold">
                 {{ t("account.support") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </div>
-          </li>
-          <li>
-            <div
-              v-if="!isMobile"
-              class="flex justify-between items-center"
-              @click="openPortal"
-            >
-              <span class="font-bold">
-                {{ t("account.billing") }}
               </span>
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </div>
