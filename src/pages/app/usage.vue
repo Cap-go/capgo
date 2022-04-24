@@ -101,7 +101,7 @@ const plans: Record<string, Plan> = {
     apps: 3,
     channels: 10,
     updates: 25000,
-    versions: 10,
+    versions: 100,
     sharedChannels: 10,
     abtest: false,
     progressiveDeploy: false,
