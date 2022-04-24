@@ -2,7 +2,7 @@ import { loadingController, toastController } from '@ionic/vue'
 import { useSupabase } from './supabase'
 
 export const openPortal = async() => {
-  console.log('openPortal')
+//   console.log('openPortal')
   const supabase = useSupabase()
   const session = supabase.auth.session()
   if (!session)
@@ -36,8 +36,8 @@ export const openPortal = async() => {
   }
 }
 
-export const openCheckout = async(planId: string) => {
-  console.log('openCheckout')
+export const openCheckout = async(priceId: string) => {
+//   console.log('openCheckout')
   const supabase = useSupabase()
   const session = supabase.auth.session()
   if (!session)
@@ -54,7 +54,7 @@ export const openCheckout = async(planId: string) => {
         'authorization': session.access_token,
       },
       body: JSON.stringify({
-        planId,
+        priceId,
       }),
     })
     const res = await response.json()
