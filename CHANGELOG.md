@@ -1,3 +1,10 @@
+## 0.30.0 (2022-04-24)
+
+### Feat
+
+- add plan to usage page
+- add price page in usage
+
 ## 0.29.6 (2022-04-24)
 
 ### Fix
