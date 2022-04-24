@@ -15,14 +15,7 @@ const guard = async(next: any, to: string, from: string) => {
       try {
         const { data, error } = await supabase
           .from<definitions['users']>('users')
-          .select(`
-        id,
-        country,
-        image_url,
-        first_name,
-        last_name,
-        image_url
-      `)
+          .select()
           .match({ id: auth?.id })
         if (!error && data && data.length)
           main.user = data[0]

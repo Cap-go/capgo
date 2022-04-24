@@ -9,7 +9,7 @@ import {
 } from '@ionic/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
-import { computed, defineEmits, defineProps, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { generate } from 'generate-password-browser'
 import type { definitions } from '~/types/supabase'

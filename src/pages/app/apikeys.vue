@@ -66,14 +66,14 @@ watchEffect(async() => {
                 {{ t('apikeys.links') }}
               </ion-label>
             </ion-item-divider>
-            <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/capgo')">
+            <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/@capgo/cli')">
               <IonLabel>
                 <h2 class="text-sm text-azure-500">
                   {{ t('apikeys.cli') }}
                 </h2>
               </IonLabel>
             </IonItem>
-            <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/capacitor-updater')">
+            <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/@capgo/capacitor-updater')">
               <IonLabel>
                 <h2 class="text-sm text-azure-500">
                   {{ t('apikeys.updater') }}
