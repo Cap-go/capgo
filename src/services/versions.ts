@@ -1,6 +1,6 @@
 import { isPlatform, loadingController, toastController } from '@ionic/vue'
 import { SplashScreen } from '@capacitor/splash-screen'
-import { CapacitorUpdater } from 'capacitor-updater'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { useSupabase } from './supabase'
 import type { definitions } from '~/types/supabase'
 

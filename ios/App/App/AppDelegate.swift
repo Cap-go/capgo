@@ -1,6 +1,6 @@
 import UIKit
 import Capacitor
-import CapacitorUpdater
+import CapgoCapacitorUpdater
 import RobingenzCapacitorScreenOrientation
 
 extension UIWindow {

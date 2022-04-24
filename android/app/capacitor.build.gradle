@@ -33,6 +33,7 @@ dependencies {
     implementation project(':capacitor-storage')
     implementation project(':capacitor-text-zoom')
     implementation project(':capacitor-toast')
+    implementation project(':capgo-capacitor-updater')
     implementation project(':robingenz-capacitor-file-picker')
     implementation project(':robingenz-capacitor-screen-orientation')
     implementation project(':capacitor-flash')
@@ -42,7 +43,6 @@ dependencies {
     implementation project(':capacitor-purchases')
     implementation project(':capacitor-rate-app')
     implementation project(':capacitor-screen-recorder')
-    implementation project(':capacitor-updater')
 
 }
 

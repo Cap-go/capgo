@@ -96,6 +96,10 @@
 		"classpath": "com.capacitorjs.plugins.toast.ToastPlugin"
 	},
 	{
+		"pkg": "@capgo/capacitor-updater",
+		"classpath": "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin"
+	},
+	{
 		"pkg": "@robingenz/capacitor-file-picker",
 		"classpath": "dev.robingenz.capacitorjs.plugins.filepicker.FilePickerPlugin"
 	},
@@ -130,9 +134,5 @@
 	{
 		"pkg": "capacitor-screen-recorder",
 		"classpath": "ee.forgr.plugin.screenrecorder.ScreenRecorderPlugin"
-	},
-	{
-		"pkg": "capacitor-updater",
-		"classpath": "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin"
 	}
 ]

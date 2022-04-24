@@ -4,7 +4,7 @@ import { Http } from '@capacitor-community/http'
 import type { URLOpenListenerEvent } from '@capacitor/app'
 import { App } from '@capacitor/app'
 import { SplashScreen } from '@capacitor/splash-screen'
-import { CapacitorUpdater } from 'capacitor-updater'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 
