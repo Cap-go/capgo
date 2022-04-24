@@ -150,6 +150,37 @@ password:
   heading: Créer un mot de passe
   new: nouveau mot de passe
   validate: Valider
+plan:
+  abtest: Test A/B
+  application: Application
+  applications: Applications
+  buy: Acheter
+  channel: Canal
+  channels: Chaînes
+  desc: >-
+    Commencez à créer gratuitement, puis ajoutez un plan pour le mettre en
+    ligne. 
+
+    Les plans de compte débloquent des fonctionnalités supplémentaires.
+  free:
+    desc: Idéal pour MVP et les tests
+  maker:
+    desc: Idéal pour les propriétaires de petites entreprises
+  monthly-billing: Facturation mensuelle
+  pricing-plans: Forfaits tarifaires
+  progressive_deploy: Déploiement progressif
+  shared_channel: Chaîne partagée
+  shared_channels: Chaînes partagées
+  solo:
+    desc: Idéal pour les développeurs indépendants
+  team:
+    desc: Idéal pour les propriétaires de grandes entreprises
+  update: Mise à jour
+  updates: Mises à jour
+  version: Version
+  versions: Versions
+  whats-included: Ce qui est inclu
+  yearly-billing: Facturation annuelle
 projects:
   list: Tous vos projets
   sharedlist: Projets partagés avec vous

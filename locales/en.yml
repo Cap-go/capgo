@@ -144,6 +144,35 @@ password:
   heading: Create Password
   new: New Password
   validate: Validate
+plan:
+  abtest: A / B testing
+  application: Application
+  applications: Applications
+  buy: Buy
+  channel: Channel
+  channels: Channels
+  desc: >-
+    Start building for free, then add a plan to go live. Account plans unlock
+    additional features.
+  free:
+    desc: Best for MVP and testing
+  maker:
+    desc: Best for small business owners
+  monthly-billing: Monthly billing
+  pricing-plans: Pricing Plans
+  progressive_deploy: Progressive deploy
+  shared_channel: Shared Channel
+  shared_channels: Shared Channels
+  solo:
+    desc: Best for independent developers
+  team:
+    desc: Best for big business owners
+  update: Update
+  updates: Updates
+  version: Version
+  versions: Versions
+  whats-included: What's included
+  yearly-billing: Yearly billing
 projects:
   list: Yours
   sharedlist: Shared with you

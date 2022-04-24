@@ -148,6 +148,35 @@ password:
   heading: Buat Kata Sandi
   new: kata sandi baru
   validate: Mengesahkan
+plan:
+  abtest: Pengujian A/B
+  application: Aplikasi
+  applications: Aplikasi
+  buy: Membeli
+  channel: Saluran
+  channels: saluran
+  desc: |-
+    Mulai membangun secara gratis, lalu tambahkan rencana untuk ditayangkan. 
+    Paket akun membuka fitur tambahan.
+  free:
+    desc: Terbaik untuk MVP dan pengujian
+  maker:
+    desc: Terbaik untuk pemilik usaha kecil
+  monthly-billing: Penagihan bulanan
+  pricing-plans: Paket Harga
+  progressive_deploy: Penyebaran progresif
+  shared_channel: Saluran Bersama
+  shared_channels: Saluran Bersama
+  solo:
+    desc: Terbaik untuk pengembang independen
+  team:
+    desc: Terbaik untuk pemilik bisnis besar
+  update: Memperbarui
+  updates: Pembaruan
+  version: 'Versi: kapan'
+  versions: Versi
+  whats-included: Apa yang termasuk?
+  yearly-billing: Penagihan tahunan
 projects:
   list: Milikmu
   sharedlist: Dibagikan dengan Anda

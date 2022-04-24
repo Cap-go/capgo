@@ -142,6 +142,35 @@ password:
   heading: パスワードの作成
   new: 新しいパスワード
   validate: 検証
+plan:
+  abtest: A/Bテスト
+  application: 応用
+  applications: アプリケーション
+  buy: 買う
+  channel: チャネル
+  channels: チャネル
+  desc: |-
+    無料で構築を開始してから、稼働する計画を追加します。
+    アカウントプランは、追加機能のロックを解除します。
+  free:
+    desc: MVPとテストに最適
+  maker:
+    desc: 中小企業の所有者に最適
+  monthly-billing: 毎月の請求
+  pricing-plans: 料金プラン
+  progressive_deploy: プログレッシブデプロイ
+  shared_channel: 共有チャネル
+  shared_channels: 共有チャネル
+  solo:
+    desc: 独立した開発者に最適
+  team:
+    desc: 大企業のオーナーに最適
+  update: アップデート
+  updates: 更新
+  version: バージョン
+  versions: バージョン
+  whats-included: 含まれているもの
+  yearly-billing: 年間請求
 projects:
   list: あなたのもの
   sharedlist: あなたと共有

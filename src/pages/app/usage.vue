@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import type { RefresherCustomEvent } from '@ionic/vue'
+import type { RefresherCustomEvent, SegmentChangeEventDetail } from '@ionic/vue'
 import {
   IonBackButton,
   IonButtons,
   IonContent,
-  IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonRefresher,
-  IonRefresherContent, IonTitle, IonToolbar, isPlatform,
+  IonHeader,
+  IonItem,
+  IonItemDivider, IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent, IonSegment,
+  IonSegmentButton, IonTitle, IonToolbar, isPlatform,
 } from '@ionic/vue'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
-import { openPortal } from '~/services/stripe'
+import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const isLoading = ref(true)
+const isMobile = isPlatform('capacitor')
+const segmentVal = ref('monthly')
+const isYearly = computed(() => segmentVal.value === 'yearly')
 const myPlan = ref<definitions['stripe_info']>()
 const route = useRoute()
 const supabase = useSupabase()
@@ -31,6 +36,11 @@ interface PastDl {
 interface Plan {
   id: string
   name: string
+  description: string
+  price: {
+    monthly: number
+    yearly: number
+  }
   apps: number
   channels: number
   updates: number
@@ -50,7 +60,12 @@ const usage = reactive({
 const plans: Record<string, Plan> = {
   free: {
     id: '',
-    name: 'free',
+    name: 'Free',
+    description: t('plan.free.desc'),
+    price: {
+      monthly: 0,
+      yearly: 0,
+    },
     apps: 1,
     channels: 1,
     updates: 500,
@@ -61,7 +76,12 @@ const plans: Record<string, Plan> = {
   },
   solo: {
     id: 'prod_LQIzwwVu6oMmAz',
-    name: 'solo',
+    name: 'Solo',
+    description: t('plan.solo.desc'),
+    price: {
+      monthly: 14,
+      yearly: 146,
+    },
     apps: 1,
     channels: 2,
     updates: 2500,
@@ -72,7 +92,12 @@ const plans: Record<string, Plan> = {
   },
   maker: {
     id: 'prod_LQIzozukEwDZDM',
-    name: 'maker',
+    name: 'Maker',
+    description: t('plan.maker.desc'),
+    price: {
+      monthly: 39,
+      yearly: 389,
+    },
     apps: 3,
     channels: 10,
     updates: 25000,
@@ -83,7 +108,12 @@ const plans: Record<string, Plan> = {
   },
   team: {
     id: 'prod_LQIzm2NGzayzXi',
-    name: 'team',
+    name: 'Team',
+    description: t('plan.team.desc'),
+    price: {
+      monthly: 99,
+      yearly: 998,
+    },
     apps: 10,
     channels: 50,
     updates: 250000,
@@ -93,19 +123,36 @@ const plans: Record<string, Plan> = {
     progressiveDeploy: true,
   },
 }
+const planList = computed(() => Object.values(plans))
+const planFeatures = (plan: Plan) => [
+  plan.apps > 1 ? `${plan.apps} ${t('plan.applications')}` : `${plan.apps} ${t('plan.application')}`,
+  plan.channels > 1 ? `${plan.channels} ${t('plan.channels')}` : `${plan.channels} ${t('plan.channel')}`,
+  plan.versions > 1 ? `${plan.versions} ${t('plan.versions')}` : `${plan.versions} ${t('plan.version')}`,
+  plan.sharedChannels > 1 ? `${plan.sharedChannels} ${t('plan.shared_channels')}` : `${plan.sharedChannels} ${t('plan.shared_channel')}`,
+  plan.updates > 1 ? `${plan.updates} ${t('plan.updates')}` : `${plan.updates} ${t('plan.update')}`,
+  plan.abtest ? t('plan.abtest') : false,
+  plan.progressiveDeploy ? t('plan.progressive_deploy') : false,
+].filter(Boolean)
+
 const currentPlanSuggest = computed<Plan>(() => {
-  const plansList = Object.values(plans)
-  return plansList.find(plan => usage.apps < plan.apps
+  return planList.value.find(plan => usage.apps < plan.apps
     && usage.channels < plan.channels
     && usage.versions < plan.versions
     && usage.sharedChannels < plan.sharedChannels
-    && usage.updates < plan.updates) || plansList[plansList.length - 1]
+    && usage.updates < plan.updates) || planList.value[planList.value.length - 1]
 })
 
 const currentPlan = computed<Plan>(() => {
-  const plansList = Object.values(plans)
-  return plansList.find(plan => myPlan.value?.product_id === plan.id) || plansList[0]
+  return planList.value.find(plan => myPlan.value?.product_id === plan.id) || planList.value[0]
 })
+
+interface SegmentCustomEvent extends CustomEvent {
+  target: HTMLIonSegmentElement
+  detail: SegmentChangeEventDetail
+}
+const segmentChanged = (e: SegmentCustomEvent) => {
+  segmentVal.value = e.detail.value || 'monthly'
+}
 
 const getMyApps = async() => {
   const { data } = await supabase
@@ -152,9 +199,9 @@ const getMaxVersion = async() => {
     usage.versions = Number(data)
 }
 
-const openChangePlan = () => {
-  if (!isPlatform('capacitor'))
-    openPortal()
+const openChangePlan = (planId: string) => {
+  if (planId)
+    openCheckout(planId)
 }
 
 const getMaxDownload = async() => {
@@ -265,6 +312,58 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
           </div>
         </IonItem>
       </ion-list>
+      <div v-if="!isMobile" class="bg-white dark:bg-gray-900">
+        <div class="max-w-7xl mx-auto py-24 px-4 sm:px-6 lg:px-8">
+          <div class="sm:flex sm:flex-col sm:align-center">
+            <h1 class="text-5xl font-extrabold text-gray-900 dark:text-gray-100 sm:text-center">
+              {{ t('plan.pricing-plans') }}
+            </h1>
+            <p class="mt-5 text-xl text-gray-500 sm:text-center">
+              {{ t('plan.desc') }}
+            </p>
+            <ion-segment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ionChange="segmentChanged($event)">
+              <ion-segment-button class="h-10" value="monthly">
+                <ion-label>{{ t('plan.monthly-billing') }}</ion-label>
+              </ion-segment-button>
+              <ion-segment-button class="h-10" value="yearly">
+                <ion-label>{{ t('plan.yearly-billing') }}</ion-label>
+              </ion-segment-button>
+            </ion-segment>
+          </div>
+          <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
+            <div v-for="p in planList" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
+              <div class="p-6">
+                <h2 class="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100">
+                  {{ p.name }}
+                </h2>
+                <p class="mt-4 text-sm text-gray-500">
+                  {{ p.description }}
+                </p>
+                <p class="mt-8">
+                  <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">${{ p.price[segmentVal] }}</span>
+                  <span class="text-base font-medium text-gray-500">/{{ isYearly ? 'yr' : 'mo' }}</span>
+                </p>
+                <div v-if="p.id" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.id)">
+                  {{ t('plan.buy') }} {{ p.name }}
+                </div>
+              </div>
+              <div class="pt-6 pb-8 px-6">
+                <h3 class="text-xs font-medium text-gray-900 dark:text-gray-100 tracking-wide uppercase">
+                  {{ t('plan.whats-included') }}
+                </h3>
+                <ul role="list" class="mt-6 space-y-4">
+                  <li v-for="(f, index) in planFeatures(p)" :key="index" class="flex space-x-3">
+                    <svg class="flex-shrink-0 h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-sm text-gray-500">{{ f }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </IonContent>
   </IonPage>
 </template>

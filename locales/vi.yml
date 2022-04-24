@@ -146,6 +146,35 @@ password:
   heading: Tạo mật khẩu
   new: mật khẩu mới
   validate: Xác thực
+plan:
+  abtest: Thử nghiệm A / B
+  application: Ứng dụng
+  applications: Các ứng dụng
+  buy: Mua
+  channel: Kênh
+  channels: Kênh truyền hình
+  desc: |-
+    Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để hoạt động. 
+    Gói tài khoản mở khóa các tính năng bổ sung.
+  free:
+    desc: Tốt nhất cho MVP và thử nghiệm
+  maker:
+    desc: Tốt nhất cho chủ doanh nghiệp nhỏ
+  monthly-billing: Thanh toán hàng tháng
+  pricing-plans: Các gói định giá
+  progressive_deploy: Triển khai liên tục
+  shared_channel: Kênh chia sẻ
+  shared_channels: Các kênh được chia sẻ
+  solo:
+    desc: Tốt nhất cho các nhà phát triển độc lập
+  team:
+    desc: Tốt nhất cho các chủ doanh nghiệp lớn
+  update: Cập nhật
+  updates: Cập nhật
+  version: Phiên bản
+  versions: Phiên bản
+  whats-included: Bao gồm những gì
+  yearly-billing: Thanh toán hàng năm
 projects:
   list: Của bạn
   sharedlist: Đã chia sẻ với bạn

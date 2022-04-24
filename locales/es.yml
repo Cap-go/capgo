@@ -152,6 +152,37 @@ password:
   heading: Crear contraseña
   new: Nueva contraseña
   validate: Validar
+plan:
+  abtest: Pruebas A/B
+  application: Solicitud
+  applications: Aplicaciones
+  buy: Comprar
+  channel: Canal
+  channels: Canales
+  desc: >-
+    Comience a construir de forma gratuita, luego agregue un plan para ponerlo
+    en marcha. 
+
+    Los planes de cuenta desbloquean funciones adicionales.
+  free:
+    desc: Lo mejor para MVP y pruebas
+  maker:
+    desc: Lo mejor para propietarios de pequeñas empresas
+  monthly-billing: Facturación mensual
+  pricing-plans: Planes de precios
+  progressive_deploy: Despliegue progresivo
+  shared_channel: Canal compartido
+  shared_channels: Canales compartidos
+  solo:
+    desc: Lo mejor para desarrolladores independientes
+  team:
+    desc: Lo mejor para propietarios de grandes empresas
+  update: Actualizar
+  updates: Actualizaciones
+  version: Versión
+  versions: Versiones
+  whats-included: Qué está incluido
+  yearly-billing: Facturación anual
 projects:
   list: Tuya
   sharedlist: Compartido con usted

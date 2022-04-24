@@ -146,6 +146,35 @@ password:
   heading: Stwórz hasło
   new: nowe hasło
   validate: Uprawomocnić
+plan:
+  abtest: Testy A/B
+  application: Podanie
+  applications: Aplikacje
+  buy: Kupić
+  channel: Kanał
+  channels: Kanały
+  desc: |-
+    Zacznij tworzyć za darmo, a następnie dodaj plan, aby rozpocząć. 
+    Plany kont odblokowują dodatkowe funkcje.
+  free:
+    desc: Najlepsze dla MVP i testów
+  maker:
+    desc: Najlepsze dla właścicieli małych firm
+  monthly-billing: Rozliczenie miesięczne
+  pricing-plans: Plany cenowe
+  progressive_deploy: Wdrażanie progresywne
+  shared_channel: Wspólny kanał
+  shared_channels: Udostępnione kanały
+  solo:
+    desc: Najlepsze dla niezależnych programistów
+  team:
+    desc: Najlepsze dla właścicieli dużych firm
+  update: Aktualizacja
+  updates: Aktualizacje
+  version: Wersja
+  versions: Wersje
+  whats-included: Co jest zawarte
+  yearly-billing: Rozliczenie roczne
 projects:
   list: Twój
   sharedlist: Dzielone z Tobą

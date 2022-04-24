@@ -147,6 +147,35 @@ password:
   heading: Crea password
   new: nuova password
   validate: Convalidare
+plan:
+  abtest: Prova A/B
+  application: Applicazione
+  applications: Applicazioni
+  buy: Acquistare
+  channel: Canale
+  channels: Canali
+  desc: |-
+    Inizia a creare gratuitamente, quindi aggiungi un piano per andare online. 
+    I piani account sbloccano funzionalità aggiuntive.
+  free:
+    desc: Ideale per MVP e test
+  maker:
+    desc: Ideale per piccoli imprenditori
+  monthly-billing: Fatturazione mensile
+  pricing-plans: Piani tariffari
+  progressive_deploy: Distribuzione progressiva
+  shared_channel: Canale condiviso
+  shared_channels: Canali condivisi
+  solo:
+    desc: Ideale per sviluppatori indipendenti
+  team:
+    desc: Ideale per i grandi imprenditori
+  update: Aggiornare
+  updates: Aggiornamenti
+  version: Versione
+  versions: Versioni
+  whats-included: Cosa è incluso
+  yearly-billing: Fatturazione annuale
 projects:
   list: Il tuo
   sharedlist: Condiviso con te

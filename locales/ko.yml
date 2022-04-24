@@ -142,6 +142,35 @@ password:
   heading: 비밀번호 생성
   new: 새 비밀번호
   validate: 확인
+plan:
+  abtest: A/B 테스트
+  application: 애플리케이션
+  applications: 애플리케이션
+  buy: 구입하다
+  channel: 채널
+  channels: 채널
+  desc: |-
+    무료로 구축을 시작한 다음 실제 실행 계획을 추가하세요. 
+    계정 계획은 추가 기능을 잠금 해제합니다.
+  free:
+    desc: MVP 및 테스트에 가장 적합
+  maker:
+    desc: 소상공인에게 최고
+  monthly-billing: 월별 청구
+  pricing-plans: 요금제
+  progressive_deploy: 점진적 배포
+  shared_channel: 공유 채널
+  shared_channels: 공유 채널
+  solo:
+    desc: 독립 개발자에게 가장 적합
+  team:
+    desc: 대기업 오너에게 최고
+  update: 업데이트
+  updates: 업데이트
+  version: 버전
+  versions: 버전
+  whats-included: 포함된 항목
+  yearly-billing: 연간 청구
 projects:
   list: 당신 것
   sharedlist: 나와 공유됨

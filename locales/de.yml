@@ -150,6 +150,37 @@ password:
   heading: Passwort erstellen
   new: Neues Kennwort
   validate: Bestätigen
+plan:
+  abtest: A / B-Tests
+  application: Anwendung
+  applications: Anwendungen
+  buy: Besorgen
+  channel: Kanal
+  channels: Kanäle
+  desc: >-
+    Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan
+    hinzu, um live zu gehen. 
+
+    Kontopläne schalten zusätzliche Funktionen frei.
+  free:
+    desc: Am besten für MVP und Tests
+  maker:
+    desc: Am besten für Kleinunternehmer
+  monthly-billing: Monatliche Abrechnung
+  pricing-plans: Preispläne
+  progressive_deploy: Progressive Bereitstellung
+  shared_channel: Geteilter Kanal
+  shared_channels: Geteilte Kanäle
+  solo:
+    desc: Am besten für unabhängige Entwickler
+  team:
+    desc: Am besten für Großunternehmer
+  update: Aktualisieren
+  updates: Aktualisierung
+  version: Ausführung
+  versions: Versionen
+  whats-included: Was ist inbegriffen
+  yearly-billing: Jährliche Abrechnung
 projects:
   list: Deine
   sharedlist: Mit dir geteilt

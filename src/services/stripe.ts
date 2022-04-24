@@ -35,3 +35,41 @@ export const openPortal = async() => {
     await toast.present()
   }
 }
+
+export const openCheckout = async(planId: string) => {
+  console.log('openCheckout')
+  const supabase = useSupabase()
+  const session = supabase.auth.session()
+  if (!session)
+    return
+  const loading = await loadingController.create({
+    message: 'Please wait...',
+  })
+  try {
+    await loading.present()
+    const response = await fetch('https://capgo.app/api/stripe_checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': session.access_token,
+      },
+      body: JSON.stringify({
+        planId,
+      }),
+    })
+    const res = await response.json()
+    await loading.dismiss()
+    if (res && res.url)
+      window.open(res.url, '_blank')
+  }
+  catch (error) {
+    console.error(error)
+    await loading.dismiss()
+    const toast = await toastController
+      .create({
+        message: 'Cannot get your checkout',
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}

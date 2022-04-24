@@ -146,6 +146,35 @@ password:
   heading: Придумайте пароль
   new: Новый пароль
   validate: Подтвердить
+plan:
+  abtest: А/Б тестирование
+  application: Заявление
+  applications: Приложения
+  buy: Купить
+  channel: Канал
+  channels: каналы
+  desc: |-
+    Начните строить бесплатно, а затем добавьте план, чтобы начать работу. 
+    Планы учетной записи открывают дополнительные функции.
+  free:
+    desc: Лучший для MVP и тестирования
+  maker:
+    desc: Лучшее для владельцев малого бизнеса
+  monthly-billing: Ежемесячная оплата
+  pricing-plans: Тарифные планы
+  progressive_deploy: Прогрессивное развертывание
+  shared_channel: Общий канал
+  shared_channels: Общие каналы
+  solo:
+    desc: Лучшее для независимых разработчиков
+  team:
+    desc: Лучшее для владельцев крупного бизнеса
+  update: Обновлять
+  updates: Обновления
+  version: Версия
+  versions: Версии
+  whats-included: Что включено
+  yearly-billing: Годовой биллинг
 projects:
   list: Ваш
   sharedlist: Поделился с вами

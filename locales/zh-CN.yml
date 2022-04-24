@@ -142,6 +142,35 @@ password:
   heading: 创建密码
   new: 新密码
   validate: 证实
+plan:
+  abtest: A/B 测试
+  application: 应用
+  applications: 应用
+  buy: 买
+  channel: 渠道
+  channels: 频道
+  desc: |-
+    开始免费构建，然后添加上线计划。
+    帐户计划解锁其他功能。
+  free:
+    desc: 最适合 MVP 和测试
+  maker:
+    desc: 最适合小企业主
+  monthly-billing: 每月计费
+  pricing-plans: 定价计划
+  progressive_deploy: 渐进式部署
+  shared_channel: 共享频道
+  shared_channels: 共享频道
+  solo:
+    desc: 最适合独立开发者
+  team:
+    desc: 最适合大企业主
+  update: 更新
+  updates: 更新
+  version: 版本
+  versions: 版本
+  whats-included: 包括什么
+  yearly-billing: 每年计费
 projects:
   list: 你的
   sharedlist: 与您共享

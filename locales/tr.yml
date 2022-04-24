@@ -146,6 +146,37 @@ password:
   heading: Şifre oluştur
   new: Yeni Şifre
   validate: Doğrula
+plan:
+  abtest: A / B testi
+  application: Başvuru
+  applications: Uygulamalar
+  buy: Satın almak
+  channel: Kanal
+  channels: Kanallar
+  desc: >-
+    Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
+    ekleyin. 
+
+    Hesap planları ek özelliklerin kilidini açar.
+  free:
+    desc: MVP ve test için en iyisi
+  maker:
+    desc: Küçük işletme sahipleri için en iyisi
+  monthly-billing: Aylık faturalandırma
+  pricing-plans: Fiyatlandırma Planları
+  progressive_deploy: aşamalı dağıtım
+  shared_channel: Paylaşılan Kanal
+  shared_channels: Paylaşılan Kanallar
+  solo:
+    desc: Bağımsız geliştiriciler için en iyisi
+  team:
+    desc: Büyük işletme sahipleri için en iyisi
+  update: Güncelleme
+  updates: güncellemeler
+  version: sürüm
+  versions: Sürümler
+  whats-included: Neler dahil
+  yearly-billing: Yıllık faturalandırma
 projects:
   list: senin
   sharedlist: Seninle paylaştı
