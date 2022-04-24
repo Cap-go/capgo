@@ -104,15 +104,16 @@ const openPortal = async() => {
   if (!session)
     return
   try {
-    const res = await fetch('https://capgo.app/api/stripe_portal', {
+    const response = await fetch('https://capgo.app/api/stripe_portal', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': session.access_token,
+        'authorization': session.access_token,
       },
     })
-    console.log('res', res)
-  // window.open('https://dashboard.stripe.com/test/subscriptions/sub_LQIzm2NGzayzXi', '_blank')
+    const res = await response.json()
+    if (res && res.url)
+      window.open(res.url, '_blank')
   }
   catch (error) {
     console.error(error)
