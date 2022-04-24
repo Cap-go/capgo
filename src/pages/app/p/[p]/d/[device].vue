@@ -404,7 +404,7 @@ const back = () => {
             {{ formatDate(device.created_at) }}
           </IonNote>
         </IonItem>
-        <IonItem v-if="device" @click="updateOverride">
+        <IonItem v-if="device" class="cursor-pointer" @click="updateOverride">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
               {{ t('device.force_version') }}
@@ -414,7 +414,7 @@ const back = () => {
             {{ deviceOverride?.version?.name || t('device.no_override') }}
           </IonNote>
         </IonItem>
-        <IonItem v-if="device" @click="updateChannel">
+        <IonItem v-if="device" class="cursor-pointer" @click="updateChannel">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
               {{ t('device.channel') }}

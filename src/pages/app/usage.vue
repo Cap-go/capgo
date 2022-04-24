@@ -2,13 +2,17 @@
 import { useI18n } from 'vue-i18n'
 import type { RefresherCustomEvent } from '@ionic/vue'
 import {
-  IonBackButton, IonButtons, IonContent, IonHeader, IonItem, IonItemDivider, IonLabel,
-  IonList, IonPage, IonRefresher, IonRefresherContent, IonTitle, IonToolbar,
+  IonBackButton,
+  IonButtons,
+  IonContent,
+  IonHeader, IonItem, IonItemDivider, IonLabel, IonList, IonPage, IonRefresher,
+  IonRefresherContent, IonTitle, IonToolbar, isPlatform,
 } from '@ionic/vue'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
+import { openPortal } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
@@ -98,28 +102,6 @@ const currentPlanSuggest = computed<Plan>(() => {
     && usage.updates < plan.updates) || plansList[plansList.length - 1]
 })
 
-const openPortal = async() => {
-  console.log('openPortal')
-  const session = supabase.auth.session()
-  if (!session)
-    return
-  try {
-    const response = await fetch('https://capgo.app/api/stripe_portal', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': session.access_token,
-      },
-    })
-    const res = await response.json()
-    if (res && res.url)
-      window.open(res.url, '_blank')
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
-
 const currentPlan = computed<Plan>(() => {
   const plansList = Object.values(plans)
   return plansList.find(plan => myPlan.value?.product_id === plan.id) || plansList[0]
@@ -168,6 +150,11 @@ const getMaxVersion = async() => {
     usage.versions = 0
   else
     usage.versions = Number(data)
+}
+
+const openChangePlan = () => {
+  if (!isPlatform('capacitor'))
+    openPortal()
 }
 
 const getMaxDownload = async() => {
@@ -251,13 +238,13 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
         <ion-item-divider>
           <ion-label>
             {{ t('your-current-suggested-plan-is') }}
-            <a href="https://capgo.app/pricing" class="!text-pumpkin-orange-500 font-bold inline" target="_blank">{{ currentPlanSuggest.name }}</a>
+            <a href="https://capgo.app/pricing" class="!text-pumpkin-orange-500 font-bold inline cursor-pointer" target="_blank">{{ currentPlanSuggest.name }}</a>
           </ion-label>
         </ion-item-divider>
         <ion-item-divider>
           <ion-label>
             {{ t('your-current-plan-is') }}
-            <div class="!text-pumpkin-orange-500 font-bold inline" target="_blank" @click="openPortal">
+            <div class="!text-pumpkin-orange-500 font-bold inline" target="_blank">
               {{ currentPlan.name }}
             </div>
           </ion-label>

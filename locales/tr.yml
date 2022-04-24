@@ -1,5 +1,6 @@
 account:
   backButton: Geri
+  billing: faturalandırma
   changePassword: Şifre değiştir
   discord: anlaşmazlık
   heading: Hesap
@@ -176,4 +177,5 @@ stats:
   versions: Sürümler
 usage:
   title: kullanım
+your-current-plan-is: Şu anki planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'

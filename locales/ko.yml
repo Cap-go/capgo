@@ -1,5 +1,6 @@
 account:
   backButton: 뒤
+  billing: 청구
   changePassword: 비밀번호 변경
   discord: 불화
   heading: 계정
@@ -172,4 +173,5 @@ stats:
   versions: 버전
 usage:
   title: 용법
+your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은

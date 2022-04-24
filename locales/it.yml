@@ -1,5 +1,6 @@
 account:
   backButton: Indietro
+  billing: Fatturazione
   changePassword: Cambiare la password
   discord: Discordia
   heading: Account
@@ -179,4 +180,5 @@ stats:
   versions: Versioni
 usage:
   title: Utilizzo
+your-current-plan-is: Il tuo piano attuale lo è
 your-current-suggested-plan-is: Il tuo attuale piano suggerito è

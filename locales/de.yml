@@ -1,5 +1,6 @@
 account:
   backButton: Zurück
+  billing: Abrechnung
   changePassword: Kennwort ändern
   discord: Zwietracht
   heading: Konto
@@ -182,4 +183,5 @@ stats:
   versions: Versionen
 usage:
   title: Verwendungszweck
+your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist

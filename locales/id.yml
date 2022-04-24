@@ -1,5 +1,6 @@
 account:
   backButton: Kembali
+  billing: Penagihan
   changePassword: Ganti kata sandi
   discord: Perselisihan
   heading: Akun
@@ -178,4 +179,5 @@ stats:
   versions: Versi
 usage:
   title: Penggunaan
+your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

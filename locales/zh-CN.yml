@@ -1,5 +1,6 @@
 account:
   backButton: 后退
+  billing: 计费
   changePassword: 更改密码
   discord: 不和谐
   heading: 帐户
@@ -172,4 +173,5 @@ stats:
   versions: 版本
 usage:
   title: 用法
+your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是

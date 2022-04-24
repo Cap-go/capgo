@@ -9,6 +9,7 @@ import {
   IonTitle,
   IonToolbar,
   actionSheetController,
+  isPlatform,
 } from '@ionic/vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { cameraOutline, chevronForwardOutline } from 'ionicons/icons'
@@ -19,6 +20,7 @@ import { Filesystem } from '@capacitor/filesystem'
 import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
+import { openPortal } from '~/services/stripe'
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -28,6 +30,7 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const auth = supabase.auth.user()
 const version = ref(import.meta.env.VITE_APP_VERSION)
+const isMobile = ref(isPlatform('capacitor'))
 
 const updloadPhoto = async(data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
@@ -286,6 +289,18 @@ const presentActionSheet = async() => {
             >
               <span class="font-bold">
                 {{ t("account.support") }}
+              </span>
+              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+            </div>
+          </li>
+          <li>
+            <div
+              v-if="!isMobile"
+              class="flex justify-between items-center"
+              @click="openPortal"
+            >
+              <span class="font-bold">
+                {{ t("account.billing") }}
               </span>
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </div>

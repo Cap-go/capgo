@@ -1,5 +1,6 @@
 account:
   backButton: Plecy
+  billing: Dane do faktury
   changePassword: Zmień hasło
   discord: Niezgoda
   heading: Rachunek
@@ -176,4 +177,5 @@ stats:
   versions: Wersje
 usage:
   title: Stosowanie
+your-current-plan-is: Twój obecny plan to
 your-current-suggested-plan-is: Twój obecny sugerowany plan to

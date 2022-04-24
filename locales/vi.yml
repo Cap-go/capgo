@@ -1,5 +1,6 @@
 account:
   backButton: Trở lại
+  billing: Thanh toán
   changePassword: Đổi mật khẩu
   discord: Bất hòa
   heading: Tài khoản
@@ -176,4 +177,5 @@ stats:
   versions: Phiên bản
 usage:
   title: Cách sử dụng
+your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

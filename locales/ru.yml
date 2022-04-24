@@ -1,5 +1,6 @@
 account:
   backButton: Назад
+  billing: Выставление счетов
   changePassword: Изменить пароль
   discord: Раздор
   heading: Счет
@@ -176,4 +177,5 @@ stats:
   versions: Версии
 usage:
   title: использование
+your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'

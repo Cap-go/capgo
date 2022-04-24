@@ -316,7 +316,7 @@ const inviteUser = async(userId: string) => {
             </ion-button>
           </div>
         </ion-item>
-        <IonItem v-for="(usr, index) in users" :key="index" @click="presentActionSheet(usr.user_id)">
+        <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
               <div class="flex justify-between items-center">

@@ -1,5 +1,6 @@
 account:
   backButton: 戻る
+  billing: 請求する
   changePassword: パスワードを変更する
   discord: 不和
   heading: アカウント
@@ -172,4 +173,5 @@ stats:
   versions: バージョン
 usage:
   title: 使用法
+your-current-plan-is: あなたの現在の計画は
 your-current-suggested-plan-is: 現在提案されている計画は

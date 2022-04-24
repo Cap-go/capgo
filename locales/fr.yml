@@ -1,5 +1,6 @@
 account:
   backButton: Retour
+  billing: Facturation
   changePassword: Changer le mot de passe
   discord: Discorde
   heading: Compte
@@ -180,4 +181,5 @@ stats:
   versions: Versions
 usage:
   title: Usage
+your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré actuel est

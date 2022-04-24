@@ -132,7 +132,7 @@ const back = () => {
       <div v-else>
         <ion-list>
           <template v-for="d in deviceFiltered" :key="d.device_id">
-            <IonItem @click="openDevice(d)">
+            <IonItem class="cursor-pointer" @click="openDevice(d)">
               <IonLabel>
                 <h2 class="text-sm text-azure-500">
                   {{ d.device_id }} {{ d.platform }} {{ d.version.name }}

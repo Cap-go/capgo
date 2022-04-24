@@ -1,5 +1,6 @@
 account:
   backButton: Back
+  billing: Billing
   changePassword: Change password
   discord: Discord
   heading: Account

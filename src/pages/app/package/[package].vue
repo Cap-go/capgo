@@ -311,7 +311,7 @@ const back = () => {
       </div>
       <div v-else>
         <ion-list ref="listRef">
-          <IonItem @click="openStats()">
+          <IonItem class="cursor-pointer" @click="openStats()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('package.mobiles-stats') }}
@@ -321,7 +321,7 @@ const back = () => {
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </IonNote>
           </IonItem>
-          <IonItem @click="openDevices()">
+          <IonItem class="cursor-pointer" @click="openDevices()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('package.device_list') }}
@@ -338,7 +338,7 @@ const back = () => {
           </IonItemDivider>
           <template v-for="ch in channels" :key="ch.name">
             <IonItemSliding>
-              <IonItem @click="openChannel(ch)">
+              <IonItem class="cursor-pointer" @click="openChannel(ch)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
                     {{ ch.name }}
@@ -367,7 +367,7 @@ const back = () => {
           </IonItem>
           <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>
-              <IonItem @click="ASVersion(v)">
+              <IonItem class="cursor-pointer" @click="ASVersion(v)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
                     {{ v.name }}

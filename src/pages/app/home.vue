@@ -213,7 +213,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
         </div>
         <template v-for="app in apps" v-else-if="apps?.length" :key="app.id">
           <IonItemSliding>
-            <IonItem @click="openPackage(app.app_id)">
+            <IonItem class="cursor-pointer" @click="openPackage(app.app_id)">
               <div slot="start" class="col-span-2 relative py-4">
                 <img :src="app.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
               </div>
