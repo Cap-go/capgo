@@ -12,7 +12,7 @@ import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import pack from './package.json'
 
-const domain = 'capgo.app'
+const domain = 'web.capgo.app'
 const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
 const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
