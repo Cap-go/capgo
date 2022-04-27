@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.5-alpha.3](https://github.com/Cap-go/capgo/compare/0.30.5-alpha.2...0.30.5-alpha.3) (2022-04-27)
+
+
+### Features
+
+* add script to excrat users ([6d4b462](https://github.com/Cap-go/capgo/commit/6d4b4629711d8504f4b758a006427b9531b312a8))
+
+
+### Bug Fixes
+
+* crisp + disable module in web ([db2a1a9](https://github.com/Cap-go/capgo/commit/db2a1a9a776de458d0bdff2f70cf11833d0fa4f6))
+
 ### [0.30.5-alpha.2](https://github.com/Cap-go/capgo/compare/0.30.5-alpha.1...0.30.5-alpha.2) (2022-04-27)
 
 
