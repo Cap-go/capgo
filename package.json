@@ -9,7 +9,7 @@
     "mobile": "vite build --mode mobile && cap copy",
     "capacitor-assets": "capacitor-assets generate",
     "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
-    "release": "standard-version",
+    "release": "standard-version -t \"\"",
     "sync": "cap sync",
     "dev": "vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
