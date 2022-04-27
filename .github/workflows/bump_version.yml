@@ -25,8 +25,6 @@ jobs:
         run: npx capacitor-standard-version --prerelease
       - name: Push to origin
         run: |
-          remote_repo="https://${GITHUB_ACTOR}:${github_token}@github.com/${GITHUB_REPOSITORY}.git"
+          remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
           git pull ${remote_repo} ${GITHUB_REF_NAME}
           git push "${remote_repo}" HEAD:${GITHUB_REF_NAME} --follow-tags --tags
-        with:
-          github_token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
