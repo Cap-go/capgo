@@ -2,6 +2,7 @@ import type { definitions } from '~/types/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
+import { setUser, setUserId } from '~/services/crips'
 
 const guard = async(next: any, to: string, from: string) => {
   const supabase = useSupabase()
@@ -26,6 +27,12 @@ const guard = async(next: any, to: string, from: string) => {
         console.log('error', error)
       }
     }
+    setUserId(auth.id)
+    setUser({
+      nickname: `${main.user?.first_name} ${main.user?.last_name}`,
+      email: main.user?.email,
+      avatar: main.user?.image_url,
+    })
 
     if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
       next('/onboarding/activation')

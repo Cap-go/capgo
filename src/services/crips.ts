@@ -5,6 +5,15 @@ const CapacitorCrisp = new CapacitorCrispWeb()
 export const setUserId = (uuid: string): void => {
   CapacitorCrisp.setString({ key: 'user-uuid', value: uuid })
 }
+
+export const setUser = (data: {
+  nickname?: string
+  phone?: string
+  email?: string
+  avatar?: string
+}): void => {
+  CapacitorCrisp.setUser(data)
+}
 export const setVersion = (version: string): void => {
   CapacitorCrisp.setString({ key: 'webVersion', value: version })
 }
