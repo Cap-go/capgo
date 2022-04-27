@@ -19,8 +19,8 @@ jobs:
           token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
       - name: Git config
         run: |
-          git config --local user.name "$INPUT_GIT_NAME"
-          git config --local user.email "$INPUT_GIT_EMAIL"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Create bump and changelog
         if: github.ref == 'refs/heads/main'
         run: npx capacitor-standard-version
