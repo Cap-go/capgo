@@ -1,0 +1,16 @@
+{
+  "bumpFiles": [
+    {
+      "filename": "./android/app/build.gradle",
+      "updater": "./version-control/android-version-updater.js"
+    },
+    {
+      "filename": "/package.json",
+      "type": "json"
+    },
+    {
+      "filename": "./ios/App/App.xcodeproj/project.pbxproj",
+      "updater": "./version-control/ios-version-updater.js"
+    }
+  ]
+}
