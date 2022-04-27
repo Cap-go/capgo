@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - main
+      - development
 
 jobs:
   bump-version:
-    if: "!startsWith(github.event.head_commit.message, 'bump:')"
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
-    name: "Bump version and create changelog with commitizen"
+    name: "Bump version and create changelog with standard version"
     steps:
       - name: Check out
         uses: actions/checkout@v2
@@ -17,7 +18,15 @@ jobs:
           fetch-depth: 0
           token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
       - name: Create bump and changelog
-        uses: commitizen-tools/commitizen-action@0.7.0
+        if: github.ref == 'refs/heads/main'
+        run: npx capacitor-standard-version
+      - name: Create bump and changelog
+        if: github.ref != 'refs/heads/main'
+        run: npx capacitor-standard-version --prerelease
+      - name: Push to origin
+        run: |
+          remote_repo="https://${GITHUB_ACTOR}:${github_token}@github.com/${GITHUB_REPOSITORY}.git"
+          git pull ${remote_repo} ${GITHUB_REF_NAME}
+          git push "${remote_repo}" HEAD:${GITHUB_REF_NAME} --follow-tags --tags
         with:
           github_token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
-          branch: 'main'
