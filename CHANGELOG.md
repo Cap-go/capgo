@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.5-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.2...0.30.5-alpha.0) (2022-04-27)
+
+
+### Features
+
+* add action for main or development ([1e09fae](https://github.com/Cap-go/capgo/commit/1e09fae3e638b6c392c74f401b3d2301ab34f383))
+* version control using standard-version ([da788a3](https://github.com/Cap-go/capgo/commit/da788a33698bf88c2a43b0ee18ee0a97e39c352a))
+
+
+### Bug Fixes
+
+* action ([3658922](https://github.com/Cap-go/capgo/commit/3658922d6f5c2df5a7ddb72bc75ccdb54ad0bc2f))
+* git config action ([e4cf374](https://github.com/Cap-go/capgo/commit/e4cf374babbf63f8722a357f14a4edff20752773))
+* issue android bump ([12f6888](https://github.com/Cap-go/capgo/commit/12f6888d8c290644562cd6dd3f4291abb15a7779))
+* issue github config in action ([034d1a7](https://github.com/Cap-go/capgo/commit/034d1a74c58709fcca01d46398f99aadf714206d))
+* release script ([31ecd9e](https://github.com/Cap-go/capgo/commit/31ecd9ec76dfdb66bc4d0660c51f428d616d2031))
+* release to capgo use different channel for alpha ([cd36083](https://github.com/Cap-go/capgo/commit/cd360838945121cfb96a1491ddc98ac25bf5b10a))
+* remove file to use new system ([45440e4](https://github.com/Cap-go/capgo/commit/45440e464e16bcef772f1a62ea42e06ccefb1b24))
+* remove with in action ([ac9454d](https://github.com/Cap-go/capgo/commit/ac9454dd94266a32db528790fa49f975d05e0508))
+
 ### [0.30.5-2](https://github.com/Cap-go/capgo/compare/v0.30.5-1...v0.30.5-2) (2022-04-27)
 
 ### [0.30.5-1](https://github.com/Cap-go/capgo/compare/v0.30.5-0...v0.30.5-1) (2022-04-27)
