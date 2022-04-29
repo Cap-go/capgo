@@ -26,7 +26,7 @@ jobs:
         run: npx capacitor-standard-version
       - name: Create bump and changelog
         if: github.ref != 'refs/heads/main'
-        run: npx capacitor-standard-version --prerelease alpha
+        run: npx capacitor-standard-version -- --prerelease alpha
       - name: Push to origin
         run: |
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
