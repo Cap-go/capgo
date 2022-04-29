@@ -5,11 +5,11 @@ import {
   IonItemDivider, IonLabel, IonList, IonListHeader, IonNote, IonPage,
   IonTitle, IonToolbar, actionSheetController, toastController,
 } from '@ionic/vue'
-import dayjs from 'dayjs'
 import { chevronBack } from 'ionicons/icons'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 
@@ -143,9 +143,7 @@ const loadData = async() => {
   ])
   isLoading.value = false
 }
-const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
-}
+
 const upsertDevVersion = async(device: string, v: definitions['app_versions']) => {
   return supabase
     .from<definitions['devices_override']>('devices_override')

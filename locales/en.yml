@@ -131,6 +131,7 @@ package:
   channels: Channels
   device_list: Devices list
   devices: See devices statistics
+  devices-list: Devices linked
   download: Download version
   link_channel: Link to channel
   link_version: Link to version

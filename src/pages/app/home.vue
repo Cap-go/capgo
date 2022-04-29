@@ -11,13 +11,13 @@ import {
   toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
-import dayjs from 'dayjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { openVersion } from '~/services/versions'
+import { formatDate } from '~/services/date'
 
 const listRef = ref()
 const { t } = useI18n()
@@ -37,9 +37,6 @@ interface ChannelUserApp {
   channel_id: definitions['channels'] & {
     version: definitions['app_versions']
   }
-}
-const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 const getMyApps = async() => {
   const { data } = await supabase
