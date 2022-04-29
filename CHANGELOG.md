@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.6-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.5...0.30.6-alpha.0) (2022-04-29)
+
+
+### Bug Fixes
+
+* change build action's tag glob pattern to "*" ([e0ad971](https://github.com/Cap-go/capgo/commit/e0ad971986873c2d38fb7761e437614341e3639d))
+
 ### [0.30.5](https://github.com/Cap-go/capgo/compare/0.30.5-alpha.4...0.30.5) (2022-04-29)
 
 
