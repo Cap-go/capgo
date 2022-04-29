@@ -13,11 +13,11 @@ import {
   IonToolbar,
   actionSheetController, isPlatform, toastController,
 } from '@ionic/vue'
-import dayjs from 'dayjs'
 import { chevronBack, chevronForwardOutline } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
@@ -138,6 +138,34 @@ const deleteVersion = async(version: definitions['app_versions']) => {
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   try {
+    const { data: channelFound, error: errorChannel } = await supabase
+      .from<definitions['channels']>('channels')
+      .select()
+      .eq('app_id', version.app_id)
+      .eq('version', version.id)
+    if ((channelFound && channelFound.length) || errorChannel) {
+      const toast = await toastController
+        .create({
+          message: `Version ${version.app_id}@${version.name} is used in a channel, unlink it first`,
+          duration: 2000,
+        })
+      await toast.present()
+      return
+    }
+    const { data: deviceFound, error: errorDevice } = await supabase
+      .from<definitions['devices_override']>('devices_override')
+      .select()
+      .eq('app_id', version.app_id)
+      .eq('version', version.id)
+    if ((deviceFound && deviceFound.length) || errorDevice) {
+      const toast = await toastController
+        .create({
+          message: `Version ${version.app_id}@${version.name} is used in a device override, unlink it first`,
+          duration: 2000,
+        })
+      await toast.present()
+      return
+    }
     const { error: delError } = await supabase
       .storage
       .from('apps')
@@ -184,10 +212,6 @@ const openDevices = () => {
 const openStats = () => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/stats`)
 }
-const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
-}
-
 const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
     .from<definitions['channels']>('channels')
