@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.5-alpha.4](https://github.com/Cap-go/capgo/compare/0.30.5-alpha.3...0.30.5-alpha.4) (2022-04-29)
+
+
+### Bug Fixes
+
+* prevent delete when link to channel ([7cc481c](https://github.com/Cap-go/capgo/commit/7cc481c533790ae22460d4e746e8835c169ca919))
+
 ### [0.30.5-alpha.3](https://github.com/Cap-go/capgo/compare/0.30.5-alpha.2...0.30.5-alpha.3) (2022-04-27)
 
 
