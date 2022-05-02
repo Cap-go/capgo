@@ -135,6 +135,7 @@ package:
   channels: saluran
   device_list: Daftar perangkat
   devices: Lihat perangkat
+  devices-list: Perangkat tertaut
   download: Unduh versi
   link_channel: Tautan ke saluran
   link_version: Tautan ke versi
@@ -207,6 +208,9 @@ stats:
   title: Statistik
   versions: Versi
 usage:
+  success: >-
+    Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
+    menit
   title: Penggunaan
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

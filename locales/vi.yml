@@ -133,6 +133,7 @@ package:
   channels: Kênh truyền hình
   device_list: Danh sách thiết bị
   devices: Xem các thiết bị
+  devices-list: Các thiết bị được liên kết
   download: Tải xuống phiên bản
   link_channel: Liên kết với kênh
   link_version: Liên kết đến phiên bản
@@ -205,6 +206,7 @@ stats:
   title: Số liệu thống kê
   versions: Phiên bản
 usage:
+  success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

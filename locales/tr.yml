@@ -133,6 +133,7 @@ package:
   channels: Kanallar
   device_list: Cihaz listesi
   devices: Cihazları görün
+  devices-list: Bağlı cihazlar
   download: Sürümü indir
   link_channel: kanala bağlantı
   link_version: sürüme bağlantı
@@ -207,6 +208,7 @@ stats:
   title: istatistikler
   versions: Sürümler
 usage:
+  success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
   title: kullanım
 your-current-plan-is: Şu anki planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'

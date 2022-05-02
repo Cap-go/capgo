@@ -133,6 +133,7 @@ package:
   channels: каналы
   device_list: Список устройств
   devices: Посмотреть устройства
+  devices-list: Устройства связаны
   download: Скачать версию
   link_channel: Ссылка на канал
   link_version: Ссылка на версию
@@ -205,6 +206,9 @@ stats:
   title: Статистика
   versions: Версии
 usage:
+  success: >-
+    Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
+    минут.
   title: использование
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'

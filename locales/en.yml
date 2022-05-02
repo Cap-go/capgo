@@ -202,6 +202,7 @@ stats:
   title: Stats
   versions: Versions
 usage:
+  success: Your plan has been setup this page will be update, in few minutes
   title: Usage
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is

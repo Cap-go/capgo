@@ -137,6 +137,7 @@ package:
   channels: Kanäle
   device_list: Geräteliste
   devices: Siehe Geräte
+  devices-list: Geräte verknüpft
   download: Download-Version
   link_channel: Link zum Kanal
   link_version: Version verlinken
@@ -213,6 +214,9 @@ stats:
   title: Statistiken
   versions: Versionen
 usage:
+  success: >-
+    Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten
+    aktualisiert
   title: Verwendungszweck
 your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist

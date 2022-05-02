@@ -129,6 +129,7 @@ package:
   channels: 채널
   device_list: 기기 목록
   devices: 기기 보기
+  devices-list: 연결된 기기
   download: 버전 다운로드
   link_channel: 채널 링크
   link_version: 버전에 대한 링크
@@ -201,6 +202,7 @@ stats:
   title: 통계
   versions: 버전
 usage:
+  success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법
 your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은

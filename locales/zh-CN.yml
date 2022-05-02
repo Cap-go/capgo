@@ -129,6 +129,7 @@ package:
   channels: 频道
   device_list: 设备列表
   devices: 查看设备
+  devices-list: 关联的设备
   download: 下载版本
   link_channel: 链接到频道
   link_version: 链接到版本
@@ -201,6 +202,7 @@ stats:
   title: 统计数据
   versions: 版本
 usage:
+  success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是
