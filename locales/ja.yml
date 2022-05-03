@@ -66,6 +66,7 @@ button:
   toggle_langs: 言語切り替え
 channel:
   add: 追加
+  beta-channel: ベータチャンネル
   cannot-delete-device: デバイスを削除できません
   copy: URLをコピー
   device: 端末

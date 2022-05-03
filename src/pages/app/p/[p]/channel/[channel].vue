@@ -96,6 +96,7 @@ const saveChannelChange = async() => {
     const update = {
       disableAutoUpdateUnderNative: channel.value.disableAutoUpdateUnderNative,
       disableAutoUpdateToMajor: channel.value.disableAutoUpdateToMajor,
+      beta: channel.value.beta,
     }
     const { error } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -368,6 +369,14 @@ const inviteUser = async(userId: string) => {
             {{ t('channel.v3') }}
           </ion-label>
         </ion-item-divider>
+        <IonItem>
+          <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
+          <IonToggle
+            color="secondary"
+            :checked="channel?.beta"
+            @ionChange="channel.beta = $event.target.checked; saveChannelChange()"
+          />
+        </IonItem>
         <IonItem>
           <IonLabel>Disable auto downgrade under native</IonLabel>
           <IonToggle

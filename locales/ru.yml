@@ -70,6 +70,7 @@ button:
   toggle_langs: Сменить язык
 channel:
   add: Добавлять
+  beta-channel: Бета-канал
   cannot-delete-device: Невозможно удалить устройство
   copy: Скопировать URL
   device: Устройство

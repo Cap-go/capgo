@@ -70,6 +70,7 @@ button:
   toggle_langs: Dilleri değiştir
 channel:
   add: Ekle
+  beta-channel: Beta kanalı
   cannot-delete-device: Cihaz silinemiyor
   copy: Url'yi kopyala
   device: Cihaz

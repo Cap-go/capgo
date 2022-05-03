@@ -66,6 +66,7 @@ button:
   toggle_langs: 언어 변경
 channel:
   add: 추가하다
+  beta-channel: 베타 채널
   cannot-delete-device: 장치를 삭제할 수 없습니다
   copy: URL 복사
   device: 장치

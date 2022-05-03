@@ -66,6 +66,7 @@ button:
   toggle_langs: 切换语言
 channel:
   add: 添加
+  beta-channel: 测试通道
   cannot-delete-device: 无法删除设备
   copy: 复制网址
   device: 设备

@@ -71,6 +71,7 @@ button:
   toggle_langs: Cambia lingua
 channel:
   add: Aggiungere
+  beta-channel: Canale beta
   cannot-delete-device: Impossibile eliminare il dispositivo
   copy: Copia URL
   device: Dispositivo

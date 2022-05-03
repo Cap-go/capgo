@@ -72,6 +72,7 @@ button:
   toggle_langs: Ubah bahasa
 channel:
   add: Menambahkan
+  beta-channel: saluran beta
   cannot-delete-device: Tidak dapat menghapus perangkat
   copy: Salin URL
   device: Perangkat

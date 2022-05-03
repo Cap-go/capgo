@@ -70,6 +70,7 @@ button:
   toggle_langs: Thay đổi ngôn ngữ
 channel:
   add: Thêm vào
+  beta-channel: Kênh beta
   cannot-delete-device: Không thể xóa thiết bị
   copy: Sao chép URL
   device: Thiết bị
