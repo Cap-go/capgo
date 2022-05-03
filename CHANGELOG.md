@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.4](https://github.com/Cap-go/capgo/compare/0.30.2...0.30.4) (2022-05-03)
+
+
+### Bug Fixes
+
+* use new CI in main too ([bd5e746](https://github.com/Cap-go/capgo/commit/bd5e746b9e10712b1f4593a15e0b4b3c5fa07128))
+
 ### 0.30.3 (2022-04-27)
 
 
