@@ -8,7 +8,7 @@ on:
 
 jobs:
   bump-version:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     runs-on: ubuntu-latest
     name: "Bump version and create changelog with standard version"
     steps:
@@ -20,7 +20,7 @@ jobs:
       - name: Git config
         run: |
           git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create bump and changelog
         if: github.ref == 'refs/heads/main'
         run: npx capacitor-standard-version
@@ -29,6 +29,7 @@ jobs:
         run: npx capacitor-standard-version --prerelease alpha
       - name: Push to origin
         run: |
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
-          git pull ${remote_repo} ${GITHUB_REF_NAME}
-          git push "${remote_repo}" HEAD:${GITHUB_REF_NAME} --follow-tags --tags
+          git pull $remote_repo $CURRENT_BRANCH
+          git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
