@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.8-alpha.4](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.3...0.30.8-alpha.4) (2022-05-03)
+
+
+### Bug Fixes
+
+* npx script ([7695b63](https://github.com/Cap-go/capgo/commit/7695b6301537b95685e3120bcdf7a135482e3b3f))
+
 ### [0.30.8-alpha.3](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.2...0.30.8-alpha.3) (2022-05-03)
 
 
