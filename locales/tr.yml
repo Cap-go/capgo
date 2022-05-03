@@ -39,6 +39,11 @@ activation:
   notification: Bildirimler
   notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
   validate: Doğrula
+alert:
+  confirm-delete: Silmeyi Onayla
+  delete-message: |-
+    Bu eylem geri alınamaz. 
+    Bunu silmek istediğinizden emin misiniz
 apikeys:
   all: anahtarlar
   checkbelow: daha fazla bilgi almak için aşağıdaki bağlantıyı kontrol edin
@@ -65,7 +70,10 @@ button:
   toggle_langs: Dilleri değiştir
 channel:
   add: Ekle
+  cannot-delete-device: Cihaz silinemiyor
   copy: Url'yi kopyala
+  device: Cihaz
+  device-deleted: Cihaz silindi
   invit: Davet etmek için e-posta yazın
   is_public: genel kanal
   make_it: Bunu yapmak
@@ -76,6 +84,7 @@ channel:
   public: Kapasitör-güncelleyici bağlantısı
   public_desc: Halk
   title: Kanal
+  user: kullanıcı
   user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
@@ -130,6 +139,7 @@ notificationSettings:
 onboarding:
   loading: Yükleniyor
 package:
+  cannot-delete-version: Sürüm silinemiyor
   channels: Kanallar
   device_list: Cihaz listesi
   devices: Cihazları görün
@@ -138,15 +148,24 @@ package:
   link_channel: kanala bağlantı
   link_version: sürüme bağlantı
   mobiles-stats: cep telefonu istatistikleri
+  name: Uygulama
   set: Sürümü kanala ayarla
   stats: istatistikler
   test: Sürümü başlat
   title: bilgi
+  version:
+    is-used-in-device: >-
+      bir cihaz geçersiz kılma işleminde kullanılıyorsa, önce bağlantısını
+      kaldırın
+  version-deleted: Sürüm silindi
   versions: Sürümler
 password:
   heading: Şifre oluştur
   new: Yeni Şifre
   validate: Doğrula
+pckage:
+  version:
+    is-used-in-channel: bir kanalda kullanılıyorsa, önce bağlantısını kaldırın
 plan:
   abtest: A / B testi
   application: Başvuru

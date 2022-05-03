@@ -2,12 +2,13 @@
 import type { RefresherCustomEvent } from '@ionic/vue'
 import {
   IonContent,
-  IonHeader, IonItem, IonItemDivider,
-  IonItemOption, IonItemOptions,
-  IonItemSliding,
+  IonHeader,
+  IonItem, IonItemDivider, IonItemOption,
+  IonItemOptions, IonItemSliding,
   IonLabel,
   IonList,
-  IonPage, IonRefresher, IonRefresherContent, IonTitle, IonToolbar,
+  IonPage,
+  IonRefresher, IonRefresherContent, IonTitle, IonToolbar, alertController,
   toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
@@ -47,10 +48,32 @@ const getMyApps = async() => {
     apps.value = data
 }
 
+const didCancel = async(name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
+
 const deleteApp = async(app: definitions['apps']) => {
   console.log('deleteApp', app)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('package.name')))
+    return
   try {
     await supabase
       .from<definitions['stats']>('stats')

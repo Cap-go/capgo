@@ -4,7 +4,7 @@ import {
   IonIcon, IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
   IonLabel, IonList, IonListHeader, IonModal, IonNote,
   IonPage, IonSearchbar, IonTitle, IonToggle, IonToolbar,
-  actionSheetController, toastController,
+  actionSheetController, alertController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
@@ -199,8 +199,27 @@ const makePublic = async(val = true) => {
     await toast.present()
   }
 }
+const didCancel = async(name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
 const deleteUser = async(usr: definitions['users']) => {
-  if (!channel.value)
+  if (!channel.value || await didCancel(t('channel.user')))
     return
   const { error } = await supabase
     .from<definitions['channel_users']>('channel_users')
@@ -212,6 +231,7 @@ const deleteUser = async(usr: definitions['users']) => {
   else
     await getUsers()
 }
+
 const presentActionSheet = async(usr: definitions['users']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
@@ -246,6 +266,8 @@ const deleteDevice = async(device: definitions['channel_devices']) => {
   console.log('deleteDevice', device)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('channel.device')))
+    return
   try {
     const { error: delDevError } = await supabase
       .from<definitions['channel_devices']>('channel_devices')
@@ -255,7 +277,7 @@ const deleteDevice = async(device: definitions['channel_devices']) => {
     if (delDevError) {
       const toast = await toastController
         .create({
-          message: 'Cannot delete device',
+          message: t('channel.cannot-delete-device'),
           duration: 2000,
         })
       await toast.present()
@@ -264,7 +286,7 @@ const deleteDevice = async(device: definitions['channel_devices']) => {
       await getDevices()
       const toast = await toastController
         .create({
-          message: 'Device deleted',
+          message: t('channel.device-deleted'),
           duration: 2000,
         })
       await toast.present()
@@ -273,7 +295,7 @@ const deleteDevice = async(device: definitions['channel_devices']) => {
   catch (error) {
     const toast = await toastController
       .create({
-        message: 'Cannot delete device',
+        message: t('channel.cannot-delete-device'),
         duration: 2000,
       })
     await toast.present()

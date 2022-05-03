@@ -41,6 +41,11 @@ activation:
     Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
     verfügbar sind
   validate: Bestätigen
+alert:
+  confirm-delete: Löschen bestätigen
+  delete-message: |-
+    Diese Aktion ist nicht umkehrbar. 
+    Möchten Sie diese wirklich löschen?
 apikeys:
   all: Schlüssel
   checkbelow: Überprüfen Sie unter dem Link, um weitere Informationen zu erhalten
@@ -67,7 +72,10 @@ button:
   toggle_langs: Sprachen ändern
 channel:
   add: Hinzufügen
+  cannot-delete-device: Gerät kann nicht gelöscht werden
   copy: URL kopieren
+  device: Gerät
+  device-deleted: Gerät gelöscht
   invit: Geben Sie die einzuladende E-Mail-Adresse ein
   is_public: Kanal öffentlich
   make_it: Mach es
@@ -78,6 +86,7 @@ channel:
   public: Kondensator-Updater-Link
   public_desc: Allgemein
   title: Kanal
+  user: Benutzer
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
   users: Mit Benutzern geteilt
   v3: V3-Einstellungen
@@ -134,6 +143,7 @@ notificationSettings:
 onboarding:
   loading: Wird geladen
 package:
+  cannot-delete-version: Version kann nicht gelöscht werden
   channels: Kanäle
   device_list: Geräteliste
   devices: Siehe Geräte
@@ -142,15 +152,24 @@ package:
   link_channel: Link zum Kanal
   link_version: Version verlinken
   mobiles-stats: Mobile Statistiken
+  name: App
   set: Version auf Kanal setzen
   stats: Statistiken
   test: Version starten
   title: die Info
+  version:
+    is-used-in-device: >-
+      in einer Geräteüberschreibung verwendet wird, heben Sie zuerst die
+      Verknüpfung auf
+  version-deleted: Fassung gelöscht
   versions: Versionen
 password:
   heading: Passwort erstellen
   new: Neues Kennwort
   validate: Bestätigen
+pckage:
+  version:
+    is-used-in-channel: in einem Kanal verwendet wird, heben Sie zuerst die Verknüpfung auf
 plan:
   abtest: A / B-Tests
   application: Anwendung

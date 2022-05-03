@@ -37,6 +37,11 @@ activation:
   notification: 通知
   notification-desc: 新しいアプリのバージョンが利用可能になったときに通知を受け取ることに同意します
   validate: 検証
+alert:
+  confirm-delete: 削除の確認
+  delete-message: |-
+    このアクションは元に戻せません。
+    これを削除してもよろしいですか
 apikeys:
   all: キー
   checkbelow: 詳細については、リンクの下を確認してください
@@ -61,7 +66,10 @@ button:
   toggle_langs: 言語切り替え
 channel:
   add: 追加
+  cannot-delete-device: デバイスを削除できません
   copy: URLをコピー
+  device: 端末
+  device-deleted: デバイスが削除されました
   invit: 招待するメールアドレスを入力
   is_public: チャンネル公開
   make_it: 成功する
@@ -72,6 +80,7 @@ channel:
   public: コンデンサ-アップデータリンク
   public_desc: 公衆
   title: チャネル
+  user: ユーザー
   user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
   users: ユーザーと共有
   v3: V3設定
@@ -126,6 +135,7 @@ notificationSettings:
 onboarding:
   loading: 読み込み中
 package:
+  cannot-delete-version: バージョンを削除できません
   channels: チャネル
   device_list: デバイスリスト
   devices: デバイスを見る
@@ -134,15 +144,22 @@ package:
   link_channel: チャネルへのリンク
   link_version: バージョンへのリンク
   mobiles-stats: モバイル統計
+  name: アプリ
   set: バージョンをチャネルに設定
   stats: 統計
   test: 起動バージョン
   title: 情報
+  version:
+    is-used-in-device: デバイスオーバーライドで使用されている場合は、最初にリンクを解除してください
+  version-deleted: バージョンが削除されました
   versions: バージョン
 password:
   heading: パスワードの作成
   new: 新しいパスワード
   validate: 検証
+pckage:
+  version:
+    is-used-in-channel: チャネルで使用されている場合は、最初にリンクを解除してください
 plan:
   abtest: A/Bテスト
   application: 応用

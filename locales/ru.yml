@@ -39,6 +39,11 @@ activation:
   notification: Уведомления
   notification-desc: Я согласен получать уведомления о появлении новой версии приложения
   validate: Подтвердить
+alert:
+  confirm-delete: Подтвердите удаление
+  delete-message: |-
+    Это действие необратимо. 
+    Вы уверены, что хотите удалить это
 apikeys:
   all: ключи
   checkbelow: проверьте ссылку ниже, чтобы получить больше информации
@@ -65,7 +70,10 @@ button:
   toggle_langs: Сменить язык
 channel:
   add: Добавлять
+  cannot-delete-device: Невозможно удалить устройство
   copy: Скопировать URL
+  device: Устройство
+  device-deleted: Устройство удалено
   invit: Введите адрес электронной почты, чтобы пригласить
   is_public: Публичный канал
   make_it: Сделай это
@@ -76,6 +84,7 @@ channel:
   public: Ссылка на конденсатор-апдейтер
   public_desc: Общественный
   title: Канал
+  user: Пользователь
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
   users: Доступно пользователям
   v3: Настройки версии 3
@@ -130,6 +139,7 @@ notificationSettings:
 onboarding:
   loading: Загрузка
 package:
+  cannot-delete-version: Не могу удалить версию
   channels: каналы
   device_list: Список устройств
   devices: Посмотреть устройства
@@ -138,15 +148,22 @@ package:
   link_channel: Ссылка на канал
   link_version: Ссылка на версию
   mobiles-stats: Мобильная статистика
+  name: Приложение
   set: Установить версию для канала
   stats: статистика
   test: Запустить версию
   title: Информация
+  version:
+    is-used-in-device: используется в переопределении устройства, сначала отсоедините его
+  version-deleted: Версия удалена
   versions: Версии
 password:
   heading: Придумайте пароль
   new: Новый пароль
   validate: Подтвердить
+pckage:
+  version:
+    is-used-in-channel: используется в канале, сначала отсоедините его
 plan:
   abtest: А/Б тестирование
   application: Заявление

@@ -11,7 +11,7 @@ import {
   IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
   IonTitle,
   IonToolbar,
-  actionSheetController, isPlatform, toastController,
+  actionSheetController, alertController, isPlatform, toastController,
 } from '@ionic/vue'
 import { chevronBack, chevronForwardOutline } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
@@ -91,10 +91,32 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
+const didCancel = async(name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
+
 const deleteChannel = async(channel: definitions['channels']) => {
   console.log('deleteChannel', channel)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('channel.title')))
+    return
   try {
     const { error: delChannelUserError } = await supabase
       .from<definitions['channel_users']>('channel_users')
@@ -137,6 +159,8 @@ const deleteVersion = async(version: definitions['app_versions']) => {
   console.log('deleteVersion', version)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('device.version')))
+    return
   try {
     const { data: channelFound, error: errorChannel } = await supabase
       .from<definitions['channels']>('channels')
@@ -146,7 +170,7 @@ const deleteVersion = async(version: definitions['app_versions']) => {
     if ((channelFound && channelFound.length) || errorChannel) {
       const toast = await toastController
         .create({
-          message: `Version ${version.app_id}@${version.name} is used in a channel, unlink it first`,
+          message: `${t('device.version')} ${version.app_id}@${version.name} ${t('pckage.version.is-used-in-channel')}`,
           duration: 2000,
         })
       await toast.present()
@@ -160,7 +184,7 @@ const deleteVersion = async(version: definitions['app_versions']) => {
     if ((deviceFound && deviceFound.length) || errorDevice) {
       const toast = await toastController
         .create({
-          message: `Version ${version.app_id}@${version.name} is used in a device override, unlink it first`,
+          message: `${t('device.version')} ${version.app_id}@${version.name} ${t('package.version.is-used-in-device')}`,
           duration: 2000,
         })
       await toast.present()
@@ -178,7 +202,7 @@ const deleteVersion = async(version: definitions['app_versions']) => {
     if (delAppError || delError) {
       const toast = await toastController
         .create({
-          message: 'Cannot delete version',
+          message: t('package.cannot-delete-version'),
           duration: 2000,
         })
       await toast.present()
@@ -186,7 +210,7 @@ const deleteVersion = async(version: definitions['app_versions']) => {
     else {
       const toast = await toastController
         .create({
-          message: 'Version deleted',
+          message: t('package.version-deleted'),
           duration: 2000,
         })
       await toast.present()
@@ -196,7 +220,7 @@ const deleteVersion = async(version: definitions['app_versions']) => {
   catch (error) {
     const toast = await toastController
       .create({
-        message: 'Cannot delete channel',
+        message: t('package.cannot-delete-version'),
         duration: 2000,
       })
     await toast.present()

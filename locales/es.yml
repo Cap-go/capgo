@@ -43,6 +43,11 @@ activation:
     Acepto recibir notificaciones cuando haya una nueva versión de la aplicación
     disponible
   validate: Validar
+alert:
+  confirm-delete: Confirmar eliminación
+  delete-message: |-
+    Esta acción no es reversible. 
+    Estás seguro que quieres eliminar esto
 apikeys:
   all: teclas
   checkbelow: verifique debajo del enlace para obtener más información
@@ -69,7 +74,10 @@ button:
   toggle_langs: Cambiar idiomas
 channel:
   add: Agregar
+  cannot-delete-device: No se puede eliminar el dispositivo
   copy: Copiar URL
+  device: Dispositivo
+  device-deleted: Dispositivo eliminado
   invit: Escriba el correo electrónico para invitar
   is_public: canal publico
   make_it: Hazlo
@@ -80,6 +88,7 @@ channel:
   public: Enlace condensador-actualizador
   public_desc: Público
   title: Canal
+  user: Usuario
   user_no_found: Usuario no encontrado, solicite registrarse primero
   users: Compartido con los usuarios
   v3: configuración V3
@@ -136,6 +145,7 @@ notificationSettings:
 onboarding:
   loading: Cargando
 package:
+  cannot-delete-version: No se puede eliminar la versión
   channels: Canales
   device_list: lista de dispositivos
   devices: ver dispositivos
@@ -144,15 +154,22 @@ package:
   link_channel: Enlace al canal
   link_version: Enlace a la versión
   mobiles-stats: Estadísticas móviles
+  name: aplicación
   set: Establecer versión para el canal
   stats: estadísticas
   test: Versión de lanzamiento
   title: información
+  version:
+    is-used-in-device: se usa en una anulación de dispositivo, desvincúlelo primero
+  version-deleted: Versión eliminada
   versions: Versiones
 password:
   heading: Crear contraseña
   new: Nueva contraseña
   validate: Validar
+pckage:
+  version:
+    is-used-in-channel: se usa en un canal, desvincúlelo primero
 plan:
   abtest: Pruebas A/B
   application: Solicitud

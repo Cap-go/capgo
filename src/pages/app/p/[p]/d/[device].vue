@@ -3,7 +3,7 @@ import {
   IonButton,
   IonButtons, IonContent, IonHeader, IonIcon, IonItem,
   IonItemDivider, IonLabel, IonList, IonListHeader, IonNote, IonPage,
-  IonTitle, IonToolbar, actionSheetController, toastController,
+  IonTitle, IonToolbar, actionSheetController, alertController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
 import { ref, watchEffect } from 'vue'
@@ -153,7 +153,28 @@ const upsertDevVersion = async(device: string, v: definitions['app_versions']) =
       app_id: packageId.value,
     })
 }
+const didCancel = async(name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
 const delDevVersion = async(device: string) => {
+  if (await didCancel(t('channel.device')))
+    return
   return supabase
     .from<definitions['devices_override']>('devices_override')
     .delete()
@@ -230,6 +251,8 @@ const upsertDevChannel = async(device: string, channel: definitions['channels'])
     })
 }
 const delDevChannel = async(device: string) => {
+  if (await didCancel(t('channel.title')))
+    return
   return supabase
     .from<definitions['channel_devices']>('channel_devices')
     .delete()
