@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.6-alpha.2](https://github.com/Cap-go/capgo/compare/0.30.6-alpha.1...0.30.6-alpha.2) (2022-05-03)
+
+
+### Bug Fixes
+
+* add alert before delete ([126b469](https://github.com/Cap-go/capgo/commit/126b469ef61fe3dca4a140ae257ab1dd1f9c7258))
+
 ### [0.30.6-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.6-alpha.0...0.30.6-alpha.1) (2022-05-02)
 
 
