@@ -1,15 +1,13 @@
 import dayjs from 'https://deno.land/dayjs@1.11.12'
-import Stripe from 'https://esm.sh/stripe@9.1.0?target=deno'
+import Stripe from 'https://esm.sh/stripe@9.1.0?no-check'
 import type { definitions } from './types_supabase.ts'
 
-type EventHeaders = Record<string, string | undefined>
-export const parseStripeEvent = (key: string, body: string, headers: EventHeaders, secret: string) => {
-  const sig = headers['stripe-signature']
+export const parseStripeEvent = async(key: string, body: string, signature: string, secret: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
   })
-  const event = stripe.webhooks.constructEvent(body, String(sig), secret)
+  const event = await stripe.webhooks.constructEventAsync(body, signature, secret, undefined, Stripe.createSubtleCryptoProvider())
   return event
 }
 
