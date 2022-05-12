@@ -11,8 +11,24 @@ import VueI18n from '@intlify/vite-plugin-vue-i18n'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import pack from './package.json'
+import keys from './configs.json'
 
-const domain = 'web.capgo.app'
+const getRightKey = (branch: string, keyname: 'base_domain' | 'supa_anon' | 'supa_url'): string => {
+  if (branch === 'development')
+    return keys[keyname].development
+  else if (branch === 'local')
+    return keys[keyname].local
+  return keys[keyname].prod
+}
+
+const getUrl = (branch = ''): string => {
+  if (branch === 'local')
+    return `http://${getRightKey(branch, 'base_domain')}`
+  else
+    return `https://${getRightKey(branch, 'base_domain')}`
+}
+
+const base_api = 'api'
 const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
 const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
@@ -29,11 +45,14 @@ export default defineConfig({
 
     EnvironmentPlugin({
       VITE_APP_VERSION: pack.version,
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || getRightKey(process.env.BRANCH || '', 'supa_anon'),
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || getRightKey(process.env.BRANCH || '', 'supa_url'),
+      VITE_NETLIFY_URL: `${getUrl(process.env.BRANCH)}/${base_api}`,
+      VITE_APP_URL: `${getUrl(process.env.BRANCH)}`,
+      VITE_BRANCH: process.env.BRANCH || 'main',
       package_dependencies: JSON.stringify(pack.dependencies),
-      domain,
+      domain: getUrl(process.env.BRANCH),
       crisp: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
-      VITE_APP_URL: `https://${process.env.BRANCH && process.env.BRANCH === 'development' ? 'development.' : 'web'}capgo.app`,
-      VITE_NETLIFY_URL: process.env.VITE_NETLIFY_URL ? process.env.VITE_NETLIFY_URL : '/api',
     }, { defineOn: 'import.meta.env' }),
 
     // https://github.com/hannoeru/vite-plugin-pages

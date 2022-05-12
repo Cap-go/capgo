@@ -1,0 +1,17 @@
+{
+    "base_domain": {
+      "prod": "web.capgo.app",
+      "development": "development.capgo.app",
+      "local": "localhost:3332"
+    },
+    "supa_anon": {
+      "prod": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTYzNzgwNTAwOSwiZXhwIjoxOTUzMzgxMDA5fQ.8tgID1d4jodPwuo_fz4KHN4o1XKB9fnqyt0_GaJSj-w",
+      "development": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5amhucXZucWt6YXpqc25zcW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTA4ODI5MzcsImV4cCI6MTk2NjQ1ODkzN30.J_lIuW98aEi-hXhpZwC9CcX-TrkZ4U4DrD5njcYjwlI",
+      "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiaWp2aGN5Ymd6eHpjZnFxdWVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTA4ODI3MzAsImV4cCI6MTk2NjQ1ODczMH0.EoIMrspWYb_eWyC5w5Q5BSCcVmDAPC_Cd71-SZ2wI9g"
+    },
+    "supa_url": {
+      "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
+      "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
+      "local": "https://aucsybvnhavogdmzwtcw.supabase.co"
+    }
+  }
