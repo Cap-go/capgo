@@ -1,9 +1,10 @@
 import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
-import Stripe from "https://esm.sh/stripe?target=deno";
+import Stripe from 'https://esm.sh/stripe?target=deno'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
 
+// FIX: https://github.com/stripe-samples/stripe-node-deno-samples/issues/1
 interface dataDemo {
   appid: string
   name: string
