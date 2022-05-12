@@ -10,3 +10,7 @@ node_modules
 .netlify
 ios/App/App/GoogleService-Info.plist
 android/app/google-services.json
+
+# Supabase
+**/supabase/.branches
+**/supabase/.temp
