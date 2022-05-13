@@ -1,4 +1,4 @@
-import dayjs from 'https://deno.land/dayjs@1.11.12'
+import dayjs from 'https://cdn.skypack.dev/dayjs'
 import Stripe from 'https://esm.sh/stripe@9.1.0?no-check'
 import type { definitions } from './types_supabase.ts'
 
