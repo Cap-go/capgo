@@ -2,13 +2,16 @@ import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
 import { createPortal } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 
 interface PortalData {
   callbackUrl: string
 }
 
 serve(async(event: Request) => {
+  console.log('method', event.method)
+  if (event.method === 'OPTIONS')
+    return sendOptionsRes()
   const supabase = supabaseAdmin
   const authorization = event.headers.get('authorization')
   if (!authorization)
@@ -16,7 +19,7 @@ serve(async(event: Request) => {
   try {
     const body = (await event.json()) as PortalData
     const { user: auth, error } = await supabase.auth.api.getUser(
-      authorization,
+      authorization?.split('Bearer ')[1],
     )
     // eslint-disable-next-line no-console
     // console.log('auth', auth)
