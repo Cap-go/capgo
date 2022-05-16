@@ -114,6 +114,114 @@ export interface paths {
       }
     }
   }
+  '/app_stats': {
+    get: {
+      parameters: {
+        query: {
+          appid?: parameters['rowFilter.app_stats.appid']
+          userId?: parameters['rowFilter.app_stats.userId']
+          created_at?: parameters['rowFilter.app_stats.created_at']
+          updated_at?: parameters['rowFilter.app_stats.updated_at']
+          channels?: parameters['rowFilter.app_stats.channels']
+          mlu?: parameters['rowFilter.app_stats.mlu']
+          versions?: parameters['rowFilter.app_stats.versions']
+          shared?: parameters['rowFilter.app_stats.shared']
+          /** Filtering Columns */
+          select?: parameters['select']
+          /** Ordering */
+          order?: parameters['order']
+          /** Limiting and Pagination */
+          offset?: parameters['offset']
+          /** Limiting and Pagination */
+          limit?: parameters['limit']
+        }
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters['range']
+          /** Limiting and Pagination */
+          'Range-Unit'?: parameters['rangeUnit']
+          /** Preference */
+          Prefer?: parameters['preferCount']
+        }
+      }
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions['app_stats'][]
+        }
+        /** Partial Content */
+        206: unknown
+      }
+    }
+    post: {
+      parameters: {
+        body: {
+          /** app_stats */
+          app_stats?: definitions['app_stats']
+        }
+        query: {
+          /** Filtering Columns */
+          select?: parameters['select']
+        }
+        header: {
+          /** Preference */
+          Prefer?: parameters['preferReturn']
+        }
+      }
+      responses: {
+        /** Created */
+        201: unknown
+      }
+    }
+    delete: {
+      parameters: {
+        query: {
+          appid?: parameters['rowFilter.app_stats.appid']
+          userId?: parameters['rowFilter.app_stats.userId']
+          created_at?: parameters['rowFilter.app_stats.created_at']
+          updated_at?: parameters['rowFilter.app_stats.updated_at']
+          channels?: parameters['rowFilter.app_stats.channels']
+          mlu?: parameters['rowFilter.app_stats.mlu']
+          versions?: parameters['rowFilter.app_stats.versions']
+          shared?: parameters['rowFilter.app_stats.shared']
+        }
+        header: {
+          /** Preference */
+          Prefer?: parameters['preferReturn']
+        }
+      }
+      responses: {
+        /** No Content */
+        204: never
+      }
+    }
+    patch: {
+      parameters: {
+        query: {
+          appid?: parameters['rowFilter.app_stats.appid']
+          userId?: parameters['rowFilter.app_stats.userId']
+          created_at?: parameters['rowFilter.app_stats.created_at']
+          updated_at?: parameters['rowFilter.app_stats.updated_at']
+          channels?: parameters['rowFilter.app_stats.channels']
+          mlu?: parameters['rowFilter.app_stats.mlu']
+          versions?: parameters['rowFilter.app_stats.versions']
+          shared?: parameters['rowFilter.app_stats.shared']
+        }
+        body: {
+          /** app_stats */
+          app_stats?: definitions['app_stats']
+        }
+        header: {
+          /** Preference */
+          Prefer?: parameters['preferReturn']
+        }
+      }
+      responses: {
+        /** No Content */
+        204: never
+      }
+    }
+  }
   '/app_versions': {
     get: {
       parameters: {
@@ -1621,6 +1729,35 @@ export interface definitions {
      */
     updated_at?: string
   }
+  app_stats: {
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    appid: string
+    /** Format: uuid */
+    userId: string
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string
+    /** Format: smallint */
+    channels?: number
+    /** Format: bigint */
+    mlu?: number
+    /** Format: bigint */
+    versions?: number
+    /** Format: bigint */
+    shared?: number
+  }
   app_versions: {
     /**
      * Format: bigint
@@ -2120,6 +2257,24 @@ export interface parameters {
   'rowFilter.apikeys.mode': string
   /** Format: timestamp with time zone */
   'rowFilter.apikeys.updated_at': string
+  /** @description app_stats */
+  'body.app_stats': definitions['app_stats']
+  /** Format: character varying */
+  'rowFilter.app_stats.appid': string
+  /** Format: uuid */
+  'rowFilter.app_stats.userId': string
+  /** Format: timestamp with time zone */
+  'rowFilter.app_stats.created_at': string
+  /** Format: timestamp with time zone */
+  'rowFilter.app_stats.updated_at': string
+  /** Format: smallint */
+  'rowFilter.app_stats.channels': string
+  /** Format: bigint */
+  'rowFilter.app_stats.mlu': string
+  /** Format: bigint */
+  'rowFilter.app_stats.versions': string
+  /** Format: bigint */
+  'rowFilter.app_stats.shared': string
   /** @description app_versions */
   'body.app_versions': definitions['app_versions']
   /** Format: bigint */
