@@ -126,6 +126,7 @@ export interface paths {
           mlu?: parameters["rowFilter.app_stats.mlu"];
           versions?: parameters["rowFilter.app_stats.versions"];
           shared?: parameters["rowFilter.app_stats.shared"];
+          mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -184,6 +185,7 @@ export interface paths {
           mlu?: parameters["rowFilter.app_stats.mlu"];
           versions?: parameters["rowFilter.app_stats.versions"];
           shared?: parameters["rowFilter.app_stats.shared"];
+          mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
         };
         header: {
           /** Preference */
@@ -206,6 +208,7 @@ export interface paths {
           mlu?: parameters["rowFilter.app_stats.mlu"];
           versions?: parameters["rowFilter.app_stats.versions"];
           shared?: parameters["rowFilter.app_stats.shared"];
+          mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
         };
         body: {
           /** app_stats */
@@ -1757,6 +1760,8 @@ export interface definitions {
     versions?: number;
     /** Format: bigint */
     shared?: number;
+    /** Format: bigint */
+    mlu_real?: number;
   };
   app_versions: {
     /**
@@ -2275,6 +2280,8 @@ export interface parameters {
   "rowFilter.app_stats.versions": string;
   /** Format: bigint */
   "rowFilter.app_stats.shared": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.mlu_real": string;
   /** @description app_versions */
   "body.app_versions": definitions["app_versions"];
   /** Format: bigint */
