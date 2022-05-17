@@ -118,8 +118,8 @@ export interface paths {
     get: {
       parameters: {
         query: {
-          appid?: parameters["rowFilter.app_stats.appid"];
-          userId?: parameters["rowFilter.app_stats.userId"];
+          app_id?: parameters["rowFilter.app_stats.app_id"];
+          user_id?: parameters["rowFilter.app_stats.user_id"];
           created_at?: parameters["rowFilter.app_stats.created_at"];
           updated_at?: parameters["rowFilter.app_stats.updated_at"];
           channels?: parameters["rowFilter.app_stats.channels"];
@@ -176,8 +176,8 @@ export interface paths {
     delete: {
       parameters: {
         query: {
-          appid?: parameters["rowFilter.app_stats.appid"];
-          userId?: parameters["rowFilter.app_stats.userId"];
+          app_id?: parameters["rowFilter.app_stats.app_id"];
+          user_id?: parameters["rowFilter.app_stats.user_id"];
           created_at?: parameters["rowFilter.app_stats.created_at"];
           updated_at?: parameters["rowFilter.app_stats.updated_at"];
           channels?: parameters["rowFilter.app_stats.channels"];
@@ -198,8 +198,8 @@ export interface paths {
     patch: {
       parameters: {
         query: {
-          appid?: parameters["rowFilter.app_stats.appid"];
-          userId?: parameters["rowFilter.app_stats.userId"];
+          app_id?: parameters["rowFilter.app_stats.app_id"];
+          user_id?: parameters["rowFilter.app_stats.user_id"];
           created_at?: parameters["rowFilter.app_stats.created_at"];
           updated_at?: parameters["rowFilter.app_stats.updated_at"];
           channels?: parameters["rowFilter.app_stats.channels"];
@@ -1736,9 +1736,9 @@ export interface definitions {
      * This is a Primary Key.<pk/>
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
-    appid: string;
+    app_id: string;
     /** Format: uuid */
-    userId: string;
+    user_id: string;
     /**
      * Format: timestamp with time zone
      * @default now()
@@ -2260,9 +2260,9 @@ export interface parameters {
   /** @description app_stats */
   "body.app_stats": definitions["app_stats"];
   /** Format: character varying */
-  "rowFilter.app_stats.appid": string;
+  "rowFilter.app_stats.app_id": string;
   /** Format: uuid */
-  "rowFilter.app_stats.userId": string;
+  "rowFilter.app_stats.user_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.app_stats.created_at": string;
   /** Format: timestamp with time zone */
