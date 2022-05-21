@@ -1,5 +1,5 @@
 import dayjs from 'https://cdn.skypack.dev/dayjs'
-import Stripe from 'https://esm.sh/stripe@9.1.0?no-check'
+import Stripe from 'https://esm.sh/stripe@9.1.0?no-check&target=deno'
 import type { definitions } from './types_supabase.ts'
 
 export const parseStripeEvent = async(key: string, body: string, signature: string, secret: string) => {

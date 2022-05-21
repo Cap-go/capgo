@@ -128,6 +128,7 @@ export interface paths {
           shared?: parameters["rowFilter.app_stats.shared"];
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -188,6 +189,7 @@ export interface paths {
           shared?: parameters["rowFilter.app_stats.shared"];
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
         };
         header: {
           /** Preference */
@@ -212,6 +214,7 @@ export interface paths {
           shared?: parameters["rowFilter.app_stats.shared"];
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
         };
         body: {
           /** app_stats */
@@ -1878,6 +1881,13 @@ export interface definitions {
     mlu_real?: number;
     /** Format: bigint */
     devices?: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * @default 2022-05
+     */
+    date_id: string;
   };
   app_stats_onprem: {
     /**
@@ -2431,6 +2441,8 @@ export interface parameters {
   "rowFilter.app_stats.mlu_real": string;
   /** Format: bigint */
   "rowFilter.app_stats.devices": string;
+  /** Format: character varying */
+  "rowFilter.app_stats.date_id": string;
   /** @description app_stats_onprem */
   "body.app_stats_onprem": definitions["app_stats_onprem"];
   /** Format: character varying */
