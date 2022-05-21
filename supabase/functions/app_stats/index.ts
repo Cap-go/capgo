@@ -74,8 +74,13 @@ serve(async(event: Request) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, downloads, versions, shared, channels)
+          // create var date_id with yearn-month
+          const now = new Date()
+          // get month with leading zero
+          const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
           const newData: definitions['app_stats'] = {
             app_id: app.app_id,
+            date_id: `${now.getFullYear()}-${month}`,
             user_id: app.user_id,
             channels: channels.count || 0,
             mlu: mlu.count || 0,
