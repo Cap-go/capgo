@@ -115,11 +115,11 @@ const back = () => {
         </IonTitle>
       </IonToolbar>
       <ion-toolbar v-if="!isLoading">
-        <ion-searchbar @IonChange="search = $event.detail.value" />
+        <ion-searchbar @ion-change="search = $event.detail.value" />
       </ion-toolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
+      <ion-refresher slot="fixed"ion-refresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <div v-if="isLoading" class="chat-items flex justify-center">

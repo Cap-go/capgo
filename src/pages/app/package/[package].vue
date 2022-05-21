@@ -351,7 +351,7 @@ const back = () => {
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
+      <ion-refresher slot="fixed"ion-refresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
@@ -411,7 +411,7 @@ const back = () => {
           </IonItemDivider>
           <!-- add item with searchbar -->
           <IonItem>
-            <IonSearchbar @IonChange="search = $event.detail.value" />
+            <IonSearchbar @ion-change="search = $event.detail.value" />
           </IonItem>
           <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>

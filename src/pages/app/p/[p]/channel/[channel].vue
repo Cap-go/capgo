@@ -360,7 +360,7 @@ const inviteUser = async(userId: string) => {
             <ion-toggle
               color="secondary"
               :checked="channel?.public"
-              @ionChange="makePublic($event.detail.checked)"
+              @ion-change="makePublic($event.detail.checked)"
             />
           </ion-buttons>
         </ion-item>
@@ -374,7 +374,7 @@ const inviteUser = async(userId: string) => {
           <IonToggle
             color="secondary"
             :checked="channel?.beta"
-            @ionChange="channel.beta = $event.target.checked; saveChannelChange()"
+            @ion-change="channel.beta = $event.target.checked; saveChannelChange()"
           />
         </IonItem>
         <IonItem>
@@ -382,7 +382,7 @@ const inviteUser = async(userId: string) => {
           <IonToggle
             color="secondary"
             :checked="channel?.disableAutoUpdateUnderNative"
-            @ionChange="channel.disableAutoUpdateUnderNative = $event.target.checked; saveChannelChange()"
+            @ion-change="channel.disableAutoUpdateUnderNative = $event.target.checked; saveChannelChange()"
           />
         </IonItem>
         <IonItem>
@@ -390,7 +390,7 @@ const inviteUser = async(userId: string) => {
           <IonToggle
             color="secondary"
             :checked="channel?.disableAutoUpdateToMajor"
-            @ionChange="channel.disableAutoUpdateToMajor = $event.target.checked; saveChannelChange()"
+            @ion-change="channel.disableAutoUpdateToMajor = $event.target.checked; saveChannelChange()"
           />
         </IonItem>
         <ion-item-divider>
@@ -428,7 +428,7 @@ const inviteUser = async(userId: string) => {
         </IonItemDivider>
         <!-- add item with searchbar -->
         <IonItem v-if="devices?.length">
-          <IonSearchbar @IonChange="search = $event.detail.value" />
+          <IonSearchbar @ion-change="search = $event.detail.value" />
         </IonItem>
         <template v-for="d in devicesFilter" :key="d.device_id">
           <IonItemSliding>

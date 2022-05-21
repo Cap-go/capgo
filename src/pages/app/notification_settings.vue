@@ -58,14 +58,14 @@ const submitDoi = async() => {
           <TitleHead :title="t('notificationSettings.heading')" />
           <div class="flex justify-between items-center my-2">
             <label for="notification" class="justify-self-start text-xl">{{ t('activation.notification') }}</label>
-            <IonToggle v-model="form.enableNotifications" color="success" @ionChange="submitNotif()" />
+            <IonToggle v-model="form.enableNotifications" color="success" @ion-change="submitNotif()" />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.notification-desc') }}
           </p>
           <div class="flex justify-between items-center mb-2 mt-4">
             <label for="notification" class="justify-self-start text-xl w-64">{{ t('activation.doi') }}</label>
-            <IonToggle v-model="form.optForNewsletters" color="success" @ionChange="submitDoi()" />
+            <IonToggle v-model="form.optForNewsletters" color="success" @ion-change="submitDoi()" />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.doi-desc') }}

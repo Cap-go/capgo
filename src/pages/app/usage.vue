@@ -21,7 +21,7 @@ import { useMainStore } from '~/stores/main'
 const { t } = useI18n()
 const isLoading = ref(true)
 const isMobile = isPlatform('capacitor')
-const segmentVal = ref('monthly')
+const segmentVal = ref<'monthly' | 'yearly'>('monthly')
 const isYearly = computed(() => segmentVal.value === 'yearly')
 const myPlan = ref<definitions['stripe_info']>()
 const route = useRoute()
@@ -29,12 +29,14 @@ const supabase = useSupabase()
 const main = useMainStore()
 const auth = supabase.auth.user()
 
-interface PastDl {
-  app_id: string
-  maxdownload: number
+interface Stats {
+  apps: number
+  channels: number
+  versions: number
+  sharedChannels: number
+  updates: number
 }
-
-interface Plan {
+interface Plan extends Stats {
   id: string
   name: string
   description: string
@@ -42,21 +44,22 @@ interface Plan {
     monthly: number
     yearly: number
   }
-  apps: number
-  channels: number
-  updates: number
-  versions: number
-  sharedChannels: number
   abtest: boolean
   progressiveDeploy: boolean
 }
-const usage = reactive({
+let app_list = [] as definitions['apps'][]
+let app_stats = [] as definitions['app_stats'][]
+const usage = reactive<Stats>({
   apps: 0,
   channels: 0,
   versions: 0,
   sharedChannels: 0,
   updates: 0,
 })
+
+const getStat = (name: string): number => {
+  return usage[name as keyof Stats]
+}
 
 const plans: Record<string, Plan> = {
   free: {
@@ -148,12 +151,16 @@ const currentPlan = computed<Plan>(() => {
   return planList.value.find(plan => myPlan.value?.product_id === plan.id) || planList.value[0]
 })
 
+const getCurrentPlanSuggestStat = (name: string): number => {
+  return currentPlanSuggest.value[name as keyof Stats]
+}
+
 interface SegmentCustomEvent extends CustomEvent {
   target: HTMLIonSegmentElement
   detail: SegmentChangeEventDetail
 }
 const segmentChanged = (e: SegmentCustomEvent) => {
-  segmentVal.value = e.detail.value || 'monthly'
+  segmentVal.value = e.detail.value === 'yearly' ? 'yearly' : 'monthly'
 }
 
 const getMyApps = async() => {
@@ -161,8 +168,19 @@ const getMyApps = async() => {
     .from<definitions['apps']>('apps')
     .select()
     .eq('user_id', auth?.id)
-  if (data && data.length)
+  if (data && data.length) {
     usage.apps = data.length
+    app_list = data
+  }
+}
+
+const getMyAppsStats = async() => {
+  const { data } = await supabase
+    .from<definitions['app_stats']>('app_stats')
+    .select()
+    .in('app_id', app_list.map(app => app.app_id))
+  if (data && data.length)
+    app_stats = data
 }
 
 const getMyPlan = async() => {
@@ -178,27 +196,30 @@ const getMyPlan = async() => {
 }
 
 const getMaxChannel = async() => {
-  const { data, error } = await supabase.rpc<number>('get_max_channel', { userid: auth?.id })
-  if (error)
-    usage.channels = 0
-  else
-    usage.channels = Number(data)
+  // from app_stats find max channel
+  usage.channels = app_stats.reduce((acc, cur) => Math.max(acc, cur.channels || 0), 0)
 }
 
 const getMaxShared = async() => {
-  const { data, error } = await supabase.rpc<number>('get_max_shared', { userid: auth?.id })
-  if (error)
-    usage.sharedChannels = 0
-  else
-    usage.sharedChannels = Number(data)
+  // from app_stats find max shared
+  usage.sharedChannels = app_stats.reduce((acc, cur) => Math.max(acc, cur.shared || 0), 0)
 }
 
 const getMaxVersion = async() => {
-  const { data, error } = await supabase.rpc<number>('get_max_version', { userid: auth?.id })
-  if (error)
-    usage.versions = 0
-  else
-    usage.versions = Number(data)
+  // from app_stats find max version
+  usage.versions = app_stats.reduce((acc, cur) => Math.max(acc, cur.versions || 0), 0)
+}
+const getMaxDownload = async() => {
+  // from app_stats find max download
+  usage.updates = app_stats.reduce((acc, cur) => Math.max(acc, cur.mlu_real || 0), 0)
+}
+const getAllMax = async() => {
+  await Promise.all([
+    getMaxChannel(),
+    getMaxShared(),
+    getMaxVersion(),
+    getMaxDownload(),
+  ])
 }
 
 const openChangePlan = (planId: string) => {
@@ -215,21 +236,9 @@ const showToastMessage = async(message: string) => {
   await toast.present()
 }
 
-const getMaxDownload = async() => {
-  const { data, error } = await supabase.rpc<PastDl>('get_dl_by_month', { userid: auth?.id, pastmonth: 0 })
-  if (error)
-    usage.updates = 0
-  if (data && data.length) {
-    const max = data.reduce((acc, cur) => {
-      if (cur.maxdownload > acc)
-        return cur.maxdownload
-      return acc
-    }, 0)
-    usage.updates = max
-  }
-}
-const stats = () => {
-  const res = Object.keys(usage)
+const stats = (): keyof Stats => {
+  // get keys of Stats interface
+  const res: keyof Stats = Object.keys(usage) as unknown as keyof Stats
   return res
 }
 
@@ -255,11 +264,9 @@ watchEffect(async() => {
   if (route.path === '/app/usage') {
     isLoading.value = true
     await Promise.all([
-      getMyApps(),
-      getMaxChannel(),
-      getMaxShared(),
-      getMaxVersion(),
-      getMaxDownload(),
+      getMyApps()
+        .then(getMyAppsStats)
+        .then(getAllMax),
       getMyPlan(),
     ])
     isLoading.value = false
@@ -291,7 +298,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
       </ion-toolbar>
     </ion-header>
     <IonContent :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
+      <ion-refresher slot="fixed"ion-refresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <ion-list v-if="!isLoading">
@@ -315,12 +322,12 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
           </p>
           <div class="w-30">
             <p :class="getBarColorClass(s)" class=" rounded text-center">
-              {{ usage[s] }}
+              {{ getStat(s) }}
             </p>
           </div>
           <div class="ml-3 w-full md:w-1/2 bg-gray-200 rounded-full dark:bg-gray-700">
-            <div :class="getBarColorClass(s)" class="min-h-4 text-xs font-medium text-center p-0.5 leading-none rounded-full" :style="{ width: `${getPercentage(usage[s], currentPlanSuggest[s])}%` }">
-              {{ getPercentage(usage[s], currentPlanSuggest[s]) < 10 ? '' : `${getPercentage(usage[s], currentPlanSuggest[s])}%` }}
+            <div :class="getBarColorClass(s)" class="min-h-4 text-xs font-medium text-center p-0.5 leading-none rounded-full" :style="{ width: `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }">
+              {{ getPercentage(getStat(s), getCurrentPlanSuggestStat(s)) < 10 ? '' : `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }}
             </div>
           </div>
         </IonItem>
@@ -334,7 +341,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             <p class="mt-5 text-xl text-gray-500 sm:text-center">
               {{ t('plan.desc') }}
             </p>
-            <ion-segment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ionChange="segmentChanged($event)">
+            <ion-segment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
               <ion-segment-button class="h-10" value="monthly">
                 <ion-label>{{ t('plan.monthly-billing') }}</ion-label>
               </ion-segment-button>
