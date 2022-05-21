@@ -175,10 +175,13 @@ const getMyApps = async() => {
 }
 
 const getMyAppsStats = async() => {
+  // create date_id with format YYYY-MM
+  const date_id = new Date().toISOString().slice(0, 7)
   const { data } = await supabase
     .from<definitions['app_stats']>('app_stats')
     .select()
     .in('app_id', app_list.map(app => app.app_id))
+    .eq('date_id', date_id)
   if (data && data.length)
     app_stats = data
 }
