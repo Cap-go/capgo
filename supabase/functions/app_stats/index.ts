@@ -24,6 +24,12 @@ const getApp = (appId: string) => {
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'set'),
+    devices: supabase
+      .from<definitions['devices']>('devices')
+      .select('*', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .lte('updated_at', lastDay.toISOString())
+      .gte('updated_at', firstDay.toISOString()),
     versions: supabase
       .from<definitions['app_versions']>('app_versions')
       .select('id', { count: 'exact', head: true })
@@ -63,8 +69,8 @@ serve(async(event: Request) => {
       if (!app.id)
         continue
       const res = getApp(app.app_id)
-      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels])
-        .then(([app, mlu, mlu_real, versions, shared, channels]) => {
+      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices])
+        .then(([app, mlu, mlu_real, versions, shared, channels, devices]) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, downloads, versions, shared, channels)
@@ -73,6 +79,7 @@ serve(async(event: Request) => {
             user_id: app.user_id,
             channels: channels.count || 0,
             mlu: mlu.count || 0,
+            devices: devices.count || 0,
             mlu_real: mlu_real.count || 0,
             versions: versions.count || 0,
             shared: shared.count || 0,

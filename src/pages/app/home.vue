@@ -219,7 +219,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
           </ion-title>
         </ion-toolbar>
       </ion-header>
-      <ion-refresher slot="fixed"ion-refresh="refreshData($event)">
+      <ion-refresher slot="fixed" @ion-refresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <ion-list ref="listRef">

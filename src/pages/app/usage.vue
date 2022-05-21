@@ -298,7 +298,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
       </ion-toolbar>
     </ion-header>
     <IonContent :fullscreen="true">
-      <ion-refresher slot="fixed"ion-refresh="refreshData($event)">
+      <ion-refresher slot="fixed" @ion-refresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <ion-list v-if="!isLoading">

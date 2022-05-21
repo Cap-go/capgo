@@ -351,7 +351,7 @@ const back = () => {
       </IonToolbar>
     </IonHeader>
     <ion-content :fullscreen="true">
-      <ion-refresher slot="fixed"ion-refresh="refreshData($event)">
+      <ion-refresher slot="fixed" @ion-refresh="refreshData($event)">
         <ion-refresher-content />
       </ion-refresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
