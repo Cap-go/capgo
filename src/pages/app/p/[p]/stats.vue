@@ -76,11 +76,17 @@ const loadData = async() => {
 }
 
 const getLastDownload = async() => {
-  const { data, error } = await supabase.rpc<number>('get_dl_by_month_by_app', { pastmonth: 0, appid: id.value })
-  if (error)
-    downloads.value = 0
-  else
-    downloads.value = Number(data)
+  // create date_id with format YYYY-MM
+  const date_id = new Date().toISOString().slice(0, 7)
+  const { data } = await supabase
+    .from<definitions['app_stats']>('app_stats')
+    .select()
+    .eq('app_id', id.value)
+    .eq('date_id', date_id)
+  if (data && data.length) {
+    // find biggest value between mlu and mlu_real
+    downloads.value = Math.max(data[0].mlu || 0, data[0].mlu_real || 0)
+  }
 }
 
 const refreshData = async(evt: RefresherCustomEvent | null = null) => {

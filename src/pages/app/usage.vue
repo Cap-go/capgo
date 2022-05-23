@@ -214,7 +214,7 @@ const getMaxVersion = async() => {
 }
 const getMaxDownload = async() => {
   // from app_stats find max download
-  usage.updates = app_stats.reduce((acc, cur) => Math.max(acc, cur.mlu_real || 0), 0)
+  usage.updates = app_stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu || 0, cur.mlu_real || 0)), 0)
 }
 const getAllMax = async() => {
   await Promise.all([
