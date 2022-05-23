@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.133.0/http/server.ts'
 import { Buffer } from 'https://deno.land/x/node_buffer@1.1.0/index.ts'
+import { isAllowInMyPlan } from '../_utils/plan.ts'
 import { supabaseAdmin, updateOrCreateChannel, updateOrCreateVersion } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
@@ -26,6 +27,8 @@ serve(async(event: Request) => {
   if (!apikey || !event.body)
     return sendRes({ status: 'Cannot Verify User' }, 400)
   try {
+    if (!(await isAllowInMyPlan(apikey.user_id)))
+      return sendRes({ status: `Your reached the limit of your plan, upgrade to continue ${Deno.env.get('WEBAPP_URL')}/usage` }, 400)
     const body = (await event.json()) as AppUpload
     const { data: appData, error: dbError0 } = await supabase
       .from<definitions['apps']>('apps')

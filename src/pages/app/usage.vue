@@ -200,21 +200,21 @@ const getMyPlan = async() => {
 
 const getMaxChannel = async() => {
   // from app_stats find max channel
-  usage.channels = app_stats.reduce((acc, cur) => Math.max(acc, cur.channels || 0), 0)
+  usage.channels = app_stats.reduce((acc, cur) => Math.max(acc, cur.channels), 0)
 }
 
 const getMaxShared = async() => {
   // from app_stats find max shared
-  usage.sharedChannels = app_stats.reduce((acc, cur) => Math.max(acc, cur.shared || 0), 0)
+  usage.sharedChannels = app_stats.reduce((acc, cur) => Math.max(acc, cur.shared), 0)
 }
 
 const getMaxVersion = async() => {
   // from app_stats find max version
-  usage.versions = app_stats.reduce((acc, cur) => Math.max(acc, cur.versions || 0), 0)
+  usage.versions = app_stats.reduce((acc, cur) => Math.max(acc, cur.versions), 0)
 }
 const getMaxDownload = async() => {
   // from app_stats find max download
-  usage.updates = app_stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu || 0, cur.mlu_real || 0)), 0)
+  usage.updates = app_stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu, cur.mlu_real)), 0)
 }
 const getAllMax = async() => {
   await Promise.all([

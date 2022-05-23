@@ -1870,17 +1870,17 @@ export interface definitions {
      */
     updated_at?: string;
     /** Format: smallint */
-    channels?: number;
+    channels: number;
     /** Format: bigint */
-    mlu?: number;
+    mlu: number;
     /** Format: bigint */
-    versions?: number;
+    versions: number;
     /** Format: bigint */
-    shared?: number;
+    shared: number;
     /** Format: bigint */
-    mlu_real?: number;
+    mlu_real: number;
     /** Format: bigint */
-    devices?: number;
+    devices: number;
     /**
      * Format: character varying
      * @description Note:

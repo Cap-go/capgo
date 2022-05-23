@@ -85,7 +85,7 @@ const getLastDownload = async() => {
     .eq('date_id', date_id)
   if (data && data.length) {
     // find biggest value between mlu and mlu_real
-    downloads.value = Math.max(data[0].mlu || 0, data[0].mlu_real || 0)
+    downloads.value = Math.max(data[0].mlu, data[0].mlu_real)
   }
 }
 
