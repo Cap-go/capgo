@@ -21,7 +21,7 @@ serve(async(event: Request) => {
     return sendRes({ status: 'Cannot Verify User' }, 400)
   try {
     const body = (await event.json()) as AppDelete
-    if (await checkAppOwner(apikey.user_id, body.appid))
+    if (!(await checkAppOwner(apikey.user_id, body.appid)))
       return sendRes({ status: 'You can\'t edit this app' }, 400)
     if (body.version) {
       const { data: versions, error: versionIdError } = await supabase
