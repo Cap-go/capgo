@@ -93,7 +93,7 @@ serve(async(event: Request) => {
       .eq('app_id', body.appid)
       .eq('user_id', apikey.user_id)
 
-    if (!data || !data.length || vError)
+    if (vError)
       return sendRes({ status: `App ${body.appid} not found in database`, error: vError }, 400)
 
     const { error: delChanError } = await supabase
