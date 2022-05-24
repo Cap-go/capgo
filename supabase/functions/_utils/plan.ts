@@ -99,17 +99,15 @@ export const getMyPlan = async(user_id: string): Promise<Plan> => {
     .from<definitions['stripe_info']>('stripe_info')
     .select()
     .eq('customer_id', user.customer_id)
-  if (data && data.length) {
-    const { product_id = 'free' } = data[0]
-    const current = Object.values(plans)
-      .find((plan) => {
-        if (plan.id === product_id)
-          return plan
-        return false
-      })
-    if (current)
-      return current
-  }
+  const product_id = data?.length && data[0].product_id ? data[0].product_id : 'free'
+  const current = Object.values(plans)
+    .find((plan) => {
+      if (plan.id === product_id)
+        return plan
+      return false
+    })
+  if (current)
+    return current
   return Promise.reject(Error('no data'))
 }
 
