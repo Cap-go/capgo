@@ -32,6 +32,9 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [0.30.8-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.7...0.30.8-alpha.0) (2022-05-03)
 
+### [0.30.8](https://github.com/Cap-go/capgo/compare/0.30.7...0.30.8) (2022-05-03)
+
+
 
 ### Bug Fixes
 
@@ -111,6 +114,7 @@ All notable changes to this project will be documented in this file. See [standa
 * release to capgo use different channel for alpha ([cd36083](https://github.com/Cap-go/capgo/commit/cd360838945121cfb96a1491ddc98ac25bf5b10a))
 * remove file to use new system ([45440e4](https://github.com/Cap-go/capgo/commit/45440e464e16bcef772f1a62ea42e06ccefb1b24))
 * remove with in action ([ac9454d](https://github.com/Cap-go/capgo/commit/ac9454dd94266a32db528790fa49f975d05e0508))
+
 
 ### [0.30.7](https://github.com/Cap-go/capgo/compare/0.30.6...0.30.7) (2022-05-03)
 
