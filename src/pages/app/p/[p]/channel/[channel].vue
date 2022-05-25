@@ -8,14 +8,14 @@ import {
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import { isAllowInMyPlan } from 'supabase/functions/_utils/plan'
+import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
+import { PlanRes } from '~/services/plans'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -23,6 +23,7 @@ interface ChannelUsers {
 interface Channel {
   version: definitions['app_versions']
 }
+const router = useRouter()
 const { t } = useI18n()
 const route = useRoute()
 const listRef = ref()
@@ -89,14 +90,12 @@ const getDevices = async() => {
     console.error(error)
   }
 }
-const saveChannelChange = async() => {
+const saveChannelChange = async(key: string, val: string) => {
   if (!id.value || !channel.value)
     return
   try {
     const update = {
-      disableAutoUpdateUnderNative: channel.value.disableAutoUpdateUnderNative,
-      disableAutoUpdateToMajor: channel.value.disableAutoUpdateToMajor,
-      beta: channel.value.beta,
+      [key]: val,
     }
     const { error } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -153,15 +152,36 @@ watchEffect(async() => {
 })
 const addUser = async() => {
   console.log('newUser', newUser.value)
-  if (!channel.value)
+  const { data: myPlan } = await supabase.functions.invoke<PlanRes>('payment_status', {})
+  if (!channel.value || !auth)
     return
-  if (!auth || !(await isAllowInMyPlan(auth?.id)))
+  if(!myPlan?.canUseMore) {
+    // show alert for upgrade plan and return
+    const alert = await alertController.create({
+      header: t('limit-reached'),
+      message: t('please-upgrade'),
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+          cssClass: 'secondary',
+        },
+        {
+          text: t('upgrade-now'),
+          handler: () => {
+            router.push('/usage')
+          },
+        },
+      ],
+    })
+    await alert.present()
     return
+  }
   const { data, error: uError } = await supabase
     .from<definitions['users']>('users')
     .select()
     .eq('email', newUser.value)
-  if (!data || !data.length || uError) {
+  if (!data || uError) {
     console.log('no user', uError)
     newUserModalOpen.value = true
     return
@@ -358,21 +378,21 @@ const inviteUser = async(userId: string) => {
             {{ t('channel.v3') }}
           </IonLabel>
         </IonItemDivider>
-        <IonItem>
+        <!-- <IonItem>
           <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
           <IonToggle
           
             color="secondary"
             :checked="channel?.beta"
-            @ion-change="channel.beta = $event.target.checked; saveChannelChange()"
+            @ion-change="saveChannelChange('beta', $event.target.checked)"
           />
-        </IonItem>
+        </IonItem> -->
         <IonItem>
           <IonLabel>Disable auto downgrade under native</IonLabel>
           <IonToggle
             color="secondary"
             :checked="channel?.disableAutoUpdateUnderNative"
-            @ion-change="channel.disableAutoUpdateUnderNative = $event.target.checked; saveChannelChange()"
+            @ion-change="saveChannelChange('disableAutoUpdateUnderNative', $event.target.checked)"
           />
         </IonItem>
         <IonItem>
@@ -380,7 +400,7 @@ const inviteUser = async(userId: string) => {
           <IonToggle
             color="secondary"
             :checked="channel?.disableAutoUpdateToMajor"
-            @ion-change="channel.disableAutoUpdateToMajor = $event.target.checked; saveChannelChange()"
+            @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
           />
         </IonItem>
         <IonItemDivider>

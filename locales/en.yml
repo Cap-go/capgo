@@ -117,6 +117,7 @@ intro:
   dynamic-route: Demo of dynamic route
   hi: Hi, {name}!
   whats-your-name: What's your name?
+limit-reached: Limit reached
 loading-more-data: Loading more data...
 login:
   andpass: And password
@@ -192,6 +193,7 @@ plan:
   versions: Versions
   whats-included: What's included
   yearly-billing: Yearly billing
+please-upgrade: Please upgrade your plan to add more users
 projects:
   list: Yours
   sharedlist: Shared with you
@@ -222,6 +224,7 @@ stats:
 trial-plan-expired: Trial Plan Expired
 trial-plan-expires-in: Trial Plan expires in
 upgrade: Upgrade
+upgrade-now: Upgrade now
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage

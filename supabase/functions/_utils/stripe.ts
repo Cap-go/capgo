@@ -88,7 +88,7 @@ export const createCustomer = async(key: string, email: string) => {
   })
 }
 
-export const extractDataEvent = (event: Stripe.Event): definitions['stripe_info'] => {
+export const extractDataEvent = (event: any): definitions['stripe_info'] => {
   const data: definitions['stripe_info'] = {
     product_id: undefined,
     subscription_id: undefined,
@@ -100,14 +100,14 @@ export const extractDataEvent = (event: Stripe.Event): definitions['stripe_info'
   console.log('event', JSON.stringify(event, null, 2))
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
-      const subscription = event.data.object as Stripe.Subscription
+      const subscription = event.data.object as any
       data.product_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.status = subscription.cancel_at ? 'canceled' : 'succeeded'
       data.subscription_id = subscription.id
       data.customer_id = String(subscription.customer)
     }
     else if (event.type === 'customer.subscription.deleted') {
-      const charge = event.data.object as Stripe.Charge
+      const charge = event.data.object as any
       data.status = 'canceled'
       data.customer_id = String(charge.customer)
       data.subscription_id = undefined

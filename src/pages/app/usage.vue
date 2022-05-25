@@ -16,9 +16,11 @@ import { useSupabase } from '~/services/supabase'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import TitleHead from '~/components/TitleHead.vue'
+import { Plan, PlanRes, Stats } from '~/services/plans'
 
 const { t } = useI18n()
 const isLoading = ref(true)
+const planList = ref([] as Plan[])
 const isMobile = isPlatform('capacitor')
 const segmentVal = ref<'monthly' | 'yearly'>('monthly')
 const isYearly = computed(() => segmentVal.value === 'yearly')
@@ -28,24 +30,6 @@ const supabase = useSupabase()
 const main = useMainStore()
 const auth = supabase.auth.user()
 
-interface Stats {
-  apps: number
-  channels: number
-  versions: number
-  sharedChannels: number
-  updates: number
-}
-interface Plan extends Stats {
-  id: string
-  name: string
-  description: string
-  price: {
-    monthly: number
-    yearly: number
-  }
-  abtest: boolean
-  progressiveDeploy: boolean
-}
 let app_list = [] as definitions['apps'][]
 let app_stats = [] as definitions['app_stats'][]
 const usage = reactive<Stats>({
@@ -59,75 +43,12 @@ const usage = reactive<Stats>({
 const getStat = (name: string): number => {
   return usage[name as keyof Stats]
 }
+const { data } = await supabase.functions.invoke<PlanRes>('payment_status', {})
 
-const plans: Record<string, Plan> = {
-  free: {
-    id: '',
-    name: 'Free',
-    description: t('plan.free.desc'),
-    price: {
-      monthly: 0,
-      yearly: 0,
-    },
-    apps: 1,
-    channels: 1,
-    updates: 500,
-    versions: 10,
-    sharedChannels: 0,
-    abtest: false,
-    progressiveDeploy: false,
-  },
-  solo: {
-    id: 'prod_LQIzwwVu6oMmAz',
-    name: 'Solo',
-    description: t('plan.solo.desc'),
-    price: {
-      monthly: 14,
-      yearly: 146,
-    },
-    apps: 1,
-    channels: 2,
-    updates: 2500,
-    versions: 10,
-    sharedChannels: 0,
-    abtest: false,
-    progressiveDeploy: false,
-  },
-  maker: {
-    id: 'prod_LQIzozukEwDZDM',
-    name: 'Maker',
-    description: t('plan.maker.desc'),
-    price: {
-      monthly: 39,
-      yearly: 389,
-    },
-    apps: 3,
-    channels: 10,
-    updates: 25000,
-    versions: 100,
-    sharedChannels: 10,
-    abtest: false,
-    progressiveDeploy: false,
-  },
-  team: {
-    id: 'prod_LQIzm2NGzayzXi',
-    name: 'Team',
-    description: t('plan.team.desc'),
-    price: {
-      monthly: 99,
-      yearly: 998,
-    },
-    apps: 10,
-    channels: 50,
-    updates: 250000,
-    versions: 1000,
-    sharedChannels: 1000,
-    abtest: true,
-    progressiveDeploy: true,
-  },
+if (data) {
+  planList.value = Object.values(data.AllPlans)
 }
 
-const planList = computed(() => Object.values(plans))
 const planFeatures = (plan: Plan) => [
   plan.apps > 1 ? `${plan.apps} ${t('plan.applications')}` : `${plan.apps} ${t('plan.application')}`,
   plan.channels > 1 ? `${plan.channels} ${t('plan.channels')}` : `${plan.channels} ${t('plan.channel')}`,
@@ -353,7 +274,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
                   {{ p.name }}
                 </h2>
                 <p class="mt-4 text-sm text-gray-500">
-                  {{ p.description }}
+                  {{ t(p.description) }}
                 </p>
                 <p class="mt-8">
                   <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">${{ p.price[segmentVal] }}</span>
