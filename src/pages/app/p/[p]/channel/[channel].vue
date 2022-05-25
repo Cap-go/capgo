@@ -15,7 +15,7 @@ import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
-import { PlanRes } from '~/services/plans'
+import { useMainStore } from '~/stores/main'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -26,6 +26,7 @@ interface Channel {
 const router = useRouter()
 const { t } = useI18n()
 const route = useRoute()
+const main = useMainStore()
 const listRef = ref()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
@@ -152,10 +153,10 @@ watchEffect(async() => {
 })
 const addUser = async() => {
   console.log('newUser', newUser.value)
-  const { data: myPlan } = await supabase.functions.invoke<PlanRes>('payment_status', {})
+
   if (!channel.value || !auth)
     return
-  if(!myPlan?.canUseMore) {
+  if(main.myPlan?.canUseMore) {
     // show alert for upgrade plan and return
     const alert = await alertController.create({
       header: t('limit-reached'),
@@ -340,9 +341,9 @@ const inviteUser = async(userId: string) => {
 </script>
 <template>
   <IonPage>
-    <TitleHead :title="t('channel.title')" no-back color="warning" />
+    <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
     <IonContent :fullscreen="true">
-    <TitleHead :title="t('channel.title')" no-back big color="warning" />
+    <TitleHead :title="t('channel.title')" big color="warning" />
       <IonHeader collapse="condense">
         <IonToolbar mode="ios">
           <IonTitle color="warning" size="large">

@@ -6,31 +6,22 @@ import {
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n'
-import { useSupabase } from '~/services/supabase';
 import { useMainStore } from '~/stores/main';
 const bannerText = ref('')
 const bannerColor = ref('')
-const supabase = useSupabase()
 const main = useMainStore()
 
-const paymentStatus = async() => {
-  const { data } = await supabase.functions.invoke('payment_status', {})
+watchEffect(() => {
 
-  console.log('paymentStatus', data)
-
-  if (data.trialDaysLeft && data.trialDaysLeft !== 0) {
-    bannerText.value = `${t('trial-plan-expires-in')}) ${parseInt(data.trialDaysLeft)} ${t('days')}`
+  console.log('paymentStatus', main.myPlan)
+  if (main.myPlan?.trialDaysLeft && main.myPlan?.trialDaysLeft !== 0) {
+    bannerText.value = `${t('trial-plan-expires-in')}) ${parseInt(main.myPlan.trialDaysLeft)} ${t('days')}`
     bannerColor.value = 'success'
   }
-  else if (data.trialDaysLeft === 0) {
+  else if (main.myPlan?.trialDaysLeft === 0) {
     bannerText.value = t('trial-plan-expired')
     bannerColor.value = 'warning'
   }
-}
-
-watchEffect(() => {
-  if (main.auth)
-    paymentStatus()
 })
 const { t } = useI18n()
 
@@ -54,9 +45,9 @@ defineProps({
     </IonToolbar>
 </template>
 <style scoped>
-.header-collapse-condense-inactive ion-toolbar #banner {
+/* .header-collapse-condense-inactive ion-toolbar #banner {
   display: none;
-}
+} */
 /* .header-collapse-main  #banner-toolbar {
   display: none;
 } */

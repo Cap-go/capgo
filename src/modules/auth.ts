@@ -3,6 +3,7 @@ import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
+import { PlanRes } from '~/services/plans'
 
 const guard = async(next: any, to: string, from: string) => {
   const supabase = useSupabase()
@@ -14,6 +15,12 @@ const guard = async(next: any, to: string, from: string) => {
     main.auth = auth
     if (!main.user) {
       try {
+        supabase.functions.invoke<PlanRes>('payment_status', {})
+        .then((res) => {
+          console.log('payment_status', res)
+          if (res.data)
+            main.myPlan = res.data
+        })
         const { data, error } = await supabase
           .from<definitions['users']>('users')
           .select()

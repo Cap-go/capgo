@@ -3,11 +3,13 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
+import { PlanRes } from '~/services/plans'
 
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | null>()
   const path = ref('')
   const user = ref<definitions['users']>()
+  const myPlan = ref<PlanRes>()
 
   const logout = async() => {
     return new Promise<void>((resolve) => {
@@ -16,6 +18,7 @@ export const useMainStore = defineStore('main', () => {
         if (event === 'SIGNED_OUT') {
           auth.value = undefined
           user.value = undefined
+          myPlan.value = undefined
           resolve()
         }
       })
@@ -27,6 +30,7 @@ export const useMainStore = defineStore('main', () => {
   }
   return {
     auth,
+    myPlan,
     user,
     path,
     logout,
