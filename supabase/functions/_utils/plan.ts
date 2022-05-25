@@ -184,3 +184,32 @@ export const isAllowInMyPlan = async(user_id: string): Promise<boolean> => {
   }
   return false
 }
+
+export const currentPaymentstatus = async(user: definitions['users']) => {
+  try {
+    const myPlan = await getMyPlan(user.id)
+    if (myPlan.name === 'Free') {
+      const created_at = (new Date(user.created_at!)).getTime()
+      const daysSinceCreated = ((new Date()).getTime() - created_at) / (1000 * 3600 * 24)
+      if (daysSinceCreated <= 30) {
+        return {
+          payment_status: 'unpaid',
+          trialDaysLeft: 30 - daysSinceCreated,
+        }
+      }
+      else {
+        return {
+          payment_status: 'unpaid',
+          trialDaysLeft: 0,
+        }
+      }
+    }
+    return {
+      payment_status: 'paid',
+      plan: myPlan,
+    }
+  }
+  catch (error) {
+    return error
+  }
+}

@@ -10,6 +10,7 @@ import { chevronBack } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { isAllowInMyPlan } from 'supabase/functions/_utils/plan'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
@@ -154,6 +155,8 @@ watchEffect(async() => {
 const addUser = async() => {
   console.log('newUser', newUser.value)
   if (!channel.value)
+    return
+  if (!(await isAllowInMyPlan(auth?.id)))
     return
   const { data, error: uError } = await supabase
     .from<definitions['users']>('users')
