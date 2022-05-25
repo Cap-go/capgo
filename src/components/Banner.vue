@@ -42,19 +42,22 @@ defineProps({
 </script>
 
 <template>
-    <IonToolbar mode="ios" :color="bannerColor" v-if="bannerText">
+    <IonToolbar mode="ios" id="banner-toolbar" :color="bannerColor" v-if="bannerText">
       <IonTitle>
         <p class="text-white text-center">
           {{ bannerText }}
         </p>
       </IonTitle>
-      <IonButton slot="end" href="/app/usage" color="secondary" class="text-white">
+      <IonButton slot="end" id="banner" href="/app/usage" color="secondary" class="text-white">
         {{ t('upgrade') }}
       </IonButton>
     </IonToolbar>
 </template>
-<style >
-.header-collapse-condense-inactive > .ion-button {
+<style scoped>
+.header-collapse-condense-inactive ion-toolbar #banner {
   display: none;
 }
+/* .header-collapse-main  #banner-toolbar {
+  display: none;
+} */
 </style>
