@@ -1,24 +1,43 @@
 <script setup lang="ts">
-import { IonIcon } from '@ionic/vue'
-import { chevronBackOutline } from 'ionicons/icons'
+import {
+  IonButtons,
+  IonSearchbar,
+  IonBackButton,
+  IonHeader,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import Banner from '~/components/Banner.vue'
+
 defineProps({
+  defaultBack: { type: String, default: '/app' },
+  noBack: { type: Boolean, default: false },
+  color: { type: String, default: 'default' },
   title: { type: String, default: '' },
   big: { type: Boolean, default: false },
+  search: { type: Boolean, default: false },
 })
+const emit = defineEmits(['searchInput'])
 const { t } = useI18n()
-const router = useRouter()
+const onSearch = (val: string) => {
+  emit('searchInput', val)
+}
 </script>
 
 <template>
-  <div class="sticky top-0 mt-safe z-50 bg-transparent">
-    <div class="absolute flex left-0 top-5 text-sm text-azure-500 items-center" @click="router.go(-1)">
-      <IonIcon :icon="chevronBackOutline" />
-      {{ t('button.back') }}
-    </div>
-    <h1 class="font-medium text-left text-black-light dark:text-white-light pt-10 first-letter:uppercase" :class="{'text-4xl': big, 'text-lg': !big}">
-      {{ title }}
-    </h1>
-  </div>
+  <IonHeader :collapse="big ? 'condense' : undefined">
+    <IonToolbar mode="ios">
+      <IonButtons slot="start" v-if="!noBack && !big">
+        <IonBackButton :default-href="defaultBack" :text="t('button.back')"></IonBackButton>
+      </IonButtons>
+      <IonTitle :color="color" :size="big ? 'large' : ''">
+          {{ title }}
+      </IonTitle>
+    </IonToolbar>
+    <IonToolbar v-if="search">
+      <IonSearchbar @ion-change="onSearch($event.detail.value)" />
+    </IonToolbar>
+    <Banner />
+  </IonHeader>
 </template>

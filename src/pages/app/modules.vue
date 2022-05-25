@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import {
   IonContent,
-  IonHeader,
   IonIcon,
   IonItemDivider,
   IonLabel,
   IonPage,
-  IonTitle,
-  IonToolbar,
 } from '@ionic/vue'
 import { chevronForwardOutline } from 'ionicons/icons'
+import TitleHead from '~/components/TitleHead.vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -38,21 +36,9 @@ console.log('modules', modules.value)
 
 <template>
   <IonPage>
-    <IonHeader>
-      <IonToolbar>
-        <IonTitle color="warning">
-          {{ t("account.heading") }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
+    <TitleHead :title="t('module.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <IonHeader collapse="condense">
-        <IonToolbar>
-          <IonTitle color="warning" size="large">
-            {{ t("module.heading") }}
-          </IonTitle>
-        </IonToolbar>
-      </IonHeader>
+      <TitleHead :title="t('module.heading')" no-back big color="warning" />
       <div class="p-6">
         <ul class="grid grid-rows-4 gap-y-5 mb-6">
           <li>
@@ -65,11 +51,11 @@ console.log('modules', modules.value)
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </a>
           </li>
-          <ion-item-divider>
-            <ion-label>
+          <IonItemDivider>
+            <IonLabel>
               available in the sandbox
-            </ion-label>
-          </ion-item-divider>
+            </IonLabel>
+          </IonItemDivider>
           <li v-for="(module, index) in modules" :key="index">
             <a
               class="flex justify-between items-center"

@@ -2,13 +2,12 @@
 import type { RefresherCustomEvent } from '@ionic/vue'
 import {
   IonContent,
-  IonHeader,
   IonItem, IonItemDivider, IonItemOption,
   IonItemOptions, IonItemSliding,
   IonLabel,
   IonList,
   IonPage,
-  IonRefresher, IonRefresherContent, IonTitle, IonToolbar, alertController,
+  IonRefresher, IonRefresherContent, alertController,
   toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
@@ -17,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
 import { formatDate } from '~/services/date'
 
@@ -203,31 +203,19 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
 }
 </script>
 <template>
-  <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-title color="warning">
-          {{ t('projects.title') }}
-        </ion-title>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title color="warning" size="large">
-            {{ t('projects.title') }}
-          </ion-title>
-        </ion-toolbar>
-      </ion-header>
-      <ion-refresher slot="fixed" @ion-refresh="refreshData($event)">
-        <ion-refresher-content />
-      </ion-refresher>
-      <ion-list ref="listRef">
-        <ion-item-divider>
-          <ion-label>
+  <IonPage>
+    <TitleHead :title="t('projects.title')" no-back color="warning" />
+    <IonContent :fullscreen="true">
+      <TitleHead :title="t('projects.title')" no-back big color="warning" />
+      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent  />
+      </IonRefresher >
+      <IonList  ref="listRef">
+        <IonItemDivider>
+          <IonLabel>
             {{ t('projects.list') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <div v-if="isLoading" class="flex justify-center">
           <Spinner />
         </div>
@@ -284,11 +272,11 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItem>
-        <ion-item-divider>
-          <ion-label>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('projects.sharedlist') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem v-for="(app, index) in sharedApps" :key="index" class="cursor-pointer" @click="openVersion(app.channel_id.version)">
           <div slot="start" class="col-span-2 relative py-4">
             <img :src="app.app_id.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
@@ -314,9 +302,9 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItem>
-      </ion-list>
-    </ion-content>
-  </ion-page>
+      </IonList >
+    </IonContent>
+  </IonPage>
 </template>
 
 <route lang="yaml">

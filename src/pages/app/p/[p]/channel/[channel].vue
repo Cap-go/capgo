@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import {
   IonButton, IonButtons, IonContent, IonHeader,
-  IonIcon, IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
+  IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
   IonLabel, IonList, IonListHeader, IonModal, IonNote,
   IonPage, IonSearchbar, IonTitle, IonToggle, IonToolbar,
   actionSheetController, alertController, toastController,
 } from '@ionic/vue'
-import { chevronBack } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { isAllowInMyPlan } from 'supabase/functions/_utils/plan'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
 import { formatDate } from '~/services/date'
+import TitleHead from '~/components/TitleHead.vue'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -24,7 +24,6 @@ interface Channel {
   version: definitions['app_versions']
 }
 const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
 const listRef = ref()
 const supabase = useSupabase()
@@ -156,7 +155,7 @@ const addUser = async() => {
   console.log('newUser', newUser.value)
   if (!channel.value)
     return
-  if (!(await isAllowInMyPlan(auth?.id)))
+  if (!auth || !(await isAllowInMyPlan(auth?.id)))
     return
   const { data, error: uError } = await supabase
     .from<definitions['users']>('users')
@@ -179,9 +178,6 @@ const addUser = async() => {
     console.error(error)
   else
     await getUsers()
-}
-const back = () => {
-  router.go(-1)
 }
 const makePublic = async(val = true) => {
   if (!channel.value || !id.value)
@@ -323,58 +319,49 @@ const inviteUser = async(userId: string) => {
 }
 </script>
 <template>
-  <ion-page>
-    <IonHeader class="header-custom">
-      <IonToolbar class="toolbar-no-border">
-        <IonButtons slot="start" class="mx-3">
-          <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
-          </IonButton>
-        </IonButtons>
-        <IonTitle color="warning">
-          {{ t('channel.title') }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title color="warning" size="large">
+  <IonPage>
+    <TitleHead :title="t('channel.title')" no-back color="warning" />
+    <IonContent :fullscreen="true">
+    <TitleHead :title="t('channel.title')" no-back big color="warning" />
+      <IonHeader collapse="condense">
+        <IonToolbar mode="ios">
+          <IonTitle color="warning" size="large">
             {{ t('channel.title') }}
-          </ion-title>
+          </IonTitle>
           <IonButtons v-if="channel" slot="end">
             <IonButton color="danger" @click="openApp()">
               {{ t('channel.open') }}
             </IonButton>
           </IonButtons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-list ref="listRef">
-        <ion-list-header>
+        </IonToolbar>
+      </IonHeader>
+      <IonList  ref="listRef">
+        <IonListHeader>
           <span class="text-vista-blue-500">
             {{ channel?.name }}
           </span>
-        </ion-list-header>
-        <ion-item>
-          <ion-label class="my-6 font-extrabold">
+        </IonListHeader>
+        <IonItem >
+          <IonLabel class="my-6 font-extrabold">
             {{ t('channel.is_public') }}
-          </ion-label>
-          <ion-buttons slot="end">
-            <ion-toggle
+          </IonLabel>
+          <IonButtons slot="end">
+            <IonToggle
               color="secondary"
               :checked="channel?.public"
               @ion-change="makePublic($event.detail.checked)"
             />
-          </ion-buttons>
-        </ion-item>
-        <ion-item-divider>
-          <ion-label>
+          </IonButtons>
+        </IonItem>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('channel.v3') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem>
           <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
           <IonToggle
+          
             color="secondary"
             :checked="channel?.beta"
             @ion-change="channel.beta = $event.target.checked; saveChannelChange()"
@@ -396,22 +383,22 @@ const inviteUser = async(userId: string) => {
             @ion-change="channel.disableAutoUpdateToMajor = $event.target.checked; saveChannelChange()"
           />
         </IonItem>
-        <ion-item-divider>
-          <ion-label>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('channel.users') }}
-          </ion-label>
-        </ion-item-divider>
-        <ion-item>
-          <ion-label position="floating">
+          </IonLabel>
+        </IonItemDivider>
+        <IonItem>
+          <IonLabel position="floating">
             {{ t('channel.invit') }}
-          </ion-label>
-          <ion-input v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
+          </IonLabel>
+          <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
           <div slot="end" class="h-full flex items-center justify-center">
-            <ion-button color="secondary" @click="addUser()">
+            <IonButton color="secondary" @click="addUser()">
               {{ t('channel.add') }}
-            </ion-button>
+            </IonButton>
           </div>
-        </ion-item>
+        </IonItem>
         <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
@@ -452,10 +439,10 @@ const inviteUser = async(userId: string) => {
             </IonItemOptions>
           </IonItemSliding>
         </template>
-      </ion-list>
-    </ion-content>
-    <ion-modal :is-open="newUserModalOpen" :swipe-to-close="true">
+      </IonList >
+    </IonContent>
+    <IonModal :is-open="newUserModalOpen" :swipe-to-close="true">
       <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />
-    </ion-modal>
-  </ion-page>
+    </IonModal>
+  </IonPage>
 </template>

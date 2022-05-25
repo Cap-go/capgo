@@ -60,9 +60,9 @@ const submit = async() => {
 
 <template>
   <IonPage>
+    <TitleHead :title="t('accountPassword.heading')" />
     <IonContent :fullscreen="true">
       <div class="py-16 px-6 mx-auto w-full lg:w-1/2">
-        <TitleHead :big="false" :title="t('accountPassword.heading')" />
         <form @submit.prevent="submit">
           <div v-if="errorMessage" class="text-center">
             <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">

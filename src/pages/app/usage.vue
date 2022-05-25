@@ -2,14 +2,12 @@
 import { useI18n } from 'vue-i18n'
 import type { RefresherCustomEvent, SegmentChangeEventDetail } from '@ionic/vue'
 import {
-  IonBackButton,
-  IonButtons,
   IonContent,
-  IonHeader,
   IonItem,
   IonItemDivider,
-  IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent, IonSegment, IonSegmentButton,
-  IonTitle, IonToolbar, isPlatform, toastController,
+  IonLabel, IonList, IonPage, IonRefresher,
+  IonRefresherContent, IonSegment, IonSegmentButton,
+  isPlatform, toastController,
 } from '@ionic/vue'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
@@ -17,6 +15,7 @@ import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
+import TitleHead from '~/components/TitleHead.vue'
 
 const { t } = useI18n()
 const isLoading = ref(true)
@@ -292,33 +291,27 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
 </script>
 <template>
   <IonPage>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button default-href="/app/account" />
-        </ion-buttons>
-        <IonTitle>{{ t('usage.title') }}</IonTitle>
-      </ion-toolbar>
-    </ion-header>
+    <TitleHead :title="t('usage.title')" default-back="/app/account" />
     <IonContent :fullscreen="true">
-      <ion-refresher slot="fixed" @ion-refresh="refreshData($event)">
-        <ion-refresher-content />
-      </ion-refresher>
-      <ion-list v-if="!isLoading">
-        <ion-item-divider>
-          <ion-label>
+    <TitleHead :title="t('usage.title')" big default-back="/app/account" />
+      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent  />
+      </IonRefresher >
+      <IonList  v-if="!isLoading">
+        <IonItemDivider>
+          <IonLabel>
             {{ t('your-current-suggested-plan-is') }}
             <a href="https://capgo.app/pricing" class="!text-pumpkin-orange-500 font-bold inline cursor-pointer" target="_blank">{{ currentPlanSuggest.name }}</a>
-          </ion-label>
-        </ion-item-divider>
-        <ion-item-divider>
-          <ion-label>
+          </IonLabel>
+        </IonItemDivider>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('your-current-plan-is') }}
             <div class="!text-pumpkin-orange-500 font-bold inline" target="_blank">
               {{ currentPlan.name }}
             </div>
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem v-for="s in stats()" :key="s">
           <p class="w-40 first-letter:uppercase">
             {{ s.replace(/([a-z])([A-Z])/g, '$1 $2') }}
@@ -334,7 +327,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </div>
         </IonItem>
-      </ion-list>
+      </IonList >
       <div v-if="!isMobile" class="bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto py-24 px-4 sm:px-6 lg:px-8">
           <div class="sm:flex sm:flex-col sm:align-center">
@@ -344,14 +337,14 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             <p class="mt-5 text-xl text-gray-500 sm:text-center">
               {{ t('plan.desc') }}
             </p>
-            <ion-segment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
-              <ion-segment-button class="h-10" value="monthly">
-                <ion-label>{{ t('plan.monthly-billing') }}</ion-label>
-              </ion-segment-button>
-              <ion-segment-button class="h-10" value="yearly">
-                <ion-label>{{ t('plan.yearly-billing') }}</ion-label>
-              </ion-segment-button>
-            </ion-segment>
+            <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
+              <IonSegmentButton  class="h-10" value="monthly">
+                <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
+              </IonSegmentButton >
+              <IonSegmentButton  class="h-10" value="yearly">
+                <IonLabel>{{ t('plan.yearly-billing') }}</IonLabel>
+              </IonSegmentButton >
+            </IonSegment>
           </div>
           <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
             <div v-for="p in planList" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
