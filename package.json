@@ -11,7 +11,8 @@
     "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
     "release": "standard-version -t \"\"",
     "sync": "cap sync",
-    "dev": "vite",
+    "serve": "vite",
+    "dev-serve": "BRANCH=development vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "types": "npx openapi-typescript https://xvwzpoazmxkqosrdewyv.supabase.co/rest/v1/\\?apikey\\=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTYzNzgwNTAwOSwiZXhwIjoxOTUzMzgxMDA5fQ.8tgID1d4jodPwuo_fz4KHN4o1XKB9fnqyt0_GaJSj-w --output src/types/supabase.ts",
     "typecheck": "vue-tsc --noEmit"

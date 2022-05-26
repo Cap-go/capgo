@@ -26,7 +26,6 @@ jobs:
         run: pnpm build
         env: # Or as an environment variable
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
-          VITE_APP_MODE: ${{ secrets.VITE_APP_MODE }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
