@@ -91,6 +91,7 @@ channel:
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
+days: jours
 device:
   channel: Lien de chaîne
   created_at: Créé à
@@ -124,6 +125,8 @@ intro:
   dynamic-route: Démo de route dynamique
   hi: Salut, {name}!
   whats-your-name: Comment t'appelles-tu ?
+limit-reached: Limite atteinte
+loading-more-data: Chargement de plus de données...
 login:
   andpass: Et mot de passe
   connexion: Connexion
@@ -200,6 +203,7 @@ plan:
   versions: Versions
   whats-included: Ce qui est inclu
   yearly-billing: Facturation annuelle
+please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 projects:
   list: Tous vos projets
   sharedlist: Projets partagés avec vous
@@ -222,6 +226,7 @@ register:
     ponctuation.
   specialError: Doit contenir des caractères spéciaux
   upperCaseError: Doit contenir des lettres majuscules
+see-usage: Voir l'utilisation
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
 stats:
   devices: Dispositifs
@@ -229,6 +234,10 @@ stats:
   subtitle: Le mois dernier
   title: Statistiques
   versions: Versions
+trial-plan-expired: Plan d'essai expiré
+trial-plan-expires-in: Le plan d'essai expire dans
+upgrade: Améliorer
+upgrade-now: Mettre à jour maintenant
 usage:
   success: >-
     Votre plan a été configuré, cette page sera mise à jour dans quelques

@@ -91,6 +91,7 @@ channel:
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
+days: hari
 device:
   channel: Tautan saluran
   created_at: Dibuat di
@@ -122,6 +123,8 @@ intro:
   dynamic-route: Contoh rute dinamik
   hi: Halo, {name}!
   whats-your-name: Siapa nama anda?
+limit-reached: Batas tercapai
+loading-more-data: Memuat lebih banyak data...
 login:
   andpass: Dan kata sandi
   connexion: Gabung
@@ -196,6 +199,7 @@ plan:
   versions: Versi
   whats-included: Apa yang termasuk?
   yearly-billing: Penagihan tahunan
+please-upgrade: Harap tingkatkan paket Anda untuk menambahkan lebih banyak pengguna
 projects:
   list: Milikmu
   sharedlist: Dibagikan dengan Anda
@@ -216,6 +220,7 @@ register:
   password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
   specialError: Harus mengandung karakter khusus
   upperCaseError: Harus mengandung huruf besar
+see-usage: Lihat penggunaan
 something-went-wrong-try-again-later: |-
   Ada yang salah! 
   Coba lagi nanti.
@@ -225,6 +230,10 @@ stats:
   subtitle: Bulan lalu
   title: Statistik
   versions: Versi
+trial-plan-expired: Paket Uji Coba Kedaluwarsa
+trial-plan-expires-in: Rencana Percobaan berakhir dalam
+upgrade: Meningkatkan
+upgrade-now: Tingkatkan sekarang
 usage:
   success: >-
     Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa

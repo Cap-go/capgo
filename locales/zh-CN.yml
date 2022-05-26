@@ -85,6 +85,7 @@ channel:
   user_no_found: 未找到用户，请先注册
   users: 与用户共享
   v3: V3 设置
+days: 天
 device:
   channel: 频道链接
   created_at: 创建于
@@ -116,6 +117,8 @@ intro:
   dynamic-route: 动态路由演示
   hi: 你好，{name}
   whats-your-name: 输入你的名字
+limit-reached: 达到上限
+loading-more-data: 正在加载更多数据...
 login:
   andpass: 和密码
   connexion: 登录
@@ -190,6 +193,7 @@ plan:
   versions: 版本
   whats-included: 包括什么
   yearly-billing: 每年计费
+please-upgrade: 请升级您的计划以添加更多用户
 projects:
   list: 你的
   sharedlist: 与您共享
@@ -210,6 +214,7 @@ register:
   password-hint: 输入至少 6 个数字、字母和标点符号的组合。
   specialError: 应包含特殊字符
   upperCaseError: 应包含大写字母
+see-usage: 查看用法
 something-went-wrong-try-again-later: |-
   有些不对劲！
   稍后再试。
@@ -219,6 +224,10 @@ stats:
   subtitle: 上个月
   title: 统计数据
   versions: 版本
+trial-plan-expired: 试用计划已过期
+trial-plan-expires-in: 试用计划将于
+upgrade: 升级
+upgrade-now: 现在升级
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法

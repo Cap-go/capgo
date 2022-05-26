@@ -119,29 +119,16 @@ export const getMystats = async(user_id: string): Promise<definitions['app_stats
   return app_stats || []
 }
 
-export const getMyPlan = async(user_id: string, stats: definitions['app_stats'][]): Promise<PlanData> => {
-  console.log('user', user_id)
-  let user: definitions['users']
+export const getMyPlan = async(user: definitions['users'], stats: definitions['app_stats'][]): Promise<PlanData> => {
   let payment: definitions['stripe_info'] | null = null
-  const { data: users } = await supabaseAdmin
-    .from<definitions['users']>('users')
-    .select()
-    .eq('id', user_id)
-  if (users && users.length)
-    user = users[0]
-  else
-    return Promise.reject(Error('no user found'))
-  if (!user?.customer_id)
-    return Promise.reject(Error('no customer_id'))
   const { data } = await supabaseAdmin
     .from<definitions['stripe_info']>('stripe_info')
     .select()
     .eq('customer_id', user.customer_id)
-  let product_id = user.created_at && dayjs(user.created_at!).add(30, 'day').isAfter(dayjs()) ? (Deno.env.get('PLAN_TEAM') || 'team') : 'free'
-  if (data && data.length && data[0].product_id) {
-    product_id = data[0].product_id
+  if (data && data.length) {
     payment = data[0]
   }
+  const product_id = payment?.product_id || 'free'
   const current = Object.values(plans)
     .find((plan) => {
       if (plan.id === product_id)
@@ -166,25 +153,26 @@ export const getMyPlan = async(user_id: string, stats: definitions['app_stats'][
 export const currentPaymentstatus = async(user: definitions['users']): Promise<PlanRes> => {
   try {
     const stats = await getMystats(user.id)
-    const myPlan = await getMyPlan(user.id, stats)
+    const myPlan = await getMyPlan(user, stats)
     const res: PlanRes = {
       stats,
       payment: myPlan.payment,
       plan: myPlan.plan,
       planSuggest: myPlan.planSuggest,
+      canUseMore: myPlan.canUseMore,
       trialDaysLeft: 30,
-      canUseMore: true,
       AllPlans: plans,
     }
-    if (res.plan === 'free') {
-      const created_at = (new Date(myPlan.payment?.trial_at!)).getTime()
-      const daysSinceCreated = ((new Date()).getTime() - created_at) / (1000 * 3600 * 24)
-      if (daysSinceCreated <= 30) {
-        res.trialDaysLeft = 30 - daysSinceCreated
-      }
-      else {
-        res.trialDaysLeft = 0
-      }
+    const today = dayjs()
+    const trial_at = dayjs(myPlan.payment?.trial_at)
+    const trial_at_one_month = trial_at.add(1, 'month')
+    console.log('trial_at', trial_at, trial_at_one_month)
+    if (trial_at_one_month.isAfter(today)) {
+      res.trialDaysLeft = trial_at_one_month.diff(today, 'day')
+      res.canUseMore = true
+    }
+    else {
+      res.trialDaysLeft = 0
     }
     return res
   }

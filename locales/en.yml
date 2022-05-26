@@ -214,6 +214,7 @@ register:
   password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
+see-usage: See usage
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 stats:
   devices: Devices

@@ -3,6 +3,7 @@ import {
   IonButton,
   IonTitle,
   IonToolbar,
+isPlatform,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -18,17 +19,25 @@ const bannerColor = ref('')
 const main = useMainStore()
 const route = useRoute()
 const { t } = useI18n()
+const isMobile = isPlatform('capacitor')
 
 watchEffect(() => {
   if (route.path === '/app/usage')
     return
   console.log('paymentStatus', main.myPlan)
-  if (main.myPlan?.trialDaysLeft && main.myPlan?.trialDaysLeft !== 0) {
-    bannerText.value = `${t('trial-plan-expires-in')}) ${parseInt(main.myPlan.trialDaysLeft)} ${t('days')}`
-    bannerColor.value = 'success'
+  if (main.myPlan && main.myPlan?.canUseMore && main.myPlan?.trialDaysLeft !== 0) {
+    bannerText.value = `${t('trial-plan-expires-in')} ${parseInt(main.myPlan.trialDaysLeft)} ${t('days')}`
+    if (main.myPlan?.trialDaysLeft <= 7)
+      bannerColor.value = 'warning'
+    else
+      bannerColor.value = 'success'
   }
-  else if (main.myPlan?.trialDaysLeft === 0) {
+  else if (main.myPlan && !main.myPlan?.canUseMore && !main.myPlan?.payment?.status) {
     bannerText.value = t('trial-plan-expired')
+    bannerColor.value = 'warning'
+  }
+  else if (main.myPlan && !main.myPlan?.canUseMore) {
+    bannerText.value = 'You reached the limit of your plan'
     bannerColor.value = 'warning'
   }
 })
@@ -41,8 +50,11 @@ watchEffect(() => {
         {{ bannerText }}
       </p>
     </IonTitle>
-    <IonButton id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
+    <IonButton id="banner" v-if="!isMobile" slot="end" href="/app/usage" color="secondary" class="text-white">
       {{ t('upgrade') }}
+    </IonButton>
+    <IonButton id="banner" v-if="isMobile" slot="end" href="/app/usage" color="secondary" class="text-white">
+      {{ t('see-usage') }}
     </IonButton>
   </IonToolbar>
 </template>
