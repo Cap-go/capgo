@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.5](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.4...0.30.9-alpha.5) (2022-05-26)
+
+
+### Bug Fixes
+
+* search in device list ([22862d1](https://github.com/Cap-go/capgo/commit/22862d1eb5892af1f8e50c2c6b000debbf09cd2e))
+
 ### [0.30.9-alpha.4](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.3...0.30.9-alpha.4) (2022-05-26)
 
 
