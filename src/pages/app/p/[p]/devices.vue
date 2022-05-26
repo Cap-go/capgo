@@ -37,14 +37,13 @@ const isDisabled = ref(false)
 const id = ref('')
 const search = ref('')
 const isLoading = ref(true)
+const isLoadingSub = ref(false)
 const devices = ref<(definitions['devices'] & Device)[]>([])
+const filtered = ref<(definitions['devices'] & Device)[]>([])
 
 const deviceFiltered = computed(() => {
-  const value = search.value
-  if (value) {
-    const filtered = devices.value.filter(device => device.device_id.toLowerCase().includes(value.toLowerCase()))
-    return filtered
-  }
+  if (search.value)
+    return filtered.value
   return devices.value
 })
 
@@ -114,8 +113,30 @@ watchEffect(async () => {
     await refreshData()
   }
 })
+const searchVersion = async () => {
+  isLoadingSub.value = true
+  const { data: dataVersions } = await supabase
+      .from<definitions['devices'] & Device>('devices')
+      .select(`
+        device_id,
+        platform,
+        plugin_version,
+        version (
+            name
+        ),
+        created_at,
+        updated_at
+      `)
+      .eq('app_id', id.value)
+      .gt('updated_at', subDays(new Date(), 30).toUTCString())
+      .order('created_at', { ascending: false })
+      .like('device_id', `%${search.value}%`)
+  filtered.value = dataVersions || []
+  isLoadingSub.value = false
+}
 const onSearch = (val: string) => {
   search.value = val
+  searchVersion()
 }
 </script>
 
@@ -131,6 +152,9 @@ const onSearch = (val: string) => {
       </div>
       <div v-else>
         <IonList>
+          <div v-if="isLoadingSub" class="chat-items flex justify-center">
+            <Spinner />
+          </div>
           <template v-for="d in deviceFiltered" :key="d.device_id">
             <IonItem class="cursor-pointer" @click="openDevice(d)">
               <IonLabel>
@@ -145,7 +169,7 @@ const onSearch = (val: string) => {
           </template>
           <IonInfiniteScroll
             threshold="100px"
-            :disabled="isDisabled"
+            :disabled="isDisabled || search"
             @ion-infinite="loadData($event)"
           >
             <IonInfiniteScrollContent

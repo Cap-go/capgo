@@ -47,7 +47,6 @@ const filtered = ref<definitions['app_versions'][]>([])
 const versionFilter = computed(() => {
   if (search.value)
     return filtered.value
-
   return versions.value
 })
 const loadAppInfo = async () => {
