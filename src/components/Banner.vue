@@ -48,9 +48,9 @@ defineProps({
     </IonToolbar>
 </template>
 <style scoped>
-/* .header-collapse-condense-inactive ion-toolbar #banner {
+.header-collapse-condense-inactive ion-toolbar #banner {
   display: none;
-} */
+}
 /* .header-collapse-main  #banner-toolbar {
   display: none;
 } */
