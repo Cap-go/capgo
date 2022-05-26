@@ -2,13 +2,15 @@ import { supabaseAdmin } from './supabase.ts'
 import type { definitions } from './types_supabase.ts'
 import dayjs from 'https://cdn.skypack.dev/dayjs'
 
-interface PlanData {
-  plan: Plan,
-  payment: definitions['stripe_info'] | null,
+export interface PlanData {
+  plan: string,
+  planSuggest: string,
+  payment?: definitions['stripe_info'] | null,
   canUseMore: boolean
 }
-interface PlanRes extends PlanData {
-  trialDaysLeft: 0,
+export interface PlanRes extends PlanData {
+  trialDaysLeft: number,
+  stats: definitions['app_stats'][],
   AllPlans: Record<string, Plan>,
 }
 
@@ -49,7 +51,7 @@ export const plans: Record<string, Plan> = {
     progressiveDeploy: false,
   },
   solo: {
-    id: 'prod_LQIzwwVu6oMmAz',
+    id: Deno.env.get('PLAN_SOLO') || 'solo',
     name: 'Solo',
     description: 'plan.solo.desc',
     price: {
@@ -65,7 +67,7 @@ export const plans: Record<string, Plan> = {
     progressiveDeploy: false,
   },
   maker: {
-    id: 'prod_LQIzozukEwDZDM',
+    id: Deno.env.get('PLAN_MAKER') || 'maker',
     name: 'Maker',
     description: 'plan.maker.desc',
     price: {
@@ -81,7 +83,7 @@ export const plans: Record<string, Plan> = {
     progressiveDeploy: false,
   },
   team: {
-    id: 'prod_LQIzm2NGzayzXi',
+    id: Deno.env.get('PLAN_TEAM') || 'team',
     name: 'Team',
     description: 'plan.team.desc',
     price: {
@@ -117,7 +119,7 @@ export const getMystats = async(user_id: string): Promise<definitions['app_stats
   return app_stats || []
 }
 
-export const getMyPlan = async(user_id: string): Promise<PlanData> => {
+export const getMyPlan = async(user_id: string, stats: definitions['app_stats'][]): Promise<PlanData> => {
   console.log('user', user_id)
   let user: definitions['users']
   let payment: definitions['stripe_info'] | null = null
@@ -135,7 +137,7 @@ export const getMyPlan = async(user_id: string): Promise<PlanData> => {
     .from<definitions['stripe_info']>('stripe_info')
     .select()
     .eq('customer_id', user.customer_id)
-  let product_id = user.created_at && dayjs(user.created_at!).add(30, 'day').isAfter(dayjs()) ? 'team' : 'free'
+  let product_id = user.created_at && dayjs(user.created_at!).add(30, 'day').isAfter(dayjs()) ? (Deno.env.get('PLAN_TEAM') || 'team') : 'free'
   if (data && data.length && data[0].product_id) {
     product_id = data[0].product_id
     payment = data[0]
@@ -147,45 +149,54 @@ export const getMyPlan = async(user_id: string): Promise<PlanData> => {
       return false
     })
   if (current) {
-    const canUseMore = await isAllowInMyPlan(current, await getMystats(user.id))
-    return { plan: current, payment, canUseMore }
+    let planSuggest = Deno.env.get('PLAN_TEAM') || 'team'
+    const found = Object.values(plans).find(plan => stats.length < plan.apps
+      && stats.reduce((acc, cur) => Math.max(acc, cur.channels), 0) < plan.channels
+      && stats.reduce((acc, cur) => Math.max(acc, cur.versions), 0) < plan.versions
+      && stats.reduce((acc, cur) => Math.max(acc, cur.shared), 0) < plan.sharedChannels
+      && stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu, cur.mlu_real)), 0) < plan.updates)
+    if (found)
+      planSuggest = found.id
+    const canUseMore = await isAllowInMyPlan(current, stats)
+    return { plan: current.id, payment, canUseMore, planSuggest }
   }
   return Promise.reject(Error('no data'))
 }
 
-export const currentPaymentstatus = async(user: definitions['users']) => {
+export const currentPaymentstatus = async(user: definitions['users']): Promise<PlanRes> => {
   try {
-    const myPlan = await getMyPlan(user.id)
-    if (myPlan.plan.id === 'free') {
+    const stats = await getMystats(user.id)
+    const myPlan = await getMyPlan(user.id, stats)
+    const res: PlanRes = {
+      stats,
+      payment: myPlan.payment,
+      plan: myPlan.plan,
+      planSuggest: myPlan.planSuggest,
+      trialDaysLeft: 30,
+      canUseMore: true,
+      AllPlans: plans,
+    }
+    if (res.plan === 'free') {
       const created_at = (new Date(user.created_at!)).getTime()
       const daysSinceCreated = ((new Date()).getTime() - created_at) / (1000 * 3600 * 24)
       if (daysSinceCreated <= 30) {
-        return {
-          canUseMore: true,
-          trialDaysLeft: 30 - daysSinceCreated,
-          AllPlans: plans,
-        }
+        res.trialDaysLeft = 30 - daysSinceCreated
       }
       else {
-        return {
-          canUseMore: false,
-          trialDaysLeft: 0,
-          AllPlans: plans,
-        }
+        res.trialDaysLeft = 0
       }
     }
-    return {
-      ...myPlan,
-      trialDaysLeft: 0,
-      AllPlans: plans,
-    }
+    return res
   }
   catch (error) {
     console.log('currentPaymentstatus error', error)
     return {
+      stats: [],
       canUseMore: false,
       trialDaysLeft: 0,
       AllPlans: plans,
+      plan: 'free',
+      planSuggest: 'solo',
     }
   }
 }

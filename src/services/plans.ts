@@ -20,12 +20,13 @@ export interface Plan extends Stats {
 }
 
 export interface PlanData {
-    plan: Plan,
+    plan: string,
+    planSuggest: string,
+    stats: definitions['app_stats'][],
     payment: definitions['stripe_info'] | null,
     canUseMore: boolean
-}
-
-export interface PlanRes extends PlanData {
+  }
+  export interface PlanRes extends PlanData {
     trialDaysLeft: 0,
     AllPlans: Record<string, Plan>,
-}
+  }
