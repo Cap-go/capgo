@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.0...0.30.9-alpha.1) (2022-05-26)
+
+
+### Bug Fixes
+
+* discard env.dev from git ([9ce3bb6](https://github.com/Cap-go/capgo/commit/9ce3bb6e6fc754b23f85c2a63e9dae082e52d0ec))
+
 ### [0.30.9-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.6...0.30.9-alpha.0) (2022-05-26)
 
 
