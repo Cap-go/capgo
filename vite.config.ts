@@ -47,7 +47,6 @@ export default defineConfig({
       VITE_APP_VERSION: pack.version,
       VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || getRightKey(process.env.BRANCH || '', 'supa_anon'),
       VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || getRightKey(process.env.BRANCH || '', 'supa_url'),
-      VITE_NETLIFY_URL: `${getUrl(process.env.BRANCH)}/${base_api}`,
       VITE_APP_URL: `${getUrl(process.env.BRANCH)}`,
       VITE_BRANCH: process.env.BRANCH || 'main',
       package_dependencies: JSON.stringify(pack.dependencies),

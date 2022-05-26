@@ -1,7 +1,7 @@
 {
     "base_domain": {
       "prod": "web.capgo.app",
-      "development": "development.capgo.app",
+      "development": "development.web.capgo.app",
       "local": "localhost:3332"
     },
     "supa_anon": {
