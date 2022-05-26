@@ -14,6 +14,7 @@ import pack from './package.json'
 import keys from './configs.json'
 
 const getRightKey = (branch: string, keyname: 'base_domain' | 'supa_anon' | 'supa_url'): string => {
+  console.log('getRightKey', branch, keyname)
   if (branch === 'development')
     return keys[keyname].development
   else if (branch === 'local')
@@ -28,7 +29,6 @@ const getUrl = (branch = ''): string => {
     return `https://${getRightKey(branch, 'base_domain')}`
 }
 
-const base_api = 'api'
 const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
 const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
