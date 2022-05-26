@@ -53,6 +53,7 @@ const currentPlanSuggest = computed(() => planList.value.find(plan => plan.id ==
 const currentPlan = computed(() => planList.value.find(plan => plan.id === main.myPlan?.plan))
 
 const getAllPlan = async () => {
+  console.log(main.myPlan)
   if (!main.myPlan)
     return
   planList.value = Object.values(main.myPlan?.AllPlans)

@@ -6,13 +6,17 @@ import {
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router';
 import { useMainStore } from '~/stores/main';
+
 const bannerText = ref('')
 const bannerColor = ref('')
 const main = useMainStore()
+const route = useRoute()
+const { t } = useI18n()
 
 watchEffect(() => {
-
+  if(route.path === '/app/usage') return 
   console.log('paymentStatus', main.myPlan)
   if (main.myPlan?.trialDaysLeft && main.myPlan?.trialDaysLeft !== 0) {
     bannerText.value = `${t('trial-plan-expires-in')}) ${parseInt(main.myPlan.trialDaysLeft)} ${t('days')}`
@@ -23,7 +27,6 @@ watchEffect(() => {
     bannerColor.value = 'warning'
   }
 })
-const { t } = useI18n()
 
 defineProps({
   text: { type: String, default: '' },
