@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.7](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.6...0.30.9-alpha.7) (2022-05-26)
+
+
+### Bug Fixes
+
+* deploy new anon key ([84c34c3](https://github.com/Cap-go/capgo/commit/84c34c3bbd3599d77939f057f0e2f092ab7975ea))
+
 ### [0.30.9-alpha.6](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.5...0.30.9-alpha.6) (2022-05-26)
 
 
