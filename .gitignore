@@ -7,6 +7,7 @@ node_modules
 *.log
 .env.mobile
 .env
+.env.dev
 .netlify
 ios/App/App/GoogleService-Info.plist
 android/app/google-services.json
