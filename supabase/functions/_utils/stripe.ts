@@ -94,6 +94,8 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
     subscription_id: undefined,
     customer_id: '',
     updated_at: dayjs().toISOString(),
+    trial_at: dayjs().toISOString(),
+    created_at: dayjs().toISOString(),
     status: undefined,
   }
   // eslint-disable-next-line no-console

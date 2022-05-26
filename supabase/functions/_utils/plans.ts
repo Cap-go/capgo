@@ -177,7 +177,7 @@ export const currentPaymentstatus = async(user: definitions['users']): Promise<P
       AllPlans: plans,
     }
     if (res.plan === 'free') {
-      const created_at = (new Date(user.created_at!)).getTime()
+      const created_at = (new Date(myPlan.payment?.trial_at!)).getTime()
       const daysSinceCreated = ((new Date()).getTime() - created_at) / (1000 * 3600 * 24)
       if (daysSinceCreated <= 30) {
         res.trialDaysLeft = 30 - daysSinceCreated

@@ -3,7 +3,7 @@
  * Do not make direct changes to the file.
  */
 
-export interface paths {
+ export interface paths {
   "/": {
     get: {
       responses: {
@@ -780,10 +780,8 @@ export interface paths {
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
           public?: parameters["rowFilter.channels.public"];
-          disableAutoUpdateUnderNative?:
-          parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
-          disableAutoUpdateToMajor?:
-          parameters["rowFilter.channels.disableAutoUpdateToMajor"];
+          disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
+          disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           beta?: parameters["rowFilter.channels.beta"];
           /** Filtering Columns */
           select?: parameters["select"];
@@ -843,10 +841,8 @@ export interface paths {
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
           public?: parameters["rowFilter.channels.public"];
-          disableAutoUpdateUnderNative?:
-          parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
-          disableAutoUpdateToMajor?:
-          parameters["rowFilter.channels.disableAutoUpdateToMajor"];
+          disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
+          disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           beta?: parameters["rowFilter.channels.beta"];
         };
         header: {
@@ -870,10 +866,8 @@ export interface paths {
           created_by?: parameters["rowFilter.channels.created_by"];
           updated_at?: parameters["rowFilter.channels.updated_at"];
           public?: parameters["rowFilter.channels.public"];
-          disableAutoUpdateUnderNative?:
-          parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
-          disableAutoUpdateToMajor?:
-          parameters["rowFilter.channels.disableAutoUpdateToMajor"];
+          disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
+          disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           beta?: parameters["rowFilter.channels.beta"];
         };
         body: {
@@ -1006,8 +1000,7 @@ export interface paths {
           created_at?: parameters["rowFilter.devices_onprem.created_at"];
           updated_at?: parameters["rowFilter.devices_onprem.updated_at"];
           platform?: parameters["rowFilter.devices_onprem.platform"];
-          plugin_version?:
-          parameters["rowFilter.devices_onprem.plugin_version"];
+          plugin_version?: parameters["rowFilter.devices_onprem.plugin_version"];
           version?: parameters["rowFilter.devices_onprem.version"];
           app_id?: parameters["rowFilter.devices_onprem.app_id"];
           device_id?: parameters["rowFilter.devices_onprem.device_id"];
@@ -1066,8 +1059,7 @@ export interface paths {
           created_at?: parameters["rowFilter.devices_onprem.created_at"];
           updated_at?: parameters["rowFilter.devices_onprem.updated_at"];
           platform?: parameters["rowFilter.devices_onprem.platform"];
-          plugin_version?:
-          parameters["rowFilter.devices_onprem.plugin_version"];
+          plugin_version?: parameters["rowFilter.devices_onprem.plugin_version"];
           version?: parameters["rowFilter.devices_onprem.version"];
           app_id?: parameters["rowFilter.devices_onprem.app_id"];
           device_id?: parameters["rowFilter.devices_onprem.device_id"];
@@ -1090,8 +1082,7 @@ export interface paths {
           created_at?: parameters["rowFilter.devices_onprem.created_at"];
           updated_at?: parameters["rowFilter.devices_onprem.updated_at"];
           platform?: parameters["rowFilter.devices_onprem.platform"];
-          plugin_version?:
-          parameters["rowFilter.devices_onprem.plugin_version"];
+          plugin_version?: parameters["rowFilter.devices_onprem.plugin_version"];
           version?: parameters["rowFilter.devices_onprem.version"];
           app_id?: parameters["rowFilter.devices_onprem.app_id"];
           device_id?: parameters["rowFilter.devices_onprem.device_id"];
@@ -1444,6 +1435,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1500,6 +1492,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
         };
         header: {
           /** Preference */
@@ -1520,6 +1513,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
         };
         body: {
           /** stripe_info */
@@ -1548,8 +1542,7 @@ export interface paths {
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
           updated_at?: parameters["rowFilter.users.updated_at"];
-          enableNotifications?:
-          parameters["rowFilter.users.enableNotifications"];
+          enableNotifications?: parameters["rowFilter.users.enableNotifications"];
           optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
           legalAccepted?: parameters["rowFilter.users.legalAccepted"];
           customer_id?: parameters["rowFilter.users.customer_id"];
@@ -1611,8 +1604,7 @@ export interface paths {
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
           updated_at?: parameters["rowFilter.users.updated_at"];
-          enableNotifications?:
-          parameters["rowFilter.users.enableNotifications"];
+          enableNotifications?: parameters["rowFilter.users.enableNotifications"];
           optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
           legalAccepted?: parameters["rowFilter.users.legalAccepted"];
           customer_id?: parameters["rowFilter.users.customer_id"];
@@ -1638,8 +1630,7 @@ export interface paths {
           email?: parameters["rowFilter.users.email"];
           id?: parameters["rowFilter.users.id"];
           updated_at?: parameters["rowFilter.users.updated_at"];
-          enableNotifications?:
-          parameters["rowFilter.users.enableNotifications"];
+          enableNotifications?: parameters["rowFilter.users.enableNotifications"];
           optForNewsletters?: parameters["rowFilter.users.optForNewsletters"];
           legalAccepted?: parameters["rowFilter.users.legalAccepted"];
           customer_id?: parameters["rowFilter.users.customer_id"];
@@ -2337,14 +2328,19 @@ export interface definitions {
      * @enum {string}
      */
     status?:
-    | "created"
-    | "succeeded"
-    | "updated"
-    | "failed"
-    | "deleted"
-    | "canceled";
+      | "created"
+      | "succeeded"
+      | "updated"
+      | "failed"
+      | "deleted"
+      | "canceled";
     /** Format: character varying */
     product_id?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    trial_at: string;
   };
   users: {
     /**
@@ -2671,6 +2667,8 @@ export interface parameters {
   "rowFilter.stripe_info.status": string;
   /** Format: character varying */
   "rowFilter.stripe_info.product_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.stripe_info.trial_at": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */
@@ -2699,6 +2697,6 @@ export interface parameters {
   "rowFilter.users.customer_id": string;
 }
 
-export interface operations { }
+export interface operations {}
 
-export interface external { }
+export interface external {}

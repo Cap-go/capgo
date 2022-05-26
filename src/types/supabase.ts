@@ -1435,6 +1435,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1491,6 +1492,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
         };
         header: {
           /** Preference */
@@ -1511,6 +1513,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
         };
         body: {
           /** stripe_info */
@@ -2333,6 +2336,11 @@ export interface definitions {
       | "canceled";
     /** Format: character varying */
     product_id?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    trial_at: string;
   };
   users: {
     /**
@@ -2659,6 +2667,8 @@ export interface parameters {
   "rowFilter.stripe_info.status": string;
   /** Format: character varying */
   "rowFilter.stripe_info.product_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.stripe_info.trial_at": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */
