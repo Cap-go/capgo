@@ -114,6 +114,234 @@ export interface paths {
       };
     };
   };
+  "/app_stats": {
+    get: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats.app_id"];
+          user_id?: parameters["rowFilter.app_stats.user_id"];
+          created_at?: parameters["rowFilter.app_stats.created_at"];
+          updated_at?: parameters["rowFilter.app_stats.updated_at"];
+          channels?: parameters["rowFilter.app_stats.channels"];
+          mlu?: parameters["rowFilter.app_stats.mlu"];
+          versions?: parameters["rowFilter.app_stats.versions"];
+          shared?: parameters["rowFilter.app_stats.shared"];
+          mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
+          devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["app_stats"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** app_stats */
+          app_stats?: definitions["app_stats"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats.app_id"];
+          user_id?: parameters["rowFilter.app_stats.user_id"];
+          created_at?: parameters["rowFilter.app_stats.created_at"];
+          updated_at?: parameters["rowFilter.app_stats.updated_at"];
+          channels?: parameters["rowFilter.app_stats.channels"];
+          mlu?: parameters["rowFilter.app_stats.mlu"];
+          versions?: parameters["rowFilter.app_stats.versions"];
+          shared?: parameters["rowFilter.app_stats.shared"];
+          mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
+          devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats.app_id"];
+          user_id?: parameters["rowFilter.app_stats.user_id"];
+          created_at?: parameters["rowFilter.app_stats.created_at"];
+          updated_at?: parameters["rowFilter.app_stats.updated_at"];
+          channels?: parameters["rowFilter.app_stats.channels"];
+          mlu?: parameters["rowFilter.app_stats.mlu"];
+          versions?: parameters["rowFilter.app_stats.versions"];
+          shared?: parameters["rowFilter.app_stats.shared"];
+          mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
+          devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
+        };
+        body: {
+          /** app_stats */
+          app_stats?: definitions["app_stats"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
+  "/app_stats_onprem": {
+    get: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
+          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
+          created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
+          updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
+          mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
+          versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
+          mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["app_stats_onprem"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** app_stats_onprem */
+          app_stats_onprem?: definitions["app_stats_onprem"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
+          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
+          created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
+          updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
+          mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
+          versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
+          mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
+          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
+          created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
+          updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
+          mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
+          versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
+          mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+        };
+        body: {
+          /** app_stats_onprem */
+          app_stats_onprem?: definitions["app_stats_onprem"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/app_versions": {
     get: {
       parameters: {
@@ -1207,6 +1435,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1263,6 +1492,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
         };
         header: {
           /** Preference */
@@ -1283,6 +1513,7 @@ export interface paths {
           customer_id?: parameters["rowFilter.stripe_info.customer_id"];
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
+          trial_at?: parameters["rowFilter.stripe_info.trial_at"];
         };
         body: {
           /** stripe_info */
@@ -1620,6 +1851,77 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
+  };
+  app_stats: {
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
+    /** Format: uuid */
+    user_id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /** Format: smallint */
+    channels: number;
+    /** Format: bigint */
+    mlu: number;
+    /** Format: bigint */
+    versions: number;
+    /** Format: bigint */
+    shared: number;
+    /** Format: bigint */
+    mlu_real: number;
+    /** Format: bigint */
+    devices: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * @default 2022-05
+     */
+    date_id: string;
+  };
+  app_stats_onprem: {
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
+    /** Format: uuid */
+    user_id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /** Format: smallint */
+    channels?: number;
+    /** Format: bigint */
+    mlu?: number;
+    /** Format: bigint */
+    versions?: number;
+    /** Format: bigint */
+    shared?: number;
+    /** Format: bigint */
+    mlu_real?: number;
   };
   app_versions: {
     /**
@@ -2007,12 +2309,12 @@ export interface definitions {
      * Format: timestamp with time zone
      * @default now()
      */
-    created_at?: string;
+    created_at: string;
     /**
      * Format: timestamp with time zone
      * @default now()
      */
-    updated_at?: string;
+    updated_at: string;
     /** Format: character varying */
     subscription_id?: string;
     /**
@@ -2034,6 +2336,11 @@ export interface definitions {
       | "canceled";
     /** Format: character varying */
     product_id?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    trial_at: string;
   };
   users: {
     /**
@@ -2120,6 +2427,50 @@ export interface parameters {
   "rowFilter.apikeys.mode": string;
   /** Format: timestamp with time zone */
   "rowFilter.apikeys.updated_at": string;
+  /** @description app_stats */
+  "body.app_stats": definitions["app_stats"];
+  /** Format: character varying */
+  "rowFilter.app_stats.app_id": string;
+  /** Format: uuid */
+  "rowFilter.app_stats.user_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_stats.created_at": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_stats.updated_at": string;
+  /** Format: smallint */
+  "rowFilter.app_stats.channels": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.mlu": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.versions": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.shared": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.mlu_real": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.devices": string;
+  /** Format: character varying */
+  "rowFilter.app_stats.date_id": string;
+  /** @description app_stats_onprem */
+  "body.app_stats_onprem": definitions["app_stats_onprem"];
+  /** Format: character varying */
+  "rowFilter.app_stats_onprem.app_id": string;
+  /** Format: uuid */
+  "rowFilter.app_stats_onprem.user_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_stats_onprem.created_at": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_stats_onprem.updated_at": string;
+  /** Format: smallint */
+  "rowFilter.app_stats_onprem.channels": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.mlu": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.versions": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.shared": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.mlu_real": string;
   /** @description app_versions */
   "body.app_versions": definitions["app_versions"];
   /** Format: bigint */
@@ -2316,6 +2667,8 @@ export interface parameters {
   "rowFilter.stripe_info.status": string;
   /** Format: character varying */
   "rowFilter.stripe_info.product_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.stripe_info.trial_at": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

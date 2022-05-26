@@ -16,4 +16,10 @@
     "route": "json"
   },
   "vue3snippets.enable-compile-vue-file-on-did-save-code": false,
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.unstable": true,
+  "deno.enablePaths": [
+    "./supabase/functions"
+  ]
 }

@@ -92,9 +92,9 @@ watchEffect(async() => {
 
 <template>
   <IonPage>
+    <TitleHead :title="t('account.personalInformation')" />
     <IonContent :fullscreen="true" class="w-full">
       <div class="grid mx-auto w-full lg:w-1/2 p-8">
-        <TitleHead :big="false" :title="t('account.personalInformation')" />
         <form
           class="mt-12 w-full"
           @submit.prevent="submit"

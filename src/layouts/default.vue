@@ -5,30 +5,30 @@ import { useRouter } from 'vue-router'
 import { computed } from 'vue'
 
 const router = useRouter()
-
 const isTab = computed(() => {
   return router.currentRoute.value.meta.option && router.currentRoute.value.meta.option === 'tabs'
 })
 const isMobile = computed(() => isPlatform('capacitor'))
+
 </script>
 <template>
-  <ion-page>
-    <ion-tabs>
+  <IonPage>
+    <IonTabs>
       <IonRouterOutlet />
-      <ion-tab-bar v-if="isTab" slot="bottom" color="secondary">
-        <ion-tab-button tab="home" href="/app/home">
-          <ion-icon :icon="list" />
-          <ion-label>Projects</ion-label>
-        </ion-tab-button>
-        <ion-tab-button v-if="isMobile" tab="modules" href="/app/modules">
-          <ion-icon :icon="hammerOutline" />
-          <ion-label>Modules</ion-label>
-        </ion-tab-button>
-        <ion-tab-button tab="account" href="/app/account">
-          <ion-icon :icon="person" />
-          <ion-label>Account</ion-label>
-        </ion-tab-button>
-      </ion-tab-bar>
-    </ion-tabs>
-  </ion-page>
+      <IonTabBar v-if="isTab" slot="bottom" color="secondary">
+        <IonTabButton tab="home" href="/app/home">
+          <IonIcon :icon="list" />
+          <IonLabel>Projects</IonLabel>
+        </IonTabButton>
+        <IonTabButton v-if="isMobile" tab="modules" href="/app/modules">
+          <IonIcon :icon="hammerOutline" />
+          <IonLabel>Modules</IonLabel>
+        </IonTabButton>
+        <IonTabButton tab="account" href="/app/account">
+          <IonIcon :icon="person" />
+          <IonLabel>Account</IonLabel>
+        </IonTabButton>
+      </IonTabBar>
+    </IonTabs>
+  </IonPage>
 </template>

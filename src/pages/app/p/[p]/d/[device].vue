@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import {
-  IonButton,
-  IonButtons, IonContent, IonHeader, IonIcon, IonItem,
+  IonContent, IonItem,
   IonItemDivider, IonLabel, IonList, IonListHeader, IonNote, IonPage,
-  IonTitle, IonToolbar, actionSheetController, alertController, toastController,
+  actionSheetController, alertController, toastController,
 } from '@ionic/vue'
-import { chevronBack } from 'ionicons/icons'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
+import TitleHead from '~/components/TitleHead.vue'
 
 interface Device {
   version: definitions['app_versions']
@@ -23,7 +22,6 @@ interface ChannelDev {
   channel_id: definitions['channels'] & Channel
 }
 const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
@@ -328,43 +326,23 @@ watchEffect(async() => {
     await loadData()
   }
 })
-const back = () => {
-  router.go(-1)
-}
 </script>
 <template>
-  <ion-page>
-    <IonHeader class="header-custom">
-      <IonToolbar class="toolbar-no-border">
-        <IonButtons slot="start" class="mx-3">
-          <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
-          </IonButton>
-        </IonButtons>
-        <IonTitle color="warning">
-          {{ t('device.title') }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title color="warning" size="large">
-            {{ t('device.title') }}
-          </ion-title>
-        </ion-toolbar>
-      </ion-header>
-      <ion-list>
-        <ion-list-header>
+  <IonPage>
+    <TitleHead :title="t('device.title')" big color="warning" />
+    <IonContent :fullscreen="true">
+    <TitleHead :title="t('device.title')" big color="warning" condense/>
+      <IonList >
+        <IonListHeader>
           <span class="text-vista-blue-500">
             {{ device?.device_id }}
           </span>
-        </ion-list-header>
-        <ion-item-divider>
-          <ion-label>
+        </IonListHeader>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('device.info') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem v-if="device">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
@@ -445,7 +423,7 @@ const back = () => {
             {{ channelDevice?.channel_id.name || t('device.no_channel') }}
           </IonNote>
         </IonItem>
-      </ion-list>
-    </ion-content>
-  </ion-page>
+      </IonList >
+    </IonContent>
+  </IonPage>
 </template>

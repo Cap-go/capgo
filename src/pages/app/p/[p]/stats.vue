@@ -1,22 +1,18 @@
 <script setup lang="ts">
 import {
-  IonButton, IonButtons, IonContent,
-  IonHeader,
-  IonIcon,
+  IonContent,
   IonPage, IonRefresher, IonRefresherContent,
-  IonTitle,
-  IonToolbar,
 } from '@ionic/vue'
-import { chevronBack } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { DoughnutChart, useDoughnutChart } from 'vue-chart-3'
 import type { ChartData, ChartOptions } from 'chart.js'
 import { subDays } from 'date-fns'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import TitleHead from '~/components/TitleHead.vue'
 
 interface Device {
   version: {
@@ -24,7 +20,6 @@ interface Device {
   }
 }
 const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const id = ref('')
@@ -76,11 +71,17 @@ const loadData = async() => {
 }
 
 const getLastDownload = async() => {
-  const { data, error } = await supabase.rpc<number>('get_dl_by_month_by_app', { pastmonth: 0, appid: id.value })
-  if (error)
-    downloads.value = 0
-  else
-    downloads.value = Number(data)
+  // create date_id with format YYYY-MM
+  const date_id = new Date().toISOString().slice(0, 7)
+  const { data } = await supabase
+    .from<definitions['app_stats']>('app_stats')
+    .select()
+    .eq('app_id', id.value)
+    .eq('date_id', date_id)
+  if (data && data.length) {
+    // find biggest value between mlu and mlu_real
+    downloads.value = Math.max(data[0].mlu, data[0].mlu_real)
+  }
 }
 
 const refreshData = async(evt: RefresherCustomEvent | null = null) => {
@@ -143,28 +144,14 @@ watchEffect(async() => {
     await refreshData()
   }
 })
-const back = () => {
-  router.go(-1)
-}
 </script>
 <template>
-  <ion-page>
-    <IonHeader class="header-custom">
-      <IonToolbar class="toolbar-no-border">
-        <IonButtons slot="start" class="mx-3">
-          <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
-          </IonButton>
-        </IonButtons>
-        <IonTitle color="warning">
-          {{ t('stats.title') }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
-    <ion-content :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
-        <ion-refresher-content />
-      </ion-refresher>
+  <IonPage>
+    <TitleHead :title="t('stats.title')" />
+    <IonContent :fullscreen="true">
+      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent  />
+      </IonRefresher >
       <div v-if="isLoading" class="chat-items flex justify-center">
         <Spinner />
       </div>
@@ -208,6 +195,6 @@ const back = () => {
         </div>
         <DoughnutChart class="my-8 mx-auto w-100 h-100" v-bind="doughnutChartProps" />
       </div>
-    </ion-content>
-  </ion-page>
+    </IonContent>
+  </IonPage>
 </template>

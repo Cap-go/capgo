@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import {
   IonButton, IonButtons, IonContent, IonHeader,
-  IonIcon, IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
+  IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
   IonLabel, IonList, IonListHeader, IonModal, IonNote,
   IonPage, IonSearchbar, IonTitle, IonToggle, IonToolbar,
   actionSheetController, alertController, toastController,
 } from '@ionic/vue'
-import { chevronBack } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -15,6 +14,8 @@ import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
 import { formatDate } from '~/services/date'
+import TitleHead from '~/components/TitleHead.vue'
+import { useMainStore } from '~/stores/main'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -22,9 +23,10 @@ interface ChannelUsers {
 interface Channel {
   version: definitions['app_versions']
 }
-const { t } = useI18n()
 const router = useRouter()
+const { t } = useI18n()
 const route = useRoute()
+const main = useMainStore()
 const listRef = ref()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
@@ -89,14 +91,12 @@ const getDevices = async() => {
     console.error(error)
   }
 }
-const saveChannelChange = async() => {
+const saveChannelChange = async(key: string, val: string) => {
   if (!id.value || !channel.value)
     return
   try {
     const update = {
-      disableAutoUpdateUnderNative: channel.value.disableAutoUpdateUnderNative,
-      disableAutoUpdateToMajor: channel.value.disableAutoUpdateToMajor,
-      beta: channel.value.beta,
+      [key]: val,
     }
     const { error } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -153,13 +153,36 @@ watchEffect(async() => {
 })
 const addUser = async() => {
   console.log('newUser', newUser.value)
-  if (!channel.value)
+
+  if (!channel.value || !auth)
     return
+  if(main.myPlan?.canUseMore) {
+    // show alert for upgrade plan and return
+    const alert = await alertController.create({
+      header: t('limit-reached'),
+      message: t('please-upgrade'),
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+          cssClass: 'secondary',
+        },
+        {
+          text: t('upgrade-now'),
+          handler: () => {
+            router.push('/usage')
+          },
+        },
+      ],
+    })
+    await alert.present()
+    return
+  }
   const { data, error: uError } = await supabase
     .from<definitions['users']>('users')
     .select()
     .eq('email', newUser.value)
-  if (!data || !data.length || uError) {
+  if (!data || uError) {
     console.log('no user', uError)
     newUserModalOpen.value = true
     return
@@ -176,9 +199,6 @@ const addUser = async() => {
     console.error(error)
   else
     await getUsers()
-}
-const back = () => {
-  router.go(-1)
 }
 const makePublic = async(val = true) => {
   if (!channel.value || !id.value)
@@ -320,69 +340,60 @@ const inviteUser = async(userId: string) => {
 }
 </script>
 <template>
-  <ion-page>
-    <IonHeader class="header-custom">
-      <IonToolbar class="toolbar-no-border">
-        <IonButtons slot="start" class="mx-3">
-          <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
-          </IonButton>
-        </IonButtons>
-        <IonTitle color="warning">
-          {{ t('channel.title') }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title color="warning" size="large">
+  <IonPage>
+    <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
+    <IonContent :fullscreen="true">
+    <TitleHead :title="t('channel.title')" big color="warning" />
+      <IonHeader collapse="condense">
+        <IonToolbar mode="ios">
+          <IonTitle color="warning" size="large">
             {{ t('channel.title') }}
-          </ion-title>
+          </IonTitle>
           <IonButtons v-if="channel" slot="end">
             <IonButton color="danger" @click="openApp()">
               {{ t('channel.open') }}
             </IonButton>
           </IonButtons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-list ref="listRef">
-        <ion-list-header>
+        </IonToolbar>
+      </IonHeader>
+      <IonList  ref="listRef">
+        <IonListHeader>
           <span class="text-vista-blue-500">
             {{ channel?.name }}
           </span>
-        </ion-list-header>
-        <ion-item>
-          <ion-label class="my-6 font-extrabold">
+        </IonListHeader>
+        <IonItem >
+          <IonLabel class="my-6 font-extrabold">
             {{ t('channel.is_public') }}
-          </ion-label>
-          <ion-buttons slot="end">
-            <ion-toggle
+          </IonLabel>
+          <IonButtons slot="end">
+            <IonToggle
               color="secondary"
               :checked="channel?.public"
-              @ionChange="makePublic($event.detail.checked)"
+              @ion-change="makePublic($event.detail.checked)"
             />
-          </ion-buttons>
-        </ion-item>
-        <ion-item-divider>
-          <ion-label>
+          </IonButtons>
+        </IonItem>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('channel.v3') }}
-          </ion-label>
-        </ion-item-divider>
-        <IonItem>
+          </IonLabel>
+        </IonItemDivider>
+        <!-- <IonItem>
           <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
           <IonToggle
+          
             color="secondary"
             :checked="channel?.beta"
-            @ionChange="channel.beta = $event.target.checked; saveChannelChange()"
+            @ion-change="saveChannelChange('beta', $event.target.checked)"
           />
-        </IonItem>
+        </IonItem> -->
         <IonItem>
           <IonLabel>Disable auto downgrade under native</IonLabel>
           <IonToggle
             color="secondary"
             :checked="channel?.disableAutoUpdateUnderNative"
-            @ionChange="channel.disableAutoUpdateUnderNative = $event.target.checked; saveChannelChange()"
+            @ion-change="saveChannelChange('disableAutoUpdateUnderNative', $event.target.checked)"
           />
         </IonItem>
         <IonItem>
@@ -390,25 +401,25 @@ const inviteUser = async(userId: string) => {
           <IonToggle
             color="secondary"
             :checked="channel?.disableAutoUpdateToMajor"
-            @ionChange="channel.disableAutoUpdateToMajor = $event.target.checked; saveChannelChange()"
+            @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
           />
         </IonItem>
-        <ion-item-divider>
-          <ion-label>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('channel.users') }}
-          </ion-label>
-        </ion-item-divider>
-        <ion-item>
-          <ion-label position="floating">
+          </IonLabel>
+        </IonItemDivider>
+        <IonItem>
+          <IonLabel position="floating">
             {{ t('channel.invit') }}
-          </ion-label>
-          <ion-input v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
+          </IonLabel>
+          <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
           <div slot="end" class="h-full flex items-center justify-center">
-            <ion-button color="secondary" @click="addUser()">
+            <IonButton color="secondary" @click="addUser()">
               {{ t('channel.add') }}
-            </ion-button>
+            </IonButton>
           </div>
-        </ion-item>
+        </IonItem>
         <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
           <IonLabel>
             <div class="col-span-6 flex flex-col">
@@ -428,7 +439,7 @@ const inviteUser = async(userId: string) => {
         </IonItemDivider>
         <!-- add item with searchbar -->
         <IonItem v-if="devices?.length">
-          <IonSearchbar @IonChange="search = $event.detail.value" />
+          <IonSearchbar @ion-change="search = $event.detail.value" />
         </IonItem>
         <template v-for="d in devicesFilter" :key="d.device_id">
           <IonItemSliding>
@@ -449,10 +460,10 @@ const inviteUser = async(userId: string) => {
             </IonItemOptions>
           </IonItemSliding>
         </template>
-      </ion-list>
-    </ion-content>
-    <ion-modal :is-open="newUserModalOpen" :swipe-to-close="true">
+      </IonList >
+    </IonContent>
+    <IonModal :is-open="newUserModalOpen" :swipe-to-close="true">
       <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />
-    </ion-modal>
-  </ion-page>
+    </IonModal>
+  </IonPage>
 </template>

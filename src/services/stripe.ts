@@ -12,17 +12,19 @@ export const openPortal = async() => {
   })
   try {
     await loading.present()
-    const response = await fetch('https://capgo.app/api/stripe_portal', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': session.access_token,
-      },
-    })
-    const res = await response.json()
+    const resp = await supabase.functions.invoke('stripe_portal', {})
+    console.error('stripe_portal', resp)
+    // const response = await fetch('https://capgo.app/api/stripe_portal', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'authorization': session.access_token,
+    //   },
+    // })
+    // const res = await response.json()
     await loading.dismiss()
-    if (res && res.url)
-      window.open(res.url, '_blank')
+    if (!resp.error && resp.data && resp.data.url)
+      window.open(resp.data.url, '_blank')
   }
   catch (error) {
     console.error(error)

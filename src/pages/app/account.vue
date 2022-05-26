@@ -3,17 +3,15 @@ import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
 import {
   IonContent,
-  IonHeader,
   IonIcon,
   IonPage,
-  IonTitle,
-  IonToolbar,
   actionSheetController,
   isPlatform,
 } from '@ionic/vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { cameraOutline, chevronForwardOutline } from 'ionicons/icons'
 import { ref } from 'vue'
+import TitleHead from '~/components/TitleHead.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
@@ -156,21 +154,9 @@ const presentActionSheet = async() => {
 
 <template>
   <IonPage>
-    <IonHeader>
-      <IonToolbar>
-        <IonTitle color="warning">
-          {{ t("account.heading") }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
+    <TitleHead :title="t('account.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <IonHeader collapse="condense">
-        <IonToolbar>
-          <IonTitle color="warning" size="large">
-            {{ t("account.heading") }}
-          </IonTitle>
-        </IonToolbar>
-      </IonHeader>
+      <TitleHead :title="t('account.heading')" no-back big color="warning" />
       <div class="py-16 px-6">
         <div
           v-if="!main.user?.image_url"

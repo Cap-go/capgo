@@ -49,23 +49,23 @@ watchEffect(async() => {
 })
 </script>
 <template>
-  <ion-page>
-    <ion-content :fullscreen="true">
+  <IonPage>
+    <TitleHead :title="t('apikeys.title')" default-back="/app/account" />
+    <IonContent :fullscreen="true">
       <div class="mx-auto w-full lg:w-1/2">
         <div class="py-16 px-6">
-          <TitleHead :big="false" :title="t('apikeys.title')" />
           <p class="m-3">
             {{ t('apikeys.explain') }}
           </p>
           <p class="m-3">
             {{ t('apikeys.checkbelow') }}
           </p>
-          <ion-list>
-            <ion-item-divider>
-              <ion-label>
+          <IonList >
+            <IonItemDivider>
+              <IonLabel>
                 {{ t('apikeys.links') }}
-              </ion-label>
-            </ion-item-divider>
+              </IonLabel>
+            </IonItemDivider>
             <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/@capgo/cli')">
               <IonLabel>
                 <h2 class="text-sm text-azure-500">
@@ -80,11 +80,11 @@ watchEffect(async() => {
                 </h2>
               </IonLabel>
             </IonItem>
-            <ion-item-divider>
-              <ion-label>
+            <IonItemDivider>
+              <IonLabel>
                 {{ t('apikeys.all') }}
-              </ion-label>
-            </ion-item-divider>
+              </IonLabel>
+            </IonItemDivider>
             <div v-if="isLoading" class="flex justify-center">
               <Spinner />
             </div>
@@ -106,11 +106,11 @@ watchEffect(async() => {
                 </div>
               </IonLabel>
             </IonItem>
-          </ion-list>
+          </IonList >
         </div>
       </div>
-    </ion-content>
-  </ion-page>
+    </IonContent>
+  </IonPage>
 </template>
 
 <route lang="yaml">
