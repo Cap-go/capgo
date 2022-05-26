@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.6...0.30.9-alpha.0) (2022-05-26)
+
+
+### Features
+
+* add app stats ([e387aa6](https://github.com/Cap-go/capgo/commit/e387aa6209fdd75b5822ee70b515479bdb0d854b))
+* add plan limits ([a19befe](https://github.com/Cap-go/capgo/commit/a19befe75633c07ec60339bcbfbf5dd38a0ee0fa))
+* add upgrade messahe system from backend ([3bd4985](https://github.com/Cap-go/capgo/commit/3bd498522f03cf275fb1888d4958a2f6277e9a23))
+
+
+### Bug Fixes
+
+* add comment ([c0144d4](https://github.com/Cap-go/capgo/commit/c0144d4f06bf034334ed861ab55f9f98adc25089))
+* all cli methods ([617f406](https://github.com/Cap-go/capgo/commit/617f40681784275b3dfa08ed545c615a5fdaf297))
+* app_stats add mul and mlu_real ([9de2322](https://github.com/Cap-go/capgo/commit/9de232254544cfe2190d04024c9073e3f966ed25))
+* app_stats function ([d442667](https://github.com/Cap-go/capgo/commit/d442667d03813c1f3ef59974b9d715b1ceeadf4c))
+* checkAppOwner logic was incorrect in delete supabase-function ([2e3e64d](https://github.com/Cap-go/capgo/commit/2e3e64dda6c1377e3d80a5edcc46548463307be7))
+* cors on front functions ([20ac84c](https://github.com/Cap-go/capgo/commit/20ac84cebb35b70c7346ce806970c4e00bb7bb40))
+* dayjs import ([0dd6684](https://github.com/Cap-go/capgo/commit/0dd6684838705a8333bc8ccb908dc5cb7894e884))
+* double banner issue ([d15d3a6](https://github.com/Cap-go/capgo/commit/d15d3a685d4e4d20adb217a34e4d8f7bd6314a23))
+* error message in cloud functions ([07b97ca](https://github.com/Cap-go/capgo/commit/07b97cab7c2189e17a191c29cd759a27d0ea732e))
+* for upload ([76dd174](https://github.com/Cap-go/capgo/commit/76dd1740fc94135b2d6cea5a474f1ebb33bfb2be))
+* hide banner in usage page ([0ef2249](https://github.com/Cap-go/capgo/commit/0ef2249373b2a543ef3a1d7f08e1db3b380bb120))
+* lockfile ([cd09fbf](https://github.com/Cap-go/capgo/commit/cd09fbf09cc3c5990cfc90c850a091915d67d107))
+* make payment_status in the store ([455c96f](https://github.com/Cap-go/capgo/commit/455c96f75a3d19b82640c19075c8dc7a94adb834))
+* remove tests ([927d784](https://github.com/Cap-go/capgo/commit/927d784cf13c1be4d62cfcbc00cc494350442a95))
+* some lint issue + payment bar ([efb526c](https://github.com/Cap-go/capgo/commit/efb526ce0974761a75a901c6d29f033067ab0187))
+* stats add devices ([3b0fe9a](https://github.com/Cap-go/capgo/commit/3b0fe9a3f3927bea24d05088658e6ba3ae14ea0c))
+* stats page ([30fddbb](https://github.com/Cap-go/capgo/commit/30fddbbe2b8eb25921f5531dd0100bb416629107))
+* stripe functions ([4c1c65f](https://github.com/Cap-go/capgo/commit/4c1c65f2c10d374bf430b51c8d7b6577a1861dc2))
+* stripe supabase functions ([696f5a3](https://github.com/Cap-go/capgo/commit/696f5a37b0157d80d060fef25975c31fe4995f19))
+* trial banner ([b7bb702](https://github.com/Cap-go/capgo/commit/b7bb7020e0d8f6e7d06523ea14b51e13ec95ec75))
+* types ([818b1f4](https://github.com/Cap-go/capgo/commit/818b1f48146f87990f9cfb49bf22625705865146))
+* types ([ae47c81](https://github.com/Cap-go/capgo/commit/ae47c81a06ed762310714d8771417f0ac5e62bb9))
+* typo and stats method ([db3eb32](https://github.com/Cap-go/capgo/commit/db3eb321080750d520598d7bdd7178ccd795c899))
+* usage page with new backend function ([96081d6](https://github.com/Cap-go/capgo/commit/96081d6199e71ab1b2adac8ff680bfbdaadda3d0))
+* usage use new system + some refactor in ion event ([3d52c7f](https://github.com/Cap-go/capgo/commit/3d52c7f5967671cbcac68767b355c7ccf48eb899))
+* use the last month stats ([a993c02](https://github.com/Cap-go/capgo/commit/a993c02bc78ae4c389e420079c414f24f8f75f16))
+* use trial at ([70de13d](https://github.com/Cap-go/capgo/commit/70de13d4e7d552d36f8f66a788ac857a46a022f7))
+
+### [0.30.8](https://github.com/Cap-go/capgo/compare/0.30.7...0.30.8) (2022-05-03)
+
 ### [0.30.8-alpha.6](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.5...0.30.8-alpha.6) (2022-05-26)
 
 
