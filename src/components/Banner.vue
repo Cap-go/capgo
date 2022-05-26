@@ -3,7 +3,7 @@ import {
   IonButton,
   IonTitle,
   IonToolbar,
-isPlatform,
+  isPlatform,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -50,10 +50,10 @@ watchEffect(() => {
         {{ bannerText }}
       </p>
     </IonTitle>
-    <IonButton id="banner" v-if="!isMobile" slot="end" href="/app/usage" color="secondary" class="text-white">
+    <IonButton v-if="!isMobile" id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
       {{ t('upgrade') }}
     </IonButton>
-    <IonButton id="banner" v-if="isMobile" slot="end" href="/app/usage" color="secondary" class="text-white">
+    <IonButton v-if="isMobile" id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
       {{ t('see-usage') }}
     </IonButton>
   </IonToolbar>
