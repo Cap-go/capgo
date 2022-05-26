@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {
   IonContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonItem,
   IonLabel,
   IonList,
-  IonInfiniteScrollContent,
-  IonInfiniteScroll,
-  IonNote, IonPage, IonRefresher, IonRefresherContent, 
+  IonNote, IonPage, IonRefresher, IonRefresherContent,
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -48,7 +48,7 @@ const deviceFiltered = computed(() => {
   return devices.value
 })
 
-const loadData = async(event?: InfiniteScrollCustomEvent) => {
+const loadData = async (event?: InfiniteScrollCustomEvent) => {
   try {
     const { data: dataDev } = await supabase
       .from<definitions['devices'] & Device>('devices')
@@ -67,7 +67,7 @@ const loadData = async(event?: InfiniteScrollCustomEvent) => {
       .order('created_at', { ascending: false })
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataDev)
-        return
+      return
     devices.value.push(...dataDev)
     if (dataDev.length === fetchLimit)
       fetchOffset += fetchLimit
@@ -81,7 +81,7 @@ const loadData = async(event?: InfiniteScrollCustomEvent) => {
     event.target.complete()
 }
 
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     devices.value = []
@@ -95,7 +95,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-const openDevice = async(device: definitions['devices']) => {
+const openDevice = async (device: definitions['devices']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/d/${device.device_id}`)
 }
 
@@ -107,7 +107,7 @@ interface RefresherCustomEvent extends CustomEvent {
   target: HTMLIonRefresherElement
 }
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path.endsWith('/devices')) {
     id.value = route.params.p as string
     id.value = id.value.replaceAll('--', '.')
@@ -118,18 +118,19 @@ const onSearch = (val: string) => {
   search.value = val
 }
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="t('devices.title')" :search="!isLoading" @search-input="onSearch" />
     <IonContent :fullscreen="true">
-      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent  />
-      </IonRefresher >
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
         <Spinner />
       </div>
       <div v-else>
-        <IonList >
+        <IonList>
           <template v-for="d in deviceFiltered" :key="d.device_id">
             <IonItem class="cursor-pointer" @click="openDevice(d)">
               <IonLabel>
@@ -142,17 +143,17 @@ const onSearch = (val: string) => {
               </IonNote>
             </IonItem>
           </template>
-      <IonInfiniteScroll
-        @ion-infinite="loadData($event)" 
-        threshold="100px" 
-        :disabled="isDisabled"
-      >
-        <IonInfiniteScrollContent
-          loading-spinner="bubbles"
-          :loading-text="t('loading-more-data')">
-        </IonInfiniteScrollContent>
-      </IonInfiniteScroll>
-        </IonList >
+          <IonInfiniteScroll
+            threshold="100px"
+            :disabled="isDisabled"
+            @ion-infinite="loadData($event)"
+          >
+            <IonInfiniteScrollContent
+              loading-spinner="bubbles"
+              :loading-text="t('loading-more-data')"
+            />
+          </IonInfiniteScroll>
+        </IonList>
       </div>
     </IonContent>
   </IonPage>

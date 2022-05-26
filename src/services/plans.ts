@@ -1,32 +1,32 @@
-import { definitions } from "~/types/supabase"
+import type { definitions } from '~/types/supabase'
 
 export interface Stats {
-    apps: number
-    channels: number
-    versions: number
-    sharedChannels: number
-    updates: number
+  apps: number
+  channels: number
+  versions: number
+  sharedChannels: number
+  updates: number
 }
 export interface Plan extends Stats {
-    id: string
-    name: string
-    description: string
-    price: {
-      monthly: number
-      yearly: number
-    }
-    abtest: boolean
-    progressiveDeploy: boolean
+  id: string
+  name: string
+  description: string
+  price: {
+    monthly: number
+    yearly: number
+  }
+  abtest: boolean
+  progressiveDeploy: boolean
 }
 
 export interface PlanData {
-    plan: string,
-    planSuggest: string,
-    stats: definitions['app_stats'][],
-    payment: definitions['stripe_info'] | null,
-    canUseMore: boolean
-  }
-  export interface PlanRes extends PlanData {
-    trialDaysLeft: 0,
-    AllPlans: Record<string, Plan>,
-  }
+  plan: string
+  planSuggest: string
+  stats: definitions['app_stats'][]
+  payment: definitions['stripe_info'] | null
+  canUseMore: boolean
+}
+export interface PlanRes extends PlanData {
+  trialDaysLeft: 0
+  AllPlans: Record<string, Plan>
+}

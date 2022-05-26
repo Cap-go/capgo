@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
-  IonButtons,
-  IonSearchbar,
   IonBackButton,
+  IonButtons,
   IonHeader,
+  IonSearchbar,
   IonTitle,
   IonToolbar,
 } from '@ionic/vue'
@@ -28,11 +28,11 @@ const onSearch = (val: string) => {
 <template>
   <IonHeader :collapse="big ? 'condense' : undefined">
     <IonToolbar mode="ios">
-      <IonButtons slot="start" v-if="!noBack && !big">
-        <IonBackButton :default-href="defaultBack" :text="t('button.back')"></IonBackButton>
+      <IonButtons v-if="!noBack && !big" slot="start">
+        <IonBackButton :default-href="defaultBack" :text="t('button.back')" />
       </IonButtons>
       <IonTitle :color="color" :size="big ? 'large' : ''">
-          {{ title }}
+        {{ title }}
       </IonTitle>
     </IonToolbar>
     <IonToolbar v-if="search">

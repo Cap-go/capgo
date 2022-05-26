@@ -16,7 +16,7 @@ const route = useRoute()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const apps = ref<definitions['apikeys'][]>()
-const copyKey = async(app: definitions['apikeys']) => {
+const copyKey = async (app: definitions['apikeys']) => {
   copy(app.key)
   const toast = await toastController
     .create({
@@ -28,7 +28,7 @@ const copyKey = async(app: definitions['apikeys']) => {
 const openLink = (link: string) => {
   window.open(link, '_system')
 }
-const geKeys = async(retry = true): Promise<void> => {
+const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true
   const { data } = await supabase
     .from<definitions['apikeys']>('apikeys')
@@ -43,11 +43,12 @@ const geKeys = async(retry = true): Promise<void> => {
   }
   isLoading.value = false
 }
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path === '/app/apikeys')
     await geKeys()
 })
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="t('apikeys.title')" default-back="/app/account" />
@@ -60,7 +61,7 @@ watchEffect(async() => {
           <p class="m-3">
             {{ t('apikeys.checkbelow') }}
           </p>
-          <IonList >
+          <IonList>
             <IonItemDivider>
               <IonLabel>
                 {{ t('apikeys.links') }}
@@ -106,7 +107,7 @@ watchEffect(async() => {
                 </div>
               </IonLabel>
             </IonItem>
-          </IonList >
+          </IonList>
         </div>
       </div>
     </IonContent>

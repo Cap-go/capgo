@@ -18,7 +18,7 @@ let user = supabase.auth.user()
 form.enableNotifications = !!user?.user_metadata?.activation?.enableNotifications
 form.optForNewsletters = !!user?.user_metadata?.activation?.optForNewsletters
 
-const submitNotif = async() => {
+const submitNotif = async () => {
   isLoading.value = true
   const activation = user?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.update({
@@ -33,7 +33,7 @@ const submitNotif = async() => {
     user = data
   isLoading.value = false
 }
-const submitDoi = async() => {
+const submitDoi = async () => {
   isLoading.value = true
   const activation = user?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.update({

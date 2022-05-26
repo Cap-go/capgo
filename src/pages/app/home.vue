@@ -39,7 +39,7 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
-const getMyApps = async() => {
+const getMyApps = async () => {
   const { data } = await supabase
     .from<definitions['apps']>('apps')
     .select()
@@ -48,7 +48,7 @@ const getMyApps = async() => {
     apps.value = data
 }
 
-const didCancel = async(name: string) => {
+const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
@@ -68,7 +68,7 @@ const didCancel = async(name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteApp = async(app: definitions['apps']) => {
+const deleteApp = async (app: definitions['apps']) => {
   console.log('deleteApp', app)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -153,7 +153,7 @@ const deleteApp = async(app: definitions['apps']) => {
     await toast.present()
   }
 }
-const getSharedWithMe = async() => {
+const getSharedWithMe = async () => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
     .select(`
@@ -181,7 +181,7 @@ const getSharedWithMe = async() => {
   if (data && data.length)
     sharedApps.value = data
 }
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path === '/app/home') {
     isLoading.value = true
     await getMyApps()
@@ -189,7 +189,7 @@ watchEffect(async() => {
     isLoading.value = false
   }
 })
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await getMyApps()
@@ -202,15 +202,16 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="t('projects.title')" no-back color="warning" />
     <IonContent :fullscreen="true">
       <TitleHead :title="t('projects.title')" no-back big color="warning" />
-      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent  />
-      </IonRefresher >
-      <IonList  ref="listRef">
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
+      <IonList ref="listRef">
         <IonItemDivider>
           <IonLabel>
             {{ t('projects.list') }}
@@ -302,7 +303,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItem>
-      </IonList >
+      </IonList>
     </IonContent>
   </IonPage>
 </template>

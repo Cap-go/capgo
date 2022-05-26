@@ -11,7 +11,7 @@ import { useSupabase } from '~/services/supabase'
 // Your web app's Firebase configuration
 const firebaseConfig = import.meta.env.VITE_FIREBASE_CONFIG
 
-const registerToken = async(token: string) => {
+const registerToken = async (token: string) => {
   const supabase = useSupabase()
   console.log(`Push registration success, token: ${token}`)
   const { error } = await supabase
@@ -32,7 +32,7 @@ export const initNotif = () => {
     console.log('register web', firebaseConfig)
     const app = initializeApp(JSON.parse(firebaseConfig as string))
     const messaging = getMessaging(app)
-    getToken(messaging, { vapidKey: import.meta.env.VITE_VAPID_KEY as string }).then(async(currentToken) => {
+    getToken(messaging, { vapidKey: import.meta.env.VITE_VAPID_KEY as string }).then(async (currentToken) => {
       if (currentToken) {
         // Send the token to your server and update the UI if necessary
         // ...
@@ -57,7 +57,7 @@ export const initNotif = () => {
   else {
     // On success, we should be able to receive notifications
     PushNotifications.addListener('registration',
-      async(token: Token) => {
+      async (token: Token) => {
         try {
           await registerToken(token.value)
         }

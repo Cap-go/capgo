@@ -39,7 +39,7 @@ const buildGraph = () => {
   dataDevLabels.value = Object.keys(vals)
 }
 
-const loadData = async() => {
+const loadData = async () => {
   try {
     const { data: dataDev } = await supabase
       .from<definitions['devices'] & Device>('devices')
@@ -70,7 +70,7 @@ const loadData = async() => {
   }
 }
 
-const getLastDownload = async() => {
+const getLastDownload = async () => {
   // create date_id with format YYYY-MM
   const date_id = new Date().toISOString().slice(0, 7)
   const { data } = await supabase
@@ -84,7 +84,7 @@ const getLastDownload = async() => {
   }
 }
 
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await loadData()
@@ -137,7 +137,7 @@ const { doughnutChartProps } = useDoughnutChart({
   options,
 })
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path.endsWith('/stats')) {
     id.value = route.params.p as string
     id.value = id.value.replaceAll('--', '.')
@@ -145,13 +145,14 @@ watchEffect(async() => {
   }
 })
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="t('stats.title')" />
     <IonContent :fullscreen="true">
-      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent  />
-      </IonRefresher >
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
         <Spinner />
       </div>

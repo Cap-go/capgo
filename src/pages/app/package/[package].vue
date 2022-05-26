@@ -2,11 +2,11 @@
 import {
   IonContent,
   IonIcon,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonItem,
   IonItemDivider,
   IonItemOption,
-  IonInfiniteScrollContent,
-  IonInfiniteScroll,
   IonItemOptions, IonItemSliding,
   IonLabel, IonList,
   IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
@@ -45,13 +45,13 @@ const versions = ref<definitions['app_versions'][]>([])
 const filtered = ref<definitions['app_versions'][]>([])
 
 const versionFilter = computed(() => {
-  if (search.value) {
+  if (search.value)
     return filtered.value
-  }
+
   return versions.value
 })
 const loadAppInfo = async () => {
-    try {
+  try {
     const { data: dataApp } = await supabase
       .from<definitions['apps']>('apps')
       .select()
@@ -81,16 +81,16 @@ const loadAppInfo = async () => {
 const searchVersion = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
-  .from<definitions['app_versions']>('app_versions')
-  .select()
-  .eq('app_id', id.value)
-  .eq('deleted', false)
-  .order('created_at', { ascending: false })
-  .like('name', `%${search.value}%`)
+    .from<definitions['app_versions']>('app_versions')
+    .select()
+    .eq('app_id', id.value)
+    .eq('deleted', false)
+    .order('created_at', { ascending: false })
+    .like('name', `%${search.value}%`)
   filtered.value = dataVersions || []
   isLoadingSub.value = false
 }
-const loadData = async(event?: InfiniteScrollCustomEvent) => {
+const loadData = async (event?: InfiniteScrollCustomEvent) => {
   try {
     const { data: dataVersions } = await supabase
       .from<definitions['app_versions']>('app_versions')
@@ -100,7 +100,7 @@ const loadData = async(event?: InfiniteScrollCustomEvent) => {
       .order('created_at', { ascending: false })
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataVersions)
-        return
+      return
     versions.value.push(...dataVersions)
     if (dataVersions.length === fetchLimit)
       fetchOffset += fetchLimit
@@ -115,7 +115,7 @@ const loadData = async(event?: InfiniteScrollCustomEvent) => {
     event.target.complete()
 }
 
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await loadAppInfo()
@@ -130,7 +130,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-const didCancel = async(name: string) => {
+const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
@@ -150,7 +150,7 @@ const didCancel = async(name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteChannel = async(channel: definitions['channels']) => {
+const deleteChannel = async (channel: definitions['channels']) => {
   console.log('deleteChannel', channel)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -194,7 +194,7 @@ const deleteChannel = async(channel: definitions['channels']) => {
   }
 }
 
-const deleteVersion = async(version: definitions['app_versions']) => {
+const deleteVersion = async (version: definitions['app_versions']) => {
   console.log('deleteVersion', version)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -275,7 +275,7 @@ const openDevices = () => {
 const openStats = () => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/stats`)
 }
-const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
+const setChannel = async (v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
     .from<definitions['channels']>('channels')
     .update({
@@ -283,13 +283,13 @@ const setChannel = async(v: definitions['app_versions'], channel: definitions['c
     })
     .eq('id', channel.id)
 }
-const ASChannelChooser = async(v: definitions['app_versions']) => {
+const ASChannelChooser = async (v: definitions['app_versions']) => {
   // const buttons
   const buttons = []
   for (const channel of channels.value) {
     buttons.push({
       text: channel.name,
-      handler: async() => {
+      handler: async () => {
         isLoading.value = true
         try {
           await setChannel(v, channel)
@@ -321,7 +321,7 @@ const ASChannelChooser = async(v: definitions['app_versions']) => {
   })
   await actionSheet.present()
 }
-const ASVersion = async(v: definitions['app_versions']) => {
+const ASVersion = async (v: definitions['app_versions']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -364,7 +364,7 @@ interface RefresherCustomEvent extends CustomEvent {
   target: HTMLIonRefresherElement
 }
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
     id.value = id.value.replaceAll('--', '.')
@@ -372,19 +372,20 @@ watchEffect(async() => {
   }
 })
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="app?.name" default-back="/app" color="warning" />
     <IonContent :fullscreen="true">
-    <TitleHead :title="app?.name" no-back big condense color="warning" />
-      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent  />
-      </IonRefresher >
+      <TitleHead :title="app?.name" no-back big condense color="warning" />
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
         <Spinner />
       </div>
       <div v-else>
-        <IonList  ref="listRef">
+        <IonList ref="listRef">
           <IonItem class="cursor-pointer" @click="openStats()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
@@ -462,16 +463,16 @@ watchEffect(async() => {
             <Spinner />
           </div>
           <IonInfiniteScroll
-            @ion-infinite="loadData($event)" 
-            threshold="100px" 
+            threshold="100px"
             :disabled="isDisabled || search"
+            @ion-infinite="loadData($event)"
           >
             <IonInfiniteScrollContent
               loading-spinner="bubbles"
-              :loading-text="t('loading-more-data')">
-            </IonInfiniteScrollContent>
+              :loading-text="t('loading-more-data')"
+            />
           </IonInfiniteScroll>
-        </IonList >
+        </IonList>
       </div>
     </IonContent>
   </IonPage>

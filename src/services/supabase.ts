@@ -38,7 +38,7 @@ export const useSupabase = () => {
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }
 
-export const autoAuth = async(route: RouteLocationNormalizedLoaded) => {
+export const autoAuth = async (route: RouteLocationNormalizedLoaded) => {
   const supabase = useSupabase()
   const session = supabase.auth.session()!
   if (session || !route.hash)

@@ -3,9 +3,9 @@ import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
-import { PlanRes } from '~/services/plans'
+import type { PlanRes } from '~/services/plans'
 
-const guard = async(next: any, to: string, from: string) => {
+const guard = async (next: any, to: string, from: string) => {
   const supabase = useSupabase()
   const auth = supabase.auth.user()
 
@@ -16,11 +16,11 @@ const guard = async(next: any, to: string, from: string) => {
     if (!main.user) {
       try {
         supabase.functions.invoke<PlanRes>('payment_status', {})
-        .then((res) => {
-          console.log('payment_status', res)
-          if (res.data)
-            main.myPlan = res.data
-        })
+          .then((res) => {
+            console.log('payment_status', res)
+            if (res.data)
+              main.myPlan = res.data
+          })
         const { data, error } = await supabase
           .from<definitions['users']>('users')
           .select()
@@ -55,7 +55,7 @@ const guard = async(next: any, to: string, from: string) => {
 
 // // vueuse/head https://github.com/vueuse/head
 export const install: UserModule = ({ router }) => {
-  router.beforeEach(async(to, from, next) => {
+  router.beforeEach(async (to, from, next) => {
     if (to.meta.middleware)
       await guard(next, to.path, from.path)
     else

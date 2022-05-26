@@ -44,7 +44,7 @@ const openApp = () => {
     return
   openVersion(channel.value.version)
 }
-const getUsers = async() => {
+const getUsers = async () => {
   if (!channel.value)
     return
   try {
@@ -73,7 +73,7 @@ const getUsers = async() => {
     console.error(error)
   }
 }
-const getDevices = async() => {
+const getDevices = async () => {
   if (!channel.value)
     return
   try {
@@ -91,7 +91,7 @@ const getDevices = async() => {
     console.error(error)
   }
 }
-const saveChannelChange = async(key: string, val: string) => {
+const saveChannelChange = async (key: string, val: string) => {
   if (!id.value || !channel.value)
     return
   try {
@@ -109,7 +109,7 @@ const saveChannelChange = async(key: string, val: string) => {
     console.error(error)
   }
 }
-const getChannel = async() => {
+const getChannel = async () => {
   if (!id.value)
     return
   try {
@@ -141,7 +141,7 @@ const getChannel = async() => {
     console.error(error)
   }
 }
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     packageId.value = route.params.p as string
     packageId.value = packageId.value.replaceAll('--', '.')
@@ -151,12 +151,12 @@ watchEffect(async() => {
     await getDevices()
   }
 })
-const addUser = async() => {
+const addUser = async () => {
   console.log('newUser', newUser.value)
 
   if (!channel.value || !auth)
     return
-  if(main.myPlan?.canUseMore) {
+  if (main.myPlan?.canUseMore) {
     // show alert for upgrade plan and return
     const alert = await alertController.create({
       header: t('limit-reached'),
@@ -200,7 +200,7 @@ const addUser = async() => {
   else
     await getUsers()
 }
-const makePublic = async(val = true) => {
+const makePublic = async (val = true) => {
   if (!channel.value || !id.value)
     return
   const { error } = await supabase
@@ -220,7 +220,7 @@ const makePublic = async(val = true) => {
     await toast.present()
   }
 }
-const didCancel = async(name: string) => {
+const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
@@ -239,7 +239,7 @@ const didCancel = async(name: string) => {
   await alert.present()
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
-const deleteUser = async(usr: definitions['users']) => {
+const deleteUser = async (usr: definitions['users']) => {
   if (!channel.value || await didCancel(t('channel.user')))
     return
   const { error } = await supabase
@@ -253,7 +253,7 @@ const deleteUser = async(usr: definitions['users']) => {
     await getUsers()
 }
 
-const presentActionSheet = async(usr: definitions['users']) => {
+const presentActionSheet = async (usr: definitions['users']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -283,7 +283,7 @@ const devicesFilter = computed(() => {
   }
   return devices.value
 })
-const deleteDevice = async(device: definitions['channel_devices']) => {
+const deleteDevice = async (device: definitions['channel_devices']) => {
   console.log('deleteDevice', device)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -322,7 +322,7 @@ const deleteDevice = async(device: definitions['channel_devices']) => {
     await toast.present()
   }
 }
-const inviteUser = async(userId: string) => {
+const inviteUser = async (userId: string) => {
   const { error } = await supabase
     .from<definitions['channel_users']>('channel_users')
     .insert({
@@ -339,11 +339,12 @@ const inviteUser = async(userId: string) => {
   }
 }
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
     <IonContent :fullscreen="true">
-    <TitleHead :title="t('channel.title')" big color="warning" />
+      <TitleHead :title="t('channel.title')" big color="warning" />
       <IonHeader collapse="condense">
         <IonToolbar mode="ios">
           <IonTitle color="warning" size="large">
@@ -356,13 +357,13 @@ const inviteUser = async(userId: string) => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonList  ref="listRef">
+      <IonList ref="listRef">
         <IonListHeader>
           <span class="text-vista-blue-500">
             {{ channel?.name }}
           </span>
         </IonListHeader>
-        <IonItem >
+        <IonItem>
           <IonLabel class="my-6 font-extrabold">
             {{ t('channel.is_public') }}
           </IonLabel>
@@ -382,7 +383,7 @@ const inviteUser = async(userId: string) => {
         <!-- <IonItem>
           <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
           <IonToggle
-          
+
             color="secondary"
             :checked="channel?.beta"
             @ion-change="saveChannelChange('beta', $event.target.checked)"
@@ -460,7 +461,7 @@ const inviteUser = async(userId: string) => {
             </IonItemOptions>
           </IonItemSliding>
         </template>
-      </IonList >
+      </IonList>
     </IonContent>
     <IonModal :is-open="newUserModalOpen" :swipe-to-close="true">
       <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />

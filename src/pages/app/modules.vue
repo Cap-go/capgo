@@ -7,9 +7,9 @@ import {
   IonPage,
 } from '@ionic/vue'
 import { chevronForwardOutline } from 'ionicons/icons'
-import TitleHead from '~/components/TitleHead.vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import TitleHead from '~/components/TitleHead.vue'
 
 const { t } = useI18n()
 
@@ -31,7 +31,6 @@ Object.keys(dependencies).forEach((dep) => {
   }
 })
 console.log('modules', modules.value)
-
 </script>
 
 <template>

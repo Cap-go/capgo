@@ -15,17 +15,15 @@ import { generate } from 'generate-password-browser'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 
+const props = defineProps({
+  emailAddress: String,
+})
+const emit = defineEmits(['inviteUser', 'close'])
 const supabase = useSupabase()
 const form = reactive({
   first_name: '',
   last_name: '',
 })
-
-const props = defineProps({
-  emailAddress: String,
-})
-
-const emit = defineEmits(['inviteUser', 'close'])
 
 const userEmail = ref(props.emailAddress)
 
@@ -41,7 +39,7 @@ const v$ = useVuelidate(rules, form)
 
 const { t } = useI18n()
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   try {
     const isFormCorrect = await v$.value.$validate()

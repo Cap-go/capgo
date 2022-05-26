@@ -42,7 +42,7 @@ const v$ = useVuelidate(rules as any, form)
 
 const router = useRouter()
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect)
@@ -118,7 +118,7 @@ const submit = async() => {
         :message="t('accountPassword.success')"
         :duration="2000"
         color="success"
-        @didDismiss="success = false"
+        @did-dismiss="success = false"
       />
     </IonContent>
   </IonPage>

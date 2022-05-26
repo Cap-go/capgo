@@ -21,7 +21,7 @@ const router = useRouter()
 
 const { t } = useI18n()
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   if (isPlatform('capacitor') && form.enableNotifications)
     await PushNotifications.requestPermissions()

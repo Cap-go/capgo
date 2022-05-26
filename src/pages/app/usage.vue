@@ -14,7 +14,7 @@ import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import TitleHead from '~/components/TitleHead.vue'
-import { Plan, Stats } from '~/services/plans'
+import type { Plan, Stats } from '~/services/plans'
 import Spinner from '~/components/Spinner.vue'
 
 const { t } = useI18n()
@@ -61,7 +61,7 @@ const getAllPlan = async () => {
 
 const getCurrentPlanSuggestStat = (name: string): number => {
   console.log('getCurrentPlanSuggestStat', name, currentPlanSuggest.value)
-  return currentPlanSuggest.value ? currentPlanSuggest?.value[name as keyof Stats]: 0
+  return currentPlanSuggest.value ? currentPlanSuggest?.value[name as keyof Stats] : 0
 }
 
 interface SegmentCustomEvent extends CustomEvent {
@@ -72,30 +72,30 @@ const segmentChanged = (e: SegmentCustomEvent) => {
   segmentVal.value = e.detail.value === 'yearly' ? 'yearly' : 'monthly'
 }
 
-const getMaxApp = async() => {
+const getMaxApp = async () => {
   // from app_stats find max channel
   usage.apps = main.myPlan?.stats.length || 0
 }
 
-const getMaxChannel = async() => {
+const getMaxChannel = async () => {
   // from app_stats find max channel
   usage.channels = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.channels), 0) || 0
 }
 
-const getMaxShared = async() => {
+const getMaxShared = async () => {
   // from app_stats find max shared
   usage.sharedChannels = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.shared), 0) || 0
 }
 
-const getMaxVersion = async() => {
+const getMaxVersion = async () => {
   // from app_stats find max version
   usage.versions = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.versions), 0) || 0
 }
-const getMaxDownload = async() => {
+const getMaxDownload = async () => {
   // from app_stats find max download
   usage.updates = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu, cur.mlu_real)), 0) || 0
 }
-const getAllMax = async() => {
+const getAllMax = async () => {
   await Promise.all([
     getMaxApp(),
     getMaxChannel(),
@@ -109,7 +109,7 @@ const openChangePlan = (planId: string) => {
   if (planId)
     openCheckout(planId)
 }
-const showToastMessage = async(message: string) => {
+const showToastMessage = async (message: string) => {
   const toast = await toastController
     .create({
       position: 'middle',
@@ -144,7 +144,7 @@ const getBarColorClass = (name: string) => {
   }
 }
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (main.myPlan) {
     isLoading.value = true
     await getAllPlan().then(getAllMax)
@@ -152,14 +152,14 @@ watchEffect(async() => {
   }
 })
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path === '/app/usage') {
     // if session_id is in url params show modal success plan setup
     route.query.session_id && showToastMessage(t('usage.success'))
   }
 })
 
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await getAllPlan().then(getAllMax)
@@ -171,18 +171,19 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 </script>
+
 <template>
   <IonPage>
     <TitleHead :title="t('usage.title')" default-back="/app/account" />
     <IonContent :fullscreen="true">
-    <TitleHead :title="t('usage.title')" big default-back="/app/account" />
-      <IonRefresher  slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent  />
-      </IonRefresher >
+      <TitleHead :title="t('usage.title')" big default-back="/app/account" />
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
       <div v-if="isLoading" class="flex justify-center">
         <Spinner />
       </div>
-      <IonList  v-if="!isLoading">
+      <IonList v-if="!isLoading">
         <IonItemDivider v-if="currentPlanSuggest">
           <IonLabel>
             {{ t('your-current-suggested-plan-is') }}
@@ -212,7 +213,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </div>
         </IonItem>
-      </IonList >
+      </IonList>
       <div v-if="!isMobile && !isLoading" class="bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto py-24 px-4 sm:px-6 lg:px-8">
           <div class="sm:flex sm:flex-col sm:align-center">
@@ -223,12 +224,12 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
               {{ t('plan.desc') }}
             </p>
             <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
-              <IonSegmentButton  class="h-10" value="monthly">
+              <IonSegmentButton class="h-10" value="monthly">
                 <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
-              </IonSegmentButton >
-              <IonSegmentButton  class="h-10" value="yearly">
+              </IonSegmentButton>
+              <IonSegmentButton class="h-10" value="yearly">
                 <IonLabel>{{ t('plan.yearly-billing') }}</IonLabel>
-              </IonSegmentButton >
+              </IonSegmentButton>
             </IonSegment>
           </div>
           <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">

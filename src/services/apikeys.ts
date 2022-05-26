@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { useSupabase } from './supabase'
 
-export const createKeys = async(userId: string): Promise<void> => {
+export const createKeys = async (userId: string): Promise<void> => {
   const supabase = useSupabase()
   await supabase
     .from('apikeys')

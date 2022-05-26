@@ -34,7 +34,7 @@ export const install: UserModule = ({ app, router }) => {
 
   if (isPlatform('capacitor')) {
     CapacitorUpdater.notifyAppReady()
-    App.addListener('appUrlOpen', async(event: URLOpenListenerEvent) => {
+    App.addListener('appUrlOpen', async (event: URLOpenListenerEvent) => {
       const loading = await loadingController.create({
         message: 'Please wait...',
       })
@@ -42,7 +42,7 @@ export const install: UserModule = ({ app, router }) => {
       let { url } = event
       console.log('url', url)
       if (url.startsWith(supabaseUrl)) {
-        const urlParams = Object.fromEntries(new URLSearchParams(url.split('?')[1]) as any)as HttpParams
+        const urlParams = Object.fromEntries(new URLSearchParams(url.split('?')[1]) as any) as HttpParams
         const options: HttpOptions = {
           url,
           params: urlParams,

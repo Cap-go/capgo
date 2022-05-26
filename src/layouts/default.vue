@@ -9,8 +9,8 @@ const isTab = computed(() => {
   return router.currentRoute.value.meta.option && router.currentRoute.value.meta.option === 'tabs'
 })
 const isMobile = computed(() => isPlatform('capacitor'))
-
 </script>
+
 <template>
   <IonPage>
     <IonTabs>

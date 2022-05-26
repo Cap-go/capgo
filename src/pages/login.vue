@@ -30,7 +30,7 @@ const rules = {
 
 }
 const v$ = useVuelidate(rules as any, form)
-const showToastMessage = async(message: string) => {
+const showToastMessage = async (message: string) => {
   const toast = await toastController
     .create({
       message,
@@ -39,7 +39,7 @@ const showToastMessage = async(message: string) => {
   await toast.present()
 }
 
-const submit = async() => {
+const submit = async () => {
   v$.value.$touch()
   if (!v$.value.$invalid) {
     isLoading.value = true
@@ -60,7 +60,7 @@ const submit = async() => {
 
 const nextLogin = () => {
   router.push('/app/home')
-  setTimeout(async() => {
+  setTimeout(async () => {
     isLoading.value = false
     if (isPlatform('capacitor'))
       SplashScreen.hide()
@@ -89,7 +89,7 @@ const fixIOS = () => {
   }
 }
 
-const checkLogin = async() => {
+const checkLogin = async () => {
   main.auth = null
   isLoading.value = true
   const user = supabase.auth.user()

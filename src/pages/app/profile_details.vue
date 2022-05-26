@@ -40,7 +40,7 @@ const rules = computed(() => ({
 
 const v$ = useVuelidate(rules, form)
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect)
@@ -67,7 +67,7 @@ const submit = async() => {
   router.go(-1)
   isLoading.value = false
 }
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path === '/app/profile_details') {
     const { data: usr } = await supabase
       .from<definitions['users']>('users')
@@ -177,8 +177,7 @@ watchEffect(async() => {
 </template>
 
 <style scoped>
-
-  ion-datetime {
+ion-datetime {
     height: auto;
     width: auto;
 
@@ -193,5 +192,4 @@ watchEffect(async() => {
   ion-modal ion-datetime {
     height: 382px;
   }
-
 </style>
