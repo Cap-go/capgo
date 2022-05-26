@@ -2306,12 +2306,12 @@ export interface definitions {
      * Format: timestamp with time zone
      * @default now()
      */
-    created_at?: string;
+    created_at: string;
     /**
      * Format: timestamp with time zone
      * @default now()
      */
-    updated_at?: string;
+    updated_at: string;
     /** Format: character varying */
     subscription_id?: string;
     /**
