@@ -116,8 +116,8 @@ watchEffect(async () => {
 const searchVersion = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
-      .from<definitions['devices'] & Device>('devices')
-      .select(`
+    .from<definitions['devices'] & Device>('devices')
+    .select(`
         device_id,
         platform,
         plugin_version,
@@ -127,10 +127,10 @@ const searchVersion = async () => {
         created_at,
         updated_at
       `)
-      .eq('app_id', id.value)
-      .gt('updated_at', subDays(new Date(), 30).toUTCString())
-      .order('created_at', { ascending: false })
-      .like('device_id', `%${search.value}%`)
+    .eq('app_id', id.value)
+    .gt('updated_at', subDays(new Date(), 30).toUTCString())
+    .order('created_at', { ascending: false })
+    .like('device_id', `%${search.value}%`)
   filtered.value = dataVersions || []
   isLoadingSub.value = false
 }
