@@ -156,10 +156,6 @@ const deleteChannel = async (channel: definitions['channels']) => {
   if (await didCancel(t('channel.title')))
     return
   try {
-    const { error: delChannelUserError } = await supabase
-      .from<definitions['channel_users']>('channel_users')
-      .delete()
-      .eq('app_id', channel.app_id)
     const { error: delChanError } = await supabase
       .from<definitions['channels']>('channels')
       .delete()

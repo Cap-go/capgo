@@ -75,28 +75,11 @@ const deleteApp = async (app: definitions['apps']) => {
   if (await didCancel(t('package.name')))
     return
   try {
-    await supabase
-      .from<definitions['stats']>('stats')
-      .delete()
-      .eq('app_id', app.app_id)
-    await supabase
-      .from<definitions['devices']>('devices')
-      .delete()
-      .eq('app_id', app.app_id)
-
-    await supabase
-      .from<definitions['channel_users']>('channel_users')
-      .delete()
-      .eq('app_id', app.app_id)
     const { data, error: vError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
-    const { error: delChanError } = await supabase
-      .from<definitions['channels']>('channels')
-      .delete()
-      .eq('app_id', app.app_id)
 
     if (data && data.length) {
       const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
@@ -115,18 +98,12 @@ const deleteApp = async (app: definitions['apps']) => {
       }
     }
 
-    const { error: delAppVersionError } = await supabase
-      .from<definitions['app_versions']>('app_versions')
-      .delete()
-      .eq('app_id', app.app_id)
-      .eq('user_id', app.user_id)
-
     const { error: dbAppError } = await supabase
       .from<definitions['apps']>('apps')
       .delete()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
-    if (delChanError || vError || delAppVersionError || dbAppError) {
+    if (vError || dbAppError) {
       const toast = await toastController
         .create({
           message: 'Cannot delete App',

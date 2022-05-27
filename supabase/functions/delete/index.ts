@@ -68,25 +68,7 @@ serve(async(event: Request) => {
         return sendRes({ status: `App ${body.appid}@${body.version} not found in database`, error: delAppSpecVersionError }, 400)
       return sendRes()
     }
-    const { error: delChannelUserError } = await supabase
-      .from<definitions['channel_users']>('channel_users')
-      .delete()
-      .eq('app_id', body.appid)
-    const { error: delAppStatsVersionError } = await supabase
-      .from<definitions['stats']>('stats')
-      .delete()
-      .eq('app_id', body.appid)
-    const { error: delDevicesVersionError } = await supabase
-      .from<definitions['devices']>('devices')
-      .delete()
-      .eq('app_id', body.appid)
 
-    if (delDevicesVersionError || delAppStatsVersionError || delChannelUserError) {
-      return sendRes({
-        status: `Something went wrong when trying to delete ${body.appid}@${body.version}`,
-        error: delDevicesVersionError || delAppStatsVersionError || delChannelUserError,
-      }, 400)
-    }
     const { data, error: vError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
@@ -95,15 +77,6 @@ serve(async(event: Request) => {
 
     if (vError)
       return sendRes({ status: `App ${body.appid} not found in database`, error: vError }, 400)
-
-    const { error: delChanError } = await supabase
-      .from<definitions['channels']>('channels')
-      .delete()
-      .eq('app_id', body.appid)
-      .eq('created_by', apikey.user_id)
-
-    if (delChanError)
-      return sendRes({ status: `Cannot delete channel version for app ${body.appid} from database`, error: delChanError }, 400)
 
     if (data && data.length) {
       const filesToRemove = data.map(x => `${apikey.user_id}/${body.appid}/versions/${x.bucket_id}`)
