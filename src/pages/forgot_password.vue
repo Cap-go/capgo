@@ -89,9 +89,9 @@ watchEffect(() => {
 
 <template>
   <IonPage>
+    <TitleHead :big="true" :title="t('forgot.heading')" />
     <IonContent :fullscreen="true">
       <div class="grid lg:w-1/2 mx-auto w-full h-full min-h-screen p-8">
-        <TitleHead :big="true" :title="t('forgot.heading')" />
         <form
           class="mt-8 relative grid item-center"
           @submit.prevent="submit"

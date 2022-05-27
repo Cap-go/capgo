@@ -8,9 +8,9 @@ const { t } = useI18n()
 
 <template>
   <IonPage>
+    <TitleHead :title="t('register.heading')" />
     <IonContent :fullscreen="true">
       <div class="py-16 px-6 mx-auto w-full lg:w-1/2 min-h-screen">
-        <TitleHead :title="t('register.heading')" />
         <div class="grid place-content-center w-full my-auto pt-40">
           <h1 class="text-3xl">
             {{ t('register.confirm-email') }}
