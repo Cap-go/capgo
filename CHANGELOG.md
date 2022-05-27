@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.12](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.11...0.30.9-alpha.12) (2022-05-27)
+
+
+### Bug Fixes
+
+* all missing misplaced TitleHead ([714e84a](https://github.com/Cap-go/capgo/commit/714e84aaf7adaae60e7d040455aa67b4e13763fd))
+
 ### [0.30.9-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.10...0.30.9-alpha.11) (2022-05-27)
 
 
