@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.13](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.12...0.30.9-alpha.13) (2022-05-27)
+
+
+### Bug Fixes
+
+* remove all mess to delete thanks to fk ([fbf766a](https://github.com/Cap-go/capgo/commit/fbf766ab968b9f2341ace866f59bd84dad803f36))
+
 ### [0.30.9-alpha.12](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.11...0.30.9-alpha.12) (2022-05-27)
 
 
