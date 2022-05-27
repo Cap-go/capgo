@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.10...0.30.9-alpha.11) (2022-05-27)
+
+
+### Bug Fixes
+
+* add script fo fk ([8339ffa](https://github.com/Cap-go/capgo/commit/8339ffa2603ecac3c489fa9efc24b5c982dea6bc))
+
 ### [0.30.9-alpha.10](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.9...0.30.9-alpha.10) (2022-05-26)
 
 ### [0.30.9-alpha.9](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.8...0.30.9-alpha.9) (2022-05-26)
