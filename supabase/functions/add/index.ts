@@ -16,7 +16,7 @@ serve(async(event: Request) => {
   const authorization = event.headers.get('authorization') || ''
   console.log('authorization', authorization)
   const session = supabaseClient.auth.setAuth(authorization.replace("Bearer ", ""))
-  const checkk = await verify(session.access_token, "61a901f1-72aa-4602-a73e-2c97c1ac2023", 'HS256')
+  const checkk = await verify(session.access_token, Deno.env.get('JWT_SIGN') || '', 'HS256')
   console.log('session', session, checkk)
   // session.user should be found to allow all supbase to work with the forged token
   if (!event.body)
@@ -31,7 +31,7 @@ serve(async(event: Request) => {
     if (await checkAppOwner(user.id, body.appid))
       return sendRes({ status: 'App exist already' }, 400)
     const fileName = `icon_${globalThis.crypto.randomUUID()}`
-    let signedURL = 'https://xvwzpoazmxkqosrdewyv.supabase.in/storage/v1/object/public/images/capgo.png'
+    let signedURL = 'https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/public/images/capgo.png'
     if (body.icon && body.iconType) {
       const buff = Buffer.from(body.icon, 'base64')
       const { error } = await supabaseClient.storage
