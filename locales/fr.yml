@@ -41,6 +41,11 @@ activation:
     J'accepte de recevoir une notification lorsqu'une nouvelle version de
     l'application est disponible
   validate: Valider
+alert:
+  confirm-delete: Confirmation de la suppression
+  delete-message: |-
+    Cette action n'est pas réversible. 
+    Êtes-vous sûr de vouloir supprimer ce
 apikeys:
   all: clés
   checkbelow: vérifier ci-dessous le lien pour obtenir plus d'informations
@@ -67,7 +72,11 @@ button:
   toggle_langs: Changer de langue
 channel:
   add: Ajouter
+  beta-channel: Chaîne bêta
+  cannot-delete-device: Impossible de supprimer l'appareil
   copy: Copier le lien
+  device: Appareil
+  device-deleted: Appareil supprimé
   invit: Tapez l'e-mail pour inviter
   is_public: Chaîne publique
   make_it: Fais-le
@@ -78,6 +87,7 @@ channel:
   public: Liaison condensateur-updater
   public_desc: Publique
   title: Informations sur la chaîne
+  user: Utilisateur
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
@@ -134,22 +144,31 @@ notificationSettings:
 onboarding:
   loading: Chargement
 package:
+  cannot-delete-version: Impossible de supprimer la version
   channels: Chaînes
   device_list: Liste des appareils
   devices: Voir les appareils
+  devices-list: Appareils liés
   download: Télécharger la version
   link_channel: Lien vers la chaîne
   link_version: Lien vers la version
   mobiles-stats: Statistiques mobiles
+  name: Application
   set: Définir la version sur le canal
   stats: Statistiques
   test: Version de lancement
   title: Info
+  version:
+    is-used-in-device: est utilisé dans un remplacement de périphérique, dissociez-le d'abord
+  version-deleted: Version supprimée
   versions: Versions
 password:
   heading: Créer un mot de passe
   new: nouveau mot de passe
   validate: Valider
+pckage:
+  version:
+    is-used-in-channel: est utilisé dans un canal, dissociez-le d'abord
 plan:
   abtest: Test A/B
   application: Application
@@ -211,6 +230,9 @@ stats:
   title: Statistiques
   versions: Versions
 usage:
+  success: >-
+    Votre plan a été configuré, cette page sera mise à jour dans quelques
+    minutes
   title: Usage
 your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré actuel est

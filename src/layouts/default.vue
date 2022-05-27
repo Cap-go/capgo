@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IonIcon, IonLabel, IonPage, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs } from '@ionic/vue'
+import { IonIcon, IonLabel, IonPage, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs, isPlatform } from '@ionic/vue'
 import { hammerOutline, list, person } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'
@@ -9,6 +9,7 @@ const router = useRouter()
 const isTab = computed(() => {
   return router.currentRoute.value.meta.option && router.currentRoute.value.meta.option === 'tabs'
 })
+const isMobile = computed(() => isPlatform('capacitor'))
 </script>
 <template>
   <ion-page>
@@ -19,7 +20,7 @@ const isTab = computed(() => {
           <ion-icon :icon="list" />
           <ion-label>Projects</ion-label>
         </ion-tab-button>
-        <ion-tab-button tab="modules" href="/app/modules">
+        <ion-tab-button v-if="isMobile" tab="modules" href="/app/modules">
           <ion-icon :icon="hammerOutline" />
           <ion-label>Modules</ion-label>
         </ion-tab-button>

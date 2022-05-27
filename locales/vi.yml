@@ -39,6 +39,11 @@ activation:
   notification: Thông báo
   notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
   validate: Xác thực
+alert:
+  confirm-delete: Xác nhận Xóa
+  delete-message: |-
+    Hành động này là không thể đảo ngược. 
+    Bạn có chắc chắn muốn xóa cái này không
 apikeys:
   all: chìa khóa
   checkbelow: kiểm tra bên dưới liên kết để nhận thêm thông tin
@@ -65,7 +70,11 @@ button:
   toggle_langs: Thay đổi ngôn ngữ
 channel:
   add: Thêm vào
+  beta-channel: Kênh beta
+  cannot-delete-device: Không thể xóa thiết bị
   copy: Sao chép URL
+  device: Thiết bị
+  device-deleted: Đã xóa thiết bị
   invit: Nhập email để mời
   is_public: Kênh công khai
   make_it: Làm cho nó
@@ -76,6 +85,7 @@ channel:
   public: Liên kết trình cập nhật tụ điện
   public_desc: Công cộng
   title: Kênh truyền hình
+  user: Người dùng
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
@@ -130,22 +140,33 @@ notificationSettings:
 onboarding:
   loading: Đang tải
 package:
+  cannot-delete-version: Không thể xóa phiên bản
   channels: Kênh truyền hình
   device_list: Danh sách thiết bị
   devices: Xem các thiết bị
+  devices-list: Các thiết bị được liên kết
   download: Tải xuống phiên bản
   link_channel: Liên kết với kênh
   link_version: Liên kết đến phiên bản
   mobiles-stats: Số liệu thống kê về điện thoại di động
+  name: Ứng dụng
   set: Đặt phiên bản cho kênh
   stats: số liệu thống kê
   test: Phiên bản khởi chạy
   title: thông tin
+  version:
+    is-used-in-device: >-
+      được sử dụng trong ghi đè thiết bị, trước tiên hãy hủy liên kết thiết bị
+      đó
+  version-deleted: Phiên bản đã bị xóa
   versions: Phiên bản
 password:
   heading: Tạo mật khẩu
   new: mật khẩu mới
   validate: Xác thực
+pckage:
+  version:
+    is-used-in-channel: được sử dụng trong một kênh, trước tiên hãy hủy liên kết kênh đó
 plan:
   abtest: Thử nghiệm A / B
   application: Ứng dụng
@@ -205,6 +226,7 @@ stats:
   title: Số liệu thống kê
   versions: Phiên bản
 usage:
+  success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

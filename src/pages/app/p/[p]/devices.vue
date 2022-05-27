@@ -10,12 +10,12 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/vue'
-import dayjs from 'dayjs'
 import { chevronBack } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { subDays } from 'date-fns'
+import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
@@ -80,10 +80,6 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
 
 const openDevice = async(device: definitions['devices']) => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/d/${device.device_id}`)
-}
-
-const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
 interface RefresherEventDetail {

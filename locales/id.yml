@@ -41,6 +41,11 @@ activation:
     Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru
     tersedia
   validate: Mengesahkan
+alert:
+  confirm-delete: Konfirmasi Hapus
+  delete-message: |-
+    Tindakan ini tidak dapat dibalik. 
+    Apa kamu yakin ingin menghapus ini
 apikeys:
   all: kunci
   checkbelow: cek di bawah link untuk mendapatkan informasi lebih lanjut
@@ -67,7 +72,11 @@ button:
   toggle_langs: Ubah bahasa
 channel:
   add: Menambahkan
+  beta-channel: saluran beta
+  cannot-delete-device: Tidak dapat menghapus perangkat
   copy: Salin URL
+  device: Perangkat
+  device-deleted: Perangkat dihapus
   invit: Ketik email untuk mengundang
   is_public: Saluran publik
   make_it: Buat itu
@@ -78,6 +87,7 @@ channel:
   public: Tautan pemutakhiran kapasitor
   public_desc: Publik
   title: Saluran
+  user: Pengguna
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
@@ -132,22 +142,31 @@ notificationSettings:
 onboarding:
   loading: Memuat
 package:
+  cannot-delete-version: Tidak dapat menghapus versi
   channels: saluran
   device_list: Daftar perangkat
   devices: Lihat perangkat
+  devices-list: Perangkat tertaut
   download: Unduh versi
   link_channel: Tautan ke saluran
   link_version: Tautan ke versi
   mobiles-stats: Statistik ponsel
+  name: Aplikasi
   set: Setel versi ke saluran
   stats: statistik
   test: Luncurkan versi
   title: informasi
+  version:
+    is-used-in-device: digunakan dalam penggantian perangkat, batalkan tautannya terlebih dahulu
+  version-deleted: Versi dihapus
   versions: Versi
 password:
   heading: Buat Kata Sandi
   new: kata sandi baru
   validate: Mengesahkan
+pckage:
+  version:
+    is-used-in-channel: digunakan dalam saluran, batalkan tautannya terlebih dahulu
 plan:
   abtest: Pengujian A/B
   application: Aplikasi
@@ -207,6 +226,9 @@ stats:
   title: Statistik
   versions: Versi
 usage:
+  success: >-
+    Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
+    menit
   title: Penggunaan
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

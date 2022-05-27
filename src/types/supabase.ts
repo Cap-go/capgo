@@ -554,6 +554,7 @@ export interface paths {
           public?: parameters["rowFilter.channels.public"];
           disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
           disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
+          beta?: parameters["rowFilter.channels.beta"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -614,6 +615,7 @@ export interface paths {
           public?: parameters["rowFilter.channels.public"];
           disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
           disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
+          beta?: parameters["rowFilter.channels.beta"];
         };
         header: {
           /** Preference */
@@ -638,6 +640,7 @@ export interface paths {
           public?: parameters["rowFilter.channels.public"];
           disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
           disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
+          beta?: parameters["rowFilter.channels.beta"];
         };
         body: {
           /** channels */
@@ -1093,9 +1096,9 @@ export interface paths {
           action?: parameters["rowFilter.stats_onprem.action"];
           device_id?: parameters["rowFilter.stats_onprem.device_id"];
           version_build?: parameters["rowFilter.stats_onprem.version_build"];
-          version?: parameters["rowFilter.stats_onprem.version"];
           app_id?: parameters["rowFilter.stats_onprem.app_id"];
           updated_at?: parameters["rowFilter.stats_onprem.updated_at"];
+          version?: parameters["rowFilter.stats_onprem.version"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1152,9 +1155,9 @@ export interface paths {
           action?: parameters["rowFilter.stats_onprem.action"];
           device_id?: parameters["rowFilter.stats_onprem.device_id"];
           version_build?: parameters["rowFilter.stats_onprem.version_build"];
-          version?: parameters["rowFilter.stats_onprem.version"];
           app_id?: parameters["rowFilter.stats_onprem.app_id"];
           updated_at?: parameters["rowFilter.stats_onprem.updated_at"];
+          version?: parameters["rowFilter.stats_onprem.version"];
         };
         header: {
           /** Preference */
@@ -1175,9 +1178,9 @@ export interface paths {
           action?: parameters["rowFilter.stats_onprem.action"];
           device_id?: parameters["rowFilter.stats_onprem.device_id"];
           version_build?: parameters["rowFilter.stats_onprem.version_build"];
-          version?: parameters["rowFilter.stats_onprem.version"];
           app_id?: parameters["rowFilter.stats_onprem.app_id"];
           updated_at?: parameters["rowFilter.stats_onprem.updated_at"];
+          version?: parameters["rowFilter.stats_onprem.version"];
         };
         body: {
           /** stats_onprem */
@@ -1416,6 +1419,28 @@ export interface paths {
       };
     };
   };
+  "/rpc/is_app_owner": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+            /** Format: character varying */
+            appid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/get_max_channel": {
     post: {
       parameters: {
@@ -1460,6 +1485,28 @@ export interface paths {
       };
     };
   };
+  "/rpc/is_app_shared": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+            /** Format: character varying */
+            appid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/get_max_shared": {
     post: {
       parameters: {
@@ -1487,6 +1534,28 @@ export interface paths {
           args: {
             /** Format: uuid */
             userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_version_shared": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+            /** Format: bigint */
+            versionid: number;
           };
         };
         header: {
@@ -1742,6 +1811,8 @@ export interface definitions {
      * @default true
      */
     disableAutoUpdateToMajor: boolean;
+    /** Format: boolean */
+    beta?: boolean;
   };
   devices: {
     /**
@@ -1921,12 +1992,6 @@ export interface definitions {
     device_id: string;
     /** Format: text */
     version_build: string;
-    /**
-     * Format: bigint
-     * @description Note:
-     * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
-     */
-    version: number;
     /** Format: character varying */
     app_id: string;
     /**
@@ -1934,6 +1999,8 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
+    /** Format: character varying */
+    version: string;
   };
   stripe_info: {
     /**
@@ -2143,6 +2210,8 @@ export interface parameters {
   "rowFilter.channels.disableAutoUpdateUnderNative": string;
   /** Format: boolean */
   "rowFilter.channels.disableAutoUpdateToMajor": string;
+  /** Format: boolean */
+  "rowFilter.channels.beta": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */
@@ -2227,12 +2296,12 @@ export interface parameters {
   "rowFilter.stats_onprem.device_id": string;
   /** Format: text */
   "rowFilter.stats_onprem.version_build": string;
-  /** Format: bigint */
-  "rowFilter.stats_onprem.version": string;
   /** Format: character varying */
   "rowFilter.stats_onprem.app_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.stats_onprem.updated_at": string;
+  /** Format: character varying */
+  "rowFilter.stats_onprem.version": string;
   /** @description stripe_info */
   "body.stripe_info": definitions["stripe_info"];
   /** Format: timestamp with time zone */

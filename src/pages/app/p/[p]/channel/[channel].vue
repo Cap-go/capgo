@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import {
   IonButton, IonButtons, IonContent, IonHeader,
-  IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader,
-  IonModal, IonPage, IonTitle, IonToggle, IonToolbar,
-  actionSheetController, toastController,
+  IonIcon, IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
+  IonLabel, IonList, IonListHeader, IonModal, IonNote,
+  IonPage, IonSearchbar, IonTitle, IonToggle, IonToolbar,
+  actionSheetController, alertController, toastController,
 } from '@ionic/vue'
 import { chevronBack } from 'ionicons/icons'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
+import { formatDate } from '~/services/date'
 
 interface ChannelUsers {
   user_id: definitions['users']
@@ -23,6 +25,7 @@ interface Channel {
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
+const listRef = ref()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const packageId = ref<string>('')
@@ -31,6 +34,8 @@ const channel = ref<definitions['channels'] & Channel>()
 const users = ref<(definitions['channel_users'] & ChannelUsers)[]>()
 const newUser = ref<string>()
 const newUserModalOpen = ref(false)
+const search = ref('')
+const devices = ref<definitions['channel_devices'][]>([])
 
 const openApp = () => {
   if (!channel.value)
@@ -66,6 +71,24 @@ const getUsers = async() => {
     console.error(error)
   }
 }
+const getDevices = async() => {
+  if (!channel.value)
+    return
+  try {
+    const { data: dataDevices } = await supabase
+      .from<definitions['channel_devices']>('channel_devices')
+      .select()
+      .eq('channel_id', id.value)
+      .eq('app_id', channel.value.version.app_id)
+    if (dataDevices && dataDevices.length)
+      devices.value = dataDevices
+    else
+      devices.value = []
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
 const saveChannelChange = async() => {
   if (!id.value || !channel.value)
     return
@@ -73,6 +96,7 @@ const saveChannelChange = async() => {
     const update = {
       disableAutoUpdateUnderNative: channel.value.disableAutoUpdateUnderNative,
       disableAutoUpdateToMajor: channel.value.disableAutoUpdateToMajor,
+      beta: channel.value.beta,
     }
     const { error } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -124,6 +148,7 @@ watchEffect(async() => {
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getUsers()
+    await getDevices()
   }
 })
 const addUser = async() => {
@@ -136,14 +161,7 @@ const addUser = async() => {
     .eq('email', newUser.value)
   if (!data || !data.length || uError) {
     console.log('no user', uError)
-    // const toast = await toastController
-    //   .create({
-    //     message: t('channel.user_no_found'),
-    //     duration: 2000,
-    //   })
-    // await toast.present()
     newUserModalOpen.value = true
-
     return
   }
 
@@ -182,8 +200,27 @@ const makePublic = async(val = true) => {
     await toast.present()
   }
 }
+const didCancel = async(name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
 const deleteUser = async(usr: definitions['users']) => {
-  if (!channel.value)
+  if (!channel.value || await didCancel(t('channel.user')))
     return
   const { error } = await supabase
     .from<definitions['channel_users']>('channel_users')
@@ -195,6 +232,7 @@ const deleteUser = async(usr: definitions['users']) => {
   else
     await getUsers()
 }
+
 const presentActionSheet = async(usr: definitions['users']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
@@ -217,6 +255,53 @@ const presentActionSheet = async(usr: definitions['users']) => {
   await actionSheet.present()
 }
 
+const devicesFilter = computed(() => {
+  const value = search.value
+  if (value) {
+    const filtered = devices.value.filter(device => device.device_id.toLowerCase().includes(value.toLowerCase()))
+    return filtered
+  }
+  return devices.value
+})
+const deleteDevice = async(device: definitions['channel_devices']) => {
+  console.log('deleteDevice', device)
+  if (listRef.value)
+    listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('channel.device')))
+    return
+  try {
+    const { error: delDevError } = await supabase
+      .from<definitions['channel_devices']>('channel_devices')
+      .delete()
+      .eq('app_id', device.app_id)
+      .eq('device_id', device.device_id)
+    if (delDevError) {
+      const toast = await toastController
+        .create({
+          message: t('channel.cannot-delete-device'),
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      await getDevices()
+      const toast = await toastController
+        .create({
+          message: t('channel.device-deleted'),
+          duration: 2000,
+        })
+      await toast.present()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: t('channel.cannot-delete-device'),
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
 const inviteUser = async(userId: string) => {
   const { error } = await supabase
     .from<definitions['channel_users']>('channel_users')
@@ -261,7 +346,7 @@ const inviteUser = async(userId: string) => {
           </IonButtons>
         </ion-toolbar>
       </ion-header>
-      <ion-list>
+      <ion-list ref="listRef">
         <ion-list-header>
           <span class="text-vista-blue-500">
             {{ channel?.name }}
@@ -284,6 +369,14 @@ const inviteUser = async(userId: string) => {
             {{ t('channel.v3') }}
           </ion-label>
         </ion-item-divider>
+        <IonItem>
+          <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
+          <IonToggle
+            color="secondary"
+            :checked="channel?.beta"
+            @ionChange="channel.beta = $event.target.checked; saveChannelChange()"
+          />
+        </IonItem>
         <IonItem>
           <IonLabel>Disable auto downgrade under native</IonLabel>
           <IonToggle
@@ -328,6 +421,34 @@ const inviteUser = async(userId: string) => {
             </div>
           </IonLabel>
         </IonItem>
+        <IonItemDivider v-if="devices?.length">
+          <IonLabel>
+            {{ t('package.devices-list') }}
+          </IonLabel>
+        </IonItemDivider>
+        <!-- add item with searchbar -->
+        <IonItem v-if="devices?.length">
+          <IonSearchbar @IonChange="search = $event.detail.value" />
+        </IonItem>
+        <template v-for="d in devicesFilter" :key="d.device_id">
+          <IonItemSliding>
+            <IonItem class="cursor-pointer">
+              <IonLabel>
+                <h2 class="text-sm text-azure-500">
+                  {{ d.device_id }}
+                </h2>
+              </IonLabel>
+              <IonNote slot="end">
+                {{ formatDate(d.created_at) }}
+              </IonNote>
+            </IonItem>
+            <IonItemOptions side="end">
+              <IonItemOption color="warning" @click="deleteDevice(d)">
+                Delete
+              </IonItemOption>
+            </IonItemOptions>
+          </IonItemSliding>
+        </template>
       </ion-list>
     </ion-content>
     <ion-modal :is-open="newUserModalOpen" :swipe-to-close="true">

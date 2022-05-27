@@ -39,6 +39,11 @@ activation:
     Aceito receber notificação quando uma nova versão do aplicativo estiver
     disponível
   validate: Validar
+alert:
+  confirm-delete: Confirmar exclusão
+  delete-message: |-
+    esta ação não é reversível. 
+    Tem certeza de que deseja excluir isso
 apikeys:
   all: chaves
   checkbelow: verifique abaixo o link para obter mais informações
@@ -65,7 +70,11 @@ button:
   toggle_langs: Mudar de idioma
 channel:
   add: Adicionar
+  beta-channel: Canal beta
+  cannot-delete-device: Não é possível excluir o dispositivo
   copy: Copiar URL
+  device: Dispositivo
+  device-deleted: Dispositivo excluído
   invit: Digite o e-mail para convidar
   is_public: Público do canal
   make_it: Faça
@@ -76,6 +85,7 @@ channel:
   public: Link do atualizador do capacitor
   public_desc: Público
   title: Canal
+  user: Do utilizador
   user_no_found: Usuário não encontrado, peça para se registrar primeiro
   users: Compartilhado com usuários
   v3: Configurações V3
@@ -130,22 +140,31 @@ notificationSettings:
 onboarding:
   loading: Carregando
 package:
+  cannot-delete-version: Não é possível excluir a versão
   channels: Canais
   device_list: Lista de dispositivos
   devices: Ver dispositivos
+  devices-list: Dispositivos vinculados
   download: Baixar versão
   link_channel: Link para o canal
   link_version: Link para a versão
   mobiles-stats: Estatísticas de celulares
+  name: Aplicativo
   set: Definir versão para canal
   stats: Estatísticas
   test: Versão de lançamento
   title: informação
+  version:
+    is-used-in-device: for usado em uma substituição de dispositivo, desvincule-o primeiro
+  version-deleted: Versão excluída
   versions: Versões
 password:
   heading: Criar senha
   new: Nova Senha
   validate: Validar
+pckage:
+  version:
+    is-used-in-channel: é usado em um canal, desvincule-o primeiro
 plan:
   abtest: Teste A/B
   application: Inscrição
@@ -207,6 +226,7 @@ stats:
   title: Estatísticas
   versions: Versões
 usage:
+  success: Seu plano foi configurado esta página será atualizada, em alguns minutos
   title: Uso
 your-current-plan-is: Seu plano atual é
 your-current-suggested-plan-is: Seu plano sugerido atual é

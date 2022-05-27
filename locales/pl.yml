@@ -39,6 +39,11 @@ activation:
     Zgadzam się na otrzymywanie powiadomień, gdy nowa wersja aplikacji będzie
     dostępna
   validate: Uprawomocnić
+alert:
+  confirm-delete: Potwierdź usunięcie
+  delete-message: |-
+    To działanie nie jest odwracalne. 
+    Czy na pewno chcesz to usunąć?
 apikeys:
   all: Klucze
   checkbelow: sprawdź poniższy link, aby uzyskać więcej informacji
@@ -65,7 +70,11 @@ button:
   toggle_langs: Zmień język
 channel:
   add: Dodać
+  beta-channel: Kanał beta
+  cannot-delete-device: Nie można usunąć urządzenia
   copy: Kopiuj URL
+  device: Urządzenie
+  device-deleted: Urządzenie usunięte
   invit: Wpisz e-mail, aby zaprosić
   is_public: Kanał publiczny
   make_it: Zrób to
@@ -76,6 +85,7 @@ channel:
   public: Łącze do aktualizacji kondensatorów
   public_desc: Publiczny
   title: Kanał
+  user: Użytkownik
   user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
   users: Udostępnione użytkownikom
   v3: Ustawienia V3
@@ -130,22 +140,31 @@ notificationSettings:
 onboarding:
   loading: Ładowanie
 package:
+  cannot-delete-version: Nie można usunąć wersji
   channels: Kanały
   device_list: Lista urządzeń
   devices: Zobacz urządzenia
+  devices-list: Połączone urządzenia
   download: Pobierz wersję
   link_channel: Link do kanału
   link_version: Link do wersji
   mobiles-stats: Statystyki telefonów komórkowych
+  name: Aplikacja
   set: Ustaw wersję na kanał
   stats: statystyki
   test: Uruchom wersję
   title: informacje
+  version:
+    is-used-in-device: jest używany w nadpisaniu urządzenia, najpierw odłącz je
+  version-deleted: Wersja usunięta
   versions: Wersje
 password:
   heading: Stwórz hasło
   new: nowe hasło
   validate: Uprawomocnić
+pckage:
+  version:
+    is-used-in-channel: jest używany w kanale, najpierw go odłącz
 plan:
   abtest: Testy A/B
   application: Podanie
@@ -205,6 +224,9 @@ stats:
   title: Statystyki
   versions: Wersje
 usage:
+  success: >-
+    Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka
+    minut
   title: Stosowanie
 your-current-plan-is: Twój obecny plan to
 your-current-suggested-plan-is: Twój obecny sugerowany plan to

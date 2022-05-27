@@ -2,22 +2,23 @@
 import type { RefresherCustomEvent } from '@ionic/vue'
 import {
   IonContent,
-  IonHeader, IonItem, IonItemDivider,
-  IonItemOption, IonItemOptions,
-  IonItemSliding,
+  IonHeader,
+  IonItem, IonItemDivider, IonItemOption,
+  IonItemOptions, IonItemSliding,
   IonLabel,
   IonList,
-  IonPage, IonRefresher, IonRefresherContent, IonTitle, IonToolbar,
+  IonPage,
+  IonRefresher, IonRefresherContent, IonTitle, IonToolbar, alertController,
   toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
-import dayjs from 'dayjs'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { openVersion } from '~/services/versions'
+import { formatDate } from '~/services/date'
 
 const listRef = ref()
 const { t } = useI18n()
@@ -38,9 +39,6 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
-const formatDate = (date: string | undefined) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
-}
 const getMyApps = async() => {
   const { data } = await supabase
     .from<definitions['apps']>('apps')
@@ -50,10 +48,32 @@ const getMyApps = async() => {
     apps.value = data
 }
 
+const didCancel = async(name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
+
 const deleteApp = async(app: definitions['apps']) => {
   console.log('deleteApp', app)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('package.name')))
+    return
   try {
     await supabase
       .from<definitions['stats']>('stats')

@@ -37,6 +37,11 @@ activation:
   notification: 通知
   notification-desc: 我接受在有新应用版本可用时接收通知
   validate: 证实
+alert:
+  confirm-delete: 确认删除
+  delete-message: |-
+    这个动作是不可逆的。
+    你确定要删除这个吗
 apikeys:
   all: 钥匙
   checkbelow: 检查下面的链接以获取更多信息
@@ -61,7 +66,11 @@ button:
   toggle_langs: 切换语言
 channel:
   add: 添加
+  beta-channel: 测试通道
+  cannot-delete-device: 无法删除设备
   copy: 复制网址
+  device: 设备
+  device-deleted: 设备已删除
   invit: 输入电子邮件以邀请
   is_public: 公开频道
   make_it: 做了
@@ -72,6 +81,7 @@ channel:
   public: 电容器更新器链接
   public_desc: 民众
   title: 渠道
+  user: 用户
   user_no_found: 未找到用户，请先注册
   users: 与用户共享
   v3: V3 设置
@@ -126,22 +136,31 @@ notificationSettings:
 onboarding:
   loading: 正在加载
 package:
+  cannot-delete-version: 无法删除版本
   channels: 频道
   device_list: 设备列表
   devices: 查看设备
+  devices-list: 关联的设备
   download: 下载版本
   link_channel: 链接到频道
   link_version: 链接到版本
   mobiles-stats: 手机数据
+  name: 应用程序
   set: 将版本设置为频道
   stats: 统计数据
   test: 发布版本
   title: 信息
+  version:
+    is-used-in-device: 在设备覆盖中使用，请先取消链接
+  version-deleted: 版本已删除
   versions: 版本
 password:
   heading: 创建密码
   new: 新密码
   validate: 证实
+pckage:
+  version:
+    is-used-in-channel: 在频道中使用，请先取消链接
 plan:
   abtest: A/B 测试
   application: 应用
@@ -201,6 +220,7 @@ stats:
   title: 统计数据
   versions: 版本
 usage:
+  success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是

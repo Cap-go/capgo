@@ -7,8 +7,9 @@ import {
   IonContent,
   IonHeader,
   IonItem,
-  IonItemDivider, IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent, IonSegment,
-  IonSegmentButton, IonTitle, IonToolbar, isPlatform,
+  IonItemDivider,
+  IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent, IonSegment, IonSegmentButton,
+  IonTitle, IonToolbar, isPlatform, toastController,
 } from '@ionic/vue'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
@@ -123,6 +124,7 @@ const plans: Record<string, Plan> = {
     progressiveDeploy: true,
   },
 }
+
 const planList = computed(() => Object.values(plans))
 const planFeatures = (plan: Plan) => [
   plan.apps > 1 ? `${plan.apps} ${t('plan.applications')}` : `${plan.apps} ${t('plan.application')}`,
@@ -203,6 +205,15 @@ const openChangePlan = (planId: string) => {
   if (planId)
     openCheckout(planId)
 }
+const showToastMessage = async(message: string) => {
+  const toast = await toastController
+    .create({
+      position: 'middle',
+      message,
+      duration: 4000,
+    })
+  await toast.present()
+}
 
 const getMaxDownload = async() => {
   const { data, error } = await supabase.rpc<PastDl>('get_dl_by_month', { userid: auth?.id, pastmonth: 0 })
@@ -252,6 +263,8 @@ watchEffect(async() => {
       getMyPlan(),
     ])
     isLoading.value = false
+    // if session_id is in url params show modal success plan setup
+    route.query.session_id && showToastMessage(t('usage.success'))
   }
 })
 

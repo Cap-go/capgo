@@ -37,6 +37,9 @@ activation:
   notification: Notifications
   notification-desc: I accept to receive notification when new app version are available
   validate: Validate
+alert:
+  confirm-delete: Confirm Delete
+  delete-message: This action is not reversible. Are you sure you want to delete this
 apikeys:
   all: keys
   checkbelow: check below the link to get more informations
@@ -63,7 +66,11 @@ button:
   toggle_langs: Change languages
 channel:
   add: Add
+  beta-channel: Beta channel
+  cannot-delete-device: Cannot delete device
   copy: Copy URL
+  device: Device
+  device-deleted: Device deleted
   invit: Type email to invite
   is_public: Channel public
   make_it: Make it
@@ -74,6 +81,7 @@ channel:
   public: Capacitor-updater link
   public_desc: Public
   title: Channel
+  user: User
   user_no_found: User not found, ask to register first
   users: Shared with users
   v3: V3 settings
@@ -128,22 +136,31 @@ notificationSettings:
 onboarding:
   loading: Loading
 package:
+  cannot-delete-version: Cannot delete version
   channels: Channels
   device_list: Devices list
   devices: See devices statistics
+  devices-list: Devices linked
   download: Download version
   link_channel: Link to channel
   link_version: Link to version
   mobiles-stats: Mobiles stats
+  name: App
   set: Set version to channel
   stats: stats
   test: Launch version
   title: info
+  version:
+    is-used-in-device: is used in a device override, unlink it first
+  version-deleted: Version deleted
   versions: Versions
 password:
   heading: Create Password
   new: New Password
   validate: Validate
+pckage:
+  version:
+    is-used-in-channel: is used in a channel, unlink it first
 plan:
   abtest: A / B testing
   application: Application
@@ -201,6 +218,7 @@ stats:
   title: Stats
   versions: Versions
 usage:
+  success: Your plan has been setup this page will be update, in few minutes
   title: Usage
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is
