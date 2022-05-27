@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.15](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.14...0.30.9-alpha.15) (2022-05-27)
+
+
+### Features
+
+* add cli_login ([5481e47](https://github.com/Cap-go/capgo/commit/5481e4747af40e0486c2fff400738bcf49535264))
+
 ### [0.30.9-alpha.14](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.13...0.30.9-alpha.14) (2022-05-27)
 
 
