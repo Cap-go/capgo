@@ -68,6 +68,9 @@ button:
   tabs: Abas
   toggle_dark: Alternar modo escuro
   toggle_langs: Mudar de idioma
+cannot-delete-app: Não é possível excluir o aplicativo
+cannot-delete-app-version: Não é possível excluir a versão do aplicativo
+cannot-delete-channel: Não é possível excluir o canal
 channel:
   add: Adicionar
   beta-channel: Canal beta
@@ -89,6 +92,8 @@ channel:
   user_no_found: Usuário não encontrado, peça para se registrar primeiro
   users: Compartilhado com usuários
   v3: Configurações V3
+channel-deleted: Canal excluído
+days: dias
 device:
   channel: Link do canal
   created_at: Criado em
@@ -120,6 +125,8 @@ intro:
   dynamic-route: Demonstração de rota dinâmica
   hi: Olá, {name}!
   whats-your-name: Qual é o seu nome?
+limit-reached: Limite alcançado
+loading-more-data: Carregando mais dados...
 login:
   andpass: E senha
   connexion: Conecte-se
@@ -196,6 +203,7 @@ plan:
   versions: Versões
   whats-included: O que está incluído
   yearly-billing: Faturamento anual
+please-upgrade: Atualize seu plano para adicionar mais usuários
 projects:
   list: Seu
   sharedlist: Compartilhado com você
@@ -216,6 +224,7 @@ register:
   password-hint: Insira uma combinação de pelo menos 6 números, letras e pontuações.
   specialError: Deve conter caracteres especiais
   upperCaseError: Deve conter letras maiúsculas
+see-usage: Ver uso
 something-went-wrong-try-again-later: |-
   Algo deu errado! 
   Tente mais tarde.
@@ -225,6 +234,10 @@ stats:
   subtitle: Mês passado
   title: Estatísticas
   versions: Versões
+trial-plan-expired: Plano de avaliação expirado
+trial-plan-expires-in: O Plano de Avaliação expira em
+upgrade: Melhoria
+upgrade-now: Atualize agora
 usage:
   success: Seu plano foi configurado esta página será atualizada, em alguns minutos
   title: Uso

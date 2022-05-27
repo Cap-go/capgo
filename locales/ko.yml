@@ -64,6 +64,9 @@ button:
   tabs: 탭
   toggle_dark: 다크모드 토글
   toggle_langs: 언어 변경
+cannot-delete-app: 앱을 삭제할 수 없습니다
+cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
+cannot-delete-channel: 채널을 삭제할 수 없습니다
 channel:
   add: 추가하다
   beta-channel: 베타 채널
@@ -85,6 +88,8 @@ channel:
   user_no_found: 사용자를 찾을 수 없습니다. 먼저 등록을 요청하세요.
   users: 사용자와 공유
   v3: V3 설정
+channel-deleted: 채널 삭제됨
+days: 날
 device:
   channel: 채널 링크
   created_at: 만든 시간
@@ -116,6 +121,8 @@ intro:
   dynamic-route: 다이나믹 라우트 데모
   hi: 안녕, {name}!
   whats-your-name: 이름이 뭐예요?
+limit-reached: 한도 도달
+loading-more-data: 추가 데이터 로드 중...
 login:
   andpass: 그리고 비밀번호
   connexion: 로그인
@@ -190,6 +197,7 @@ plan:
   versions: 버전
   whats-included: 포함된 항목
   yearly-billing: 연간 청구
+please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 projects:
   list: 당신 것
   sharedlist: 나와 공유됨
@@ -210,6 +218,7 @@ register:
   password-hint: 6개 이상의 숫자, 문자, 구두점 조합을 입력하세요.
   specialError: 특수 문자를 포함해야 합니다.
   upperCaseError: 대문자를 포함해야 합니다.
+see-usage: 사용법 보기
 something-went-wrong-try-again-later: |-
   문제가 발생했습니다! 
   나중에 다시 시도하세요.
@@ -219,6 +228,10 @@ stats:
   subtitle: 지난 달
   title: 통계
   versions: 버전
+trial-plan-expired: 평가판 만료됨
+trial-plan-expires-in: 평가판은 다음 날짜에 만료됩니다.
+upgrade: 업그레이드
+upgrade-now: 지금 업그레이드
 usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법

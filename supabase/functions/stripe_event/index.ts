@@ -1,28 +1,31 @@
 import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { extractDataEvent, parseStripeEvent } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
-import { checkKey, sendRes } from '../_utils/utils.ts'
-
-interface dataDemo {
-  appid: string
-  name: string
-  icon: string
-  iconType: string
-}
+import { sendRes } from '../_utils/utils.ts'
 
 serve(async(event: Request) => {
   const supabase = supabaseAdmin
-  const authorization = event.headers.get('apikey')
-  if (!authorization)
-    return sendRes({ status: 'Cannot find authorization' }, 400)
-  const apikey: definitions['apikeys'] | null = await checkKey(authorization, supabase, ['upload', 'all', 'write'])
-  if (!apikey || !event.body)
-    return sendRes({ status: 'Cannot Verify User' }, 400)
+
+  if (!event.headers.get('stripe-signature') || !Deno.env.get('STRIPE_WEBHOOK_SECRET') || !Deno.env.get('STRIPE_SECRET_KEY'))
+    return sendRes({ status: 'Webhook Error: no signature or no secret found' }, 400)
+
+  // event.headers
   try {
-    const body = (await event.json()) as dataDemo
-    // const body = await event.text()
-    console.log('body', body)
-    return sendRes()
+    const stripeEvent = await extractDataEvent(parseStripeEvent(Deno.env.get('STRIPE_SECRET_KEY') || '', await event.text(), event.headers.get('stripe-signature') || '', Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''))
+    if (stripeEvent.customer_id === '')
+      return sendRes('no customer found', 500)
+
+    const { error: dbError } = await supabase
+      .from<definitions['stripe_info']>('stripe_info')
+      .update(stripeEvent)
+      .eq('customer_id', stripeEvent.customer_id)
+    // eslint-disable-next-line no-console
+    console.log('stripeEvent', stripeEvent)
+    if (dbError)
+      return sendRes(dbError, 500)
+
+    return sendRes({ received: true })
   }
   catch (e) {
     return sendRes({

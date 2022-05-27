@@ -21,7 +21,7 @@ const router = useRouter()
 
 const { t } = useI18n()
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   if (isPlatform('capacitor') && form.enableNotifications)
     await PushNotifications.requestPermissions()
@@ -46,9 +46,9 @@ const submit = async() => {
 
 <template>
   <IonPage>
+    <TitleHead :big="true" :title="t('activation.heading')" />
     <IonContent :fullscreen="true">
       <form class="grid mx-auto w-full lg:w-1/2 p-8" @submit.prevent="submit">
-        <TitleHead :big="true" :title="t('activation.heading')" />
         <p class="mt-12 mb-6 text-pumpkin-orange-500 text-left text-lg font-medium leading-snug">
           {{ t('activation.desc') }}
         </p>

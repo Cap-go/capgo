@@ -16,7 +16,7 @@ const isLoading = ref(true)
 
 const user = ref<User | null>(null)
 
-const updateDb = async() => {
+const updateDb = async () => {
   console.log('update db')
   let session = supabase.auth.session()!
 
@@ -57,7 +57,7 @@ const updateDb = async() => {
 
 watchEffect(() => {
   if (route.path === '/onboarding/verify_email') {
-    setTimeout(async() => {
+    setTimeout(async () => {
       await updateDb()
     }, 500)
   }

@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import {
-  IonButton,
-  IonButtons, IonContent, IonHeader, IonIcon, IonItem,
+  IonContent, IonItem,
   IonItemDivider, IonLabel, IonList, IonListHeader, IonNote, IonPage,
-  IonTitle, IonToolbar, actionSheetController, alertController, toastController,
+  actionSheetController, alertController, toastController,
 } from '@ionic/vue'
-import { chevronBack } from 'ionicons/icons'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
+import TitleHead from '~/components/TitleHead.vue'
 
 interface Device {
   version: definitions['app_versions']
@@ -23,7 +22,6 @@ interface ChannelDev {
   channel_id: definitions['channels'] & Channel
 }
 const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
@@ -35,7 +33,7 @@ const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
 const channelDevice = ref<definitions['channel_devices'] & ChannelDev>()
 
-const getVersion = async() => {
+const getVersion = async () => {
   try {
     const { data: dataVersions } = await supabase
       .from<definitions['app_versions']>('app_versions')
@@ -49,7 +47,7 @@ const getVersion = async() => {
     console.error(error)
   }
 }
-const getChannels = async() => {
+const getChannels = async () => {
   try {
     const { data: dataChannels } = await supabase
       .from<definitions['channels'] & Channel>('channels')
@@ -66,7 +64,7 @@ const getChannels = async() => {
     console.error(error)
   }
 }
-const getChannelOverride = async() => {
+const getChannelOverride = async () => {
   const { data: dataDev } = await supabase
     .from<definitions['channel_devices'] & ChannelDev>('channel_devices')
     .select(`
@@ -84,7 +82,7 @@ const getChannelOverride = async() => {
     .eq('app_id', packageId.value)
   channelDevice.value = dataDev?.length ? dataDev[0] : undefined
 }
-const getDeviceOverride = async() => {
+const getDeviceOverride = async () => {
   const { data: dataDev } = await supabase
     .from<definitions['devices_override'] & Device>('devices_override')
     .select(`
@@ -99,7 +97,7 @@ const getDeviceOverride = async() => {
     .eq('app_id', packageId.value)
   deviceOverride.value = dataDev?.length ? dataDev[0] : undefined
 }
-const getDevice = async() => {
+const getDevice = async () => {
   if (!id.value)
     return
   try {
@@ -132,7 +130,7 @@ const getDevice = async() => {
   }
 }
 
-const loadData = async() => {
+const loadData = async () => {
   isLoading.value = true
   await Promise.all([
     getDevice(),
@@ -144,7 +142,7 @@ const loadData = async() => {
   isLoading.value = false
 }
 
-const upsertDevVersion = async(device: string, v: definitions['app_versions']) => {
+const upsertDevVersion = async (device: string, v: definitions['app_versions']) => {
   return supabase
     .from<definitions['devices_override']>('devices_override')
     .upsert({
@@ -153,7 +151,7 @@ const upsertDevVersion = async(device: string, v: definitions['app_versions']) =
       app_id: packageId.value,
     })
 }
-const didCancel = async(name: string) => {
+const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
@@ -172,7 +170,7 @@ const didCancel = async(name: string) => {
   await alert.present()
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
-const delDevVersion = async(device: string) => {
+const delDevVersion = async (device: string) => {
   if (await didCancel(t('channel.device')))
     return
   return supabase
@@ -181,12 +179,12 @@ const delDevVersion = async(device: string) => {
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
-const updateOverride = async() => {
+const updateOverride = async () => {
   const buttons = []
   for (const version of versions.value) {
     buttons.push({
       text: version.name,
-      handler: async() => {
+      handler: async () => {
         if (!device.value?.device_id)
           return
         isLoading.value = true
@@ -216,7 +214,7 @@ const updateOverride = async() => {
   if (channelDevice.value) {
     buttons.push({
       text: t('button.remove'),
-      handler: async() => {
+      handler: async () => {
         device.value?.device_id && delDevVersion(device.value?.device_id)
         const toast = await toastController
           .create({
@@ -241,7 +239,7 @@ const updateOverride = async() => {
   })
   await actionSheet.present()
 }
-const upsertDevChannel = async(device: string, channel: definitions['channels']) => {
+const upsertDevChannel = async (device: string, channel: definitions['channels']) => {
   return supabase
     .from<definitions['channel_devices']>('channel_devices')
     .upsert({
@@ -250,7 +248,7 @@ const upsertDevChannel = async(device: string, channel: definitions['channels'])
       app_id: packageId.value,
     })
 }
-const delDevChannel = async(device: string) => {
+const delDevChannel = async (device: string) => {
   if (await didCancel(t('channel.title')))
     return
   return supabase
@@ -259,12 +257,12 @@ const delDevChannel = async(device: string) => {
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
-const updateChannel = async() => {
+const updateChannel = async () => {
   const buttons = []
   for (const channel of channels.value) {
     buttons.push({
       text: channel.name,
-      handler: async() => {
+      handler: async () => {
         if (!device.value?.device_id)
           return
         isLoading.value = true
@@ -294,7 +292,7 @@ const updateChannel = async() => {
   if (channelDevice.value) {
     buttons.push({
       text: t('button.remove'),
-      handler: async() => {
+      handler: async () => {
         device.value?.device_id && delDevChannel(device.value?.device_id)
         const toast = await toastController
           .create({
@@ -320,7 +318,7 @@ const updateChannel = async() => {
   await actionSheet.present()
 }
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path.includes('/d/')) {
     packageId.value = route.params.p as string
     packageId.value = packageId.value.replaceAll('--', '.')
@@ -328,43 +326,24 @@ watchEffect(async() => {
     await loadData()
   }
 })
-const back = () => {
-  router.go(-1)
-}
 </script>
+
 <template>
-  <ion-page>
-    <IonHeader class="header-custom">
-      <IonToolbar class="toolbar-no-border">
-        <IonButtons slot="start" class="mx-3">
-          <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
-          </IonButton>
-        </IonButtons>
-        <IonTitle color="warning">
-          {{ t('device.title') }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title color="warning" size="large">
-            {{ t('device.title') }}
-          </ion-title>
-        </ion-toolbar>
-      </ion-header>
-      <ion-list>
-        <ion-list-header>
+  <IonPage>
+    <TitleHead :title="t('device.title')" big color="warning" />
+    <IonContent :fullscreen="true">
+      <TitleHead :title="t('device.title')" big color="warning" condense />
+      <IonList>
+        <IonListHeader>
           <span class="text-vista-blue-500">
             {{ device?.device_id }}
           </span>
-        </ion-list-header>
-        <ion-item-divider>
-          <ion-label>
+        </IonListHeader>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('device.info') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem v-if="device">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
@@ -445,7 +424,7 @@ const back = () => {
             {{ channelDevice?.channel_id.name || t('device.no_channel') }}
           </IonNote>
         </IonItem>
-      </ion-list>
-    </ion-content>
-  </ion-page>
+      </IonList>
+    </IonContent>
+  </IonPage>
 </template>

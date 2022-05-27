@@ -12,10 +12,10 @@ interface dataDemo {
 
 serve(async(event: Request) => {
   const supabase = supabaseAdmin
-  const authorization = event.headers.get('apikey')
-  if (!authorization)
+  const apikey_string = event.headers.get('apikey')
+  if (!apikey_string)
     return sendRes({ status: 'Cannot find authorization' }, 400)
-  const apikey: definitions['apikeys'] | null = await checkKey(authorization, supabase, ['upload', 'all', 'write'])
+  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabase, ['upload', 'all', 'write'])
   if (!apikey || !event.body)
     return sendRes({ status: 'Cannot Verify User' }, 400)
   try {

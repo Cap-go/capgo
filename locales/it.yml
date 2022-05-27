@@ -69,6 +69,9 @@ button:
   tabs: schede
   toggle_dark: Attiva/disattiva modalità scura
   toggle_langs: Cambia lingua
+cannot-delete-app: Impossibile eliminare l'app
+cannot-delete-app-version: Impossibile eliminare la versione dell'app
+cannot-delete-channel: Impossibile eliminare il canale
 channel:
   add: Aggiungere
   beta-channel: Canale beta
@@ -90,6 +93,8 @@ channel:
   user_no_found: Utente non trovato, chiedi prima di registrarti
   users: Condiviso con gli utenti
   v3: Impostazioni V3
+channel-deleted: Canale cancellato
+days: giorni
 device:
   channel: Collegamento al canale
   created_at: Creato a
@@ -121,6 +126,8 @@ intro:
   dynamic-route: Demo di rotta dinamica
   hi: Ciao, {name}!
   whats-your-name: Come ti chiami?
+limit-reached: Limite raggiunto
+loading-more-data: Caricamento più dati...
 login:
   andpass: E password
   connexion: Login
@@ -195,6 +202,7 @@ plan:
   versions: Versioni
   whats-included: Cosa è incluso
   yearly-billing: Fatturazione annuale
+please-upgrade: Aggiorna il tuo piano per aggiungere più utenti
 projects:
   list: Il tuo
   sharedlist: Condiviso con te
@@ -217,6 +225,7 @@ register:
     punteggiatura.
   specialError: Dovrebbe contenere caratteri speciali
   upperCaseError: Dovrebbe contenere lettere maiuscole
+see-usage: Vedi utilizzo
 something-went-wrong-try-again-later: |-
   Qualcosa è andato storto! 
   Riprovare più tardi.
@@ -226,6 +235,10 @@ stats:
   subtitle: Lo scorso mese
   title: Statistiche
   versions: Versioni
+trial-plan-expired: Piano di prova scaduto
+trial-plan-expires-in: Il piano di prova scade tra
+upgrade: Aggiornamento
+upgrade-now: Aggiorna ora
 usage:
   success: >-
     Il tuo piano è stato impostato questa pagina sarà aggiornata, in pochi

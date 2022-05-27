@@ -68,6 +68,9 @@ button:
   tabs: Вкладки
   toggle_dark: Включить темный режим
   toggle_langs: Сменить язык
+cannot-delete-app: Не могу удалить приложение
+cannot-delete-app-version: Не могу удалить версию приложения
+cannot-delete-channel: Не могу удалить канал
 channel:
   add: Добавлять
   beta-channel: Бета-канал
@@ -89,6 +92,8 @@ channel:
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
   users: Доступно пользователям
   v3: Настройки версии 3
+channel-deleted: Канал удален
+days: дни
 device:
   channel: Ссылка на канал
   created_at: Создано на
@@ -120,6 +125,8 @@ intro:
   dynamic-route: Демо динамического маршрута
   hi: Привет, {name}!
   whats-your-name: Как тебя зовут?
+limit-reached: Достигнут предел
+loading-more-data: Загрузка дополнительных данных...
 login:
   andpass: И пароль
   connexion: Авторизоваться
@@ -194,6 +201,7 @@ plan:
   versions: Версии
   whats-included: Что включено
   yearly-billing: Годовой биллинг
+please-upgrade: Обновите план, чтобы добавить больше пользователей
 projects:
   list: Ваш
   sharedlist: Поделился с вами
@@ -214,6 +222,7 @@ register:
   password-hint: Введите комбинацию не менее 6 цифр, букв и знаков препинания.
   specialError: Должен содержать специальные символы
   upperCaseError: Должен содержать заглавные буквы
+see-usage: См. использование
 something-went-wrong-try-again-later: |-
   Что-то пошло не так! 
   Попробуйте позже.
@@ -223,6 +232,10 @@ stats:
   subtitle: Прошлый месяц
   title: Статистика
   versions: Версии
+trial-plan-expired: Срок действия пробного плана истек
+trial-plan-expires-in: Срок действия пробного плана истекает через
+upgrade: Обновление
+upgrade-now: Обнови сейчас
 usage:
   success: >-
     Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько

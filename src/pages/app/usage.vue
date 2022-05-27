@@ -2,55 +2,31 @@
 import { useI18n } from 'vue-i18n'
 import type { RefresherCustomEvent, SegmentChangeEventDetail } from '@ionic/vue'
 import {
-  IonBackButton,
-  IonButtons,
   IonContent,
-  IonHeader,
   IonItem,
   IonItemDivider,
-  IonLabel, IonList, IonPage, IonRefresher, IonRefresherContent, IonSegment, IonSegmentButton,
-  IonTitle, IonToolbar, isPlatform, toastController,
+  IonLabel, IonList, IonPage, IonRefresher,
+  IonRefresherContent, IonSegment, IonSegmentButton,
+  isPlatform, toastController,
 } from '@ionic/vue'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import type { definitions } from '~/types/supabase'
-import { useSupabase } from '~/services/supabase'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
+import TitleHead from '~/components/TitleHead.vue'
+import type { Plan, Stats } from '~/services/plans'
+import Spinner from '~/components/Spinner.vue'
 
 const { t } = useI18n()
 const isLoading = ref(true)
+const planList = ref([] as Plan[])
 const isMobile = isPlatform('capacitor')
-const segmentVal = ref('monthly')
+const segmentVal = ref<'monthly' | 'yearly'>('monthly')
 const isYearly = computed(() => segmentVal.value === 'yearly')
-const myPlan = ref<definitions['stripe_info']>()
 const route = useRoute()
-const supabase = useSupabase()
 const main = useMainStore()
-const auth = supabase.auth.user()
 
-interface PastDl {
-  app_id: string
-  maxdownload: number
-}
-
-interface Plan {
-  id: string
-  name: string
-  description: string
-  price: {
-    monthly: number
-    yearly: number
-  }
-  apps: number
-  channels: number
-  updates: number
-  versions: number
-  sharedChannels: number
-  abtest: boolean
-  progressiveDeploy: boolean
-}
-const usage = reactive({
+const usage = reactive<Stats>({
   apps: 0,
   channels: 0,
   versions: 0,
@@ -58,74 +34,10 @@ const usage = reactive({
   updates: 0,
 })
 
-const plans: Record<string, Plan> = {
-  free: {
-    id: '',
-    name: 'Free',
-    description: t('plan.free.desc'),
-    price: {
-      monthly: 0,
-      yearly: 0,
-    },
-    apps: 1,
-    channels: 1,
-    updates: 500,
-    versions: 10,
-    sharedChannels: 0,
-    abtest: false,
-    progressiveDeploy: false,
-  },
-  solo: {
-    id: 'prod_LQIzwwVu6oMmAz',
-    name: 'Solo',
-    description: t('plan.solo.desc'),
-    price: {
-      monthly: 14,
-      yearly: 146,
-    },
-    apps: 1,
-    channels: 2,
-    updates: 2500,
-    versions: 10,
-    sharedChannels: 0,
-    abtest: false,
-    progressiveDeploy: false,
-  },
-  maker: {
-    id: 'prod_LQIzozukEwDZDM',
-    name: 'Maker',
-    description: t('plan.maker.desc'),
-    price: {
-      monthly: 39,
-      yearly: 389,
-    },
-    apps: 3,
-    channels: 10,
-    updates: 25000,
-    versions: 100,
-    sharedChannels: 10,
-    abtest: false,
-    progressiveDeploy: false,
-  },
-  team: {
-    id: 'prod_LQIzm2NGzayzXi',
-    name: 'Team',
-    description: t('plan.team.desc'),
-    price: {
-      monthly: 99,
-      yearly: 998,
-    },
-    apps: 10,
-    channels: 50,
-    updates: 250000,
-    versions: 1000,
-    sharedChannels: 1000,
-    abtest: true,
-    progressiveDeploy: true,
-  },
+const getStat = (name: string): number => {
+  return usage[name as keyof Stats]
 }
 
-const planList = computed(() => Object.values(plans))
 const planFeatures = (plan: Plan) => [
   plan.apps > 1 ? `${plan.apps} ${t('plan.applications')}` : `${plan.apps} ${t('plan.application')}`,
   plan.channels > 1 ? `${plan.channels} ${t('plan.channels')}` : `${plan.channels} ${t('plan.channel')}`,
@@ -136,76 +48,68 @@ const planFeatures = (plan: Plan) => [
   plan.progressiveDeploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
 
-const currentPlanSuggest = computed<Plan>(() => {
-  return planList.value.find(plan => usage.apps < plan.apps
-    && usage.channels < plan.channels
-    && usage.versions < plan.versions
-    && usage.sharedChannels < plan.sharedChannels
-    && usage.updates < plan.updates) || planList.value[planList.value.length - 1]
-})
+const currentPlanSuggest = computed(() => planList.value.find(plan => plan.id === main.myPlan?.planSuggest))
 
-const currentPlan = computed<Plan>(() => {
-  return planList.value.find(plan => myPlan.value?.product_id === plan.id) || planList.value[0]
-})
+const currentPlan = computed(() => planList.value.find(plan => plan.id === main.myPlan?.plan))
+
+const getAllPlan = async () => {
+  console.log(main.myPlan)
+  if (!main.myPlan)
+    return
+  planList.value = Object.values(main.myPlan?.AllPlans)
+}
+
+const getCurrentPlanSuggestStat = (name: string): number => {
+  console.log('getCurrentPlanSuggestStat', name, currentPlanSuggest.value)
+  return currentPlanSuggest.value ? currentPlanSuggest?.value[name as keyof Stats] : 0
+}
 
 interface SegmentCustomEvent extends CustomEvent {
   target: HTMLIonSegmentElement
   detail: SegmentChangeEventDetail
 }
 const segmentChanged = (e: SegmentCustomEvent) => {
-  segmentVal.value = e.detail.value || 'monthly'
+  segmentVal.value = e.detail.value === 'yearly' ? 'yearly' : 'monthly'
 }
 
-const getMyApps = async() => {
-  const { data } = await supabase
-    .from<definitions['apps']>('apps')
-    .select()
-    .eq('user_id', auth?.id)
-  if (data && data.length)
-    usage.apps = data.length
+const getMaxApp = async () => {
+  // from app_stats find max channel
+  usage.apps = main.myPlan?.stats.length || 0
 }
 
-const getMyPlan = async() => {
-  console.log('user', supabase.auth.user(), supabase.auth.session())
-  if (!main.user?.customer_id)
-    return
-  const { data } = await supabase
-    .from<definitions['stripe_info']>('stripe_info')
-    .select()
-    .eq('customer_id', main.user?.customer_id)
-  if (data && data.length)
-    myPlan.value = data[0]
+const getMaxChannel = async () => {
+  // from app_stats find max channel
+  usage.channels = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.channels), 0) || 0
 }
 
-const getMaxChannel = async() => {
-  const { data, error } = await supabase.rpc<number>('get_max_channel', { userid: auth?.id })
-  if (error)
-    usage.channels = 0
-  else
-    usage.channels = Number(data)
+const getMaxShared = async () => {
+  // from app_stats find max shared
+  usage.sharedChannels = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.shared), 0) || 0
 }
 
-const getMaxShared = async() => {
-  const { data, error } = await supabase.rpc<number>('get_max_shared', { userid: auth?.id })
-  if (error)
-    usage.sharedChannels = 0
-  else
-    usage.sharedChannels = Number(data)
+const getMaxVersion = async () => {
+  // from app_stats find max version
+  usage.versions = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.versions), 0) || 0
 }
-
-const getMaxVersion = async() => {
-  const { data, error } = await supabase.rpc<number>('get_max_version', { userid: auth?.id })
-  if (error)
-    usage.versions = 0
-  else
-    usage.versions = Number(data)
+const getMaxDownload = async () => {
+  // from app_stats find max download
+  usage.updates = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu, cur.mlu_real)), 0) || 0
+}
+const getAllMax = async () => {
+  await Promise.all([
+    getMaxApp(),
+    getMaxChannel(),
+    getMaxShared(),
+    getMaxVersion(),
+    getMaxDownload(),
+  ])
 }
 
 const openChangePlan = (planId: string) => {
   if (planId)
     openCheckout(planId)
 }
-const showToastMessage = async(message: string) => {
+const showToastMessage = async (message: string) => {
   const toast = await toastController
     .create({
       position: 'middle',
@@ -215,25 +119,14 @@ const showToastMessage = async(message: string) => {
   await toast.present()
 }
 
-const getMaxDownload = async() => {
-  const { data, error } = await supabase.rpc<PastDl>('get_dl_by_month', { userid: auth?.id, pastmonth: 0 })
-  if (error)
-    usage.updates = 0
-  if (data && data.length) {
-    const max = data.reduce((acc, cur) => {
-      if (cur.maxdownload > acc)
-        return cur.maxdownload
-      return acc
-    }, 0)
-    usage.updates = max
-  }
-}
-const stats = () => {
-  const res = Object.keys(usage)
+const stats = (): keyof Stats => {
+  // get keys of Stats interface
+  const res: keyof Stats = Object.keys(usage) as unknown as keyof Stats
   return res
 }
 
 const getPercentage = (val: number, total: number) => {
+  console.log('getPercentage', val, total)
   return Math.floor((val * 100) / total)
 }
 const getBarColorClass = (name: string) => {
@@ -251,27 +144,25 @@ const getBarColorClass = (name: string) => {
   }
 }
 
-watchEffect(async() => {
-  if (route.path === '/app/usage') {
+watchEffect(async () => {
+  if (main.myPlan) {
     isLoading.value = true
-    await Promise.all([
-      getMyApps(),
-      getMaxChannel(),
-      getMaxShared(),
-      getMaxVersion(),
-      getMaxDownload(),
-      getMyPlan(),
-    ])
+    await getAllPlan().then(getAllMax)
     isLoading.value = false
+  }
+})
+
+watchEffect(async () => {
+  if (route.path === '/app/usage') {
     // if session_id is in url params show modal success plan setup
     route.query.session_id && showToastMessage(t('usage.success'))
   }
 })
 
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
-    await getMyApps()
+    await getAllPlan().then(getAllMax)
   }
   catch (error) {
     console.error(error)
@@ -280,52 +171,50 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 </script>
+
 <template>
   <IonPage>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button default-href="/app/account" />
-        </ion-buttons>
-        <IonTitle>{{ t('usage.title') }}</IonTitle>
-      </ion-toolbar>
-    </ion-header>
+    <TitleHead :title="t('usage.title')" default-back="/app/account" />
     <IonContent :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
-        <ion-refresher-content />
-      </ion-refresher>
-      <ion-list v-if="!isLoading">
-        <ion-item-divider>
-          <ion-label>
+      <TitleHead :title="t('usage.title')" big default-back="/app/account" />
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
+      <div v-if="isLoading" class="flex justify-center">
+        <Spinner />
+      </div>
+      <IonList v-if="!isLoading">
+        <IonItemDivider v-if="currentPlanSuggest">
+          <IonLabel>
             {{ t('your-current-suggested-plan-is') }}
             <a href="https://capgo.app/pricing" class="!text-pumpkin-orange-500 font-bold inline cursor-pointer" target="_blank">{{ currentPlanSuggest.name }}</a>
-          </ion-label>
-        </ion-item-divider>
-        <ion-item-divider>
-          <ion-label>
+          </IonLabel>
+        </IonItemDivider>
+        <IonItemDivider v-if="currentPlan">
+          <IonLabel>
             {{ t('your-current-plan-is') }}
             <div class="!text-pumpkin-orange-500 font-bold inline" target="_blank">
               {{ currentPlan.name }}
             </div>
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem v-for="s in stats()" :key="s">
           <p class="w-40 first-letter:uppercase">
             {{ s.replace(/([a-z])([A-Z])/g, '$1 $2') }}
           </p>
           <div class="w-30">
             <p :class="getBarColorClass(s)" class=" rounded text-center">
-              {{ usage[s] }}
+              {{ getStat(s) }}
             </p>
           </div>
           <div class="ml-3 w-full md:w-1/2 bg-gray-200 rounded-full dark:bg-gray-700">
-            <div :class="getBarColorClass(s)" class="min-h-4 text-xs font-medium text-center p-0.5 leading-none rounded-full" :style="{ width: `${getPercentage(usage[s], currentPlanSuggest[s])}%` }">
-              {{ getPercentage(usage[s], currentPlanSuggest[s]) < 10 ? '' : `${getPercentage(usage[s], currentPlanSuggest[s])}%` }}
+            <div :class="getBarColorClass(s)" class="min-h-4 text-xs font-medium text-center p-0.5 leading-none rounded-full" :style="{ width: `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }">
+              {{ getPercentage(getStat(s), getCurrentPlanSuggestStat(s)) < 10 ? '' : `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }}
             </div>
           </div>
         </IonItem>
-      </ion-list>
-      <div v-if="!isMobile" class="bg-white dark:bg-gray-900">
+      </IonList>
+      <div v-if="!isMobile && !isLoading" class="bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto py-24 px-4 sm:px-6 lg:px-8">
           <div class="sm:flex sm:flex-col sm:align-center">
             <h1 class="text-5xl font-extrabold text-gray-900 dark:text-gray-100 sm:text-center">
@@ -334,14 +223,14 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             <p class="mt-5 text-xl text-gray-500 sm:text-center">
               {{ t('plan.desc') }}
             </p>
-            <ion-segment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ionChange="segmentChanged($event)">
-              <ion-segment-button class="h-10" value="monthly">
-                <ion-label>{{ t('plan.monthly-billing') }}</ion-label>
-              </ion-segment-button>
-              <ion-segment-button class="h-10" value="yearly">
-                <ion-label>{{ t('plan.yearly-billing') }}</ion-label>
-              </ion-segment-button>
-            </ion-segment>
+            <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
+              <IonSegmentButton class="h-10" value="monthly">
+                <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
+              </IonSegmentButton>
+              <IonSegmentButton class="h-10" value="yearly">
+                <IonLabel>{{ t('plan.yearly-billing') }}</IonLabel>
+              </IonSegmentButton>
+            </IonSegment>
           </div>
           <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
             <div v-for="p in planList" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
@@ -350,7 +239,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
                   {{ p.name }}
                 </h2>
                 <p class="mt-4 text-sm text-gray-500">
-                  {{ p.description }}
+                  {{ t(p.description) }}
                 </p>
                 <p class="mt-8">
                   <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">${{ p.price[segmentVal] }}</span>

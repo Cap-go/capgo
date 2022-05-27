@@ -68,6 +68,9 @@ button:
   tabs: Sekmeler
   toggle_dark: Karanlık modu değiştir
   toggle_langs: Dilleri değiştir
+cannot-delete-app: Uygulama silinemiyor
+cannot-delete-app-version: Uygulama sürümü silinemiyor
+cannot-delete-channel: Kanal silinemiyor
 channel:
   add: Ekle
   beta-channel: Beta kanalı
@@ -89,6 +92,8 @@ channel:
   user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
+channel-deleted: Kanal silindi
+days: günler
 device:
   channel: Kanal bağlantısı
   created_at: 'Şu saatte oluşturuldu:'
@@ -120,6 +125,8 @@ intro:
   dynamic-route: Dinamik rota demosu
   hi: Merhaba, {name}!
   whats-your-name: Adınız nedir?
+limit-reached: Sınıra ulaşıldı
+loading-more-data: Daha fazla veri yükleniyor...
 login:
   andpass: Ve şifre
   connexion: Giriş yapmak
@@ -198,6 +205,7 @@ plan:
   versions: Sürümler
   whats-included: Neler dahil
   yearly-billing: Yıllık faturalandırma
+please-upgrade: Lütfen daha fazla kullanıcı eklemek için planınızı yükseltin
 projects:
   list: senin
   sharedlist: Seninle paylaştı
@@ -218,6 +226,7 @@ register:
   password-hint: En az 6 rakam, harf ve noktalama işaretinden oluşan bir kombinasyon girin.
   specialError: Özel karakterler içermelidir
   upperCaseError: Büyük harfler içermelidir
+see-usage: Kullanıma bakın
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
@@ -227,6 +236,10 @@ stats:
   subtitle: Geçen ay
   title: istatistikler
   versions: Sürümler
+trial-plan-expired: Deneme Planının Süresi Doldu
+trial-plan-expires-in: 'Deneme Planı şu tarihte sona eriyor:'
+upgrade: Güncelleme
+upgrade-now: Hemen Yükselt
 usage:
   success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
   title: kullanım

@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import {
-  IonButton, IonButtons, IonContent,
-  IonHeader,
+  IonContent,
   IonIcon,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonItem,
   IonItemDivider,
   IonItemOption,
   IonItemOptions, IonItemSliding,
   IonLabel, IonList,
   IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
-  IonTitle,
-  IonToolbar,
   actionSheetController, alertController, isPlatform, toastController,
 } from '@ionic/vue'
-import { chevronBack, chevronForwardOutline } from 'ionicons/icons'
+import { chevronForwardOutline } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -22,7 +21,15 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { openVersion } from '~/services/versions'
+import TitleHead from '~/components/TitleHead.vue'
 
+interface InfiniteScrollCustomEvent extends CustomEvent {
+  target: HTMLIonInfiniteScrollElement
+}
+
+const fetchLimit = 10
+let fetchOffset = 0
+const isDisabled = ref(false)
 const listRef = ref()
 const { t } = useI18n()
 const router = useRouter()
@@ -31,30 +38,23 @@ const supabase = useSupabase()
 const id = ref('')
 const search = ref('')
 const isLoading = ref(false)
+const isLoadingSub = ref(false)
 const app = ref<definitions['apps']>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
+const filtered = ref<definitions['app_versions'][]>([])
 
 const versionFilter = computed(() => {
-  const value = search.value
-  if (value) {
-    const filtered = versions.value.filter(version => version.name.toLowerCase().includes(value.toLowerCase()))
-    return filtered
-  }
+  if (search.value)
+    return filtered.value
   return versions.value
 })
-const loadData = async() => {
+const loadAppInfo = async () => {
   try {
     const { data: dataApp } = await supabase
       .from<definitions['apps']>('apps')
       .select()
       .eq('app_id', id.value)
-    const { data: dataVersions } = await supabase
-      .from<definitions['app_versions']>('app_versions')
-      .select()
-      .eq('app_id', id.value)
-      .eq('deleted', false)
-      .order('created_at', { ascending: false })
     const { data: dataChannel } = await supabase
       .from<definitions['channels'] & Channel>('channels')
       .select(`
@@ -71,17 +71,55 @@ const loadData = async() => {
       .eq('app_id', id.value)
       .order('updated_at', { ascending: false })
     app.value = dataApp?.length ? dataApp[0] : app.value
-    versions.value = dataVersions || versions.value
     channels.value = dataChannel || channels.value
   }
   catch (error) {
     console.error(error)
   }
 }
+const searchVersion = async () => {
+  isLoadingSub.value = true
+  const { data: dataVersions } = await supabase
+    .from<definitions['app_versions']>('app_versions')
+    .select()
+    .eq('app_id', id.value)
+    .eq('deleted', false)
+    .order('created_at', { ascending: false })
+    .like('name', `%${search.value}%`)
+  filtered.value = dataVersions || []
+  isLoadingSub.value = false
+}
+const loadData = async (event?: InfiniteScrollCustomEvent) => {
+  try {
+    const { data: dataVersions } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', id.value)
+      .eq('deleted', false)
+      .order('created_at', { ascending: false })
+      .range(fetchOffset, fetchOffset + fetchLimit - 1)
+    if (!dataVersions)
+      return
+    versions.value.push(...dataVersions)
+    if (dataVersions.length === fetchLimit)
+      fetchOffset += fetchLimit
+    else
+      isDisabled.value = true
+    versions.value = dataVersions || versions.value
+  }
+  catch (error) {
+    console.error(error)
+  }
+  if (event)
+    event.target.complete()
+}
 
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
+    await loadAppInfo()
+    versions.value = []
+    fetchOffset = 0
     await loadData()
   }
   catch (error) {
@@ -91,7 +129,7 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-const didCancel = async(name: string) => {
+const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
@@ -111,26 +149,22 @@ const didCancel = async(name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteChannel = async(channel: definitions['channels']) => {
+const deleteChannel = async (channel: definitions['channels']) => {
   console.log('deleteChannel', channel)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   if (await didCancel(t('channel.title')))
     return
   try {
-    const { error: delChannelUserError } = await supabase
-      .from<definitions['channel_users']>('channel_users')
-      .delete()
-      .eq('app_id', channel.app_id)
     const { error: delChanError } = await supabase
       .from<definitions['channels']>('channels')
       .delete()
       .eq('app_id', channel.app_id)
       .eq('id', channel.id)
-    if (delChanError || delChannelUserError) {
+    if (delChanError) {
       const toast = await toastController
         .create({
-          message: 'Cannot delete channel',
+          message: t('cannot-delete-channel'),
           duration: 2000,
         })
       await toast.present()
@@ -139,7 +173,7 @@ const deleteChannel = async(channel: definitions['channels']) => {
       await refreshData()
       const toast = await toastController
         .create({
-          message: 'Channel deleted',
+          message: t('channel-deleted'),
           duration: 2000,
         })
       await toast.present()
@@ -148,14 +182,14 @@ const deleteChannel = async(channel: definitions['channels']) => {
   catch (error) {
     const toast = await toastController
       .create({
-        message: 'Cannot delete channel',
+        message: t('cannot-delete-channel'),
         duration: 2000,
       })
     await toast.present()
   }
 }
 
-const deleteVersion = async(version: definitions['app_versions']) => {
+const deleteVersion = async (version: definitions['app_versions']) => {
   console.log('deleteVersion', version)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -236,7 +270,7 @@ const openDevices = () => {
 const openStats = () => {
   router.push(`/app/p/${id.value.replaceAll('.', '--')}/stats`)
 }
-const setChannel = async(v: definitions['app_versions'], channel: definitions['channels']) => {
+const setChannel = async (v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
     .from<definitions['channels']>('channels')
     .update({
@@ -244,13 +278,13 @@ const setChannel = async(v: definitions['app_versions'], channel: definitions['c
     })
     .eq('id', channel.id)
 }
-const ASChannelChooser = async(v: definitions['app_versions']) => {
+const ASChannelChooser = async (v: definitions['app_versions']) => {
   // const buttons
   const buttons = []
   for (const channel of channels.value) {
     buttons.push({
       text: channel.name,
-      handler: async() => {
+      handler: async () => {
         isLoading.value = true
         try {
           await setChannel(v, channel)
@@ -282,7 +316,7 @@ const ASChannelChooser = async(v: definitions['app_versions']) => {
   })
   await actionSheet.present()
 }
-const ASVersion = async(v: definitions['app_versions']) => {
+const ASVersion = async (v: definitions['app_versions']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -325,40 +359,28 @@ interface RefresherCustomEvent extends CustomEvent {
   target: HTMLIonRefresherElement
 }
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
     id.value = id.value.replaceAll('--', '.')
     await refreshData()
   }
 })
-const back = () => {
-  router.go(-1)
-}
 </script>
+
 <template>
-  <ion-page>
-    <IonHeader class="header-custom">
-      <IonToolbar class="toolbar-no-border">
-        <IonButtons slot="start" class="mx-3">
-          <IonButton @click="back">
-            <IonIcon :icon="chevronBack" class="text-grey-dark" /> {{ t('button.back') }}
-          </IonButton>
-        </IonButtons>
-        <IonTitle color="warning">
-          {{ app?.name }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
-    <ion-content :fullscreen="true">
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
-        <ion-refresher-content />
-      </ion-refresher>
+  <IonPage>
+    <TitleHead :title="app?.name" default-back="/app" color="warning" />
+    <IonContent :fullscreen="true">
+      <TitleHead :title="app?.name" no-back big condense color="warning" />
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
       <div v-if="isLoading" class="chat-items flex justify-center">
         <Spinner />
       </div>
       <div v-else>
-        <ion-list ref="listRef">
+        <IonList ref="listRef">
           <IonItem class="cursor-pointer" @click="openStats()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
@@ -411,7 +433,7 @@ const back = () => {
           </IonItemDivider>
           <!-- add item with searchbar -->
           <IonItem>
-            <IonSearchbar @IonChange="search = $event.detail.value" />
+            <IonSearchbar @ion-change="search = $event.detail.value.toLowerCase(); searchVersion()" />
           </IonItem>
           <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>
@@ -432,8 +454,21 @@ const back = () => {
               </IonItemOptions>
             </IonItemSliding>
           </template>
-        </ion-list>
+          <div v-if="isLoadingSub" class="chat-items flex justify-center">
+            <Spinner />
+          </div>
+          <IonInfiniteScroll
+            threshold="100px"
+            :disabled="isDisabled || search"
+            @ion-infinite="loadData($event)"
+          >
+            <IonInfiniteScrollContent
+              loading-spinner="bubbles"
+              :loading-text="t('loading-more-data')"
+            />
+          </IonInfiniteScroll>
+        </IonList>
       </div>
-    </ion-content>
-  </ion-page>
+    </IonContent>
+  </IonPage>
 </template>

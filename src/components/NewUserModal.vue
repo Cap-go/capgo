@@ -15,17 +15,15 @@ import { generate } from 'generate-password-browser'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 
+const props = defineProps({
+  emailAddress: String,
+})
+const emit = defineEmits(['inviteUser', 'close'])
 const supabase = useSupabase()
 const form = reactive({
   first_name: '',
   last_name: '',
 })
-
-const props = defineProps({
-  emailAddress: String,
-})
-
-const emit = defineEmits(['inviteUser'])
 
 const userEmail = ref(props.emailAddress)
 
@@ -41,7 +39,7 @@ const v$ = useVuelidate(rules, form)
 
 const { t } = useI18n()
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   try {
     const isFormCorrect = await v$.value.$validate()
@@ -95,16 +93,16 @@ const submit = async() => {
 </script>
 
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-title>
+  <IonHeader>
+    <IonToolbar mode="ios">
+      <IonTitle>
         Invite user
-      </ion-title>
-      <ion-button slot="end" @click="$emit('close')">
+      </IonTitle>
+      <IonButton slot="end" @click="emit('close')">
         Close
-      </ion-button>
-    </ion-toolbar>
-  </ion-header>
+      </IonButton>
+    </IonToolbar>
+  </IonHeader>
   <IonContent>
     <div class="grid lg:w-1/2 mx-auto w-full h-full min-h-screen p-8">
       <form

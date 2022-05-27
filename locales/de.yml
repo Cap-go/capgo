@@ -70,6 +70,9 @@ button:
   tabs: Registerkarten
   toggle_dark: Dunkelmodus umschalten
   toggle_langs: Sprachen ändern
+cannot-delete-app: App kann nicht gelöscht werden
+cannot-delete-app-version: App-Version kann nicht gelöscht werden
+cannot-delete-channel: Kanal kann nicht gelöscht werden
 channel:
   add: Hinzufügen
   beta-channel: Beta-Kanal
@@ -91,6 +94,8 @@ channel:
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
   users: Mit Benutzern geteilt
   v3: V3-Einstellungen
+channel-deleted: Kanal gelöscht
+days: Tage
 device:
   channel: Kanallink
   created_at: Hergestellt in
@@ -124,6 +129,8 @@ intro:
   dynamic-route: Demo einer dynamischen Route
   hi: Hi, {name}!
   whats-your-name: Wie heißt du?
+limit-reached: Limit erreicht
+loading-more-data: Weitere Daten werden geladen...
 login:
   andpass: Und Passwort
   connexion: Anmeldung
@@ -202,6 +209,7 @@ plan:
   versions: Versionen
   whats-included: Was ist inbegriffen
   yearly-billing: Jährliche Abrechnung
+please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 projects:
   list: Deine
   sharedlist: Mit dir geteilt
@@ -224,6 +232,7 @@ register:
     Satzzeichen ein.
   specialError: Sollte Sonderzeichen enthalten
   upperCaseError: Sollte Großbuchstaben enthalten
+see-usage: Siehe Verwendung
 something-went-wrong-try-again-later: |-
   Etwas ist schief gelaufen! 
   Versuchen Sie es später noch einmal.
@@ -233,6 +242,10 @@ stats:
   subtitle: Letzten Monat
   title: Statistiken
   versions: Versionen
+trial-plan-expired: Testplan abgelaufen
+trial-plan-expires-in: Der Testplan läuft ab in
+upgrade: Aktualisierung
+upgrade-now: Jetzt upgraden
 usage:
   success: >-
     Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten

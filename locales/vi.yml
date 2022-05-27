@@ -68,6 +68,9 @@ button:
   tabs: Các tab
   toggle_dark: Chuyển đổi chế độ tối
   toggle_langs: Thay đổi ngôn ngữ
+cannot-delete-app: Không thể xóa ứng dụng
+cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
+cannot-delete-channel: Không thể xóa kênh
 channel:
   add: Thêm vào
   beta-channel: Kênh beta
@@ -89,6 +92,8 @@ channel:
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
+channel-deleted: Kênh đã bị xóa
+days: ngày
 device:
   channel: Liên kết kênh
   created_at: Được tạo lúc
@@ -120,6 +125,8 @@ intro:
   dynamic-route: Bản giới thiệu về dynamic route
   hi: Hi, {name}!
   whats-your-name: Tên bạn là gì?
+limit-reached: Đạt tới giới hạn
+loading-more-data: Đang tải thêm dữ liệu ...
 login:
   andpass: Và mật khẩu
   connexion: Đăng nhập
@@ -196,6 +203,7 @@ plan:
   versions: Phiên bản
   whats-included: Bao gồm những gì
   yearly-billing: Thanh toán hàng năm
+please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 projects:
   list: Của bạn
   sharedlist: Đã chia sẻ với bạn
@@ -216,6 +224,7 @@ register:
   password-hint: Nhập kết hợp của ít nhất 6 số, chữ cái và dấu chấm câu.
   specialError: Phải chứa các ký tự đặc biệt
   upperCaseError: Nên chứa các chữ cái in hoa
+see-usage: Xem mức sử dụng
 something-went-wrong-try-again-later: |-
   Đã xảy ra lỗi! 
   Thử lại sau.
@@ -225,6 +234,10 @@ stats:
   subtitle: Tháng trước
   title: Số liệu thống kê
   versions: Phiên bản
+trial-plan-expired: Gói dùng thử đã hết hạn
+trial-plan-expires-in: Gói dùng thử sẽ hết hạn sau
+upgrade: Nâng cấp
+upgrade-now: Nâng cấp ngay bây giờ
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng

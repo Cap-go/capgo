@@ -8,7 +8,7 @@ interface versionSet {
   version: string
   versionName?: string | undefined
 }
-export const openVersion = async(app: definitions['app_versions']) => {
+export const openVersion = async (app: definitions['app_versions']) => {
   const supabase = useSupabase()
   const auth = supabase.auth.user()
 

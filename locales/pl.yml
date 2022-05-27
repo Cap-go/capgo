@@ -68,6 +68,9 @@ button:
   tabs: Karty
   toggle_dark: Ustaw tryb nocny
   toggle_langs: Zmień język
+cannot-delete-app: Nie można usunąć aplikacji
+cannot-delete-app-version: Nie można usunąć wersji aplikacji
+cannot-delete-channel: Nie można usunąć kanału
 channel:
   add: Dodać
   beta-channel: Kanał beta
@@ -89,6 +92,8 @@ channel:
   user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
   users: Udostępnione użytkownikom
   v3: Ustawienia V3
+channel-deleted: Kanał usunięty
+days: dni
 device:
   channel: Link do kanału
   created_at: Utworzono w
@@ -120,6 +125,8 @@ intro:
   dynamic-route: Demonstracja dynamicznego route
   hi: Cześć, {name}!
   whats-your-name: Jak masz na imię?
+limit-reached: Limit osiągnięty
+loading-more-data: Ładuję więcej danych...
 login:
   andpass: I hasło
   connexion: Zaloguj sie
@@ -194,6 +201,7 @@ plan:
   versions: Wersje
   whats-included: Co jest zawarte
   yearly-billing: Rozliczenie roczne
+please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 projects:
   list: Twój
   sharedlist: Dzielone z Tobą
@@ -214,6 +222,7 @@ register:
   password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
   specialError: Powinien zawierać znaki specjalne
   upperCaseError: Powinien zawierać wielkie litery
+see-usage: Zobacz użycie
 something-went-wrong-try-again-later: |-
   Coś poszło nie tak! 
   Spróbuj ponownie później.
@@ -223,6 +232,10 @@ stats:
   subtitle: W zeszłym miesiącu
   title: Statystyki
   versions: Wersje
+trial-plan-expired: Plan próbny wygasł
+trial-plan-expires-in: Plan próbny wygasa za
+upgrade: Uaktualnić
+upgrade-now: Ulepsz teraz
 usage:
   success: >-
     Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka

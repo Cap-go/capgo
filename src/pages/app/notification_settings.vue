@@ -18,7 +18,7 @@ let user = supabase.auth.user()
 form.enableNotifications = !!user?.user_metadata?.activation?.enableNotifications
 form.optForNewsletters = !!user?.user_metadata?.activation?.optForNewsletters
 
-const submitNotif = async() => {
+const submitNotif = async () => {
   isLoading.value = true
   const activation = user?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.update({
@@ -33,7 +33,7 @@ const submitNotif = async() => {
     user = data
   isLoading.value = false
 }
-const submitDoi = async() => {
+const submitDoi = async () => {
   isLoading.value = true
   const activation = user?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.update({
@@ -52,20 +52,20 @@ const submitDoi = async() => {
 
 <template>
   <IonPage>
+    <TitleHead :title="t('notificationSettings.heading')" />
     <IonContent :fullscreen="true">
       <div class="mx-auto w-full lg:w-1/2">
         <div class="py-16 px-6">
-          <TitleHead :title="t('notificationSettings.heading')" />
           <div class="flex justify-between items-center my-2">
             <label for="notification" class="justify-self-start text-xl">{{ t('activation.notification') }}</label>
-            <IonToggle v-model="form.enableNotifications" color="success" @ionChange="submitNotif()" />
+            <IonToggle v-model="form.enableNotifications" color="success" @ion-change="submitNotif()" />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.notification-desc') }}
           </p>
           <div class="flex justify-between items-center mb-2 mt-4">
             <label for="notification" class="justify-self-start text-xl w-64">{{ t('activation.doi') }}</label>
-            <IonToggle v-model="form.optForNewsletters" color="success" @ionChange="submitDoi()" />
+            <IonToggle v-model="form.optForNewsletters" color="success" @ion-change="submitDoi()" />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.doi-desc') }}

@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
 import type { definitions } from './types_supabase.ts'
-
 // Import Supabase client
 
 export const supabaseClient = createClient(

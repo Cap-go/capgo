@@ -2,6 +2,162 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.9-alpha.15](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.14...0.30.9-alpha.15) (2022-05-27)
+
+
+### Features
+
+* add cli_login ([5481e47](https://github.com/Cap-go/capgo/commit/5481e4747af40e0486c2fff400738bcf49535264))
+
+### [0.30.9-alpha.14](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.13...0.30.9-alpha.14) (2022-05-27)
+
+
+### Bug Fixes
+
+* missing translation ([745d22e](https://github.com/Cap-go/capgo/commit/745d22ec6d92146164918029d2100ed6554e463f))
+
+### [0.30.9-alpha.13](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.12...0.30.9-alpha.13) (2022-05-27)
+
+
+### Bug Fixes
+
+* remove all mess to delete thanks to fk ([fbf766a](https://github.com/Cap-go/capgo/commit/fbf766ab968b9f2341ace866f59bd84dad803f36))
+
+### [0.30.9-alpha.12](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.11...0.30.9-alpha.12) (2022-05-27)
+
+
+### Bug Fixes
+
+* all missing misplaced TitleHead ([714e84a](https://github.com/Cap-go/capgo/commit/714e84aaf7adaae60e7d040455aa67b4e13763fd))
+
+### [0.30.9-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.10...0.30.9-alpha.11) (2022-05-27)
+
+
+### Bug Fixes
+
+* add script fo fk ([8339ffa](https://github.com/Cap-go/capgo/commit/8339ffa2603ecac3c489fa9efc24b5c982dea6bc))
+
+### [0.30.9-alpha.10](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.9...0.30.9-alpha.10) (2022-05-26)
+
+### [0.30.9-alpha.9](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.8...0.30.9-alpha.9) (2022-05-26)
+
+
+### Bug Fixes
+
+* trial banner for mobile and fix backend payment function ([6afa6ca](https://github.com/Cap-go/capgo/commit/6afa6cac4e95df7d916c21312a3c566222e96b2a))
+
+### [0.30.9-alpha.8](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.7...0.30.9-alpha.8) (2022-05-26)
+
+
+### Bug Fixes
+
+* lint ([dad2fca](https://github.com/Cap-go/capgo/commit/dad2fca716e45ef25dc8effdac05fcd4ba23b188))
+
+### [0.30.9-alpha.7](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.6...0.30.9-alpha.7) (2022-05-26)
+
+
+### Bug Fixes
+
+* deploy new anon key ([84c34c3](https://github.com/Cap-go/capgo/commit/84c34c3bbd3599d77939f057f0e2f092ab7975ea))
+
+### [0.30.9-alpha.6](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.5...0.30.9-alpha.6) (2022-05-26)
+
+
+### Bug Fixes
+
+* add log for env debug ([b1fdea3](https://github.com/Cap-go/capgo/commit/b1fdea33d77f8d227bd1ea2f987208f9fca90400))
+
+### [0.30.9-alpha.5](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.4...0.30.9-alpha.5) (2022-05-26)
+
+
+### Bug Fixes
+
+* search in device list ([22862d1](https://github.com/Cap-go/capgo/commit/22862d1eb5892af1f8e50c2c6b000debbf09cd2e))
+
+### [0.30.9-alpha.4](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.3...0.30.9-alpha.4) (2022-05-26)
+
+
+### Bug Fixes
+
+* remove old configs ([2e6da87](https://github.com/Cap-go/capgo/commit/2e6da8748a30a2ebc4ec43a080f42356b4977102))
+
+### [0.30.9-alpha.3](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.2...0.30.9-alpha.3) (2022-05-26)
+
+
+### Bug Fixes
+
+* tigger CI ([03fec35](https://github.com/Cap-go/capgo/commit/03fec3588807a903a7a7b73208a32632042e7d88))
+
+### [0.30.9-alpha.2](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.1...0.30.9-alpha.2) (2022-05-26)
+
+
+### Bug Fixes
+
+* lint issues ([a39811c](https://github.com/Cap-go/capgo/commit/a39811cca80f93d443961dc970ca9cde9b13efe7))
+
+### [0.30.9-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.0...0.30.9-alpha.1) (2022-05-26)
+
+
+### Bug Fixes
+
+* discard env.dev from git ([9ce3bb6](https://github.com/Cap-go/capgo/commit/9ce3bb6e6fc754b23f85c2a63e9dae082e52d0ec))
+
+### [0.30.9-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.6...0.30.9-alpha.0) (2022-05-26)
+
+
+### Features
+
+* add app stats ([e387aa6](https://github.com/Cap-go/capgo/commit/e387aa6209fdd75b5822ee70b515479bdb0d854b))
+* add plan limits ([a19befe](https://github.com/Cap-go/capgo/commit/a19befe75633c07ec60339bcbfbf5dd38a0ee0fa))
+* add upgrade messahe system from backend ([3bd4985](https://github.com/Cap-go/capgo/commit/3bd498522f03cf275fb1888d4958a2f6277e9a23))
+
+
+### Bug Fixes
+
+* add comment ([c0144d4](https://github.com/Cap-go/capgo/commit/c0144d4f06bf034334ed861ab55f9f98adc25089))
+* all cli methods ([617f406](https://github.com/Cap-go/capgo/commit/617f40681784275b3dfa08ed545c615a5fdaf297))
+* app_stats add mul and mlu_real ([9de2322](https://github.com/Cap-go/capgo/commit/9de232254544cfe2190d04024c9073e3f966ed25))
+* app_stats function ([d442667](https://github.com/Cap-go/capgo/commit/d442667d03813c1f3ef59974b9d715b1ceeadf4c))
+* checkAppOwner logic was incorrect in delete supabase-function ([2e3e64d](https://github.com/Cap-go/capgo/commit/2e3e64dda6c1377e3d80a5edcc46548463307be7))
+* cors on front functions ([20ac84c](https://github.com/Cap-go/capgo/commit/20ac84cebb35b70c7346ce806970c4e00bb7bb40))
+* dayjs import ([0dd6684](https://github.com/Cap-go/capgo/commit/0dd6684838705a8333bc8ccb908dc5cb7894e884))
+* double banner issue ([d15d3a6](https://github.com/Cap-go/capgo/commit/d15d3a685d4e4d20adb217a34e4d8f7bd6314a23))
+* error message in cloud functions ([07b97ca](https://github.com/Cap-go/capgo/commit/07b97cab7c2189e17a191c29cd759a27d0ea732e))
+* for upload ([76dd174](https://github.com/Cap-go/capgo/commit/76dd1740fc94135b2d6cea5a474f1ebb33bfb2be))
+* hide banner in usage page ([0ef2249](https://github.com/Cap-go/capgo/commit/0ef2249373b2a543ef3a1d7f08e1db3b380bb120))
+* lockfile ([cd09fbf](https://github.com/Cap-go/capgo/commit/cd09fbf09cc3c5990cfc90c850a091915d67d107))
+* make payment_status in the store ([455c96f](https://github.com/Cap-go/capgo/commit/455c96f75a3d19b82640c19075c8dc7a94adb834))
+* remove tests ([927d784](https://github.com/Cap-go/capgo/commit/927d784cf13c1be4d62cfcbc00cc494350442a95))
+* some lint issue + payment bar ([efb526c](https://github.com/Cap-go/capgo/commit/efb526ce0974761a75a901c6d29f033067ab0187))
+* stats add devices ([3b0fe9a](https://github.com/Cap-go/capgo/commit/3b0fe9a3f3927bea24d05088658e6ba3ae14ea0c))
+* stats page ([30fddbb](https://github.com/Cap-go/capgo/commit/30fddbbe2b8eb25921f5531dd0100bb416629107))
+* stripe functions ([4c1c65f](https://github.com/Cap-go/capgo/commit/4c1c65f2c10d374bf430b51c8d7b6577a1861dc2))
+* stripe supabase functions ([696f5a3](https://github.com/Cap-go/capgo/commit/696f5a37b0157d80d060fef25975c31fe4995f19))
+* trial banner ([b7bb702](https://github.com/Cap-go/capgo/commit/b7bb7020e0d8f6e7d06523ea14b51e13ec95ec75))
+* types ([818b1f4](https://github.com/Cap-go/capgo/commit/818b1f48146f87990f9cfb49bf22625705865146))
+* types ([ae47c81](https://github.com/Cap-go/capgo/commit/ae47c81a06ed762310714d8771417f0ac5e62bb9))
+* typo and stats method ([db3eb32](https://github.com/Cap-go/capgo/commit/db3eb321080750d520598d7bdd7178ccd795c899))
+* usage page with new backend function ([96081d6](https://github.com/Cap-go/capgo/commit/96081d6199e71ab1b2adac8ff680bfbdaadda3d0))
+* usage use new system + some refactor in ion event ([3d52c7f](https://github.com/Cap-go/capgo/commit/3d52c7f5967671cbcac68767b355c7ccf48eb899))
+* use the last month stats ([a993c02](https://github.com/Cap-go/capgo/commit/a993c02bc78ae4c389e420079c414f24f8f75f16))
+* use trial at ([70de13d](https://github.com/Cap-go/capgo/commit/70de13d4e7d552d36f8f66a788ac857a46a022f7))
+
+### [0.30.8](https://github.com/Cap-go/capgo/compare/0.30.7...0.30.8) (2022-05-03)
+
+### [0.30.8-alpha.6](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.5...0.30.8-alpha.6) (2022-05-26)
+
+
+### Bug Fixes
+
+* add better config for multi env ([b94afb5](https://github.com/Cap-go/capgo/commit/b94afb568f8af826bfb4dfec0dbd6674d1f954d4))
+
+### [0.30.8-alpha.5](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.4...0.30.8-alpha.5) (2022-05-04)
+
+
+### Bug Fixes
+
+* lock ([24c0473](https://github.com/Cap-go/capgo/commit/24c0473a8e88f8eab73e4b35435a571cb98f5f09))
+
 ### [0.30.8-alpha.4](https://github.com/Cap-go/capgo/compare/0.30.8-alpha.3...0.30.8-alpha.4) (2022-05-03)
 
 
@@ -31,6 +187,9 @@ All notable changes to this project will be documented in this file. See [standa
 * build issue ([b38c7e5](https://github.com/Cap-go/capgo/commit/b38c7e5d4746f6c7570f0ee593ec5289fa5937d4))
 
 ### [0.30.8-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.7...0.30.8-alpha.0) (2022-05-03)
+
+### [0.30.8](https://github.com/Cap-go/capgo/compare/0.30.7...0.30.8) (2022-05-03)
+
 
 
 ### Bug Fixes

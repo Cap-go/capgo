@@ -3,11 +3,8 @@ import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
 import {
   IonContent,
-  IonHeader,
   IonIcon,
   IonPage,
-  IonTitle,
-  IonToolbar,
   actionSheetController,
   isPlatform,
 } from '@ionic/vue'
@@ -17,6 +14,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
+import TitleHead from '~/components/TitleHead.vue'
 import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
@@ -32,7 +30,7 @@ const auth = supabase.auth.user()
 const version = ref(import.meta.env.VITE_APP_VERSION)
 const isMobile = ref(isPlatform('capacitor'))
 
-const updloadPhoto = async(data: string, fileName: string, contentType: string) => {
+const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
     .from('images')
     .upload(`${auth?.id}/${fileName}`, decode(data), {
@@ -58,7 +56,7 @@ const updloadPhoto = async(data: string, fileName: string, contentType: string) 
   main.user = usr[0]
 }
 
-const takePhoto = async() => {
+const takePhoto = async () => {
   const cameraPhoto = await Camera.getPhoto({
     resultType: CameraResultType.DataUrl,
     source: CameraSource.Camera,
@@ -91,7 +89,7 @@ const blobToData = (blob: Blob) => {
     reader.readAsDataURL(blob)
   })
 }
-const pickPhoto = async() => {
+const pickPhoto = async () => {
   const { photos } = await Camera.pickImages({
     limit: 1,
     quality: 100,
@@ -124,7 +122,7 @@ const pickPhoto = async() => {
     isLoading.value = false
   }
 }
-const presentActionSheet = async() => {
+const presentActionSheet = async () => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -156,21 +154,9 @@ const presentActionSheet = async() => {
 
 <template>
   <IonPage>
-    <IonHeader>
-      <IonToolbar>
-        <IonTitle color="warning">
-          {{ t("account.heading") }}
-        </IonTitle>
-      </IonToolbar>
-    </IonHeader>
+    <TitleHead :title="t('account.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <IonHeader collapse="condense">
-        <IonToolbar>
-          <IonTitle color="warning" size="large">
-            {{ t("account.heading") }}
-          </IonTitle>
-        </IonToolbar>
-      </IonHeader>
+      <TitleHead :title="t('account.heading')" no-back big color="warning" />
       <div class="py-16 px-6">
         <div
           v-if="!main.user?.image_url"
@@ -208,7 +194,7 @@ const presentActionSheet = async() => {
         >
 
         <h2 class="text-center mt-4 text-2xl text-black-light">
-          {{ main.user?.first_name + " " + main.user?.last_name }}
+          {{ `${main.user?.first_name} ${main.user?.last_name}` }}
         </h2>
         <p class="text-center text-azure-500 font-bold">
           <span class="uppercase">{{ main.user?.country }}</span>

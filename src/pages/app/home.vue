@@ -2,13 +2,12 @@
 import type { RefresherCustomEvent } from '@ionic/vue'
 import {
   IonContent,
-  IonHeader,
   IonItem, IonItemDivider, IonItemOption,
   IonItemOptions, IonItemSliding,
   IonLabel,
   IonList,
   IonPage,
-  IonRefresher, IonRefresherContent, IonTitle, IonToolbar, alertController,
+  IonRefresher, IonRefresherContent, alertController,
   toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
@@ -17,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
 import { formatDate } from '~/services/date'
 
@@ -39,7 +39,7 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
-const getMyApps = async() => {
+const getMyApps = async () => {
   const { data } = await supabase
     .from<definitions['apps']>('apps')
     .select()
@@ -48,7 +48,7 @@ const getMyApps = async() => {
     apps.value = data
 }
 
-const didCancel = async(name: string) => {
+const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
@@ -68,35 +68,18 @@ const didCancel = async(name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteApp = async(app: definitions['apps']) => {
+const deleteApp = async (app: definitions['apps']) => {
   console.log('deleteApp', app)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   if (await didCancel(t('package.name')))
     return
   try {
-    await supabase
-      .from<definitions['stats']>('stats')
-      .delete()
-      .eq('app_id', app.app_id)
-    await supabase
-      .from<definitions['devices']>('devices')
-      .delete()
-      .eq('app_id', app.app_id)
-
-    await supabase
-      .from<definitions['channel_users']>('channel_users')
-      .delete()
-      .eq('app_id', app.app_id)
     const { data, error: vError } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
-    const { error: delChanError } = await supabase
-      .from<definitions['channels']>('channels')
-      .delete()
-      .eq('app_id', app.app_id)
 
     if (data && data.length) {
       const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
@@ -107,7 +90,7 @@ const deleteApp = async(app: definitions['apps']) => {
       if (delError) {
         const toast = await toastController
           .create({
-            message: 'Cannot delete channel',
+            message: t('cannot-delete-app-version'),
             duration: 2000,
           })
         await toast.present()
@@ -115,21 +98,15 @@ const deleteApp = async(app: definitions['apps']) => {
       }
     }
 
-    const { error: delAppVersionError } = await supabase
-      .from<definitions['app_versions']>('app_versions')
-      .delete()
-      .eq('app_id', app.app_id)
-      .eq('user_id', app.user_id)
-
     const { error: dbAppError } = await supabase
       .from<definitions['apps']>('apps')
       .delete()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
-    if (delChanError || vError || delAppVersionError || dbAppError) {
+    if (vError || dbAppError) {
       const toast = await toastController
         .create({
-          message: 'Cannot delete App',
+          message: t('cannot-delete-app'),
           duration: 2000,
         })
       await toast.present()
@@ -147,13 +124,13 @@ const deleteApp = async(app: definitions['apps']) => {
   catch (error) {
     const toast = await toastController
       .create({
-        message: 'Cannot delete app',
+        message: t('cannot-delete-app'),
         duration: 2000,
       })
     await toast.present()
   }
 }
-const getSharedWithMe = async() => {
+const getSharedWithMe = async () => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
     .select(`
@@ -181,7 +158,7 @@ const getSharedWithMe = async() => {
   if (data && data.length)
     sharedApps.value = data
 }
-watchEffect(async() => {
+watchEffect(async () => {
   if (route.path === '/app/home') {
     isLoading.value = true
     await getMyApps()
@@ -189,7 +166,7 @@ watchEffect(async() => {
     isLoading.value = false
   }
 })
-const refreshData = async(evt: RefresherCustomEvent | null = null) => {
+const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await getMyApps()
@@ -202,32 +179,21 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 </script>
+
 <template>
-  <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-title color="warning">
-          {{ t('projects.title') }}
-        </ion-title>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title color="warning" size="large">
-            {{ t('projects.title') }}
-          </ion-title>
-        </ion-toolbar>
-      </ion-header>
-      <ion-refresher slot="fixed" @ionRefresh="refreshData($event)">
-        <ion-refresher-content />
-      </ion-refresher>
-      <ion-list ref="listRef">
-        <ion-item-divider>
-          <ion-label>
+  <IonPage>
+    <TitleHead :title="t('projects.title')" no-back color="warning" />
+    <IonContent :fullscreen="true">
+      <TitleHead :title="t('projects.title')" no-back big color="warning" />
+      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+        <IonRefresherContent />
+      </IonRefresher>
+      <IonList ref="listRef">
+        <IonItemDivider>
+          <IonLabel>
             {{ t('projects.list') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <div v-if="isLoading" class="flex justify-center">
           <Spinner />
         </div>
@@ -284,11 +250,11 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItem>
-        <ion-item-divider>
-          <ion-label>
+        <IonItemDivider>
+          <IonLabel>
             {{ t('projects.sharedlist') }}
-          </ion-label>
-        </ion-item-divider>
+          </IonLabel>
+        </IonItemDivider>
         <IonItem v-for="(app, index) in sharedApps" :key="index" class="cursor-pointer" @click="openVersion(app.channel_id.version)">
           <div slot="start" class="col-span-2 relative py-4">
             <img :src="app.app_id.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
@@ -314,9 +280,9 @@ const refreshData = async(evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItem>
-      </ion-list>
-    </ion-content>
-  </ion-page>
+      </IonList>
+    </IonContent>
+  </IonPage>
 </template>
 
 <route lang="yaml">

@@ -42,7 +42,7 @@ const v$ = useVuelidate(rules, form)
 const router = useRouter()
 const route = useRoute()
 
-const signInUser = async() => {
+const signInUser = async () => {
   if (!route.hash) {
     router.push('/login')
     return
@@ -59,7 +59,7 @@ const signInUser = async() => {
   })
 }
 
-const submit = async() => {
+const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect) {
@@ -75,7 +75,7 @@ const submit = async() => {
   router.push('/onboarding/activation')
 }
 
-watchEffect(async() => {
+watchEffect(async () => {
   if (route && route.path === '/onboarding/set_password')
     await signInUser()
 })
@@ -145,7 +145,7 @@ watchEffect(async() => {
         message="Changed password successfully"
         :duration="2000"
         color="success"
-        @didDismiss="success = false"
+        @did-dismiss="success = false"
       />
     </IonContent>
   </IonPage>
