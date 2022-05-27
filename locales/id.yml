@@ -70,6 +70,9 @@ button:
   tabs: tab
   toggle_dark: Ubah ke mode gelap
   toggle_langs: Ubah bahasa
+cannot-delete-app: Tidak dapat menghapus Aplikasi
+cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
+cannot-delete-channel: Tidak dapat menghapus saluran
 channel:
   add: Menambahkan
   beta-channel: saluran beta
@@ -91,6 +94,7 @@ channel:
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
+channel-deleted: Saluran dihapus
 days: hari
 device:
   channel: Tautan saluran

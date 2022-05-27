@@ -64,6 +64,9 @@ button:
   tabs: 标签
   toggle_dark: 切换深色模式
   toggle_langs: 切换语言
+cannot-delete-app: 无法删除应用
+cannot-delete-app-version: 无法删除应用版本
+cannot-delete-channel: 无法删除频道
 channel:
   add: 添加
   beta-channel: 测试通道
@@ -85,6 +88,7 @@ channel:
   user_no_found: 未找到用户，请先注册
   users: 与用户共享
   v3: V3 设置
+channel-deleted: 频道已删除
 days: 天
 device:
   channel: 频道链接

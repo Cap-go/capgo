@@ -68,6 +68,9 @@ button:
   tabs: Вкладки
   toggle_dark: Включить темный режим
   toggle_langs: Сменить язык
+cannot-delete-app: Не могу удалить приложение
+cannot-delete-app-version: Не могу удалить версию приложения
+cannot-delete-channel: Не могу удалить канал
 channel:
   add: Добавлять
   beta-channel: Бета-канал
@@ -89,6 +92,7 @@ channel:
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
   users: Доступно пользователям
   v3: Настройки версии 3
+channel-deleted: Канал удален
 days: дни
 device:
   channel: Ссылка на канал

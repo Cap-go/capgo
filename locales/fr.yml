@@ -70,6 +70,9 @@ button:
   tabs: Onglets
   toggle_dark: Basculer en mode sombre
   toggle_langs: Changer de langue
+cannot-delete-app: Impossible de supprimer l'application
+cannot-delete-app-version: Impossible de supprimer la version de l'application
+cannot-delete-channel: Impossible de supprimer la chaîne
 channel:
   add: Ajouter
   beta-channel: Chaîne bêta
@@ -91,6 +94,7 @@ channel:
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
+channel-deleted: Chaîne supprimée
 days: jours
 device:
   channel: Lien de chaîne

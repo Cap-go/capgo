@@ -68,6 +68,9 @@ button:
   tabs: Các tab
   toggle_dark: Chuyển đổi chế độ tối
   toggle_langs: Thay đổi ngôn ngữ
+cannot-delete-app: Không thể xóa ứng dụng
+cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
+cannot-delete-channel: Không thể xóa kênh
 channel:
   add: Thêm vào
   beta-channel: Kênh beta
@@ -89,6 +92,7 @@ channel:
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
+channel-deleted: Kênh đã bị xóa
 days: ngày
 device:
   channel: Liên kết kênh

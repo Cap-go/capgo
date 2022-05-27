@@ -68,6 +68,9 @@ button:
   tabs: Karty
   toggle_dark: Ustaw tryb nocny
   toggle_langs: Zmień język
+cannot-delete-app: Nie można usunąć aplikacji
+cannot-delete-app-version: Nie można usunąć wersji aplikacji
+cannot-delete-channel: Nie można usunąć kanału
 channel:
   add: Dodać
   beta-channel: Kanał beta
@@ -89,6 +92,7 @@ channel:
   user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
   users: Udostępnione użytkownikom
   v3: Ustawienia V3
+channel-deleted: Kanał usunięty
 days: dni
 device:
   channel: Link do kanału

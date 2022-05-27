@@ -161,10 +161,10 @@ const deleteChannel = async (channel: definitions['channels']) => {
       .delete()
       .eq('app_id', channel.app_id)
       .eq('id', channel.id)
-    if (delChanError || delChannelUserError) {
+    if (delChanError) {
       const toast = await toastController
         .create({
-          message: 'Cannot delete channel',
+          message: t('cannot-delete-channel'),
           duration: 2000,
         })
       await toast.present()
@@ -173,7 +173,7 @@ const deleteChannel = async (channel: definitions['channels']) => {
       await refreshData()
       const toast = await toastController
         .create({
-          message: 'Channel deleted',
+          message: t('channel-deleted'),
           duration: 2000,
         })
       await toast.present()
@@ -182,7 +182,7 @@ const deleteChannel = async (channel: definitions['channels']) => {
   catch (error) {
     const toast = await toastController
       .create({
-        message: 'Cannot delete channel',
+        message: t('cannot-delete-channel'),
         duration: 2000,
       })
     await toast.present()

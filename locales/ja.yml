@@ -64,6 +64,9 @@ button:
   tabs: タブ
   toggle_dark: ダークモード切り替え
   toggle_langs: 言語切り替え
+cannot-delete-app: アプリを削除できません
+cannot-delete-app-version: アプリのバージョンを削除できません
+cannot-delete-channel: チャネルを削除できません
 channel:
   add: 追加
   beta-channel: ベータチャンネル
@@ -85,6 +88,7 @@ channel:
   user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
   users: ユーザーと共有
   v3: V3設定
+channel-deleted: チャンネルが削除されました
 days: 日々
 device:
   channel: チャネルリンク

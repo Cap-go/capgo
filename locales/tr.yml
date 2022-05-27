@@ -68,6 +68,9 @@ button:
   tabs: Sekmeler
   toggle_dark: Karanlık modu değiştir
   toggle_langs: Dilleri değiştir
+cannot-delete-app: Uygulama silinemiyor
+cannot-delete-app-version: Uygulama sürümü silinemiyor
+cannot-delete-channel: Kanal silinemiyor
 channel:
   add: Ekle
   beta-channel: Beta kanalı
@@ -89,6 +92,7 @@ channel:
   user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
+channel-deleted: Kanal silindi
 days: günler
 device:
   channel: Kanal bağlantısı

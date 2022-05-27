@@ -70,6 +70,9 @@ button:
   tabs: Registerkarten
   toggle_dark: Dunkelmodus umschalten
   toggle_langs: Sprachen ändern
+cannot-delete-app: App kann nicht gelöscht werden
+cannot-delete-app-version: App-Version kann nicht gelöscht werden
+cannot-delete-channel: Kanal kann nicht gelöscht werden
 channel:
   add: Hinzufügen
   beta-channel: Beta-Kanal
@@ -91,6 +94,7 @@ channel:
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
   users: Mit Benutzern geteilt
   v3: V3-Einstellungen
+channel-deleted: Kanal gelöscht
 days: Tage
 device:
   channel: Kanallink

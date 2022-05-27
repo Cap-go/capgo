@@ -69,6 +69,9 @@ button:
   tabs: schede
   toggle_dark: Attiva/disattiva modalità scura
   toggle_langs: Cambia lingua
+cannot-delete-app: Impossibile eliminare l'app
+cannot-delete-app-version: Impossibile eliminare la versione dell'app
+cannot-delete-channel: Impossibile eliminare il canale
 channel:
   add: Aggiungere
   beta-channel: Canale beta
@@ -90,6 +93,7 @@ channel:
   user_no_found: Utente non trovato, chiedi prima di registrarti
   users: Condiviso con gli utenti
   v3: Impostazioni V3
+channel-deleted: Canale cancellato
 days: giorni
 device:
   channel: Collegamento al canale

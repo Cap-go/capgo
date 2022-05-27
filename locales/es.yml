@@ -72,6 +72,9 @@ button:
   tabs: Pestañas
   toggle_dark: Alternar modo oscuro
   toggle_langs: Cambiar idiomas
+cannot-delete-app: No se puede eliminar la aplicación
+cannot-delete-app-version: No se puede eliminar la versión de la aplicación
+cannot-delete-channel: No se puede eliminar el canal
 channel:
   add: Agregar
   beta-channel: canal beta
@@ -93,6 +96,7 @@ channel:
   user_no_found: Usuario no encontrado, solicite registrarse primero
   users: Compartido con los usuarios
   v3: configuración V3
+channel-deleted: Canal eliminado
 days: dias
 device:
   channel: enlace del canal

@@ -64,6 +64,9 @@ button:
   tabs: 탭
   toggle_dark: 다크모드 토글
   toggle_langs: 언어 변경
+cannot-delete-app: 앱을 삭제할 수 없습니다
+cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
+cannot-delete-channel: 채널을 삭제할 수 없습니다
 channel:
   add: 추가하다
   beta-channel: 베타 채널
@@ -85,6 +88,7 @@ channel:
   user_no_found: 사용자를 찾을 수 없습니다. 먼저 등록을 요청하세요.
   users: 사용자와 공유
   v3: V3 설정
+channel-deleted: 채널 삭제됨
 days: 날
 device:
   channel: 채널 링크

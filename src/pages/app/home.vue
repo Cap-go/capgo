@@ -90,7 +90,7 @@ const deleteApp = async (app: definitions['apps']) => {
       if (delError) {
         const toast = await toastController
           .create({
-            message: 'Cannot delete channel',
+            message: t('cannot-delete-app-version'),
             duration: 2000,
           })
         await toast.present()
@@ -106,7 +106,7 @@ const deleteApp = async (app: definitions['apps']) => {
     if (vError || dbAppError) {
       const toast = await toastController
         .create({
-          message: 'Cannot delete App',
+          message: t('cannot-delete-app'),
           duration: 2000,
         })
       await toast.present()
@@ -124,7 +124,7 @@ const deleteApp = async (app: definitions['apps']) => {
   catch (error) {
     const toast = await toastController
       .create({
-        message: 'Cannot delete app',
+        message: t('cannot-delete-app'),
         duration: 2000,
       })
     await toast.present()

@@ -64,6 +64,9 @@ button:
   tabs: Tabs
   toggle_dark: Toggle dark mode
   toggle_langs: Change languages
+cannot-delete-app: Cannot delete App
+cannot-delete-app-version: Cannot delete app version
+cannot-delete-channel: Cannot delete channel
 channel:
   add: Add
   beta-channel: Beta channel
@@ -85,6 +88,7 @@ channel:
   user_no_found: User not found, ask to register first
   users: Shared with users
   v3: V3 settings
+channel-deleted: Channel deleted
 days: days
 device:
   channel: Channel link
