@@ -42,7 +42,6 @@ specifiers:
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.3.0
   '@robingenz/capacitor-screen-orientation': 1.1.7
-  '@supabase/storage-js': 1.7.0
   '@supabase/supabase-js': 1.35.3
   '@teamhive/capacitor-video-recorder': ^5.0.0
   '@types/fs-extra': ^9.0.13
@@ -142,7 +141,6 @@ dependencies:
   '@netlify/functions': 0.11.1
   '@robingenz/capacitor-file-picker': 0.3.0_@capacitor+core@3.5.1
   '@robingenz/capacitor-screen-orientation': 1.1.7_@capacitor+core@3.5.1
-  '@supabase/storage-js': 1.7.0
   '@supabase/supabase-js': 1.35.3
   '@teamhive/capacitor-video-recorder': 5.0.0_@capacitor+core@3.5.1
   '@vuelidate/core': 2.0.0-alpha.41_vue@3.2.36

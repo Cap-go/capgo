@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.30.9-alpha.16",
+  "version": "0.30.11",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
@@ -53,7 +53,6 @@
     "@netlify/functions": "0.11.1",
     "@robingenz/capacitor-file-picker": "0.3.0",
     "@robingenz/capacitor-screen-orientation": "1.1.7",
-    "@supabase/storage-js": "1.7.0",
     "@supabase/supabase-js": "1.35.3",
     "@teamhive/capacitor-video-recorder": "^5.0.0",
     "@vuelidate/core": "2.0.0-alpha.41",

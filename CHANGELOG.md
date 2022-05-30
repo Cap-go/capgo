@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [0.30.9-alpha.16](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.15...0.30.9-alpha.16) (2022-05-27)
+### [0.30.11](https://github.com/Cap-go/capgo/compare/0.30.10...0.30.11) (2022-05-27)
+
+
+### Bug Fixes
+
+* remove old package ([db22a9d](https://github.com/Cap-go/capgo/commit/db22a9d6fe2f8d2682f2189d7dd57181dafcdd96))
+
+### [0.30.10](https://github.com/Cap-go/capgo/compare/0.30.9...0.30.10) (2022-05-27)
+
+
+### Bug Fixes
+
+* remove toekn ([9e64f71](https://github.com/Cap-go/capgo/commit/9e64f71e516577e7041fdca0d077a8056f03676b))
+
+### [0.30.9](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.15...0.30.9) (2022-05-27)
 
 
 ### Bug Fixes
@@ -277,7 +291,6 @@ All notable changes to this project will be documented in this file. See [standa
 * release to capgo use different channel for alpha ([cd36083](https://github.com/Cap-go/capgo/commit/cd360838945121cfb96a1491ddc98ac25bf5b10a))
 * remove file to use new system ([45440e4](https://github.com/Cap-go/capgo/commit/45440e464e16bcef772f1a62ea42e06ccefb1b24))
 * remove with in action ([ac9454d](https://github.com/Cap-go/capgo/commit/ac9454dd94266a32db528790fa49f975d05e0508))
-
 
 ### [0.30.7](https://github.com/Cap-go/capgo/compare/0.30.6...0.30.7) (2022-05-03)
 
