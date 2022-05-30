@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.12-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.0...0.30.12-alpha.1) (2022-05-30)
+
+
+### Bug Fixes
+
+* remove old cli cloud function ([938aafe](https://github.com/Cap-go/capgo/commit/938aafea67fe0aca869f8e9f8a8b630fcc6fd58c))
+
 ### [0.30.12-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.11...0.30.12-alpha.0) (2022-05-30)
 
 ### [0.30.9-alpha.16](https://github.com/Cap-go/capgo/compare/0.30.9-alpha.15...0.30.9-alpha.16) (2022-05-27)
