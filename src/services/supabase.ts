@@ -16,6 +16,7 @@ export const useSupabase = () => {
       if (requestInit?.method === 'POST' && (url.includes('/storage/') || url.includes('/rpc/'))) {
         return fetch(requestInfo, {
           method: requestInit?.method,
+          signal: requestInit?.signal || undefined,
           headers: requestInit?.headers,
           body: requestInit?.body,
         })
