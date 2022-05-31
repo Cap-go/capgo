@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.12-alpha.2](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.1...0.30.12-alpha.2) (2022-05-31)
+
+
+### Bug Fixes
+
+* add missign signal ([a64d0c6](https://github.com/Cap-go/capgo/commit/a64d0c62499eb6be6ff7168baa0890cefbc44f44))
+
 ### [0.30.12-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.0...0.30.12-alpha.1) (2022-05-30)
 
 
