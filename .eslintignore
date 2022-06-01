@@ -1,3 +1,4 @@
 dist
 public
 src/types/supabase.ts
+supabase/functions/_utils/types_supabase.ts
