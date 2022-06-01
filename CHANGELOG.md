@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.12-alpha.5](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.4...0.30.12-alpha.5) (2022-06-01)
+
+
+### Bug Fixes
+
+* use getType instead past script ([c4e6254](https://github.com/Cap-go/capgo/commit/c4e625426c694504876ddad790a7904c68747ca6))
+
 ### [0.30.12-alpha.4](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.3...0.30.12-alpha.4) (2022-05-31)
 
 
