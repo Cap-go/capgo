@@ -67,7 +67,7 @@ const getUsers = async () => {
       users.value = dataUsers
     else
       console.log('no users')
-    console.log('users', users.value)
+    // console.log('users', users.value)
   }
   catch (error) {
     console.error(error)

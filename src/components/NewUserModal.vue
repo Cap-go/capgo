@@ -78,7 +78,7 @@ const submit = async () => {
           first_name: user?.user_metadata.first_name,
           last_name: user?.user_metadata.last_name,
           email: user?.email,
-        },
+        }, {  returning: 'minimal' }
       )
     isLoading.value = false
     if (error || userTableError)
