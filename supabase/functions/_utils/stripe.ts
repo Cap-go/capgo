@@ -103,7 +103,8 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
       const subscription = event.data.object as any
-      data.product_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
+      data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
+      data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
       data.status = subscription.cancel_at ? 'canceled' : 'succeeded'
       data.subscription_id = subscription.id
       data.customer_id = String(subscription.customer)
