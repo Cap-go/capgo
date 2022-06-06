@@ -127,6 +127,8 @@ export interface paths {
           versions?: parameters["rowFilter.app_stats.versions"];
           shared?: parameters["rowFilter.app_stats.shared"];
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
+          devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -186,6 +188,8 @@ export interface paths {
           versions?: parameters["rowFilter.app_stats.versions"];
           shared?: parameters["rowFilter.app_stats.shared"];
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
+          devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
         };
         header: {
           /** Preference */
@@ -209,10 +213,123 @@ export interface paths {
           versions?: parameters["rowFilter.app_stats.versions"];
           shared?: parameters["rowFilter.app_stats.shared"];
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
+          devices?: parameters["rowFilter.app_stats.devices"];
+          date_id?: parameters["rowFilter.app_stats.date_id"];
         };
         body: {
           /** app_stats */
           app_stats?: definitions["app_stats"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
+  "/app_stats_onprem": {
+    get: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
+          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
+          created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
+          updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
+          mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
+          versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
+          mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["app_stats_onprem"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** app_stats_onprem */
+          app_stats_onprem?: definitions["app_stats_onprem"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
+          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
+          created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
+          updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
+          mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
+          versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
+          mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
+          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
+          created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
+          updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
+          mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
+          versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
+          mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+        };
+        body: {
+          /** app_stats_onprem */
+          app_stats_onprem?: definitions["app_stats_onprem"];
         };
         header: {
           /** Preference */
@@ -1097,10 +1214,10 @@ export interface paths {
           price_m?: parameters["rowFilter.plans.price_m"];
           price_y?: parameters["rowFilter.plans.price_y"];
           stripe_id?: parameters["rowFilter.plans.stripe_id"];
-          apps?: parameters["rowFilter.plans.apps"];
-          channels?: parameters["rowFilter.plans.channels"];
-          updates?: parameters["rowFilter.plans.updates"];
-          versions?: parameters["rowFilter.plans.versions"];
+          app?: parameters["rowFilter.plans.app"];
+          channel?: parameters["rowFilter.plans.channel"];
+          update?: parameters["rowFilter.plans.update"];
+          version?: parameters["rowFilter.plans.version"];
           shared?: parameters["rowFilter.plans.shared"];
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
@@ -1162,10 +1279,10 @@ export interface paths {
           price_m?: parameters["rowFilter.plans.price_m"];
           price_y?: parameters["rowFilter.plans.price_y"];
           stripe_id?: parameters["rowFilter.plans.stripe_id"];
-          apps?: parameters["rowFilter.plans.apps"];
-          channels?: parameters["rowFilter.plans.channels"];
-          updates?: parameters["rowFilter.plans.updates"];
-          versions?: parameters["rowFilter.plans.versions"];
+          app?: parameters["rowFilter.plans.app"];
+          channel?: parameters["rowFilter.plans.channel"];
+          update?: parameters["rowFilter.plans.update"];
+          version?: parameters["rowFilter.plans.version"];
           shared?: parameters["rowFilter.plans.shared"];
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
@@ -1191,10 +1308,10 @@ export interface paths {
           price_m?: parameters["rowFilter.plans.price_m"];
           price_y?: parameters["rowFilter.plans.price_y"];
           stripe_id?: parameters["rowFilter.plans.stripe_id"];
-          apps?: parameters["rowFilter.plans.apps"];
-          channels?: parameters["rowFilter.plans.channels"];
-          updates?: parameters["rowFilter.plans.updates"];
-          versions?: parameters["rowFilter.plans.versions"];
+          app?: parameters["rowFilter.plans.app"];
+          channel?: parameters["rowFilter.plans.channel"];
+          update?: parameters["rowFilter.plans.update"];
+          version?: parameters["rowFilter.plans.version"];
           shared?: parameters["rowFilter.plans.shared"];
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
@@ -1448,6 +1565,7 @@ export interface paths {
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
           trial_at?: parameters["rowFilter.stripe_info.trial_at"];
+          price_id?: parameters["rowFilter.stripe_info.price_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1505,6 +1623,7 @@ export interface paths {
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
           trial_at?: parameters["rowFilter.stripe_info.trial_at"];
+          price_id?: parameters["rowFilter.stripe_info.price_id"];
         };
         header: {
           /** Preference */
@@ -1526,6 +1645,7 @@ export interface paths {
           status?: parameters["rowFilter.stripe_info.status"];
           product_id?: parameters["rowFilter.stripe_info.product_id"];
           trial_at?: parameters["rowFilter.stripe_info.trial_at"];
+          price_id?: parameters["rowFilter.stripe_info.price_id"];
         };
         body: {
           /** stripe_info */
@@ -1704,6 +1824,26 @@ export interface paths {
       };
     };
   };
+  "/rpc/get_current_plan_name": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/get_dl_by_month_by_app": {
     post: {
       parameters: {
@@ -1715,6 +1855,34 @@ export interface paths {
             pastmonth: number;
             /** Format: character varying */
             appid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/find_best_plan": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: bigint */
+            apps_n: number;
+            /** Format: bigint */
+            channels_n: number;
+            /** Format: bigint */
+            shared_n: number;
+            /** Format: bigint */
+            updates_n: number;
+            /** Format: bigint */
+            versions_n: number;
           };
         };
         header: {
@@ -1796,6 +1964,26 @@ export interface paths {
       };
     };
   };
+  "/rpc/is_trial": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/exist_app": {
     post: {
       parameters: {
@@ -1805,6 +1993,26 @@ export interface paths {
             apikey: string;
             /** Format: character varying */
             appid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_paying": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
           };
         };
         header: {
@@ -1907,8 +2115,8 @@ export interface paths {
       parameters: {
         body: {
           args: {
-            /** Format: text */
-            apikey: string;
+            /** Format: uuid */
+            userid: string;
           };
         };
         header: {
@@ -1933,6 +2141,26 @@ export interface paths {
             apikey: string;
             /** Format: character varying */
             app_id: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_good_plan": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
           };
         };
         header: {
@@ -2028,6 +2256,46 @@ export interface definitions {
     shared: number;
     /** Format: bigint */
     mlu_real: number;
+    /** Format: bigint */
+    devices: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * @default 2022-05
+     */
+    date_id: string;
+  };
+  app_stats_onprem: {
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
+    /** Format: uuid */
+    user_id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /** Format: smallint */
+    channels?: number;
+    /** Format: bigint */
+    mlu?: number;
+    /** Format: bigint */
+    versions?: number;
+    /** Format: bigint */
+    shared?: number;
+    /** Format: bigint */
+    mlu_real?: number;
   };
   app_versions: {
     /**
@@ -2058,7 +2326,10 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     deleted: boolean;
     /** Format: character varying */
     external_url?: string;
@@ -2207,7 +2478,10 @@ export interface definitions {
      * @default now()
      */
     updated_at: string;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     public: boolean;
     /**
      * Format: boolean
@@ -2219,7 +2493,10 @@ export interface definitions {
      * @default true
      */
     disableAutoUpdateToMajor: boolean;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     beta?: boolean;
   };
   devices: {
@@ -2347,9 +2624,13 @@ export interface definitions {
      * Format: character varying
      * @description Note:
      * This is a Primary Key.<pk/>
+     * @default
      */
     name: string;
-    /** Format: character varying */
+    /**
+     * Format: character varying
+     * @default
+     */
     description: string;
     /** Format: bigint */
     price_m: number;
@@ -2359,21 +2640,28 @@ export interface definitions {
      * Format: character varying
      * @description Note:
      * This is a Primary Key.<pk/>
+     * @default
      */
     stripe_id: string;
     /** Format: bigint */
-    apps: number;
+    app: number;
     /** Format: bigint */
-    channels: number;
+    channel: number;
     /** Format: bigint */
-    updates: number;
+    update: number;
     /** Format: bigint */
-    versions: number;
+    version: number;
     /** Format: bigint */
     shared: number;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     abtest: boolean;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     progressive_deploy: boolean;
     /**
      * Format: uuid
@@ -2491,13 +2779,18 @@ export interface definitions {
       | "failed"
       | "deleted"
       | "canceled";
-    /** Format: character varying */
-    product_id?: string;
+    /**
+     * Format: character varying
+     * @default free
+     */
+    product_id: string;
     /**
      * Format: timestamp with time zone
      * @default now()
      */
     trial_at: string;
+    /** Format: character varying */
+    price_id?: string;
   };
   users: {
     /**
@@ -2526,11 +2819,20 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     enableNotifications: boolean;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     optForNewsletters: boolean;
-    /** Format: boolean */
+    /**
+     * Format: boolean
+     * @default false
+     */
     legalAccepted: boolean;
     /** Format: character varying */
     customer_id?: string;
@@ -2604,6 +2906,30 @@ export interface parameters {
   "rowFilter.app_stats.shared": string;
   /** Format: bigint */
   "rowFilter.app_stats.mlu_real": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.devices": string;
+  /** Format: character varying */
+  "rowFilter.app_stats.date_id": string;
+  /** @description app_stats_onprem */
+  "body.app_stats_onprem": definitions["app_stats_onprem"];
+  /** Format: character varying */
+  "rowFilter.app_stats_onprem.app_id": string;
+  /** Format: uuid */
+  "rowFilter.app_stats_onprem.user_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_stats_onprem.created_at": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_stats_onprem.updated_at": string;
+  /** Format: smallint */
+  "rowFilter.app_stats_onprem.channels": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.mlu": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.versions": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.shared": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.mlu_real": string;
   /** @description app_versions */
   "body.app_versions": definitions["app_versions"];
   /** Format: bigint */
@@ -2763,13 +3089,13 @@ export interface parameters {
   /** Format: character varying */
   "rowFilter.plans.stripe_id": string;
   /** Format: bigint */
-  "rowFilter.plans.apps": string;
+  "rowFilter.plans.app": string;
   /** Format: bigint */
-  "rowFilter.plans.channels": string;
+  "rowFilter.plans.channel": string;
   /** Format: bigint */
-  "rowFilter.plans.updates": string;
+  "rowFilter.plans.update": string;
   /** Format: bigint */
-  "rowFilter.plans.versions": string;
+  "rowFilter.plans.version": string;
   /** Format: bigint */
   "rowFilter.plans.shared": string;
   /** Format: boolean */
@@ -2834,6 +3160,8 @@ export interface parameters {
   "rowFilter.stripe_info.product_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.stripe_info.trial_at": string;
+  /** Format: character varying */
+  "rowFilter.stripe_info.price_id": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

@@ -76,6 +76,7 @@ serve(async(event: Request) => {
           // console.log('app', app.app_id, downloads, versions, shared, channels)
           // create var date_id with yearn-month
           const now = new Date()
+          // get_current_plan_name
           // get month with leading zero
           const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
           const newData: definitions['app_stats'] = {

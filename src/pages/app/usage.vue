@@ -9,59 +9,48 @@ import {
   IonRefresherContent, IonSegment, IonSegmentButton,
   isPlatform, toastController,
 } from '@ionic/vue'
-import { computed, reactive, ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import TitleHead from '~/components/TitleHead.vue'
-import type { Plan, Stats } from '~/services/plans'
+import type { PlanRes, Stats } from '~/services/plans'
 import Spinner from '~/components/Spinner.vue'
+import { definitions } from '~/types/supabase'
+import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
+const supabase = useSupabase()
 const isLoading = ref(true)
-const planList = ref([] as Plan[])
 const isMobile = isPlatform('capacitor')
-const segmentVal = ref<'monthly' | 'yearly'>('monthly')
-const isYearly = computed(() => segmentVal.value === 'yearly')
+const segmentVal = ref<'m' | 'y'>('m')
+const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
 
-const usage = reactive<Stats>({
-  apps: 0,
-  channels: 0,
-  versions: 0,
-  sharedChannels: 0,
-  updates: 0,
-})
-
 const getStat = (name: string): number => {
-  return usage[name as keyof Stats]
+  console.log('getStat', name)
+  return main.myPlan?.stats[name as keyof Stats] || 0
 }
 
-const planFeatures = (plan: Plan) => [
-  plan.apps > 1 ? `${plan.apps} ${t('plan.applications')}` : `${plan.apps} ${t('plan.application')}`,
-  plan.channels > 1 ? `${plan.channels} ${t('plan.channels')}` : `${plan.channels} ${t('plan.channel')}`,
-  plan.versions > 1 ? `${plan.versions} ${t('plan.versions')}` : `${plan.versions} ${t('plan.version')}`,
-  plan.sharedChannels > 1 ? `${plan.sharedChannels} ${t('plan.shared_channels')}` : `${plan.sharedChannels} ${t('plan.shared_channel')}`,
-  plan.updates > 1 ? `${plan.updates} ${t('plan.updates')}` : `${plan.updates} ${t('plan.update')}`,
+const planFeatures = (plan: definitions['plans']) => [
+  plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
+  plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
+  plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
+  plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
+  plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
   plan.abtest ? t('plan.abtest') : false,
-  plan.progressiveDeploy ? t('plan.progressive_deploy') : false,
+  plan.progressive_deploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
 
-const currentPlanSuggest = computed(() => planList.value.find(plan => plan.id === main.myPlan?.planSuggest))
+const currentPlanSuggest = computed(() => main.myPlan?.AllPlans.find(plan => plan.name === main.myPlan?.planSuggest))
 
-const currentPlan = computed(() => planList.value.find(plan => plan.id === main.myPlan?.plan))
-
-const getAllPlan = async () => {
-  console.log(main.myPlan)
-  if (!main.myPlan)
-    return
-  planList.value = Object.values(main.myPlan?.AllPlans)
-}
+const currentPlan = computed(() => main.myPlan?.AllPlans.find(plan => plan.name === main.myPlan?.plan))
 
 const getCurrentPlanSuggestStat = (name: string): number => {
-  console.log('getCurrentPlanSuggestStat', name, currentPlanSuggest.value)
-  return currentPlanSuggest.value ? currentPlanSuggest?.value[name as keyof Stats] : 0
+  const key = name.replace('max_', '')
+  console.log('getCurrentPlanSuggestStat', key)
+  return currentPlanSuggest.value ? currentPlanSuggest?.value[key as keyof definitions['plans']] as number : 0
 }
 
 interface SegmentCustomEvent extends CustomEvent {
@@ -69,40 +58,7 @@ interface SegmentCustomEvent extends CustomEvent {
   detail: SegmentChangeEventDetail
 }
 const segmentChanged = (e: SegmentCustomEvent) => {
-  segmentVal.value = e.detail.value === 'yearly' ? 'yearly' : 'monthly'
-}
-
-const getMaxApp = async () => {
-  // from app_stats find max channel
-  usage.apps = main.myPlan?.stats.length || 0
-}
-
-const getMaxChannel = async () => {
-  // from app_stats find max channel
-  usage.channels = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.channels), 0) || 0
-}
-
-const getMaxShared = async () => {
-  // from app_stats find max shared
-  usage.sharedChannels = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.shared), 0) || 0
-}
-
-const getMaxVersion = async () => {
-  // from app_stats find max version
-  usage.versions = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, cur.versions), 0) || 0
-}
-const getMaxDownload = async () => {
-  // from app_stats find max download
-  usage.updates = main.myPlan?.stats.reduce((acc, cur) => Math.max(acc, Math.max(cur.mlu, cur.mlu_real)), 0) || 0
-}
-const getAllMax = async () => {
-  await Promise.all([
-    getMaxApp(),
-    getMaxChannel(),
-    getMaxShared(),
-    getMaxVersion(),
-    getMaxDownload(),
-  ])
+  segmentVal.value = e.detail.value === 'y' ? 'y' : 'm'
 }
 
 const openChangePlan = (planId: string) => {
@@ -119,38 +75,49 @@ const showToastMessage = async (message: string) => {
   await toast.present()
 }
 
+const formatName = (name: string): string => {
+  return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace('max_', '')
+}
+
 const stats = (): keyof Stats => {
   // get keys of Stats interface
-  const res: keyof Stats = Object.keys(usage) as unknown as keyof Stats
+  if (!main.myPlan?.stats) {
+    return [] as unknown as keyof Stats
+  }
+  const res: keyof Stats = Object.keys(main.myPlan?.stats).filter(key => key !== 'max_device') as unknown as keyof Stats
   return res
 }
 
+const getPrice = (plan: definitions['plans'], t: 'm' | 'y'): number => {
+  return plan[t === 'm' ? 'price_m' : 'price_y']
+}
 const getPercentage = (val: number, total: number) => {
-  console.log('getPercentage', val, total)
   return Math.floor((val * 100) / total)
 }
 const getBarColorClass = (name: string) => {
   switch (name) {
-    case 'apps':
+    case 'max_app':
       return 'bg-emerald-700 text-emerald-100'
-    case 'channels':
+    case 'max_channel':
       return 'bg-azure-700 text-azure-100'
-    case 'versions':
+    case 'max_version':
       return 'bg-rose-700 text-rose-100'
-    case 'sharedChannels':
+    case 'max_shared':
       return 'bg-vista-blue-700 text-vista-blue-100'
-    case 'updates':
+    case 'max_update':
       return 'bg-pumpkin-orange-700 text-pumpkin-orange-100'
   }
 }
 
-watchEffect(async () => {
-  if (main.myPlan) {
-    isLoading.value = true
-    await getAllPlan().then(getAllMax)
-    isLoading.value = false
+watch(
+  () => main.myPlan,
+  (myPlan, prevMyPlan) => {
+    console.log('myPlan changed', myPlan, prevMyPlan)
+    if (!prevMyPlan && myPlan) {
+      isLoading.value = false
+    }
   }
-})
+)
 
 watchEffect(async () => {
   if (route.path === '/app/usage') {
@@ -162,7 +129,11 @@ watchEffect(async () => {
 const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
-    await getAllPlan().then(getAllMax)
+    // await getAllMax()
+    console.log('refreshData')
+    const res = await supabase.functions.invoke<PlanRes>('payment_status', {})
+    if (res.data)
+      main.myPlan = res.data
   }
   catch (error) {
     console.error(error)
@@ -200,7 +171,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
         </IonItemDivider>
         <IonItem v-for="s in stats()" :key="s">
           <p class="w-40 first-letter:uppercase">
-            {{ s.replace(/([a-z])([A-Z])/g, '$1 $2') }}
+            {{ formatName(s) }}
           </p>
           <div class="w-30">
             <p :class="getBarColorClass(s)" class=" rounded text-center">
@@ -224,16 +195,16 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
               {{ t('plan.desc') }}
             </p>
             <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
-              <IonSegmentButton class="h-10" value="monthly">
+              <IonSegmentButton class="h-10" value="m">
                 <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
               </IonSegmentButton>
-              <IonSegmentButton class="h-10" value="yearly">
+              <IonSegmentButton class="h-10" value="y">
                 <IonLabel>{{ t('plan.yearly-billing') }}</IonLabel>
               </IonSegmentButton>
             </IonSegment>
           </div>
           <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
-            <div v-for="p in planList" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
+            <div v-for="p in main.myPlan?.AllPlans" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
               <div class="p-6">
                 <h2 class="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100">
                   {{ p.name }}
@@ -242,10 +213,10 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
                   {{ t(p.description) }}
                 </p>
                 <p class="mt-8">
-                  <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">${{ p.price[segmentVal] }}</span>
+                  <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">€{{ getPrice(p, segmentVal) }}</span>
                   <span class="text-base font-medium text-gray-500">/{{ isYearly ? 'yr' : 'mo' }}</span>
                 </p>
-                <div v-if="p.id" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.id)">
+                <div v-if="p.stripe_id !== 'free'" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.id)">
                   {{ t('plan.buy') }} {{ p.name }}
                 </div>
               </div>
