@@ -36,8 +36,11 @@ watchEffect(() => {
     bannerText.value = t('trial-plan-expired')
     bannerColor.value = 'warning'
   }
-  else if (main.myPlan && !main.myPlan?.canUseMore) {
+  else if (main.myPlan && !main.myPlan?.canUseMore && main.myPlan.paying) {
     bannerText.value = 'You reached the limit of your plan'
+    bannerColor.value = 'warning'
+  } else {
+    bannerText.value = 'Your plan is currently inactive'
     bannerColor.value = 'warning'
   }
 })

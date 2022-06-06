@@ -15,6 +15,7 @@ export interface PlanData {
   stats: Stats
   payment: definitions['stripe_info'] | null
   canUseMore: boolean
+  paying: boolean
 }
 export interface PlanRes extends PlanData {
   trialDaysLeft: 0

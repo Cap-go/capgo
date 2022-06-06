@@ -6,6 +6,7 @@ export interface PlanData {
   planSuggest: string,
   payment?: definitions['stripe_info'] | null,
   canUseMore: boolean
+  paying: boolean,
 }
 export interface PlanRes extends PlanData {
   trialDaysLeft: number,
@@ -33,6 +34,16 @@ export const getPlans = async(): Promise<definitions['plans'][]> => {
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin
       .rpc<boolean>('is_good_plan', { userid: userId })
+      .single()
+  if (error) {
+      throw error
+  }
+  return data || false
+}
+
+export const isPaying = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin
+      .rpc<boolean>('is_paying', { userid: userId })
       .single()
   if (error) {
       throw error
@@ -106,7 +117,8 @@ export const getMyPlan = async(user: definitions['users'], stats: Stats): Promis
   if (current) {
     const planSuggest = await findBestPlan(stats)
     const canUseMore = await isGoodPlan(user.id)
-    return { plan: current, payment, canUseMore, planSuggest }
+    const paying = await isPaying(user.id)
+    return { plan: current, payment, canUseMore, planSuggest, paying }
   }
   return Promise.reject(Error('no data'))
 }
@@ -120,6 +132,7 @@ export const currentPaymentstatus = async(user: definitions['users']): Promise<P
     const res: PlanRes = {
       stats,
       payment: myPlan.payment,
+      paying: myPlan.paying,
       plan: myPlan.plan,
       planSuggest: myPlan.planSuggest,
       canUseMore: myPlan.canUseMore,
@@ -142,6 +155,7 @@ export const currentPaymentstatus = async(user: definitions['users']): Promise<P
         max_update: 0,
         max_device: 0,
       },
+      paying: false,
       canUseMore: false,
       trialDaysLeft: 0,
       AllPlans: await getPlans(),
