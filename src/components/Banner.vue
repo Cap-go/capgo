@@ -22,10 +22,10 @@ const { t } = useI18n()
 const isMobile = isPlatform('capacitor')
 
 watchEffect(() => {
-  if (route.path === '/app/usage')
+  if (route.path === '/app/usage' || !main.myPlan)
     return
   console.log('paymentStatus', main.myPlan)
-  if (main.myPlan && main.myPlan?.canUseMore && main.myPlan?.trialDaysLeft !== 0) {
+  if (main.myPlan && !main.myPlan?.canUseMore && main.myPlan?.trialDaysLeft !== 0) {
     bannerText.value = `${t('trial-plan-expires-in')} ${parseInt(main.myPlan.trialDaysLeft)} ${t('days')}`
     if (main.myPlan?.trialDaysLeft <= 7)
       bannerColor.value = 'warning'
@@ -39,7 +39,8 @@ watchEffect(() => {
   else if (main.myPlan && !main.myPlan?.canUseMore && main.myPlan.paying) {
     bannerText.value = 'You reached the limit of your plan'
     bannerColor.value = 'warning'
-  } else {
+  }
+  else if (!main.myPlan?.canUseMore) {
     bannerText.value = 'Your plan is currently inactive'
     bannerColor.value = 'warning'
   }

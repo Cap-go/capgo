@@ -64,7 +64,7 @@ export const findBestPlan = async (stats: Stats): Promise<string> => {
   if (error) {
       throw error
   }
-  return data || Deno.env.get('PLAN_TEAM') || 'Team'
+  return data || 'Team'
 }
 
 export const isTrial = async (userId: string): Promise<number> => {
@@ -113,8 +113,8 @@ export const getMyPlan = async(user: definitions['users'], stats: Stats): Promis
   const current = await getCurrentPlanName(user.id)
   if (current) {
     const planSuggest = await findBestPlan(stats)
-    const canUseMore = await isGoodPlan(user.id)
     const paying = await isPaying(user.id)
+    const canUseMore = paying ? await isGoodPlan(user.id) : false
     return { plan: current, payment, canUseMore, planSuggest, paying }
   }
   return Promise.reject(Error('no data'))

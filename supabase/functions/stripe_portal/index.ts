@@ -17,12 +17,16 @@ serve(async(event: Request) => {
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)
   try {
-    const body = (await event.json()) as PortalData
+    let body: PortalData = {callbackUrl: `${Deno.env.get('WEBAPP_URL')}/app/usage`}
+    try {
+      body = (await event.json()) as PortalData
+    // deno-lint-ignore no-empty
+    } catch {}
     const { user: auth, error } = await supabase.auth.api.getUser(
       authorization?.split('Bearer ')[1],
     )
     // eslint-disable-next-line no-console
-    // console.log('auth', auth)
+    console.log('auth', auth)
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
@@ -36,11 +40,12 @@ serve(async(event: Request) => {
     if (!user.customer_id)
       return sendRes({ status: 'no customer' }, 400)
     // eslint-disable-next-line no-console
-    // console.log('user', user)
-    const link = await createPortal(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.callbackUrl || 'https://web.capgo.app/app/usage')
+    console.log('user', user)
+    const link = await createPortal(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.callbackUrl)
     return sendRes({ url: link.url })
   }
   catch (e) {
+    console.log('e', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

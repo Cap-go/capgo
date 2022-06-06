@@ -15,22 +15,26 @@ serve(async(event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
+    console.log('body')
     const body = (await event.json()) as { record: definitions['users'] }
     const record = body.record
     if (record.customer_id)
       return sendRes()
-    const customer = await createCustomer(Deno.env.get('process.env.STRIPE_SECRET_KEY') || '', record.email)
+    console.log('createCustomer')
+    const customer = await createCustomer(Deno.env.get('STRIPE_SECRET_KEY') || '', record.email)
     const { error: dbStripeError } = await supabase
       .from<definitions['stripe_info']>('stripe_info')
       .insert({
         customer_id: customer.id,
       })
+    console.log('stripe_info done')
     const { error: dbError } = await supabase
       .from<definitions['users']>('users')
       .update({
         customer_id: customer.id,
       })
       .eq('email', record.email)
+    console.log('users done')
     if (dbError || dbStripeError) {
       console.error(dbError)
       return sendRes({ message: dbError }, 400)
@@ -38,6 +42,7 @@ serve(async(event: Request) => {
     return sendRes()
   }
   catch (e) {
+    console.log('e', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

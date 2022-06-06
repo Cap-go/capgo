@@ -21,7 +21,7 @@ import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
 const supabase = useSupabase()
-const isLoading = ref(true)
+const isLoading = ref(false)
 const isMobile = isPlatform('capacitor')
 const segmentVal = ref<'m' | 'y'>('m')
 const isYearly = computed(() => segmentVal.value === 'y')
@@ -112,9 +112,10 @@ const getBarColorClass = (name: string) => {
 watch(
   () => main.myPlan,
   (myPlan, prevMyPlan) => {
-    console.log('myPlan changed', myPlan, prevMyPlan)
     if (!prevMyPlan && myPlan) {
       isLoading.value = false
+    } else if (prevMyPlan && !myPlan) {
+      isLoading.value = true
     }
   }
 )
@@ -216,7 +217,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
                   <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">€{{ getPrice(p, segmentVal) }}</span>
                   <span class="text-base font-medium text-gray-500">/{{ isYearly ? 'yr' : 'mo' }}</span>
                 </p>
-                <div v-if="p.stripe_id !== 'free'" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.id)">
+                <div v-if="p.stripe_id !== 'free'" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.stripe_id)">
                   {{ t('plan.buy') }} {{ p.name }}
                 </div>
               </div>

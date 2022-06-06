@@ -41,15 +41,16 @@ serve(async(event: Request) => {
       return sendRes({ status: 'not authorize' }, 400)
     if (!user.customer_id)
       return sendRes({ status: 'no customer' }, 400)
-    console.log('createCheckout', user.id)
+    console.log('createCheckout', user.id, body.priceId)
     
     // eslint-disable-next-line no-console
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string
-    const checkout = await createCheckout(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || 'https://web.capgo.app/app/usage', body.cancelUrl || 'https://web.capgo.app/app/usage')
+    const checkout = await createCheckout(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`)
     return sendRes({ url: checkout.url })
   }
   catch (e) {
+    console.log('e', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

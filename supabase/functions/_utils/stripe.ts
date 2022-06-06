@@ -2,13 +2,26 @@ import dayjs from 'https://cdn.skypack.dev/dayjs'
 import Stripe from 'https://esm.sh/stripe@9.1.0?no-check&target=deno'
 import type { definitions } from './types_supabase.ts'
 
+const cryptoProvider = Stripe.createSubtleCryptoProvider();
 export const parseStripeEvent = async(key: string, body: string, signature: string, secret: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
   })
-  const event = await stripe.webhooks.constructEventAsync(body, signature, secret, undefined, Stripe.createSubtleCryptoProvider())
-  return event
+  let receivedEvent;
+  try {
+    receivedEvent = await stripe.webhooks.constructEventAsync(
+      body,
+      signature,
+      secret,
+      undefined,
+      cryptoProvider
+    );
+  } catch (err) {
+    console.log('Error parsing event', err);
+    return new Response(err.message, { status: 400 });
+  }
+  return receivedEvent
 }
 
 export const createPortal = async(key: string, customerId: string, callbackUrl: string) => {
