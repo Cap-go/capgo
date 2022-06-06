@@ -1214,10 +1214,10 @@
           price_m?: parameters["rowFilter.plans.price_m"];
           price_y?: parameters["rowFilter.plans.price_y"];
           stripe_id?: parameters["rowFilter.plans.stripe_id"];
-          apps?: parameters["rowFilter.plans.apps"];
-          channels?: parameters["rowFilter.plans.channels"];
-          updates?: parameters["rowFilter.plans.updates"];
-          versions?: parameters["rowFilter.plans.versions"];
+          app?: parameters["rowFilter.plans.app"];
+          channel?: parameters["rowFilter.plans.channel"];
+          update?: parameters["rowFilter.plans.update"];
+          version?: parameters["rowFilter.plans.version"];
           shared?: parameters["rowFilter.plans.shared"];
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
@@ -1279,10 +1279,10 @@
           price_m?: parameters["rowFilter.plans.price_m"];
           price_y?: parameters["rowFilter.plans.price_y"];
           stripe_id?: parameters["rowFilter.plans.stripe_id"];
-          apps?: parameters["rowFilter.plans.apps"];
-          channels?: parameters["rowFilter.plans.channels"];
-          updates?: parameters["rowFilter.plans.updates"];
-          versions?: parameters["rowFilter.plans.versions"];
+          app?: parameters["rowFilter.plans.app"];
+          channel?: parameters["rowFilter.plans.channel"];
+          update?: parameters["rowFilter.plans.update"];
+          version?: parameters["rowFilter.plans.version"];
           shared?: parameters["rowFilter.plans.shared"];
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
@@ -1308,10 +1308,10 @@
           price_m?: parameters["rowFilter.plans.price_m"];
           price_y?: parameters["rowFilter.plans.price_y"];
           stripe_id?: parameters["rowFilter.plans.stripe_id"];
-          apps?: parameters["rowFilter.plans.apps"];
-          channels?: parameters["rowFilter.plans.channels"];
-          updates?: parameters["rowFilter.plans.updates"];
-          versions?: parameters["rowFilter.plans.versions"];
+          app?: parameters["rowFilter.plans.app"];
+          channel?: parameters["rowFilter.plans.channel"];
+          update?: parameters["rowFilter.plans.update"];
+          version?: parameters["rowFilter.plans.version"];
           shared?: parameters["rowFilter.plans.shared"];
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
@@ -2644,13 +2644,13 @@ export interface definitions {
      */
     stripe_id: string;
     /** Format: bigint */
-    apps: number;
+    app: number;
     /** Format: bigint */
-    channels: number;
+    channel: number;
     /** Format: bigint */
-    updates: number;
+    update: number;
     /** Format: bigint */
-    versions: number;
+    version: number;
     /** Format: bigint */
     shared: number;
     /**
@@ -2779,8 +2779,11 @@ export interface definitions {
       | "failed"
       | "deleted"
       | "canceled";
-    /** Format: character varying */
-    product_id?: string;
+    /**
+     * Format: character varying
+     * @default free
+     */
+    product_id: string;
     /**
      * Format: timestamp with time zone
      * @default now()
@@ -3086,13 +3089,13 @@ export interface parameters {
   /** Format: character varying */
   "rowFilter.plans.stripe_id": string;
   /** Format: bigint */
-  "rowFilter.plans.apps": string;
+  "rowFilter.plans.app": string;
   /** Format: bigint */
-  "rowFilter.plans.channels": string;
+  "rowFilter.plans.channel": string;
   /** Format: bigint */
-  "rowFilter.plans.updates": string;
+  "rowFilter.plans.update": string;
   /** Format: bigint */
-  "rowFilter.plans.versions": string;
+  "rowFilter.plans.version": string;
   /** Format: bigint */
   "rowFilter.plans.shared": string;
   /** Format: boolean */

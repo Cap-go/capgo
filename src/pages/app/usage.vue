@@ -32,11 +32,11 @@ const getStat = (name: string): number => {
 }
 
 const planFeatures = (plan: definitions['plans']) => [
-  plan.apps > 1 ? `${plan.apps} ${t('plan.applications')}` : `${plan.apps} ${t('plan.application')}`,
-  plan.channels > 1 ? `${plan.channels} ${t('plan.channels')}` : `${plan.channels} ${t('plan.channel')}`,
-  plan.versions > 1 ? `${plan.versions} ${t('plan.versions')}` : `${plan.versions} ${t('plan.version')}`,
+  plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
+  plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
+  plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
   plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
-  plan.updates > 1 ? `${plan.updates} ${t('plan.updates')}` : `${plan.updates} ${t('plan.update')}`,
+  plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
   plan.abtest ? t('plan.abtest') : false,
   plan.progressive_deploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
@@ -46,8 +46,9 @@ const currentPlanSuggest = computed(() => main.myPlan?.AllPlans.find(plan => pla
 const currentPlan = computed(() => main.myPlan?.AllPlans.find(plan => plan.name === main.myPlan?.plan))
 
 const getCurrentPlanSuggestStat = (name: string): number => {
-  console.log('getCurrentPlanSuggestStat', name, currentPlanSuggest.value, currentPlan.value)
-  return currentPlanSuggest.value ? currentPlanSuggest?.value[name as keyof definitions['plans']] as number : 0
+  const key = name.replace('max_', '')
+  console.log('getCurrentPlanSuggestStat', key)
+  return currentPlanSuggest.value ? currentPlanSuggest?.value[key as keyof definitions['plans']] as number : 0
 }
 
 interface SegmentCustomEvent extends CustomEvent {
@@ -81,7 +82,7 @@ const stats = (): keyof Stats => {
   if (!main.myPlan?.stats) {
     return [] as unknown as keyof Stats
   }
-  const res: keyof Stats = Object.keys(main.myPlan?.stats) as unknown as keyof Stats
+  const res: keyof Stats = Object.keys(main.myPlan?.stats).filter(key => key !== 'max_device') as unknown as keyof Stats
   return res
 }
 

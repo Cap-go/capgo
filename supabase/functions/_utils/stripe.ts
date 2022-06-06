@@ -90,7 +90,8 @@ export const createCustomer = async(key: string, email: string) => {
 
 export const extractDataEvent = (event: any): definitions['stripe_info'] => {
   const data: definitions['stripe_info'] = {
-    product_id: undefined,
+    product_id: 'free',
+    price_id: '',
     subscription_id: undefined,
     customer_id: '',
     updated_at: dayjs().toISOString(),

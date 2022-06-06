@@ -43,11 +43,11 @@ export const isGoodPlan = async (userId: string): Promise<boolean> => {
 export const findBestPlan = async (stats: Stats): Promise<string> => {
   const { data, error } = await supabaseAdmin
       .rpc<string>('find_best_plan', { 
-        apps_n: stats.max_app,
-        channels_n: stats.max_channel,
-        updates_n: stats.max_update,
-        versions_n: stats.max_version,
-        shared_n: stats.max_shared
+        apps_n: stats.max_app || 0,
+        channels_n: stats.max_channel || 0,
+        updates_n: stats.max_update || 0,
+        versions_n: stats.max_version || 0,
+        shared_n: stats.max_shared || 0
       })
       .single()
   if (error) {
@@ -88,7 +88,7 @@ export const getMaxstats = async(userId: string): Promise<Stats> => {
     max_channel: 0,
     max_version: 0,
     max_shared: 0,
-    max_mlu: 0,
+    max_update: 0,
     max_device: 0,
   }
 }
