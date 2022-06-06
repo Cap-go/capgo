@@ -151,6 +151,17 @@ watchEffect(async () => {
     await getDevices()
   }
 })
+
+const existUser = async (email: string): Promise<string> => {
+  const { data, error } = await supabase
+      .rpc<string>('exist_user', { e_mail: email })
+      .single()
+  if (error) {
+      throw error
+  }
+  return data
+}
+
 const addUser = async () => {
   console.log('newUser', newUser.value)
 
@@ -178,13 +189,10 @@ const addUser = async () => {
     await alert.present()
     return
   }
-  const { data, error: uError } = await supabase
-    .from<definitions['users']>('users')
-    .select()
-    .eq('email', newUser.value)
-  if (!data || uError) {
-    console.log('no user', uError)
-    newUserModalOpen.value = true
+  // exist_user
+  const exist = await existUser(newUser.value || '')
+  if (!exist) {
+    newUserModalOpen.value = false
     return
   }
 
@@ -193,12 +201,15 @@ const addUser = async () => {
     .insert({
       channel_id: id.value,
       app_id: channel.value.version.app_id,
-      user_id: data[0].id,
+      user_id: exist,
+      created_by: auth.id,
     })
   if (error)
     console.error(error)
-  else
+  else {
     await getUsers()
+    newUser.value = ''
+  }
 }
 const makePublic = async (val = true) => {
   if (!channel.value || !id.value)
