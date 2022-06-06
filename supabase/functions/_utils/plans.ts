@@ -105,14 +105,11 @@ export const getMaxstats = async(userId: string, dateId: string): Promise<Stats>
 }
 
 export const getMyPlan = async(user: definitions['users'], stats: Stats): Promise<PlanData> => {
-  let payment: definitions['stripe_info'] | null = null
-  const { data } = await supabaseAdmin
+  const { data: payment } = await supabaseAdmin
     .from<definitions['stripe_info']>('stripe_info')
     .select()
     .eq('customer_id', user.customer_id)
-  if (data && data.length) {
-    payment = data[0]
-  }
+    .single()
   const current = await getCurrentPlanName(user.id)
   if (current) {
     const planSuggest = await findBestPlan(stats)

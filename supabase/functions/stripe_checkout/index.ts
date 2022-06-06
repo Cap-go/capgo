@@ -20,24 +20,29 @@ serve(async(event: Request) => {
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)
   try {
+    console.log('body')
     const body = (await event.json()) as PortalData
+    console.log('auth')
     const { user: auth, error } = await supabase.auth.api.getUser(
       authorization?.split('Bearer ')[1],
     )
+    console.log('auth done', auth?.id)
     // eslint-disable-next-line no-console
     // console.log('auth', auth)
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
-    const { data: users, error: dbError } = await supabase
+    const { data: user, error: dbError } = await supabase
       .from<definitions['users']>('users')
       .select()
       .eq('id', auth.id)
-    if (dbError || !users || !users.length)
+      .single()
+    if (dbError || !user)
       return sendRes({ status: 'not authorize' }, 400)
-    const user = users[0]
     if (!user.customer_id)
       return sendRes({ status: 'no customer' }, 400)
+    console.log('createCheckout', user.id)
+    
     // eslint-disable-next-line no-console
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string

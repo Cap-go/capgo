@@ -45,15 +45,15 @@ const updloadPhoto = async (data: string, fileName: string, contentType: string)
     .from('users')
     .update({ image_url: publicURL })
     .match({ id: auth?.id })
-
+    .single()
   isLoading.value = false
 
-  if (error || urlError || dbError || !publicURL || !usr || !usr.length) {
+  if (error || urlError || dbError || !publicURL || !usr) {
     errorMessage.value = t('something-went-wrong-try-again-later')
     console.error('upload error', error, urlError, dbError)
     return
   }
-  main.user = usr[0]
+  main.user = usr
 }
 
 const takePhoto = async () => {

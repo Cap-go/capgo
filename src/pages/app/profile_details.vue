@@ -57,13 +57,14 @@ const submit = async () => {
   const { data: usr, error: dbError } = await supabase
     .from<definitions['users']>('users')
     .upsert(updateData)
+    .single()
 
-  if (dbError || !usr || usr.length === 0) {
+  if (dbError || !usr) {
     errorMessage.value = dbError?.message || 'Unknow'
     isLoading.value = false
     return
   }
-  main.user = usr[0]
+  main.user = usr
   router.go(-1)
   isLoading.value = false
 }
@@ -79,12 +80,13 @@ watchEffect(async () => {
         email
       `)
       .match({ id: auth?.id })
-    if (usr && usr.length) {
-      console.log('usr', usr[0])
-      form.email = usr[0].email || ''
-      form.country = usr[0].country || ''
-      form.first_name = usr[0].first_name || ''
-      form.last_name = usr[0].last_name || ''
+      .single()
+    if (usr) {
+      console.log('usr', usr)
+      form.email = usr.email || ''
+      form.country = usr.country || ''
+      form.first_name = usr.first_name || ''
+      form.last_name = usr.last_name || ''
     }
   }
 })

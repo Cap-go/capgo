@@ -80,7 +80,8 @@ const getChannelOverride = async () => {
       updated_at
     `)
     .eq('app_id', packageId.value)
-  channelDevice.value = dataDev?.length ? dataDev[0] : undefined
+    .single()
+  channelDevice.value = dataDev || undefined
 }
 const getDeviceOverride = async () => {
   const { data: dataDev } = await supabase
@@ -95,7 +96,8 @@ const getDeviceOverride = async () => {
       updated_at
     `)
     .eq('app_id', packageId.value)
-  deviceOverride.value = dataDev?.length ? dataDev[0] : undefined
+    .single()
+  deviceOverride.value = dataDev || undefined
 }
 const getDevice = async () => {
   if (!id.value)
@@ -119,8 +121,9 @@ const getDevice = async () => {
           updated_at
         `)
       .eq('device_id', id.value)
-    if (data && data.length)
-      device.value = data[0]
+      .single()
+    if (data)
+      device.value = data
     else
       console.log('no channel')
     console.log('channel', device.value)

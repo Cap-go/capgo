@@ -26,13 +26,13 @@ serve(async(event: Request) => {
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
-    const { data: users, error: dbError } = await supabase
+    const { data: user, error: dbError } = await supabase
       .from<definitions['users']>('users')
       .select()
       .eq('id', auth.id)
-    if (dbError || !users || !users.length)
+      .single()
+    if (dbError || !user)
       return sendRes({ status: 'not authorize' }, 400)
-    const user = users[0]
     if (!user.customer_id)
       return sendRes({ status: 'no customer' }, 400)
     // eslint-disable-next-line no-console

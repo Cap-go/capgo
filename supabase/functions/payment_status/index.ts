@@ -19,15 +19,12 @@ serve(async(event: Request) => {
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
-    let user: definitions['users']
-
-    const { data: users } = await supabase
+    const { data: user } = await supabase
       .from<definitions['users']>('users')
       .select()
       .eq('id', auth.id)
-    if (users && users.length)
-      user = users[0]
-    else
+      .single()
+    if (!user)
       return Promise.reject(Error('no user found'))
     const paymentStatus = await currentPaymentstatus(user)
 

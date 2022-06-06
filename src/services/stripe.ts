@@ -49,20 +49,24 @@ export const openCheckout = async (priceId: string) => {
   })
   try {
     await loading.present()
-    const response = await fetch('https://capgo.app/api/stripe_checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': session.access_token,
-      },
-      body: JSON.stringify({
-        priceId,
-      }),
-    })
-    const res = await response.json()
+    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId }) })
     await loading.dismiss()
-    if (res && res.url)
-      window.open(res.url, '_blank')
+    if (!resp.error && resp.data && resp.data.url)
+      window.open(resp.data.url, '_blank')
+    // const response = await fetch('https://capgo.app/api/stripe_checkout', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'authorization': session.access_token,
+    //   },
+    //   body: JSON.stringify({
+    //     priceId,
+    //   }),
+    // })
+    // const res = await response.json()
+    // await loading.dismiss()
+    // if (res && res.url)
+    //   window.open(res.url, '_blank')
   }
   catch (error) {
     console.error(error)

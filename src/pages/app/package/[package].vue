@@ -55,6 +55,7 @@ const loadAppInfo = async () => {
       .from<definitions['apps']>('apps')
       .select()
       .eq('app_id', id.value)
+      .single()
     const { data: dataChannel } = await supabase
       .from<definitions['channels'] & Channel>('channels')
       .select(`
@@ -70,7 +71,7 @@ const loadAppInfo = async () => {
           `)
       .eq('app_id', id.value)
       .order('updated_at', { ascending: false })
-    app.value = dataApp?.length ? dataApp[0] : app.value
+    app.value = dataApp || app.value
     channels.value = dataChannel || channels.value
   }
   catch (error) {

@@ -131,8 +131,9 @@ const getChannel = async () => {
           updated_at
         `)
       .eq('id', id.value)
-    if (data && data.length)
-      channel.value = data[0]
+      .single()
+    if (data)
+      channel.value = data
     else
       console.log('no channel')
     console.log('channel', channel.value)
