@@ -79,7 +79,7 @@ watchEffect(async () => {
         country,
         email
       `)
-      .match({ id: auth?.id })
+      .eq('id', auth?.id)
       .single()
     if (usr) {
       console.log('usr', usr)

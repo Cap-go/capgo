@@ -24,10 +24,14 @@ const guard = async (next: any, to: string, from: string) => {
         const { data, error } = await supabase
           .from<definitions['users']>('users')
           .select()
-          .match({ id: auth?.id })
+          .eq('id', auth?.id)
+          .limit(1)
           .single()
-        if (!error && data)
-          main.user = data
+        if (!error && data) {
+          console.log('user', data)
+          main.user = JSON.parse(data as any as string) // TODO: fix and understand why it's needed
+          // main.user = data
+        }
         else
           return next('/onboarding/verify_email')
       }

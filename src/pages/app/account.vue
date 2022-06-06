@@ -44,7 +44,7 @@ const updloadPhoto = async (data: string, fileName: string, contentType: string)
   const { data: usr, error: dbError } = await supabase
     .from('users')
     .update({ image_url: publicURL })
-    .match({ id: auth?.id })
+    .eq('id', auth?.id)
     .single()
   isLoading.value = false
 
