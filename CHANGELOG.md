@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.12-alpha.10](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.9...0.30.12-alpha.10) (2022-06-06)
+
+
+### Bug Fixes
+
+* color bar ([ad00d58](https://github.com/Cap-go/capgo/commit/ad00d587a3c3ec4ed86e4bd43a8396492b45d2aa))
+* max stats issue ([d14efba](https://github.com/Cap-go/capgo/commit/d14efba8de1d5fe0eb7d646db98820267a7504c9))
+
 ### [0.30.12-alpha.9](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.8...0.30.12-alpha.9) (2022-06-06)
 
 
