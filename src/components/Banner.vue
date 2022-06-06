@@ -5,7 +5,7 @@ import {
   IonToolbar,
   isPlatform,
 } from '@ionic/vue'
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useMainStore } from '~/stores/main'
@@ -21,30 +21,33 @@ const route = useRoute()
 const { t } = useI18n()
 const isMobile = isPlatform('capacitor')
 
-watchEffect(() => {
-  if (route.path === '/app/usage' || !main.myPlan)
-    return
-  console.log('paymentStatus', main.myPlan)
-  if (main.myPlan && !main.myPlan?.canUseMore && main.myPlan?.trialDaysLeft !== 0) {
-    bannerText.value = `${t('trial-plan-expires-in')} ${parseInt(main.myPlan.trialDaysLeft)} ${t('days')}`
-    if (main.myPlan?.trialDaysLeft <= 7)
+watch(
+  () => main.myPlan,
+  (myPlan, prevMyPlan) => {
+    if (route.path === '/app/usage' || prevMyPlan)
+      return
+    if (myPlan && !myPlan?.paying && myPlan?.trialDaysLeft !== 0) {
+      bannerText.value = `${t('trial-plan-expires-in')} ${parseInt(myPlan.trialDaysLeft)} ${t('days')}`
+      if (myPlan?.trialDaysLeft <= 7)
+        bannerColor.value = 'warning'
+      else
+        bannerColor.value = 'success'
+    }
+    else if (myPlan && !myPlan?.canUseMore && !myPlan?.payment?.status) {
+      bannerText.value = t('trial-plan-expired')
       bannerColor.value = 'warning'
-    else
-      bannerColor.value = 'success'
+    }
+    else if (myPlan && !myPlan?.canUseMore && myPlan.paying) {
+      bannerText.value = 'You reached the limit of your plan'
+      bannerColor.value = 'warning'
+    }
+    else if (!myPlan?.canUseMore) {
+      bannerText.value = 'Your plan is currently inactive'
+      bannerColor.value = 'warning'
+    }
   }
-  else if (main.myPlan && !main.myPlan?.canUseMore && !main.myPlan?.payment?.status) {
-    bannerText.value = t('trial-plan-expired')
-    bannerColor.value = 'warning'
-  }
-  else if (main.myPlan && !main.myPlan?.canUseMore && main.myPlan.paying) {
-    bannerText.value = 'You reached the limit of your plan'
-    bannerColor.value = 'warning'
-  }
-  else if (!main.myPlan?.canUseMore) {
-    bannerText.value = 'Your plan is currently inactive'
-    bannerColor.value = 'warning'
-  }
-})
+)
+
 </script>
 
 <template>
