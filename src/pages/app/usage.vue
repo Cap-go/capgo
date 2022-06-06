@@ -14,11 +14,13 @@ import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import TitleHead from '~/components/TitleHead.vue'
-import type { Stats } from '~/services/plans'
+import type { PlanRes, Stats } from '~/services/plans'
 import Spinner from '~/components/Spinner.vue'
 import { definitions } from '~/types/supabase'
+import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
+const supabase = useSupabase()
 const isLoading = ref(true)
 const isMobile = isPlatform('capacitor')
 const segmentVal = ref<'m' | 'y'>('m')
@@ -129,6 +131,9 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   try {
     // await getAllMax()
     console.log('refreshData')
+    const res = await supabase.functions.invoke<PlanRes>('payment_status', {})
+    if (res.data)
+      main.myPlan = res.data
   }
   catch (error) {
     console.error(error)
@@ -211,7 +216,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
                   <span class="text-4xl font-extrabold text-gray-900 dark:text-gray-100">€{{ getPrice(p, segmentVal) }}</span>
                   <span class="text-base font-medium text-gray-500">/{{ isYearly ? 'yr' : 'mo' }}</span>
                 </p>
-                <div v-if="p.id" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.id)">
+                <div v-if="p.stripe_id !== 'free'" class="mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.id)">
                   {{ t('plan.buy') }} {{ p.name }}
                 </div>
               </div>

@@ -76,9 +76,9 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
   return data || 'Free'
 }
 
-export const getMaxstats = async(userId: string): Promise<Stats> => {
+export const getMaxstats = async(userId: string, dateId: string): Promise<Stats> => {
   const { data, error } = await supabaseAdmin
-      .rpc<Stats>('get_max_stats', { userid: userId })
+      .rpc<Stats>('get_max_stats', { userid: userId, dateid: dateId })
       .single()
   if (error) {
       throw error
@@ -113,7 +113,9 @@ export const getMyPlan = async(user: definitions['users'], stats: Stats): Promis
 
 export const currentPaymentstatus = async(user: definitions['users']): Promise<PlanRes> => {
   try {
-    const stats = await getMaxstats(user.id)
+    // dateId yyyy-mm
+    const dateId = new Date().toISOString().slice(0, 7)
+    const stats = await getMaxstats(user.id, dateId)
     const myPlan = await getMyPlan(user, stats)
     const res: PlanRes = {
       stats,
