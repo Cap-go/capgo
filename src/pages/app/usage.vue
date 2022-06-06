@@ -94,15 +94,15 @@ const getPercentage = (val: number, total: number) => {
 }
 const getBarColorClass = (name: string) => {
   switch (name) {
-    case 'apps':
+    case 'max_app':
       return 'bg-emerald-700 text-emerald-100'
-    case 'channels':
+    case 'max_channel':
       return 'bg-azure-700 text-azure-100'
-    case 'versions':
+    case 'max_version':
       return 'bg-rose-700 text-rose-100'
-    case 'sharedChannels':
+    case 'max_shared':
       return 'bg-vista-blue-700 text-vista-blue-100'
-    case 'updates':
+    case 'max_update':
       return 'bg-pumpkin-orange-700 text-pumpkin-orange-100'
   }
 }
