@@ -13,13 +13,8 @@ export const useSupabase = () => {
     detectSessionInUrl: false,
     fetch: (requestInfo, requestInit) => {
       const url = requestInfo.toString()
-      if (requestInit?.method === 'POST' && (url.includes('/storage/') || url.includes('/rpc/'))) {
-        return fetch(requestInfo, {
-          method: requestInit?.method,
-          signal: requestInit?.signal || undefined,
-          headers: requestInit?.headers,
-          body: requestInit?.body,
-        })
+      if (requestInit?.method === 'POST' && url.includes('/storage/')) {
+        return fetch(requestInfo, requestInit)
       }
       return Http.request({
         url,
@@ -28,7 +23,9 @@ export const useSupabase = () => {
         data: requestInit?.body,
       })
         .then((data) => {
-          const resp = new Response(JSON.stringify(data.data), {
+          const type = data.headers['content-type']
+          const res = type.includes('application/vnd.pgrst.object+json') ? data.data : JSON.stringify(data.data)
+          const resp = new Response(res, {
             status: data.status,
             headers: data.headers,
           })
