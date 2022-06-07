@@ -26,6 +26,7 @@ const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
+const auth = supabase.auth.user()
 const isLoading = ref(true)
 const device = ref<definitions['devices'] & Device>()
 const deviceOverride = ref<definitions['devices_override'] & Device>()
@@ -249,6 +250,7 @@ const upsertDevChannel = async (device: string, channel: definitions['channels']
       device_id: device,
       channel_id: channel.id,
       app_id: packageId.value,
+      created_by: auth?.id,
     })
 }
 const delDevChannel = async (device: string) => {
