@@ -1,9 +1,11 @@
-import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.140.0/http/server.ts'
 import { createCustomer } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
+// Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
+// function.
 serve(async(event: Request) => {
   const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
@@ -20,7 +22,25 @@ serve(async(event: Request) => {
     const record = body.record
     if (record.customer_id)
       return sendRes()
-    console.log('createCustomer')
+    await supabase
+    .from<definitions['apikeys']>('apikeys')
+    .insert([
+      {
+        user_id: record.id,
+        key: crypto.randomUUID(),
+        mode: 'all',
+      },
+      {
+        user_id: record.id,
+        key: crypto.randomUUID(),
+        mode: 'upload',
+      },
+      {
+        user_id: record.id,
+        key: crypto.randomUUID(),
+        mode: 'read',
+      }])
+    console.log('createCustomer stripe')
     const customer = await createCustomer(Deno.env.get('STRIPE_SECRET_KEY') || '', record.email)
     const { error: dbStripeError } = await supabase
       .from<definitions['stripe_info']>('stripe_info')
