@@ -3,7 +3,7 @@
  * Do not make direct changes to the file.
  */
 
- export interface paths {
+export interface paths {
   "/": {
     get: {
       responses: {
@@ -1804,6 +1804,28 @@
       };
     };
   };
+  "/rpc/is_in_channel": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            ownerid: string;
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/get_max_channel": {
     post: {
       parameters: {
@@ -2115,8 +2137,30 @@
       parameters: {
         body: {
           args: {
+            /** Format: character varying */
+            dateid: string;
             /** Format: uuid */
             userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/exist_user": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: character varying */
+            e_mail: string;
           };
         };
         header: {
@@ -2161,6 +2205,26 @@
           args: {
             /** Format: uuid */
             userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_allowed_action": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: text */
+            apikey: string;
           };
         };
         header: {
@@ -2390,7 +2454,7 @@ export interface definitions {
      * @description Note:
      * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
      */
-    created_by?: string;
+    created_by: string;
     /**
      * Format: text
      * @description Note:
