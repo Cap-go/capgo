@@ -17,6 +17,7 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
+import dayjs from 'dayjs'
 
 interface Device {
   version: {
@@ -49,6 +50,8 @@ const deviceFiltered = computed(() => {
 
 const loadData = async (event?: InfiniteScrollCustomEvent) => {
   try {
+    // create a date object for the last day of the previous month with dayjs
+    const lastDay = dayjs().subtract(1, 'month')
     const { data: dataDev } = await supabase
       .from<definitions['devices'] & Device>('devices')
       .select(`
@@ -62,7 +65,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
         updated_at
       `)
       .eq('app_id', id.value)
-      .gt('updated_at', subDays(new Date(), 30).toUTCString())
+      .gt('updated_at', lastDay.toISOString())
       .order('created_at', { ascending: false })
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataDev)
