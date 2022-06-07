@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.17](https://github.com/Cap-go/capgo/compare/0.30.16...0.30.17) (2022-06-07)
+
+
+### Bug Fixes
+
+* issue with single ([2d6fb66](https://github.com/Cap-go/capgo/commit/2d6fb6676b96881bc2c55f9c8ff8d5896fb01d93))
+* lock ([454ad88](https://github.com/Cap-go/capgo/commit/454ad88cc63e91929ef80392510bed7515bfbcca))
+* register script ([78e81ef](https://github.com/Cap-go/capgo/commit/78e81ef931eea9bb8da1291948c7addea6aafca0))
+
 ### [0.30.16](https://github.com/Cap-go/capgo/compare/0.30.15...0.30.16) (2022-06-07)
 
 
