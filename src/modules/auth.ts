@@ -32,8 +32,7 @@ const guard = async (next: any, to: string, from: string) => {
           main.user = JSON.parse(data as any as string) // TODO: fix and understand why it's needed
           // main.user = data
         }
-        else
-          return next('/onboarding/verify_email')
+        else { return next('/onboarding/verify_email') }
       }
       catch (error) {
         console.log('error', error)

@@ -9,14 +9,14 @@ import {
   IonRefresherContent, IonSegment, IonSegmentButton,
   isPlatform, toastController,
 } from '@ionic/vue'
-import { computed, ref, watchEffect, watch } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import TitleHead from '~/components/TitleHead.vue'
 import type { PlanRes, Stats } from '~/services/plans'
 import Spinner from '~/components/Spinner.vue'
-import { definitions } from '~/types/supabase'
+import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
@@ -81,9 +81,9 @@ const formatName = (name: string): string => {
 
 const stats = (): keyof Stats => {
   // get keys of Stats interface
-  if (!main.myPlan?.stats) {
+  if (!main.myPlan?.stats)
     return [] as unknown as keyof Stats
-  }
+
   const res: keyof Stats = Object.keys(main.myPlan?.stats).filter(key => key !== 'max_device') as unknown as keyof Stats
   return res
 }
@@ -112,12 +112,11 @@ const getBarColorClass = (name: string) => {
 watch(
   () => main.myPlan,
   (myPlan, prevMyPlan) => {
-    if (!prevMyPlan && myPlan) {
+    if (!prevMyPlan && myPlan)
       isLoading.value = false
-    } else if (prevMyPlan && !myPlan) {
+    else if (prevMyPlan && !myPlan)
       isLoading.value = true
-    }
-  }
+  },
 )
 
 watchEffect(async () => {
