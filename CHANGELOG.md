@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.14-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.11...0.30.14-alpha.0) (2022-06-07)
+
+
+### Bug Fixes
+
+* add user to channel ([1addade](https://github.com/Cap-go/capgo/commit/1addade561163da344c8c520f5ffc167e7ef66e4))
+* banner ([3014a2f](https://github.com/Cap-go/capgo/commit/3014a2f56fa6ac7f4f8c81947891d744686863c0))
+* issue account ([c753e25](https://github.com/Cap-go/capgo/commit/c753e25015d520cf876a91c16b43f3c662b07dcc))
+* remove complexity for getting one elem ([0c51e81](https://github.com/Cap-go/capgo/commit/0c51e81bc6757c49d6ce2711a77c1f23870f7425))
+* stripe system in supabase ([e5ae112](https://github.com/Cap-go/capgo/commit/e5ae112dced485e58d0d3e72311330d2869a9bb7))
+* version issue ([2fc7886](https://github.com/Cap-go/capgo/commit/2fc788664e3fff33dc47f2330b04e09b2925587b))
+
+### [0.30.12](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.8...0.30.12) (2022-06-01)
+
 ### [0.30.12-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.10...0.30.12-alpha.11) (2022-06-06)
 
 
