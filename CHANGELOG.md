@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 * add user to channel ([1addade](https://github.com/Cap-go/capgo/commit/1addade561163da344c8c520f5ffc167e7ef66e4))
 * banner ([3014a2f](https://github.com/Cap-go/capgo/commit/3014a2f56fa6ac7f4f8c81947891d744686863c0))
+* if plan canceled ([1d9de45](https://github.com/Cap-go/capgo/commit/1d9de4519dcdd73ff2205258c3c4be5869273737))
 * issue account ([c753e25](https://github.com/Cap-go/capgo/commit/c753e25015d520cf876a91c16b43f3c662b07dcc))
 * remove complexity for getting one elem ([0c51e81](https://github.com/Cap-go/capgo/commit/0c51e81bc6757c49d6ce2711a77c1f23870f7425))
 * stripe system in supabase ([e5ae112](https://github.com/Cap-go/capgo/commit/e5ae112dced485e58d0d3e72311330d2869a9bb7))

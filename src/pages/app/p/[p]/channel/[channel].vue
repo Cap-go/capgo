@@ -155,11 +155,11 @@ watchEffect(async () => {
 
 const existUser = async (email: string): Promise<string> => {
   const { data, error } = await supabase
-      .rpc<string>('exist_user', { e_mail: email })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<string>('exist_user', { e_mail: email })
+    .single()
+  if (error)
+    throw error
+
   return data
 }
 
@@ -205,8 +205,7 @@ const addUser = async () => {
       user_id: exist,
       created_by: auth.id,
     })
-  if (error)
-    console.error(error)
+  if (error) { console.error(error) }
   else {
     await getUsers()
     newUser.value = ''

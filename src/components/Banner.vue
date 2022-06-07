@@ -45,9 +45,8 @@ watch(
       bannerText.value = 'Your plan is currently inactive'
       bannerColor.value = 'warning'
     }
-  }
+  },
 )
-
 </script>
 
 <template>
