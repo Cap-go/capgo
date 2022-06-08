@@ -3,6 +3,7 @@ import path from 'path'
 import { defineConfig } from 'vite'
 import Vue from '@vitejs/plugin-vue'
 import Pages from 'vite-plugin-pages'
+import { viteCommonjs, esbuildCommonjs } from '@originjs/vite-plugin-commonjs'
 import Layouts from 'vite-plugin-vue-layouts'
 import Icons from 'unplugin-icons/vite'
 import WindiCSS from 'vite-plugin-windicss'
@@ -39,6 +40,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    viteCommonjs(),
     Vue({
       include: [/\.vue$/, /\.md$/],
     }),
@@ -168,6 +170,11 @@ export default defineConfig({
     exclude: [
       'vue-demi',
     ],
+    esbuildOptions:{
+      plugins:[
+        esbuildCommonjs([]) 
+      ]
+    }
   },
 
   test: {

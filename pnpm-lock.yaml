@@ -39,6 +39,7 @@ specifiers:
   '@intlify/vite-plugin-vue-i18n': 4.0.0
   '@ionic/vue': 6.1.8
   '@ionic/vue-router': 6.1.8
+  '@originjs/vite-plugin-commonjs': ^1.0.3
   '@robingenz/capacitor-file-picker': 0.3.0
   '@robingenz/capacitor-screen-orientation': 1.1.7
   '@supabase/supabase-js': 1.35.3
@@ -177,6 +178,7 @@ devDependencies:
   '@iconify-json/ion': 1.1.1
   '@iconify-json/ls': 1.1.1
   '@intlify/vite-plugin-vue-i18n': 4.0.0_ffjyq3xvmksbcj77tjaigym5hi
+  '@originjs/vite-plugin-commonjs': 1.0.3
   '@types/fs-extra': 9.0.13
   '@types/mime': 2.0.3
   '@types/node': 17.0.35
@@ -3692,6 +3694,12 @@ packages:
     resolution: {integrity: sha512-s1zLBjWhdEI2zwaoSgyOFoKSl109CUcVBCc7biPJ3aAf6LGLU6szDvi31JPU7bxfla2lqfhjbbg/5DdFNxOwHw==}
     dependencies:
       '@octokit/openapi-types': 11.2.0
+    dev: true
+
+  /@originjs/vite-plugin-commonjs/1.0.3:
+    resolution: {integrity: sha512-KuEXeGPptM2lyxdIEJ4R11+5ztipHoE7hy8ClZt3PYaOVQ/pyngd2alaSrPnwyFeOW1UagRBaQ752aA1dTMdOQ==}
+    dependencies:
+      esbuild: 0.14.29
     dev: true
 
   /@polka/url/1.0.0-next.20:
