@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.20](https://github.com/Cap-go/capgo/compare/0.30.19...0.30.20) (2022-06-09)
+
+
+### Bug Fixes
+
+* issue for module inclusion error ([4e6887d](https://github.com/Cap-go/capgo/commit/4e6887d53778c135108892a441e8658a97579d69))
+* issue payment_status no exist ([35e038e](https://github.com/Cap-go/capgo/commit/35e038e561ac4e4dbc7842a1658c427222fa4634))
+* remove old create key ([35ed9d4](https://github.com/Cap-go/capgo/commit/35ed9d4979252499f776bc6d90b380e3ef663860))
+* remove useless file ([d623ef2](https://github.com/Cap-go/capgo/commit/d623ef220b3699ea18cb75aa08b88b3b1d01e5c8))
+
 ### [0.30.19](https://github.com/Cap-go/capgo/compare/0.30.18...0.30.19) (2022-06-07)
 
 
