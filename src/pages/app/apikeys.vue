@@ -8,7 +8,6 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 import Spinner from '~/components/Spinner.vue'
-import { createKeys } from '~/services/apikeys'
 
 const { t } = useI18n()
 const isLoading = ref(false)
@@ -38,7 +37,6 @@ const geKeys = async (retry = true): Promise<void> => {
     apps.value = data
   }
   else if (retry && auth?.id) {
-    await createKeys(auth?.id)
     return geKeys(false)
   }
   isLoading.value = false

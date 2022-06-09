@@ -5,7 +5,6 @@ import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { createKeys } from '~/services/apikeys'
 import type { definitions } from '~/types/supabase'
 
 const supabase = useSupabase()
