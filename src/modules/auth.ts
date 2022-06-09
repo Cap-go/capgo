@@ -20,6 +20,8 @@ const guard = async (next: any, to: string, from: string) => {
             console.log('payment_status', res)
             if (res.data)
               main.myPlan = res.data
+          }).catch((err) => {
+            console.log('error payment_status', err)
           })
         const { data, error } = await supabase
           .from<definitions['users']>('users')
