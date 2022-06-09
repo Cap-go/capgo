@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.21](https://github.com/Cap-go/capgo/compare/0.30.20...0.30.21) (2022-06-09)
+
+
+### Bug Fixes
+
+* remove old create key process ([73dfe21](https://github.com/Cap-go/capgo/commit/73dfe211cfd56e6b9041aaf603bd0640d0acd13d))
+
 ### [0.30.20](https://github.com/Cap-go/capgo/compare/0.30.19...0.30.20) (2022-06-09)
 
 
