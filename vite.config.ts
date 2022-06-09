@@ -14,7 +14,8 @@ import EnvironmentPlugin from 'vite-plugin-environment'
 import pack from './package.json'
 import keys from './configs.json'
 
-const getRightKey = (branch: string, keyname: 'base_domain' | 'supa_anon' | 'supa_url'): string => {
+const branch = process.env.BRANCH || process.env.GITHUB_HEAD_REF || 'main'
+const getRightKey = (keyname: 'base_domain' | 'supa_anon' | 'supa_url'): string => {
   console.log('getRightKey', branch, keyname)
   if (branch === 'development')
     return keys[keyname].development
@@ -23,11 +24,11 @@ const getRightKey = (branch: string, keyname: 'base_domain' | 'supa_anon' | 'sup
   return keys[keyname].prod
 }
 
-const getUrl = (branch = ''): string => {
+const getUrl = (): string => {
   if (branch === 'local')
-    return `http://${getRightKey(branch, 'base_domain')}`
+    return `http://${getRightKey('base_domain')}`
   else
-    return `https://${getRightKey(branch, 'base_domain')}`
+    return `https://${getRightKey('base_domain')}`
 }
 
 const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
@@ -47,12 +48,12 @@ export default defineConfig({
 
     EnvironmentPlugin({
       VITE_APP_VERSION: pack.version,
-      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || getRightKey(process.env.BRANCH || '', 'supa_anon'),
-      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || getRightKey(process.env.BRANCH || '', 'supa_url'),
-      VITE_APP_URL: `${getUrl(process.env.BRANCH)}`,
-      VITE_BRANCH: process.env.BRANCH || 'main',
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || getRightKey('supa_anon'),
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || getRightKey('supa_url'),
+      VITE_APP_URL: `${getUrl()}`,
+      VITE_BRANCH: branch,
       package_dependencies: JSON.stringify(pack.dependencies),
-      domain: getUrl(process.env.BRANCH),
+      domain: getUrl(),
       crisp: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
     }, { defineOn: 'import.meta.env' }),
 
