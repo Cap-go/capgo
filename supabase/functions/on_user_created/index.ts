@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.140.0/http/server.ts'
-import { postPerson } from "../_utils/crisp.ts";
+import { addDataPerson, postPerson } from "../_utils/crisp.ts";
 import { createCustomer } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -49,6 +49,11 @@ serve(async(event: Request) => {
       .insert({
         customer_id: customer.id,
       })
+      await addDataPerson(record.email, {
+        id: record.id,
+        customer_id: customer.id,
+        product_id: 'free'
+    })
     console.log('stripe_info done')
     const { error: dbError } = await supabase
       .from<definitions['users']>('users')

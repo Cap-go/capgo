@@ -11,8 +11,8 @@ export const postPerson = async(email: string, firstName?: string, lastName?: st
     const CRISP_TOKEN_B64 = btoa(CRISP_TOKEN)
     const response = await axiod.post(url, {
         email,
-        "person": {
-            "nickname": `${firstName} ${lastName}`,
+        person: {
+            nickname: `${firstName} ${lastName}`,
             avatar,
         }
     }, {
@@ -23,6 +23,7 @@ export const postPerson = async(email: string, firstName?: string, lastName?: st
     })
     return response.data
 }
+
 export const updatePerson = async(email: string, person: any) => {
     const CRISP_ID = Deno.env.get('CRISP_ID') || ''
     // /v1/website/{website_id}/people/profile/{people_id}
