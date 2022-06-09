@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { addDataPerson } from "../_utils/crisp.ts";
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -19,15 +20,32 @@ serve(async(event: Request) => {
     if (stripeEvent.customer_id === '')
       return sendRes('no customer found', 500)
 
-    const { error: dbError } = await supabase
+    // find email from user with customer_id
+    const { error: dbError, data: user } = await supabase
+      .from<definitions['users']>('users')
+      .select(`email,
+      id`)
+      .eq('customer_id', stripeEvent.customer_id)
+      .single()
+    if (dbError)
+      return sendRes(dbError, 500)
+    if (!user)
+      return sendRes('no user found', 500)
+    const { error: dbError2 } = await supabase
       .from<definitions['stripe_info']>('stripe_info')
       .update(stripeEvent)
       .eq('customer_id', stripeEvent.customer_id)
     // eslint-disable-next-line no-console
     console.log('stripeEvent', stripeEvent)
-    if (dbError)
+    if (dbError2)
       return sendRes(dbError, 500)
-
+    await addDataPerson(user.email, {
+      id: user.id,
+      customer_id: stripeEvent.customer_id,
+      status: stripeEvent.status,
+      price_id: stripeEvent.price_id,
+      product_id: stripeEvent.product_id,
+    })
     return sendRes({ received: true })
   }
   catch (e) {

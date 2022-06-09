@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.140.0/http/server.ts'
+import { postPerson } from "../_utils/crisp.ts";
 import { createCustomer } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -40,6 +41,7 @@ serve(async(event: Request) => {
         key: crypto.randomUUID(),
         mode: 'read',
       }])
+    await postPerson(record.email, record.first_name, record.last_name, record.image_url ? record.image_url : undefined)
     console.log('createCustomer stripe')
     const customer = await createCustomer(Deno.env.get('STRIPE_SECRET_KEY') || '', record.email)
     const { error: dbStripeError } = await supabase
