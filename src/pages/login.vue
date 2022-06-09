@@ -49,6 +49,7 @@ const submit = async () => {
     })
     isLoading.value = false
     if (error) {
+      console.error('error', error)
       showToastMessage('Authentification invalide')
     }
     else {
