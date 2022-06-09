@@ -16,7 +16,6 @@ export const useSupabase = () => {
       const url = requestInfo.toString()
       if (requestInit?.method === 'POST' && url.includes('/storage/'))
         return fetch(requestInfo, requestInit)
-
       return Http.request({
         url,
         method: requestInit?.method,
@@ -25,7 +24,7 @@ export const useSupabase = () => {
       })
         .then((data) => {
           const type = data.headers['content-type']
-          const res = (type.includes('application/vnd.pgrst.object+json') && !isPlatform('capacitor')) ? data.data : JSON.stringify(data.data)
+          const res = type === 'application/vnd.pgrst.object+json' ? data.data : JSON.stringify(data.data)
           const resp = new Response(res, {
             status: data.status,
             headers: data.headers,
