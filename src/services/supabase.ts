@@ -1,3 +1,4 @@
+import { isPlatform } from '@ionic/vue';
 import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 import { Http } from '@capacitor-community/http'
@@ -24,7 +25,7 @@ export const useSupabase = () => {
       })
         .then((data) => {
           const type = data.headers['content-type']
-          const res = type.includes('application/vnd.pgrst.object+json') ? data.data : JSON.stringify(data.data)
+          const res = (type.includes('application/vnd.pgrst.object+json') && !isPlatform('capacitor')) ? data.data : JSON.stringify(data.data)
           const resp = new Response(res, {
             status: data.status,
             headers: data.headers,
