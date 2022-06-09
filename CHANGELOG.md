@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.22](https://github.com/Cap-go/capgo/compare/0.30.21...0.30.22) (2022-06-09)
+
+
+### Bug Fixes
+
+* make create user to crisp CRM ([844189c](https://github.com/Cap-go/capgo/commit/844189c8ecc509e1280c30bda543cbab07bf9e46))
+
 ### [0.30.21](https://github.com/Cap-go/capgo/compare/0.30.20...0.30.21) (2022-06-09)
 
 
