@@ -43,46 +43,107 @@ declare global {
       lock_full_view: boolean
       cross_origin_cookies: boolean
     }
+    CRISP_READY_TRIGGER: () => void
+    pushToCrisp: (data: any) => void
     CRISP_WEBSITE_ID: string
     CRISP_TOKEN_ID: string
   }
 }
 
 export class CapacitorCrispWeb {
-  ifrm = document.createElement('iframe')
-  $crisp: unknown[] = []
+  ifrm: HTMLIFrameElement = document.createElement('iframe')
+  isReady = false
+  tmpArr: any[] = []
 
   constructor() {
     document.body.appendChild(this.ifrm)
+    this.createIframe()
+    if (this.ifrm.contentDocument) {
+      const s = this.createScript(this.ifrm.contentDocument, 'iframe')
+      this.ifrm.contentDocument.getElementsByTagName('head')[0].appendChild(s)
+    }
+    this.setAutoHide()
+  }
+
+  private createScript(source: Document, id: string) {
+    const s = source.createElement('script')
+    s.src = 'https://client.crisp.chat/l.js'
+    s.type = 'text/javascript'
+    s.id = `crisp-script-${id}`
+    s.async = true
+    return s
+  }
+
+  private createIframe() {
     this.ifrm.style.position = 'absolute'
     this.ifrm.style.bottom = '0'
+    this.ifrm.style.right = '0'
     this.ifrm.style.zIndex = '-1'
     this.ifrm.style.width = '100%'
     this.ifrm.style.height = '100%'
     this.ifrm.style.maxWidth = '500px'
     this.ifrm.style.backgroundClip = 'padding-box'
     this.ifrm.style.backgroundColor = 'black'
+    this.ifrm.title = 'Crisp Chat Iframe'
+    this.ifrm.id = 'crisp-chat-iframe'
+
     this.ifrm.style.padding
-      = 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
-    if (!this.ifrm.contentWindow || !this.ifrm.contentDocument)
+    = 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+    if (!this.ifrm.contentWindow || !this.ifrm.contentDocument) {
+      console.error('iframe not created, missing contentWindow or contentDocument')
       return
-    this.ifrm.contentWindow.$crisp = []
-    const s = this.ifrm.contentDocument.createElement('script')
-    if (!s)
-      return
-    s.src = 'https://client.crisp.chat/l.js'
-    s.type = 'text/javascript'
-    s.async = true
-    this.ifrm.contentDocument.getElementsByTagName('head')[0].appendChild(s)
-    this.setAutoHide()
+    }
+    if (!this.ifrm.contentWindow.$crisp)
+      this.ifrm.contentWindow.$crisp = []
+
+    this.ifrm.contentWindow.CRISP_WEBSITE_ID = import.meta.env.crisp as string
+    this.ifrm.contentWindow.CRISP_RUNTIME_CONFIG = {
+      lock_maximized: true,
+      lock_full_view: false,
+      cross_origin_cookies: true,
+    }
+    this.ifrm.contentWindow.CRISP_READY_TRIGGER = () => {
+      if (!this.ifrm.contentWindow)
+        return
+      console.log('crisp iframe ready')
+      this.isReady = true
+      this.push([])
+    }
+    const script = this.ifrm.contentDocument.createElement('script')
+    script.append(`
+      window.pushToCrisp = function(data) {
+        window.$crisp.push(JSON.parse(JSON.stringify(data)));
+      }
+  `)
+    this.ifrm.contentDocument.body.appendChild(script)
+
+    const b = this.ifrm.contentDocument.createElement('button')
+    // create close cross top right
+    b.style.position = 'absolute'
+    b.style.top = '0'
+    b.style.right = '0'
+    b.style.zIndex = '1000001'
+    b.style.width = '50px'
+    b.style.height = '50px'
+    b.style.backgroundColor = 'transparent'
+    b.style.cursor = 'pointer'
+    b.style.border = 'none'
+    b.style.fill = 'white'
+    b.style.padding = '10px'
+    b.onclick = () => {
+      this.ifrm.style.zIndex = '-1'
+    }
+    // fill with svg icon cross
+    b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 256C0 114.6 114.6 0 256 0C397.4 0 512 114.6 512 256C512 397.4 397.4 512 256 512C114.6 512 0 397.4 0 256zM175 208.1L222.1 255.1L175 303C165.7 312.4 165.7 327.6 175 336.1C184.4 346.3 199.6 346.3 208.1 336.1L255.1 289.9L303 336.1C312.4 346.3 327.6 346.3 336.1 336.1C346.3 327.6 346.3 312.4 336.1 303L289.9 255.1L336.1 208.1C346.3 199.6 346.3 184.4 336.1 175C327.6 165.7 312.4 165.7 303 175L255.1 222.1L208.1 175C199.6 165.7 184.4 165.7 175 175C165.7 184.4 165.7 199.6 175 208.1V208.1z"/></svg>'
+    this.ifrm.contentDocument.body.appendChild(b)
   }
 
   private setAutoHide() {
     if (!this.ifrm.contentWindow)
       return
     this.ifrm.contentWindow.$crisp.push(
-      ['safe', true],
-      ['do', 'chat:hide'],
+    // ['safe', true],
+      ['do', 'chat:open'],
       [
         'on',
         'chat:closed',
@@ -90,39 +151,42 @@ export class CapacitorCrispWeb {
           if (!this.ifrm.contentWindow)
             return
           this.ifrm.style.zIndex = '-1'
-          this.ifrm.contentWindow.$crisp.push(['do', 'chat:hide'])
         },
       ],
       [
         'on',
         'message:received',
         () => {
-          if (!this.ifrm.contentWindow)
-            return
-          this.ifrm.contentWindow.$crisp.push(['do', 'chat:show'])
-          this.ifrm.contentWindow.$crisp.push(['do', 'chat:open'])
-          setTimeout(() => {
-            this.ifrm.style.zIndex = '10'
-          }, 50)
+          this.ifrm.style.zIndex = '10'
         },
       ],
     )
   }
 
+  private push(...args: any[]) {
+    if (!this.ifrm.contentWindow?.$crisp || !this.isReady) {
+      console.log('crisp not ready yet')
+      this.tmpArr.push(...args)
+      return
+    }
+    else {
+      this.tmpArr.forEach((arg) => {
+        this.ifrm.contentWindow?.pushToCrisp(arg)
+      })
+    }
+    args.forEach((arg) => {
+      this.ifrm.contentWindow?.pushToCrisp(arg)
+    })
+  }
+
   async configure(data: { websiteID: string }): Promise<void> {
     if (this.ifrm.contentWindow)
       this.ifrm.contentWindow.CRISP_WEBSITE_ID = data.websiteID
+    window.CRISP_WEBSITE_ID = data.websiteID
   }
 
   async openMessenger(): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-
-    this.ifrm.contentWindow.$crisp.push(['do', 'chat:show'])
-    this.ifrm.contentWindow.$crisp.push(['do', 'chat:open'])
-    setTimeout(() => {
-      this.ifrm.style.zIndex = '10'
-    }, 50)
+    this.ifrm.style.zIndex = '10'
   }
 
   async setTokenID(data: { tokenID: string }): Promise<void> {
@@ -137,29 +201,28 @@ export class CapacitorCrispWeb {
     email?: string
     avatar?: string
   }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
+    const arr = []
     if (data.nickname) {
-      this.ifrm.contentWindow.$crisp.push([
+      arr.push([
         'set',
         'user:nickname',
         [data.nickname],
       ])
     }
+
     if (data.email)
-      this.ifrm.contentWindow.$crisp.push(['set', 'user:email', [data.email]])
+      arr.push(['set', 'user:email', [data.email]])
 
     if (data.phone)
-      this.ifrm.contentWindow.$crisp.push(['set', 'user:phone', [data.phone]])
+      arr.push(['set', 'user:phone', [data.phone]])
 
     if (data.avatar)
-      this.ifrm.contentWindow.$crisp.push(['set', 'user:avatar', [data.avatar]])
+      arr.push(['set', 'user:avatar', [data.avatar]])
+    this.push(...arr)
   }
 
   async pushEvent(data: { name: string; color: eventColor }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-    this.ifrm.contentWindow.$crisp.push([
+    this.push([
       'set',
       'session:event',
       [[[data.name, null, data.color]]],
@@ -173,8 +236,6 @@ export class CapacitorCrispWeb {
     employment?: [title: string, role: string]
     geolocation?: [country: string, city: string]
   }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
     const meta: any = {}
     if (data.url)
       meta.url = data.url
@@ -188,7 +249,7 @@ export class CapacitorCrispWeb {
     if (data.geolocation)
       meta.geolocation = data.geolocation
 
-    this.ifrm.contentWindow.$crisp.push([
+    this.push([
       'set',
       'user:company',
       [data.name, meta],
@@ -196,29 +257,23 @@ export class CapacitorCrispWeb {
   }
 
   async setInt(data: { key: string; value: number }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-    this.ifrm.contentWindow.$crisp.push([
+    this.push([
       'set',
       'session:data',
-      [[[data.key, data.value]]],
+      [data.key, data.value],
     ])
   }
 
   async setString(data: { key: string; value: string }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-    this.ifrm.contentWindow.$crisp.push([
+    this.push([
       'set',
       'session:data',
-      [[[data.key, data.value]]],
+      [data.key, data.value],
     ])
   }
 
   async sendMessage(data: { value: string }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-    this.ifrm.contentWindow.$crisp.push([
+    this.push([
       'do',
       'message:send',
       ['text', data.value],
@@ -226,9 +281,7 @@ export class CapacitorCrispWeb {
   }
 
   async setSegment(data: { segment: string }): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-    this.ifrm.contentWindow.$crisp.push([
+    this.push([
       'set',
       'session:segments',
       [[data.segment]],
@@ -236,9 +289,6 @@ export class CapacitorCrispWeb {
   }
 
   async reset(): Promise<void> {
-    if (!this.ifrm.contentWindow)
-      return
-    this.ifrm.contentWindow.$crisp.push(['do', 'session:reset'])
-    this.setAutoHide()
+    this.push(['do', 'session:reset'])
   }
 }

@@ -33,12 +33,12 @@ const geKeys = async (retry = true): Promise<void> => {
     .from<definitions['apikeys']>('apikeys')
     .select()
     .eq('user_id', auth?.id)
-  if (data && data.length) {
+  if (data && data.length)
     apps.value = data
-  }
-  else if (retry && auth?.id) {
+
+  else if (retry && auth?.id)
     return geKeys(false)
-  }
+
   isLoading.value = false
 }
 watchEffect(async () => {

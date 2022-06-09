@@ -29,10 +29,10 @@ const guard = async (next: any, to: string, from: string) => {
           .eq('id', auth?.id)
           .limit(1)
           .single()
-        if (!error && data) {
+        if (!error && data)
           main.user = data
-        }
-        else { return next('/onboarding/verify_email') }
+
+        else return next('/onboarding/verify_email')
       }
       catch (error) {
         console.log('error', error)

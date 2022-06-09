@@ -12,12 +12,12 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { subDays } from 'date-fns'
+import dayjs from 'dayjs'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
-import dayjs from 'dayjs'
 
 interface Device {
   version: {
