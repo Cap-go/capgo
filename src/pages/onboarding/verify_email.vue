@@ -47,7 +47,6 @@ const updateDb = async () => {
         image_url: '',
       },
     )
-  await createKeys(user.value?.id)
   if (error)
     console.log('updateDb', error)
   router.push('/onboarding/activation')
