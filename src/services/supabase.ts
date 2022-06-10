@@ -1,4 +1,3 @@
-import { isPlatform } from '@ionic/vue';
 import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 import { Http } from '@capacitor-community/http'
