@@ -3,7 +3,7 @@ import path from 'path'
 import { defineConfig } from 'vite'
 import Vue from '@vitejs/plugin-vue'
 import Pages from 'vite-plugin-pages'
-import { viteCommonjs, esbuildCommonjs } from '@originjs/vite-plugin-commonjs'
+import { esbuildCommonjs, viteCommonjs } from '@originjs/vite-plugin-commonjs'
 import Layouts from 'vite-plugin-vue-layouts'
 import Icons from 'unplugin-icons/vite'
 import WindiCSS from 'vite-plugin-windicss'
@@ -48,8 +48,8 @@ export default defineConfig({
 
     EnvironmentPlugin({
       VITE_APP_VERSION: pack.version,
-      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || getRightKey('supa_anon'),
-      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || getRightKey('supa_url'),
+      VITE_SUPABASE_ANON_KEY: getRightKey('supa_anon'),
+      VITE_SUPABASE_URL: getRightKey('supa_url'),
       VITE_APP_URL: `${getUrl()}`,
       VITE_BRANCH: branch,
       package_dependencies: JSON.stringify(pack.dependencies),
@@ -171,11 +171,11 @@ export default defineConfig({
     exclude: [
       'vue-demi',
     ],
-    esbuildOptions:{
-      plugins:[
-        esbuildCommonjs([]) 
-      ]
-    }
+    esbuildOptions: {
+      plugins: [
+        esbuildCommonjs([]),
+      ],
+    },
   },
 
   test: {
