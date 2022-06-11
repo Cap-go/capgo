@@ -22,8 +22,7 @@ export const useSupabase = () => {
         data: requestInit?.body,
       })
         .then((data) => {
-          const type = data.headers['content-type']
-          const res = type === 'application/vnd.pgrst.object+json' ? data.data : JSON.stringify(data.data)
+          const res = typeof data.data === 'string' ? data.data : JSON.stringify(data.data)
           const resp = new Response(res, {
             status: data.status,
             headers: data.headers,

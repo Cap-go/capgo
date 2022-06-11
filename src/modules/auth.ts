@@ -13,7 +13,7 @@ const guard = async (next: any, to: string, from: string) => {
 
   if (auth && !main.auth) {
     main.auth = auth
-    if (!main.user) {
+    if (!main.user && auth) {
       try {
         supabase.functions.invoke<PlanRes>('payment_status', {})
           .then((res) => {
@@ -31,19 +31,18 @@ const guard = async (next: any, to: string, from: string) => {
           .single()
         if (!error && data)
           main.user = data
-
         else return next('/onboarding/verify_email')
+        setUser({
+          nickname: `${data.first_name} ${data.last_name}`,
+          email: data.email,
+          avatar: data.image_url,
+        })
       }
       catch (error) {
         console.log('error', error)
       }
     }
     setUserId(auth.id)
-    setUser({
-      nickname: `${main.user?.first_name} ${main.user?.last_name}`,
-      email: main.user?.email,
-      avatar: main.user?.image_url,
-    })
 
     if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
       next('/onboarding/activation')

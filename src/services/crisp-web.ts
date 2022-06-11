@@ -112,7 +112,8 @@ export class CapacitorCrispWeb {
     const script = this.ifrm.contentDocument.createElement('script')
     script.append(`
       window.pushToCrisp = function(data) {
-        window.$crisp.push(JSON.parse(JSON.stringify(data)));
+        console.log('pushToCrisp', data);
+        window.$crisp.push(JSON.parse(data));
       }
   `)
     this.ifrm.contentDocument.body.appendChild(script)
@@ -171,11 +172,11 @@ export class CapacitorCrispWeb {
     }
     else {
       this.tmpArr.forEach((arg) => {
-        this.ifrm.contentWindow?.pushToCrisp(arg)
+        this.ifrm.contentWindow?.pushToCrisp(JSON.stringify(arg))
       })
     }
     args.forEach((arg) => {
-      this.ifrm.contentWindow?.pushToCrisp(arg)
+      this.ifrm.contentWindow?.pushToCrisp(JSON.stringify(arg))
     })
   }
 
