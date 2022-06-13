@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/Cap-go/capgo/compare/1.3.0...1.4.0) (2022-06-13)
+
+
+### Features
+
+* add event for email campain ([c8e3ced](https://github.com/Cap-go/capgo/commit/c8e3ced43dea0e9e179138c1504f359865fee072))
+
 ## [1.3.0](https://github.com/Cap-go/capgo/compare/1.2.8...1.3.0) (2022-06-13)
 
 
