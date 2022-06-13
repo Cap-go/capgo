@@ -1572,6 +1572,7 @@ export interface paths {
           product_id?: parameters["rowFilter.stripe_info.product_id"];
           trial_at?: parameters["rowFilter.stripe_info.trial_at"];
           price_id?: parameters["rowFilter.stripe_info.price_id"];
+          is_good_plan?: parameters["rowFilter.stripe_info.is_good_plan"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1630,6 +1631,7 @@ export interface paths {
           product_id?: parameters["rowFilter.stripe_info.product_id"];
           trial_at?: parameters["rowFilter.stripe_info.trial_at"];
           price_id?: parameters["rowFilter.stripe_info.price_id"];
+          is_good_plan?: parameters["rowFilter.stripe_info.is_good_plan"];
         };
         header: {
           /** Preference */
@@ -1652,6 +1654,7 @@ export interface paths {
           product_id?: parameters["rowFilter.stripe_info.product_id"];
           trial_at?: parameters["rowFilter.stripe_info.trial_at"];
           price_id?: parameters["rowFilter.stripe_info.price_id"];
+          is_good_plan?: parameters["rowFilter.stripe_info.is_good_plan"];
         };
         body: {
           /** stripe_info */
@@ -2281,7 +2284,11 @@ export interface definitions {
      * @default now()
      */
     created_at?: string;
-    /** Format: uuid */
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
     user_id: string;
     /** Format: character varying */
     key: string;
@@ -2344,7 +2351,11 @@ export interface definitions {
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id: string;
-    /** Format: uuid */
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
     user_id: string;
     /**
      * Format: timestamp with time zone
@@ -2389,7 +2400,11 @@ export interface definitions {
     name: string;
     /** Format: character varying */
     bucket_id?: string;
-    /** Format: uuid */
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
     user_id: string;
     /**
      * Format: timestamp with time zone
@@ -2418,7 +2433,11 @@ export interface definitions {
     app_id: string;
     /** Format: character varying */
     icon_url: string;
-    /** Format: uuid */
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
     user_id: string;
     /** Format: character varying */
     name?: string;
@@ -2840,6 +2859,7 @@ export interface definitions {
      * Format: character varying
      * @description Note:
      * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `users.customer_id`.<fk table='users' column='customer_id'/>
      */
     customer_id: string;
     /**
@@ -2855,7 +2875,8 @@ export interface definitions {
       | "canceled";
     /**
      * Format: character varying
-     * @default free
+     * @description Note:
+     * This is a Foreign Key to `plans.stripe_id`.<fk table='plans' column='stripe_id'/>
      */
     product_id: string;
     /**
@@ -2865,6 +2886,11 @@ export interface definitions {
     trial_at: string;
     /** Format: character varying */
     price_id?: string;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    is_good_plan?: boolean;
   };
   users: {
     /**
@@ -2908,7 +2934,11 @@ export interface definitions {
      * @default false
      */
     legalAccepted: boolean;
-    /** Format: character varying */
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `stripe_info.customer_id`.<fk table='stripe_info' column='customer_id'/>
+     */
     customer_id?: string;
   };
 }
@@ -3240,6 +3270,8 @@ export interface parameters {
   "rowFilter.stripe_info.trial_at": string;
   /** Format: character varying */
   "rowFilter.stripe_info.price_id": string;
+  /** Format: boolean */
+  "rowFilter.stripe_info.is_good_plan": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */
