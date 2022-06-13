@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
-import { addDataPerson, updatePerson } from '../_utils/crisp.ts'
+import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -55,11 +55,15 @@ serve(async (event: Request) => {
       if (plan) {
         const isMonthly = plan.price_m_id === stripeEvent.price_id
         await updatePerson(user.email, undefined, [plan.name, isMonthly ? 'Monthly' : 'Yearly'])
+        await addEventPerson(user.email, {
+          plan: plan.name,
+        }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'red')
       }
       else { await updatePerson(user.email, undefined, ['Not_found']) }
     }
     else if (stripeEvent.status === 'canceled') {
       await updatePerson(user.email, undefined, ['Canceled'])
+      await addEventPerson(user.email, {}, 'user:cancel', 'red')
     }
     else {
       await updatePerson(user.email, undefined, ['Free'])
