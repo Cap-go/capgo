@@ -1,11 +1,12 @@
 import { serve } from 'https://deno.land/std@0.140.0/http/server.ts'
-import { updatePerson } from "../_utils/crisp.ts";
+import type { Person } from '../_utils/crisp.ts'
+import { updatePerson } from '../_utils/crisp.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
-serve(async(event: Request) => {
+serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret)
@@ -19,11 +20,11 @@ serve(async(event: Request) => {
     const body = (await event.json()) as { record: definitions['users'] }
     const record = body.record
     console.log('updatePerson crisp')
-    const person = {
+    const person: Person = {
       nickname: `${record.first_name} ${record.last_name}`,
       avatar: record.image_url ? record.image_url : undefined,
       country: record.country ? record.country : undefined,
-  }
+    }
     await updatePerson(record.email, person)
     return sendRes()
   }

@@ -1222,6 +1222,8 @@ export interface paths {
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
           id?: parameters["rowFilter.plans.id"];
+          price_m_id?: parameters["rowFilter.plans.price_m_id"];
+          price_y_id?: parameters["rowFilter.plans.price_y_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1287,6 +1289,8 @@ export interface paths {
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
           id?: parameters["rowFilter.plans.id"];
+          price_m_id?: parameters["rowFilter.plans.price_m_id"];
+          price_y_id?: parameters["rowFilter.plans.price_y_id"];
         };
         header: {
           /** Preference */
@@ -1316,6 +1320,8 @@ export interface paths {
           abtest?: parameters["rowFilter.plans.abtest"];
           progressive_deploy?: parameters["rowFilter.plans.progressive_deploy"];
           id?: parameters["rowFilter.plans.id"];
+          price_m_id?: parameters["rowFilter.plans.price_m_id"];
+          price_y_id?: parameters["rowFilter.plans.price_y_id"];
         };
         body: {
           /** plans */
@@ -2734,6 +2740,10 @@ export interface definitions {
      * @default extensions.uuid_generate_v4()
      */
     id: string;
+    /** Format: character varying */
+    price_m_id: string;
+    /** Format: character varying */
+    price_y_id: string;
   };
   stats: {
     /**
@@ -3168,6 +3178,10 @@ export interface parameters {
   "rowFilter.plans.progressive_deploy": string;
   /** Format: uuid */
   "rowFilter.plans.id": string;
+  /** Format: character varying */
+  "rowFilter.plans.price_m_id": string;
+  /** Format: character varying */
+  "rowFilter.plans.price_y_id": string;
   /** @description stats */
   "body.stats": definitions["stats"];
   /** Format: bigint */
