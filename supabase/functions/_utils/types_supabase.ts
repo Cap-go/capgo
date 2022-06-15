@@ -1951,6 +1951,34 @@ export interface paths {
       };
     };
   };
+  "/rpc/find_fit_plan": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: bigint */
+            apps_n: number;
+            /** Format: bigint */
+            channels_n: number;
+            /** Format: bigint */
+            shared_n: number;
+            /** Format: bigint */
+            updates_n: number;
+            /** Format: bigint */
+            versions_n: number;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/exist_app_versions": {
     post: {
       parameters: {

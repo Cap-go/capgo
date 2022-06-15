@@ -11,18 +11,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import VueI18n from '@intlify/vite-plugin-vue-i18n'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
+import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
-import keys from './configs.json'
-
-const branch = process.env.BRANCH || process.env.GITHUB_HEAD_REF || 'main'
-const getRightKey = (keyname: 'base_domain' | 'supa_anon' | 'supa_url'): string => {
-  console.log('getRightKey', branch, keyname)
-  if (branch === 'development')
-    return keys[keyname].development
-  else if (branch === 'local')
-    return keys[keyname].local
-  return keys[keyname].prod
-}
 
 const getUrl = (): string => {
   if (branch === 'local')

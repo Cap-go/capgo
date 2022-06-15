@@ -14,8 +14,8 @@
     "serve": "vite",
     "dev-serve": "BRANCH=development vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
-    "types": "node getTypes.js",
-    "dev-types": "BRANCH=development node getTypes.js",
+    "types": "node ./scripts/getTypes.mjs",
+    "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
