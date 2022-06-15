@@ -26,13 +26,15 @@ jobs:
       - name: Build
         id: build_code
         run: pnpm build
-        env: # Or as an environment variable
+        env:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-      - name: Update functions
+      - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          BRANCH: development
         run: node scripts/deploy_functions.mjs  
       - name: Update functions
         if: "!contains(github.ref, '-alpha.')"
