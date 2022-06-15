@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.3](https://github.com/Cap-go/capgo/compare/1.6.2...1.6.3) (2022-06-15)
+
+
+### Bug Fixes
+
+* issue with folder missing ([8068e36](https://github.com/Cap-go/capgo/commit/8068e367a9538a8f7baa99bb4ad320934f622ca1))
+
 ### [1.6.2](https://github.com/Cap-go/capgo/compare/1.6.1...1.6.2) (2022-06-15)
 
 
