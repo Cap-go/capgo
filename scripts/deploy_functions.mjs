@@ -30,13 +30,13 @@ folders.forEach((folder) => {
 })
 
 try {
+  console.log('projectRef', projectRef)
+  fs.writeFileSync('./supabase/.temp/project-ref', projectRef)
   if (!token) {
     console.error('SUPABASE_TOKEN is not set')
     exit(1)
   }
   fs.writeFileSync(`${homedir()}/.supabase/access-token`, token)
-  fs.writeFileSync('supabase/.temp/project-ref', projectRef)
-  console.log('projectRef', projectRef)
   await Promise.all(calls)
 }
 catch (e) {
