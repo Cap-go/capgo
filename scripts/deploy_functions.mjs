@@ -13,23 +13,6 @@ const calls = []
 const token = process.env.SUPABASE_TOKEN || ''
 const projectRef = supa_url.split('.')[0].replace('https://', '')
 
-folders.forEach((folder) => {
-  const file = `./supabase/functions/${folder}/.no_verify_jwt`
-  let command = `supabase functions deploy ${folder}`
-  let no_verify_jwt = false
-  if (existsSync(file)) {
-    command += ' --no-verify-jwt'
-    no_verify_jwt = true
-  }
-  calls.push(exec(command).then((r) => {
-    if (r.stderr)
-      console.error(folder, r.stderr)
-    else
-      console.log(`Upload done for ${folder}${no_verify_jwt ? ' no_verify_jwt' : ''} ✅`)
-    return r
-  }))
-})
-
 try {
   console.log('projectRef', projectRef)
   await outputFile('./supabase/.temp/project-ref', projectRef)
@@ -38,6 +21,22 @@ try {
     exit(1)
   }
   await outputFile(`${homedir()}/.supabase/access-token`, token)
+  folders.forEach((folder) => {
+    const file = `./supabase/functions/${folder}/.no_verify_jwt`
+    let command = `supabase functions deploy ${folder}`
+    let no_verify_jwt = false
+    if (existsSync(file)) {
+      command += ' --no-verify-jwt'
+      no_verify_jwt = true
+    }
+    calls.push(exec(command).then((r) => {
+      if (r.stderr)
+        console.error(folder, r.stderr)
+      else
+        console.log(`Upload done for ${folder}${no_verify_jwt ? ' no_verify_jwt' : ''} ✅`)
+      return r
+    }))
+  })
   await Promise.all(calls)
 }
 catch (e) {
