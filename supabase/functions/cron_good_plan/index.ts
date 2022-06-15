@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -40,6 +41,8 @@ serve(async (event: Request) => {
             .rpc<boolean>('is_good_plan', { userid: user.id })
             .single()
           console.log('is_good_plan', user.id, is_good_plan)
+          if (!is_good_plan)
+            await addEventPerson(user.email, {}, 'user:need_upgrade', 'red')
           return supabaseAdmin
             .from<definitions['stripe_info']>('stripe_info')
             .update({ is_good_plan: !!is_good_plan })

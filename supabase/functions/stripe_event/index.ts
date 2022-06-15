@@ -57,7 +57,8 @@ serve(async (event: Request) => {
         await updatePerson(user.email, undefined, [plan.name, isMonthly ? 'Monthly' : 'Yearly'])
         await addEventPerson(user.email, {
           plan: plan.name,
-        }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'red')
+        }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'green')
+        await addEventPerson(user.email, {}, 'user:upgrade', 'green')
       }
       else { await updatePerson(user.email, undefined, ['Not_found']) }
     }
