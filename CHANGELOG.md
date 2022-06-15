@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.4](https://github.com/Cap-go/capgo/compare/1.5.3...1.5.4) (2022-06-15)
+
+
+### Bug Fixes
+
+* add missign supabase cli ([1948799](https://github.com/Cap-go/capgo/commit/1948799f005d6ab5ed32dff6a0dea4555d0bf0b9))
+
 ### [1.5.3](https://github.com/Cap-go/capgo/compare/1.5.2...1.5.3) (2022-06-15)
 
 
