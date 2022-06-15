@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
-serve(async(event: Request) => {
+serve(async (event: Request) => {
   const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
@@ -18,12 +18,12 @@ serve(async(event: Request) => {
     const record = body.record
     console.log('record', record)
     const { error: dbError } = await supabase
-    .from<definitions['apps']>('apps')
-    .update({
-      last_version: record.name,
-    }, { returning: "minimal" })
-    .eq('app_id', record.app_id)
-    .eq('user_id', record.user_id)
+      .from<definitions['apps']>('apps')
+      .update({
+        last_version: record.name,
+      }, { returning: 'minimal' })
+      .eq('app_id', record.app_id)
+      .eq('user_id', record.user_id)
     if (dbError) {
       console.log('dbError', dbError)
       return sendRes({ status: 'Error unknow', error: dbError }, 500)
