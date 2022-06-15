@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.6](https://github.com/Cap-go/capgo/compare/1.6.5...1.6.6) (2022-06-15)
+
+
+### Bug Fixes
+
+* order send command only when ready ([3a0c7e9](https://github.com/Cap-go/capgo/commit/3a0c7e96612beb88c2933fc421b9554e6f1a6cce))
+
 ### [1.6.5](https://github.com/Cap-go/capgo/compare/1.6.4...1.6.5) (2022-06-15)
 
 
