@@ -8,7 +8,6 @@ import { supa_url } from './utils.mjs'
 
 const exec = promisify(execCb)
 const folders = readdirSync('./supabase/functions').filter(file => !file.startsWith('_'))
-const calls = []
 
 const token = process.env.SUPABASE_TOKEN || ''
 const projectRef = supa_url.split('.')[0].replace('https://', '')
@@ -21,7 +20,8 @@ try {
     exit(1)
   }
   await outputFile(`${homedir()}/.supabase/access-token`, token)
-  folders.forEach((folder) => {
+  // for in folders
+  for (const folder of folders) {
     const file = `./supabase/functions/${folder}/.no_verify_jwt`
     let command = `supabase functions deploy ${folder}`
     let no_verify_jwt = false
@@ -29,15 +29,16 @@ try {
       command += ' --no-verify-jwt'
       no_verify_jwt = true
     }
-    calls.push(exec(command).then((r) => {
-      if (r.stderr)
+    console.log(`Upload ${folder}${no_verify_jwt ? ' no_verify_jwt' : ''}`)
+    await exec(command).then((r) => {
+      if (r.stderr) {
         console.error(folder, r.stderr)
-      else
-        console.log(`Upload done for ${folder}${no_verify_jwt ? ' no_verify_jwt' : ''} ✅`)
+        exit(1)
+      }
       return r
-    }))
-  })
-  await Promise.all(calls)
+    })
+    console.log('Done ✅')
+  }
 }
 catch (e) {
   console.error(e) // should contain code (exit code) and signal (that caused the termination).
