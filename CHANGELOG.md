@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.1](https://github.com/Cap-go/capgo/compare/1.5.0...1.5.1) (2022-06-15)
+
+
+### Bug Fixes
+
+* crisp customer event ([2791826](https://github.com/Cap-go/capgo/commit/279182614a7eff81fc0c045bb62d4153d27f8102))
+* lint in version trigger ([66c1027](https://github.com/Cap-go/capgo/commit/66c102770c96d106baf6c8e7d19d872bb1af25ea))
+
 ## [1.5.0](https://github.com/Cap-go/capgo/compare/1.4.0...1.5.0) (2022-06-13)
 
 
