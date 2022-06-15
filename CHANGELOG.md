@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.6.0](https://github.com/Cap-go/capgo/compare/1.5.4...1.6.0) (2022-06-15)
+
+
+### Features
+
+* mix script for maintenance ([d2b621e](https://github.com/Cap-go/capgo/commit/d2b621ef60d5bbb998e600291e8ab33df22dfa26))
+
+
+### Bug Fixes
+
+* build functions in  CI ([4667754](https://github.com/Cap-go/capgo/commit/466775439748f21ef425b14419ae3e0177e4d042))
+* lint ([45df20b](https://github.com/Cap-go/capgo/commit/45df20bce533767a9550d64b9e189648187c319b))
+
 ### [1.5.4](https://github.com/Cap-go/capgo/compare/1.5.3...1.5.4) (2022-06-15)
 
 
