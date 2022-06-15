@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.2](https://github.com/Cap-go/capgo/compare/1.5.1...1.5.2) (2022-06-15)
+
+
+### Bug Fixes
+
+* add auto publish in supabase functions ([bfa1848](https://github.com/Cap-go/capgo/commit/bfa1848e8948c3b3d7341dfb2fd85cacf34d4f40))
+
 ### [1.5.1](https://github.com/Cap-go/capgo/compare/1.5.0...1.5.1) (2022-06-15)
 
 
