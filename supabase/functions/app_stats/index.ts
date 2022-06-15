@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -44,7 +44,7 @@ const getApp = (appId: string) => {
       .eq('app_id', appId),
   }
 }
-serve(async(event: Request) => {
+serve(async (event: Request) => {
   const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')

@@ -28,6 +28,14 @@ jobs:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Update functions
+        if: "contains(github.ref, '-alpha.')"
+        id: update_functions_preprod
+        run: node scripts/deploy_functions.mjs  
+      - name: Update functions
+        if: "!contains(github.ref, '-alpha.')"
+        id: update_functions_prod
+        run: node scripts/deploy_functions.mjs 
       - name: Create Release Alpha
         if: "contains(github.ref, '-alpha.')"
         id: create_release_prepro
