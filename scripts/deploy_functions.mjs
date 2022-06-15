@@ -3,6 +3,7 @@ import util from 'util'
 import { exec as execCb } from 'child_process'
 import { exit } from 'process'
 import { homedir } from 'os'
+import fs_extra from 'fs-extra'
 import { supa_url } from './utils.mjs'
 
 const exec = util.promisify(execCb)
@@ -31,12 +32,12 @@ folders.forEach((folder) => {
 
 try {
   console.log('projectRef', projectRef)
-  fs.writeFileSync('./supabase/.temp/project-ref', projectRef)
+  await fs_extra.outputFile('./supabase/.temp/project-ref', projectRef)
   if (!token) {
     console.error('SUPABASE_TOKEN is not set')
     exit(1)
   }
-  fs.writeFileSync(`${homedir()}/.supabase/access-token`, token)
+  await fs_extra.outputFile(`${homedir()}/.supabase/access-token`, token)
   await Promise.all(calls)
 }
 catch (e) {
