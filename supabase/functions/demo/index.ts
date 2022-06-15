@@ -10,7 +10,7 @@ interface dataDemo {
   iconType: string
 }
 
-serve(async(event: Request) => {
+serve(async (event: Request) => {
   const supabase = supabaseAdmin
   const apikey_string = event.headers.get('apikey')
   if (!apikey_string)
