@@ -1,13 +1,13 @@
-import fs from 'fs'
-import util from 'util'
+import { existsSync, readdirSync } from 'fs'
+import { promisify } from 'util'
 import { exec as execCb } from 'child_process'
 import { exit } from 'process'
 import { homedir } from 'os'
-import fs_extra from 'fs-extra'
+import { outputFile } from 'fs-extra'
 import { supa_url } from './utils.mjs'
 
-const exec = util.promisify(execCb)
-const folders = fs.readdirSync('./supabase/functions').filter(file => !file.startsWith('_'))
+const exec = promisify(execCb)
+const folders = readdirSync('./supabase/functions').filter(file => !file.startsWith('_'))
 const calls = []
 
 const token = process.env.SUPABASE_TOKEN || ''
@@ -17,7 +17,7 @@ folders.forEach((folder) => {
   const file = `./supabase/functions/${folder}/.no_verify_jwt`
   let command = `supabase functions deploy ${folder}`
   let no_verify_jwt = false
-  if (fs.existsSync(file)) {
+  if (existsSync(file)) {
     command += ' --no-verify-jwt'
     no_verify_jwt = true
   }
@@ -32,12 +32,12 @@ folders.forEach((folder) => {
 
 try {
   console.log('projectRef', projectRef)
-  await fs_extra.outputFile('./supabase/.temp/project-ref', projectRef)
+  await outputFile('./supabase/.temp/project-ref', projectRef)
   if (!token) {
     console.error('SUPABASE_TOKEN is not set')
     exit(1)
   }
-  await fs_extra.outputFile(`${homedir()}/.supabase/access-token`, token)
+  await outputFile(`${homedir()}/.supabase/access-token`, token)
   await Promise.all(calls)
 }
 catch (e) {
