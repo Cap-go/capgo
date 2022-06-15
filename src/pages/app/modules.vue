@@ -37,7 +37,7 @@ console.log('modules', modules.value)
   <IonPage>
     <TitleHead :title="t('module.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <TitleHead :title="t('module.heading')" no-back big color="warning" />
+      <!-- <TitleHead :title="t('module.heading')" no-back big color="warning" /> -->
       <div class="p-6">
         <ul class="grid grid-rows-4 gap-y-5 mb-6">
           <li>

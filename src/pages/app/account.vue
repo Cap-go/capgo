@@ -156,7 +156,7 @@ const presentActionSheet = async () => {
   <IonPage>
     <TitleHead :title="t('account.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <TitleHead :title="t('account.heading')" no-back big color="warning" />
+      <!-- <TitleHead :title="t('account.heading')" no-back big color="warning" /> -->
       <div class="py-16 px-6">
         <div
           v-if="!main.user?.image_url"

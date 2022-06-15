@@ -112,7 +112,6 @@ export class CapacitorCrispWeb {
     const script = this.ifrm.contentDocument.createElement('script')
     script.append(`
       window.pushToCrisp = function(data) {
-        console.log('pushToCrisp', data);
         window.$crisp.push(JSON.parse(data));
       }
   `)

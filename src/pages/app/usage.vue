@@ -147,7 +147,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   <IonPage>
     <TitleHead :title="t('usage.title')" default-back="/app/account" />
     <IonContent :fullscreen="true">
-      <TitleHead :title="t('usage.title')" big default-back="/app/account" />
+      <!-- <TitleHead :title="t('usage.title')" big default-back="/app/account" /> -->
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>
