@@ -1,10 +1,10 @@
-import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { currentPaymentstatus } from '../_utils/plans.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 
-serve(async(event: Request) => {
+serve(async (event: Request) => {
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
   const supabase = supabaseAdmin

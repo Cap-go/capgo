@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 import type { PlanRes } from '~/services/plans'
+import { reset } from '~/services/crips'
 
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | null>()
@@ -19,6 +20,7 @@ export const useMainStore = defineStore('main', () => {
           auth.value = undefined
           user.value = undefined
           myPlan.value = undefined
+          reset()
           resolve()
         }
       })

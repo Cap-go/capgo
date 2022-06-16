@@ -2,16 +2,16 @@ import { supabaseAdmin } from './supabase.ts'
 import type { definitions } from './types_supabase.ts'
 
 export interface PlanData {
-  plan: string,
-  planSuggest: string,
-  payment?: definitions['stripe_info'] | null,
+  plan: string
+  planSuggest: string
+  payment?: definitions['stripe_info'] | null
   canUseMore: boolean
-  paying: boolean,
+  paying: boolean
 }
 export interface PlanRes extends PlanData {
-  trialDaysLeft: number,
-  stats: Stats,
-  AllPlans: definitions['plans'][],
+  trialDaysLeft: number
+  stats: Stats
+  AllPlans: definitions['plans'][]
 }
 
 export interface Stats {
@@ -23,7 +23,7 @@ export interface Stats {
   max_device: number
 }
 
-export const getPlans = async(): Promise<definitions['plans'][]> => {
+export const getPlans = async (): Promise<definitions['plans'][]> => {
   const { data: plans } = await supabaseAdmin
     .from<definitions['plans']>('plans')
     .select()
@@ -33,67 +33,67 @@ export const getPlans = async(): Promise<definitions['plans'][]> => {
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin
-      .rpc<boolean>('is_good_plan', { userid: userId })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<boolean>('is_good_plan', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
   return data || false
 }
 
 export const isPaying = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin
-      .rpc<boolean>('is_paying', { userid: userId })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<boolean>('is_paying', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
   return data || false
 }
 
 export const findBestPlan = async (stats: Stats): Promise<string> => {
   const { data, error } = await supabaseAdmin
-      .rpc<string>('find_best_plan', { 
-        apps_n: stats.max_app || 0,
-        channels_n: stats.max_channel || 0,
-        updates_n: stats.max_update || 0,
-        versions_n: stats.max_version || 0,
-        shared_n: stats.max_shared || 0
-      })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<string>('find_best_plan', {
+      apps_n: stats.max_app || 0,
+      channels_n: stats.max_channel || 0,
+      updates_n: stats.max_update || 0,
+      versions_n: stats.max_version || 0,
+      shared_n: stats.max_shared || 0,
+    })
+    .single()
+  if (error)
+    throw error
+
   return data || 'Team'
 }
 
 export const isTrial = async (userId: string): Promise<number> => {
   const { data, error } = await supabaseAdmin
-      .rpc<number>('is_trial', { userid: userId })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<number>('is_trial', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
   return data || 0
 }
 
 export const getCurrentPlanName = async (userId: string): Promise<string> => {
   const { data, error } = await supabaseAdmin
-      .rpc<string>('get_current_plan_name', { userid: userId })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<string>('get_current_plan_name', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
   return data || 'Free'
 }
 
-export const getMaxstats = async(userId: string, dateId: string): Promise<Stats> => {
+export const getMaxstats = async (userId: string, dateId: string): Promise<Stats> => {
   const { data, error } = await supabaseAdmin
-      .rpc<Stats>('get_max_stats', { userid: userId, dateid: dateId })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<Stats>('get_max_stats', { userid: userId, dateid: dateId })
+    .single()
+  if (error)
+    throw error
+
   return data || {
     max_app: 0,
     max_channel: 0,
@@ -104,7 +104,7 @@ export const getMaxstats = async(userId: string, dateId: string): Promise<Stats>
   }
 }
 
-export const getMyPlan = async(user: definitions['users'], stats: Stats): Promise<PlanData> => {
+export const getMyPlan = async (user: definitions['users'], stats: Stats): Promise<PlanData> => {
   const { data: payment } = await supabaseAdmin
     .from<definitions['stripe_info']>('stripe_info')
     .select()
@@ -120,7 +120,7 @@ export const getMyPlan = async(user: definitions['users'], stats: Stats): Promis
   return Promise.reject(Error('no data'))
 }
 
-export const currentPaymentstatus = async(user: definitions['users']): Promise<PlanRes> => {
+export const currentPaymentstatus = async (user: definitions['users']): Promise<PlanRes> => {
   try {
     // dateId yyyy-mm
     const dateId = new Date().toISOString().slice(0, 7)
@@ -136,9 +136,8 @@ export const currentPaymentstatus = async(user: definitions['users']): Promise<P
       trialDaysLeft: await isTrial(user.id),
       AllPlans: await getPlans(),
     }
-    if (res.trialDaysLeft > 0) {
+    if (res.trialDaysLeft > 0)
       res.canUseMore = true
-    }
     return res
   }
   catch (error) {

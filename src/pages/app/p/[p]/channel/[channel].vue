@@ -355,7 +355,7 @@ const inviteUser = async (userId: string) => {
   <IonPage>
     <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
     <IonContent :fullscreen="true">
-      <TitleHead :title="t('channel.title')" big color="warning" />
+      <!-- <TitleHead :title="t('channel.title')" big color="warning" /> -->
       <IonHeader collapse="condense">
         <IonToolbar mode="ios">
           <IonTitle color="warning" size="large">

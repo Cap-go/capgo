@@ -373,7 +373,7 @@ watchEffect(async () => {
   <IonPage>
     <TitleHead :title="app?.name" default-back="/app" color="warning" />
     <IonContent :fullscreen="true">
-      <TitleHead :title="app?.name" no-back big condense color="warning" />
+      <!-- <TitleHead :title="app?.name" no-back big condense color="warning" /> -->
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>

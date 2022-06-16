@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.139.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
@@ -11,7 +11,7 @@ interface PortalData {
   successUrl: string
   cancelUrl: string
 }
-serve(async(event: Request) => {
+serve(async (event: Request) => {
   console.log('method', event.method)
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
@@ -27,7 +27,7 @@ serve(async(event: Request) => {
       authorization?.split('Bearer ')[1],
     )
     console.log('auth done', auth?.id)
-    // eslint-disable-next-line no-console
+
     // console.log('auth', auth)
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
@@ -42,8 +42,7 @@ serve(async(event: Request) => {
     if (!user.customer_id)
       return sendRes({ status: 'no customer' }, 400)
     console.log('createCheckout', user.id, body.priceId)
-    
-    // eslint-disable-next-line no-console
+
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string
     const checkout = await createCheckout(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`)

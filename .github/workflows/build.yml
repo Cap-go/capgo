@@ -15,6 +15,8 @@ jobs:
       - uses: pnpm/action-setup@v2.0.1
         with:
           version: 6.22.2
+      - name: Install Supabase CLI
+        run: brew install supabase/tap/supabase
       - name: Install dependencies
         id: install_code
         run: pnpm i        
@@ -24,17 +26,28 @@ jobs:
       - name: Build
         id: build_code
         run: pnpm build
-        env: # Or as an environment variable
+        env:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Update functions Alpha
+        if: "contains(github.ref, '-alpha.')"
+        id: update_functions_preprod
+        env:
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          BRANCH: development
+        run: node scripts/deploy_functions.mjs  
+      - name: Update functions
+        if: "!contains(github.ref, '-alpha.')"
+        id: update_functions_prod
+        env:
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+        run: node scripts/deploy_functions.mjs 
       - name: Create Release Alpha
         if: "contains(github.ref, '-alpha.')"
         id: create_release_prepro
-        run: npx @capgo/cli upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+        run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: "!contains(github.ref, '-alpha.')"
         id: create_release_prod
-        run: npx @capgo/cli upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+        run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production

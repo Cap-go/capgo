@@ -26,6 +26,7 @@ const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
+const auth = supabase.auth.user()
 const isLoading = ref(true)
 const device = ref<definitions['devices'] & Device>()
 const deviceOverride = ref<definitions['devices_override'] & Device>()
@@ -249,6 +250,7 @@ const upsertDevChannel = async (device: string, channel: definitions['channels']
       device_id: device,
       channel_id: channel.id,
       app_id: packageId.value,
+      created_by: auth?.id,
     })
 }
 const delDevChannel = async (device: string) => {
@@ -333,9 +335,9 @@ watchEffect(async () => {
 
 <template>
   <IonPage>
-    <TitleHead :title="t('device.title')" big color="warning" />
+    <TitleHead :title="t('device.title')" color="warning" />
     <IonContent :fullscreen="true">
-      <TitleHead :title="t('device.title')" big color="warning" condense />
+      <!-- <TitleHead :title="t('device.title')" big color="warning" condense /> -->
       <IonList>
         <IonListHeader>
           <span class="text-vista-blue-500">

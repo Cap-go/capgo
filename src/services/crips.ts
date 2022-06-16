@@ -12,6 +12,7 @@ export const setUser = (data: {
   email?: string
   avatar?: string
 }): void => {
+  // console.log('setUser CapacitorCrisp')
   CapacitorCrisp.setUser(data)
 }
 export const setVersion = (version: string): void => {
@@ -35,14 +36,14 @@ export const setDeviceInfo = (
 export const setPaidPlan = (planId: string): void => {
   CapacitorCrisp.setString({ key: 'paid-plan', value: planId })
 }
-export const setPaidOldPlan = (planId: string): void => {
-  CapacitorCrisp.setString({ key: 'paid-old-plan', value: planId })
-}
 export const sendMessage = (value: string): void => {
   CapacitorCrisp.sendMessage({ value })
 }
 export const openChat = (): void => {
   CapacitorCrisp.openMessenger()
+}
+export const reset = (): void => {
+  CapacitorCrisp.reset()
 }
 export const initCrisp = (): void => {
   try {

@@ -3,6 +3,7 @@ import path from 'path'
 import { defineConfig } from 'vite'
 import Vue from '@vitejs/plugin-vue'
 import Pages from 'vite-plugin-pages'
+import { esbuildCommonjs, viteCommonjs } from '@originjs/vite-plugin-commonjs'
 import Layouts from 'vite-plugin-vue-layouts'
 import Icons from 'unplugin-icons/vite'
 import WindiCSS from 'vite-plugin-windicss'
@@ -10,23 +11,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 import VueI18n from '@intlify/vite-plugin-vue-i18n'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
+import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
-import keys from './configs.json'
 
-const getRightKey = (branch: string, keyname: 'base_domain' | 'supa_anon' | 'supa_url'): string => {
-  console.log('getRightKey', branch, keyname)
-  if (branch === 'development')
-    return keys[keyname].development
-  else if (branch === 'local')
-    return keys[keyname].local
-  return keys[keyname].prod
-}
-
-const getUrl = (branch = ''): string => {
+const getUrl = (): string => {
   if (branch === 'local')
-    return `http://${getRightKey(branch, 'base_domain')}`
+    return `http://${getRightKey('base_domain')}`
   else
-    return `https://${getRightKey(branch, 'base_domain')}`
+    return `https://${getRightKey('base_domain')}`
 }
 
 const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
@@ -39,18 +31,19 @@ export default defineConfig({
     },
   },
   plugins: [
+    viteCommonjs(),
     Vue({
       include: [/\.vue$/, /\.md$/],
     }),
 
     EnvironmentPlugin({
       VITE_APP_VERSION: pack.version,
-      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || getRightKey(process.env.BRANCH || '', 'supa_anon'),
-      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || getRightKey(process.env.BRANCH || '', 'supa_url'),
-      VITE_APP_URL: `${getUrl(process.env.BRANCH)}`,
-      VITE_BRANCH: process.env.BRANCH || 'main',
+      VITE_SUPABASE_ANON_KEY: getRightKey('supa_anon'),
+      VITE_SUPABASE_URL: getRightKey('supa_url'),
+      VITE_APP_URL: `${getUrl()}`,
+      VITE_BRANCH: branch,
       package_dependencies: JSON.stringify(pack.dependencies),
-      domain: getUrl(process.env.BRANCH),
+      domain: getUrl(),
       crisp: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
     }, { defineOn: 'import.meta.env' }),
 
@@ -168,6 +161,11 @@ export default defineConfig({
     exclude: [
       'vue-demi',
     ],
+    esbuildOptions: {
+      plugins: [
+        esbuildCommonjs([]),
+      ],
+    },
   },
 
   test: {

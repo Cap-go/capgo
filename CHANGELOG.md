@@ -2,17 +2,237 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [0.30.14-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.14-alpha.0...0.30.14-alpha.1) (2022-06-07)
+### [1.6.6](https://github.com/Cap-go/capgo/compare/1.6.5...1.6.6) (2022-06-15)
+
+
+### Bug Fixes
+
+* order send command only when ready ([3a0c7e9](https://github.com/Cap-go/capgo/commit/3a0c7e96612beb88c2933fc421b9554e6f1a6cce))
+
+### [1.6.5](https://github.com/Cap-go/capgo/compare/1.6.4...1.6.5) (2022-06-15)
+
+
+### Bug Fixes
+
+* CI ([91f79a4](https://github.com/Cap-go/capgo/commit/91f79a4aa52000a0bcf11823758f5381abe382e9))
+
+### [1.6.4](https://github.com/Cap-go/capgo/compare/1.6.3...1.6.4) (2022-06-15)
+
+
+### Bug Fixes
+
+* import only necessary ([4d4f2dc](https://github.com/Cap-go/capgo/commit/4d4f2dca7de2fef38e5df221a142995e1f5cd096))
+
+### [1.6.3](https://github.com/Cap-go/capgo/compare/1.6.2...1.6.3) (2022-06-15)
+
+
+### Bug Fixes
+
+* issue with folder missing ([8068e36](https://github.com/Cap-go/capgo/commit/8068e367a9538a8f7baa99bb4ad320934f622ca1))
+
+### [1.6.2](https://github.com/Cap-go/capgo/compare/1.6.1...1.6.2) (2022-06-15)
+
+
+### Bug Fixes
+
+* projectRef ([5b9ee04](https://github.com/Cap-go/capgo/commit/5b9ee0469f329dd925a57bb39cab97f8380a8d4a))
+
+### [1.6.1](https://github.com/Cap-go/capgo/compare/1.6.0...1.6.1) (2022-06-15)
+
+
+### Bug Fixes
+
+* workflow typo ([66fa97e](https://github.com/Cap-go/capgo/commit/66fa97ec3a297f4d1a4084b83fd9265e757ee74d))
+
+## [1.6.0](https://github.com/Cap-go/capgo/compare/1.5.4...1.6.0) (2022-06-15)
+
+
+### Features
+
+* mix script for maintenance ([d2b621e](https://github.com/Cap-go/capgo/commit/d2b621ef60d5bbb998e600291e8ab33df22dfa26))
+
+
+### Bug Fixes
+
+* build functions in  CI ([4667754](https://github.com/Cap-go/capgo/commit/466775439748f21ef425b14419ae3e0177e4d042))
+* lint ([45df20b](https://github.com/Cap-go/capgo/commit/45df20bce533767a9550d64b9e189648187c319b))
+
+### [1.5.4](https://github.com/Cap-go/capgo/compare/1.5.3...1.5.4) (2022-06-15)
+
+
+### Bug Fixes
+
+* add missign supabase cli ([1948799](https://github.com/Cap-go/capgo/commit/1948799f005d6ab5ed32dff6a0dea4555d0bf0b9))
+
+### [1.5.3](https://github.com/Cap-go/capgo/compare/1.5.2...1.5.3) (2022-06-15)
+
+
+### Bug Fixes
+
+* crisp log + title design ([dc7a9e0](https://github.com/Cap-go/capgo/commit/dc7a9e0422647ff5eb3078154415462e20319cba))
+
+### [1.5.2](https://github.com/Cap-go/capgo/compare/1.5.1...1.5.2) (2022-06-15)
+
+
+### Bug Fixes
+
+* add auto publish in supabase functions ([bfa1848](https://github.com/Cap-go/capgo/commit/bfa1848e8948c3b3d7341dfb2fd85cacf34d4f40))
+
+### [1.5.1](https://github.com/Cap-go/capgo/compare/1.5.0...1.5.1) (2022-06-15)
+
+
+### Bug Fixes
+
+* crisp customer event ([2791826](https://github.com/Cap-go/capgo/commit/279182614a7eff81fc0c045bb62d4153d27f8102))
+* lint in version trigger ([66c1027](https://github.com/Cap-go/capgo/commit/66c102770c96d106baf6c8e7d19d872bb1af25ea))
+
+## [1.5.0](https://github.com/Cap-go/capgo/compare/1.4.0...1.5.0) (2022-06-13)
+
+
+### Features
+
+* add cron_good_plan ([fdf5077](https://github.com/Cap-go/capgo/commit/fdf50779d24cf98a8ef5ddba8714d13eeac2f065))
+
+## [1.4.0](https://github.com/Cap-go/capgo/compare/1.3.0...1.4.0) (2022-06-13)
+
+
+### Features
+
+* add event for email campain ([c8e3ced](https://github.com/Cap-go/capgo/commit/c8e3ced43dea0e9e179138c1504f359865fee072))
+
+## [1.3.0](https://github.com/Cap-go/capgo/compare/1.2.8...1.3.0) (2022-06-13)
+
+
+### Features
+
+* add segment in crips for sub ([781989f](https://github.com/Cap-go/capgo/commit/781989fa83e4202df7577cf6deca0f92439aac03))
+
+### [1.2.8](https://github.com/Cap-go/capgo/compare/1.2.7...1.2.8) (2022-06-11)
+
+
+### Bug Fixes
+
+* expire text ([f89bf0c](https://github.com/Cap-go/capgo/commit/f89bf0cf302d643007accebcffcccbfab841359d))
+
+### [1.2.7](https://github.com/Cap-go/capgo/compare/1.2.6...1.2.7) (2022-06-11)
+
+
+### Bug Fixes
+
+* build system mobile ([b95e577](https://github.com/Cap-go/capgo/commit/b95e5777b5d1e6ad0ead91d7891d3df2e7991744))
+
+### [1.2.6](https://github.com/Cap-go/capgo/compare/1.2.5...1.2.6) (2022-06-11)
+
+
+### Bug Fixes
+
+* crisp last issue ([a7ce02c](https://github.com/Cap-go/capgo/commit/a7ce02c5da6f2e4207db4b152683e27d6fbb85d1))
+
+### [1.2.5](https://github.com/Cap-go/capgo/compare/1.2.4...1.2.5) (2022-06-10)
+
+
+### Bug Fixes
+
+* remove useless import ([e5247e3](https://github.com/Cap-go/capgo/commit/e5247e34edf7d07ae8b3395532e4fbead4ed4956))
+
+### [1.2.4](https://github.com/Cap-go/capgo/compare/1.2.3...1.2.4) (2022-06-09)
+
+
+### Bug Fixes
+
+* include issue ([cbbcad0](https://github.com/Cap-go/capgo/commit/cbbcad0cc208fa1e853a250211cce70e591db0c7))
+
+### [1.2.3](https://github.com/Cap-go/capgo/compare/1.2.2...1.2.3) (2022-06-09)
+
+
+### Bug Fixes
+
+* branch issue github action build ([128aeb6](https://github.com/Cap-go/capgo/commit/128aeb6258df7f38c6f120af6c44fc83fe694e95))
+
+### [1.2.2](https://github.com/Cap-go/capgo/compare/1.2.1...1.2.2) (2022-06-09)
+
+
+### Bug Fixes
+
+* issue supabase ([6161aee](https://github.com/Cap-go/capgo/commit/6161aeec0043ea8c7a503a8e93be5e8105266c5d))
+
+### [1.2.1](https://github.com/Cap-go/capgo/compare/0.30.23...1.2.1) (2022-06-09)
+
+
+### Bug Fixes
+
+* version issue ([56e48e2](https://github.com/Cap-go/capgo/commit/56e48e24e5c76f9208f8f37bacadb3e63a56afd4))
+
+### [0.30.23](https://github.com/Cap-go/capgo/compare/0.30.22...0.30.23) (2022-06-09)
+
+
+### Bug Fixes
+
+* crisp + update packages ([8e1b49d](https://github.com/Cap-go/capgo/commit/8e1b49db5d25d00aaa3a1563e040dea231e0aabd))
+* on user created ([7a5e183](https://github.com/Cap-go/capgo/commit/7a5e183ef5ea4bf62995036af339d619f7523020))
+
+### [0.30.22](https://github.com/Cap-go/capgo/compare/0.30.21...0.30.22) (2022-06-09)
+
+
+### Bug Fixes
+
+* make create user to crisp CRM ([844189c](https://github.com/Cap-go/capgo/commit/844189c8ecc509e1280c30bda543cbab07bf9e46))
+
+### [0.30.21](https://github.com/Cap-go/capgo/compare/0.30.20...0.30.21) (2022-06-09)
+
+
+### Bug Fixes
+
+* remove old create key process ([73dfe21](https://github.com/Cap-go/capgo/commit/73dfe211cfd56e6b9041aaf603bd0640d0acd13d))
+
+### [0.30.20](https://github.com/Cap-go/capgo/compare/0.30.19...0.30.20) (2022-06-09)
+
+
+### Bug Fixes
+
+* issue for module inclusion error ([4e6887d](https://github.com/Cap-go/capgo/commit/4e6887d53778c135108892a441e8658a97579d69))
+* issue payment_status no exist ([35e038e](https://github.com/Cap-go/capgo/commit/35e038e561ac4e4dbc7842a1658c427222fa4634))
+* remove old create key ([35ed9d4](https://github.com/Cap-go/capgo/commit/35ed9d4979252499f776bc6d90b380e3ef663860))
+* remove useless file ([d623ef2](https://github.com/Cap-go/capgo/commit/d623ef220b3699ea18cb75aa08b88b3b1d01e5c8))
+
+### [0.30.19](https://github.com/Cap-go/capgo/compare/0.30.18...0.30.19) (2022-06-07)
+
+
+### Bug Fixes
+
+* types ([ed65509](https://github.com/Cap-go/capgo/commit/ed65509ea522c0895423f3c66f8718ec8a211c03))
+
+### [0.30.18](https://github.com/Cap-go/capgo/compare/0.30.17...0.30.18) (2022-06-07)
+
+
+### Bug Fixes
+
+* created_by ([1097dfa](https://github.com/Cap-go/capgo/commit/1097dfaccd8e56e951ff4d25c6b3279fbb68ec1b))
+
+### [0.30.17](https://github.com/Cap-go/capgo/compare/0.30.16...0.30.17) (2022-06-07)
+
+
+### Bug Fixes
+
+* issue with single ([2d6fb66](https://github.com/Cap-go/capgo/commit/2d6fb6676b96881bc2c55f9c8ff8d5896fb01d93))
+* lock ([454ad88](https://github.com/Cap-go/capgo/commit/454ad88cc63e91929ef80392510bed7515bfbcca))
+* register script ([78e81ef](https://github.com/Cap-go/capgo/commit/78e81ef931eea9bb8da1291948c7addea6aafca0))
+
+### [0.30.16](https://github.com/Cap-go/capgo/compare/0.30.15...0.30.16) (2022-06-07)
+
+
+### Bug Fixes
+
+* remove useless package ([a68dadc](https://github.com/Cap-go/capgo/commit/a68dadc92b98f4b695af7043eb9afe888f19c661))
+
+### [0.30.15](https://github.com/Cap-go/capgo/compare/0.30.14...0.30.15) (2022-06-07)
 
 
 ### Bug Fixes
 
 * lint ([97082e6](https://github.com/Cap-go/capgo/commit/97082e661780694a96837491ea3827914c472553))
 
-### [0.30.14](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.11...0.30.14) (2022-06-07)
-
-### [0.30.14-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.11...0.30.14-alpha.0) (2022-06-07)
-
+### [0.30.14](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.10...0.30.14) (2022-06-07)
 
 ### Bug Fixes
 

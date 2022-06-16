@@ -1,10 +1,12 @@
-import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { serve } from 'https://deno.land/std@0.140.0/http/server.ts'
+import type { Person } from '../_utils/crisp.ts'
+import { updatePerson } from '../_utils/crisp.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
+// Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
+// function.
 serve(async (event: Request) => {
-  const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret)
@@ -14,23 +16,20 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    const body = (await event.json()) as { record: definitions['app_versions'] }
+    console.log('body')
+    const body = (await event.json()) as { record: definitions['users'] }
     const record = body.record
-    console.log('record', record)
-    const { error: dbError } = await supabase
-      .from<definitions['apps']>('apps')
-      .update({
-        last_version: record.name,
-      }, { returning: 'minimal' })
-      .eq('app_id', record.app_id)
-      .eq('user_id', record.user_id)
-    if (dbError) {
-      console.log('dbError', dbError)
-      return sendRes({ status: 'Error unknow', error: dbError }, 500)
+    console.log('updatePerson crisp')
+    const person: Person = {
+      nickname: `${record.first_name} ${record.last_name}`,
+      avatar: record.image_url ? record.image_url : undefined,
+      country: record.country ? record.country : undefined,
     }
+    await updatePerson(record.email, person)
     return sendRes()
   }
   catch (e) {
+    console.log('e', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

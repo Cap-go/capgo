@@ -12,6 +12,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { subDays } from 'date-fns'
+import dayjs from 'dayjs'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
@@ -49,6 +50,8 @@ const deviceFiltered = computed(() => {
 
 const loadData = async (event?: InfiniteScrollCustomEvent) => {
   try {
+    // create a date object for the last day of the previous month with dayjs
+    const lastDay = dayjs().subtract(1, 'month')
     const { data: dataDev } = await supabase
       .from<definitions['devices'] & Device>('devices')
       .select(`
@@ -62,7 +65,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
         updated_at
       `)
       .eq('app_id', id.value)
-      .gt('updated_at', subDays(new Date(), 30).toUTCString())
+      .gt('updated_at', lastDay.toISOString())
       .order('created_at', { ascending: false })
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataDev)

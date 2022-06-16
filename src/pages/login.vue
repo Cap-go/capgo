@@ -49,6 +49,7 @@ const submit = async () => {
     })
     isLoading.value = false
     if (error) {
+      console.error('error', error)
       showToastMessage('Authentification invalide')
     }
     else {
@@ -148,7 +149,7 @@ onMounted(checkLogin)
             <IonLabel>
               <img src="/lock.png" alt="password">
             </IonLabel>
-            <IonInput id="passwordInput" v-model="form.password" inputmode="password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('login.password') " required="true" />
+            <IonInput id="passwordInput" v-model="form.password" inputmode="password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " required="true" />
             <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
             <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
           </IonItem>

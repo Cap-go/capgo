@@ -13,13 +13,15 @@ const guard = async (next: any, to: string, from: string) => {
 
   if (auth && !main.auth) {
     main.auth = auth
-    if (!main.user) {
+    if (!main.user && auth) {
       try {
         supabase.functions.invoke<PlanRes>('payment_status', {})
           .then((res) => {
             console.log('payment_status', res)
             if (res.data)
               main.myPlan = res.data
+          }).catch((err) => {
+            console.log('error payment_status', err)
           })
         const { data, error } = await supabase
           .from<definitions['users']>('users')
@@ -27,23 +29,20 @@ const guard = async (next: any, to: string, from: string) => {
           .eq('id', auth?.id)
           .limit(1)
           .single()
-        if (!error && data) {
-          console.log('user', data)
-          main.user = JSON.parse(data as any as string) // TODO: fix and understand why it's needed
-          // main.user = data
-        }
-        else { return next('/onboarding/verify_email') }
+        if (!error && data)
+          main.user = data
+        else return next('/onboarding/verify_email')
+        setUser({
+          nickname: `${data.first_name} ${data.last_name}`,
+          email: data.email,
+          avatar: data.image_url,
+        })
       }
       catch (error) {
         console.log('error', error)
       }
     }
     setUserId(auth.id)
-    setUser({
-      nickname: `${main.user?.first_name} ${main.user?.last_name}`,
-      email: main.user?.email,
-      avatar: main.user?.image_url,
-    })
 
     if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
       next('/onboarding/activation')

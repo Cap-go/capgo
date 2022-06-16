@@ -226,8 +226,8 @@ stats:
   subtitle: Last month
   title: Stats
   versions: Versions
-trial-plan-expired: Trial Plan Expired
-trial-plan-expires-in: Trial Plan expires in
+trial-plan-expired: Trial Expired
+trial-plan-expires-in: Trial expires in
 upgrade: Upgrade
 upgrade-now: Upgrade now
 usage:
