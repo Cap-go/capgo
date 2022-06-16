@@ -7,7 +7,7 @@ import { outputFile } from 'fs-extra'
 import { supa_url } from './utils.mjs'
 
 const exec = promisify(execCb)
-const folders = readdirSync('./supabase/functions').filter(file => !file.startsWith('_'))
+const folders = readdirSync('./supabase/functions').filter(file => !file.startsWith('_') && file !== 'demo')
 
 const token = process.env.SUPABASE_TOKEN || ''
 const projectRef = supa_url.split('.')[0].replace('https://', '')
