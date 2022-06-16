@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.7-alpha.1](https://github.com/Cap-go/capgo/compare/1.6.7-alpha.0...1.6.7-alpha.1) (2022-06-16)
+
+
+### Bug Fixes
+
+* for CI auto function update ([85df5fa](https://github.com/Cap-go/capgo/commit/85df5fa216b1e015d4759325923edb1435bcaff1))
+
 ### [1.6.7-alpha.0](https://github.com/Cap-go/capgo/compare/1.6.6...1.6.7-alpha.0) (2022-06-16)
 
 
