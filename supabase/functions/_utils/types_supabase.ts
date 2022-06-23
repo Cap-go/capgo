@@ -239,11 +239,11 @@ export interface paths {
           user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
-          channels?: parameters["rowFilter.app_stats_onprem.channels"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
           versions?: parameters["rowFilter.app_stats_onprem.versions"];
-          shared?: parameters["rowFilter.app_stats_onprem.shared"];
           mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+          date_id?: parameters["rowFilter.app_stats_onprem.date_id"];
+          devices?: parameters["rowFilter.app_stats_onprem.devices"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -298,11 +298,11 @@ export interface paths {
           user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
-          channels?: parameters["rowFilter.app_stats_onprem.channels"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
           versions?: parameters["rowFilter.app_stats_onprem.versions"];
-          shared?: parameters["rowFilter.app_stats_onprem.shared"];
           mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+          date_id?: parameters["rowFilter.app_stats_onprem.date_id"];
+          devices?: parameters["rowFilter.app_stats_onprem.devices"];
         };
         header: {
           /** Preference */
@@ -321,11 +321,11 @@ export interface paths {
           user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
-          channels?: parameters["rowFilter.app_stats_onprem.channels"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
           versions?: parameters["rowFilter.app_stats_onprem.versions"];
-          shared?: parameters["rowFilter.app_stats_onprem.shared"];
           mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
+          date_id?: parameters["rowFilter.app_stats_onprem.date_id"];
+          devices?: parameters["rowFilter.app_stats_onprem.devices"];
         };
         body: {
           /** app_stats_onprem */
@@ -2395,16 +2395,20 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
-    /** Format: smallint */
-    channels?: number;
     /** Format: bigint */
     mlu?: number;
     /** Format: bigint */
     versions?: number;
     /** Format: bigint */
-    shared?: number;
-    /** Format: bigint */
     mlu_real?: number;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    date_id: string;
+    /** Format: bigint */
+    devices?: number;
   };
   app_versions: {
     /**
@@ -2887,7 +2891,6 @@ export interface definitions {
      * Format: character varying
      * @description Note:
      * This is a Primary Key.<pk/>
-     * This is a Foreign Key to `users.customer_id`.<fk table='users' column='customer_id'/>
      */
     customer_id: string;
     /**
@@ -2905,6 +2908,7 @@ export interface definitions {
      * Format: character varying
      * @description Note:
      * This is a Foreign Key to `plans.stripe_id`.<fk table='plans' column='stripe_id'/>
+     * @default free
      */
     product_id: string;
     /**
@@ -3052,16 +3056,16 @@ export interface parameters {
   "rowFilter.app_stats_onprem.created_at": string;
   /** Format: timestamp with time zone */
   "rowFilter.app_stats_onprem.updated_at": string;
-  /** Format: smallint */
-  "rowFilter.app_stats_onprem.channels": string;
   /** Format: bigint */
   "rowFilter.app_stats_onprem.mlu": string;
   /** Format: bigint */
   "rowFilter.app_stats_onprem.versions": string;
   /** Format: bigint */
-  "rowFilter.app_stats_onprem.shared": string;
-  /** Format: bigint */
   "rowFilter.app_stats_onprem.mlu_real": string;
+  /** Format: character varying */
+  "rowFilter.app_stats_onprem.date_id": string;
+  /** Format: bigint */
+  "rowFilter.app_stats_onprem.devices": string;
   /** @description app_versions */
   "body.app_versions": definitions["app_versions"];
   /** Format: bigint */
