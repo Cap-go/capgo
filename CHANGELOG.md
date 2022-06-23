@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.8](https://github.com/Cap-go/capgo/compare/1.6.7...1.6.8) (2022-06-23)
+
+
+### Bug Fixes
+
+* add custom plan form in webapp too ([7e49501](https://github.com/Cap-go/capgo/commit/7e495019f697d1bbaf76c57b8abbebd71377e34a))
+
 ### [1.6.7](https://github.com/Cap-go/capgo/compare/1.6.6...1.6.7) (2022-06-15)
 
 
