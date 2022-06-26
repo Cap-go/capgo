@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.10](https://github.com/Cap-go/capgo/compare/1.6.9...1.6.10) (2022-06-26)
+
+
+### Bug Fixes
+
+* need upgrade for account without tried the product ([4923227](https://github.com/Cap-go/capgo/commit/4923227bbad2ef27d147fef82ff26dabc23bf1cc))
+
 ### [1.6.9](https://github.com/Cap-go/capgo/compare/1.6.8...1.6.9) (2022-06-23)
 
 
