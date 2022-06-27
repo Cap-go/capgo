@@ -2,29 +2,30 @@ import dayjs from 'https://cdn.skypack.dev/dayjs'
 import Stripe from 'https://esm.sh/stripe@9.1.0?no-check&target=deno'
 import type { definitions } from './types_supabase.ts'
 
-const cryptoProvider = Stripe.createSubtleCryptoProvider();
-export const parseStripeEvent = async(key: string, body: string, signature: string, secret: string) => {
+const cryptoProvider = Stripe.createSubtleCryptoProvider()
+export const parseStripeEvent = async (key: string, body: string, signature: string, secret: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
   })
-  let receivedEvent;
+  let receivedEvent
   try {
     receivedEvent = await stripe.webhooks.constructEventAsync(
       body,
       signature,
       secret,
       undefined,
-      cryptoProvider
-    );
-  } catch (err) {
-    console.log('Error parsing event', err);
-    return new Response(err.message, { status: 400 });
+      cryptoProvider,
+    )
+  }
+  catch (err) {
+    console.log('Error parsing event', err)
+    return new Response(err.message, { status: 400 })
   }
   return receivedEvent
 }
 
-export const createPortal = async(key: string, customerId: string, callbackUrl: string) => {
+export const createPortal = async (key: string, customerId: string, callbackUrl: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
@@ -36,12 +37,12 @@ export const createPortal = async(key: string, customerId: string, callbackUrl: 
   return link
 }
 
-export const createCheckout = async(key: string, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
+export const createCheckout = async (key: string, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
   })
-  // eslint-disable-next-line no-console
+
   // console.log('planId', planId)
   let priceId = null
   try {
@@ -49,14 +50,12 @@ export const createCheckout = async(key: string, customerId: string, reccurence:
       query: `product:'${planId}'`,
     })
     prices.data.forEach((price: any) => {
-      // eslint-disable-next-line no-console
       // console.log('price', JSON.stringify(price))
       if (price.recurring.interval === reccurence && price.active)
         priceId = price.id
     })
   }
   catch (err) {
-    // eslint-disable-next-line no-console
     console.log('err', err)
   }
   if (!priceId)
@@ -72,13 +71,13 @@ export const createCheckout = async(key: string, customerId: string, reccurence:
     success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: cancelUrl,
   }
-  // eslint-disable-next-line no-console
+
   // console.log('checkoutData', checkoutData)
   const session = await stripe.checkout.sessions.create(checkoutData)
   return session
 }
 
-export const deleteSub = async(key: string, subscriptionId: string) => {
+export const deleteSub = async (key: string, subscriptionId: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
@@ -91,7 +90,7 @@ export const deleteSub = async(key: string, subscriptionId: string) => {
     return err
   }
 }
-export const createCustomer = async(key: string, email: string) => {
+export const createCustomer = async (key: string, email: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
     httpClient: Stripe.createFetchHttpClient(),
@@ -112,7 +111,7 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
     created_at: dayjs().toISOString(),
     status: undefined,
   }
-  // eslint-disable-next-line no-console
+
   console.log('event', JSON.stringify(event, null, 2))
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
