@@ -1,4 +1,4 @@
-import Stripe from 'https://esm.sh/stripe@9.10.0?no-check&target=deno'
+import Stripe from 'https://esm.sh/stripe@9.1.0?no-check&target=deno'
 import type { definitions } from './types_supabase.ts'
 
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
