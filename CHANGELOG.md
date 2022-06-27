@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.17](https://github.com/Cap-go/capgo/compare/1.6.16...1.6.17) (2022-06-27)
+
+
+### Bug Fixes
+
+* createSubtleCryptoProvider ([17e4989](https://github.com/Cap-go/capgo/commit/17e4989ea4f9492e6cc57d5503190a513a3d77ed))
+
 ### [1.6.16](https://github.com/Cap-go/capgo/compare/1.6.15...1.6.16) (2022-06-27)
 
 
