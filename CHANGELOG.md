@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.14](https://github.com/Cap-go/capgo/compare/1.6.13...1.6.14) (2022-06-27)
+
+
+### Bug Fixes
+
+* remove dayjs in deno ([899a8ac](https://github.com/Cap-go/capgo/commit/899a8acb0da8c3a923a952c325414f9b440f4b31))
+
 ### [1.6.13](https://github.com/Cap-go/capgo/compare/1.6.12...1.6.13) (2022-06-27)
 
 
