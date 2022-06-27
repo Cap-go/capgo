@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.11](https://github.com/Cap-go/capgo/compare/1.6.10...1.6.11) (2022-06-27)
+
+
+### Bug Fixes
+
+* eslint ([01b16b5](https://github.com/Cap-go/capgo/commit/01b16b5f9f0564ab5cce9f2cf411106a9b2f9eb7))
+
 ### [1.6.10](https://github.com/Cap-go/capgo/compare/1.6.9...1.6.10) (2022-06-26)
 
 
