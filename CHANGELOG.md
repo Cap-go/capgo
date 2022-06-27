@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.15](https://github.com/Cap-go/capgo/compare/1.6.14...1.6.15) (2022-06-27)
+
+
+### Bug Fixes
+
+* discord link ([59b705f](https://github.com/Cap-go/capgo/commit/59b705f97fd331691c303dea0469f6ca9d4863e5))
+* on user create ([d36096f](https://github.com/Cap-go/capgo/commit/d36096fc15861a1839bf78e41b0c0aea4c02a6fa))
+* version std ([904be69](https://github.com/Cap-go/capgo/commit/904be694802b9a4125de35aba97f5b51483b722f))
+
 ### [1.6.14](https://github.com/Cap-go/capgo/compare/1.6.13...1.6.14) (2022-06-27)
 
 
