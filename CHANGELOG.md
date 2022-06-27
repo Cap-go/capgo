@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.16](https://github.com/Cap-go/capgo/compare/1.6.15...1.6.16) (2022-06-27)
+
+
+### Bug Fixes
+
+* stripe ([6a3595f](https://github.com/Cap-go/capgo/commit/6a3595f33a8b6aa0aa76c1607859f4f3cd3ae9e2))
+
 ### [1.6.15](https://github.com/Cap-go/capgo/compare/1.6.14...1.6.15) (2022-06-27)
 
 
