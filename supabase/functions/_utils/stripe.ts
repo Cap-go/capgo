@@ -1,7 +1,6 @@
-import Stripe from 'https://esm.sh/stripe@9.1.0?no-check&target=deno'
+import Stripe from 'https://esm.sh/stripe@9.10.0?no-check&target=deno'
 import type { definitions } from './types_supabase.ts'
 
-const cryptoProvider = Stripe.createSubtleCryptoProvider()
 export const parseStripeEvent = async (key: string, body: string, signature: string, secret: string) => {
   const stripe = new Stripe(key, {
     apiVersion: '2020-08-27',
@@ -14,7 +13,7 @@ export const parseStripeEvent = async (key: string, body: string, signature: str
       signature,
       secret,
       undefined,
-      cryptoProvider,
+      Stripe.createSubtleCryptoProvider(),
     )
   }
   catch (err) {
