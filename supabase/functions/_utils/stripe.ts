@@ -1,5 +1,4 @@
-import dayjs from 'https://cdn.skypack.dev/dayjs'
-import Stripe from 'https://esm.sh/stripe@9.1.0?no-check&target=deno'
+import Stripe from 'https://esm.sh/stripe@9.10.0?no-check&target=deno'
 import type { definitions } from './types_supabase.ts'
 
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
@@ -106,9 +105,9 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
     price_id: '',
     subscription_id: undefined,
     customer_id: '',
-    updated_at: dayjs().toISOString(),
-    trial_at: dayjs().toISOString(),
-    created_at: dayjs().toISOString(),
+    updated_at: new Date().toISOString(),
+    trial_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
     status: undefined,
   }
 

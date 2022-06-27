@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.145.0/http/server.ts'
-import dayjs from 'https://cdn.skypack.dev/dayjs'
 import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -45,7 +44,7 @@ serve(async (event: Request) => {
           console.log('is_good_plan', user.id, is_good_plan)
           if (!is_good_plan) {
             // create dateid var with yyyy-mm with dayjs
-            const dateid = dayjs().format('YYYY-MM')
+            const dateid = new Date().toISOString().slice(0, 7)
             const { data: get_max_stats } = await supabaseAdmin
               .rpc<Stats>('get_max_stats', { userid: user.id, dateid })
               .single()
