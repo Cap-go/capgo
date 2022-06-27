@@ -21,8 +21,6 @@ serve(async (event: Request) => {
     console.log('body')
     const body = (await event.json()) as { record: definitions['users'] }
     const record = body.record
-    if (record.customer_id)
-      return sendRes()
     await supabase
       .from<definitions['apikeys']>('apikeys')
       .insert([
@@ -43,6 +41,8 @@ serve(async (event: Request) => {
         }])
     await postPerson(record.email, record.first_name, record.last_name, record.image_url ? record.image_url : undefined)
     console.log('createCustomer stripe')
+    if (record.customer_id)
+      return sendRes()
     const customer = await createCustomer(Deno.env.get('STRIPE_SECRET_KEY') || '', record.email)
     const { error: dbStripeError } = await supabase
       .from<definitions['stripe_info']>('stripe_info')
