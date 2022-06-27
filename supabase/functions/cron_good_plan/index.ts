@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.145.0/http/server.ts'
 import dayjs from 'https://cdn.skypack.dev/dayjs'
 import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
