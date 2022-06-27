@@ -43,7 +43,7 @@ serve(async (event: Request) => {
     console.log('createCustomer stripe')
     if (record.customer_id)
       return sendRes()
-    const customer = await createCustomer(Deno.env.get('STRIPE_SECRET_KEY') || '', record.email)
+    const customer = await createCustomer(record.email)
     const { error: dbStripeError } = await supabase
       .from<definitions['stripe_info']>('stripe_info')
       .insert({

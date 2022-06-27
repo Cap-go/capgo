@@ -14,9 +14,7 @@ serve(async (event: Request) => {
   // event.headers
   try {
     const signature = event.headers.get('Stripe-Signature') || ''
-    const secretKey = Deno.env.get('STRIPE_SECRET_KEY') || ''
-    const webhookKey = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
-    const stripeEvent = await extractDataEvent(await parseStripeEvent(secretKey, await event.text(), signature, webhookKey))
+    const stripeEvent = await extractDataEvent(await parseStripeEvent(await event.text(), signature))
     if (stripeEvent.customer_id === '')
       return sendRes('no customer found', 500)
 

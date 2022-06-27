@@ -1,101 +1,94 @@
-import Stripe from 'https://esm.sh/stripe@9.10.0?no-check&target=deno'
+import axiod from 'https://deno.land/x/axiod/mod.ts'
 import type { definitions } from './types_supabase.ts'
 
-export const parseStripeEvent = async (key: string, body: string, signature: string, secret: string) => {
-  const stripe = new Stripe(key, {
-    apiVersion: '2020-08-27',
-    httpClient: Stripe.createFetchHttpClient(),
-  })
-  let receivedEvent
-  try {
-    receivedEvent = await stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      secret,
-      undefined,
-      Stripe.createSubtleCryptoProvider(),
-    )
-  }
-  catch (err) {
-    console.log('Error parsing event', err)
-    return new Response(err.message, { status: 400 })
-  }
-  return receivedEvent
+const getAuth = () => {
+  // get stripe token
+  const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || ''
+  const CRISP_TOKEN = `${STRIPE_SECRET_KEY}:`
+  // encode b64
+  const CRISP_TOKEN_B64 = btoa(CRISP_TOKEN)
+  return `Basic ${CRISP_TOKEN_B64}`
+}
+const getConfig = (form = false) => ({
+  headers: {
+    Authorization: getAuth(),
+    ...(form && { 'Content-Type': 'application/x-www-form-urlencoded' }),
+  },
+})
+export const parseStripeEvent = async (body: string, signature: string) => {
+  // const secretKey = Deno.env.get('STRIPE_SECRET_KEY') || ''
+  // const webhookKey = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
+  // const stripe = new Stripe(key, {
+  //   apiVersion: '2020-08-27',
+  //   httpClient: Stripe.createFetchHttpClient(),
+  // })
+  // let receivedEvent
+  // try {
+  //   receivedEvent = await stripe.webhooks.constructEventAsync(
+  //     body,
+  //     signature,
+  //     secret,
+  //     undefined,
+  //     cryptoProvider,
+  //   )
+  // }
+  // catch (err) {
+  //   console.log('Error parsing event', err)
+  //   return new Response(err.message, { status: 400 })
+  // }
+  // return receivedEvent
+  const jsonPayload = JSON.parse(body)
+  return jsonPayload
 }
 
-export const createPortal = async (key: string, customerId: string, callbackUrl: string) => {
-  const stripe = new Stripe(key, {
-    apiVersion: '2020-08-27',
-    httpClient: Stripe.createFetchHttpClient(),
-  })
-  const link = await stripe.billingPortal.sessions.create({
+export const createPortal = async (customerId: string, callbackUrl: string) => {
+  const response = await axiod.post('https://api.stripe.com/v1/billing_portal/sessions', {
     customer: customerId,
     return_url: callbackUrl,
-  })
-  return link
+  }, getConfig())
+  return response.data
 }
 
-export const createCheckout = async (key: string, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
-  const stripe = new Stripe(key, {
-    apiVersion: '2020-08-27',
-    httpClient: Stripe.createFetchHttpClient(),
-  })
-
-  // console.log('planId', planId)
+export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
   let priceId = null
   try {
-    const prices = await stripe.prices.search({
-      query: `product:'${planId}'`,
-    })
-    prices.data.forEach((price: any) => {
-      // console.log('price', JSON.stringify(price))
+    const response = await axiod.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
+    const prices = response.data.data
+    prices.forEach((price: any) => {
       if (price.recurring.interval === reccurence && price.active)
         priceId = price.id
     })
   }
   catch (err) {
-    console.log('err', err)
+    console.log('search err', err)
   }
   if (!priceId)
-    Promise.reject(new Error('Cannot find price'))
+    return Promise.reject(new Error('Cannot find price'))
   const checkoutData = {
     billing_address_collection: 'auto',
-    line_items: [{
-      price: priceId,
-      quantity: 1,
-    }],
     mode: 'subscription',
     customer: customerId,
     success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: cancelUrl,
   }
-
-  // console.log('checkoutData', checkoutData)
-  const session = await stripe.checkout.sessions.create(checkoutData)
-  return session
-}
-
-export const deleteSub = async (key: string, subscriptionId: string) => {
-  const stripe = new Stripe(key, {
-    apiVersion: '2020-08-27',
-    httpClient: Stripe.createFetchHttpClient(),
-  })
+  const data = new URLSearchParams(checkoutData as any)
+  data.append('line_items[0][price]', priceId)
+  data.append('line_items[0][quantity]', '1')
   try {
-    const res = await stripe.subscriptions.del(subscriptionId)
-    return res
+    const response = await axiod.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig())
+    return response.data
   }
-  catch (err) {
-    return err
+  catch (err2) {
+    console.log('create customer err', err2)
+    return null
   }
 }
-export const createCustomer = async (key: string, email: string) => {
-  const stripe = new Stripe(key, {
-    apiVersion: '2020-08-27',
-    httpClient: Stripe.createFetchHttpClient(),
-  })
-  return await stripe.customers.create({
+
+export const createCustomer = async (email: string) => {
+  const response = await axiod.post('https://api.stripe.com/v1/customers', {
     email,
-  })
+  }, getConfig())
+  return response.data
 }
 
 export const extractDataEvent = (event: any): definitions['stripe_info'] => {

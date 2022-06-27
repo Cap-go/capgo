@@ -42,7 +42,7 @@ serve(async (event: Request) => {
       return sendRes({ status: 'no customer' }, 400)
 
     console.log('user', user)
-    const link = await createPortal(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.callbackUrl)
+    const link = await createPortal(user.customer_id, body.callbackUrl)
     return sendRes({ url: link.url })
   }
   catch (e) {

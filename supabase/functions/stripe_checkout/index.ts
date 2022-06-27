@@ -45,7 +45,7 @@ serve(async (event: Request) => {
 
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string
-    const checkout = await createCheckout(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`)
+    const checkout = await createCheckout(user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`)
     return sendRes({ url: checkout.url })
   }
   catch (e) {
