@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.13](https://github.com/Cap-go/capgo/compare/1.6.12...1.6.13) (2022-06-27)
+
+
+### Bug Fixes
+
+* add auto update deno ([7add1b3](https://github.com/Cap-go/capgo/commit/7add1b3df2dd4cc85d4e52eb7b291f3423b77ebb))
+* std version deno ([1f50718](https://github.com/Cap-go/capgo/commit/1f50718255dddd6ec3ba57f98a348d119f585f85))
+
 ### [1.6.12](https://github.com/Cap-go/capgo/compare/1.6.11...1.6.12) (2022-06-27)
 
 
