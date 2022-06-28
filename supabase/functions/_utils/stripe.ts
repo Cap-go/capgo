@@ -37,6 +37,7 @@ export const parseStripeEvent = async (body: string, signature: string) => {
   //   return new Response(err.message, { status: 400 })
   // }
   // return receivedEvent
+  // Quick fix to let prod user pay
   const jsonPayload = JSON.parse(body)
   return jsonPayload
 }

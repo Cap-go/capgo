@@ -13,6 +13,7 @@
     "sync": "cap sync",
     "serve": "vite",
     "dev-serve": "BRANCH=development vite",
+    "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
