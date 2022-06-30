@@ -11,50 +11,50 @@ interface ChannelDev {
   channel_id: Channel
 }
 interface AppInfos {
-  cap_version_name: string
-  cap_version_build: string
-  cap_plugin_version: string
-  cap_platform: string
-  cap_app_id: string
-  cap_device_id: string
+  version_name: string
+  version_build: string
+  plugin_version: string
+  platform: string
+  app_id: string
+  device_id: string
 }
 
 serve(async (event: Request) => {
   try {
     const body = (await event.json()) as AppInfos
     let {
-      cap_version_name,
-      cap_version_build,
-      cap_plugin_version,
+      version_name,
+      version_build,
+      plugin_version,
     } = body
     const {
-      cap_platform,
-      cap_app_id,
-      cap_device_id,
+      platform,
+      app_id,
+      device_id,
     } = body
-    // if cap_version_build is not semver, then make it semver
-    const coerce = semver.coerce(cap_version_build)
+    // if version_build is not semver, then make it semver
+    const coerce = semver.coerce(version_build)
     if (coerce)
-      cap_version_build = coerce.version
+      version_build = coerce.version
     else
-      return sendRes({ message: `Native version: ${cap_version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
-    cap_version_name = cap_version_name === 'builtin' ? cap_version_build : cap_version_name
-    cap_plugin_version = cap_plugin_version || '2.3.3'
-    if (!cap_app_id || !cap_device_id || !cap_version_build || !cap_version_name || !cap_platform) {
-      console.error('Cannot get all headers', cap_platform,
-        cap_app_id,
-        cap_device_id,
-        cap_version_build,
-        cap_version_name)
+      return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
+    version_name = version_name === 'builtin' ? version_build : version_name
+    plugin_version = plugin_version || '2.3.3'
+    if (!app_id || !device_id || !version_build || !version_name || !platform) {
+      console.error('Cannot get all headers', platform,
+        app_id,
+        device_id,
+        version_build,
+        version_name)
       return sendRes({ message: 'missing appid' }, 400)
     }
 
-    console.log('Headers', cap_platform,
-      cap_app_id,
-      cap_device_id,
-      cap_version_build,
-      cap_plugin_version,
-      cap_version_name)
+    console.log('Headers', platform,
+      app_id,
+      device_id,
+      version_build,
+      plugin_version,
+      version_name)
 
     const supabase = supabaseAdmin
 
@@ -77,7 +77,7 @@ serve(async (event: Request) => {
             external_url
           )
         `)
-      .eq('app_id', cap_app_id)
+      .eq('app_id', app_id)
       .eq('public', true)
       .single()
     const { data: channelOverride } = await supabase
@@ -98,8 +98,8 @@ serve(async (event: Request) => {
           created_at,
           updated_at
         `)
-      .eq('device_id', cap_device_id)
-      .eq('app_id', cap_app_id)
+      .eq('device_id', device_id)
+      .eq('app_id', app_id)
     const { data: devicesOverride } = await supabase
       .from<definitions['devices_override'] & Channel>('devices_override')
       .select(`
@@ -115,10 +115,10 @@ serve(async (event: Request) => {
             external_url
           )
         `)
-      .eq('device_id', cap_device_id)
-      .eq('app_id', cap_app_id)
+      .eq('device_id', device_id)
+      .eq('app_id', app_id)
     if (dbError || !channel) {
-      console.error('Cannot get channel', cap_app_id, `no public channel ${JSON.stringify(dbError)}`)
+      console.error('Cannot get channel', app_id, `no public channel ${JSON.stringify(dbError)}`)
       return sendRes({
         message: 'Cannot get channel',
         err: `no public channel ${JSON.stringify(dbError)}`,
@@ -127,7 +127,7 @@ serve(async (event: Request) => {
     const trial = await isTrial(channel.created_by)
     const paying = await isGoodPlan(channel.created_by)
     if (!paying && !trial) {
-      console.error('Cannot update, upgrade plan to continue to update', cap_app_id)
+      console.error('Cannot update, upgrade plan to continue to update', app_id)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
         err: 'not good plan',
@@ -135,25 +135,25 @@ serve(async (event: Request) => {
     }
     let version: definitions['app_versions'] = channel.version as definitions['app_versions']
     if (channelOverride && channelOverride.length) {
-      console.log('Set channel override', cap_app_id, channelOverride[0].channel_id.version.name)
+      console.log('Set channel override', app_id, channelOverride[0].channel_id.version.name)
       version = channelOverride[0].channel_id.version as definitions['app_versions']
     }
     if (devicesOverride && devicesOverride.length) {
-      console.log('Set device override', cap_app_id, devicesOverride[0].version.name)
+      console.log('Set device override', app_id, devicesOverride[0].version.name)
       version = devicesOverride[0].version as definitions['app_versions']
     }
 
     if (!version.bucket_id && !version.external_url) {
-      console.error('Cannot get zip file', cap_app_id)
+      console.error('Cannot get zip file', app_id)
       return sendRes({
         message: 'Cannot get zip file',
       }, 200)
     }
     await updateOrCreateDevice({
-      app_id: cap_app_id,
-      device_id: cap_device_id,
-      platform: cap_platform as definitions['devices']['platform'],
-      plugin_version: cap_plugin_version,
+      app_id,
+      device_id,
+      platform: platform as definitions['devices']['platform'],
+      plugin_version,
       version: version.id,
     })
 
@@ -162,48 +162,48 @@ serve(async (event: Request) => {
     if (version.bucket_id && !version.external_url) {
       const res = await supabase
         .storage
-        .from(`apps/${version.user_id}/${cap_app_id}/versions`)
+        .from(`apps/${version.user_id}/${app_id}/versions`)
         .createSignedUrl(version.bucket_id, 60)
       if (res && res.signedURL)
         signedURL = res.signedURL
     }
 
-    // console.log('signedURL', cap_device_id, signedURL, cap_version_name, version.name)
-    if (cap_version_name === version.name) {
-      console.log('No new version available', cap_device_id, cap_version_name, version.name)
+    // console.log('signedURL', device_id, signedURL, version_name, version.name)
+    if (version_name === version.name) {
+      console.log('No new version available', device_id, version_name, version.name)
       return sendRes({
         message: 'No new version available',
       }, 200)
     }
 
-    // console.log('check disableAutoUpdateToMajor', cap_device_id)
-    if (channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(cap_version_name)) {
-      console.log('Cannot upgrade major version', cap_device_id)
+    // console.log('check disableAutoUpdateToMajor', device_id)
+    if (channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
+      console.log('Cannot upgrade major version', device_id)
       return sendRes({
         major: true,
         message: 'Cannot upgrade major version',
         version: version.name,
-        old: cap_version_name,
+        old: version_name,
       }, 200)
     }
 
-    console.log('check disableAutoUpdateUnderNative', cap_device_id)
-    if (channel.disableAutoUpdateUnderNative && semver.lt(version.name, cap_version_build)) {
-      console.log('Cannot revert under native version', cap_device_id)
+    console.log('check disableAutoUpdateUnderNative', device_id)
+    if (channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+      console.log('Cannot revert under native version', device_id)
       return sendRes({
         message: 'Cannot revert under native version',
         version: version.name,
-        old: cap_version_name,
+        old: version_name,
       }, 200)
     }
 
-    // console.log('save stats', cap_device_id)
+    // console.log('save stats', device_id)
     const stat: Partial<definitions['stats']> = {
-      platform: cap_platform as definitions['stats']['platform'],
-      device_id: cap_device_id,
+      platform: platform as definitions['stats']['platform'],
+      device_id,
       action: 'get',
-      app_id: cap_app_id,
-      version_build: cap_version_build,
+      app_id,
+      version_build,
       version: version.id,
     }
     try {
@@ -211,13 +211,13 @@ serve(async (event: Request) => {
         .from<definitions['stats']>('stats')
         .insert(stat)
       if (error)
-        console.error('Cannot insert stat', cap_app_id, cap_version_build, error)
+        console.error('Cannot insert stat', app_id, version_build, error)
     }
     catch (err) {
-      console.error('Cannot insert stats', cap_app_id, err)
+      console.error('Cannot insert stats', app_id, err)
     }
 
-    console.log('New version available', cap_app_id, version.name, signedURL)
+    console.log('New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,
       url: signedURL,
