@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.20](https://github.com/Cap-go/capgo/compare/1.6.19...1.6.20) (2022-06-28)
+
+
+### Bug Fixes
+
+* deploy function system ([c269434](https://github.com/Cap-go/capgo/commit/c2694343f13bc924326e55a58e01cb811fc8a989))
+
 ### [1.6.19](https://github.com/Cap-go/capgo/compare/1.6.18...1.6.19) (2022-06-28)
 
 
