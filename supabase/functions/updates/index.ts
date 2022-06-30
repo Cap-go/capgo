@@ -42,7 +42,7 @@ serve(async (event: Request) => {
     version_name = version_name === 'builtin' ? version_build : version_name
     plugin_version = plugin_version || '2.3.3'
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      console.error('Cannot get all headers', platform,
+      console.error('Cannot get all vars', platform,
         app_id,
         device_id,
         version_build,
@@ -217,7 +217,6 @@ serve(async (event: Request) => {
     catch (err) {
       console.error('Cannot insert stats', app_id, err)
     }
-
     console.log('New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,
@@ -225,6 +224,7 @@ serve(async (event: Request) => {
     })
   }
   catch (e) {
+    console.error('Cannot update', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
