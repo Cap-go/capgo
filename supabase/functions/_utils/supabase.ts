@@ -104,3 +104,23 @@ export const updateOrCreateDevice = async (update: Partial<definitions['devices'
       .eq('device_id', update.device_id)
   }
 }
+
+export const isGoodPlan = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin
+    .rpc<boolean>('is_good_plan', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || false
+}
+
+export const isTrial = async (userId: string): Promise<number> => {
+  const { data, error } = await supabaseAdmin
+    .rpc<number>('is_trial', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || 0
+}
