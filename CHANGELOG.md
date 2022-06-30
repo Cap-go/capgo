@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.1](https://github.com/Cap-go/capgo/compare/1.7.0...1.7.1) (2022-06-30)
+
+
+### Bug Fixes
+
+* add no-verify ([376a557](https://github.com/Cap-go/capgo/commit/376a557163cc9baf7be586aacdb6fa06bf178949))
+* remove useless cap_ prefix ([b9ab159](https://github.com/Cap-go/capgo/commit/b9ab15973f573b030d3a3759e89145292d67b81f))
+
 ## [1.7.0](https://github.com/Cap-go/capgo/compare/1.6.21...1.7.0) (2022-06-30)
 
 
