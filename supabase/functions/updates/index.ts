@@ -22,6 +22,7 @@ interface AppInfos {
 serve(async (event: Request) => {
   try {
     const body = (await event.json()) as AppInfos
+    console.log('body', body)
     let {
       version_name,
       version_build,

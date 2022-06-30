@@ -20,7 +20,7 @@ serve(async (event: Request) => {
     let statsDb = 'stats'
     let deviceDb = 'devices'
 
-    console.log('event.body', event.body)
+    console.log('body', body)
     const device: Partial<definitions['devices'] | definitions['devices_onprem']> = {
       platform: body.platform as definitions['stats']['platform'],
       device_id: body.device_id,
