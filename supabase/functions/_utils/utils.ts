@@ -24,8 +24,9 @@ export const checkKey = async (authorization: string | undefined, supabase: Supa
       .from<definitions['apikeys']>('apikeys')
       .select()
       .eq('key', authorization)
+      .in('mode', allowed)
       .single()
-    if (!data || error || !allowed.includes(data.mode))
+    if (!data || error)
       return null
     return data
   }
