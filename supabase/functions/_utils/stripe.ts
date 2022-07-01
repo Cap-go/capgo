@@ -4,15 +4,15 @@ import type { definitions } from './types_supabase.ts'
 const getAuth = () => {
   // get stripe token
   const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || ''
-  const CRISP_TOKEN = `${STRIPE_SECRET_KEY}:`
+  const STRIPE_TOKEN = `${STRIPE_SECRET_KEY}:`
   // encode b64
-  const CRISP_TOKEN_B64 = btoa(CRISP_TOKEN)
-  return `Basic ${CRISP_TOKEN_B64}`
+  const STRIPE_TOKEN_B64 = btoa(STRIPE_TOKEN)
+  return `Basic ${STRIPE_TOKEN_B64}`
 }
 const getConfig = (form = false) => ({
   headers: {
-    Authorization: getAuth(),
-    ...(form && { 'Content-Type': 'application/x-www-form-urlencoded' }),
+    authorization: getAuth(),
+    ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
   },
 })
 export const parseStripeEvent = async (body: string, signature: string) => {
