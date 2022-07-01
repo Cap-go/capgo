@@ -88,7 +88,7 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
 export const createCustomer = async (email: string) => {
   const response = await axiod.post('https://api.stripe.com/v1/customers', {
     email,
-  }, getConfig())
+  }, getConfig(true))
   return response.data
 }
 
