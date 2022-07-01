@@ -39,7 +39,7 @@ serve(async (event: Request) => {
       version_build = coerce.version
     else
       return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
-    version_name = version_name === 'builtin' ? version_build : version_name
+    version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     plugin_version = plugin_version || '2.3.3'
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       console.error('Cannot get all vars', platform,
