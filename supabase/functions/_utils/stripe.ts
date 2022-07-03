@@ -76,7 +76,7 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
   data.append('line_items[0][price]', priceId)
   data.append('line_items[0][quantity]', '1')
   try {
-    const response = await axiod.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig())
+    const response = await axiod.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(true))
     return response.data
   }
   catch (err2) {
@@ -86,9 +86,11 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
 }
 
 export const createCustomer = async (email: string) => {
-  const response = await axiod.post('https://api.stripe.com/v1/customers', {
+  const config = getConfig(true)
+  console.log('config', config)
+  const response = await axiod.post('https://api.stripe.com/v1/customers', new URLSearchParams({
     email,
-  }, getConfig(true))
+  }), config)
   return response.data
 }
 
