@@ -9,6 +9,7 @@ interface AppStats {
   device_id: string
   version_name?: string
   plugin_version?: string
+  version_os?: string
   version: number
   version_build: string
   app_id: string
@@ -26,6 +27,7 @@ serve(async (event: Request) => {
       device_id: body.device_id,
       app_id: body.app_id,
       plugin_version: body.plugin_version || '2.3.3',
+      os_version: body.version_os,
     }
 
     const stat: Partial<definitions['stats']> = {
