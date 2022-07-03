@@ -43,10 +43,10 @@ export const parseStripeEvent = async (body: string, signature: string) => {
 }
 
 export const createPortal = async (customerId: string, callbackUrl: string) => {
-  const response = await axiod.post('https://api.stripe.com/v1/billing_portal/sessions', {
+  const response = await axiod.post('https://api.stripe.com/v1/billing_portal/sessions', new URLSearchParams({
     customer: customerId,
     return_url: callbackUrl,
-  }, getConfig())
+  }), getConfig(true))
   return response.data
 }
 
