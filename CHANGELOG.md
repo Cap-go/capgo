@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.7](https://github.com/Cap-go/capgo/compare/1.7.6...1.7.7) (2022-07-03)
+
+
+### Bug Fixes
+
+* stripe checkout ([87286e4](https://github.com/Cap-go/capgo/commit/87286e4dba44c1a10aef4b4783fe10e16e603946))
+
 ### [1.7.6](https://github.com/Cap-go/capgo/compare/1.7.5...1.7.6) (2022-07-01)
 
 
