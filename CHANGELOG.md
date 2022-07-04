@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.10-alpha.0](https://github.com/Cap-go/capgo/compare/1.7.9...1.7.10-alpha.0) (2022-07-04)
+
+
+### Bug Fixes
+
+* add exemple env ([f2506cb](https://github.com/Cap-go/capgo/commit/f2506cb855355386c0589ce3019135c8dff5f05d))
+
+### [1.6.7-alpha.1](https://github.com/Cap-go/capgo/compare/1.6.7-alpha.0...1.6.7-alpha.1) (2022-06-16)
+
+
+### Bug Fixes
+
+* for CI auto function update ([85df5fa](https://github.com/Cap-go/capgo/commit/85df5fa216b1e015d4759325923edb1435bcaff1))
+
+### [1.6.7-alpha.0](https://github.com/Cap-go/capgo/compare/1.6.7...1.6.7-alpha.0) (2022-06-16)
+
+### [0.30.14-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.15...0.30.14-alpha.1) (2022-06-07)
+
+### [0.30.14-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.14...0.30.14-alpha.0) (2022-06-07)
+
+### [0.30.12-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.10...0.30.12-alpha.11) (2022-06-06)
+
 ### [1.7.9](https://github.com/Cap-go/capgo/compare/1.7.8...1.7.9) (2022-07-03)
 
 
