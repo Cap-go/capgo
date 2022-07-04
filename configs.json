@@ -7,11 +7,11 @@
     "supa_anon": {
       "prod": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTYzNzgwNTAwOSwiZXhwIjoxOTUzMzgxMDA5fQ.8tgID1d4jodPwuo_fz4KHN4o1XKB9fnqyt0_GaJSj-w",
       "development": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1Y3N5YnZuaGF2b2dkbXp3dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTM1ODcxNjgsImV4cCI6MTk2OTE2MzE2OH0.8FKKJqiGgoVA3p9GH5wvnbWkWywIxVLqQyZFhupZ7C4",
-      "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1Y3N5YnZuaGF2b2dkbXp3dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTM1ODcxNjgsImV4cCI6MTk2OTE2MzE2OH0.8FKKJqiGgoVA3p9GH5wvnbWkWywIxVLqQyZFhupZ7C4"
+      "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24ifQ.625_WdcF3KHqz5amU0x2X5WWHP-OEs_4qj0ssLNHzTs"
     },
     "supa_url": {
       "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
       "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
-      "local": "https://aucsybvnhavogdmzwtcw.supabase.co"
+      "local": "http://localhost:54321"
     }
   }

@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.145.0/http/server.ts'
 import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
@@ -14,9 +14,7 @@ serve(async (event: Request) => {
   // event.headers
   try {
     const signature = event.headers.get('Stripe-Signature') || ''
-    const secretKey = Deno.env.get('STRIPE_SECRET_KEY') || ''
-    const webhookKey = Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
-    const stripeEvent = await extractDataEvent(await parseStripeEvent(secretKey, await event.text(), signature, webhookKey))
+    const stripeEvent = await extractDataEvent(await parseStripeEvent(await event.text(), signature))
     if (stripeEvent.customer_id === '')
       return sendRes('no customer found', 500)
 

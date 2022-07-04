@@ -271,7 +271,7 @@ const presentActionSheet = async () => {
           <li>
             <a
               class="flex justify-between items-center"
-              href="https://discord.com/invite/VnYRvBfgA6"
+              href="https://discord.gg/VnYRvBfgA6"
               target="_blank"
             >
               <span class="font-bold">

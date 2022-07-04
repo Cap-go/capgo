@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "1.6.7-alpha.1",
+  "version": "1.7.9",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
@@ -13,6 +13,7 @@
     "sync": "cap sync",
     "serve": "vite",
     "dev-serve": "BRANCH=development vite",
+    "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",

@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.145.0/http/server.ts'
 import { createPortal } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -42,7 +42,7 @@ serve(async (event: Request) => {
       return sendRes({ status: 'no customer' }, 400)
 
     console.log('user', user)
-    const link = await createPortal(Deno.env.get('STRIPE_SECRET_KEY') || '', user.customer_id, body.callbackUrl)
+    const link = await createPortal(user.customer_id, body.callbackUrl)
     return sendRes({ url: link.url })
   }
   catch (e) {

@@ -1,8 +1,9 @@
-import { serve } from 'https://deno.land/std@0.143.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.145.0/http/server.ts'
 import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
+import type { Stats } from '../_utils/plans.ts'
 
 serve(async (event: Request) => {
   const supabase = supabaseAdmin
@@ -41,8 +42,17 @@ serve(async (event: Request) => {
             .rpc<boolean>('is_good_plan', { userid: user.id })
             .single()
           console.log('is_good_plan', user.id, is_good_plan)
-          if (!is_good_plan)
-            await addEventPerson(user.email, {}, 'user:need_upgrade', 'red')
+          if (!is_good_plan) {
+            // create dateid var with yyyy-mm with dayjs
+            const dateid = new Date().toISOString().slice(0, 7)
+            const { data: get_max_stats } = await supabaseAdmin
+              .rpc<Stats>('get_max_stats', { userid: user.id, dateid })
+              .single()
+            if (get_max_stats && get_max_stats?.max_device > 100)
+              await addEventPerson(user.email, {}, 'user:need_upgrade', 'red')
+            else if (get_max_stats)
+              await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
+          }
           return supabaseAdmin
             .from<definitions['stripe_info']>('stripe_info')
             .update({ is_good_plan: !!is_good_plan })

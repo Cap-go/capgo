@@ -16,7 +16,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-export const checkKey = async(authorization: string | undefined, supabase: SupabaseClient, allowed: definitions['apikeys']['mode'][]): Promise<definitions['apikeys'] | null> => {
+export const checkKey = async (authorization: string | undefined, supabase: SupabaseClient, allowed: definitions['apikeys']['mode'][]): Promise<definitions['apikeys'] | null> => {
   if (!authorization)
     return null
   try {
@@ -24,8 +24,9 @@ export const checkKey = async(authorization: string | undefined, supabase: Supab
       .from<definitions['apikeys']>('apikeys')
       .select()
       .eq('key', authorization)
+      .in('mode', allowed)
       .single()
-    if (!data || error || !allowed.includes(data.mode))
+    if (!data || error)
       return null
     return data
   }

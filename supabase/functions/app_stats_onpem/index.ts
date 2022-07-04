@@ -11,35 +11,27 @@ const getApp = (appId: string) => {
   // console.log('req', req)
   return {
     mlu: supabase
-      .from<definitions['stats']>('stats')
+      .from<definitions['stats_onprem']>('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'get'),
     mlu_real: supabase
-      .from<definitions['stats']>('stats')
+      .from<definitions['stats_onprem']>('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'set'),
     devices: supabase
-      .from<definitions['devices']>('devices')
+      .from<definitions['devices_onprem']>('devices')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
     versions: supabase
-      .from<definitions['app_versions']>('app_versions')
-      .select('id', { count: 'exact', head: true })
-      .eq('app_id', appId),
-    shared: supabase
-      .from<definitions['channel_users']>('channel_users')
-      .select('id', { count: 'exact', head: true })
-      .eq('app_id', appId),
-    channels: supabase
-      .from<definitions['channels']>('channels')
+      .from<definitions['stats_onprem']>('app_versions')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
   }
@@ -69,8 +61,8 @@ serve(async (event: Request) => {
       if (!app.id)
         continue
       const res = getApp(app.app_id)
-      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices])
-        .then(([app, mlu, mlu_real, versions, shared, channels, devices]) => {
+      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.devices])
+        .then(([app, mlu, mlu_real, versions, devices]) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, downloads, versions, shared, channels)
@@ -79,20 +71,18 @@ serve(async (event: Request) => {
           // get_current_plan_name
           // get month with leading zero
           const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
-          const newData: definitions['app_stats'] = {
+          const newData: definitions['app_stats_onprem'] = {
             app_id: app.app_id,
             date_id: `${now.getFullYear()}-${month}`,
             user_id: app.user_id,
-            channels: channels.count || 0,
             mlu: mlu.count || 0,
             devices: devices.count || 0,
             mlu_real: mlu_real.count || 0,
             versions: versions.count || 0,
-            shared: shared.count || 0,
           }
           // console.log('newData', newData)
           return supabase
-            .from<definitions['app_stats']>('app_stats')
+            .from<definitions['app_stats_onprem']>('app_stats_onprem')
             .upsert(newData)
         }))
     }

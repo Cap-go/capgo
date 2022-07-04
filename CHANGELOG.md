@@ -2,25 +2,184 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [1.6.7-alpha.1](https://github.com/Cap-go/capgo/compare/1.6.7-alpha.0...1.6.7-alpha.1) (2022-06-16)
+### [1.7.9](https://github.com/Cap-go/capgo/compare/1.7.8...1.7.9) (2022-07-03)
 
 
 ### Bug Fixes
 
-* for CI auto function update ([85df5fa](https://github.com/Cap-go/capgo/commit/85df5fa216b1e015d4759325923edb1435bcaff1))
+* stats display list ([7e5b953](https://github.com/Cap-go/capgo/commit/7e5b9538e50b520c3ba7baf58b0408906dfeb011))
 
-### [1.6.7-alpha.0](https://github.com/Cap-go/capgo/compare/1.6.6...1.6.7-alpha.0) (2022-06-16)
+### [1.7.8](https://github.com/Cap-go/capgo/compare/1.7.7...1.7.8) (2022-07-03)
+
+
+### Bug Fixes
+
+* stripe issue ([092ec3f](https://github.com/Cap-go/capgo/commit/092ec3fb2084f092a307654f61cd189ea95a701e))
+
+### [1.7.7](https://github.com/Cap-go/capgo/compare/1.7.6...1.7.7) (2022-07-03)
+
+
+### Bug Fixes
+
+* stripe checkout ([87286e4](https://github.com/Cap-go/capgo/commit/87286e4dba44c1a10aef4b4783fe10e16e603946))
+
+### [1.7.6](https://github.com/Cap-go/capgo/compare/1.7.5...1.7.6) (2022-07-01)
+
+
+### Bug Fixes
+
+* headers ([755b01f](https://github.com/Cap-go/capgo/commit/755b01f5e9ca60925db8814cd8858d8bd13ca22e))
+
+### [1.7.5](https://github.com/Cap-go/capgo/compare/1.7.4...1.7.5) (2022-07-01)
+
+
+### Bug Fixes
+
+* create customer issue ([474416a](https://github.com/Cap-go/capgo/commit/474416a5af53914766c8ad44614b571911f6dd0a))
+
+### [1.7.4](https://github.com/Cap-go/capgo/compare/1.7.3...1.7.4) (2022-07-01)
+
+
+### Bug Fixes
+
+* if no version send ([4192234](https://github.com/Cap-go/capgo/commit/419223486304dcdbf2571007faf5f715b8859a69))
+
+### [1.7.3](https://github.com/Cap-go/capgo/compare/1.7.2...1.7.3) (2022-06-30)
+
+
+### Bug Fixes
+
+* add better logs ([8ca6c4a](https://github.com/Cap-go/capgo/commit/8ca6c4a96edb81f5d2839d1d54f1581fc617518e))
+
+### [1.7.2](https://github.com/Cap-go/capgo/compare/1.7.1...1.7.2) (2022-06-30)
+
+
+### Bug Fixes
+
+* add better logs for new update and stats functions ([955b464](https://github.com/Cap-go/capgo/commit/955b4646af00fedacc31d79db7619e524cc3b46b))
+
+### [1.7.1](https://github.com/Cap-go/capgo/compare/1.7.0...1.7.1) (2022-06-30)
+
+
+### Bug Fixes
+
+* add no-verify ([376a557](https://github.com/Cap-go/capgo/commit/376a557163cc9baf7be586aacdb6fa06bf178949))
+* remove useless cap_ prefix ([b9ab159](https://github.com/Cap-go/capgo/commit/b9ab15973f573b030d3a3759e89145292d67b81f))
+
+## [1.7.0](https://github.com/Cap-go/capgo/compare/1.6.21...1.7.0) (2022-06-30)
+
+
+### Features
+
+* add update and stats functions ([b57143c](https://github.com/Cap-go/capgo/commit/b57143c37278c65a89a66b097664c59d57353bb3))
+
+### [1.6.21](https://github.com/Cap-go/capgo/compare/1.6.20...1.6.21) (2022-06-30)
+
+
+### Bug Fixes
+
+* how key are check ([9b2a4e0](https://github.com/Cap-go/capgo/commit/9b2a4e06b056911c169ff1c5f32819a66245604c))
+
+### [1.6.20](https://github.com/Cap-go/capgo/compare/1.6.19...1.6.20) (2022-06-28)
+
+
+### Bug Fixes
+
+* deploy function system ([c269434](https://github.com/Cap-go/capgo/commit/c2694343f13bc924326e55a58e01cb811fc8a989))
+
+### [1.6.19](https://github.com/Cap-go/capgo/compare/1.6.18...1.6.19) (2022-06-28)
+
+
+### Bug Fixes
+
+* add local config ([42f7c4c](https://github.com/Cap-go/capgo/commit/42f7c4c24d2b0c89b2ebd85a6c19c3f913b1ab6c))
+
+### [1.6.18](https://github.com/Cap-go/capgo/compare/1.6.17...1.6.18) (2022-06-27)
+
+
+### Bug Fixes
+
+* stripe issue ([6a7aaf7](https://github.com/Cap-go/capgo/commit/6a7aaf7dce77543933dccfc406fd9259ebe76827))
+
+### [1.6.17](https://github.com/Cap-go/capgo/compare/1.6.16...1.6.17) (2022-06-27)
+
+
+### Bug Fixes
+
+* createSubtleCryptoProvider ([17e4989](https://github.com/Cap-go/capgo/commit/17e4989ea4f9492e6cc57d5503190a513a3d77ed))
+
+### [1.6.16](https://github.com/Cap-go/capgo/compare/1.6.15...1.6.16) (2022-06-27)
+
+
+### Bug Fixes
+
+* stripe ([6a3595f](https://github.com/Cap-go/capgo/commit/6a3595f33a8b6aa0aa76c1607859f4f3cd3ae9e2))
+
+### [1.6.15](https://github.com/Cap-go/capgo/compare/1.6.14...1.6.15) (2022-06-27)
+
+
+### Bug Fixes
+
+* discord link ([59b705f](https://github.com/Cap-go/capgo/commit/59b705f97fd331691c303dea0469f6ca9d4863e5))
+* on user create ([d36096f](https://github.com/Cap-go/capgo/commit/d36096fc15861a1839bf78e41b0c0aea4c02a6fa))
+* version std ([904be69](https://github.com/Cap-go/capgo/commit/904be694802b9a4125de35aba97f5b51483b722f))
+
+### [1.6.14](https://github.com/Cap-go/capgo/compare/1.6.13...1.6.14) (2022-06-27)
+
+
+### Bug Fixes
+
+* remove dayjs in deno ([899a8ac](https://github.com/Cap-go/capgo/commit/899a8acb0da8c3a923a952c325414f9b440f4b31))
+
+### [1.6.13](https://github.com/Cap-go/capgo/compare/1.6.12...1.6.13) (2022-06-27)
+
+
+### Bug Fixes
+
+* add auto update deno ([7add1b3](https://github.com/Cap-go/capgo/commit/7add1b3df2dd4cc85d4e52eb7b291f3423b77ebb))
+* std version deno ([1f50718](https://github.com/Cap-go/capgo/commit/1f50718255dddd6ec3ba57f98a348d119f585f85))
+
+### [1.6.12](https://github.com/Cap-go/capgo/compare/1.6.11...1.6.12) (2022-06-27)
+
+
+### Bug Fixes
+
+* remove useless comments ([da65ab6](https://github.com/Cap-go/capgo/commit/da65ab698c2c92b9b2e36ffc47d668f5d6eb7f76))
+
+### [1.6.11](https://github.com/Cap-go/capgo/compare/1.6.10...1.6.11) (2022-06-27)
+
+
+### Bug Fixes
+
+* eslint ([01b16b5](https://github.com/Cap-go/capgo/commit/01b16b5f9f0564ab5cce9f2cf411106a9b2f9eb7))
+
+### [1.6.10](https://github.com/Cap-go/capgo/compare/1.6.9...1.6.10) (2022-06-26)
+
+
+### Bug Fixes
+
+* need upgrade for account without tried the product ([4923227](https://github.com/Cap-go/capgo/commit/4923227bbad2ef27d147fef82ff26dabc23bf1cc))
+
+### [1.6.9](https://github.com/Cap-go/capgo/compare/1.6.8...1.6.9) (2022-06-23)
+
+
+### Bug Fixes
+
+* types ([1fb5a91](https://github.com/Cap-go/capgo/commit/1fb5a912ae494421f9f9ce4a052984e8fb1d72f9))
+
+### [1.6.8](https://github.com/Cap-go/capgo/compare/1.6.7...1.6.8) (2022-06-23)
+
+
+### Bug Fixes
+
+* add custom plan form in webapp too ([7e49501](https://github.com/Cap-go/capgo/commit/7e495019f697d1bbaf76c57b8abbebd71377e34a))
+
+### [1.6.7](https://github.com/Cap-go/capgo/compare/1.6.6...1.6.7) (2022-06-15)
 
 
 ### Bug Fixes
 
 * await after each exec ([e7e9fba](https://github.com/Cap-go/capgo/commit/e7e9fbac8ba0a9f55b0e605f085186eddda92329))
-
-### [0.30.14-alpha.1](https://github.com/Cap-go/capgo/compare/0.30.15...0.30.14-alpha.1) (2022-06-07)
-
-### [0.30.14-alpha.0](https://github.com/Cap-go/capgo/compare/0.30.14...0.30.14-alpha.0) (2022-06-07)
-
-### [0.30.12-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.10...0.30.12-alpha.11) (2022-06-06)
 
 ### [1.6.6](https://github.com/Cap-go/capgo/compare/1.6.5...1.6.6) (2022-06-15)
 

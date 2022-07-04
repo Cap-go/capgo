@@ -15,8 +15,7 @@ export const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
 
-export const updateOrCreateVersion = async(update: Partial<definitions['app_versions']>) => {
-  // eslint-disable-next-line no-console
+export const updateOrCreateVersion = async (update: Partial<definitions['app_versions']>) => {
   console.log('updateOrCreateVersion', update)
   const { data, error } = await supabaseAdmin
     .from<definitions['app_versions']>('app_versions')
@@ -24,7 +23,6 @@ export const updateOrCreateVersion = async(update: Partial<definitions['app_vers
     .eq('app_id', update.app_id)
     .eq('name', update.name)
   if (data && data.length && !error) {
-  // eslint-disable-next-line no-console
     console.log('update Version')
     update.deleted = false
     return supabaseAdmin
@@ -40,8 +38,7 @@ export const updateOrCreateVersion = async(update: Partial<definitions['app_vers
   }
 }
 
-export const updateOrCreateChannel = async(update: Partial<definitions['channels']>) => {
-  // eslint-disable-next-line no-console
+export const updateOrCreateChannel = async (update: Partial<definitions['channels']>) => {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.error('missing app_id, name, or created_by')
@@ -68,7 +65,7 @@ export const updateOrCreateChannel = async(update: Partial<definitions['channels
   }
 }
 
-export const checkAppOwner = async(userId: string | undefined, appId: string | undefined): Promise<boolean> => {
+export const checkAppOwner = async (userId: string | undefined, appId: string | undefined): Promise<boolean> => {
   if (!appId || !userId)
     return false
   try {
@@ -87,8 +84,7 @@ export const checkAppOwner = async(userId: string | undefined, appId: string | u
   }
 }
 
-export const updateOrCreateDevice = async(update: Partial<definitions['devices']>) => {
-  // eslint-disable-next-line no-console
+export const updateOrCreateDevice = async (update: Partial<definitions['devices']>) => {
   console.log('updateOrCreateDevice', update)
   const { data, error } = await supabaseAdmin
     .from<definitions['devices']>('devices')
@@ -107,4 +103,24 @@ export const updateOrCreateDevice = async(update: Partial<definitions['devices']
       .eq('app_id', update.app_id)
       .eq('device_id', update.device_id)
   }
+}
+
+export const isGoodPlan = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin
+    .rpc<boolean>('is_good_plan', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || false
+}
+
+export const isTrial = async (userId: string): Promise<number> => {
+  const { data, error } = await supabaseAdmin
+    .rpc<number>('is_trial', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || 0
 }
