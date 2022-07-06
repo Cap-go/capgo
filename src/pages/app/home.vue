@@ -46,6 +46,8 @@ const getMyApps = async () => {
     .eq('user_id', auth?.id)
   if (data && data.length)
     apps.value = data
+  else
+    apps.value = []
 }
 
 const didCancel = async (name: string) => {
