@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file. See [standa
 
 * add exemple env ([f2506cb](https://github.com/Cap-go/capgo/commit/f2506cb855355386c0589ce3019135c8dff5f05d))
 
+
+### [1.6.7-alpha.1](https://github.com/Cap-go/capgo/compare/1.6.7-alpha.0...1.6.7-alpha.1) (2022-06-16)
+
 ### [1.7.9](https://github.com/Cap-go/capgo/compare/1.7.8...1.7.9) (2022-07-03)
 
 
@@ -420,7 +423,6 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [0.30.14](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.10...0.30.14) (2022-06-07)
 
-
 ### Bug Fixes
 
 * add user to channel ([1addade](https://github.com/Cap-go/capgo/commit/1addade561163da344c8c520f5ffc167e7ef66e4))
@@ -432,6 +434,13 @@ All notable changes to this project will be documented in this file. See [standa
 * version issue ([2fc7886](https://github.com/Cap-go/capgo/commit/2fc788664e3fff33dc47f2330b04e09b2925587b))
 
 ### [0.30.12](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.8...0.30.12) (2022-06-01)
+
+### [0.30.12-alpha.11](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.10...0.30.12-alpha.11) (2022-06-06)
+
+
+### Bug Fixes
+
+* if plan canceled ([1d9de45](https://github.com/Cap-go/capgo/commit/1d9de4519dcdd73ff2205258c3c4be5869273737))
 
 ### [0.30.12-alpha.10](https://github.com/Cap-go/capgo/compare/0.30.12-alpha.9...0.30.12-alpha.10) (2022-06-06)
 
