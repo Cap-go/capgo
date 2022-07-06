@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.11](https://github.com/Cap-go/capgo/compare/1.7.10-alpha.2...1.7.11) (2022-07-06)
+
+
+### Bug Fixes
+
+* remove app when change account ([2b410e8](https://github.com/Cap-go/capgo/commit/2b410e86519bb5d7440908cdf5fe1b4876c7fcf1))
+
+### [1.7.10](https://github.com/Cap-go/capgo/compare/1.7.9...1.7.10) (2022-07-04)
+
 ### [1.7.10](https://github.com/Cap-go/capgo/compare/1.7.9...1.7.10) (2022-07-04)
 
 
