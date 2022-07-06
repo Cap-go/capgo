@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.10-alpha.2](https://github.com/Cap-go/capgo/compare/1.7.10-alpha.1...1.7.10-alpha.2) (2022-07-06)
+
+
+### Bug Fixes
+
+* script use var ENV ([188972f](https://github.com/Cap-go/capgo/commit/188972f77c943516bbf3fdd11ac961131a3a85e2))
+
 ### [1.7.10-alpha.1](https://github.com/Cap-go/capgo/compare/1.7.10-alpha.0...1.7.10-alpha.1) (2022-07-04)
 
 
