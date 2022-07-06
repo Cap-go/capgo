@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.10-alpha.1](https://github.com/Cap-go/capgo/compare/1.7.10-alpha.0...1.7.10-alpha.1) (2022-07-04)
+
+
+### Bug Fixes
+
+* annon ([1044a37](https://github.com/Cap-go/capgo/commit/1044a3763e6f5e82d199e81aa73b573c6a778769))
+
 ### [1.7.10-alpha.0](https://github.com/Cap-go/capgo/compare/1.7.9...1.7.10-alpha.0) (2022-07-04)
 
 
