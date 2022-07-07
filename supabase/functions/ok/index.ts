@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.145.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.147.0/http/server.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 interface dataDemo {
