@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.12](https://github.com/Cap-go/capgo/compare/1.7.11...1.7.12) (2022-07-07)
+
+
+### Bug Fixes
+
+* update deno std ([91119a0](https://github.com/Cap-go/capgo/commit/91119a01fc249f7ed7c4d68386aa45b99b701ccf))
+
 ### [1.7.11](https://github.com/Cap-go/capgo/compare/1.7.10-alpha.2...1.7.11) (2022-07-06)
 
 
