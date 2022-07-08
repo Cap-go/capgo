@@ -42,7 +42,7 @@ const devices = ref<definitions['channel_devices'][]>([])
 const openApp = () => {
   if (!channel.value)
     return
-  openVersion(channel.value.version)
+  openVersion(channel.value.version, auth?.id || '')
 }
 const getUsers = async () => {
   if (!channel.value)

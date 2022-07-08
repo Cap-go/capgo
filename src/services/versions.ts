@@ -8,9 +8,8 @@ interface versionSet {
   version: string
   versionName?: string | undefined
 }
-export const openVersion = async (app: definitions['app_versions']) => {
+export const openVersion = async (app: definitions['app_versions'], userId: string) => {
   const supabase = useSupabase()
-  const auth = supabase.auth.user()
 
   const loading = await loadingController
     .create({
@@ -23,7 +22,7 @@ export const openVersion = async (app: definitions['app_versions']) => {
   if (app.bucket_id) {
     const res = await supabase
       .storage
-      .from(`apps/${auth?.id}/${app.app_id}/versions`)
+      .from(`apps/${userId}/${app.app_id}/versions`)
       .createSignedUrl(app.bucket_id, 60)
 
     signedURL = res.data?.signedURL

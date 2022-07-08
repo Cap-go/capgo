@@ -324,7 +324,7 @@ const ASVersion = async (v: definitions['app_versions']) => {
         text: isPlatform('capacitor') ? t('package.test') : t('package.download'),
         handler: () => {
           actionSheet.dismiss()
-          openVersion(v)
+          openVersion(v, auth?.id || '')
         },
       },
       {
