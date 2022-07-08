@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.147.0/http/server.ts'
 import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
-import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
+import { extractDataEvent, parseStripeEvent } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
