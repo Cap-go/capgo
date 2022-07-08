@@ -4,10 +4,6 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { useSupabase } from './supabase'
 import type { definitions } from '~/types/supabase'
 
-interface versionSet {
-  version: string
-  versionName?: string | undefined
-}
 export const openVersion = async (app: definitions['app_versions'], userId: string) => {
   const supabase = useSupabase()
 
@@ -34,11 +30,11 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
   if (signedURL && isPlatform('capacitor')) {
     try {
       SplashScreen.show()
-      const newFolder: versionSet = await CapacitorUpdater.download({
+      const newBundle = await CapacitorUpdater.download({
         url: signedURL,
+        version: app.name,
       })
-      newFolder.versionName = app.name
-      await CapacitorUpdater.set(newFolder)
+      await CapacitorUpdater.set(newBundle)
     }
     catch (error) {
       console.error(error)
