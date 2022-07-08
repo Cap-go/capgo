@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.20](https://github.com/Cap-go/capgo/compare/1.7.19...1.7.20) (2022-07-08)
+
+
+### Bug Fixes
+
+* go back to custom parse event ([adf56c3](https://github.com/Cap-go/capgo/commit/adf56c3bb8b0e769b8fb0c61c45b671ef03b1970))
+
 ### [1.7.19](https://github.com/Cap-go/capgo/compare/1.7.18...1.7.19) (2022-07-08)
 
 
