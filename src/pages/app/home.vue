@@ -142,6 +142,7 @@ const getSharedWithMe = async () => {
         name,
         icon_url,
         last_version,
+        user_id,
         created_at
       ),
       channel_id (
@@ -257,7 +258,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
             {{ t('projects.sharedlist') }}
           </IonLabel>
         </IonItemDivider>
-        <IonItem v-for="(app, index) in sharedApps" :key="index" class="cursor-pointer" @click="openVersion(app.channel_id.version, app.user_id)">
+        <IonItem v-for="(app, index) in sharedApps" :key="index" class="cursor-pointer" @click="openVersion(app.channel_id.version, app.app_id.user_id)">
           <div slot="start" class="col-span-2 relative py-4">
             <img :src="app.app_id.icon_url" alt="logo" class="rounded-xl h-15 w-15 object-cover">
           </div>
