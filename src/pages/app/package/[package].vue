@@ -35,6 +35,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
+const auth = supabase.auth.user()
 const id = ref('')
 const search = ref('')
 const isLoading = ref(false)
@@ -434,7 +435,7 @@ watchEffect(async () => {
           </IonItemDivider>
           <!-- add item with searchbar -->
           <IonItem>
-            <IonSearchbar @ion-change="search = $event.detail.value.toLowerCase(); searchVersion()" />
+            <IonSearchbar @ion-change="search = ($event.detail.value || '').toLowerCase(); searchVersion()" />
           </IonItem>
           <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>
@@ -460,7 +461,7 @@ watchEffect(async () => {
           </div>
           <IonInfiniteScroll
             threshold="100px"
-            :disabled="isDisabled || search"
+            :disabled="isDisabled || !!search"
             @ion-infinite="loadData($event)"
           >
             <IonInfiniteScrollContent

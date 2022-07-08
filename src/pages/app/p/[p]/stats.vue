@@ -295,7 +295,7 @@ watchEffect(async () => {
           </template>
           <IonInfiniteScroll
             threshold="100px"
-            :disabled="isDisabled || search"
+            :disabled="isDisabled || !!search"
             @ion-infinite="loadStatsData($event)"
           >
             <IonInfiniteScrollContent

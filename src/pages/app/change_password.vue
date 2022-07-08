@@ -71,7 +71,7 @@ const submit = async () => {
           </div>
           <div class="ion-padding">
             <IonItem class="ion-no-padding">
-              <IonInput v-model="form.password" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('accountPassword.password') " required="true" />
+              <IonInput v-model="form.password" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('accountPassword.password') " :required="true" />
               <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
               <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
             </IonItem>
@@ -81,7 +81,7 @@ const submit = async () => {
               </p>
             </div>
             <IonItem class="ion-no-padding">
-              <IonInput v-model="form.confirmPassword" :type="showPassword2 ? 'text' : 'password'" class="mt-2 border-b border-black-light" :placeholder="t('accountPassword.confirmPassword')" required="true" />
+              <IonInput v-model="form.confirmPassword" :type="showPassword2 ? 'text' : 'password'" class="mt-2 border-b border-black-light" :placeholder="t('accountPassword.confirmPassword')" :required="true" />
               <img v-if="showPassword2" src="/eye-open.png" alt="password" @click="showPassword2 = !showPassword2">
               <img v-else src="/eye-close.png" alt="password" @click="showPassword2 = !showPassword2">
             </IonItem>

@@ -96,7 +96,7 @@ watchEffect(async () => {
           </div>
           <div class="ion-padding">
             <IonItem class="ion-no-padding">
-              <IonInput v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password.new') " required="true" />
+              <IonInput v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password.new')" :required="true" />
               <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
               <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
             </IonItem>
@@ -108,7 +108,7 @@ watchEffect(async () => {
           </div>
           <div class="ion-padding">
             <IonItem class="ion-no-padding">
-              <IonInput v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('register.confirm-password') " required="true" />
+              <IonInput v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('register.confirm-password')" :required="true" />
               <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
               <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
             </IonItem>

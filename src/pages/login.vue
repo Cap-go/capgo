@@ -138,7 +138,7 @@ onMounted(checkLogin)
             <IonLabel>
               <img src="/person.png" alt="person">
             </IonLabel>
-            <IonInput id="emailInput" v-model="form.email" inputmode="email" autocomplete="email" name="email" type="email" :disabled="isLoading" :placeholder="t('login.email')" required="true" />
+            <IonInput id="emailInput" v-model="form.email" inputmode="email" autocomplete="email" name="email" type="email" :disabled="isLoading" :placeholder="t('login.email')" :required="true" />
           </IonItem>
           <div v-for="(error, index) of v$.email.$errors" :key="index">
             <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
@@ -149,7 +149,7 @@ onMounted(checkLogin)
             <IonLabel>
               <img src="/lock.png" alt="password">
             </IonLabel>
-            <IonInput id="passwordInput" v-model="form.password" inputmode="password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " required="true" />
+            <IonInput id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " :required="true" />
             <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
             <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
           </IonItem>

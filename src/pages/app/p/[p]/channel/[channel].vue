@@ -91,7 +91,7 @@ const getDevices = async () => {
     console.error(error)
   }
 }
-const saveChannelChange = async (key: string, val: string) => {
+const saveChannelChange = async (key: string, val: boolean) => {
   if (!id.value || !channel.value)
     return
   try {
@@ -451,7 +451,7 @@ const inviteUser = async (userId: string) => {
         </IonItemDivider>
         <!-- add item with searchbar -->
         <IonItem v-if="devices?.length">
-          <IonSearchbar @ion-change="search = $event.detail.value" />
+          <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
         </IonItem>
         <template v-for="d in devicesFilter" :key="d.device_id">
           <IonItemSliding>

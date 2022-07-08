@@ -172,7 +172,7 @@ const onSearch = (val: string) => {
           </template>
           <IonInfiniteScroll
             threshold="100px"
-            :disabled="isDisabled || search"
+            :disabled="isDisabled || !!search"
             @ion-infinite="loadData($event)"
           >
             <IonInfiniteScrollContent
