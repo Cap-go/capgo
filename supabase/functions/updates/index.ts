@@ -224,7 +224,7 @@ serve(async (event: Request) => {
     })
   }
   catch (e) {
-    console.error('Cannot update', e)
+    console.error('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
