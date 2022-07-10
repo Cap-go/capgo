@@ -208,7 +208,7 @@ plan:
 please-upgrade: Lütfen daha fazla kullanıcı eklemek için planınızı yükseltin
 projects:
   list: senin
-  sharedlist: Seninle paylaştı
+  sharedlist: Benimle paylaştı
   title: Projeler
 register:
   already-account: Zaten bir hesabınız var mı?

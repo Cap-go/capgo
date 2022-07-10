@@ -206,7 +206,7 @@ plan:
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 projects:
   list: Của bạn
-  sharedlist: Đã chia sẻ với bạn
+  sharedlist: Chia sẻ với tôi
   title: Dự án
 register:
   already-account: Bạn đã có tài khoản?

@@ -200,7 +200,7 @@ plan:
 please-upgrade: 请升级您的计划以添加更多用户
 projects:
   list: 你的
-  sharedlist: 与您共享
+  sharedlist: 与我分享
   title: 项目
 register:
   already-account: 你已经有一个账户吗？

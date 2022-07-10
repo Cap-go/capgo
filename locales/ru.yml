@@ -204,7 +204,7 @@ plan:
 please-upgrade: Обновите план, чтобы добавить больше пользователей
 projects:
   list: Ваш
-  sharedlist: Поделился с вами
+  sharedlist: Поделился со мной
   title: Проекты
 register:
   already-account: У вас уже есть аккаунт?

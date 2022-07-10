@@ -200,7 +200,7 @@ plan:
 please-upgrade: プランをアップグレードして、ユーザーを追加してください
 projects:
   list: あなたのもの
-  sharedlist: あなたと共有
+  sharedlist: 私と共有
   title: プロジェクト
 register:
   already-account: すでにアカウントをお持ちですか？

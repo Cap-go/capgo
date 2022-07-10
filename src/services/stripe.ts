@@ -14,17 +14,17 @@ export const openPortal = async () => {
     await loading.present()
     const resp = await supabase.functions.invoke('stripe_portal', {})
     console.error('stripe_portal', resp)
-    // const response = await fetch('https://capgo.app/api/stripe_portal', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'authorization': session.access_token,
-    //   },
-    // })
-    // const res = await response.json()
     await loading.dismiss()
-    if (!resp.error && resp.data && resp.data.url)
+    if (!resp.error && resp.data && resp.data.url) {
       window.open(resp.data.url, '_blank')
+    }
+    else {
+      const toast = await toastController.create({
+        message: 'Cannot open your portal',
+        duration: 2000,
+      })
+      await toast.present()
+    }
   }
   catch (error) {
     console.error(error)

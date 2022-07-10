@@ -212,7 +212,7 @@ plan:
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 projects:
   list: Deine
-  sharedlist: Mit dir geteilt
+  sharedlist: Mit mir geteilt
   title: Projekte
 register:
   already-account: Sie haben schon ein Konto?

@@ -200,7 +200,7 @@ plan:
 please-upgrade: Please upgrade your plan to add more users
 projects:
   list: Yours
-  sharedlist: Shared with you
+  sharedlist: Shared with me
   title: Projects
 register:
   already-account: You already have an account?

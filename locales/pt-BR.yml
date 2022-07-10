@@ -206,7 +206,7 @@ plan:
 please-upgrade: Atualize seu plano para adicionar mais usuários
 projects:
   list: Seu
-  sharedlist: Compartilhado com você
+  sharedlist: Compartilhou comigo
   title: Projetos
 register:
   already-account: Você já tem uma conta?
