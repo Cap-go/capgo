@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.26](https://github.com/Cap-go/capgo/compare/1.7.25...1.7.26) (2022-07-10)
+
+
+### Bug Fixes
+
+* open portal ios ([b9712b9](https://github.com/Cap-go/capgo/commit/b9712b953429f9902719fec7d66381fb8dc3b4c8))
+* try to debug mobile ([eb0c9fd](https://github.com/Cap-go/capgo/commit/eb0c9fdb2381b449f252b87576fa231f7804f87b))
+
 ### [1.7.25](https://github.com/Cap-go/capgo/compare/1.7.24...1.7.25) (2022-07-10)
 
 
