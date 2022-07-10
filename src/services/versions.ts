@@ -32,9 +32,11 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
       SplashScreen.show()
       const newBundle = await CapacitorUpdater.download({
         url: signedURL,
-        version: app.name,
       })
-      await CapacitorUpdater.set(newBundle)
+      await CapacitorUpdater.set({
+        version: newBundle.version,
+        versionName: app.name,
+      })
     }
     catch (error) {
       console.error(error)
