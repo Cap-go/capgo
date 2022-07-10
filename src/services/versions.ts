@@ -1,5 +1,4 @@
 import { isPlatform, loadingController, toastController } from '@ionic/vue'
-import { SplashScreen } from '@capacitor/splash-screen'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { useSupabase } from './supabase'
 import type { definitions } from '~/types/supabase'
@@ -29,15 +28,20 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
 
   if (signedURL && isPlatform('capacitor')) {
     try {
-      SplashScreen.show()
       const newBundle = await CapacitorUpdater.download({
         url: signedURL,
         version: app.name,
       })
+      const current = await CapacitorUpdater.current()
+      console.log('current', current)
+      await CapacitorUpdater.next({ id: current.bundle.id })
+      // iso date in one hour
+      const expires = new Date(Date.now() + 1000 * 60 * 60).toISOString()
+      await CapacitorUpdater.setDelay({ kind: 'date', value: expires })
       await CapacitorUpdater.set(newBundle)
     }
     catch (error) {
-      console.error(error)
+      console.error('Error', error)
       const toast = await toastController
         .create({
           message: 'Cannot set this version',
@@ -45,7 +49,6 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
         })
       await toast.present()
     }
-    SplashScreen.show()
     await loading.dismiss()
   }
   else {
