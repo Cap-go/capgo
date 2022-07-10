@@ -145,7 +145,7 @@ const getChannel = async () => {
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     packageId.value = route.params.p as string
-    packageId.value = packageId.value.replaceAll('--', '.')
+    packageId.value = packageId.value.replace(/--/g, '.')
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getUsers()

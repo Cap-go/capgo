@@ -148,7 +148,7 @@ const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
 }
 
 const openDevice = async (stat: definitions['stats']) => {
-  router.push(`/app/p/${id.value.replaceAll('.', '--')}/d/${stat.device_id}`)
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/d/${stat.device_id}`)
 }
 
 const refreshStatsData = async (evt: RefresherCustomEvent | null = null) => {
@@ -222,7 +222,7 @@ const { doughnutChartProps } = useDoughnutChart({
 watchEffect(async () => {
   if (route.path.endsWith('/stats')) {
     id.value = route.params.p as string
-    id.value = id.value.replaceAll('--', '.')
+    id.value = id.value.replace(/--/g, '.')
     await refreshData()
   }
 })

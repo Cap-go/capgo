@@ -98,7 +98,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
 }
 
 const openDevice = async (device: definitions['devices']) => {
-  router.push(`/app/p/${id.value.replaceAll('.', '--')}/d/${device.device_id}`)
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/d/${device.device_id}`)
 }
 
 interface RefresherEventDetail {
@@ -112,7 +112,7 @@ interface RefresherCustomEvent extends CustomEvent {
 watchEffect(async () => {
   if (route.path.endsWith('/devices')) {
     id.value = route.params.p as string
-    id.value = id.value.replaceAll('--', '.')
+    id.value = id.value.replace(/--/g, '.')
     await refreshData()
   }
 })
