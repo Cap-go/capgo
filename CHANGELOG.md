@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.26-alpha.3](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.2...1.7.26-alpha.3) (2022-07-10)
+
+
+### Bug Fixes
+
+* make android work ([3d065fe](https://github.com/Cap-go/capgo/commit/3d065fe66bf5f1f9de4aeb12e0c8d87f4507dfc3))
+
 ### [1.7.26-alpha.2](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.1...1.7.26-alpha.2) (2022-07-10)
 
 ### [1.7.26-alpha.1](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.0...1.7.26-alpha.1) (2022-07-10)
