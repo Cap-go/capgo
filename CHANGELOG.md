@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.26-alpha.1](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.0...1.7.26-alpha.1) (2022-07-10)
+
+
+### Bug Fixes
+
+* :boom: update to v4 ([566fa94](https://github.com/Cap-go/capgo/commit/566fa9496caddc4e58f6d2499b8e8b74694a8bd4))
+
 ### [1.7.26-alpha.0](https://github.com/Cap-go/capgo/compare/1.7.25...1.7.26-alpha.0) (2022-07-10)
 
 
