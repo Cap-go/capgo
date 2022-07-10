@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.30-alpha.0](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.3...1.7.30-alpha.0) (2022-07-10)
+
+
+### Bug Fixes
+
+* logs issue edge ([15f7220](https://github.com/Cap-go/capgo/commit/15f7220b4fcd99c54d42e606155da583a7dbf92a))
+
+### [1.7.29](https://github.com/Cap-go/capgo/compare/1.7.28...1.7.29) (2022-07-10)
+
+
+### Bug Fixes
+
+* issue on old android replaceAll missing ([29800fd](https://github.com/Cap-go/capgo/commit/29800fd8a52f1990674faaab91ee6b4b8c1c3916))
+
+### [1.7.28](https://github.com/Cap-go/capgo/compare/1.7.27...1.7.28) (2022-07-10)
+
+### [1.7.27](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.1...1.7.27) (2022-07-10)
+
+
+### Bug Fixes
+
+* use back v3 in prod ([c229113](https://github.com/Cap-go/capgo/commit/c2291138b3390b7004cb1cbb08eff1b13cf10a05))
+
+### [1.7.26](https://github.com/Cap-go/capgo/compare/1.7.25...1.7.26) (2022-07-10)
+
 ### [1.7.29](https://github.com/Cap-go/capgo/compare/1.7.28...1.7.29) (2022-07-10)
 
 
