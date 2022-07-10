@@ -1,6 +1,26 @@
-import { loadingController, toastController } from '@ionic/vue'
+import { actionSheetController, isPlatform, loadingController, toastController } from '@ionic/vue'
 import { useSupabase } from './supabase'
 
+const presentActionSheetOpen = async (url: string) => {
+  const actionSheet = await actionSheetController.create({
+    buttons: [
+      {
+        text: 'Continue',
+        handler: () => {
+          window.open(url, '_blank')
+        },
+      },
+    ],
+  })
+  await actionSheet.present()
+}
+const openBlank = (link: string) => {
+  console.log('openBlank', link)
+  if (isPlatform('ios'))
+    presentActionSheetOpen(link)
+  else
+    window.open(link, '_blank')
+}
 export const openPortal = async () => {
 //   console.log('openPortal')
   const supabase = useSupabase()
@@ -17,7 +37,7 @@ export const openPortal = async () => {
     await loading.dismiss()
     if (!resp.error && resp.data && resp.data.url) {
       console.error('resp.data.url', resp.data.url)
-      window.open(resp.data.url, '_blank')
+      openBlank(resp.data.url)
     }
     else {
       const toast = await toastController.create({
@@ -28,7 +48,7 @@ export const openPortal = async () => {
     }
   }
   catch (error) {
-    console.error(error)
+    console.error('Error unknow', error)
     await loading.dismiss()
     const toast = await toastController
       .create({
@@ -37,6 +57,7 @@ export const openPortal = async () => {
       })
     await toast.present()
   }
+  return null
 }
 
 export const openCheckout = async (priceId: string) => {
@@ -53,7 +74,7 @@ export const openCheckout = async (priceId: string) => {
     const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId }) })
     await loading.dismiss()
     if (!resp.error && resp.data && resp.data.url)
-      window.open(resp.data.url, '_blank')
+      openBlank(resp.data.url)
   }
   catch (error) {
     console.error(error)
