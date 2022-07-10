@@ -16,6 +16,7 @@ export const openPortal = async () => {
     console.error('stripe_portal', resp)
     await loading.dismiss()
     if (!resp.error && resp.data && resp.data.url) {
+      console.error('resp.data.url', resp.data.url)
       window.open(resp.data.url, '_blank')
     }
     else {
