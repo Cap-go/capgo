@@ -3,12 +3,27 @@ import Capacitor
 import CapgoCapacitorUpdater
 import RobingenzCapacitorScreenOrientation
 
+extension UIApplication {
+
+
+public class func topViewController(_ base: UIViewController? = UIApplication.shared.windows.first?.rootViewController) -> UIViewController? {
+    if let nav = base as? UINavigationController {
+        return topViewController(nav.visibleViewController)
+    }
+    if let tab = base as? UITabBarController {
+        if let selected = tab.selectedViewController {
+            return topViewController(selected)
+        }
+    }
+    if let presented = base?.presentedViewController {
+        return topViewController(presented)
+    }
+    return base
+}}
+
 extension UIWindow {
-    alertShake = nil
     open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
         let defaults = UserDefaults.standard
-        if (alertShake != nil)
-            return
         if motion == .motionShake {
             let appName = "app"
             let title = "Preview \(appName) Menu"
@@ -18,37 +33,37 @@ extension UIWindow {
             let cancelButtonTitle = "Close menu"
             let updater = CapacitorUpdater()
             if let vc = (rootViewController as? CAPBridgeViewController) {
-                print("getServerBasePath", vc.getServerBasePath())
-                let serverBasePath = defaults.object(forKey:"serverBasePath") as? String ?? ""
-                let versionName = defaults.object(forKey:"versionName") as? String ?? ""
-                let LatestVersionAutoUpdate = UserDefaults.standard.string(forKey: "LatestVersionAutoUpdate") ?? ""
-                if (serverBasePath == "" || serverBasePath.contains(versionName)) {
+                if UIApplication.topViewController()!.isKind(of: UIAlertController.self) { 
+                    print("UIAlertController is already presented")
                     return
                 }
-                alertShake = UIAlertController(title: title, message: message, preferredStyle: UIAlertController.Style.alert)
+                func resetBuiltin () {
+                    updater.reset()
+                    vc.setServerBasePath(path: "")
+                    DispatchQueue.main.async {
+                        vc.loadView()
+                        vc.viewDidLoad()
+                        _ = updater.delete(id: bundleId)
+                        print("✨  Capgo: Reset to builtin version")
+                    }
+                }
+                let bundleId = updater.getCurrentBundleId()
+                print("getServerBasePath", vc.getServerBasePath())
+                print("bundleId", bundleId)
+                let alertShake = UIAlertController(title: title, message: message, preferredStyle: UIAlertController.Style.alert)
                 alertShake.addAction(UIAlertAction(title: okButtonTitle, style: UIAlertAction.Style.default, handler: { (_) -> Void in
-                    let LatestVersionNameAutoUpdate = UserDefaults.standard.string(forKey: "LatestVersionNameAutoUpdate") ?? ""
-                    if(LatestVersionAutoUpdate != "" && LatestVersionNameAutoUpdate != "") {
-                        _ = updater.set(version: LatestVersionAutoUpdate, versionName: LatestVersionNameAutoUpdate)
-                        let pathHot = updater.getLastPathHot()
-                        let pathPersist = updater.getLastPathPersist()
-                        if (pathHot != "" && pathPersist != "") {
-                            UserDefaults.standard.set(String(pathPersist.suffix(10)), forKey: "serverBasePath")
-                            vc.setServerBasePath(path: pathHot)
-                            _ = updater.delete(version: serverBasePath, versionName: versionName)
-                        } else {
-
-                        }
+                    guard let next = updater.getNextVersion() else {
+                        resetBuiltin()
+                        return
+                    }
+                    if (!next.isBuiltin()) {
+                        print("✨  Capgo: Resetting to: \(next.toString())")
+                        _ = updater.set(bundle: next)
+                        let destHot = updater.getPathHot(id: next.getId())
+                        print("✨  Capgo: Reloading \(next.toString())")
+                        vc.setServerBasePath(path: destHot.path)
                     } else {
-                        updater.reset()
-                        let pathPersist = updater.getLastPathPersist()
-                        vc.setServerBasePath(path: pathPersist)
-                        defaults.set("", forKey: "serverBasePath")
-                        DispatchQueue.main.async {
-                            vc.loadView()
-                            vc.viewDidLoad()
-                            _ = updater.delete(version: serverBasePath, versionName: versionName)
-                        }
+                        resetBuiltin()
                     }
                     print("✨  Capgo: Reload app done")
                 }))
@@ -60,7 +75,7 @@ extension UIWindow {
                 }))
                 DispatchQueue.main.async {
                     vc.present(alertShake, animated: true, completion: { () -> Void in
-                        alertShake = nil
+//                        alertShake = nil
                     })
                 }
             }
@@ -134,5 +149,4 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             NotificationCenter.default.post(name: .capacitorStatusBarTapped, object: nil)
         }
     }
-
 }
