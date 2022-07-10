@@ -4,16 +4,20 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.hardware.SensorManager;
+
+import ee.forgr.capacitor_updater.BundleInfo;
 import ee.forgr.capacitor_updater.CapacitorUpdater;
+
+import com.android.volley.toolbox.Volley;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import android.os.Bundle;
 import android.util.Log;
+
+import com.getcapacitor.plugin.WebView;
 import com.squareup.seismic.ShakeDetector;
 
-import java.io.File;
 import java.text.MessageFormat;
 
 public class MainActivity extends BridgeActivity implements ShakeDetector.Listener {
@@ -38,17 +42,12 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
 
     @Override public void hearShake() {
         Log.i("Capgo", "hearShake");
-        CapacitorUpdater updater;
-        String LatestVersionAutoUpdate = prefs.getString("LatestVersionAutoUpdate", "");
-        try {
-            updater = new CapacitorUpdater(this.bridge.getContext());
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-            return;
-        }
-        Log.i("Capgo hearShake", updater.getLastPathHot());
-
-        if (updater.getLastPathHot() == "public" || isShow || updater.getLastPathHot().contains(LatestVersionAutoUpdate)) {
+        CapacitorUpdater updater = new CapacitorUpdater();
+        updater.prefs = this.bridge.getContext().getSharedPreferences(WebView.WEBVIEW_PREFS_NAME, Activity.MODE_PRIVATE);
+        updater.editor = this.prefs.edit();
+        updater.documentsDir = this.bridge.getContext().getFilesDir();
+        updater.requestQueue = Volley.newRequestQueue(this.bridge.getContext());
+        if (isShow) {
             return;
         }
         isShow = true;
@@ -65,29 +64,26 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         builder.setPositiveButton(okButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 // User clicked OK button
-                String serverBasePath = updater.getLastPathHot();
-                File fHot = new File(serverBasePath);
-                String versionName = updater.getVersionName();
-                String LatestVersionNameAutoUpdate = prefs.getString("LatestVersionNameAutoUpdate", "");
-                Boolean isAssets = true;
-                if (!LatestVersionAutoUpdate.equals("") && !LatestVersionNameAutoUpdate.equals("")) {
-                    isAssets = !updater.set(LatestVersionAutoUpdate, LatestVersionNameAutoUpdate);
+                BundleInfo current = updater.getCurrentBundle();
+                Log.i(CapacitorUpdater.TAG, "get next: ");
+                BundleInfo next = updater.getNextBundle();
+                Log.i(CapacitorUpdater.TAG, "next: " + next.toString());
+                if (!next.isBuiltin()) {
+                    updater.set(next.getId());
                 } else {
                     updater.reset();
                 }
-                if (isAssets) {
-                    updater.reset();
-                    String pathHot = updater.getLastPathHot();
-                    brd.setServerAssetPath(pathHot);
+                final String path = updater.getCurrentBundlePath();
+                Log.i(CapacitorUpdater.TAG, "Reloading: " + path);
+                if(updater.isUsingBuiltin()) {
+                    brd.setServerAssetPath(path);
                 } else {
-                    String pathHot = updater.getLastPathHot();
-                    brd.setServerBasePath(pathHot);
+                    brd.setServerBasePath(path);
                 }
                 try {
-                    String name = fHot.getName();
-                    updater.delete(name, versionName);
+                    updater.delete(current.getId());
                 } catch (Exception err) {
-                    Log.i("Capgo", "Cannot delete version " + versionName, err);
+                    Log.i("Capgo", "Cannot delete version " + current.getId(), err);
                 }
                 Log.i("Capgo", "Capgo: Reload app done");
                 dialog.dismiss();
@@ -97,7 +93,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         builder.setNeutralButton(reloadButtonTitle, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 Log.i("Capgo", reloadButtonTitle);
-                String pathHot = updater.getLastPathHot();
+                String pathHot = updater.getCurrentBundlePath();
                 brd.setServerBasePath(pathHot);
                 dialog.dismiss();
                 isShow = false;
