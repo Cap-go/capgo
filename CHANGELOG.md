@@ -2,24 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [1.7.26-alpha.2](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.1...1.7.26-alpha.2) (2022-07-10)
-
-### [1.7.26-alpha.1](https://github.com/Cap-go/capgo/compare/1.7.26-alpha.0...1.7.26-alpha.1) (2022-07-10)
+### [1.7.29](https://github.com/Cap-go/capgo/compare/1.7.28...1.7.29) (2022-07-10)
 
 
 ### Bug Fixes
 
-* :boom: update to v4 ([566fa94](https://github.com/Cap-go/capgo/commit/566fa9496caddc4e58f6d2499b8e8b74694a8bd4))
+* issue on old android replaceAll missing ([29800fd](https://github.com/Cap-go/capgo/commit/29800fd8a52f1990674faaab91ee6b4b8c1c3916))
 
-### [1.7.26-alpha.0](https://github.com/Cap-go/capgo/compare/1.7.25...1.7.26-alpha.0) (2022-07-10)
+### [1.7.28](https://github.com/Cap-go/capgo/compare/1.7.27...1.7.28) (2022-07-10)
+
+### [1.7.27](https://github.com/Cap-go/capgo/compare/1.7.26...1.7.27) (2022-07-10)
+
+
+### Bug Fixes
+
+* use back v3 in prod ([c229113](https://github.com/Cap-go/capgo/commit/c2291138b3390b7004cb1cbb08eff1b13cf10a05))
+
+### [1.7.26](https://github.com/Cap-go/capgo/compare/1.7.25...1.7.26) (2022-07-10)
 
 
 ### Bug Fixes
 
 * open portal ios ([b9712b9](https://github.com/Cap-go/capgo/commit/b9712b953429f9902719fec7d66381fb8dc3b4c8))
 * try to debug mobile ([eb0c9fd](https://github.com/Cap-go/capgo/commit/eb0c9fdb2381b449f252b87576fa231f7804f87b))
-
-### [1.7.10-alpha.3](https://github.com/Cap-go/capgo/compare/1.7.10-alpha.2...1.7.10-alpha.3) (2022-07-06)
 
 ### [1.7.25](https://github.com/Cap-go/capgo/compare/1.7.24...1.7.25) (2022-07-10)
 

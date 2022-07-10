@@ -70,7 +70,7 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.log('e', e)
+    console.error('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

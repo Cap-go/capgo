@@ -30,7 +30,7 @@ const auth = supabase.auth.user()
 const apps = ref<definitions['apps'][]>()
 const sharedApps = ref<(definitions['channel_users'] & ChannelUserApp)[]>()
 const openPackage = (appId: string) => {
-  router.push(`/app/package/${appId.replaceAll('.', '--')}`)
+  router.push(`/app/package/${appId.replace(/\./g, '--')}`)
 }
 
 interface ChannelUserApp {

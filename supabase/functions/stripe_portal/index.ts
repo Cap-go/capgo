@@ -46,7 +46,7 @@ serve(async (event: Request) => {
     return sendRes({ url: link.url })
   }
   catch (e) {
-    console.log('e', e)
+    console.error('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

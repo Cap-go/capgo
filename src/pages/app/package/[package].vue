@@ -264,13 +264,13 @@ const deleteVersion = async (version: definitions['app_versions']) => {
 }
 
 const openChannel = (channel: definitions['channels']) => {
-  router.push(`/app/p/${id.value.replaceAll('.', '--')}/channel/${channel.id}`)
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
 }
 const openDevices = () => {
-  router.push(`/app/p/${id.value.replaceAll('.', '--')}/devices`)
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/devices`)
 }
 const openStats = () => {
-  router.push(`/app/p/${id.value.replaceAll('.', '--')}/stats`)
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/stats`)
 }
 const setChannel = async (v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
@@ -364,7 +364,7 @@ interface RefresherCustomEvent extends CustomEvent {
 watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
-    id.value = id.value.replaceAll('--', '.')
+    id.value = id.value.replace(/--/g, '.')
     await refreshData()
   }
 })

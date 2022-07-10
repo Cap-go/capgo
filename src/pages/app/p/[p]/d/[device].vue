@@ -326,7 +326,7 @@ const updateChannel = async () => {
 watchEffect(async () => {
   if (route.path.includes('/d/')) {
     packageId.value = route.params.p as string
-    packageId.value = packageId.value.replaceAll('--', '.')
+    packageId.value = packageId.value.replace(/--/g, '.')
     id.value = route.params.device as string
     await loadData()
   }
