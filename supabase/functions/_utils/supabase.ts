@@ -41,7 +41,7 @@ export const updateOrCreateVersion = async (update: Partial<definitions['app_ver
 export const updateOrCreateChannel = async (update: Partial<definitions['channels']>) => {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
-    console.error('missing app_id, name, or created_by')
+    console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
   const { data, error } = await supabaseAdmin
@@ -79,7 +79,7 @@ export const checkAppOwner = async (userId: string | undefined, appId: string | 
     return true
   }
   catch (error) {
-    console.error(error)
+    console.log(error)
     return false
   }
 }

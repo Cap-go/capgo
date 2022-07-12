@@ -31,7 +31,7 @@ serve(async (event: Request) => {
     return sendRes(paymentStatus)
   }
   catch (e) {
-    console.error('Error', e)
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknown',
       error: JSON.stringify(e),

@@ -48,7 +48,7 @@ serve(async (event: Request) => {
       device.version = data[0].id
     }
     else {
-      console.error('switch to onprem', body.app_id)
+      console.log('switch to onprem', body.app_id)
       device.version = body.version_name || 'unknown'
       stat.version = body.version || 0
       statsDb = `${statsDb}_onprem`
@@ -63,7 +63,7 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.error('Error', e)
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

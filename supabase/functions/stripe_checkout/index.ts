@@ -49,7 +49,7 @@ serve(async (event: Request) => {
     return sendRes({ url: checkout.url })
   }
   catch (e) {
-    console.error('Error', e)
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

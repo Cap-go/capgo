@@ -42,7 +42,7 @@ serve(async (event: Request) => {
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     plugin_version = plugin_version || '2.3.3'
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      console.error('Cannot get all vars', platform,
+      console.log('Cannot get all vars', platform,
         app_id,
         device_id,
         version_build,
@@ -119,7 +119,7 @@ serve(async (event: Request) => {
       .eq('device_id', device_id)
       .eq('app_id', app_id)
     if (dbError || !channel) {
-      console.error('Cannot get channel', app_id, `no public channel ${JSON.stringify(dbError)}`)
+      console.log('Cannot get channel', app_id, `no public channel ${JSON.stringify(dbError)}`)
       return sendRes({
         message: 'Cannot get channel',
         err: `no public channel ${JSON.stringify(dbError)}`,
@@ -128,7 +128,7 @@ serve(async (event: Request) => {
     const trial = await isTrial(channel.created_by)
     const paying = await isGoodPlan(channel.created_by)
     if (!paying && !trial) {
-      console.error('Cannot update, upgrade plan to continue to update', app_id)
+      console.log('Cannot update, upgrade plan to continue to update', app_id)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
         err: 'not good plan',
@@ -145,7 +145,7 @@ serve(async (event: Request) => {
     }
 
     if (!version.bucket_id && !version.external_url) {
-      console.error('Cannot get zip file', app_id)
+      console.log('Cannot get zip file', app_id)
       return sendRes({
         message: 'Cannot get zip file',
       }, 200)
@@ -212,10 +212,10 @@ serve(async (event: Request) => {
         .from<definitions['stats']>('stats')
         .insert(stat)
       if (error)
-        console.error('Cannot insert stat', app_id, version_build, error)
+        console.log('Cannot insert stat', app_id, version_build, error)
     }
     catch (err) {
-      console.error('Cannot insert stats', app_id, err)
+      console.log('Cannot insert stats', app_id, err)
     }
     console.log('New version available', app_id, version.name, signedURL)
     return sendRes({
@@ -224,7 +224,7 @@ serve(async (event: Request) => {
     })
   }
   catch (e) {
-    console.error('Error', e)
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

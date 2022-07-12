@@ -24,7 +24,7 @@ const initCustomers = async () => {
         customer_id: customer.id,
       })
     if (dbStripeError) {
-      console.error(dbStripeError)
+      console.log(dbStripeError)
       return
     }
     const { error: dbError } = await supabase
@@ -34,7 +34,7 @@ const initCustomers = async () => {
       })
       .eq('email', user.email)
     if (dbError) {
-      console.error(dbError)
+      console.log(dbError)
       return
     }
   }

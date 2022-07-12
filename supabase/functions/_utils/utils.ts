@@ -31,7 +31,7 @@ export const checkKey = async (authorization: string | undefined, supabase: Supa
     return data
   }
   catch (error) {
-    console.error(error)
+    console.log(error)
     return null
   }
 }

@@ -85,7 +85,7 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
       data.subscription_id = undefined
     }
     else {
-      console.error('Other event', event.type, event)
+      console.log('Other event', event.type, event)
     }
   }
   return data

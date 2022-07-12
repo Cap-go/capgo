@@ -10,7 +10,7 @@ serve(async (event: Request) => {
   if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.error('Fail Authorization')
+    console.log('Fail Authorization')
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
@@ -31,7 +31,7 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.error('Error', e)
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

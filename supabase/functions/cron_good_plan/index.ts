@@ -10,11 +10,11 @@ serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret) {
-    console.error('Cannot find authorization secret')
+    console.log('Cannot find authorization secret')
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
   }
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.error('Fail Authorization', authorizationSecret, API_SECRET)
+    console.log('Fail Authorization', authorizationSecret, API_SECRET)
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
@@ -64,7 +64,7 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.error('Error', e)
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
