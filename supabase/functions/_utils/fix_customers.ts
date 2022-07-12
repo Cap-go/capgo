@@ -17,7 +17,7 @@ const initCustomers = async () => {
   }
   // iterate users and send them to stripe
   for (const user of users) {
-    const customer = await createCustomer('sk_test_51K1SWEGH46eYKnWwlgifxLXnfrMnHjI66LujEcqSfBWjDAEc7r9mA7IV2STq2IrcN0eGCFJNkLIREeHAwqRSXSmx00K8bmp3dO', user.email)
+    const customer = await createCustomer(user.email)
     const { error: dbStripeError } = await supabase
       .from<definitions['stripe_info']>('stripe_info')
       .insert({
