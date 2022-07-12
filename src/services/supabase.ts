@@ -13,7 +13,7 @@ export const useSupabase = () => {
     detectSessionInUrl: false,
     fetch: (requestInfo, requestInit) => {
       const url = requestInfo.toString()
-      if (requestInit?.method === 'POST' && url.includes('/storage/'))
+      if (requestInit?.method === 'POST' && (url.includes('/storage/') || url.includes('.functions.supabase.co')))
         return fetch(requestInfo, requestInit)
       return Http.request({
         url,
