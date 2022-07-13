@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.35](https://github.com/Cap-go/capgo/compare/1.7.34...1.7.35) (2022-07-13)
+
+
+### Bug Fixes
+
+* add missign created_by ([280ba86](https://github.com/Cap-go/capgo/commit/280ba8615e74f743bb1b8b0124ced30c7712989f))
+
 ### [1.7.34](https://github.com/Cap-go/capgo/compare/1.7.33...1.7.34) (2022-07-12)
 
 
