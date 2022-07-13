@@ -236,7 +236,6 @@ export interface paths {
       parameters: {
         query: {
           app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
-          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
@@ -295,7 +294,6 @@ export interface paths {
       parameters: {
         query: {
           app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
-          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
@@ -318,7 +316,6 @@ export interface paths {
       parameters: {
         query: {
           app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
-          user_id?: parameters["rowFilter.app_stats_onprem.user_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
@@ -1113,6 +1110,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_override.device_id"];
           version?: parameters["rowFilter.devices_override.version"];
           app_id?: parameters["rowFilter.devices_override.app_id"];
+          created_by?: parameters["rowFilter.devices_override.created_by"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1168,6 +1166,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_override.device_id"];
           version?: parameters["rowFilter.devices_override.version"];
           app_id?: parameters["rowFilter.devices_override.app_id"];
+          created_by?: parameters["rowFilter.devices_override.created_by"];
         };
         header: {
           /** Preference */
@@ -1187,6 +1186,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_override.device_id"];
           version?: parameters["rowFilter.devices_override.version"];
           app_id?: parameters["rowFilter.devices_override.app_id"];
+          created_by?: parameters["rowFilter.devices_override.created_by"];
         };
         body: {
           /** devices_override */
@@ -2376,15 +2376,8 @@ export interface definitions {
      * Format: character varying
      * @description Note:
      * This is a Primary Key.<pk/>
-     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id: string;
-    /**
-     * Format: uuid
-     * @description Note:
-     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
-     */
-    user_id: string;
     /**
      * Format: timestamp with time zone
      * @default now()
@@ -2729,6 +2722,12 @@ export interface definitions {
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id: string;
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
+    created_by?: string;
   };
   plans: {
     /**
@@ -3050,8 +3049,6 @@ export interface parameters {
   "body.app_stats_onprem": definitions["app_stats_onprem"];
   /** Format: character varying */
   "rowFilter.app_stats_onprem.app_id": string;
-  /** Format: uuid */
-  "rowFilter.app_stats_onprem.user_id": string;
   /** Format: timestamp with time zone */
   "rowFilter.app_stats_onprem.created_at": string;
   /** Format: timestamp with time zone */
@@ -3208,6 +3205,8 @@ export interface parameters {
   "rowFilter.devices_override.version": string;
   /** Format: character varying */
   "rowFilter.devices_override.app_id": string;
+  /** Format: uuid */
+  "rowFilter.devices_override.created_by": string;
   /** @description plans */
   "body.plans": definitions["plans"];
   /** Format: timestamp with time zone */

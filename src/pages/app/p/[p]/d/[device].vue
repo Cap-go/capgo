@@ -153,6 +153,7 @@ const upsertDevVersion = async (device: string, v: definitions['app_versions']) 
       device_id: device,
       version: v.id,
       app_id: packageId.value,
+      created_by: auth?.id,
     })
 }
 const didCancel = async (name: string) => {
