@@ -10,13 +10,15 @@ interface GlobalStats {
 }
 
 const getGithubStars = async (): Promise<number> => {
-  return await Promise.resolve(125)
+  const res = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater')
+  const json = await res.json()
+  return json.stargazers_count
 }
 
 const getStats = (): GlobalStats => {
   return {
-    apps: supabaseAdmin.functions.invoke<number>('get_all_apps', {}).then(res => (res.data ? res.data : 0)),
-    updates: supabaseAdmin.functions.invoke<number>('get_all_updates', {}).then(res => (res.data ? res.data : 0)),
+    apps: supabaseAdmin.functions.invoke<number>('count_all_apps', {}).then(res => (res.data ? res.data : 0)),
+    updates: supabaseAdmin.functions.invoke<number>('count_all_updates', {}).then(res => (res.data ? res.data : 0)),
     stars: getGithubStars(),
   }
 }
