@@ -4,8 +4,8 @@ import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 interface GlobalStats {
-  apps: Promise<number>
-  updates: Promise<number>
+  apps: PromiseLike<number>
+  updates: PromiseLike<number>
   stars: Promise<number>
 }
 
@@ -17,8 +17,16 @@ const getGithubStars = async (): Promise<number> => {
 
 const getStats = (): GlobalStats => {
   return {
-    apps: supabaseAdmin.functions.invoke<number>('count_all_apps', {}).then(res => (res.data ? res.data : 0)),
-    updates: supabaseAdmin.functions.invoke<number>('count_all_updates', {}).then(res => (res.data ? res.data : 0)),
+    apps: supabaseAdmin.rpc<number>('count_all_apps', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_apps', res.error)
+      return res.data || 0
+    }),
+    updates: supabaseAdmin.rpc<number>('count_all_updates', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_updates', res.error)
+      return res.data || 0
+    }),
     stars: getGithubStars(),
   }
 }
