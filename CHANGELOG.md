@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.8.0](https://github.com/Cap-go/capgo/compare/1.7.35...1.8.0) (2022-07-17)
+
+
+### Features
+
+* add web_stats ([ff97e7d](https://github.com/Cap-go/capgo/commit/ff97e7d265320e3cf8ff6d14bb6d934840b43da8))
+
+
+### Bug Fixes
+
+* update web_stats ([b5540b5](https://github.com/Cap-go/capgo/commit/b5540b55b45b141e16e2273d5f54525127014839))
+
 ### [1.7.35](https://github.com/Cap-go/capgo/compare/1.7.34...1.7.35) (2022-07-13)
 
 
