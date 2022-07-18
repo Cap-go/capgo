@@ -46,15 +46,10 @@ serve(async (event: Request) => {
     const res = getStats()
     const [apps, updates, stars] = await Promise.all([res.apps, res.updates, res.stars])
     // console.log('app', app.app_id, downloads, versions, shared, channels)
-    // create var date_id with yearn-month
-    const now = new Date()
-    // get_current_plan_name
-    // get month with leading zero
-    const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
-    // get day
-    const day = now.getDate() < 10 ? `0${now.getDate()}` : `${now.getDate()}`
+    // create var date_id with yearn-month-day
+    const date_id = new Date().toISOString().slice(0, 10)
     const newData: definitions['global_stats'] = {
-      date_id: `${now.getFullYear()}-${month}-${day}`,
+      date_id,
       apps,
       updates,
       stars,
