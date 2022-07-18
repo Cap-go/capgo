@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.3](https://github.com/Cap-go/capgo/compare/1.8.2...1.8.3) (2022-07-18)
+
+
+### Bug Fixes
+
+* make date_id simpler ([d5157dd](https://github.com/Cap-go/capgo/commit/d5157dddd3da3e9f62429f34d4bcc97b0c194a82))
+
 ### [1.8.2](https://github.com/Cap-go/capgo/compare/1.8.1...1.8.2) (2022-07-18)
 
 
