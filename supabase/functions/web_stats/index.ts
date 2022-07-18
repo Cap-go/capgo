@@ -51,8 +51,10 @@ serve(async (event: Request) => {
     // get_current_plan_name
     // get month with leading zero
     const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
+    // get day
+    const day = now.getDate() < 10 ? `0${now.getDate()}` : `${now.getDate()}`
     const newData: definitions['global_stats'] = {
-      date_id: `${now.getFullYear()}-${month}`,
+      date_id: `${now.getFullYear()}-${month}-${day}`,
       apps,
       updates,
       stars,

@@ -49,9 +49,9 @@ serve(async (event: Request) => {
               .rpc<Stats>('get_max_stats', { userid: user.id, dateid })
               .single()
             if (get_max_stats && get_max_stats?.max_device > 100)
-              await addEventPerson(user.email, {}, 'user:need_upgrade', 'red')
+              all.push(addEventPerson(user.email, {}, 'user:need_upgrade', 'red'))
             else if (get_max_stats)
-              await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
+              all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))
           }
           return supabaseAdmin
             .from<definitions['stripe_info']>('stripe_info')
