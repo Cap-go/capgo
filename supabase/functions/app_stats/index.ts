@@ -33,7 +33,8 @@ const getApp = (appId: string) => {
     versions: supabase
       .from<definitions['app_versions']>('app_versions')
       .select('id', { count: 'exact', head: true })
-      .eq('app_id', appId),
+      .eq('app_id', appId)
+      .eq('deleted', false),
     shared: supabase
       .from<definitions['channel_users']>('channel_users')
       .select('id', { count: 'exact', head: true })
