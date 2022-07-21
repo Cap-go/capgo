@@ -2,6 +2,7 @@ account:
   backButton: Trở lại
   billing: Thanh toán
   changePassword: Đổi mật khẩu
+  delete-account: Xóa tài khoản của tôi đi
   discord: Bất hòa
   heading: Tài khoản
   keys: Khóa API

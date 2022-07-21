@@ -2,6 +2,7 @@ account:
   backButton: Back
   billing: Billing
   changePassword: Change password
+  delete-account: Delete my account
   discord: Discord
   heading: Account
   keys: API keys

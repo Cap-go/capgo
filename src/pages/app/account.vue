@@ -15,7 +15,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import TitleHead from '~/components/TitleHead.vue'
-import { openChat } from '~/services/crips'
+import { openChat, sendMessage } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { openPortal } from '~/services/stripe'
@@ -122,6 +122,12 @@ const pickPhoto = async () => {
     isLoading.value = false
   }
 }
+
+const deleteAccount = async () => {
+  sendMessage('delete my account')
+  openChat()
+}
+
 const presentActionSheet = async () => {
   const actionSheet = await actionSheetController.create({
     buttons: [
@@ -306,6 +312,14 @@ const presentActionSheet = async () => {
         >
           {{ t("account.privacy") }}
         </a>
+        <div class="mx-auto text-center mt-4">
+          <button
+            class="mx-auto font-bold text-pumpkin-orange-300"
+            @click="deleteAccount()"
+          >
+            {{ t("account.delete-account") }}
+          </button>
+        </div>
         <div class="mx-auto text-center mt-4">
           <button
             class="mx-auto font-bold text-pumpkin-orange-500"

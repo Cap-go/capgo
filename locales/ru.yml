@@ -2,6 +2,7 @@ account:
   backButton: Назад
   billing: Выставление счетов
   changePassword: Изменить пароль
+  delete-account: Удалите мой аккаунт
   discord: Раздор
   heading: Счет
   keys: ключи API

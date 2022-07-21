@@ -2,6 +2,7 @@ account:
   backButton: atrás
   billing: Facturación
   changePassword: Cambia la contraseña
+  delete-account: Borrar mi cuenta
   discord: Discordia
   heading: Cuenta
   keys: claves API

@@ -2,6 +2,7 @@ account:
   backButton: Kembali
   billing: Penagihan
   changePassword: Ganti kata sandi
+  delete-account: Hapus akun Saya
   discord: Perselisihan
   heading: Akun
   keys: kunci API

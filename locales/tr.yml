@@ -2,6 +2,7 @@ account:
   backButton: Geri
   billing: faturalandırma
   changePassword: Şifre değiştir
+  delete-account: Hesabımı sil
   discord: anlaşmazlık
   heading: Hesap
   keys: API anahtarları

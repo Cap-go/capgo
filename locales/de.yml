@@ -2,6 +2,7 @@ account:
   backButton: Zurück
   billing: Abrechnung
   changePassword: Kennwort ändern
+  delete-account: Mein Konto löschen
   discord: Zwietracht
   heading: Konto
   keys: API-Schlüssel

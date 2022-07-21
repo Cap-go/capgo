@@ -2,6 +2,7 @@ account:
   backButton: 戻る
   billing: 請求する
   changePassword: パスワードを変更する
+  delete-account: アカウントを削除します
   discord: 不和
   heading: アカウント
   keys: APIキー

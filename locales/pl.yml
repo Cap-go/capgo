@@ -2,6 +2,7 @@ account:
   backButton: Plecy
   billing: Dane do faktury
   changePassword: Zmień hasło
+  delete-account: Usuń moje konto
   discord: Niezgoda
   heading: Rachunek
   keys: Klucze API
