@@ -124,8 +124,25 @@ const pickPhoto = async () => {
 }
 
 const deleteAccount = async () => {
-  sendMessage('delete my account')
-  openChat()
+  const actionSheet = await actionSheetController.create({
+    buttons: [
+      {
+        text: t('button.remove'),
+        handler: () => {
+          sendMessage('delete my account')
+          openChat()
+        },
+      },
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+    ],
+  })
+  await actionSheet.present()
 }
 
 const presentActionSheet = async () => {
@@ -314,7 +331,7 @@ const presentActionSheet = async () => {
         </a>
         <div class="mx-auto text-center mt-4">
           <button
-            class="mx-auto font-bold text-pumpkin-orange-300"
+            class="mx-auto font-bold text-muted-blue-500"
             @click="deleteAccount()"
           >
             {{ t("account.delete-account") }}
