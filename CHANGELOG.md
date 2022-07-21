@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.7-alpha.0](https://github.com/Cap-go/capgo/compare/1.8.6...1.8.7-alpha.0) (2022-07-21)
+
+
+### Bug Fixes
+
+* :boom: update to v4 ([44ca2e4](https://github.com/Cap-go/capgo/commit/44ca2e405e44349c5e7c8d66edcd5a54594fc9e4))
+* make android work ([f9d660b](https://github.com/Cap-go/capgo/commit/f9d660b6cb1cb3707d9c674278efd336e8a72216))
+
 ### [1.8.6](https://github.com/Cap-go/capgo/compare/1.8.5...1.8.6) (2022-07-21)
 
 
