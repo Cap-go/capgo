@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.4](https://github.com/Cap-go/capgo/compare/1.8.3...1.8.4) (2022-07-21)
+
+
+### Bug Fixes
+
+* add delete my account button ([41a24c6](https://github.com/Cap-go/capgo/commit/41a24c650958ad4c73d6f0b9cade3fed48a4b5f0))
+
 ### [1.8.3](https://github.com/Cap-go/capgo/compare/1.8.2...1.8.3) (2022-07-18)
 
 
