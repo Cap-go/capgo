@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.5](https://github.com/Cap-go/capgo/compare/1.8.4...1.8.5) (2022-07-21)
+
+
+### Bug Fixes
+
+* delete coller and add actionsheet ([592ace5](https://github.com/Cap-go/capgo/commit/592ace58b82bbc7762f4106812208fc860aa525a))
+
 ### [1.8.4](https://github.com/Cap-go/capgo/compare/1.8.3...1.8.4) (2022-07-21)
 
 
