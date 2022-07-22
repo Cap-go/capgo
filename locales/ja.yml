@@ -3,6 +3,7 @@ account:
   billing: 請求する
   changePassword: パスワードを変更する
   delete-account: アカウントを削除します
+  delete_sure: 本気ですか ？
   discord: 不和
   heading: アカウント
   keys: APIキー

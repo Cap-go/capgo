@@ -3,6 +3,7 @@ account:
   billing: 计费
   changePassword: 更改密码
   delete-account: 删除我的账户
+  delete_sure: 你确定吗 ？
   discord: 不和谐
   heading: 帐户
   keys: API 密钥

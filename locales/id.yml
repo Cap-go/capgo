@@ -3,6 +3,7 @@ account:
   billing: Penagihan
   changePassword: Ganti kata sandi
   delete-account: Hapus akun Saya
+  delete_sure: Apa kamu yakin ?
   discord: Perselisihan
   heading: Akun
   keys: kunci API

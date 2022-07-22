@@ -3,6 +3,7 @@ account:
   billing: 청구
   changePassword: 비밀번호 변경
   delete-account: 계정을 삭제하다
+  delete_sure: 확실합니까 ?
   discord: 불화
   heading: 계정
   keys: API 키

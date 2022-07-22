@@ -15,10 +15,11 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import TitleHead from '~/components/TitleHead.vue'
-import { openChat, sendMessage } from '~/services/crips'
+import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { openPortal } from '~/services/stripe'
+import type { definitions } from '~/types/supabase'
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -125,12 +126,24 @@ const pickPhoto = async () => {
 
 const deleteAccount = async () => {
   const actionSheet = await actionSheetController.create({
+    header: t('account.delete_sure'),
     buttons: [
       {
         text: t('button.remove'),
-        handler: () => {
-          sendMessage('delete my account')
-          openChat()
+        handler: async () => {
+          const { error } = await supabase
+            .from<definitions['deleted_account']>('deleted_account')
+            .insert({
+              email: main.auth?.email,
+            })
+          if (error) {
+            console.error(error)
+            errorMessage.value = t('something-went-wrong-try-again-later')
+          }
+          else {
+            await main.logout()
+            router.replace('/login')
+          }
         },
       },
       {

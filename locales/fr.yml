@@ -3,6 +3,7 @@ account:
   billing: Facturation
   changePassword: Changer le mot de passe
   delete-account: Supprimer mon compte
+  delete_sure: Êtes-vous sûr ?
   discord: Discorde
   heading: Compte
   keys: Clés API

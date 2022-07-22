@@ -3,6 +3,7 @@ account:
   billing: Выставление счетов
   changePassword: Изменить пароль
   delete-account: Удалите мой аккаунт
+  delete_sure: Ты уверен ?
   discord: Раздор
   heading: Счет
   keys: ключи API

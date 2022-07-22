@@ -3,6 +3,7 @@ account:
   billing: Fatturazione
   changePassword: Cambiare la password
   delete-account: Cancella il mio account
+  delete_sure: Sei sicuro ?
   discord: Discordia
   heading: Account
   keys: Chiavi API

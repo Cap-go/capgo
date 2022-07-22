@@ -882,6 +882,99 @@ export interface paths {
       };
     };
   };
+  "/deleted_account": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.deleted_account.id"];
+          created_at?: parameters["rowFilter.deleted_account.created_at"];
+          email?: parameters["rowFilter.deleted_account.email"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["deleted_account"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** deleted_account */
+          deleted_account?: definitions["deleted_account"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.deleted_account.id"];
+          created_at?: parameters["rowFilter.deleted_account.created_at"];
+          email?: parameters["rowFilter.deleted_account.email"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.deleted_account.id"];
+          created_at?: parameters["rowFilter.deleted_account.created_at"];
+          email?: parameters["rowFilter.deleted_account.email"];
+        };
+        body: {
+          /** deleted_account */
+          deleted_account?: definitions["deleted_account"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/devices": {
     get: {
       parameters: {
@@ -1770,6 +1863,99 @@ export interface paths {
       };
     };
   };
+  "/tasks": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.tasks.id"];
+          created_at?: parameters["rowFilter.tasks.created_at"];
+          url?: parameters["rowFilter.tasks.url"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["tasks"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** tasks */
+          tasks?: definitions["tasks"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.tasks.id"];
+          created_at?: parameters["rowFilter.tasks.created_at"];
+          url?: parameters["rowFilter.tasks.url"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.tasks.id"];
+          created_at?: parameters["rowFilter.tasks.created_at"];
+          url?: parameters["rowFilter.tasks.url"];
+        };
+        body: {
+          /** tasks */
+          tasks?: definitions["tasks"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/users": {
     get: {
       parameters: {
@@ -1921,6 +2107,26 @@ export interface paths {
             ownerid: string;
             /** Format: uuid */
             userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_not_deleted": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: character varying */
+            email_check: string;
           };
         };
         header: {
@@ -2290,6 +2496,23 @@ export interface paths {
       };
     };
   };
+  "/rpc/count_all_apps": {
+    post: {
+      parameters: {
+        body: {
+          args: { [key: string]: unknown };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/exist_user": {
     post: {
       parameters: {
@@ -2342,6 +2565,23 @@ export interface paths {
             /** Format: uuid */
             userid: string;
           };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/count_all_updates": {
+    post: {
+      parameters: {
+        body: {
+          args: { [key: string]: unknown };
         };
         header: {
           /** Preference */
@@ -2712,6 +2952,21 @@ export interface definitions {
      */
     beta?: boolean;
   };
+  deleted_account: {
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: number;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /** Format: character varying */
+    email: string;
+  };
   devices: {
     /**
      * Format: timestamp with time zone
@@ -3041,6 +3296,21 @@ export interface definitions {
      */
     is_good_plan?: boolean;
   };
+  tasks: {
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: number;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /** Format: text */
+    url: string;
+  };
   users: {
     /**
      * Format: timestamp with time zone
@@ -3273,6 +3543,14 @@ export interface parameters {
   "rowFilter.channels.disableAutoUpdateToMajor": string;
   /** Format: boolean */
   "rowFilter.channels.beta": string;
+  /** @description deleted_account */
+  "body.deleted_account": definitions["deleted_account"];
+  /** Format: bigint */
+  "rowFilter.deleted_account.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.deleted_account.created_at": string;
+  /** Format: character varying */
+  "rowFilter.deleted_account.email": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */
@@ -3433,6 +3711,14 @@ export interface parameters {
   "rowFilter.stripe_info.price_id": string;
   /** Format: boolean */
   "rowFilter.stripe_info.is_good_plan": string;
+  /** @description tasks */
+  "body.tasks": definitions["tasks"];
+  /** Format: bigint */
+  "rowFilter.tasks.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.tasks.created_at": string;
+  /** Format: text */
+  "rowFilter.tasks.url": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

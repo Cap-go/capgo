@@ -3,6 +3,7 @@ account:
   billing: Cobrança
   changePassword: Mudar senha
   delete-account: Deletar minha conta
+  delete_sure: Tem certeza ?
   discord: Discórdia
   heading: Conta
   keys: Chaves de API

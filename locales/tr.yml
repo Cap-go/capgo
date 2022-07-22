@@ -3,6 +3,7 @@ account:
   billing: faturalandırma
   changePassword: Şifre değiştir
   delete-account: Hesabımı sil
+  delete_sure: Emin misin ?
   discord: anlaşmazlık
   heading: Hesap
   keys: API anahtarları

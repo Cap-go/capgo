@@ -3,7 +3,9 @@ account:
   billing: Billing
   changePassword: Change password
   delete-account: Delete my account
+  delete_sure: Are you sure ?
   discord: Discord
+  error: Error
   heading: Account
   keys: API keys
   legal: Terms of services

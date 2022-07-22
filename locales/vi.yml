@@ -3,6 +3,7 @@ account:
   billing: Thanh toán
   changePassword: Đổi mật khẩu
   delete-account: Xóa tài khoản của tôi đi
+  delete_sure: Bạn có chắc không ?
   discord: Bất hòa
   heading: Tài khoản
   keys: Khóa API

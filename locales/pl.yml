@@ -3,6 +3,7 @@ account:
   billing: Dane do faktury
   changePassword: Zmień hasło
   delete-account: Usuń moje konto
+  delete_sure: Jesteś pewny ?
   discord: Niezgoda
   heading: Rachunek
   keys: Klucze API

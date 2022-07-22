@@ -3,6 +3,7 @@ account:
   billing: Abrechnung
   changePassword: Kennwort ändern
   delete-account: Mein Konto löschen
+  delete_sure: Bist du dir sicher ?
   discord: Zwietracht
   heading: Konto
   keys: API-Schlüssel
