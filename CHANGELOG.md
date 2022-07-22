@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.7-alpha.1](https://github.com/Cap-go/capgo/compare/1.8.7-alpha.0...1.8.7-alpha.1) (2022-07-22)
+
+
+### Bug Fixes
+
+* add deleted_modal and system ([638f3b9](https://github.com/Cap-go/capgo/commit/638f3b9a2d37345e4539ba594133b9f927c71672))
+
 ### [1.8.7-alpha.0](https://github.com/Cap-go/capgo/compare/1.8.6...1.8.7-alpha.0) (2022-07-21)
 
 
