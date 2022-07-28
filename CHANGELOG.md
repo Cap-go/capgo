@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.9.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.8.7-alpha.3...1.9.0-alpha.0) (2022-07-28)
+
+
+### Features
+
+* add missing api endpoint ([94f21a7](https://github.com/Cap-go/capgo/commit/94f21a7911fa60c593e490df1e91ede781654c0a))
+
 ### [1.8.7-alpha.3](https://github.com/Cap-go/capgo/compare/1.8.7-alpha.2...1.8.7-alpha.3) (2022-07-28)
 
 
