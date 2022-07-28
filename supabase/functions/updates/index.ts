@@ -1,7 +1,7 @@
-import { serve } from 'https://deno.land/std@0.147.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.149.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { isGoodPlan, isTrial, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
+import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 
 interface Channel {
@@ -127,14 +127,15 @@ serve(async (event: Request) => {
     }
     const trial = await isTrial(channel.created_by)
     const paying = await isGoodPlan(channel.created_by)
+    let version: definitions['app_versions'] = channel.version as definitions['app_versions']
     if (!paying && !trial) {
       console.log('Cannot update, upgrade plan to continue to update', app_id)
+      await sendStats('needUpgrade', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
         err: 'not good plan',
       }, 200)
     }
-    let version: definitions['app_versions'] = channel.version as definitions['app_versions']
     if (channelOverride && channelOverride.length) {
       console.log('Set channel override', app_id, channelOverride[0].channel_id.version.name)
       version = channelOverride[0].channel_id.version as definitions['app_versions']
@@ -172,6 +173,7 @@ serve(async (event: Request) => {
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
     if (version_name === version.name) {
       console.log('No new version available', device_id, version_name, version.name)
+      await sendStats('noNew', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         message: 'No new version available',
       }, 200)
@@ -180,6 +182,7 @@ serve(async (event: Request) => {
     // console.log('check disableAutoUpdateToMajor', device_id)
     if (channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
       console.log('Cannot upgrade major version', device_id)
+      await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         major: true,
         message: 'Cannot upgrade major version',
@@ -190,6 +193,7 @@ serve(async (event: Request) => {
 
     console.log('check disableAutoUpdateUnderNative', device_id)
     if (channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+      await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, version.id)
       console.log('Cannot revert under native version', device_id)
       return sendRes({
         message: 'Cannot revert under native version',
@@ -199,24 +203,7 @@ serve(async (event: Request) => {
     }
 
     // console.log('save stats', device_id)
-    const stat: Partial<definitions['stats']> = {
-      platform: platform as definitions['stats']['platform'],
-      device_id,
-      action: 'get',
-      app_id,
-      version_build,
-      version: version.id,
-    }
-    try {
-      const { error } = await supabase
-        .from<definitions['stats']>('stats')
-        .insert(stat)
-      if (error)
-        console.log('Cannot insert stat', app_id, version_build, error)
-    }
-    catch (err) {
-      console.log('Cannot insert stats', app_id, err)
-    }
+    await sendStats('get', platform, device_id, app_id, version_build, version.id)
     console.log('New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,

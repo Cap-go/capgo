@@ -52,7 +52,7 @@ extension UIWindow {
                 print("bundleId", bundleId)
                 let alertShake = UIAlertController(title: title, message: message, preferredStyle: UIAlertController.Style.alert)
                 alertShake.addAction(UIAlertAction(title: okButtonTitle, style: UIAlertAction.Style.default, handler: { (_) -> Void in
-                    guard let next = updater.getNextVersion() else {
+                    guard let next = updater.getNextBundle() else {
                         resetBuiltin()
                         return
                     }

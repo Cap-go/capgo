@@ -124,3 +124,24 @@ export const isTrial = async (userId: string): Promise<number> => {
 
   return data || 0
 }
+
+export const sendStats = async (action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) => {
+  const stat: Partial<definitions['stats']> = {
+    platform: platform as definitions['stats']['platform'],
+    device_id,
+    action,
+    app_id,
+    version_build,
+    version: versionId,
+  }
+  try {
+    const { error } = await supabaseAdmin
+      .from<definitions['stats']>('stats')
+      .insert(stat)
+    if (error)
+      console.log('Cannot insert stat', app_id, version_build, error)
+  }
+  catch (err) {
+    console.log('Cannot insert stats', app_id, err)
+  }
+}

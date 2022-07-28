@@ -33,7 +33,7 @@ def capacitor_pods
   pod 'CapacitorStorage', :path => '../../node_modules/.pnpm/@capacitor+storage@1.2.5_@capacitor+core@3.6.0/node_modules/@capacitor/storage'
   pod 'CapacitorTextZoom', :path => '../../node_modules/.pnpm/@capacitor+text-zoom@1.0.8_@capacitor+core@3.6.0/node_modules/@capacitor/text-zoom'
   pod 'CapacitorToast', :path => '../../node_modules/.pnpm/@capacitor+toast@1.0.8_@capacitor+core@3.6.0/node_modules/@capacitor/toast'
-  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.18_@capacitor+core@3.6.0/node_modules/@capgo/capacitor-updater'
+  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.24_@capacitor+core@3.6.0/node_modules/@capgo/capacitor-updater'
   pod 'RobingenzCapacitorFilePicker', :path => '../../node_modules/.pnpm/@robingenz+capacitor-file-picker@0.3.0_@capacitor+core@3.6.0/node_modules/@robingenz/capacitor-file-picker'
   pod 'RobingenzCapacitorScreenOrientation', :path => '../../node_modules/.pnpm/@robingenz+capacitor-screen-orientation@1.1.7_@capacitor+core@3.6.0/node_modules/@robingenz/capacitor-screen-orientation'
   pod 'TeamhiveCapacitorVideoRecorder', :path => '../../node_modules/.pnpm/@teamhive+capacitor-video-recorder@5.0.0_@capacitor+core@3.6.0/node_modules/@teamhive/capacitor-video-recorder'

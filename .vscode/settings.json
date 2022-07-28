@@ -21,5 +21,6 @@
   "deno.unstable": true,
   "deno.enablePaths": [
     "./supabase/functions"
-  ]
+  ],
+  "nuxt.isNuxtApp": false
 }

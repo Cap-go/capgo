@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.147.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.149.0/http/server.ts'
 import type { Person } from '../_utils/crisp.ts'
 import { updatePerson } from '../_utils/crisp.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
