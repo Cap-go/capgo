@@ -6,6 +6,9 @@ import type { definitions } from '../_utils/types_supabase.ts'
 serve(async (event: Request) => {
   const url = new URL(event.url)
   console.log('url', url, url.searchParams.get('service'))
+  console.log('Current Deno version', Deno.version.deno)
+  console.log('Current TypeScript version', Deno.version.typescript)
+  console.log('Current V8 version', Deno.version.v8)
   if (url.searchParams.get('service') === 'database') {
     const { data, error } = await supabaseAdmin
       .from<definitions['apps']>('apps')
