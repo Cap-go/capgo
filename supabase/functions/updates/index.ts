@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.149.0/http/server.ts'
-import * as semver from 'https://deno.land/x/semver/mod.ts'
+import * as semver from 'https://deno.land/x/semver@v1.4.0/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
