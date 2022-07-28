@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.7-alpha.3](https://github.com/Cap-go/capgo/compare/1.8.7-alpha.2...1.8.7-alpha.3) (2022-07-28)
+
+
+### Bug Fixes
+
+* add log for runtime ([4929bf5](https://github.com/Cap-go/capgo/commit/4929bf5c5c88f8250ca00c34aaa4877ca86ce101))
+
 ### [1.8.7-alpha.2](https://github.com/Cap-go/capgo/compare/1.8.7-alpha.1...1.8.7-alpha.2) (2022-07-28)
 
 
