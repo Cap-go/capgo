@@ -62,7 +62,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
 }
 
 serve(async (event: Request) => {
-  const apikey_string = event.headers.get('apikey')
+  const apikey_string = event.headers.get('authorization')
   const api_mode_string = event.headers.get('api_mode')
 
   if (!apikey_string)
