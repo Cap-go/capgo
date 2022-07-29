@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.9.0](https://github.com/Cap-go/capgo/compare/1.9.0-alpha.0...1.9.0) (2022-07-29)
+
+
+### Bug Fixes
+
+* comment new api for now ([e2deca5](https://github.com/Cap-go/capgo/commit/e2deca5370d270d1464076b04ea90706afbcfd76))
+
 ## [1.9.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.8.7-alpha.3...1.9.0-alpha.0) (2022-07-28)
 
 
