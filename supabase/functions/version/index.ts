@@ -11,7 +11,10 @@ interface GetLatest {
 
 export const deleteVersion = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as GetLatest
-
+  if (!(body.appid || body.app_id)) {
+    console.log('No app_id provided')
+    return sendRes({ status: 'Missing app_id' }, 400)
+  }
   if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
     console.error('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
@@ -38,11 +41,15 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
 export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   try {
     const body = (await event.json()) as GetLatest
-    if (!(body.appid || body.app_id))
+    if (!(body.appid || body.app_id)) {
+      console.log('No app_id provided')
       return sendRes({ status: 'Missing app_id' }, 400)
+    }
+    if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
+      console.error('You can\'t access this app')
+      return sendRes({ status: 'You can\'t access this app' }, 400)
+    }
 
-    if (!apikey || !event.body)
-      return sendRes({ status: 'Cannot Verify User' }, 400)
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
     const { data: dataVersions, error: dbError } = await supabaseAdmin
@@ -51,13 +58,16 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       .eq('app_id', body.appid || body.app_id)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
-    if (dbError || !dataVersions || !dataVersions.length)
-      return sendRes({ status: 'Cannot get latest version', error: dbError }, 400)
+    if (dbError || !dataVersions || !dataVersions.length) {
+      console.error('Cannot get version')
+      return sendRes({ status: 'Cannot get version', error: dbError }, 400)
+    }
 
     return sendRes({ versions: dataVersions })
   }
   catch (e) {
-    return sendRes({ status: 'Cannot get latest version', error: e }, 500)
+    console.error('Cannot get version', e)
+    return sendRes({ status: 'Cannot get version', error: e }, 500)
   }
 }
 
@@ -65,12 +75,15 @@ serve(async (event: Request) => {
   const apikey_string = event.headers.get('authorization')
   const api_mode_string = event.headers.get('api_mode')
 
-  if (!apikey_string)
-    return sendRes({ status: 'Cannot find authorization' }, 400)
+  if (!apikey_string) {
+    console.error('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
   const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
-  if (!apikey || !event.body)
-    return sendRes({ status: 'Cannot Verify User' }, 400)
-
+  if (!apikey) {
+    console.error('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
   if (api_mode_string === 'GET')
     return get(event, apikey)
   else if (api_mode_string === 'DELETE')

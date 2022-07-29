@@ -11,13 +11,16 @@ interface dataDemo {
 }
 
 serve(async (event: Request) => {
-  const supabase = supabaseAdmin
   const apikey_string = event.headers.get('authorization')
-  if (!apikey_string)
-    return sendRes({ status: 'Cannot find authorization' }, 400)
-  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabase, ['upload', 'all', 'write'])
-  if (!apikey || !event.body)
-    return sendRes({ status: 'Cannot Verify User' }, 400)
+  if (!apikey_string) {
+    console.error('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
+  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
+  if (!apikey) {
+    console.error('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
   try {
     const body = (await event.json()) as dataDemo
     console.log('body', body)

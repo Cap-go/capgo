@@ -49,7 +49,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
 const post = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as DeviceLink
   if (!body.device_id || !body.app_id) {
-    console.error('Cannot find device')
+    console.error('Cannot find device or appi_id')
     return sendRes({ status: 'Cannot find device' }, 400)
   }
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
@@ -128,11 +128,15 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   }
   else {
     // delete channel_override
-    await supabaseAdmin
+    const { error: dbErrorDel } = await supabaseAdmin
       .from<definitions['channel_devices']>('channel_devices')
       .delete()
       .eq('device_id', body.device_id)
       .eq('app_id', body.app_id)
+    if (dbErrorDel) {
+      console.error('Cannot delete channel override', dbErrorDel)
+      return sendRes({ status: 'Cannot delete channel override', error: dbErrorDel }, 400)
+    }
   }
   return sendRes()
 }
@@ -166,11 +170,15 @@ serve(async (event: Request) => {
   const apikey_string = event.headers.get('authorization')
   const api_mode_string = event.headers.get('api_mode')
 
-  if (!apikey_string)
-    return sendRes({ status: 'Cannot find authorization' }, 400)
+  if (!apikey_string) {
+    console.error('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
   const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
-  if (!apikey || !event.body)
-    return sendRes({ status: 'Cannot Verify User' }, 400)
+  if (!apikey) {
+    console.error('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
 
   if (api_mode_string === 'POST')
     return post(event, apikey)
