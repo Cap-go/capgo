@@ -57,9 +57,7 @@ serve(async (event: Request) => {
       plugin_version,
       version_name)
 
-    const supabase = supabaseAdmin
-
-    const { data: channel, error: dbError } = await supabase
+    const { data: channel, error: dbError } = await supabaseAdmin
       .from<definitions['channels'] & Channel>('channels')
       .select(`
           id,
@@ -81,7 +79,7 @@ serve(async (event: Request) => {
       .eq('app_id', app_id)
       .eq('public', true)
       .single()
-    const { data: channelOverride } = await supabase
+    const { data: channelOverride } = await supabaseAdmin
       .from<definitions['channel_devices'] & ChannelDev>('channel_devices')
       .select(`
           device_id,
@@ -101,7 +99,7 @@ serve(async (event: Request) => {
         `)
       .eq('device_id', device_id)
       .eq('app_id', app_id)
-    const { data: devicesOverride } = await supabase
+    const { data: devicesOverride } = await supabaseAdmin
       .from<definitions['devices_override'] & Channel>('devices_override')
       .select(`
           device_id,
@@ -127,7 +125,16 @@ serve(async (event: Request) => {
     }
     const trial = await isTrial(channel.created_by)
     const paying = await isGoodPlan(channel.created_by)
-    let version: definitions['app_versions'] = channel.version as definitions['app_versions']
+    let version: definitions['app_versions'] = channel.version
+    await updateOrCreateDevice({
+      app_id,
+      device_id,
+      platform: platform as definitions['devices']['platform'],
+      plugin_version,
+      version: version.id,
+      updated_at: new Date().toISOString(),
+    })
+    // console.log('updateOrCreateDevice done')
     if (!paying && !trial) {
       console.log('Cannot update, upgrade plan to continue to update', app_id)
       await sendStats('needUpgrade', platform, device_id, app_id, version_build, version.id)
@@ -138,11 +145,11 @@ serve(async (event: Request) => {
     }
     if (channelOverride && channelOverride.length) {
       console.log('Set channel override', app_id, channelOverride[0].channel_id.version.name)
-      version = channelOverride[0].channel_id.version as definitions['app_versions']
+      version = channelOverride[0].channel_id.version
     }
     if (devicesOverride && devicesOverride.length) {
       console.log('Set device override', app_id, devicesOverride[0].version.name)
-      version = devicesOverride[0].version as definitions['app_versions']
+      version = devicesOverride[0].version
     }
 
     if (!version.bucket_id && !version.external_url) {
@@ -151,18 +158,9 @@ serve(async (event: Request) => {
         message: 'Cannot get zip file',
       }, 200)
     }
-    await updateOrCreateDevice({
-      app_id,
-      device_id,
-      platform: platform as definitions['devices']['platform'],
-      plugin_version,
-      version: version.id,
-    })
-
-    // console.log('updateOrCreateDevice done')
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await supabase
+      const res = await supabaseAdmin
         .storage
         .from(`apps/${version.user_id}/${app_id}/versions`)
         .createSignedUrl(version.bucket_id, 60)

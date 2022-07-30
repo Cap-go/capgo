@@ -16,7 +16,7 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
     return sendRes({ status: 'Missing app_id' }, 400)
   }
   if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
-    console.error('You can\'t access this app')
+    console.log('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
   }
   try {
@@ -27,12 +27,12 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
       })
       .eq('app_id', body.appid || body.app_id)
     if (dbError) {
-      console.error('Cannot delete version')
+      console.log('Cannot delete version')
       return sendRes({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
     }
   }
   catch (e) {
-    console.error('Cannot delete version', e)
+    console.log('Cannot delete version', e)
     return sendRes({ status: 'Cannot delete version', error: e }, 500)
   }
   return sendRes()
@@ -46,7 +46,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       return sendRes({ status: 'Missing app_id' }, 400)
     }
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
-      console.error('You can\'t access this app')
+      console.log('You can\'t access this app')
       return sendRes({ status: 'You can\'t access this app' }, 400)
     }
 
@@ -59,15 +59,15 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       .eq('deleted', false)
       .order('created_at', { ascending: false })
     if (dbError || !dataVersions || !dataVersions.length) {
-      console.error('Cannot get version')
+      console.log('Cannot get version')
       return sendRes({ status: 'Cannot get version', error: dbError }, 400)
     }
 
     return sendRes({ versions: dataVersions })
   }
   catch (e) {
-    console.error('Cannot get version', e)
-    return sendRes({ status: 'Cannot get version', error: e }, 500)
+    console.log('Cannot get version', JSON.stringify(e))
+    return sendRes({ status: 'Cannot get version', error: JSON.stringify(e) }, 500)
   }
 }
 
@@ -76,18 +76,18 @@ serve(async (event: Request) => {
   const api_mode_string = event.headers.get('api_mode')
 
   if (!apikey_string) {
-    console.error('Missing apikey')
+    console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
   const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
   if (!apikey) {
-    console.error('Missing apikey')
+    console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
   if (api_mode_string === 'GET')
     return get(event, apikey)
   else if (api_mode_string === 'DELETE')
     return deleteVersion(event, apikey)
-  console.error('Method not allowed')
+  console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })

@@ -17,7 +17,7 @@ interface GetDevice {
 const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app')
+    console.log('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
   }
   // if device_id get one device
@@ -29,7 +29,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
       .eq('device_id', body.device_id)
       .single()
     if (dbError || !dataDevice) {
-      console.error('Cannot find device')
+      console.log('Cannot find device')
       return sendRes({ status: 'Cannot find device', error: dbError }, 400)
     }
     return sendRes(dataDevice)
@@ -49,11 +49,11 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
 const post = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as DeviceLink
   if (!body.device_id || !body.app_id) {
-    console.error('Cannot find device or appi_id')
+    console.log('Cannot find device or appi_id')
     return sendRes({ status: 'Cannot find device' }, 400)
   }
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app')
+    console.log('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
   }
   // find device
@@ -64,7 +64,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
     .eq('device_id', body.device_id)
     .single()
   if (dbError || !dataDevice) {
-    console.error('Cannot find device', dbError)
+    console.log('Cannot find device', dbError)
     return sendRes({ status: 'Cannot find device', error: dbError }, 400)
   }
   // if version_id set device_override to it
@@ -76,7 +76,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       .eq('name', body.version_id)
       .single()
     if (dbError || !dataVersion) {
-      console.error('Cannot find version', dbError)
+      console.log('Cannot find version', dbError)
       return sendRes({ status: 'Cannot find version', error: dbError }, 400)
     }
     const { data: dataDev, error: dbErrorDev } = await supabaseAdmin
@@ -88,7 +88,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
         created_by: apikey.user_id,
       })
     if (dbErrorDev || !dataDev) {
-      console.error('Cannot save device override', dbErrorDev)
+      console.log('Cannot save device override', dbErrorDev)
       return sendRes({ status: 'Cannot save device override', error: dbErrorDev }, 400)
     }
   }
@@ -110,7 +110,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       .eq('name', body.channel)
       .single()
     if (dbError || !dataChannel) {
-      console.error('Cannot find channel', dbError)
+      console.log('Cannot find channel', dbError)
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
     }
     const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin
@@ -122,7 +122,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
         created_by: apikey.user_id,
       })
     if (dbErrorDev || !dataChannelDev) {
-      console.error('Cannot find channel override', dbErrorDev)
+      console.log('Cannot find channel override', dbErrorDev)
       return sendRes({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
     }
   }
@@ -134,7 +134,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       .eq('device_id', body.device_id)
       .eq('app_id', body.app_id)
     if (dbErrorDel) {
-      console.error('Cannot delete channel override', dbErrorDel)
+      console.log('Cannot delete channel override', dbErrorDel)
       return sendRes({ status: 'Cannot delete channel override', error: dbErrorDel }, 400)
     }
   }
@@ -145,7 +145,7 @@ export const deleteDev = async (event: Request, apikey: definitions['apikeys']):
   const body = (await event.json()) as DeviceLink
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app')
+    console.log('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
   }
   try {
@@ -155,12 +155,12 @@ export const deleteDev = async (event: Request, apikey: definitions['apikeys']):
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id)
     if (error) {
-      console.error('Cannot create channel')
+      console.log('Cannot create channel')
       return sendRes({ status: 'Cannot create channel', error: JSON.stringify(error) }, 400)
     }
   }
   catch (e) {
-    console.error('Cannot create channel', e)
+    console.log('Cannot create channel', e)
     return sendRes({ status: 'Cannot set channels', error: e }, 500)
   }
   return sendRes()
@@ -171,12 +171,12 @@ serve(async (event: Request) => {
   const api_mode_string = event.headers.get('api_mode')
 
   if (!apikey_string) {
-    console.error('Missing apikey')
+    console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
   const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
   if (!apikey) {
-    console.error('Missing apikey')
+    console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
 
@@ -186,6 +186,6 @@ serve(async (event: Request) => {
     return get(event, apikey)
   else if (api_mode_string === 'DELETE')
     return deleteDev(event, apikey)
-  console.error('Method not allowed')
+  console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
