@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.9](https://github.com/Cap-go/capgo/compare/1.9.8...1.9.9) (2022-07-31)
+
+
+### Bug Fixes
+
+* udd for supabase ([96996db](https://github.com/Cap-go/capgo/commit/96996dbdde4fc613a3c4af29689a5e0af5fd546b))
+* update versions ([5beff96](https://github.com/Cap-go/capgo/commit/5beff96fe6ee9c8b76970b7476d76d999472a76a))
+
 ### [1.9.8](https://github.com/Cap-go/capgo/compare/1.9.7...1.9.8) (2022-07-30)
 
 ### [1.9.7](https://github.com/Cap-go/capgo/compare/1.9.6...1.9.7) (2022-07-30)
