@@ -355,6 +355,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
+          checksum?: parameters["rowFilter.app_versions.checksum"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -414,6 +415,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
+          checksum?: parameters["rowFilter.app_versions.checksum"];
         };
         header: {
           /** Preference */
@@ -437,6 +439,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
+          checksum?: parameters["rowFilter.app_versions.checksum"];
         };
         body: {
           /** app_versions */
@@ -2787,6 +2790,8 @@ export interface definitions {
     deleted: boolean;
     /** Format: character varying */
     external_url?: string;
+    /** Format: character varying */
+    checksum?: string;
   };
   apps: {
     /**
@@ -3479,6 +3484,8 @@ export interface parameters {
   "rowFilter.app_versions.deleted": string;
   /** Format: character varying */
   "rowFilter.app_versions.external_url": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.checksum": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: timestamp with time zone */
