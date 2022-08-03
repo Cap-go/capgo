@@ -36,7 +36,7 @@ const guard = async (next: any, to: string, from: string) => {
         else return next('/onboarding/verify_email')
         await snag.publish({
           channel: 'user-login',
-          event: 'User Joined',
+          event: 'User Login',
           icon: '✅',
           tags: {
             userId: data.id,
