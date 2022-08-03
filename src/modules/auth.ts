@@ -39,7 +39,7 @@ const guard = async (next: any, to: string, from: string) => {
           event: 'User Login',
           icon: '✅',
           tags: {
-            userId: data.id,
+            'user-id': data.id,
           },
           notify: false,
         })
