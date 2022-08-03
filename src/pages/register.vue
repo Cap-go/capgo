@@ -12,8 +12,10 @@ import { useRouter } from 'vue-router'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
+import { useLogSnag } from '~/services/logsnag'
 
 const router = useRouter()
+const snag = useLogSnag()
 const supabase = useSupabase()
 const { t } = useI18n()
 const form = reactive({
@@ -85,6 +87,17 @@ const submit = async () => {
     // http://localhost:3334/onboarding/verify_email,http://localhost:3334/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
   )
   isLoading.value = false
+  snag.publish({
+    channel: 'user-register',
+    event: 'User Joined',
+    icon: '🎉',
+    tags: {
+      first_name: form.first_name,
+      last_name: form.last_name,
+      email: form.email,
+    },
+    notify: true,
+  })
   if (error) {
     errorMessage.value = error.message
     return

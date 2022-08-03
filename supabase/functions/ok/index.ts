@@ -5,7 +5,7 @@ import type { definitions } from '../_utils/types_supabase.ts'
 
 serve(async (event: Request) => {
   const url = new URL(event.url)
-  console.log('url', url.searchParams.get('service'))
+  console.log('url', url, url.searchParams.get('service'))
   if (url.searchParams.get('service') === 'database') {
     const { data, error } = await supabaseAdmin
       .from<definitions['apps']>('apps')

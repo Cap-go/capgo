@@ -5,6 +5,7 @@ account:
   delete-account: Cancella il mio account
   delete_sure: Sei sicuro ?
   discord: Discordia
+  error: Errore
   heading: Account
   keys: Chiavi API
   legal: Termini di servizio
@@ -128,6 +129,7 @@ intro:
   dynamic-route: Demo di rotta dinamica
   hi: Ciao, {name}!
   whats-your-name: Come ti chiami?
+invalid-auth: autenticazione non valida
 limit-reached: Limite raggiunto
 loading-more-data: Caricamento più dati...
 login:

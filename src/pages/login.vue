@@ -39,6 +39,15 @@ const showToastMessage = async (message: string) => {
   await toast.present()
 }
 
+const nextLogin = async () => {
+  router.push('/app/home')
+  setTimeout(async () => {
+    isLoading.value = false
+    if (isPlatform('capacitor'))
+      SplashScreen.hide()
+  }, 500)
+}
+
 const submit = async () => {
   v$.value.$touch()
   if (!v$.value.$invalid) {
@@ -50,22 +59,12 @@ const submit = async () => {
     isLoading.value = false
     if (error) {
       console.error('error', error)
-      showToastMessage('Authentification invalide')
+      showToastMessage(t('invalid-auth'))
     }
     else {
-      showToastMessage('Connexion réussie')
-      router.push('/app/home')
+      await nextLogin()
     }
   }
-}
-
-const nextLogin = () => {
-  router.push('/app/home')
-  setTimeout(async () => {
-    isLoading.value = false
-    if (isPlatform('capacitor'))
-      SplashScreen.hide()
-  }, 500)
 }
 
 const fixIOS = () => {
@@ -96,7 +95,7 @@ const checkLogin = async () => {
   const user = supabase.auth.user()
   let session = supabase.auth.session()!
   if (user) {
-    nextLogin()
+    await nextLogin()
   }
   else if (!session && route.hash) {
     const logSession = await autoAuth(route)
@@ -105,7 +104,7 @@ const checkLogin = async () => {
     if (logSession.session)
       session = logSession.session
     if (logSession.user)
-      nextLogin()
+      await nextLogin()
   }
   else {
     isLoading.value = false

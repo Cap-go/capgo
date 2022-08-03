@@ -5,6 +5,7 @@ account:
   delete-account: アカウントを削除します
   delete_sure: 本気ですか ？
   discord: 不和
+  error: エラー
   heading: アカウント
   keys: APIキー
   legal: 利用規約
@@ -123,6 +124,7 @@ intro:
   dynamic-route: 動的ルートのデモ
   hi: こんにちは、{name}!
   whats-your-name: 君の名は。
+invalid-auth: 無効な認証
 limit-reached: 制限に達しました
 loading-more-data: より多くのデータを読み込んでいます...
 login:

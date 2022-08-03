@@ -5,6 +5,7 @@ account:
   delete-account: 계정을 삭제하다
   delete_sure: 확실합니까 ?
   discord: 불화
+  error: 오류
   heading: 계정
   keys: API 키
   legal: 서비스 약관
@@ -123,6 +124,7 @@ intro:
   dynamic-route: 다이나믹 라우트 데모
   hi: 안녕, {name}!
   whats-your-name: 이름이 뭐예요?
+invalid-auth: 잘못된 인증
 limit-reached: 한도 도달
 loading-more-data: 추가 데이터 로드 중...
 login:

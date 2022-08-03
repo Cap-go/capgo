@@ -30,6 +30,7 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
     try {
       const newBundle = await CapacitorUpdater.download({
         url: signedURL,
+        version: app.name,
       })
       await CapacitorUpdater.set({
         version: newBundle.version,

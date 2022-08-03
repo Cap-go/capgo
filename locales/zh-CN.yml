@@ -5,6 +5,7 @@ account:
   delete-account: 删除我的账户
   delete_sure: 你确定吗 ？
   discord: 不和谐
+  error: 错误
   heading: 帐户
   keys: API 密钥
   legal: 服务条款
@@ -123,6 +124,7 @@ intro:
   dynamic-route: 动态路由演示
   hi: 你好，{name}
   whats-your-name: 输入你的名字
+invalid-auth: 无效的身份验证
 limit-reached: 达到上限
 loading-more-data: 正在加载更多数据...
 login:

@@ -5,6 +5,7 @@ account:
   delete-account: Hapus akun Saya
   delete_sure: Apa kamu yakin ?
   discord: Perselisihan
+  error: Kesalahan
   heading: Akun
   keys: kunci API
   legal: Persyaratan layanan
@@ -129,6 +130,7 @@ intro:
   dynamic-route: Contoh rute dinamik
   hi: Halo, {name}!
   whats-your-name: Siapa nama anda?
+invalid-auth: autentik tidak valid
 limit-reached: Batas tercapai
 loading-more-data: Memuat lebih banyak data...
 login:
