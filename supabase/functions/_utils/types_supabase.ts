@@ -129,6 +129,7 @@ export interface paths {
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
           date_id?: parameters["rowFilter.app_stats.date_id"];
+          versionSize?: parameters["rowFilter.app_stats.versionSize"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -190,6 +191,7 @@ export interface paths {
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
           date_id?: parameters["rowFilter.app_stats.date_id"];
+          versionSize?: parameters["rowFilter.app_stats.versionSize"];
         };
         header: {
           /** Preference */
@@ -215,6 +217,7 @@ export interface paths {
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
           date_id?: parameters["rowFilter.app_stats.date_id"];
+          versionSize?: parameters["rowFilter.app_stats.versionSize"];
         };
         body: {
           /** app_stats */
@@ -352,6 +355,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
+          checksum?: parameters["rowFilter.app_versions.checksum"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -411,6 +415,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
+          checksum?: parameters["rowFilter.app_versions.checksum"];
         };
         header: {
           /** Preference */
@@ -434,6 +439,7 @@ export interface paths {
           updated_at?: parameters["rowFilter.app_versions.updated_at"];
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
+          checksum?: parameters["rowFilter.app_versions.checksum"];
         };
         body: {
           /** app_versions */
@@ -886,9 +892,9 @@ export interface paths {
     get: {
       parameters: {
         query: {
-          id?: parameters["rowFilter.deleted_account.id"];
           created_at?: parameters["rowFilter.deleted_account.created_at"];
           email?: parameters["rowFilter.deleted_account.email"];
+          id?: parameters["rowFilter.deleted_account.id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -939,9 +945,9 @@ export interface paths {
     delete: {
       parameters: {
         query: {
-          id?: parameters["rowFilter.deleted_account.id"];
           created_at?: parameters["rowFilter.deleted_account.created_at"];
           email?: parameters["rowFilter.deleted_account.email"];
+          id?: parameters["rowFilter.deleted_account.id"];
         };
         header: {
           /** Preference */
@@ -956,9 +962,9 @@ export interface paths {
     patch: {
       parameters: {
         query: {
-          id?: parameters["rowFilter.deleted_account.id"];
           created_at?: parameters["rowFilter.deleted_account.created_at"];
           email?: parameters["rowFilter.deleted_account.email"];
+          id?: parameters["rowFilter.deleted_account.id"];
         };
         body: {
           /** deleted_account */
@@ -2709,6 +2715,8 @@ export interface definitions {
      * @default 2022-05
      */
     date_id: string;
+    /** Format: bigint */
+    versionSize?: number;
   };
   app_stats_onprem: {
     /**
@@ -2782,6 +2790,8 @@ export interface definitions {
     deleted: boolean;
     /** Format: character varying */
     external_url?: string;
+    /** Format: character varying */
+    checksum?: string;
   };
   apps: {
     /**
@@ -2954,18 +2964,19 @@ export interface definitions {
   };
   deleted_account: {
     /**
-     * Format: bigint
-     * @description Note:
-     * This is a Primary Key.<pk/>
-     */
-    id: number;
-    /**
      * Format: timestamp with time zone
      * @default now()
      */
     created_at?: string;
     /** Format: character varying */
     email: string;
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * @default extensions.uuid_generate_v4()
+     */
+    id: string;
   };
   devices: {
     /**
@@ -3433,6 +3444,8 @@ export interface parameters {
   "rowFilter.app_stats.devices": string;
   /** Format: character varying */
   "rowFilter.app_stats.date_id": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.versionSize": string;
   /** @description app_stats_onprem */
   "body.app_stats_onprem": definitions["app_stats_onprem"];
   /** Format: character varying */
@@ -3471,6 +3484,8 @@ export interface parameters {
   "rowFilter.app_versions.deleted": string;
   /** Format: character varying */
   "rowFilter.app_versions.external_url": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.checksum": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: timestamp with time zone */
@@ -3545,12 +3560,12 @@ export interface parameters {
   "rowFilter.channels.beta": string;
   /** @description deleted_account */
   "body.deleted_account": definitions["deleted_account"];
-  /** Format: bigint */
-  "rowFilter.deleted_account.id": string;
   /** Format: timestamp with time zone */
   "rowFilter.deleted_account.created_at": string;
   /** Format: character varying */
   "rowFilter.deleted_account.email": string;
+  /** Format: uuid */
+  "rowFilter.deleted_account.id": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */

@@ -1,9 +1,9 @@
-import { serve } from 'https://deno.land/std@0.149.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.150.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
-const getApp = (appId: string) => {
+const getApp = (userId: string, appId: string) => {
   const supabase = supabaseAdmin
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -31,10 +31,9 @@ const getApp = (appId: string) => {
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
     versions: supabase
-      .from<definitions['app_versions']>('app_versions')
-      .select('id', { count: 'exact', head: true })
-      .eq('app_id', appId)
-      .eq('deleted', false),
+      .storage
+      .from('apps')
+      .list(`${userId}/${appId}/versions`),
     shared: supabase
       .from<definitions['channel_users']>('channel_users')
       .select('id', { count: 'exact', head: true })
@@ -69,7 +68,7 @@ serve(async (event: Request) => {
     for (const app of apps) {
       if (!app.id)
         continue
-      const res = getApp(app.app_id)
+      const res = getApp(app.user_id, app.app_id)
       all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices])
         .then(([app, mlu, mlu_real, versions, shared, channels, devices]) => {
           if (!app.app_id)
@@ -88,7 +87,8 @@ serve(async (event: Request) => {
             mlu: mlu.count || 0,
             devices: devices.count || 0,
             mlu_real: mlu_real.count || 0,
-            versions: versions.count || 0,
+            versions: versions.data?.length || 0,
+            versionSize: versions.data?.reduce((acc, cur) => acc + ((cur.metadata as any).size || 0), 0) || 0,
             shared: shared.count || 0,
           }
           // console.log('newData', newData)

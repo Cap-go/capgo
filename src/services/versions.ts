@@ -32,13 +32,21 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
         url: signedURL,
         version: app.name,
       })
-      const current = await CapacitorUpdater.current()
-      console.log('current', current)
-      await CapacitorUpdater.next({ id: current.bundle.id })
-      // iso date in one hour
-      const expires = new Date(Date.now() + 1000 * 60 * 60).toISOString()
-      await CapacitorUpdater.setDelay({ kind: 'date', value: expires })
-      await CapacitorUpdater.set(newBundle)
+      await CapacitorUpdater.set({
+        version: newBundle.version,
+        versionName: app.name,
+      })
+      // comment temporary
+      // const newBundle = await CapacitorUpdater.download({
+      //   url: signedURL,
+      // })
+      // const current = await CapacitorUpdater.current()
+      // console.log('current', current)
+      // await CapacitorUpdater.next({ id: current.bundle.id })
+      // // iso date in one hour
+      // const expires = new Date(Date.now() + 1000 * 60 * 60).toISOString()
+      // await CapacitorUpdater.setDelay({ kind: 'date', value: expires })
+      // await CapacitorUpdater.set(newBundle)
     }
     catch (error) {
       console.error('Error', error)

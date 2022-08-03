@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.149.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.150.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
@@ -17,7 +17,7 @@ interface GetDevice {
 export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = (await event.json()) as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app')
+    console.log('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
   }
   // get one channel or all channels
@@ -28,7 +28,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
     if (dbError || !dataChannel || !dataChannel.length) {
-      console.error('Cannot find channel')
+      console.log('Cannot find channel')
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
     }
     return sendRes(dataChannel[0])
@@ -48,7 +48,7 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
   const body = (await event.json()) as ChannelSet
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id || body.app_id))) {
-    console.error('You can\'t access this app')
+    console.log('You can\'t access this app')
     return sendRes({ status: 'You can\'t access this app' }, 400)
   }
   try {
@@ -58,12 +58,12 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
       .eq('app_id', body.app_id || body.app_id)
       .eq('name', body.channel)
     if (dbError) {
-      console.error('Cannot delete channel')
+      console.log('Cannot delete channel')
       return sendRes({ status: 'Cannot delete channel', error: JSON.stringify(dbError) }, 400)
     }
   }
   catch (e) {
-    console.error('Cannot delete channel', e)
+    console.log('Cannot delete channel', e)
     return sendRes({ status: 'Cannot delete channels', error: e }, 500)
   }
   return sendRes()
@@ -87,7 +87,7 @@ export const post = async (event: Request, apikey: definitions['apikeys']): Prom
       .eq('deleted', false)
       .single()
     if (vError || !data) {
-      console.error(`Cannot find version ${body.version}`)
+      console.log(`Cannot find version ${body.version}`)
       return sendRes({ status: `Cannot find version ${body.version}`, error: JSON.stringify(vError) }, 400)
     }
     channel.version = data.id
@@ -98,26 +98,30 @@ export const post = async (event: Request, apikey: definitions['apikeys']): Prom
   try {
     const { error: dbError } = await updateOrCreateChannel(channel)
     if (dbError) {
-      console.error('Cannot create channel')
+      console.log('Cannot create channel')
       return sendRes({ status: 'Cannot create channel', error: JSON.stringify(dbError) }, 400)
     }
   }
   catch (e) {
-    console.error('Cannot create channel', e)
+    console.log('Cannot create channel', e)
     return sendRes({ status: 'Cannot set channels', error: e }, 500)
   }
   return sendRes()
 }
 
 serve(async (event: Request) => {
-  const apikey_string = event.headers.get('apikey')
+  const apikey_string = event.headers.get('authorization')
   const api_mode_string = event.headers.get('api_mode')
 
-  if (!apikey_string)
-    return sendRes({ status: 'Cannot find authorization' }, 400)
+  if (!apikey_string) {
+    console.log('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
   const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
-  if (!apikey || !event.body)
-    return sendRes({ status: 'Cannot Verify User' }, 400)
+  if (!apikey) {
+    console.log('Missing apikey')
+    return sendRes({ status: 'Missing apikey' }, 400)
+  }
 
   if (api_mode_string === 'POST')
     return post(event, apikey)
@@ -125,6 +129,6 @@ serve(async (event: Request) => {
     return get(event, apikey)
   else if (api_mode_string === 'DELETE')
     return deleteChannel(event, apikey)
-  console.error('Method not allowed')
+  console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
