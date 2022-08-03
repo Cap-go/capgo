@@ -5,6 +5,7 @@ account:
   delete-account: Hesabımı sil
   delete_sure: Emin misin ?
   discord: anlaşmazlık
+  error: Hata
   heading: Hesap
   keys: API anahtarları
   legal: Hizmet şartları
@@ -127,6 +128,7 @@ intro:
   dynamic-route: Dinamik rota demosu
   hi: Merhaba, {name}!
   whats-your-name: Adınız nedir?
+invalid-auth: geçersiz yetkilendirme
 limit-reached: Sınıra ulaşıldı
 loading-more-data: Daha fazla veri yükleniyor...
 login:

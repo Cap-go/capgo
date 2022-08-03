@@ -5,6 +5,7 @@ account:
   delete-account: Удалите мой аккаунт
   delete_sure: Ты уверен ?
   discord: Раздор
+  error: Ошибка
   heading: Счет
   keys: ключи API
   legal: Условия предоставления услуг
@@ -127,6 +128,7 @@ intro:
   dynamic-route: Демо динамического маршрута
   hi: Привет, {name}!
   whats-your-name: Как тебя зовут?
+invalid-auth: недействительная авторизация
 limit-reached: Достигнут предел
 loading-more-data: Загрузка дополнительных данных...
 login:

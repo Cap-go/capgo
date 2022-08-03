@@ -5,6 +5,7 @@ account:
   delete-account: Deletar minha conta
   delete_sure: Tem certeza ?
   discord: Discórdia
+  error: Erro
   heading: Conta
   keys: Chaves de API
   legal: Termos de serviços
@@ -127,6 +128,7 @@ intro:
   dynamic-route: Demonstração de rota dinâmica
   hi: Olá, {name}!
   whats-your-name: Qual é o seu nome?
+invalid-auth: autenticação inválida
 limit-reached: Limite alcançado
 loading-more-data: Carregando mais dados...
 login:

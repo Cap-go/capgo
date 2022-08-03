@@ -5,6 +5,7 @@ account:
   delete-account: Xóa tài khoản của tôi đi
   delete_sure: Bạn có chắc không ?
   discord: Bất hòa
+  error: Lỗi
   heading: Tài khoản
   keys: Khóa API
   legal: Điều khoản dịch vụ
@@ -127,6 +128,7 @@ intro:
   dynamic-route: Bản giới thiệu về dynamic route
   hi: Hi, {name}!
   whats-your-name: Tên bạn là gì?
+invalid-auth: xác thực không hợp lệ
 limit-reached: Đạt tới giới hạn
 loading-more-data: Đang tải thêm dữ liệu ...
 login:

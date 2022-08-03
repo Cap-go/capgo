@@ -4,10 +4,12 @@ import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
 import type { PlanRes } from '~/services/plans'
+import { useLogSnag } from '~/services/logsnag'
 
 const guard = async (next: any, to: string, from: string) => {
   const supabase = useSupabase()
   const auth = supabase.auth.user()
+  const snag = useLogSnag()
 
   const main = useMainStore()
 
@@ -32,6 +34,15 @@ const guard = async (next: any, to: string, from: string) => {
         if (!error && data)
           main.user = data
         else return next('/onboarding/verify_email')
+        await snag.publish({
+          channel: 'user-login',
+          event: 'User Joined',
+          icon: '✅',
+          tags: {
+            email: data.email,
+          },
+          notify: false,
+        })
         setUser({
           nickname: `${data.first_name} ${data.last_name}`,
           email: data.email,

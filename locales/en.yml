@@ -124,6 +124,7 @@ intro:
   dynamic-route: Demo of dynamic route
   hi: Hi, {name}!
   whats-your-name: What's your name?
+invalid-auth: invalid auth
 limit-reached: Limit reached
 loading-more-data: Loading more data...
 login:

@@ -5,6 +5,7 @@ account:
   delete-account: Mein Konto löschen
   delete_sure: Bist du dir sicher ?
   discord: Zwietracht
+  error: Fehler
   heading: Konto
   keys: API-Schlüssel
   legal: Nutzungsbedingungen
@@ -131,6 +132,7 @@ intro:
   dynamic-route: Demo einer dynamischen Route
   hi: Hi, {name}!
   whats-your-name: Wie heißt du?
+invalid-auth: ungültige Auth
 limit-reached: Limit erreicht
 loading-more-data: Weitere Daten werden geladen...
 login:

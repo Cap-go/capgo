@@ -24,11 +24,6 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow Camera feature to try it in the sandbox app your are developing</string>
 	<key>NSLocationAlwaysUsageDescription</key>
