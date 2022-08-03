@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.10.2](https://github.com/Cap-go/capgo/compare/1.10.1...1.10.2) (2022-08-03)
+
+
+### Bug Fixes
+
+* use userId in snag ([8d59ae0](https://github.com/Cap-go/capgo/commit/8d59ae067123962afa198f852ad971d41402afc1))
+
 ### [1.10.1](https://github.com/Cap-go/capgo/compare/1.10.0...1.10.1) (2022-08-03)
 
 
