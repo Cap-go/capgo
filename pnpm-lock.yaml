@@ -32,7 +32,7 @@ specifiers:
   '@capacitor/storage': 1.2.5
   '@capacitor/text-zoom': ^4.0.1
   '@capacitor/toast': ^4.0.1
-  '@capgo/capacitor-updater': 4.0.0-alpha.27
+  '@capgo/capacitor-updater': 4.0.0-alpha.30
   '@iconify-json/carbon': 1.1.7
   '@iconify-json/ion': 1.1.3
   '@iconify-json/ls': 1.1.2
@@ -135,7 +135,7 @@ dependencies:
   '@capacitor/storage': 1.2.5_@capacitor+core@4.0.1
   '@capacitor/text-zoom': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/toast': 4.0.1_@capacitor+core@4.0.1
-  '@capgo/capacitor-updater': 4.0.0-alpha.27_@capacitor+core@4.0.1
+  '@capgo/capacitor-updater': 4.0.0-alpha.30_@capacitor+core@4.0.1
   '@ionic/vue': 6.2.0
   '@ionic/vue-router': 6.2.0
   '@robingenz/capacitor-file-picker': 0.3.1_@capacitor+core@4.0.1
@@ -1847,8 +1847,8 @@ packages:
       '@capacitor/core': 4.0.1
     dev: false
 
-  /@capgo/capacitor-updater/4.0.0-alpha.27_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-towm4UVSn7ekIL86c4nS790cbfQ90Y1YSEyVIg6bdKp/4MZvjZlRY1hAE8LZCL2cBdyEDiFjMV68HlGYwpmNLA==}
+  /@capgo/capacitor-updater/4.0.0-alpha.30_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-tgu6q2uaGvzXspoqk8pezczYg3F3zIWzoNmpMfMM21QrIE1beIOChMtIwXrE0HwS3zvjS3+CDAwKqS1vVZftCw==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:

@@ -75,7 +75,7 @@ include ':capacitor-toast'
 project(':capacitor-toast').projectDir = new File('../node_modules/.pnpm/@capacitor+toast@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/toast/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.27_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.30_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
 
 include ':robingenz-capacitor-file-picker'
 project(':robingenz-capacitor-file-picker').projectDir = new File('../node_modules/.pnpm/@robingenz+capacitor-file-picker@0.3.1_@capacitor+core@4.0.1/node_modules/@robingenz/capacitor-file-picker/android')

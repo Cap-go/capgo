@@ -49,7 +49,7 @@
     "@capacitor/storage": "1.2.5",
     "@capacitor/text-zoom": "^4.0.1",
     "@capacitor/toast": "^4.0.1",
-    "@capgo/capacitor-updater": "4.0.0-alpha.27",
+    "@capgo/capacitor-updater": "4.0.0-alpha.30",
     "@ionic/vue": "6.2.0",
     "@ionic/vue-router": "6.2.0",
     "@robingenz/capacitor-file-picker": "0.3.1",
