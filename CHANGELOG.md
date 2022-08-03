@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.10.3](https://github.com/Cap-go/capgo/compare/1.10.2...1.10.3) (2022-08-03)
+
+
+### Bug Fixes
+
+* event name login ([f82cb31](https://github.com/Cap-go/capgo/commit/f82cb3155a07b3a34292559f545a676bb721b37a))
+
 ### [1.10.2](https://github.com/Cap-go/capgo/compare/1.10.1...1.10.2) (2022-08-03)
 
 
