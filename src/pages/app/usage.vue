@@ -139,10 +139,10 @@ watchEffect(async () => {
           event: 'User subscribe',
           icon: '📊',
           tags: {
-            userId: main.user?.id,
+            'user-id': main.user?.id,
           },
           notify: false,
-        })
+        }).catch()
       }
     }
     else if (main.user?.id) {
@@ -151,10 +151,10 @@ watchEffect(async () => {
         event: 'User visit',
         icon: '📊',
         tags: {
-          userId: main.user?.id,
+          'user-id': main.user?.id,
         },
         notify: false,
-      })
+      }).catch()
     }
   }
 })

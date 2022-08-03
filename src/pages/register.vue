@@ -96,10 +96,10 @@ const submit = async () => {
     event: 'User Joined',
     icon: '🎉',
     tags: {
-      userId: user.id,
+      'user-id': user.id,
     },
     notify: true,
-  })
+  }).catch()
   router.push('/onboarding/confirm_email')
 }
 </script>
