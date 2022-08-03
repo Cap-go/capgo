@@ -6,7 +6,6 @@ import { checkKey, sendRes } from '../_utils/utils.ts'
 interface GetLatest {
   appid?: string
   app_id?: string
-  channel: string
 }
 
 export const deleteVersion = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
@@ -52,6 +51,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
 
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
+
     const { data: dataVersions, error: dbError } = await supabaseAdmin
       .from<definitions['app_versions']>('app_versions')
       .select()
