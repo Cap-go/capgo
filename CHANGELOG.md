@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.10.0](https://github.com/Cap-go/capgo/compare/1.9.10...1.10.0) (2022-08-03)
+
+
+### Features
+
+* :boom: Upgrade to capgo v4 ([25a98ed](https://github.com/Cap-go/capgo/commit/25a98ed97ede5543c24fb614625cba3283fd133b))
+
+## [1.9.0-alpha.1](https://github.com/Cap-go/capgo/compare/1.9.1...1.9.0-alpha.1) (2022-07-29)
+
+
+### Bug Fixes
+
+* deno version ([9ea1fba](https://github.com/Cap-go/capgo/commit/9ea1fba5520a85d4bdf521321716cf629bf6697e))
+
 ### [1.9.10](https://github.com/Cap-go/capgo/compare/1.9.9...1.9.10) (2022-08-02)
 
 
