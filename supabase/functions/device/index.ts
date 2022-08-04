@@ -17,8 +17,8 @@ interface GetDevice {
 const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+    console.log('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   // if device_id get one device
   if (body.device_id) {
@@ -53,8 +53,8 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
     return sendRes({ status: 'Cannot find device' }, 400)
   }
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+    console.log('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   // find device
   const { data: dataDevice, error: dbError } = await supabaseAdmin
@@ -145,8 +145,8 @@ export const deleteDev = async (event: Request, apikey: definitions['apikeys']):
   const body = (await event.json()) as DeviceLink
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+    console.log('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
     const { error } = await supabaseAdmin

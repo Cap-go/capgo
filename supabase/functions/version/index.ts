@@ -15,8 +15,8 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
     return sendRes({ status: 'Missing app_id' }, 400)
   }
   if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+    console.log('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
     const { error: dbError } = await supabaseAdmin
@@ -45,8 +45,8 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       return sendRes({ status: 'Missing app_id' }, 400)
     }
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
-      console.log('You can\'t access this app')
-      return sendRes({ status: 'You can\'t access this app' }, 400)
+      console.log('You can\'t access this app', body.app_id)
+      return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id)))
