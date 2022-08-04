@@ -17,7 +17,7 @@ interface GetDevice {
 export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = (await event.json()) as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.log('You can\'t access this app', body.app_id)
+    console.error('You can\'t access this app', body.app_id)
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   // get one channel or all channels
@@ -48,7 +48,7 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
   const body = (await event.json()) as ChannelSet
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.log('You can\'t access this app', body.app_id)
+    console.error('You can\'t access this app', body.app_id)
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
