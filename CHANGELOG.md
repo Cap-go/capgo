@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.11.3](https://github.com/Cap-go/capgo/compare/1.11.2...1.11.3) (2022-08-03)
+
+
+### Bug Fixes
+
+* remove useless key in object ([e4d56b6](https://github.com/Cap-go/capgo/commit/e4d56b60d22c0c72ee79b68e5bad138980f00f45))
+
 ### [1.11.2](https://github.com/Cap-go/capgo/compare/1.11.1...1.11.2) (2022-08-03)
 
 
