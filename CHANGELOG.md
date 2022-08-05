@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.13.0](https://github.com/Cap-go/capgo/compare/1.12.2...1.13.0) (2022-08-05)
+
+
+### Features
+
+* add appsize and checksum ([31c9135](https://github.com/Cap-go/capgo/commit/31c9135ea97c9f2e9e1525e1cc2de361197e094b))
+
+
+### Bug Fixes
+
+* update packages ([f7d3fd5](https://github.com/Cap-go/capgo/commit/f7d3fd59fa476f200756c71b43fe8c7434466f8a))
+
 ### [1.12.2](https://github.com/Cap-go/capgo/compare/1.12.1...1.12.2) (2022-08-05)
 
 
