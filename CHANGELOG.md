@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.13.1](https://github.com/Cap-go/capgo/compare/1.13.0...1.13.1) (2022-08-05)
+
+
+### Bug Fixes
+
+* display size for not fund ([6464f50](https://github.com/Cap-go/capgo/commit/6464f50cad4fc1768af083d2dad0f6a5a074740b))
+
 ## [1.13.0](https://github.com/Cap-go/capgo/compare/1.12.2...1.13.0) (2022-08-05)
 
 
