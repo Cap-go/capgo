@@ -157,6 +157,7 @@ package:
   devices: Посмотреть устройства
   devices-list: Устройства связаны
   download: Скачать версию
+  externally: хранится снаружи
   link_channel: Ссылка на канал
   link_version: Ссылка на версию
   mobiles-stats: Мобильная статистика

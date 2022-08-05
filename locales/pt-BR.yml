@@ -157,6 +157,7 @@ package:
   devices: Ver dispositivos
   devices-list: Dispositivos vinculados
   download: Baixar versão
+  externally: armazenado externamente
   link_channel: Link para o canal
   link_version: Link para a versão
   mobiles-stats: Estatísticas de celulares

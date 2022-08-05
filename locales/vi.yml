@@ -157,6 +157,7 @@ package:
   devices: Xem các thiết bị
   devices-list: Các thiết bị được liên kết
   download: Tải xuống phiên bản
+  externally: được lưu trữ bên ngoài
   link_channel: Liên kết với kênh
   link_version: Liên kết đến phiên bản
   mobiles-stats: Số liệu thống kê về điện thoại di động

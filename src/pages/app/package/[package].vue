@@ -81,7 +81,18 @@ const loadAppInfo = async () => {
 }
 
 const bytesToMb = (bytes: number) => {
-  return (bytes / 1024 / 1024).toFixed(2)
+  const res = bytes / 1024 / 1024
+  console.log('res', res, bytes)
+  return `${res.toFixed(2)} MB`
+}
+
+const showSize = (version: (definitions['app_versions'] & definitions['app_versions_meta'])) => {
+  if (version.size)
+    return bytesToMb(version.size)
+  else if (version.external_url)
+    return t('package.externally')
+  else
+    return t('package.not_available')
 }
 
 const searchVersion = async () => {
@@ -126,7 +137,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
       .in("id", dataVersions.map(({ id }) => id))
     // merge dataVersions and dataVersionsMeta
     const newVersions = dataVersions.map<(definitions['app_versions'] & definitions['app_versions_meta'])>(({ id, ...rest }) => {
-        const version = dataVersionsMeta ? dataVersionsMeta.find(({ id }) => id === id) : {size: 0, checksum : ""}
+        const version = dataVersionsMeta && dataVersionsMeta.find(({ id }) => id === id) ? dataVersionsMeta.find(({ id }) => id === id) : {size: 0, checksum : "Not found"}
         return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
     })
     versions.value.push(...newVersions)
@@ -470,7 +481,7 @@ watchEffect(async () => {
               <IonItem class="cursor-pointer" @click="ASVersion(v)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
-                    {{ v.name }} ( {{ bytesToMb(v.size)}} MB )
+                    {{ v.name }} ( {{ showSize(v)}} )
                   </h2>
                 </IonLabel>
                 <IonNote slot="end">

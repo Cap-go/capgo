@@ -157,6 +157,7 @@ package:
   devices: Cihazları görün
   devices-list: Bağlı cihazlar
   download: Sürümü indir
+  externally: harici olarak depolanır
   link_channel: kanala bağlantı
   link_version: sürüme bağlantı
   mobiles-stats: cep telefonu istatistikleri

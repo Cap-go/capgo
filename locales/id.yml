@@ -159,6 +159,7 @@ package:
   devices: Lihat perangkat
   devices-list: Perangkat tertaut
   download: Unduh versi
+  externally: disimpan secara eksternal
   link_channel: Tautan ke saluran
   link_version: Tautan ke versi
   mobiles-stats: Statistik ponsel

@@ -158,6 +158,7 @@ package:
   devices: Vedi dispositivi
   devices-list: Dispositivi collegati
   download: Scarica versione
+  externally: immagazzinato esternamente
   link_channel: Link al canale
   link_version: Link alla versione
   mobiles-stats: Statistiche sui cellulari

@@ -157,6 +157,7 @@ package:
   devices: Zobacz urządzenia
   devices-list: Połączone urządzenia
   download: Pobierz wersję
+  externally: przechowywane zewnętrznie
   link_channel: Link do kanału
   link_version: Link do wersji
   mobiles-stats: Statystyki telefonów komórkowych

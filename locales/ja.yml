@@ -153,6 +153,7 @@ package:
   devices: デバイスを見る
   devices-list: リンクされたデバイス
   download: ダウンロード版
+  externally: 外部保存
   link_channel: チャネルへのリンク
   link_version: バージョンへのリンク
   mobiles-stats: モバイル統計

@@ -153,6 +153,7 @@ package:
   devices: 查看设备
   devices-list: 关联的设备
   download: 下载版本
+  externally: 存储在外部
   link_channel: 链接到频道
   link_version: 链接到版本
   mobiles-stats: 手机数据

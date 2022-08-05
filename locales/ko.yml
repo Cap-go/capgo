@@ -153,6 +153,7 @@ package:
   devices: 기기 보기
   devices-list: 연결된 기기
   download: 버전 다운로드
+  externally: 외부에 저장
   link_channel: 채널 링크
   link_version: 버전에 대한 링크
   mobiles-stats: 모바일 통계

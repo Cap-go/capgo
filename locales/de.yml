@@ -161,6 +161,7 @@ package:
   devices: Siehe Geräte
   devices-list: Geräte verknüpft
   download: Download-Version
+  externally: extern gespeichert
   link_channel: Link zum Kanal
   link_version: Version verlinken
   mobiles-stats: Mobile Statistiken
