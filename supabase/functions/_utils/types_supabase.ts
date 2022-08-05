@@ -2929,6 +2929,7 @@ export interface definitions {
      * Format: bigint
      * @description Note:
      * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
      */
     id: number;
   };

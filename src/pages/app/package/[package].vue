@@ -42,8 +42,8 @@ const isLoading = ref(false)
 const isLoadingSub = ref(false)
 const app = ref<definitions['apps']>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
-const versions = ref<definitions['app_versions'][]>([])
-const filtered = ref<definitions['app_versions'][]>([])
+const versions = ref<(definitions['app_versions'] & definitions['app_versions_meta'])[]>([])
+const filtered = ref<(definitions['app_versions'] & definitions['app_versions_meta'])[]>([])
 
 const versionFilter = computed(() => {
   if (search.value)
@@ -79,6 +79,11 @@ const loadAppInfo = async () => {
     console.error(error)
   }
 }
+
+const bytesToMb = (bytes: number) => {
+  return (bytes / 1024 / 1024).toFixed(2)
+}
+
 const searchVersion = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
@@ -88,7 +93,20 @@ const searchVersion = async () => {
     .eq('deleted', false)
     .order('created_at', { ascending: false })
     .like('name', `%${search.value}%`)
-  filtered.value = dataVersions || []
+  if (!dataVersions) {
+    filtered.value =  []
+    isLoadingSub.value = false
+    return
+  }
+  const { data: dataVersionsMeta } = await supabase
+      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .select()
+      .in("id", dataVersions.map(({ id }) => id))
+  const newVersions = dataVersions.map<(definitions['app_versions'] & definitions['app_versions_meta'])>(({ id, ...rest }) => {
+    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id }) => id === id) : {size: 0, checksum : ""}
+    return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
+  })
+  filtered.value = newVersions
   isLoadingSub.value = false
 }
 const loadData = async (event?: InfiniteScrollCustomEvent) => {
@@ -102,12 +120,21 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataVersions)
       return
-    versions.value.push(...dataVersions)
+    const { data: dataVersionsMeta } = await supabase
+      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .select()
+      .in("id", dataVersions.map(({ id }) => id))
+    // merge dataVersions and dataVersionsMeta
+    const newVersions = dataVersions.map<(definitions['app_versions'] & definitions['app_versions_meta'])>(({ id, ...rest }) => {
+        const version = dataVersionsMeta ? dataVersionsMeta.find(({ id }) => id === id) : {size: 0, checksum : ""}
+        return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
+    })
+    versions.value.push(...newVersions)
+
     if (dataVersions.length === fetchLimit)
       fetchOffset += fetchLimit
     else
       isDisabled.value = true
-    versions.value = dataVersions || versions.value
   }
   catch (error) {
     console.error(error)
@@ -318,8 +345,9 @@ const ASChannelChooser = async (v: definitions['app_versions']) => {
   })
   await actionSheet.present()
 }
-const ASVersion = async (v: definitions['app_versions']) => {
+const ASVersion = async (v: (definitions['app_versions'] & definitions['app_versions_meta'])) => {
   const actionSheet = await actionSheetController.create({
+    header: `Checksum ${v.checksum}`,
     buttons: [
       {
         text: isPlatform('capacitor') ? t('package.test') : t('package.download'),
@@ -442,7 +470,7 @@ watchEffect(async () => {
               <IonItem class="cursor-pointer" @click="ASVersion(v)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
-                    {{ v.name }}
+                    {{ v.name }} ( {{ bytesToMb(v.size)}} MB )
                   </h2>
                 </IonLabel>
                 <IonNote slot="end">
