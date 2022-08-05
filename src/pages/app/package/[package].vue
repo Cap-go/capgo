@@ -82,7 +82,6 @@ const loadAppInfo = async () => {
 
 const bytesToMb = (bytes: number) => {
   const res = bytes / 1024 / 1024
-  console.log('res', res, bytes)
   return `${res.toFixed(2)} MB`
 }
 
