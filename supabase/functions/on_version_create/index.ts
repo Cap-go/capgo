@@ -30,7 +30,7 @@ serve(async (event: Request) => {
       .from(`apps/${record.user_id}/${record.app_id}/versions`)
       .download(record.bucket_id)
     if (error || !data) {
-      console.log('Error', error)
+      console.log('Error', record.bucket_id, error)
       return sendRes()
     }
     const u = await new Response(data).arrayBuffer()
