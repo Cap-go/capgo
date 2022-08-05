@@ -24,14 +24,16 @@ specifiers:
   '@capacitor/local-notifications': ^4.0.1
   '@capacitor/motion': ^4.0.1
   '@capacitor/network': ^4.0.1
+  '@capacitor/preferences': ^4.0.1
   '@capacitor/push-notifications': ^4.0.1
   '@capacitor/screen-reader': ^4.0.1
   '@capacitor/share': ^4.0.1
   '@capacitor/splash-screen': ^4.0.1
   '@capacitor/status-bar': ^4.0.1
-  '@capacitor/storage': 1.2.5
   '@capacitor/text-zoom': ^4.0.1
   '@capacitor/toast': ^4.0.1
+  '@capawesome/capacitor-file-picker': ^0.4.0
+  '@capawesome/capacitor-screen-orientation': ^2.0.0
   '@capgo/capacitor-updater': 4.0.0-alpha.33
   '@iconify-json/carbon': 1.1.7
   '@iconify-json/ion': 1.1.3
@@ -39,8 +41,6 @@ specifiers:
   '@intlify/vite-plugin-vue-i18n': 5.0.1
   '@ionic/vue': 6.2.1
   '@ionic/vue-router': 6.2.1
-  '@robingenz/capacitor-file-picker': 0.3.1
-  '@robingenz/capacitor-screen-orientation': 1.1.7
   '@supabase/supabase-js': 1.35.6
   '@teamhive/capacitor-video-recorder': ^5.0.0
   '@types/fs-extra': ^9.0.13
@@ -126,19 +126,19 @@ dependencies:
   '@capacitor/local-notifications': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/motion': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/network': 4.0.1_@capacitor+core@4.0.1
+  '@capacitor/preferences': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/push-notifications': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/screen-reader': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/share': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/splash-screen': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/status-bar': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/storage': 1.2.5_@capacitor+core@4.0.1
   '@capacitor/text-zoom': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/toast': 4.0.1_@capacitor+core@4.0.1
+  '@capawesome/capacitor-file-picker': 0.4.0_@capacitor+core@4.0.1
+  '@capawesome/capacitor-screen-orientation': 2.0.0_@capacitor+core@4.0.1
   '@capgo/capacitor-updater': 4.0.0-alpha.33_@capacitor+core@4.0.1
   '@ionic/vue': 6.2.1
   '@ionic/vue-router': 6.2.1
-  '@robingenz/capacitor-file-picker': 0.3.1_@capacitor+core@4.0.1
-  '@robingenz/capacitor-screen-orientation': 1.1.7_@capacitor+core@4.0.1
   '@supabase/supabase-js': 1.35.6
   '@teamhive/capacitor-video-recorder': 5.0.0_@capacitor+core@4.0.1
   '@vuelidate/core': 2.0.0-alpha.44_vue@3.2.37
@@ -1749,6 +1749,14 @@ packages:
       '@capacitor/core': 4.0.1
     dev: false
 
+  /@capacitor/preferences/4.0.1_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-FffJjKS4XcodUj/rtFtWizQ9q/oYDSn5opZ+JYwj/EkjiMWMhY/Pk9lN3vwQfp+VJrTt3hjr+bwKXjhTbYBqKw==}
+    peerDependencies:
+      '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
   /@capacitor/project/1.1.1_zgusdg2syqzg2kik2gzyf5b6di:
     resolution: {integrity: sha512-YBMsIMhnfEU6hREKaLKvhPW92AGedXF0DkJjb+TjDGWn3wbYpAVGD9vogRojJCVkjW9MQGUz4AOgAu6T4RLCxw==}
     dependencies:
@@ -1821,14 +1829,6 @@ packages:
       '@capacitor/core': 4.0.1
     dev: false
 
-  /@capacitor/storage/1.2.5_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-pWhnw4U7wN/zFV4lA4BLMypSufTktCbk548Yk4whSb0KAq3R0mLfSubRIHkGdcPqQWCsM6g/zUuszurhz6ncWQ==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
   /@capacitor/text-zoom/4.0.1_@capacitor+core@4.0.1:
     resolution: {integrity: sha512-BIecDYzHjJnMIfv3dsO2FnCv9JRS3FxhV1kos84n3JjAVcy4SsOtvTd2YBU8gAU6JXQ4FUQp7Z1EncDAvsiw3g==}
     peerDependencies:
@@ -1839,6 +1839,22 @@ packages:
 
   /@capacitor/toast/4.0.1_@capacitor+core@4.0.1:
     resolution: {integrity: sha512-caBbhbDPg11R4F/Xb/HKpmIDjXxQbKocVTYLN577AymmyQBUJQgiADTYYnG+Viom41mG9crirZ9WKjARG9lR0w==}
+    peerDependencies:
+      '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
+  /@capawesome/capacitor-file-picker/0.4.0_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-viyq6c3J3aUghSfuLhjON0IUz5537OrBh4N/oSdty9CJr2UvSrNbSdol5OoyOtPCOLHagULFE4lt0LdKL9V8LQ==}
+    peerDependencies:
+      '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
+  /@capawesome/capacitor-screen-orientation/2.0.0_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-issRxAYGtTc+t5CuVGso2YOrQhCEQJKreUlWyu2mOL8/TQFXiggBzxKkqLe2rLYPkEXcx37iQO1Eqql1dLTVTQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
@@ -3867,22 +3883,6 @@ packages:
 
   /@protobufjs/utf8/1.1.0:
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
-    dev: false
-
-  /@robingenz/capacitor-file-picker/0.3.1_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-cjXARYPEQ/XKMGIhA4wF7sQ4PkDjJVIzUy6bNXwjWCm8p2EjwjnogWOp/pgBFxLBkq0ktSEBXKJSJXC8fJnR/w==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
-  /@robingenz/capacitor-screen-orientation/1.1.7_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-PkjWZNKVIGuKMZfnyrbdM5CFJuzcu8TQAiC5i6GMH64ksqaKiRAmRG5iwI+QoH7ppEm3Z9GDYxLL7n8BpWNwZw==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
     dev: false
 
   /@rollup/plugin-babel/5.3.0_p4vz6pb3rhohp2l36o5vj5nb5e:

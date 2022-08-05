@@ -6,7 +6,7 @@ include ':capacitor-community-http'
 project(':capacitor-community-http').projectDir = new File('../node_modules/.pnpm/@capacitor-community+http@1.4.1/node_modules/@capacitor-community/http/android')
 
 include ':capacitor-community-keep-awake'
-project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/.pnpm/@capacitor-community+keep-awake@2.1.1_@capacitor+core@4.0.1/node_modules/@capacitor-community/keep-awake/android')
+project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/.pnpm/@capacitor-community+keep-awake@3.0.0_@capacitor+core@4.0.1/node_modules/@capacitor-community/keep-awake/android')
 
 include ':capacitor-action-sheet'
 project(':capacitor-action-sheet').projectDir = new File('../node_modules/.pnpm/@capacitor+action-sheet@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/action-sheet/android')
@@ -50,6 +50,9 @@ project(':capacitor-local-notifications').projectDir = new File('../node_modules
 include ':capacitor-network'
 project(':capacitor-network').projectDir = new File('../node_modules/.pnpm/@capacitor+network@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/network/android')
 
+include ':capacitor-preferences'
+project(':capacitor-preferences').projectDir = new File('../node_modules/.pnpm/@capacitor+preferences@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/preferences/android')
+
 include ':capacitor-push-notifications'
 project(':capacitor-push-notifications').projectDir = new File('../node_modules/.pnpm/@capacitor+push-notifications@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/push-notifications/android')
 
@@ -63,10 +66,7 @@ include ':capacitor-splash-screen'
 project(':capacitor-splash-screen').projectDir = new File('../node_modules/.pnpm/@capacitor+splash-screen@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/splash-screen/android')
 
 include ':capacitor-status-bar'
-project(':capacitor-status-bar').projectDir = new File('../node_modules/.pnpm/@capacitor+status-bar@4.0.0_@capacitor+core@4.0.1/node_modules/@capacitor/status-bar/android')
-
-include ':capacitor-storage'
-project(':capacitor-storage').projectDir = new File('../node_modules/.pnpm/@capacitor+storage@1.2.5_@capacitor+core@4.0.1/node_modules/@capacitor/storage/android')
+project(':capacitor-status-bar').projectDir = new File('../node_modules/.pnpm/@capacitor+status-bar@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/status-bar/android')
 
 include ':capacitor-text-zoom'
 project(':capacitor-text-zoom').projectDir = new File('../node_modules/.pnpm/@capacitor+text-zoom@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/text-zoom/android')
@@ -74,14 +74,14 @@ project(':capacitor-text-zoom').projectDir = new File('../node_modules/.pnpm/@ca
 include ':capacitor-toast'
 project(':capacitor-toast').projectDir = new File('../node_modules/.pnpm/@capacitor+toast@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/toast/android')
 
+include ':capawesome-capacitor-file-picker'
+project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-file-picker@0.4.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-file-picker/android')
+
+include ':capawesome-capacitor-screen-orientation'
+project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-screen-orientation/android')
+
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.30_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
-
-include ':robingenz-capacitor-file-picker'
-project(':robingenz-capacitor-file-picker').projectDir = new File('../node_modules/.pnpm/@robingenz+capacitor-file-picker@0.3.1_@capacitor+core@4.0.1/node_modules/@robingenz/capacitor-file-picker/android')
-
-include ':robingenz-capacitor-screen-orientation'
-project(':robingenz-capacitor-screen-orientation').projectDir = new File('../node_modules/.pnpm/@robingenz+capacitor-screen-orientation@1.1.7_@capacitor+core@4.0.1/node_modules/@robingenz/capacitor-screen-orientation/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.33_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
 
 include ':capacitor-flash'
 project(':capacitor-flash').projectDir = new File('../node_modules/.pnpm/capacitor-flash@1.1.3_@capacitor+core@4.0.1/node_modules/capacitor-flash/android')
