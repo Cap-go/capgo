@@ -38,11 +38,11 @@ jobs:
           context: "Basic tests"
           state: "pending"
           sha: ${{ steps.commit.outputs.sha }}
-      # - name: Basic tests
-      #   id: test
-      #   continue-on-error: true
-      #   run: |
-      #     deno test --allow-read --allow-write
+      - name: Basic tests
+        id: test
+        continue-on-error: true
+        run: |
+          deno test --allow-read --allow-write supabase/functions/_test/*.ts
       - name: Set commit status with outcome
         uses: Sibz/github-status-action@v1
         with:
