@@ -34,7 +34,7 @@ const guard = async (next: any, to: string, from: string) => {
         if (!error && data)
           main.user = data
         else return next('/onboarding/verify_email')
-        await snag.publish({
+        snag.publish({
           channel: 'user-login',
           event: 'User Login',
           icon: '✅',
@@ -42,7 +42,7 @@ const guard = async (next: any, to: string, from: string) => {
             'user-id': data.id,
           },
           notify: false,
-        })
+        }).catch()
         setUser({
           nickname: `${data.first_name} ${data.last_name}`,
           email: data.email,
