@@ -1,5 +1,5 @@
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.6'
 import type { definitions } from '../_utils/types_supabase.ts'
 
 const supabaseUrl = 'https://***.supabase.co'
@@ -27,10 +27,8 @@ const createMeta = async (record: definitions['app_versions']) => {
     .select()
     .eq('id', record.id)
     .single()
-  if (!error || data) {
-    console.log('app_versions_meta found', record.id)
+  if (!error || data)
     return
-  }
   const { data: data2, error: error2 } = await useSupabase()
     .storage
     .from(`apps/${record.user_id}/${record.app_id}/versions`)
@@ -56,22 +54,47 @@ const createMeta = async (record: definitions['app_versions']) => {
     })
   if (dbError)
     console.error('Cannot create app version meta', dbError)
+  console.log('app_versions_meta create', record.id)
 }
 // delete all app_versions_meta as sql query
 // delete from app_versions_meta where id in (select id from app_versions where deleted = true)
 
+const pageSize = 100
 const createAll = async () => {
   // list all app_versions
-  const { data, error } = await useSupabase()
-    .from<definitions['app_versions']>('app_versions')
-    .select()
-    .eq('deleted', false)
-    .not('bucket_id', 'is', null)
-  if (error) { console.log('error', error) }
-  else if (data && data.length) {
+  const allData: definitions['app_versions'][] = []
+  // loop through all app_versions
+  for (let skip = 0; skip >= 0;) {
+    const end = skip + pageSize
+    // console.log('skip', skip, 'end', end)
+    const { data: appVersions, error: appVersionsError } = await useSupabase()
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('deleted', false)
+      .not('bucket_id', 'is', null)
+      .range(skip, end)
+
+    if (appVersionsError) {
+      console.error(appVersionsError)
+      return
+    }
+    // console.log('app_versions', appVersions.length)
+    // add to allData
+    allData.push(...appVersions)
+    if (appVersions.length !== pageSize + 1) {
+      console.log('No more app_versions to delete')
+      skip = -1
+    }
+    else {
+      skip += pageSize
+    }
+  }
+  console.log('app_versions to delete', allData.length)
+
+  if (allData.length) {
     // loop on all element and create metadata for each
     const all = []
-    for (const version of data)
+    for (const version of allData)
       all.push(createMeta(version))
     // all.push(createMeta(data[0]))
 
