@@ -29,7 +29,6 @@ const guard = async (next: any, to: string, from: string) => {
           .from<definitions['users']>('users')
           .select()
           .eq('id', auth?.id)
-          .limit(1)
           .single()
         if (!error && data)
           main.user = data
