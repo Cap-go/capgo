@@ -104,16 +104,16 @@ const searchVersion = async () => {
     .order('created_at', { ascending: false })
     .like('name', `%${search.value}%`)
   if (!dataVersions) {
-    filtered.value =  []
+    filtered.value = []
     isLoadingSub.value = false
     return
   }
   const { data: dataVersionsMeta } = await supabase
-      .from<definitions['app_versions_meta']>('app_versions_meta')
-      .select()
-      .in("id", dataVersions.map(({ id }) => id))
-  const newVersions = dataVersions.map<(definitions['app_versions'] & definitions['app_versions_meta'])>(({ id, ...rest }) => {
-    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id }) => id === id) : {size: 0, checksum : ""}
+    .from<definitions['app_versions_meta']>('app_versions_meta')
+    .select()
+    .in('id', dataVersions.map(({ id }) => id))
+  const newVersions = dataVersions.map(({ id, ...rest }) => {
+    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
     return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
   })
   filtered.value = newVersions
@@ -133,11 +133,11 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
     const { data: dataVersionsMeta } = await supabase
       .from<definitions['app_versions_meta']>('app_versions_meta')
       .select()
-      .in("id", dataVersions.map(({ id }) => id))
+      .in('id', dataVersions.map(({ id }) => id))
     // merge dataVersions and dataVersionsMeta
-    const newVersions = dataVersions.map<(definitions['app_versions'] & definitions['app_versions_meta'])>(({ id, ...rest }) => {
-        const version = dataVersionsMeta && dataVersionsMeta.find(({ id }) => id === id) ? dataVersionsMeta.find(({ id }) => id === id) : {size: 0, checksum : "Not found"}
-        return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
+    const newVersions = dataVersions.map(({ id, ...rest }) => {
+      const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
+      return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
     })
     versions.value.push(...newVersions)
 
@@ -480,7 +480,7 @@ watchEffect(async () => {
               <IonItem class="cursor-pointer" @click="ASVersion(v)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
-                    {{ v.name }} ( {{ showSize(v)}} )
+                    {{ v.name }} ( {{ showSize(v) }} )
                   </h2>
                 </IonLabel>
                 <IonNote slot="end">
