@@ -92,7 +92,7 @@ const loadData = async () => {
       .order('created_at', { ascending: false })
     versions.value = dataVersions || versions.value
     devices.value = dataDevices || devices.value
-    console.log('devices', devices.value)
+    // console.log('devices', devices.value)
     buildGraph()
   }
   catch (error) {
