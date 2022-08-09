@@ -73,7 +73,7 @@ serve(async (event: Request) => {
         .then(([app, mlu, mlu_real, versions, shared, channels, devices]) => {
           if (!app.app_id)
             return
-          // console.log('app', app.app_id, downloads, versions, shared, channels)
+          // console.log('app', app.app_id, devices, versions, shared, channels)
           // create var date_id with yearn-month
           const now = new Date()
           // get_current_plan_name

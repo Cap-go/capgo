@@ -140,6 +140,7 @@ login:
   withemail: With email adress
 module:
   heading: Modules
+monthly-active-users: Monthly active users
 not-found: Not found
 notificationSettings:
   heading: Notification settings

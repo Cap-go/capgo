@@ -148,6 +148,7 @@ login:
   withemail: Mit E-Mail-Adresse
 module:
   heading: Module
+monthly-active-users: Monatlich aktive Benutzer
 not-found: Nicht gefunden
 notificationSettings:
   heading: Konto
@@ -166,6 +167,7 @@ package:
   link_version: Version verlinken
   mobiles-stats: Mobile Statistiken
   name: App
+  not_available: Paket nicht gefunden
   set: Version auf Kanal setzen
   stats: Statistiken
   test: Version starten

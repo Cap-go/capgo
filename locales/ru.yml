@@ -144,6 +144,7 @@ login:
   withemail: С адресом электронной почты
 module:
   heading: Модули
+monthly-active-users: Ежемесячные активные пользователи
 not-found: Не найден
 notificationSettings:
   heading: Настройки уведомлений
@@ -162,6 +163,7 @@ package:
   link_version: Ссылка на версию
   mobiles-stats: Мобильная статистика
   name: Приложение
+  not_available: Пакет не найден
   set: Установить версию для канала
   stats: статистика
   test: Запустить версию

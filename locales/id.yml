@@ -146,6 +146,7 @@ login:
   withemail: Dengan alamat email
 module:
   heading: Modul
+monthly-active-users: Pengguna aktif bulanan
 not-found: Tidak ditemukan
 notificationSettings:
   heading: Akun
@@ -164,6 +165,7 @@ package:
   link_version: Tautan ke versi
   mobiles-stats: Statistik ponsel
   name: Aplikasi
+  not_available: Paket tidak ditemukan
   set: Setel versi ke saluran
   stats: statistik
   test: Luncurkan versi

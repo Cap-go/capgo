@@ -150,6 +150,7 @@ login:
   withemail: con dirección de correo electrónico
 module:
   heading: Módulos
+monthly-active-users: Usuarios activos mensuales
 not-found: No se ha encontrado
 notificationSettings:
   heading: Cuenta
@@ -168,6 +169,7 @@ package:
   link_version: Enlace a la versión
   mobiles-stats: Estadísticas móviles
   name: aplicación
+  not_available: Paquete no encontrado
   set: Establecer versión para el canal
   stats: estadísticas
   test: Versión de lanzamiento

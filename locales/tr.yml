@@ -144,6 +144,7 @@ login:
   withemail: e-posta adresi ile
 module:
   heading: Modüller
+monthly-active-users: Aylık aktif kullanıcılar
 not-found: Bulunamadı
 notificationSettings:
   heading: Bildirim ayarları
@@ -162,6 +163,7 @@ package:
   link_version: sürüme bağlantı
   mobiles-stats: cep telefonu istatistikleri
   name: Uygulama
+  not_available: Paket bulunamadı
   set: Sürümü kanala ayarla
   stats: istatistikler
   test: Sürümü başlat

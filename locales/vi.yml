@@ -144,6 +144,7 @@ login:
   withemail: Với địa chỉ email
 module:
   heading: Mô-đun
+monthly-active-users: Người dùng hoạt động hàng tháng
 not-found: Không tìm thấy
 notificationSettings:
   heading: Thiết lập thông báo
@@ -162,6 +163,7 @@ package:
   link_version: Liên kết đến phiên bản
   mobiles-stats: Số liệu thống kê về điện thoại di động
   name: Ứng dụng
+  not_available: Gói hàng không được tìm thấy
   set: Đặt phiên bản cho kênh
   stats: số liệu thống kê
   test: Phiên bản khởi chạy

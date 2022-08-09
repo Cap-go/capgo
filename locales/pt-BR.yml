@@ -144,6 +144,7 @@ login:
   withemail: Com endereço de e-mail
 module:
   heading: Módulos
+monthly-active-users: Usuários ativos mensais
 not-found: Não encontrado
 notificationSettings:
   heading: Configurações de notificação
@@ -162,6 +163,7 @@ package:
   link_version: Link para a versão
   mobiles-stats: Estatísticas de celulares
   name: Aplicativo
+  not_available: Pacote não encontrado
   set: Definir versão para canal
   stats: Estatísticas
   test: Versão de lançamento

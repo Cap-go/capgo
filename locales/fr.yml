@@ -148,6 +148,7 @@ login:
   withemail: Avec adresse e-mail
 module:
   heading: Modules
+monthly-active-users: Utilisateurs actifs mensuels
 not-found: Page non trouvée
 notificationSettings:
   heading: Réglages des notifications
@@ -166,6 +167,7 @@ package:
   link_version: Lien vers la version
   mobiles-stats: Statistiques mobiles
   name: Application
+  not_available: Colis introuvable
   set: Définir la version sur le canal
   stats: Statistiques
   test: Version de lancement

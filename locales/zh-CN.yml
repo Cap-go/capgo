@@ -140,6 +140,7 @@ login:
   withemail: 有电子邮件地址
 module:
   heading: 模块
+monthly-active-users: 月活跃用户
 not-found: 未找到页面
 notificationSettings:
   heading: 通知设置
@@ -158,6 +159,7 @@ package:
   link_version: 链接到版本
   mobiles-stats: 手机数据
   name: 应用程序
+  not_available: 未找到包裹
   set: 将版本设置为频道
   stats: 统计数据
   test: 发布版本

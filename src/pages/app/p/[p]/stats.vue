@@ -70,7 +70,7 @@ const buildGraph = () => {
 
 const loadData = async () => {
   try {
-    const { data: dataDev } = await supabase
+    const { data: dataDevices } = await supabase
       .from<definitions['devices'] & Device>('devices')
       .select(`
         device_id,
@@ -91,7 +91,8 @@ const loadData = async () => {
       .eq('deleted', false)
       .order('created_at', { ascending: false })
     versions.value = dataVersions || versions.value
-    devices.value = dataDev || devices.value
+    devices.value = dataDevices || devices.value
+    console.log('devices', devices.value)
     buildGraph()
   }
   catch (error) {
@@ -168,9 +169,9 @@ const refreshStatsData = async (evt: RefresherCustomEvent | null = null) => {
 const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
+    await refreshStatsData()
     await loadData()
     await getLastDownload()
-    await refreshStatsData()
   }
   catch (error) {
     console.error(error)
@@ -249,7 +250,7 @@ watchEffect(async () => {
                 {{ devices.length }}
               </p>
               <p class="text-sm text-center text-gray-500">
-                Devices
+                {{ t('monthly-active-users') }}
               </p>
             </div>
           </div>

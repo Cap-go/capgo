@@ -140,6 +140,7 @@ login:
   withemail: メールアドレス付き
 module:
   heading: モジュール
+monthly-active-users: 月間アクティブ ユーザー数
 not-found: 見つかりませんでした
 notificationSettings:
   heading: 通知設定
@@ -158,6 +159,7 @@ package:
   link_version: バージョンへのリンク
   mobiles-stats: モバイル統計
   name: アプリ
+  not_available: パッケージが見つかりません
   set: バージョンをチャネルに設定
   stats: 統計
   test: 起動バージョン
