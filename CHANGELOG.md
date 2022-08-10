@@ -2,80 +2,248 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<<<<<<< HEAD
 ## [1.9.0-alpha.3](https://github.com/Cap-go/capgo/compare/1.9.0-alpha.2...1.9.0-alpha.3) (2022-08-03)
 
 ### [1.9.10](https://github.com/Cap-go/capgo/compare/1.9.9...1.9.10) (2022-08-02)
+=======
+### [1.13.11](https://github.com/Cap-go/capgo/compare/1.13.10...1.13.11) (2022-08-09)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * upgrade types ([b06b936](https://github.com/Cap-go/capgo/commit/b06b93663ecba5b098e62be3dae27f98298c27fc))
 
 ### [1.9.9](https://github.com/Cap-go/capgo/compare/1.9.8...1.9.9) (2022-07-31)
+=======
+* script go to all data ([a932075](https://github.com/Cap-go/capgo/commit/a932075d7c3bf0cf2f7b92b101581239479cfd6f))
+
+### [1.13.10](https://github.com/Cap-go/capgo/compare/1.13.9...1.13.10) (2022-08-09)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * udd for supabase ([96996db](https://github.com/Cap-go/capgo/commit/96996dbdde4fc613a3c4af29689a5e0af5fd546b))
 * update versions ([5beff96](https://github.com/Cap-go/capgo/commit/5beff96fe6ee9c8b76970b7476d76d999472a76a))
 
 ### [1.9.8](https://github.com/Cap-go/capgo/compare/1.9.7...1.9.8) (2022-07-30)
 
 ### [1.9.7](https://github.com/Cap-go/capgo/compare/1.9.6...1.9.7) (2022-07-30)
+=======
+* remove useless comment ([08c13ec](https://github.com/Cap-go/capgo/commit/08c13ec570fe2f78340ee1f2640fc3d2e7efdcd5))
+
+### [1.13.9](https://github.com/Cap-go/capgo/compare/1.13.8...1.13.9) (2022-08-09)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * stats ([bfde62f](https://github.com/Cap-go/capgo/commit/bfde62f2905c9856f22918a9464bc712259a76b1))
 
 ### [1.9.6](https://github.com/Cap-go/capgo/compare/1.9.5...1.9.6) (2022-07-29)
+=======
+* coding style ([42e9655](https://github.com/Cap-go/capgo/commit/42e965570e7c50d3f8ad33f742e23648bb82030d))
+
+### [1.13.8](https://github.com/Cap-go/capgo/compare/1.13.7...1.13.8) (2022-08-09)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * missing logs ([3d93cb9](https://github.com/Cap-go/capgo/commit/3d93cb9526f145a36a75ae4e54f7d5b347acff96))
 
 ### [1.9.5](https://github.com/Cap-go/capgo/compare/1.9.4...1.9.5) (2022-07-29)
+=======
+* dataVersionsMeta lint ([cc23d0b](https://github.com/Cap-go/capgo/commit/cc23d0b0f9a6fe2e2334c9069257288cb30077e8))
+
+### [1.13.7](https://github.com/Cap-go/capgo/compare/1.13.6...1.13.7) (2022-08-09)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * revert useless change ([fbade84](https://github.com/Cap-go/capgo/commit/fbade845f2a7fc5fa990c1d0bf3baa1021524936))
 
 ### [1.9.4](https://github.com/Cap-go/capgo/compare/1.9.3...1.9.4) (2022-07-29)
+=======
+* issue with snag ([d5037a6](https://github.com/Cap-go/capgo/commit/d5037a6e6105f77f17532d6dc3b08bfd97c6d124))
+
+### [1.13.6](https://github.com/Cap-go/capgo/compare/1.13.5...1.13.6) (2022-08-09)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * remove useless ([21cf94c](https://github.com/Cap-go/capgo/commit/21cf94c82a2523dbb3910ca4083803f5c6ee601b))
 
 ### [1.9.3](https://github.com/Cap-go/capgo/compare/1.9.2...1.9.3) (2022-07-29)
+=======
+* devices counter ([778119e](https://github.com/Cap-go/capgo/commit/778119e6366b95a329787236866fd5ecbb2458bf))
+
+### [1.13.5](https://github.com/Cap-go/capgo/compare/1.13.4...1.13.5) (2022-08-08)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * issue missing authorization ([98dd6e9](https://github.com/Cap-go/capgo/commit/98dd6e96d528c703bbe575d7fcd633eabb64f38d))
 
 ### [1.9.2](https://github.com/Cap-go/capgo/compare/1.9.0-alpha.1...1.9.2) (2022-07-29)
+=======
+* add test in deno ([40ae113](https://github.com/Cap-go/capgo/commit/40ae1131c83517c4d1534a36aa3a4715694f3475))
+
+### [1.13.4](https://github.com/Cap-go/capgo/compare/1.13.3...1.13.4) (2022-08-08)
+
+### [1.13.3](https://github.com/Cap-go/capgo/compare/1.13.2...1.13.3) (2022-08-08)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * apikey ([ea1e27e](https://github.com/Cap-go/capgo/commit/ea1e27e462ab53169de88b1a6d40b1b51f090cfc))
 
 ### [1.9.1](https://github.com/Cap-go/capgo/compare/1.9.0...1.9.1) (2022-07-29)
+=======
+* auto update deno ([bd6813d](https://github.com/Cap-go/capgo/commit/bd6813de71c3707cec5095252e296b8d5d9b143f))
+
+### [1.13.2](https://github.com/Cap-go/capgo/compare/1.13.1...1.13.2) (2022-08-05)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * deno version ([aa7a41e](https://github.com/Cap-go/capgo/commit/aa7a41efc24078196d958126eaeae394876e8248))
 
 ## [1.9.0](https://github.com/Cap-go/capgo/compare/1.9.0-alpha.0...1.9.0) (2022-07-29)
+=======
+* remove debug log ([d049d01](https://github.com/Cap-go/capgo/commit/d049d01f3355e46c92010f2afbfaf0315e645bfd))
+
+### [1.13.1](https://github.com/Cap-go/capgo/compare/1.13.0...1.13.1) (2022-08-05)
+>>>>>>> main
 
 
 ### Bug Fixes
 
+<<<<<<< HEAD
 * comment new api for now ([e2deca5](https://github.com/Cap-go/capgo/commit/e2deca5370d270d1464076b04ea90706afbcfd76))
+=======
+* display size for not fund ([6464f50](https://github.com/Cap-go/capgo/commit/6464f50cad4fc1768af083d2dad0f6a5a074740b))
+
+## [1.13.0](https://github.com/Cap-go/capgo/compare/1.12.2...1.13.0) (2022-08-05)
+
+
+### Features
+
+* add appsize and checksum ([31c9135](https://github.com/Cap-go/capgo/commit/31c9135ea97c9f2e9e1525e1cc2de361197e094b))
+
+
+### Bug Fixes
+
+* update packages ([f7d3fd5](https://github.com/Cap-go/capgo/commit/f7d3fd59fa476f200756c71b43fe8c7434466f8a))
+
+### [1.12.2](https://github.com/Cap-go/capgo/compare/1.12.1...1.12.2) (2022-08-05)
+
+
+### Bug Fixes
+
+* remove old useless module ([4ddc663](https://github.com/Cap-go/capgo/commit/4ddc66347131c9f0f8072b1d1d5037bf7157408d))
+
+### [1.12.1](https://github.com/Cap-go/capgo/compare/1.12.0...1.12.1) (2022-08-05)
+
+
+### Bug Fixes
+
+* old records ([9ff7a78](https://github.com/Cap-go/capgo/commit/9ff7a78a813b2b8ca293651dd4633f8f1cb94a64))
+
+## [1.12.0](https://github.com/Cap-go/capgo/compare/1.11.4...1.12.0) (2022-08-05)
+
+
+### Features
+
+* add version_meta for checksum and size ([c432004](https://github.com/Cap-go/capgo/commit/c432004d46c8b7713b4a3e922c90173da7dc6d5f))
+
+### [1.11.4](https://github.com/Cap-go/capgo/compare/1.11.3...1.11.4) (2022-08-04)
+
+
+### Bug Fixes
+
+* loggin ([a93d537](https://github.com/Cap-go/capgo/commit/a93d5375c3fb61f87aa511ec8a75376eebf990b7))
+* loggin use right error type ([b278c99](https://github.com/Cap-go/capgo/commit/b278c99a73df626346e8b0362d00df93365d9782))
+
+### [1.11.3](https://github.com/Cap-go/capgo/compare/1.11.2...1.11.3) (2022-08-03)
+
+
+### Bug Fixes
+
+* remove useless key in object ([e4d56b6](https://github.com/Cap-go/capgo/commit/e4d56b60d22c0c72ee79b68e5bad138980f00f45))
+
+### [1.11.2](https://github.com/Cap-go/capgo/compare/1.11.1...1.11.2) (2022-08-03)
+
+
+### Bug Fixes
+
+* login event ([329b9e8](https://github.com/Cap-go/capgo/commit/329b9e87208ea13b900e6960153088a8f26f239d))
+
+### [1.11.1](https://github.com/Cap-go/capgo/compare/1.11.0...1.11.1) (2022-08-03)
+
+
+### Bug Fixes
+
+* snag ([9b6d971](https://github.com/Cap-go/capgo/commit/9b6d97188ac881e8829d357853cf35da7e40177c))
+
+## [1.11.0](https://github.com/Cap-go/capgo/compare/1.10.3...1.11.0) (2022-08-03)
+
+
+### Features
+
+* add events for usage ([ae82bce](https://github.com/Cap-go/capgo/commit/ae82bce10a9b656e4ebd015e6954d66bc5342780))
+
+### [1.10.3](https://github.com/Cap-go/capgo/compare/1.10.2...1.10.3) (2022-08-03)
+
+
+### Bug Fixes
+
+* event name login ([f82cb31](https://github.com/Cap-go/capgo/commit/f82cb3155a07b3a34292559f545a676bb721b37a))
+
+### [1.10.2](https://github.com/Cap-go/capgo/compare/1.10.1...1.10.2) (2022-08-03)
+
+
+### Bug Fixes
+
+* use userId in snag ([8d59ae0](https://github.com/Cap-go/capgo/commit/8d59ae067123962afa198f852ad971d41402afc1))
+
+### [1.10.1](https://github.com/Cap-go/capgo/compare/1.10.0...1.10.1) (2022-08-03)
+
+
+### Bug Fixes
+
+* issue updater ([58379cb](https://github.com/Cap-go/capgo/commit/58379cbbc18c4a03d981f8f0bb9fbe9495526345))
+
+## [1.10.0](https://github.com/Cap-go/capgo/compare/1.9.10...1.10.0) (2022-08-03)
+
+
+### Features
+
+* :boom: Upgrade to capgo v4 ([25a98ed](https://github.com/Cap-go/capgo/commit/25a98ed97ede5543c24fb614625cba3283fd133b))
+
+## [1.9.0-alpha.1](https://github.com/Cap-go/capgo/compare/1.9.1...1.9.0-alpha.1) (2022-07-29)
+
+
+### Bug Fixes
+
+* deno version ([9ea1fba](https://github.com/Cap-go/capgo/commit/9ea1fba5520a85d4bdf521321716cf629bf6697e))
+>>>>>>> main
 
 ### [1.9.10](https://github.com/Cap-go/capgo/compare/1.9.9...1.9.10) (2022-08-02)
 

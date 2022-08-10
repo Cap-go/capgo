@@ -64,6 +64,10 @@
 		"classpath": "com.capacitorjs.plugins.network.NetworkPlugin"
 	},
 	{
+		"pkg": "@capacitor/preferences",
+		"classpath": "com.capacitorjs.plugins.preferences.PreferencesPlugin"
+	},
+	{
 		"pkg": "@capacitor/push-notifications",
 		"classpath": "com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin"
 	},
@@ -84,10 +88,6 @@
 		"classpath": "com.capacitorjs.plugins.statusbar.StatusBarPlugin"
 	},
 	{
-		"pkg": "@capacitor/storage",
-		"classpath": "com.capacitorjs.plugins.storage.StoragePlugin"
-	},
-	{
 		"pkg": "@capacitor/text-zoom",
 		"classpath": "com.capacitorjs.plugins.textzoom.TextZoomPlugin"
 	},
@@ -96,16 +96,16 @@
 		"classpath": "com.capacitorjs.plugins.toast.ToastPlugin"
 	},
 	{
+		"pkg": "@capawesome/capacitor-file-picker",
+		"classpath": "io.capawesome.capacitorjs.plugins.filepicker.FilePickerPlugin"
+	},
+	{
+		"pkg": "@capawesome/capacitor-screen-orientation",
+		"classpath": "io.capawesome.capacitorjs.plugins.screenorientation.ScreenOrientationPlugin"
+	},
+	{
 		"pkg": "@capgo/capacitor-updater",
 		"classpath": "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin"
-	},
-	{
-		"pkg": "@robingenz/capacitor-file-picker",
-		"classpath": "dev.robingenz.capacitorjs.plugins.filepicker.FilePickerPlugin"
-	},
-	{
-		"pkg": "@robingenz/capacitor-screen-orientation",
-		"classpath": "dev.robingenz.capacitor.screenorientation.ScreenOrientationPlugin"
 	},
 	{
 		"pkg": "capacitor-flash",

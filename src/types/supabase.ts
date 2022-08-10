@@ -456,6 +456,111 @@ export interface paths {
       };
     };
   };
+  "/app_versions_meta": {
+    get: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.app_versions_meta.created_at"];
+          app_id?: parameters["rowFilter.app_versions_meta.app_id"];
+          user_id?: parameters["rowFilter.app_versions_meta.user_id"];
+          updated_at?: parameters["rowFilter.app_versions_meta.updated_at"];
+          checksum?: parameters["rowFilter.app_versions_meta.checksum"];
+          size?: parameters["rowFilter.app_versions_meta.size"];
+          id?: parameters["rowFilter.app_versions_meta.id"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["app_versions_meta"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** app_versions_meta */
+          app_versions_meta?: definitions["app_versions_meta"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.app_versions_meta.created_at"];
+          app_id?: parameters["rowFilter.app_versions_meta.app_id"];
+          user_id?: parameters["rowFilter.app_versions_meta.user_id"];
+          updated_at?: parameters["rowFilter.app_versions_meta.updated_at"];
+          checksum?: parameters["rowFilter.app_versions_meta.checksum"];
+          size?: parameters["rowFilter.app_versions_meta.size"];
+          id?: parameters["rowFilter.app_versions_meta.id"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          created_at?: parameters["rowFilter.app_versions_meta.created_at"];
+          app_id?: parameters["rowFilter.app_versions_meta.app_id"];
+          user_id?: parameters["rowFilter.app_versions_meta.user_id"];
+          updated_at?: parameters["rowFilter.app_versions_meta.updated_at"];
+          checksum?: parameters["rowFilter.app_versions_meta.checksum"];
+          size?: parameters["rowFilter.app_versions_meta.size"];
+          id?: parameters["rowFilter.app_versions_meta.id"];
+        };
+        body: {
+          /** app_versions_meta */
+          app_versions_meta?: definitions["app_versions_meta"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/apps": {
     get: {
       parameters: {
@@ -2793,6 +2898,41 @@ export interface definitions {
     /** Format: character varying */
     checksum?: string;
   };
+  app_versions_meta: {
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
+     */
+    app_id: string;
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
+    user_id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /** Format: character varying */
+    checksum: string;
+    /** Format: bigint */
+    size: number;
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     * This is a Foreign Key to `app_versions.id`.<fk table='app_versions' column='id'/>
+     */
+    id: number;
+  };
   apps: {
     /**
      * Format: timestamp with time zone
@@ -3486,6 +3626,22 @@ export interface parameters {
   "rowFilter.app_versions.external_url": string;
   /** Format: character varying */
   "rowFilter.app_versions.checksum": string;
+  /** @description app_versions_meta */
+  "body.app_versions_meta": definitions["app_versions_meta"];
+  /** Format: timestamp with time zone */
+  "rowFilter.app_versions_meta.created_at": string;
+  /** Format: character varying */
+  "rowFilter.app_versions_meta.app_id": string;
+  /** Format: uuid */
+  "rowFilter.app_versions_meta.user_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.app_versions_meta.updated_at": string;
+  /** Format: character varying */
+  "rowFilter.app_versions_meta.checksum": string;
+  /** Format: bigint */
+  "rowFilter.app_versions_meta.size": string;
+  /** Format: bigint */
+  "rowFilter.app_versions_meta.id": string;
   /** @description apps */
   "body.apps": definitions["apps"];
   /** Format: timestamp with time zone */

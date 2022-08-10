@@ -29,20 +29,19 @@ const guard = async (next: any, to: string, from: string) => {
           .from<definitions['users']>('users')
           .select()
           .eq('id', auth?.id)
-          .limit(1)
           .single()
         if (!error && data)
           main.user = data
         else return next('/onboarding/verify_email')
-        await snag.publish({
+        snag.publish({
           channel: 'user-login',
-          event: 'User Joined',
+          event: 'User Login',
           icon: '✅',
           tags: {
-            email: data.email,
+            'user-id': data.id,
           },
           notify: false,
-        })
+        }).catch()
         setUser({
           nickname: `${data.first_name} ${data.last_name}`,
           email: data.email,

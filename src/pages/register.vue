@@ -64,7 +64,7 @@ const submit = async () => {
     isLoading.value = false
     return
   }
-  const { error } = await supabase.auth.signUp(
+  const { user, error } = await supabase.auth.signUp(
     {
       email: form.email,
       password: form.password,
@@ -87,22 +87,19 @@ const submit = async () => {
     // http://localhost:3334/onboarding/verify_email,http://localhost:3334/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
   )
   isLoading.value = false
+  if (error || !user) {
+    errorMessage.value = error?.message || 'user not found'
+    return
+  }
   snag.publish({
     channel: 'user-register',
     event: 'User Joined',
     icon: '🎉',
     tags: {
-      first_name: form.first_name,
-      last_name: form.last_name,
-      email: form.email,
+      'user-id': user.id,
     },
     notify: true,
-  })
-  if (error) {
-    errorMessage.value = error.message
-    return
-  }
-
+  }).catch()
   router.push('/onboarding/confirm_email')
 }
 </script>

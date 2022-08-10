@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.150.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.151.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
@@ -6,7 +6,6 @@ import { checkKey, sendRes } from '../_utils/utils.ts'
 interface GetLatest {
   appid?: string
   app_id?: string
-  channel: string
 }
 
 export const deleteVersion = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
@@ -16,8 +15,8 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
     return sendRes({ status: 'Missing app_id' }, 400)
   }
   if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+    console.error('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
     const { error: dbError } = await supabaseAdmin
@@ -46,12 +45,13 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       return sendRes({ status: 'Missing app_id' }, 400)
     }
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
-      console.log('You can\'t access this app')
-      return sendRes({ status: 'You can\'t access this app' }, 400)
+      console.error('You can\'t access this app', body.app_id)
+      return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
+
     const { data: dataVersions, error: dbError } = await supabaseAdmin
       .from<definitions['app_versions']>('app_versions')
       .select()

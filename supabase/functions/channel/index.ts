@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.150.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.151.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
@@ -17,8 +17,8 @@ interface GetDevice {
 export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = (await event.json()) as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+    console.error('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   // get one channel or all channels
   if (body.channel) {
@@ -47,9 +47,9 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
 export const deleteChannel = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = (await event.json()) as ChannelSet
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id || body.app_id))) {
-    console.log('You can\'t access this app')
-    return sendRes({ status: 'You can\'t access this app' }, 400)
+  if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
+    console.error('You can\'t access this app', body.app_id)
+    return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
     const { error: dbError } = await supabaseAdmin

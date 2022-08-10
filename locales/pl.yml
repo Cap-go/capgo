@@ -144,6 +144,7 @@ login:
   withemail: Z adresem e-mail
 module:
   heading: Moduły
+monthly-active-users: Aktywni użytkownicy miesięcznie
 not-found: Nie znaleziono
 notificationSettings:
   heading: Ustawienia powiadomień
@@ -157,10 +158,12 @@ package:
   devices: Zobacz urządzenia
   devices-list: Połączone urządzenia
   download: Pobierz wersję
+  externally: przechowywane zewnętrznie
   link_channel: Link do kanału
   link_version: Link do wersji
   mobiles-stats: Statystyki telefonów komórkowych
   name: Aplikacja
+  not_available: Nie znaleziono pakietu
   set: Ustaw wersję na kanał
   stats: statystyki
   test: Uruchom wersję

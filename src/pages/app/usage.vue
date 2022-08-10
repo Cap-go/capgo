@@ -19,6 +19,7 @@ import type { PlanRes, Stats } from '~/services/plans'
 import Spinner from '~/components/Spinner.vue'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
+import { useLogSnag } from '~/services/logsnag'
 
 const crisp = new CapacitorCrispWeb()
 const openSupport = () => {
@@ -27,6 +28,7 @@ const openSupport = () => {
 }
 
 const { t } = useI18n()
+const snag = useLogSnag()
 const supabase = useSupabase()
 const isLoading = ref(false)
 const isMobile = isPlatform('capacitor')
@@ -129,7 +131,31 @@ watch(
 watchEffect(async () => {
   if (route.path === '/app/usage') {
     // if session_id is in url params show modal success plan setup
-    route.query.session_id && showToastMessage(t('usage.success'))
+    if (route.query.session_id) {
+      showToastMessage(t('usage.success'))
+      if (main.user?.id) {
+        snag.publish({
+          channel: 'usage',
+          event: 'User subscribe',
+          icon: '📊',
+          tags: {
+            'user-id': main.user?.id,
+          },
+          notify: false,
+        }).catch()
+      }
+    }
+    else if (main.user?.id) {
+      snag.publish({
+        channel: 'usage',
+        event: 'User visit',
+        icon: '📊',
+        tags: {
+          'user-id': main.user?.id,
+        },
+        notify: false,
+      }).catch()
+    }
   }
 })
 

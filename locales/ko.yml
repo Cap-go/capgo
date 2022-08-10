@@ -140,6 +140,7 @@ login:
   withemail: 이메일 주소로
 module:
   heading: 모듈
+monthly-active-users: 월간 활성 사용자
 not-found: 찾을 수 없습니다
 notificationSettings:
   heading: 알림 설정
@@ -153,10 +154,12 @@ package:
   devices: 기기 보기
   devices-list: 연결된 기기
   download: 버전 다운로드
+  externally: 외부에 저장
   link_channel: 채널 링크
   link_version: 버전에 대한 링크
   mobiles-stats: 모바일 통계
   name: 앱
+  not_available: 패키지를 찾을 수 없음
   set: 버전을 채널로 설정
   stats: 통계
   test: 출시 버전

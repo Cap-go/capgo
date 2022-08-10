@@ -1,14 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
-import { createCustomer } from './stripe.ts'
-import type { definitions } from './types_supabase.ts'
+import { createCustomer } from '../_utils/stripe.ts'
+import type { definitions } from '../_utils/types_supabase.ts'
 
+const supabaseUrl = 'https://***.supabase.co'
+const supabaseAnonKey = '***'
+
+const useSupabase = () => {
+  const options = {
+    // const options: SupabaseClientOptions = {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  }
+  return createClient(supabaseUrl, supabaseAnonKey, options)
+}
 // get all users from supabase
 const initCustomers = async () => {
-  const supabase = createClient(
-    'https://aucsybvnhavogdmzwtcw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1Y3N5YnZuaGF2b2dkbXp3dGN3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY1MzU4NzE2OCwiZXhwIjoxOTY5MTYzMTY4fQ.GhdrbI342XQEUQG913dQ7XAu9dGNB_s7jOXCaAxhIk8',
-  )
-  const { data: users } = await supabase
+  const { data: users } = await useSupabase()
     .from<definitions['users']>('users')
     .select()
   if (!users) {
@@ -18,7 +26,7 @@ const initCustomers = async () => {
   // iterate users and send them to stripe
   for (const user of users) {
     const customer = await createCustomer(user.email)
-    const { error: dbStripeError } = await supabase
+    const { error: dbStripeError } = await useSupabase()
       .from<definitions['stripe_info']>('stripe_info')
       .insert({
         customer_id: customer.id,
@@ -27,7 +35,7 @@ const initCustomers = async () => {
       console.log(dbStripeError)
       return
     }
-    const { error: dbError } = await supabase
+    const { error: dbError } = await useSupabase()
       .from<definitions['users']>('users')
       .update({
         customer_id: customer.id,

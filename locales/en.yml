@@ -140,6 +140,7 @@ login:
   withemail: With email adress
 module:
   heading: Modules
+monthly-active-users: Monthly active users
 not-found: Not found
 notificationSettings:
   heading: Notification settings
@@ -153,10 +154,12 @@ package:
   devices: See devices statistics
   devices-list: Devices linked
   download: Download version
+  externally: stored externally
   link_channel: Link to channel
   link_version: Link to version
   mobiles-stats: Mobiles stats
   name: App
+  not_available: Package not found
   set: Set version to channel
   stats: stats
   test: Launch version

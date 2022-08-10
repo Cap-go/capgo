@@ -145,6 +145,7 @@ login:
   withemail: Con indirizzo email
 module:
   heading: Moduli
+monthly-active-users: Utenti attivi mensili
 not-found: Non trovato
 notificationSettings:
   heading: Account
@@ -158,10 +159,12 @@ package:
   devices: Vedi dispositivi
   devices-list: Dispositivi collegati
   download: Scarica versione
+  externally: immagazzinato esternamente
   link_channel: Link al canale
   link_version: Link alla versione
   mobiles-stats: Statistiche sui cellulari
   name: App
+  not_available: Pacchetto non trovato
   set: Imposta la versione sul canale
   stats: statistiche
   test: Versione di lancio
