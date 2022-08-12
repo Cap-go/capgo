@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.14.0](https://github.com/Cap-go/capgo/compare/1.13.14...1.14.0) (2022-08-12)
+
+
+### Features
+
+* add bandwidth calc ([221abb6](https://github.com/Cap-go/capgo/commit/221abb62a05e8bff4a997e7c1383cfe8131a6d3d))
+
 ### [1.13.14](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.4...1.13.14) (2022-08-12)
 
 
