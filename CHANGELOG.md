@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.13.12](https://github.com/Cap-go/capgo/compare/1.13.11...1.13.12) (2022-08-12)
+
+
+### Bug Fixes
+
+* create customer id when missing ([045557a](https://github.com/Cap-go/capgo/commit/045557aa12ec2d42a77a84d71bbeaa4ab371ecd6))
+
 ### [1.13.11](https://github.com/Cap-go/capgo/compare/1.13.10...1.13.11) (2022-08-09)
 
 
