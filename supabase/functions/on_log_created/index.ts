@@ -87,7 +87,7 @@ serve(async (event: Request) => {
         const { data: dataAppVersion } = await supabaseAdmin
           .from<definitions['app_versions']>('app_versions')
           .select()
-          .eq('id', record.id)
+          .eq('id', record.version)
           .single()
         if (!dataAppVersion) {
           console.log('Cannot find app_versions', record.id)
