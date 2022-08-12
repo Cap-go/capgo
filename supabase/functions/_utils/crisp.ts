@@ -33,9 +33,14 @@ export const postPerson = async (email: string, firstName?: string, lastName?: s
   return response.data
 }
 export interface Person {
-  nickname: string
+  nickname?: string
   avatar?: string
+  status?: string
   country?: string
+  id?: string
+  customer_id?: string
+  product_id?: string
+  price_id?: string
 }
 
 export const updatePerson = async (email: string, person?: Person, segments: string[] = []) => {
@@ -48,7 +53,7 @@ export const updatePerson = async (email: string, person?: Person, segments: str
   return response.data
 }
 
-export const addDataPerson = async (email: string, data: any) => {
+export const addDataPerson = async (email: string, data: Person) => {
   const url = `${baseUrl()}/people/data/${email}`
   const response = await axiod.patch(url, { data }, getConfig())
   return response.data
