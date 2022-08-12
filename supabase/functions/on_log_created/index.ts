@@ -18,7 +18,15 @@ serve(async (event: Request) => {
     console.log('body')
     const body = (await event.json()) as { record: definitions['stats'] }
     const record = body.record
-
+    // set
+    if (record.action === 'set') {
+      // add app size to bandwidth
+      console.log('add device to bandwidth')
+    }
+    else {
+      // add device to MAU
+      console.log('add device to MAU')
+    }
     return sendRes()
   }
   catch (e) {
