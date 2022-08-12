@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.11-alpha.4](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.3...1.9.11-alpha.4) (2022-08-12)
+
+
+### Bug Fixes
+
+* add base of app_stats_daily ([57c28d5](https://github.com/Cap-go/capgo/commit/57c28d5e2fc20a1ed1c1b02fda3246425268ca26))
+
 ### [1.9.11-alpha.3](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.2...1.9.11-alpha.3) (2022-08-12)
 
 ### [1.9.11-alpha.2](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.1...1.9.11-alpha.2) (2022-08-12)
