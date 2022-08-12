@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.14.4](https://github.com/Cap-go/capgo/compare/1.14.3...1.14.4) (2022-08-12)
+
+
+### Bug Fixes
+
+* issue with Foreign key ([50ba11b](https://github.com/Cap-go/capgo/commit/50ba11be9ece5fdddf1217f5b13625cb4b22d8e8))
+
 ### [1.14.3](https://github.com/Cap-go/capgo/compare/1.14.2...1.14.3) (2022-08-12)
 
 
