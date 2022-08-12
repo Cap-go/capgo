@@ -129,7 +129,8 @@ export interface paths {
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
           date_id?: parameters["rowFilter.app_stats.date_id"];
-          versionSize?: parameters["rowFilter.app_stats.versionSize"];
+          version_size?: parameters["rowFilter.app_stats.version_size"];
+          bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -191,7 +192,8 @@ export interface paths {
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
           date_id?: parameters["rowFilter.app_stats.date_id"];
-          versionSize?: parameters["rowFilter.app_stats.versionSize"];
+          version_size?: parameters["rowFilter.app_stats.version_size"];
+          bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
         };
         header: {
           /** Preference */
@@ -217,7 +219,8 @@ export interface paths {
           mlu_real?: parameters["rowFilter.app_stats.mlu_real"];
           devices?: parameters["rowFilter.app_stats.devices"];
           date_id?: parameters["rowFilter.app_stats.date_id"];
-          versionSize?: parameters["rowFilter.app_stats.versionSize"];
+          version_size?: parameters["rowFilter.app_stats.version_size"];
+          bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
         };
         body: {
           /** app_stats */
@@ -1974,99 +1977,6 @@ export interface paths {
       };
     };
   };
-  "/tasks": {
-    get: {
-      parameters: {
-        query: {
-          id?: parameters["rowFilter.tasks.id"];
-          created_at?: parameters["rowFilter.tasks.created_at"];
-          url?: parameters["rowFilter.tasks.url"];
-          /** Filtering Columns */
-          select?: parameters["select"];
-          /** Ordering */
-          order?: parameters["order"];
-          /** Limiting and Pagination */
-          offset?: parameters["offset"];
-          /** Limiting and Pagination */
-          limit?: parameters["limit"];
-        };
-        header: {
-          /** Limiting and Pagination */
-          Range?: parameters["range"];
-          /** Limiting and Pagination */
-          "Range-Unit"?: parameters["rangeUnit"];
-          /** Preference */
-          Prefer?: parameters["preferCount"];
-        };
-      };
-      responses: {
-        /** OK */
-        200: {
-          schema: definitions["tasks"][];
-        };
-        /** Partial Content */
-        206: unknown;
-      };
-    };
-    post: {
-      parameters: {
-        body: {
-          /** tasks */
-          tasks?: definitions["tasks"];
-        };
-        query: {
-          /** Filtering Columns */
-          select?: parameters["select"];
-        };
-        header: {
-          /** Preference */
-          Prefer?: parameters["preferReturn"];
-        };
-      };
-      responses: {
-        /** Created */
-        201: unknown;
-      };
-    };
-    delete: {
-      parameters: {
-        query: {
-          id?: parameters["rowFilter.tasks.id"];
-          created_at?: parameters["rowFilter.tasks.created_at"];
-          url?: parameters["rowFilter.tasks.url"];
-        };
-        header: {
-          /** Preference */
-          Prefer?: parameters["preferReturn"];
-        };
-      };
-      responses: {
-        /** No Content */
-        204: never;
-      };
-    };
-    patch: {
-      parameters: {
-        query: {
-          id?: parameters["rowFilter.tasks.id"];
-          created_at?: parameters["rowFilter.tasks.created_at"];
-          url?: parameters["rowFilter.tasks.url"];
-        };
-        body: {
-          /** tasks */
-          tasks?: definitions["tasks"];
-        };
-        header: {
-          /** Preference */
-          Prefer?: parameters["preferReturn"];
-        };
-      };
-      responses: {
-        /** No Content */
-        204: never;
-      };
-    };
-  };
   "/users": {
     get: {
       parameters: {
@@ -2256,6 +2166,28 @@ export interface paths {
       parameters: {
         body: {
           args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/get_stats": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: character varying */
+            dateid: string;
             /** Format: uuid */
             userid: string;
           };
@@ -2821,7 +2753,9 @@ export interface definitions {
      */
     date_id: string;
     /** Format: bigint */
-    versionSize?: number;
+    version_size?: number;
+    /** Format: bigint */
+    bandwidth?: number;
   };
   app_stats_onprem: {
     /**
@@ -3447,21 +3381,6 @@ export interface definitions {
      */
     is_good_plan?: boolean;
   };
-  tasks: {
-    /**
-     * Format: bigint
-     * @description Note:
-     * This is a Primary Key.<pk/>
-     */
-    id: number;
-    /**
-     * Format: timestamp with time zone
-     * @default now()
-     */
-    created_at?: string;
-    /** Format: text */
-    url: string;
-  };
   users: {
     /**
      * Format: timestamp with time zone
@@ -3585,7 +3504,9 @@ export interface parameters {
   /** Format: character varying */
   "rowFilter.app_stats.date_id": string;
   /** Format: bigint */
-  "rowFilter.app_stats.versionSize": string;
+  "rowFilter.app_stats.version_size": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.bandwidth": string;
   /** @description app_stats_onprem */
   "body.app_stats_onprem": definitions["app_stats_onprem"];
   /** Format: character varying */
@@ -3882,14 +3803,6 @@ export interface parameters {
   "rowFilter.stripe_info.price_id": string;
   /** Format: boolean */
   "rowFilter.stripe_info.is_good_plan": string;
-  /** @description tasks */
-  "body.tasks": definitions["tasks"];
-  /** Format: bigint */
-  "rowFilter.tasks.id": string;
-  /** Format: timestamp with time zone */
-  "rowFilter.tasks.created_at": string;
-  /** Format: text */
-  "rowFilter.tasks.url": string;
   /** @description users */
   "body.users": definitions["users"];
   /** Format: timestamp with time zone */

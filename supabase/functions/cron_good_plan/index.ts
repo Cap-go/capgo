@@ -6,7 +6,6 @@ import { sendRes } from '../_utils/utils.ts'
 import type { Stats } from '../_utils/plans.ts'
 
 serve(async (event: Request) => {
-  const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret) {

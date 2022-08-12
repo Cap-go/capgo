@@ -31,7 +31,6 @@ const getStats = (): GlobalStats => {
   }
 }
 serve(async (event: Request) => {
-  const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret) {
@@ -55,7 +54,7 @@ serve(async (event: Request) => {
       stars,
     }
     // console.log('newData', newData)
-    await supabase
+    await supabaseAdmin
       .from<definitions['global_stats']>('global_stats')
       .upsert(newData)
     return sendRes()

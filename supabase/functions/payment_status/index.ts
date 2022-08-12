@@ -7,19 +7,18 @@ import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 serve(async (event: Request) => {
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
-  const supabase = supabaseAdmin
   const authorization = event.headers.get('authorization')
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)
   try {
-    const { user: auth, error } = await supabase.auth.api.getUser(
+    const { user: auth, error } = await supabaseAdmin.auth.api.getUser(
       authorization?.split('Bearer ')[1],
     )
 
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
-    const { data: user } = await supabase
+    const { data: user } = await supabaseAdmin
       .from<definitions['users']>('users')
       .select()
       .eq('id', auth.id)
