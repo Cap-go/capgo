@@ -86,7 +86,7 @@ serve(async (event: Request) => {
             devices: devices.count || 0,
             mlu_real: mlu_real.count || 0,
             versions: versions.data?.length || 0,
-            versionSize: versions.data?.reduce((acc, cur) => acc + ((cur.metadata as any).size || 0), 0) || 0,
+            version_size: versions.data?.reduce((acc, cur) => acc + ((cur.metadata as any).size || 0), 0) || 0,
             shared: shared.count || 0,
           }
           // console.log('newData', newData)
