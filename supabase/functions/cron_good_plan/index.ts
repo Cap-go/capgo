@@ -17,7 +17,7 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    const { data: users } = await supabase
+    const { data: users } = await supabaseAdmin
       .from<definitions['users']>('users')
       .select()
 
