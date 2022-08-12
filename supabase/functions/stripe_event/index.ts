@@ -6,8 +6,6 @@ import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 serve(async (event: Request) => {
-  const supabase = supabaseAdmin
-
   if (!event.headers.get('stripe-signature') || !Deno.env.get('STRIPE_WEBHOOK_SECRET') || !Deno.env.get('STRIPE_SECRET_KEY'))
     return sendRes({ status: 'Webhook Error: no signature or no secret found' }, 400)
 
@@ -20,7 +18,7 @@ serve(async (event: Request) => {
       return sendRes('no customer found', 500)
 
     // find email from user with customer_id
-    const { error: dbError, data: user } = await supabase
+    const { error: dbError, data: user } = await supabaseAdmin
       .from<definitions['users']>('users')
       .select(`email,
       id`)
@@ -30,7 +28,7 @@ serve(async (event: Request) => {
       return sendRes(dbError, 500)
     if (!user)
       return sendRes('no user found', 500)
-    const { error: dbError2 } = await supabase
+    const { error: dbError2 } = await supabaseAdmin
       .from<definitions['stripe_info']>('stripe_info')
       .update(stripeData)
       .eq('customer_id', stripeData.customer_id)
@@ -46,7 +44,7 @@ serve(async (event: Request) => {
       product_id: stripeData.product_id,
     })
     if (stripeData.status !== 'canceled' && stripeData.price_id) {
-      const { data: plan } = await supabase
+      const { data: plan } = await supabaseAdmin
         .from<definitions['plans']>('plans')
         .select()
         .eq('stripe_id', stripeData.product_id)

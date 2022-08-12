@@ -4,48 +4,46 @@ import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 const getApp = (userId: string, appId: string) => {
-  const supabase = supabaseAdmin
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
   // console.log('req', req)
   return {
-    mlu: supabase
+    mlu: supabaseAdmin
       .from<definitions['stats']>('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'get'),
-    mlu_real: supabase
+    mlu_real: supabaseAdmin
       .from<definitions['stats']>('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'set'),
-    devices: supabase
+    devices: supabaseAdmin
       .from<definitions['devices']>('devices')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
-    versions: supabase
+    versions: supabaseAdmin
       .storage
       .from('apps')
       .list(`${userId}/${appId}/versions`),
-    shared: supabase
+    shared: supabaseAdmin
       .from<definitions['channel_users']>('channel_users')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
-    channels: supabase
+    channels: supabaseAdmin
       .from<definitions['channels']>('channels')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
   }
 }
 serve(async (event: Request) => {
-  const supabase = supabaseAdmin
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret) {
@@ -57,7 +55,7 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    const { data: apps } = await supabase
+    const { data: apps } = await supabaseAdmin
       .from<definitions['apps']>('apps')
       .select()
 
@@ -92,7 +90,7 @@ serve(async (event: Request) => {
             shared: shared.count || 0,
           }
           // console.log('newData', newData)
-          return supabase
+          return supabaseAdmin
             .from<definitions['app_stats']>('app_stats')
             .upsert(newData)
         }))
