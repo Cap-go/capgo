@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.151.0/http/server.ts'
+import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -15,18 +16,58 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
     const body = (await event.json()) as { record: definitions['stats'] }
     const record = body.record
-    // set
+    console.log('record', record)
+    const today_id = new Date().toISOString().slice(0, 10)
+    const month_id = new Date().toISOString().slice(0, 7)
+    const increment: AppStatsIncrement = {
+      app_id: record.app_id,
+      date_id: today_id,
+      bandwidth: 0,
+      mlu: 0,
+      mlu_real: 0,
+      devices: 0,
+      version_size: 0,
+      channels: 0,
+      shared: 0,
+      versions: 0,
+    }
     if (record.action === 'set') {
-      // add app size to bandwidth
-      console.log('add device to bandwidth')
+      increment.mlu = 1
     }
-    else {
-      // add device to MAU
-      console.log('add device to MAU')
+    else if (record.action === 'get') {
+      increment.mlu_real = 1
+      const { data: dataVersionsMeta } = await supabaseAdmin
+        .from<definitions['app_versions_meta']>('app_versions_meta')
+        .select()
+        .eq('id', record.id)
+        .single()
+      if (dataVersionsMeta)
+        increment.bandwidth = dataVersionsMeta.size
     }
+    // get device and check if update_at is today
+    const { data: dataDevice } = await supabaseAdmin
+      .from<definitions['devices']>('devices')
+      .select()
+      .eq('device_id', record.device_id)
+      .single()
+    if (dataDevice) {
+      // compare date with today
+      if (dataDevice.date_id !== month_id) {
+        increment.devices = 1
+        await supabaseAdmin
+          .from<definitions['devices']>('devices')
+          .update({
+            date_id: month_id,
+          })
+          .eq('device_id', record.device_id)
+      }
+    }
+    const { error } = await supabaseAdmin
+      .rpc('increment_stats', increment)
+    if (error)
+      console.error('increment_stats', error)
     return sendRes()
   }
   catch (e) {

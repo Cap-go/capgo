@@ -1101,6 +1101,7 @@ export interface paths {
           platform?: parameters["rowFilter.devices.platform"];
           plugin_version?: parameters["rowFilter.devices.plugin_version"];
           os_version?: parameters["rowFilter.devices.os_version"];
+          date_id?: parameters["rowFilter.devices.date_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1159,6 +1160,7 @@ export interface paths {
           platform?: parameters["rowFilter.devices.platform"];
           plugin_version?: parameters["rowFilter.devices.plugin_version"];
           os_version?: parameters["rowFilter.devices.os_version"];
+          date_id?: parameters["rowFilter.devices.date_id"];
         };
         header: {
           /** Preference */
@@ -1181,6 +1183,7 @@ export interface paths {
           platform?: parameters["rowFilter.devices.platform"];
           plugin_version?: parameters["rowFilter.devices.plugin_version"];
           os_version?: parameters["rowFilter.devices.os_version"];
+          date_id?: parameters["rowFilter.devices.date_id"];
         };
         body: {
           /** devices */
@@ -2094,6 +2097,44 @@ export interface paths {
       responses: {
         /** No Content */
         204: never;
+      };
+    };
+  };
+  "/rpc/increment_stats": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: integer */
+            mlu: number;
+            /** Format: integer */
+            devices: number;
+            /** Format: character varying */
+            date_id: string;
+            /** Format: integer */
+            version_size: number;
+            /** Format: integer */
+            shared: number;
+            /** Format: integer */
+            bandwidth: number;
+            /** Format: integer */
+            channels: number;
+            /** Format: character varying */
+            app_id: string;
+            /** Format: integer */
+            versions: number;
+            /** Format: integer */
+            mlu_real: number;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
       };
     };
   };
@@ -3093,6 +3134,8 @@ export interface definitions {
     plugin_version: string;
     /** Format: character varying */
     os_version?: string;
+    /** Format: character varying */
+    date_id?: string;
   };
   devices_onprem: {
     /**
@@ -3661,6 +3704,8 @@ export interface parameters {
   "rowFilter.devices.plugin_version": string;
   /** Format: character varying */
   "rowFilter.devices.os_version": string;
+  /** Format: character varying */
+  "rowFilter.devices.date_id": string;
   /** @description devices_onprem */
   "body.devices_onprem": definitions["devices_onprem"];
   /** Format: timestamp with time zone */

@@ -2,6 +2,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
 import type { definitions } from './types_supabase.ts'
 // Import Supabase client
 
+export interface AppStatsIncrement {
+  app_id: string
+  date_id: string
+  bandwidth: number
+  mlu: number
+  mlu_real: number
+  devices: number
+  version_size: number
+  channels: number
+  shared: number
+  versions: number
+}
 export const supabaseClient = createClient(
   // Supabase API URL - env var exported by default.
   Deno.env.get('SUPABASE_URL') ?? '',

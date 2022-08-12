@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
+import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -50,7 +51,23 @@ serve(async (event: Request) => {
       })
     if (dbError)
       console.error('Cannot create app version meta', dbError)
-
+    const today_id = new Date().toISOString().slice(0, 10)
+    const increment: AppStatsIncrement = {
+      app_id: record.app_id,
+      date_id: today_id,
+      bandwidth: 0,
+      mlu: 0,
+      mlu_real: 0,
+      devices: 0,
+      version_size: size,
+      channels: 0,
+      shared: 0,
+      versions: 0,
+    }
+    const { error: incrError } = await supabaseAdmin
+      .rpc('increment_stats', increment)
+    if (incrError)
+      console.error('increment_stats', incrError)
     return sendRes()
   }
   catch (e) {

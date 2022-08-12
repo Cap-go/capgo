@@ -58,7 +58,6 @@ serve(async (event: Request) => {
     const { data: apps } = await supabaseAdmin
       .from<definitions['apps']>('apps')
       .select()
-
     if (!apps || !apps.length)
       return sendRes({ status: 'error', message: 'no apps' })
     // explore all apps
@@ -72,14 +71,11 @@ serve(async (event: Request) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, devices, versions, shared, channels)
-          // create var date_id with yearn-month
-          const now = new Date()
-          // get_current_plan_name
-          // get month with leading zero
-          const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
+          const month_id = new Date().toISOString().slice(0, 7)
+          const today_id = new Date().toISOString().slice(0, 10)
           const newData: definitions['app_stats'] = {
             app_id: app.app_id,
-            date_id: `${now.getFullYear()}-${month}`,
+            date_id: month_id,
             user_id: app.user_id,
             channels: channels.count || 0,
             mlu: mlu.count || 0,
@@ -90,6 +86,9 @@ serve(async (event: Request) => {
             shared: shared.count || 0,
           }
           // console.log('newData', newData)
+          all.push(supabaseAdmin
+            .from<definitions['app_stats']>('app_stats')
+            .upsert({ ...newData, date_id: today_id }))
           return supabaseAdmin
             .from<definitions['app_stats']>('app_stats')
             .upsert(newData)
