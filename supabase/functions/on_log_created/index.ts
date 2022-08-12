@@ -69,10 +69,40 @@ serve(async (event: Request) => {
       }
     }
     if (changed) {
-      const { error } = await supabaseAdmin
-        .rpc('increment_stats', increment)
-      if (error)
-        console.error('increment_stats', error)
+      // get app_stats
+      const { data: dataAppStats } = await supabaseAdmin
+        .from<definitions['app_stats']>('app_stats')
+        .select()
+        .eq('app_id', record.app_id)
+        .eq('date_id', today_id)
+        .single()
+      if (dataAppStats) {
+        const { error } = await supabaseAdmin
+          .rpc('increment_stats', increment)
+        if (error)
+          console.error('increment_stats', error)
+      }
+      else {
+        // get app_versions_meta
+        const { data: dataAppVersion } = await supabaseAdmin
+          .from<definitions['app_versions']>('app_versions')
+          .select()
+          .eq('id', record.id)
+          .single()
+        if (!dataAppVersion) {
+          console.log('Cannot find app_versions', record.id)
+          return sendRes()
+        }
+        const newDay: definitions['app_stats'] = {
+          ...increment,
+          user_id: dataAppVersion?.user_id,
+        }
+        const { error } = await supabaseAdmin
+          .from<definitions['app_stats']>('app_stats')
+          .insert(newDay)
+        if (error)
+          console.error('Cannot create app_stats', error)
+      }
     }
     return sendRes()
   }

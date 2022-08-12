@@ -72,7 +72,6 @@ serve(async (event: Request) => {
             return
           // console.log('app', app.app_id, devices, versions, shared, channels)
           const month_id = new Date().toISOString().slice(0, 7)
-          const today_id = new Date().toISOString().slice(0, 10)
           const newData: definitions['app_stats'] = {
             app_id: app.app_id,
             date_id: month_id,
@@ -86,9 +85,6 @@ serve(async (event: Request) => {
             shared: shared.count || 0,
           }
           // console.log('newData', newData)
-          all.push(supabaseAdmin
-            .from<definitions['app_stats']>('app_stats')
-            .upsert({ ...newData, date_id: today_id }))
           return supabaseAdmin
             .from<definitions['app_stats']>('app_stats')
             .upsert(newData)
