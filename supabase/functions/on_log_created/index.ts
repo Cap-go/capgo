@@ -21,6 +21,7 @@ serve(async (event: Request) => {
     console.log('record', record)
     const today_id = new Date().toISOString().slice(0, 10)
     const month_id = new Date().toISOString().slice(0, 7)
+    let changed = false
     const increment: AppStatsIncrement = {
       app_id: record.app_id,
       date_id: today_id,
@@ -35,6 +36,7 @@ serve(async (event: Request) => {
     }
     if (record.action === 'set') {
       increment.mlu = 1
+      changed = true
     }
     else if (record.action === 'get') {
       increment.mlu_real = 1
@@ -45,6 +47,7 @@ serve(async (event: Request) => {
         .single()
       if (dataVersionsMeta)
         increment.bandwidth = dataVersionsMeta.size
+      changed = true
     }
     // get device and check if update_at is today
     const { data: dataDevice } = await supabaseAdmin
@@ -56,6 +59,7 @@ serve(async (event: Request) => {
       // compare date with today
       if (dataDevice.date_id !== month_id) {
         increment.devices = 1
+        changed = true
         await supabaseAdmin
           .from<definitions['devices']>('devices')
           .update({
@@ -64,10 +68,12 @@ serve(async (event: Request) => {
           .eq('device_id', record.device_id)
       }
     }
-    const { error } = await supabaseAdmin
-      .rpc('increment_stats', increment)
-    if (error)
-      console.error('increment_stats', error)
+    if (changed) {
+      const { error } = await supabaseAdmin
+        .rpc('increment_stats', increment)
+      if (error)
+        console.error('increment_stats', error)
+    }
     return sendRes()
   }
   catch (e) {
