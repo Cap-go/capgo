@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.11-alpha.5](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.4...1.9.11-alpha.5) (2022-08-12)
+
+
+### Bug Fixes
+
+* versionSize name ([f83082a](https://github.com/Cap-go/capgo/commit/f83082ae2a27b41b18047a4b1a38af80f2a9d979))
+
 ### [1.9.11-alpha.4](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.3...1.9.11-alpha.4) (2022-08-12)
 
 
