@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.11-alpha.1](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.0...1.9.11-alpha.1) (2022-08-12)
+
+
+### Bug Fixes
+
+* create customer id when missing ([045557a](https://github.com/Cap-go/capgo/commit/045557aa12ec2d42a77a84d71bbeaa4ab371ecd6))
+
 ### [1.9.11-alpha.0](https://github.com/Cap-go/capgo/compare/1.13.11...1.9.11-alpha.0) (2022-08-10)
 
 ## [1.9.0-alpha.3](https://github.com/Cap-go/capgo/compare/1.10.0...1.9.0-alpha.3) (2022-08-03)
