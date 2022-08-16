@@ -67,3 +67,18 @@ export const createCustomer = async (email: string) => {
   return response.data
 }
 
+export const removeOldSubscription = async (subscriptionId: string) => {
+  console.log('removeOldSubscription', subscriptionId)
+  const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || ''
+  const STRIPE_TOKEN = `${STRIPE_SECRET_KEY}`
+  console.log('STRIPE_TOKEN', STRIPE_TOKEN)
+  const requestOptions = {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${STRIPE_TOKEN}`,
+    },
+  }
+
+  const response = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, requestOptions)
+  return response.json()
+}
