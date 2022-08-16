@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.10.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.5...1.10.0-alpha.0) (2022-08-16)
+
+
+### Features
+
+* delete old subscription when upgrade ([69284fc](https://github.com/Cap-go/capgo/commit/69284fc018610abed4f84b3ca788f561be3e4d4f))
+
 ### [1.9.11-alpha.5](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.4...1.9.11-alpha.5) (2022-08-12)
 
 
