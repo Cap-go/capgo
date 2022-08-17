@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.16.1](https://github.com/Cap-go/capgo/compare/1.16.0-alpha.0...1.16.1) (2022-08-17)
+
+
+### Bug Fixes
+
+* issue with bandwidth ([48aa7e8](https://github.com/Cap-go/capgo/commit/48aa7e8a505d690c0496b36a76162e9d20e022fa))
+
+## [1.16.0](https://github.com/Cap-go/capgo/compare/1.15.1...1.16.0) (2022-08-17)
+
 ## [1.16.0](https://github.com/Cap-go/capgo/compare/1.15.1...1.16.0) (2022-08-17)
 
 
