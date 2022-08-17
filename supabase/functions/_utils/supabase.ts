@@ -50,6 +50,42 @@ export const updateOrCreateVersion = async (update: Partial<definitions['app_ver
   }
 }
 
+export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: string, version: number) => {
+  const { data: dataAppStats } = await supabaseAdmin
+    .from<definitions['app_stats']>('app_stats')
+    .select()
+    .eq('app_id', increment.app_id)
+    .eq('date_id', date_id)
+    .single()
+  if (dataAppStats) {
+    const { error } = await supabaseAdmin
+      .rpc('increment_stats', increment)
+    if (error)
+      console.error('increment_stats', error)
+  }
+  else {
+  // get app_versions_meta
+    const { data: dataAppVersion } = await supabaseAdmin
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('id', version)
+      .single()
+    if (!dataAppVersion) {
+      console.log('Cannot find app_versions', version)
+      return
+    }
+    const newDay: definitions['app_stats'] = {
+      ...increment,
+      user_id: dataAppVersion?.user_id,
+    }
+    const { error } = await supabaseAdmin
+      .from<definitions['app_stats']>('app_stats')
+      .insert(newDay)
+    if (error)
+      console.error('Cannot create app_stats', error)
+  }
+}
+
 export const updateOrCreateChannel = async (update: Partial<definitions['channels']>) => {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
