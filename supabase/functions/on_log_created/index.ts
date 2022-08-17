@@ -70,8 +70,19 @@ serve(async (event: Request) => {
           .eq('device_id', record.device_id)
       }
     }
-    if (changed)
-      await updateOrAppStats(increment, today_id, record.version)
+    if (changed) {
+      // get app_versions_meta
+      const { data: dataApp } = await supabaseAdmin
+        .from<definitions['apps']>('apps')
+        .select()
+        .eq('app_id', record.app_id)
+        .single()
+      if (!dataApp) {
+        console.log('Cannot find app', record.app_id)
+        return sendRes()
+      }
+      await updateOrAppStats(increment, today_id, dataApp.user_id)
+    }
 
     return sendRes()
   }

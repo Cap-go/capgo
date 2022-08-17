@@ -50,7 +50,7 @@ export const updateOrCreateVersion = async (update: Partial<definitions['app_ver
   }
 }
 
-export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: string, version: number) => {
+export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: string, user_id: string) => {
   const { data: dataAppStats } = await supabaseAdmin
     .from<definitions['app_stats']>('app_stats')
     .select()
@@ -64,19 +64,9 @@ export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: st
       console.error('increment_stats', error)
   }
   else {
-  // get app_versions_meta
-    const { data: dataAppVersion } = await supabaseAdmin
-      .from<definitions['app_versions']>('app_versions')
-      .select()
-      .eq('id', version)
-      .single()
-    if (!dataAppVersion) {
-      console.log('Cannot find app_versions', version)
-      return
-    }
     const newDay: definitions['app_stats'] = {
       ...increment,
-      user_id: dataAppVersion?.user_id,
+      user_id,
     }
     const { error } = await supabaseAdmin
       .from<definitions['app_stats']>('app_stats')
