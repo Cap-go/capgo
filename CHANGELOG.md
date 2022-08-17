@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.16.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.15.1...1.16.0-alpha.0) (2022-08-17)
+
+
+### Features
+
+* add on_channel_create and on_shared_create ([2e06d33](https://github.com/Cap-go/capgo/commit/2e06d3362fcf76eb7734f54151bf9d37d3e906a7))
+
 ### [1.15.1](https://github.com/Cap-go/capgo/compare/1.15.0...1.15.1) (2022-08-17)
 
 
