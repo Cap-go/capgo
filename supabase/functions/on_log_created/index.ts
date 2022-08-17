@@ -1,4 +1,5 @@
-import { serve } from 'https://deno.land/std@0.151.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
+import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -15,17 +16,93 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
     const body = (await event.json()) as { record: definitions['stats'] }
     const record = body.record
-    // set
-    if (record.action === 'set') {
-      // add app size to bandwidth
-      console.log('add device to bandwidth')
+    console.log('record', record)
+    const today_id = new Date().toISOString().slice(0, 10)
+    const month_id = new Date().toISOString().slice(0, 7)
+    let changed = false
+    const increment: AppStatsIncrement = {
+      app_id: record.app_id,
+      date_id: today_id,
+      bandwidth: 0,
+      mlu: 0,
+      mlu_real: 0,
+      devices: 0,
+      version_size: 0,
+      channels: 0,
+      shared: 0,
+      versions: 0,
     }
-    else {
-      // add device to MAU
-      console.log('add device to MAU')
+    if (record.action === 'set') {
+      increment.mlu = 1
+      changed = true
+    }
+    else if (record.action === 'get') {
+      increment.mlu_real = 1
+      const { data: dataVersionsMeta } = await supabaseAdmin
+        .from<definitions['app_versions_meta']>('app_versions_meta')
+        .select()
+        .eq('id', record.id)
+        .single()
+      if (dataVersionsMeta)
+        increment.bandwidth = dataVersionsMeta.size
+      changed = true
+    }
+    // get device and check if update_at is today
+    const { data: dataDevice } = await supabaseAdmin
+      .from<definitions['devices']>('devices')
+      .select()
+      .eq('device_id', record.device_id)
+      .single()
+    if (dataDevice) {
+      // compare date with today
+      if (dataDevice.date_id !== month_id) {
+        increment.devices = 1
+        changed = true
+        await supabaseAdmin
+          .from<definitions['devices']>('devices')
+          .update({
+            date_id: month_id,
+          })
+          .eq('device_id', record.device_id)
+      }
+    }
+    if (changed) {
+      // get app_stats
+      const { data: dataAppStats } = await supabaseAdmin
+        .from<definitions['app_stats']>('app_stats')
+        .select()
+        .eq('app_id', record.app_id)
+        .eq('date_id', today_id)
+        .single()
+      if (dataAppStats) {
+        const { error } = await supabaseAdmin
+          .rpc('increment_stats', increment)
+        if (error)
+          console.error('increment_stats', error)
+      }
+      else {
+        // get app_versions_meta
+        const { data: dataAppVersion } = await supabaseAdmin
+          .from<definitions['app_versions']>('app_versions')
+          .select()
+          .eq('id', record.version)
+          .single()
+        if (!dataAppVersion) {
+          console.log('Cannot find app_versions', record.id)
+          return sendRes()
+        }
+        const newDay: definitions['app_stats'] = {
+          ...increment,
+          user_id: dataAppVersion?.user_id,
+        }
+        const { error } = await supabaseAdmin
+          .from<definitions['app_stats']>('app_stats')
+          .insert(newDay)
+        if (error)
+          console.error('Cannot create app_stats', error)
+      }
     }
     return sendRes()
   }

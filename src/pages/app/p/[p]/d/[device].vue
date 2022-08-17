@@ -186,6 +186,21 @@ const delDevVersion = async (device: string) => {
 }
 const updateOverride = async () => {
   const buttons = []
+  if (channelDevice.value) {
+    buttons.push({
+      text: t('button.remove'),
+      handler: async () => {
+        device.value?.device_id && delDevVersion(device.value?.device_id)
+        const toast = await toastController
+          .create({
+            message: t('device.unlink_version'),
+            duration: 2000,
+          })
+        await toast.present()
+        await loadData()
+      },
+    })
+  }
   for (const version of versions.value) {
     buttons.push({
       text: version.name,
@@ -213,21 +228,6 @@ const updateOverride = async () => {
           await toast.present()
         }
         isLoading.value = false
-      },
-    })
-  }
-  if (channelDevice.value) {
-    buttons.push({
-      text: t('button.remove'),
-      handler: async () => {
-        device.value?.device_id && delDevVersion(device.value?.device_id)
-        const toast = await toastController
-          .create({
-            message: t('device.unlink_version'),
-            duration: 2000,
-          })
-        await toast.present()
-        await loadData()
       },
     })
   }

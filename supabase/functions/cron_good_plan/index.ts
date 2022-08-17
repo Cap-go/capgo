@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.151.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
 import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -17,7 +17,7 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    const { data: users } = await supabase
+    const { data: users } = await supabaseAdmin
       .from<definitions['users']>('users')
       .select()
 

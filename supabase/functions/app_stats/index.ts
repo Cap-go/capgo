@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.151.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -58,7 +58,6 @@ serve(async (event: Request) => {
     const { data: apps } = await supabaseAdmin
       .from<definitions['apps']>('apps')
       .select()
-
     if (!apps || !apps.length)
       return sendRes({ status: 'error', message: 'no apps' })
     // explore all apps
@@ -72,14 +71,10 @@ serve(async (event: Request) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, devices, versions, shared, channels)
-          // create var date_id with yearn-month
-          const now = new Date()
-          // get_current_plan_name
-          // get month with leading zero
-          const month = now.getMonth() + 1 < 10 ? `0${now.getMonth() + 1}` : `${now.getMonth() + 1})`
+          const month_id = new Date().toISOString().slice(0, 7)
           const newData: definitions['app_stats'] = {
             app_id: app.app_id,
-            date_id: `${now.getFullYear()}-${month}`,
+            date_id: month_id,
             user_id: app.user_id,
             channels: channels.count || 0,
             mlu: mlu.count || 0,

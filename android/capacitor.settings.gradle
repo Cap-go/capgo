@@ -81,7 +81,7 @@ include ':capawesome-capacitor-screen-orientation'
 project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-screen-orientation/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.33_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.35_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
 
 include ':capacitor-flash'
 project(':capacitor-flash').projectDir = new File('../node_modules/.pnpm/capacitor-flash@1.1.3_@capacitor+core@4.0.1/node_modules/capacitor-flash/android')
@@ -93,7 +93,7 @@ include ':capacitor-native-audio'
 project(':capacitor-native-audio').projectDir = new File('../node_modules/.pnpm/capacitor-native-audio@3.0.2_@capacitor+core@4.0.1/node_modules/capacitor-native-audio/android')
 
 include ':capacitor-native-biometric'
-project(':capacitor-native-biometric').projectDir = new File('../node_modules/.pnpm/capacitor-native-biometric@3.1.1/node_modules/capacitor-native-biometric/android')
+project(':capacitor-native-biometric').projectDir = new File('../node_modules/.pnpm/capacitor-native-biometric@4.1.2/node_modules/capacitor-native-biometric/android')
 
 include ':capacitor-purchases'
 project(':capacitor-purchases').projectDir = new File('../node_modules/.pnpm/capacitor-purchases@1.2.4_@capacitor+core@4.0.1/node_modules/capacitor-purchases/android')
