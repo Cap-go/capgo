@@ -43,12 +43,12 @@ serve(async (event: Request) => {
       const { data: dataVersionsMeta } = await supabaseAdmin
         .from<definitions['app_versions_meta']>('app_versions_meta')
         .select()
-        .eq('id', record.id)
+        .eq('id', record.version)
         .single()
       if (dataVersionsMeta)
         increment.bandwidth = dataVersionsMeta.size
       else
-        console.log('Cannot find version meta', record.id)
+        console.log('Cannot find version meta', record.version)
       changed = true
     }
     // get device and check if update_at is today
