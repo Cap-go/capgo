@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.15.0](https://github.com/Cap-go/capgo/compare/1.15.0-alpha.0...1.15.0) (2022-08-17)
+
+## [1.15.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.10.0-alpha.0...1.15.0-alpha.0) (2022-08-17)
+
+### [1.14.6](https://github.com/Cap-go/capgo/compare/1.14.5...1.14.6) (2022-08-15)
+
+
+### Bug Fixes
+
+* order of remove in device link ([2cf810f](https://github.com/Cap-go/capgo/commit/2cf810fb1b2812e095cffd7bdf6a5d5ec2be5b71))
+
+### [1.14.5](https://github.com/Cap-go/capgo/compare/1.14.4...1.14.5) (2022-08-15)
+
+### [1.14.4](https://github.com/Cap-go/capgo/compare/1.14.3...1.14.4) (2022-08-12)
+
+
+### Bug Fixes
+
+* issue with Foreign key ([50ba11b](https://github.com/Cap-go/capgo/commit/50ba11be9ece5fdddf1217f5b13625cb4b22d8e8))
+
+### [1.14.3](https://github.com/Cap-go/capgo/compare/1.14.2...1.14.3) (2022-08-12)
+
+
+### Bug Fixes
+
+* in no log today ([2f70755](https://github.com/Cap-go/capgo/commit/2f70755e9e54a99ba3fcc3b42925be2db6a43ba2))
+
+### [1.14.2](https://github.com/Cap-go/capgo/compare/1.14.1...1.14.2) (2022-08-12)
+
+
+### Bug Fixes
+
+* increase only if change ([6948731](https://github.com/Cap-go/capgo/commit/6948731dac1be459406161a71f322e556ad4cfa2))
+
+### [1.14.1](https://github.com/Cap-go/capgo/compare/1.14.0...1.14.1) (2022-08-12)
+
+
+### Bug Fixes
+
+* issue build ([c95944c](https://github.com/Cap-go/capgo/commit/c95944c3371b3c6ec8cdda5c7fb3c256a78faad5))
+
+## [1.14.0](https://github.com/Cap-go/capgo/compare/1.13.14...1.14.0) (2022-08-12)
+
+
+### Features
+
+* add bandwidth calc ([221abb6](https://github.com/Cap-go/capgo/commit/221abb62a05e8bff4a997e7c1383cfe8131a6d3d))
+
+### [1.13.14](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.5...1.13.14) (2022-08-12)
+
+### [1.13.13](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.1...1.13.13) (2022-08-12)
+
+### [1.13.12](https://github.com/Cap-go/capgo/compare/1.9.11-alpha.0...1.13.12) (2022-08-12)
+
 ### [1.14.6](https://github.com/Cap-go/capgo/compare/1.14.5...1.14.6) (2022-08-15)
 
 

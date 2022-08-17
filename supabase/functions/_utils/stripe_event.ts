@@ -82,7 +82,7 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
       const charge = event.data.object as any
       data.status = 'canceled'
       data.customer_id = String(charge.customer)
-      data.subscription_id = undefined
+      data.subscription_id = charge.id
     }
     else {
       console.log('Other event', event.type, event)

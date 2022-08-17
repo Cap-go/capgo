@@ -4,6 +4,7 @@ import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
+import { removeOldSubscription } from '../_utils/stripe.ts'
 
 serve(async (event: Request) => {
   if (!event.headers.get('stripe-signature') || !Deno.env.get('STRIPE_WEBHOOK_SECRET') || !Deno.env.get('STRIPE_SECRET_KEY'))
@@ -28,14 +29,15 @@ serve(async (event: Request) => {
       return sendRes(dbError, 500)
     if (!user)
       return sendRes('no user found', 500)
-    const { error: dbError2 } = await supabaseAdmin
+
+    const { data: customer } = await supabaseAdmin
       .from<definitions['stripe_info']>('stripe_info')
-      .update(stripeData)
+      .select()
       .eq('customer_id', stripeData.customer_id)
+      .single()
 
     console.log('stripeData', stripeData)
-    if (dbError2)
-      return sendRes(dbError, 500)
+
     await addDataPerson(user.email, {
       id: user.id,
       customer_id: stripeData.customer_id,
@@ -50,6 +52,16 @@ serve(async (event: Request) => {
         .eq('stripe_id', stripeData.product_id)
         .single()
       if (plan) {
+        const { error: dbError2 } = await supabaseAdmin
+          .from<definitions['stripe_info']>('stripe_info')
+          .update(stripeData)
+          .eq('customer_id', stripeData.customer_id)
+        if (customer && customer.product_id !== 'free' && customer.subscription_id)
+          await removeOldSubscription(customer.subscription_id)
+
+        if (dbError2)
+          return sendRes(dbError, 500)
+
         const isMonthly = plan.price_m_id === stripeData.price_id
         await updatePerson(user.email, undefined, [plan.name, isMonthly ? 'Monthly' : 'Yearly'])
         await addEventPerson(user.email, {
@@ -60,8 +72,16 @@ serve(async (event: Request) => {
       else { await updatePerson(user.email, undefined, ['Not_found']) }
     }
     else if (stripeData.status === 'canceled') {
-      await updatePerson(user.email, undefined, ['Canceled'])
-      await addEventPerson(user.email, {}, 'user:cancel', 'red')
+      if (customer && customer.subscription_id === stripeData.subscription_id) {
+        const { error: dbError2 } = await supabaseAdmin
+          .from<definitions['stripe_info']>('stripe_info')
+          .update(stripeData)
+          .eq('customer_id', stripeData.customer_id)
+        if (dbError2)
+          return sendRes(dbError, 500)
+        await updatePerson(user.email, undefined, ['Canceled'])
+        await addEventPerson(user.email, {}, 'user:cancel', 'red')
+      }
     }
     else {
       await updatePerson(user.email, undefined, ['Free'])
@@ -72,7 +92,7 @@ serve(async (event: Request) => {
   catch (e) {
     console.log('Error', e)
     return sendRes({
-      status: 'Error unknow',
+      status: 'Error unknown',
       error: JSON.stringify(e),
     }, 500)
   }
