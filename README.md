@@ -1,11 +1,11 @@
 <p align='center'>
-  <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/public/capgo.png' alt='Vitesse - Opinionated Vite Starter Template' width='200'/>
+  <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor' width='200'/>
 </p>
 
 <br>
 
 <p align='center'>
-<a href="https://capgo.app/">App</a>
+<a href="https://capgo.app/">Capgo - Instant updates for capacitor</a>
 </p>
 
 <br>
@@ -22,7 +22,7 @@
 
 ## Documentation
 
-https://doc.capgo.app
+https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
 
 ## Plugins
 
