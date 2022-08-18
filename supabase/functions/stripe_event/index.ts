@@ -56,7 +56,7 @@ serve(async (event: Request) => {
           .from<definitions['stripe_info']>('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
-        if (customer && customer.product_id !== 'free' && customer.subscription_id)
+        if (customer && customer.product_id !== 'free' && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id) {
           await removeOldSubscription(customer.subscription_id)
 
         if (dbError2)
