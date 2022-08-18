@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.16.2](https://github.com/Cap-go/capgo/compare/1.16.1...1.16.2) (2022-08-18)
+
+
+### Bug Fixes
+
+* don't delete subscription renewal ([c4e9e50](https://github.com/Cap-go/capgo/commit/c4e9e507f59f62575e17897e6723e7b5b85187fe))
+
 ### [1.16.1](https://github.com/Cap-go/capgo/compare/1.16.0-alpha.0...1.16.1) (2022-08-17)
 
 
