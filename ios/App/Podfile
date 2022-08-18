@@ -37,7 +37,7 @@ def capacitor_pods
   pod 'CapacitorToast', :path => '../../node_modules/.pnpm/@capacitor+toast@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/toast'
   pod 'CapawesomeCapacitorFilePicker', :path => '../../node_modules/.pnpm/@capawesome+capacitor-file-picker@0.4.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-file-picker'
   pod 'CapawesomeCapacitorScreenOrientation', :path => '../../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-screen-orientation'
-  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.35_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater'
+  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.42_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater'
   pod 'TeamhiveCapacitorVideoRecorder', :path => '../../node_modules/.pnpm/@teamhive+capacitor-video-recorder@5.0.0_@capacitor+core@4.0.1/node_modules/@teamhive/capacitor-video-recorder'
   pod 'CapacitorFlash', :path => '../../node_modules/.pnpm/capacitor-flash@1.1.3_@capacitor+core@4.0.1/node_modules/capacitor-flash'
   pod 'CapacitorMute', :path => '../../node_modules/.pnpm/capacitor-mute@0.0.4_@capacitor+core@4.0.1/node_modules/capacitor-mute'

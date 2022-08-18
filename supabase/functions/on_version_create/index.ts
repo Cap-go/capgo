@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
 import type { AppStatsIncrement } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
@@ -62,12 +62,9 @@ serve(async (event: Request) => {
       version_size: size,
       channels: 0,
       shared: 0,
-      versions: 0,
+      versions: 1,
     }
-    const { error: incrError } = await supabaseAdmin
-      .rpc('increment_stats', increment)
-    if (incrError)
-      console.error('increment_stats', incrError)
+    await updateOrAppStats(increment, today_id, record.user_id)
     return sendRes()
   }
   catch (e) {

@@ -81,7 +81,7 @@ include ':capawesome-capacitor-screen-orientation'
 project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-screen-orientation/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.35_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.42_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
 
 include ':capacitor-flash'
 project(':capacitor-flash').projectDir = new File('../node_modules/.pnpm/capacitor-flash@1.1.3_@capacitor+core@4.0.1/node_modules/capacitor-flash/android')

@@ -1,7 +1,7 @@
 import UIKit
 import Capacitor
 import CapgoCapacitorUpdater
-import RobingenzCapacitorScreenOrientation
+import CapawesomeCapacitorScreenOrientation
 
 extension UIApplication {
 

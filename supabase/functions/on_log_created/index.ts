@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
 import type { AppStatsIncrement } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
@@ -43,10 +43,12 @@ serve(async (event: Request) => {
       const { data: dataVersionsMeta } = await supabaseAdmin
         .from<definitions['app_versions_meta']>('app_versions_meta')
         .select()
-        .eq('id', record.id)
+        .eq('id', record.version)
         .single()
       if (dataVersionsMeta)
         increment.bandwidth = dataVersionsMeta.size
+      else
+        console.log('Cannot find version meta', record.version)
       changed = true
     }
     // get device and check if update_at is today
@@ -69,41 +71,19 @@ serve(async (event: Request) => {
       }
     }
     if (changed) {
-      // get app_stats
-      const { data: dataAppStats } = await supabaseAdmin
-        .from<definitions['app_stats']>('app_stats')
+      // get app_versions_meta
+      const { data: dataApp } = await supabaseAdmin
+        .from<definitions['apps']>('apps')
         .select()
         .eq('app_id', record.app_id)
-        .eq('date_id', today_id)
         .single()
-      if (dataAppStats) {
-        const { error } = await supabaseAdmin
-          .rpc('increment_stats', increment)
-        if (error)
-          console.error('increment_stats', error)
+      if (!dataApp) {
+        console.log('Cannot find app', record.app_id)
+        return sendRes()
       }
-      else {
-        // get app_versions_meta
-        const { data: dataAppVersion } = await supabaseAdmin
-          .from<definitions['app_versions']>('app_versions')
-          .select()
-          .eq('id', record.version)
-          .single()
-        if (!dataAppVersion) {
-          console.log('Cannot find app_versions', record.id)
-          return sendRes()
-        }
-        const newDay: definitions['app_stats'] = {
-          ...increment,
-          user_id: dataAppVersion?.user_id,
-        }
-        const { error } = await supabaseAdmin
-          .from<definitions['app_stats']>('app_stats')
-          .insert(newDay)
-        if (error)
-          console.error('Cannot create app_stats', error)
-      }
+      await updateOrAppStats(increment, today_id, dataApp.user_id)
     }
+
     return sendRes()
   }
   catch (e) {

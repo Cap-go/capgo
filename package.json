@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "1.14.6",
+  "version": "1.16.1",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
@@ -51,7 +51,7 @@
     "@capacitor/toast": "^4.0.1",
     "@capawesome/capacitor-file-picker": "^0.4.0",
     "@capawesome/capacitor-screen-orientation": "^2.0.0",
-    "@capgo/capacitor-updater": "4.0.0-alpha.35",
+    "@capgo/capacitor-updater": "4.0.0-alpha.42",
     "@ionic/vue": "6.2.2",
     "@ionic/vue-router": "6.2.2",
     "@supabase/supabase-js": "1.35.6",
