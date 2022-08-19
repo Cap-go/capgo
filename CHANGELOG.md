@@ -6,6 +6,27 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [1.16.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.16.1...1.16.1-alpha.0) (2022-08-17)
 
+### [1.16.5](https://github.com/Cap-go/capgo/compare/1.16.4...1.16.5) (2022-08-19)
+
+
+### Bug Fixes
+
+* use always latest pnpm ([e17fa64](https://github.com/Cap-go/capgo/commit/e17fa64441f60ffb209ff48df824adfa4c9ee8bf))
+
+### [1.16.4](https://github.com/Cap-go/capgo/compare/1.16.3...1.16.4) (2022-08-19)
+
+
+### Bug Fixes
+
+* stats get all devices ([db00121](https://github.com/Cap-go/capgo/commit/db001219466484c89ffd470a16d1eb19feb3f8ef))
+
+### [1.16.3](https://github.com/Cap-go/capgo/compare/1.16.2...1.16.3) (2022-08-18)
+
+
+### Bug Fixes
+
+* image readme ([652d2a6](https://github.com/Cap-go/capgo/commit/652d2a6827068ec06031f8e68fae608cc1429e60))
+
 ### [1.16.2](https://github.com/Cap-go/capgo/compare/1.16.1...1.16.2) (2022-08-18)
 
 
