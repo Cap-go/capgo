@@ -68,10 +68,12 @@ const buildGraph = () => {
   dataDevLabels.value = Object.keys(vals)
 }
 
-const loadData = async () => {
-  try {
-    const { data: dataDevices } = await supabase
-      .from<definitions['devices'] & Device>('devices')
+const getAllDevices = async () => {
+  let offset = 0
+  let prevLenght = 1
+  const date = subDays(new Date(), 30).toUTCString()
+  while (prevLenght) {
+    const { data } = await supabase.from<definitions['devices'] & Device>('devices')
       .select(`
         device_id,
         platform,
@@ -83,7 +85,20 @@ const loadData = async () => {
         updated_at
       `)
       .eq('app_id', id.value)
-      .gt('updated_at', subDays(new Date(), 30).toUTCString())
+      .gt('updated_at', date)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + 100)
+    if (data && data.length) {
+      devices.value.push(...data)
+      offset += 100
+    }
+    prevLenght = data ? data.length : 0
+  }
+}
+
+const loadData = async () => {
+  try {
+    await getAllDevices()
     const { data: dataVersions } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
@@ -91,7 +106,6 @@ const loadData = async () => {
       .eq('deleted', false)
       .order('created_at', { ascending: false })
     versions.value = dataVersions || versions.value
-    devices.value = dataDevices || devices.value
     // console.log('devices', devices.value)
     buildGraph()
   }
