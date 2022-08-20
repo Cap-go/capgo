@@ -179,6 +179,7 @@ plan:
   abtest: A/B 테스트
   application: 애플리케이션
   applications: 애플리케이션
+  bandwidth: GB 대역폭
   buy: 구입하다
   channel: 채널
   channels: 채널
@@ -189,6 +190,7 @@ plan:
     desc: MVP 및 테스트에 가장 적합
   maker:
     desc: 소상공인에게 최고
+  mau: 월간 활성 사용자
   monthly-billing: 월별 청구
   pricing-plans: 요금제
   progressive_deploy: 점진적 배포
@@ -196,6 +198,7 @@ plan:
   shared_channels: 공유 채널
   solo:
     desc: 독립 개발자에게 가장 적합
+  storage: GB 스토리지
   team:
     desc: 대기업 오너에게 최고
   update: 업데이트

@@ -185,6 +185,7 @@ plan:
   abtest: A / B testi
   application: Başvuru
   applications: Uygulamalar
+  bandwidth: GB Bant Genişliği
   buy: Satın almak
   channel: Kanal
   channels: Kanallar
@@ -197,6 +198,7 @@ plan:
     desc: MVP ve test için en iyisi
   maker:
     desc: Küçük işletme sahipleri için en iyisi
+  mau: Aylık aktif kullanıcılar
   monthly-billing: Aylık faturalandırma
   pricing-plans: Fiyatlandırma Planları
   progressive_deploy: aşamalı dağıtım
@@ -204,6 +206,7 @@ plan:
   shared_channels: Paylaşılan Kanallar
   solo:
     desc: Bağımsız geliştiriciler için en iyisi
+  storage: GB Depolama
   team:
     desc: Büyük işletme sahipleri için en iyisi
   update: Güncelleme

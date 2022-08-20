@@ -1,5 +1,9 @@
 import { defineConfig } from 'windicss/helpers'
 import colors from 'windicss/colors'
+import lineClamp from 'windicss/plugin/line-clamp'
+import forms from 'windicss/plugin/forms'
+import typography from 'windicss/plugin/typography'
+import aspectRatio from 'windicss/plugin/aspect-ratio'
 import defaultTheme from 'windicss/defaultTheme'
 
 export default defineConfig({
@@ -7,10 +11,10 @@ export default defineConfig({
   // https://windicss.org/posts/v30.html#attributify-mode
   attributify: true,
   plugins: [
-    require('windicss/plugin/line-clamp'),
-    require('windicss/plugin/forms'),
-    require('windicss/plugin/typography'),
-    require('windicss/plugin/aspect-ratio'),
+    lineClamp,
+    forms,
+    typography({}),
+    aspectRatio,
   ],
   variants: {
     aspectRatio: ['responsive'],

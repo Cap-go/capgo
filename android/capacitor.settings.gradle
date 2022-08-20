@@ -8,6 +8,9 @@ project(':capacitor-community-http').projectDir = new File('../node_modules/.pnp
 include ':capacitor-community-keep-awake'
 project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/.pnpm/@capacitor-community+keep-awake@3.0.0_@capacitor+core@4.0.1/node_modules/@capacitor-community/keep-awake/android')
 
+include ':capacitor-community-native-audio'
+project(':capacitor-community-native-audio').projectDir = new File('../node_modules/.pnpm/@capacitor-community+native-audio@3.0.4_@capacitor+core@4.0.1/node_modules/@capacitor-community/native-audio/android')
+
 include ':capacitor-action-sheet'
 project(':capacitor-action-sheet').projectDir = new File('../node_modules/.pnpm/@capacitor+action-sheet@4.0.1_@capacitor+core@4.0.1/node_modules/@capacitor/action-sheet/android')
 
@@ -80,26 +83,20 @@ project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modu
 include ':capawesome-capacitor-screen-orientation'
 project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.0_@capacitor+core@4.0.1/node_modules/@capawesome/capacitor-screen-orientation/android')
 
+include ':capgo-capacitor-flash'
+project(':capgo-capacitor-flash').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-flash@1.2.9_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-flash/android')
+
+include ':capgo-capacitor-mute'
+project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.3_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-mute/android')
+
+include ':capgo-capacitor-screen-recorder'
+project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.4_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-screen-recorder/android')
+
 include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.42_@capacitor+core@4.0.1/node_modules/@capgo/capacitor-updater/android')
-
-include ':capacitor-flash'
-project(':capacitor-flash').projectDir = new File('../node_modules/.pnpm/capacitor-flash@1.1.3_@capacitor+core@4.0.1/node_modules/capacitor-flash/android')
-
-include ':capacitor-mute'
-project(':capacitor-mute').projectDir = new File('../node_modules/.pnpm/capacitor-mute@0.0.4_@capacitor+core@4.0.1/node_modules/capacitor-mute/android')
-
-include ':capacitor-native-audio'
-project(':capacitor-native-audio').projectDir = new File('../node_modules/.pnpm/capacitor-native-audio@3.0.2_@capacitor+core@4.0.1/node_modules/capacitor-native-audio/android')
 
 include ':capacitor-native-biometric'
 project(':capacitor-native-biometric').projectDir = new File('../node_modules/.pnpm/capacitor-native-biometric@4.1.2/node_modules/capacitor-native-biometric/android')
 
-include ':capacitor-purchases'
-project(':capacitor-purchases').projectDir = new File('../node_modules/.pnpm/capacitor-purchases@1.2.4_@capacitor+core@4.0.1/node_modules/capacitor-purchases/android')
-
 include ':capacitor-rate-app'
-project(':capacitor-rate-app').projectDir = new File('../node_modules/.pnpm/capacitor-rate-app@2.0.0_@capacitor+core@4.0.1/node_modules/capacitor-rate-app/android')
-
-include ':capacitor-screen-recorder'
-project(':capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/capacitor-screen-recorder@1.1.5_@capacitor+core@4.0.1/node_modules/capacitor-screen-recorder/android')
+project(':capacitor-rate-app').projectDir = new File('../node_modules/.pnpm/capacitor-rate-app@3.0.0_@capacitor+core@4.0.1/node_modules/capacitor-rate-app/android')

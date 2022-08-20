@@ -185,6 +185,7 @@ plan:
   abtest: Pengujian A/B
   application: Aplikasi
   applications: Aplikasi
+  bandwidth: GB Bandwidth
   buy: Membeli
   channel: Saluran
   channels: saluran
@@ -195,6 +196,7 @@ plan:
     desc: Terbaik untuk MVP dan pengujian
   maker:
     desc: Terbaik untuk pemilik usaha kecil
+  mau: Pengguna aktif bulanan
   monthly-billing: Penagihan bulanan
   pricing-plans: Paket Harga
   progressive_deploy: Penyebaran progresif
@@ -202,6 +204,7 @@ plan:
   shared_channels: Saluran Bersama
   solo:
     desc: Terbaik untuk pengembang independen
+  storage: Penyimpanan GB
   team:
     desc: Terbaik untuk pemilik bisnis besar
   update: Memperbarui

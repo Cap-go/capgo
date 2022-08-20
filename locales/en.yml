@@ -179,6 +179,7 @@ plan:
   abtest: A / B testing
   application: Application
   applications: Applications
+  bandwidth: GB Bandwidth
   buy: Buy
   channel: Channel
   channels: Channels
@@ -189,6 +190,7 @@ plan:
     desc: Best for MVP and testing
   maker:
     desc: Best for small business owners
+  mau: Monthly active users
   monthly-billing: Monthly billing
   pricing-plans: Pricing Plans
   progressive_deploy: Progressive deploy
@@ -196,6 +198,7 @@ plan:
   shared_channels: Shared Channels
   solo:
     desc: Best for independent developers
+  storage: GB Storage
   team:
     desc: Best for big business owners
   update: Update

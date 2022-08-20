@@ -179,6 +179,7 @@ plan:
   abtest: A/B 测试
   application: 应用
   applications: 应用
+  bandwidth: 国标带宽
   buy: 买
   channel: 渠道
   channels: 频道
@@ -189,6 +190,7 @@ plan:
     desc: 最适合 MVP 和测试
   maker:
     desc: 最适合小企业主
+  mau: 月活跃用户
   monthly-billing: 每月计费
   pricing-plans: 定价计划
   progressive_deploy: 渐进式部署
@@ -196,6 +198,7 @@ plan:
   shared_channels: 共享频道
   solo:
     desc: 最适合独立开发者
+  storage: GB 存储
   team:
     desc: 最适合大企业主
   update: 更新

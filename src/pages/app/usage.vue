@@ -11,6 +11,8 @@ import {
 } from '@ionic/vue'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
+import type { ChartData } from 'chart.js'
+import { LineChart, useLineChart } from 'vue-chart-3'
 import { CapacitorCrispWeb } from '~/services/crisp-web'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
@@ -20,6 +22,9 @@ import Spinner from '~/components/Spinner.vue'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
+import { useTailwind } from '~/services/tailwind'
+
+const tw = useTailwind()
 
 const crisp = new CapacitorCrispWeb()
 const openSupport = () => {
@@ -28,9 +33,35 @@ const openSupport = () => {
 }
 
 const { t } = useI18n()
+const daysInCurrentMonth = () => new Date().getDate()
+// const randomIntArrayInRange = (min: number, max: number, n = 1) =>
+//   Array.from(
+//     { length: n },
+//     () => Math.floor(Math.random() * (max - min + 1)) + min,
+//   )
+const accumulateData = (arr: number[]) => {
+  return arr.reduce((acc: number[], val: number) => {
+    // get last value and add to val
+    const last = acc[acc.length - 1] || 0
+    return [...acc, last + val]
+  }, [])
+}
+const monthdays = () => {
+  const arr = [...Array(daysInCurrentMonth() + 1).keys()]
+  arr.pop()
+  return arr
+}
+const dataStatsLabels = ref(monthdays())
+// const dataMAUValues = ref(prepareRandomData(randomIntArrayInRange(0, 20000 / daysInCurrentMonth(), daysInCurrentMonth())))
+// const dataStorageValues = ref(prepareRandomData(randomIntArrayInRange(0, 300 / daysInCurrentMonth(), daysInCurrentMonth()).map((value: number) => value / 100)))
+// const dataBandwidthValues = ref(prepareRandomData(randomIntArrayInRange(0, 200 / daysInCurrentMonth(), daysInCurrentMonth()).map((value: number) => value / 100)))
+const dataMAUValues = ref(new Array(daysInCurrentMonth()).fill(0))
+const dataStorageValues = ref(new Array(daysInCurrentMonth()).fill(0))
+const dataBandwidthValues = ref(new Array(daysInCurrentMonth()).fill(0))
 const snag = useLogSnag()
 const supabase = useSupabase()
 const isLoading = ref(false)
+const segmentModel = ref<'new' | 'old'>('old')
 const isMobile = isPlatform('capacitor')
 const segmentVal = ref<'m' | 'y'>('m')
 const isYearly = computed(() => segmentVal.value === 'y')
@@ -38,16 +69,18 @@ const route = useRoute()
 const main = useMainStore()
 
 const getStat = (name: string): number => {
-  console.log('getStat', name)
   return main.myPlan?.stats[name as keyof Stats] || 0
 }
 
 const planFeatures = (plan: definitions['plans']) => [
-  plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
-  plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
-  plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
-  plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
-  plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
+  // plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
+  // plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
+  // plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
+  // plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
+  // plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
+  plan.mau > 1 ? `${plan.mau} ${t('plan.mau')}` : `${plan.mau} ${t('plan.mau')}`,
+  plan.storage > 1 ? `${plan.storage} ${t('plan.storage')}` : `${plan.storage} ${t('plan.storage')}`,
+  plan.bandwidth > 1 ? `${plan.bandwidth} ${t('plan.bandwidth')}` : `${plan.bandwidth} ${t('plan.bandwidth')}`,
   plan.abtest ? t('plan.abtest') : false,
   plan.progressive_deploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
@@ -58,7 +91,6 @@ const currentPlan = computed(() => main.myPlan?.AllPlans.find(plan => plan.name 
 
 const getCurrentPlanSuggestStat = (name: string): number => {
   const key = name.replace('max_', '')
-  console.log('getCurrentPlanSuggestStat', key)
   return currentPlanSuggest.value ? currentPlanSuggest?.value[key as keyof definitions['plans']] as number : 0
 }
 
@@ -118,13 +150,184 @@ const getBarColorClass = (name: string) => {
   }
 }
 
+const MAUData = computed<ChartData<'line'>>(() => ({
+  labels: dataStatsLabels.value,
+  datasets: [{
+    label: 'MAU',
+    data: dataMAUValues.value,
+    borderColor: (tw.allConfig.theme.colors.emerald as any)[100],
+    backgroundColor: (tw.allConfig.theme.colors.emerald as any)[200],
+  }],
+}))
+const StorageData = computed<ChartData<'line'>>(() => ({
+  labels: dataStatsLabels.value,
+  datasets: [{
+    label: 'Storage',
+    data: dataStorageValues.value,
+    borderColor: (tw.allConfig.theme.colors.azure as any)[100],
+    backgroundColor: (tw.allConfig.theme.colors.azure as any)[200],
+  }],
+}))
+const BandwidthData = computed<ChartData<'line'>>(() => ({
+  labels: dataStatsLabels.value,
+  datasets: [{
+    label: 'Bandwidth',
+    data: dataBandwidthValues.value,
+    borderColor: (tw.allConfig.theme.colors.rose as any)[100],
+    backgroundColor: (tw.allConfig.theme.colors.rose as any)[200],
+  }],
+}))
+
+const createAnotation = (id: string, y: number, title: string, lineColor: string, bgColor: string) => {
+  const obj: any = {}
+  obj[`line_${id}`] = {
+    type: 'line',
+    yMin: y,
+    yMax: y,
+    borderColor: lineColor,
+    borderWidth: 2,
+  }
+  obj[`label_${id}`] = {
+    type: 'label',
+    xValue: daysInCurrentMonth() / 2,
+    yValue: y,
+    backgroundColor: bgColor,
+    // color: '#fff',
+    content: [title],
+    font: {
+      size: 10,
+    },
+  }
+  return obj
+}
+const getRightDataset = (key: string): number[] => {
+  switch (key) {
+    case 'mau':
+      return dataMAUValues.value
+    case 'storage':
+      return dataStorageValues.value
+    case 'bandwidth':
+      return dataBandwidthValues.value
+  }
+  return []
+}
+/// generate annotation from plan
+const generateAnnotations = (key: 'mau' | 'storage' | 'bandwidth', color: string): any => {
+  // find biggest value in data
+
+  let annotations: any = {}
+  const dataset = getRightDataset(key)
+  const min = Math.min(...dataset)
+  const max = Math.max(...dataset)
+  console.log('generateAnnotations', key, color, min, max)
+
+  // const annotations: any = {}
+  main.myPlan?.AllPlans.forEach((plan, i) => {
+    if (plan[key] && plan[key] > min && plan[key] < (max * 1.2)) {
+      console.log('generateAnnotations', key, plan.name)
+      const color1 = (i + 1) * 100
+      const color2 = (i + 2) * 100
+      annotations = {
+        ...annotations,
+        ...createAnotation(plan.id, plan[key], plan.name, (tw.allConfig.theme.colors as any)[color][color1], (tw.allConfig.theme.colors as any)[color][color2]),
+      }
+    }
+  })
+  return annotations
+}
+
+const { lineChartProps: MAUProps } = useLineChart({
+  chartData: MAUData,
+  options: {
+    plugins: {
+      title: {
+        display: true,
+        text: 'MAU usage',
+      },
+      annotation: {
+        annotations: generateAnnotations('mau', 'emerald'),
+      },
+    },
+  },
+})
+const { lineChartProps: StorageProps } = useLineChart({
+  chartData: StorageData,
+  options: {
+    plugins: {
+      title: {
+        display: true,
+        text: 'Storage usage',
+      },
+      annotation: {
+        annotations: generateAnnotations('storage', 'azure'),
+      },
+    },
+  },
+})
+const { lineChartProps: BandwidthProps } = useLineChart({
+  chartData: BandwidthData,
+  options: {
+    plugins: {
+      title: {
+        display: true,
+        text: 'Bandwidth usage',
+      },
+      annotation: {
+        annotations: generateAnnotations('bandwidth', 'rose'),
+      },
+    },
+  },
+})
+
+const modelChanged = (event: SegmentCustomEvent) => {
+  segmentModel.value = event.detail.value === 'new' ? 'new' : 'old'
+}
+const rebuildAnnotations = () => {
+  if (MAUProps.value.options?.plugins.annotation.annotations)
+    MAUProps.value.options.plugins.annotation.annotations = generateAnnotations('mau', 'emerald')
+  if (StorageProps.value.options?.plugins.annotation.annotations)
+    StorageProps.value.options.plugins.annotation.annotations = generateAnnotations('storage', 'azure')
+  if (BandwidthProps.value.options?.plugins.annotation.annotations)
+    BandwidthProps.value.options.plugins.annotation.annotations = generateAnnotations('bandwidth', 'rose')
+}
+
+const getUsages = async () => {
+  // get aapp_stats
+  const date_id = new Date().toISOString().slice(0, 7)
+  const { data } = await supabase
+    .from<definitions['app_stats']>('app_stats')
+    .select()
+    .eq('user_id', main.user?.id)
+    .like('date_id', `${date_id}%`)
+  if (data) {
+    // find biggest value between mlu and mlu_real
+    // console.log('data', data)
+    dataMAUValues.value.fill(0)
+    dataStorageValues.value.fill(0)
+    dataBandwidthValues.value.fill(0)
+    data.forEach((item: definitions['app_stats']) => {
+      const dayNumber = Number(item.date_id.slice(8))
+      dataMAUValues.value[dayNumber] += item.devices
+      dataStorageValues.value[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
+      dataBandwidthValues.value[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
+    })
+    dataMAUValues.value = accumulateData(dataMAUValues.value)
+    dataStorageValues.value = accumulateData(dataStorageValues.value)
+    dataBandwidthValues.value = accumulateData(dataBandwidthValues.value)
+    rebuildAnnotations()
+  }
+}
+
 watch(
   () => main.myPlan,
   (myPlan, prevMyPlan) => {
-    if (!prevMyPlan && myPlan)
+    if (!prevMyPlan && myPlan) {
+      getUsages()
+      // reGenerate annotations
+
       isLoading.value = false
-    else if (prevMyPlan && !myPlan)
-      isLoading.value = true
+    }
+    else if (prevMyPlan && !myPlan) { isLoading.value = true }
   },
 )
 
@@ -146,6 +349,7 @@ watchEffect(async () => {
       }
     }
     else if (main.user?.id) {
+      getUsages()
       snag.publish({
         channel: 'usage',
         event: 'User visit',
@@ -202,21 +406,36 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItemDivider>
-        <IonItem v-for="s in stats()" :key="s">
-          <p class="w-40 first-letter:uppercase">
-            {{ formatName(s) }}
-          </p>
-          <div class="w-30">
-            <p :class="getBarColorClass(s)" class=" rounded text-center">
-              {{ getStat(s) }}
+        <IonSegment :value="segmentModel" @ion-change="modelChanged($event)">
+          <IonSegmentButton value="old">
+            <IonLabel>Old pricing model</IonLabel>
+          </IonSegmentButton>
+          <IonSegmentButton value="new">
+            <IonLabel>New</IonLabel>
+          </IonSegmentButton>
+        </IonSegment>
+        <div v-if="segmentModel === 'new'" class="flex col-auto bg-white">
+          <LineChart class="my-8 mx-auto w-100 h-100" v-bind="MAUProps" />
+          <LineChart class="my-8 mx-auto w-100 h-100" v-bind="StorageProps" />
+          <LineChart class="my-8 mx-auto w-100 h-100" v-bind="BandwidthProps" />
+        </div>
+        <div v-else>
+          <IonItem v-for="s in stats()" :key="s">
+            <p class="w-40 first-letter:uppercase">
+              {{ formatName(s) }}
             </p>
-          </div>
-          <div class="ml-3 w-full md:w-1/2 bg-gray-200 rounded-full dark:bg-gray-700">
-            <div :class="getBarColorClass(s)" class="min-h-4 text-xs font-medium text-center p-0.5 leading-none rounded-full" :style="{ width: `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }">
-              {{ getPercentage(getStat(s), getCurrentPlanSuggestStat(s)) < 10 ? '' : `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }}
+            <div class="w-30">
+              <p :class="getBarColorClass(s)" class=" rounded text-center">
+                {{ getStat(s) }}
+              </p>
             </div>
-          </div>
-        </IonItem>
+            <div class="ml-3 w-full md:w-1/2 bg-gray-200 rounded-full dark:bg-gray-700">
+              <div :class="getBarColorClass(s)" class="min-h-4 text-xs font-medium text-center p-0.5 leading-none rounded-full" :style="{ width: `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }">
+                {{ getPercentage(getStat(s), getCurrentPlanSuggestStat(s)) < 10 ? '' : `${getPercentage(getStat(s), getCurrentPlanSuggestStat(s))}%` }}
+              </div>
+            </div>
+          </IonItem>
+        </div>
       </IonList>
       <div v-if="!isMobile && !isLoading" class="bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto py-24 px-4 sm:px-6 lg:px-8">

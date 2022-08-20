@@ -15,6 +15,7 @@ const guard = async (next: any, to: string, from: string) => {
 
   if (auth && !main.auth) {
     main.auth = auth
+    console.log('set auth', auth)
     if (!main.user && auth) {
       try {
         supabase.functions.invoke<PlanRes>('payment_status', {})

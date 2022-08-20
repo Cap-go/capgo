@@ -187,6 +187,7 @@ plan:
   abtest: Test A/B
   application: Application
   applications: Applications
+  bandwidth: Bande passante Go
   buy: Acheter
   channel: Canal
   channels: Chaînes
@@ -199,6 +200,7 @@ plan:
     desc: Idéal pour MVP et les tests
   maker:
     desc: Idéal pour les propriétaires de petites entreprises
+  mau: Utilisateurs actifs mensuels
   monthly-billing: Facturation mensuelle
   pricing-plans: Forfaits tarifaires
   progressive_deploy: Déploiement progressif
@@ -206,6 +208,7 @@ plan:
   shared_channels: Chaînes partagées
   solo:
     desc: Idéal pour les développeurs indépendants
+  storage: Go de stockage
   team:
     desc: Idéal pour les propriétaires de grandes entreprises
   update: Mise à jour

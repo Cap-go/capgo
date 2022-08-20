@@ -1512,6 +1512,108 @@ export interface paths {
       };
     };
   };
+  "/pay_as_you_go": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.pay_as_you_go.id"];
+          created_at?: parameters["rowFilter.pay_as_you_go.created_at"];
+          mau?: parameters["rowFilter.pay_as_you_go.mau"];
+          storage?: parameters["rowFilter.pay_as_you_go.storage"];
+          bandwidth?: parameters["rowFilter.pay_as_you_go.bandwidth"];
+          type?: parameters["rowFilter.pay_as_you_go.type"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["pay_as_you_go"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** pay_as_you_go */
+          pay_as_you_go?: definitions["pay_as_you_go"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.pay_as_you_go.id"];
+          created_at?: parameters["rowFilter.pay_as_you_go.created_at"];
+          mau?: parameters["rowFilter.pay_as_you_go.mau"];
+          storage?: parameters["rowFilter.pay_as_you_go.storage"];
+          bandwidth?: parameters["rowFilter.pay_as_you_go.bandwidth"];
+          type?: parameters["rowFilter.pay_as_you_go.type"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.pay_as_you_go.id"];
+          created_at?: parameters["rowFilter.pay_as_you_go.created_at"];
+          mau?: parameters["rowFilter.pay_as_you_go.mau"];
+          storage?: parameters["rowFilter.pay_as_you_go.storage"];
+          bandwidth?: parameters["rowFilter.pay_as_you_go.bandwidth"];
+          type?: parameters["rowFilter.pay_as_you_go.type"];
+        };
+        body: {
+          /** pay_as_you_go */
+          pay_as_you_go?: definitions["pay_as_you_go"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/plans": {
     get: {
       parameters: {
@@ -1533,6 +1635,9 @@ export interface paths {
           id?: parameters["rowFilter.plans.id"];
           price_m_id?: parameters["rowFilter.plans.price_m_id"];
           price_y_id?: parameters["rowFilter.plans.price_y_id"];
+          storage?: parameters["rowFilter.plans.storage"];
+          bandwidth?: parameters["rowFilter.plans.bandwidth"];
+          mau?: parameters["rowFilter.plans.mau"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1600,6 +1705,9 @@ export interface paths {
           id?: parameters["rowFilter.plans.id"];
           price_m_id?: parameters["rowFilter.plans.price_m_id"];
           price_y_id?: parameters["rowFilter.plans.price_y_id"];
+          storage?: parameters["rowFilter.plans.storage"];
+          bandwidth?: parameters["rowFilter.plans.bandwidth"];
+          mau?: parameters["rowFilter.plans.mau"];
         };
         header: {
           /** Preference */
@@ -1631,6 +1739,9 @@ export interface paths {
           id?: parameters["rowFilter.plans.id"];
           price_m_id?: parameters["rowFilter.plans.price_m_id"];
           price_y_id?: parameters["rowFilter.plans.price_y_id"];
+          storage?: parameters["rowFilter.plans.storage"];
+          bandwidth?: parameters["rowFilter.plans.bandwidth"];
+          mau?: parameters["rowFilter.plans.mau"];
         };
         body: {
           /** plans */
@@ -3230,6 +3341,31 @@ export interface definitions {
     /** Format: bigint */
     stars: number;
   };
+  /** @description price for pay as you go */
+  pay_as_you_go: {
+    /**
+     * Format: bigint
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: number;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /** Format: double precision */
+    mau: number;
+    /** Format: double precision */
+    storage: number;
+    /** Format: double precision */
+    bandwidth: number;
+    /**
+     * Format: public.pay_as_you_go_type
+     * @enum {string}
+     */
+    type: "base" | "units";
+  };
   plans: {
     /**
      * Format: timestamp with time zone
@@ -3295,6 +3431,12 @@ export interface definitions {
     price_m_id: string;
     /** Format: character varying */
     price_y_id: string;
+    /** Format: bigint */
+    storage: number;
+    /** Format: bigint */
+    bandwidth: number;
+    /** Format: bigint */
+    mau: number;
   };
   stats: {
     /**
@@ -3752,6 +3894,20 @@ export interface parameters {
   "rowFilter.global_stats.updates": string;
   /** Format: bigint */
   "rowFilter.global_stats.stars": string;
+  /** @description pay_as_you_go */
+  "body.pay_as_you_go": definitions["pay_as_you_go"];
+  /** Format: bigint */
+  "rowFilter.pay_as_you_go.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.pay_as_you_go.created_at": string;
+  /** Format: double precision */
+  "rowFilter.pay_as_you_go.mau": string;
+  /** Format: double precision */
+  "rowFilter.pay_as_you_go.storage": string;
+  /** Format: double precision */
+  "rowFilter.pay_as_you_go.bandwidth": string;
+  /** Format: public.pay_as_you_go_type */
+  "rowFilter.pay_as_you_go.type": string;
   /** @description plans */
   "body.plans": definitions["plans"];
   /** Format: timestamp with time zone */
@@ -3788,6 +3944,12 @@ export interface parameters {
   "rowFilter.plans.price_m_id": string;
   /** Format: character varying */
   "rowFilter.plans.price_y_id": string;
+  /** Format: bigint */
+  "rowFilter.plans.storage": string;
+  /** Format: bigint */
+  "rowFilter.plans.bandwidth": string;
+  /** Format: bigint */
+  "rowFilter.plans.mau": string;
   /** @description stats */
   "body.stats": definitions["stats"];
   /** Format: bigint */

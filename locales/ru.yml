@@ -183,6 +183,7 @@ plan:
   abtest: А/Б тестирование
   application: Заявление
   applications: Приложения
+  bandwidth: Пропускная способность в ГБ
   buy: Купить
   channel: Канал
   channels: каналы
@@ -193,6 +194,7 @@ plan:
     desc: Лучший для MVP и тестирования
   maker:
     desc: Лучшее для владельцев малого бизнеса
+  mau: Ежемесячные активные пользователи
   monthly-billing: Ежемесячная оплата
   pricing-plans: Тарифные планы
   progressive_deploy: Прогрессивное развертывание
@@ -200,6 +202,7 @@ plan:
   shared_channels: Общие каналы
   solo:
     desc: Лучшее для независимых разработчиков
+  storage: ГБ хранения
   team:
     desc: Лучшее для владельцев крупного бизнеса
   update: Обновлять

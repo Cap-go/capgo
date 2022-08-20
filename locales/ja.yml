@@ -179,6 +179,7 @@ plan:
   abtest: A/Bテスト
   application: 応用
   applications: アプリケーション
+  bandwidth: GB帯域幅
   buy: 買う
   channel: チャネル
   channels: チャネル
@@ -189,6 +190,7 @@ plan:
     desc: MVPとテストに最適
   maker:
     desc: 中小企業の所有者に最適
+  mau: 月間アクティブ ユーザー数
   monthly-billing: 毎月の請求
   pricing-plans: 料金プラン
   progressive_deploy: プログレッシブデプロイ
@@ -196,6 +198,7 @@ plan:
   shared_channels: 共有チャネル
   solo:
     desc: 独立した開発者に最適
+  storage: GB ストレージ
   team:
     desc: 大企業のオーナーに最適
   update: アップデート

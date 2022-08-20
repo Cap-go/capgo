@@ -189,6 +189,7 @@ plan:
   abtest: Pruebas A/B
   application: Solicitud
   applications: Aplicaciones
+  bandwidth: Ancho de banda GB
   buy: Comprar
   channel: Canal
   channels: Canales
@@ -201,6 +202,7 @@ plan:
     desc: Lo mejor para MVP y pruebas
   maker:
     desc: Lo mejor para propietarios de pequeñas empresas
+  mau: Usuarios activos mensuales
   monthly-billing: Facturación mensual
   pricing-plans: Planes de precios
   progressive_deploy: Despliegue progresivo
@@ -208,6 +210,7 @@ plan:
   shared_channels: Canales compartidos
   solo:
     desc: Lo mejor para desarrolladores independientes
+  storage: GB de almacenamiento
   team:
     desc: Lo mejor para propietarios de grandes empresas
   update: Actualizar

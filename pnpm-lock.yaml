@@ -4,6 +4,7 @@ specifiers:
   '@antfu/eslint-config': 0.26.1
   '@capacitor-community/http': ^1.4.1
   '@capacitor-community/keep-awake': ^3.0.0
+  '@capacitor-community/native-audio': ^3.0.4
   '@capacitor/action-sheet': ^4.0.1
   '@capacitor/android': ^4.0.1
   '@capacitor/app': ^4.0.1
@@ -34,6 +35,9 @@ specifiers:
   '@capacitor/toast': ^4.0.1
   '@capawesome/capacitor-file-picker': ^0.4.0
   '@capawesome/capacitor-screen-orientation': ^2.0.0
+  '@capgo/capacitor-flash': ^1.2.9
+  '@capgo/capacitor-mute': ^1.1.3
+  '@capgo/capacitor-screen-recorder': ^1.2.4
   '@capgo/capacitor-updater': 4.0.0-alpha.42
   '@iconify-json/carbon': 1.1.7
   '@iconify-json/ion': 1.1.3
@@ -55,15 +59,11 @@ specifiers:
   '@vuelidate/validators': 2.0.0-alpha.31
   '@vueuse/core': 9.1.0
   base64-arraybuffer: 1.0.2
-  capacitor-flash: 1.1.3
-  capacitor-mute: ^0.0.4
-  capacitor-native-audio: ^3.0.2
   capacitor-native-biometric: 4.1.2
-  capacitor-purchases: 1.2.4
-  capacitor-rate-app: ^2.0.0
-  capacitor-screen-recorder: 1.1.5
+  capacitor-rate-app: ^3.0.0
   capacitor-set-version: ^2.0.7
   chart.js: ^3.9.1
+  chartjs-plugin-annotation: ^2.0.0
   copy-text-to-clipboard: ^3.0.1
   critters: 0.0.16
   cross-env: ^7.0.3
@@ -107,6 +107,7 @@ specifiers:
 dependencies:
   '@capacitor-community/http': 1.4.1
   '@capacitor-community/keep-awake': 3.0.0_@capacitor+core@4.0.1
+  '@capacitor-community/native-audio': 3.0.4_@capacitor+core@4.0.1
   '@capacitor/action-sheet': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/android': 4.0.1_@capacitor+core@4.0.1
   '@capacitor/app': 4.0.1_@capacitor+core@4.0.1
@@ -136,6 +137,9 @@ dependencies:
   '@capacitor/toast': 4.0.1_@capacitor+core@4.0.1
   '@capawesome/capacitor-file-picker': 0.4.0_@capacitor+core@4.0.1
   '@capawesome/capacitor-screen-orientation': 2.0.0_@capacitor+core@4.0.1
+  '@capgo/capacitor-flash': 1.2.9_@capacitor+core@4.0.1
+  '@capgo/capacitor-mute': 1.1.3_@capacitor+core@4.0.1
+  '@capgo/capacitor-screen-recorder': 1.2.4_@capacitor+core@4.0.1
   '@capgo/capacitor-updater': 4.0.0-alpha.42_@capacitor+core@4.0.1
   '@ionic/vue': 6.2.2
   '@ionic/vue-router': 6.2.2
@@ -145,14 +149,10 @@ dependencies:
   '@vuelidate/validators': 2.0.0-alpha.31_vue@3.2.37
   '@vueuse/core': 9.1.0_vue@3.2.37
   base64-arraybuffer: 1.0.2
-  capacitor-flash: 1.1.3_@capacitor+core@4.0.1
-  capacitor-mute: 0.0.4_@capacitor+core@4.0.1
-  capacitor-native-audio: 3.0.2_@capacitor+core@4.0.1
   capacitor-native-biometric: 4.1.2
-  capacitor-purchases: 1.2.4_@capacitor+core@4.0.1
-  capacitor-rate-app: 2.0.0_@capacitor+core@4.0.1
-  capacitor-screen-recorder: 1.1.5_@capacitor+core@4.0.1
+  capacitor-rate-app: 3.0.0_@capacitor+core@4.0.1
   chart.js: 3.9.1
+  chartjs-plugin-annotation: 2.0.0_chart.js@3.9.1
   copy-text-to-clipboard: 3.0.1
   dayjs: 1.11.5
   firebase: 9.9.2
@@ -1493,6 +1493,14 @@ packages:
       '@capacitor/core': 4.0.1
     dev: false
 
+  /@capacitor-community/native-audio/3.0.4_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-WvVbcNKJpTvGwiJw9A1bmsZv/fi94pZ4Z1pYB+k65VfpAXjlBuFMexZprSwbVgb9WoHtYoY3T/Nj4BIH2QMgDg==}
+    peerDependencies:
+      '@capacitor/core': ^3.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
   /@capacitor/action-sheet/4.0.1_@capacitor+core@4.0.1:
     resolution: {integrity: sha512-8F4TT05KCvSccGZjezEXPgiRvjuwQRpVUApTTVNQaEgHP9vPhuzfQB9hp9NByR8IfuHMwAlJGSnoFp7fZ6xHuw==}
     peerDependencies:
@@ -1857,6 +1865,30 @@ packages:
     resolution: {integrity: sha512-issRxAYGtTc+t5CuVGso2YOrQhCEQJKreUlWyu2mOL8/TQFXiggBzxKkqLe2rLYPkEXcx37iQO1Eqql1dLTVTQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
+  /@capgo/capacitor-flash/1.2.9_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-0RNOYSQ/KrIguAp64I0RQFa2FCa6OyQ8jxx5iiFTZ/UPJuYZHaOGFqDnUCGEWIrT6y47oQphhfnS+7X1QQeNyg==}
+    peerDependencies:
+      '@capacitor/core': ^3.0.0 || ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
+  /@capgo/capacitor-mute/1.1.3_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-BuABfEGuMM8eiRtvt+6Jb49JZbf9EKIoYjNW3IBw37GSngcz8+TQQ1g3WwnUjji2jIbwJM92GFl3J3QmoDcpkA==}
+    peerDependencies:
+      '@capacitor/core': ^3.0.0 || ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.0.1
+    dev: false
+
+  /@capgo/capacitor-screen-recorder/1.2.4_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-UR8Vk01l96n/5hOb+uUdIzi3/+Iqta6UNR2gP3G/1hKIIjFUTHd61kOhEmycFVhvQxAFrTFT0jei1xE7/YjyYw==}
+    peerDependencies:
+      '@capacitor/core': ^3.0.0 || ^4.0.0
     dependencies:
       '@capacitor/core': 4.0.1
     dev: false
@@ -5796,56 +5828,16 @@ packages:
     resolution: {integrity: sha512-0zaSO+TnCHtHJIbpLroX7nsD+vYuOVjl3uzFbJO1wMVbuveJA0RK2WcQA9ZUIOiO0/ArMiMgHJLxfEZhQiC0kw==}
     dev: true
 
-  /capacitor-flash/1.1.3_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-PpvtGwOp0jKYryM8oUQIW+YGOame9dRTUFPKakfkORdJIwCH4QkIC2OjfnsOH4Q9iHEM6mxrF4nMKLbFMAOZdQ==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
-  /capacitor-mute/0.0.4_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-I/BVB0R06K9jYwD9kHokFVPgPqPiJpfX6lt2Ts1FttG9aCB2Hm38Ywm7kANX8rK1ayzukR4+ndAayw1FvEvdIw==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
-  /capacitor-native-audio/3.0.2_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-3V4nXs7OCR8IBDTiO8uj7o3oxikw7KOX4cYBPVlW8YY28DVxZBUrPVXeAGuLWUienktedFoY3cGGHF/ysoltAQ==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
   /capacitor-native-biometric/4.1.2:
     resolution: {integrity: sha512-tzrWzPdrJHsc3Sg1Ue95mYMIwhckRZOiUBRIQpB2tihZm6xi/7uHMWY32HPVzAjQjIn0VXH48TVvciNpvgLBGg==}
     dependencies:
       '@capacitor/core': 3.6.0
     dev: false
 
-  /capacitor-purchases/1.2.4_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-gzYP7EY0E5JatjG0Jdj6szCH3+wEmlbnu9kFo/cH3AacWAyYPeS6xGk+pFqRpJUKMdK10JniRmbJh/Mk9xS4bA==}
+  /capacitor-rate-app/3.0.0_@capacitor+core@4.0.1:
+    resolution: {integrity: sha512-r2r26923Ehi30EV7ueKYYqhqkdJmvcVOYyaGCpRYlt8TNCaQzSBEuGrtBbXwOQemj1VK5rKUYUjAZ2lpSHAfMQ==}
     peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
-  /capacitor-rate-app/2.0.0_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-wqtmK7/mb34o5gp7eaWKudqx1xGwmXne4M2cPOdeO64ikfUXTHLtTfWd6kx2kzgm7yh9tNIXkKnqEwLvNT8cKQ==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
-    dependencies:
-      '@capacitor/core': 4.0.1
-    dev: false
-
-  /capacitor-screen-recorder/1.1.5_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-NlCHm+KFMgFU42ZfLe3EBMdSe/v0C5U3lF9llJIhSmyiDHQnZZ3XVnk0XYqoQWpvzYTflDpNnF4A3yU2LT7TyQ==}
-    peerDependencies:
-      '@capacitor/core': ^3.0.0
+      '@capacitor/core': ^4.0.0
     dependencies:
       '@capacitor/core': 4.0.1
     dev: false
@@ -5968,6 +5960,14 @@ packages:
 
   /chart.js/3.9.1:
     resolution: {integrity: sha512-Ro2JbLmvg83gXF5F4sniaQ+lTbSv18E+TIf2cOeiH1Iqd2PGFOtem+DUufMZsCJwFE7ywPOpfXFBwRTGq7dh6w==}
+    dev: false
+
+  /chartjs-plugin-annotation/2.0.0_chart.js@3.9.1:
+    resolution: {integrity: sha512-Gd8X+uaWuD63qHSf4R9SvFIdHbxmP1RBsKfdlQt7oFgsyDYjqP2y0WrbEs1UoE7OXJDm8lfZes2tQQNhEL/EZw==}
+    peerDependencies:
+      chart.js: ^3.7.0
+    dependencies:
+      chart.js: 3.9.1
     dev: false
 
   /check-error/1.0.2:
