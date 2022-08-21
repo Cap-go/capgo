@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.17.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.16.6-alpha.0...1.17.0-alpha.0) (2022-08-21)
+
+
+### Features
+
+* add function for delete version ([6cb7034](https://github.com/Cap-go/capgo/commit/6cb7034d3c87fb1ef7fdef7fab8aed144a63e6d6))
+* add new chart ([a67cf7e](https://github.com/Cap-go/capgo/commit/a67cf7e6a171ba60aef229dc57c995b20b615324))
+
+
+### Bug Fixes
+
+* annotation display ([3952505](https://github.com/Cap-go/capgo/commit/3952505faa2781b235706f2ee0b9a481f0e500f1))
+
 ### [1.16.6-alpha.0](https://github.com/Cap-go/capgo/compare/1.16.5...1.16.6-alpha.0) (2022-08-19)
 
 ### [1.16.3-alpha.0](https://github.com/Cap-go/capgo/compare/1.16.2...1.16.3-alpha.0) (2022-08-18)
