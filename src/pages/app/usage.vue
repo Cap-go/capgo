@@ -34,11 +34,6 @@ const openSupport = () => {
 
 const { t } = useI18n()
 const daysInCurrentMonth = () => new Date().getDate()
-// const randomIntArrayInRange = (min: number, max: number, n = 1) =>
-//   Array.from(
-//     { length: n },
-//     () => Math.floor(Math.random() * (max - min + 1)) + min,
-//   )
 const accumulateData = (arr: number[]) => {
   return arr.reduce((acc: number[], val: number) => {
     // get last value and add to val
@@ -52,9 +47,6 @@ const monthdays = () => {
   return arr
 }
 const dataStatsLabels = ref(monthdays())
-// const dataMAUValues = ref(prepareRandomData(randomIntArrayInRange(0, 20000 / daysInCurrentMonth(), daysInCurrentMonth())))
-// const dataStorageValues = ref(prepareRandomData(randomIntArrayInRange(0, 300 / daysInCurrentMonth(), daysInCurrentMonth()).map((value: number) => value / 100)))
-// const dataBandwidthValues = ref(prepareRandomData(randomIntArrayInRange(0, 200 / daysInCurrentMonth(), daysInCurrentMonth()).map((value: number) => value / 100)))
 const dataMAUValues = ref(new Array(daysInCurrentMonth()).fill(0))
 const dataStorageValues = ref(new Array(daysInCurrentMonth()).fill(0))
 const dataBandwidthValues = ref(new Array(daysInCurrentMonth()).fill(0))
@@ -73,14 +65,19 @@ const getStat = (name: string): number => {
 }
 
 const planFeatures = (plan: definitions['plans']) => [
-  // plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
-  // plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
-  // plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
-  // plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
-  // plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
-  plan.mau > 1 ? `${plan.mau} ${t('plan.mau')}` : `${plan.mau} ${t('plan.mau')}`,
-  plan.storage > 1 ? `${plan.storage} ${t('plan.storage')}` : `${plan.storage} ${t('plan.storage')}`,
-  plan.bandwidth > 1 ? `${plan.bandwidth} ${t('plan.bandwidth')}` : `${plan.bandwidth} ${t('plan.bandwidth')}`,
+  ...(segmentModel.value !== 'new'
+    ? [
+        plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
+        plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
+        plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
+        plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
+        plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
+      ]
+    : [
+        plan.mau > 1 ? `${plan.mau} ${t('plan.mau')}` : `${plan.mau} ${t('plan.mau')}`,
+        plan.storage > 1 ? `${plan.storage} ${t('plan.storage')}` : `${plan.storage} ${t('plan.storage')}`,
+        plan.bandwidth > 1 ? `${plan.bandwidth} ${t('plan.bandwidth')}` : `${plan.bandwidth} ${t('plan.bandwidth')}`,
+      ]),
   plan.abtest ? t('plan.abtest') : false,
   plan.progressive_deploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
@@ -214,17 +211,13 @@ const getRightDataset = (key: string): number[] => {
 /// generate annotation from plan
 const generateAnnotations = (key: 'mau' | 'storage' | 'bandwidth', color: string): any => {
   // find biggest value in data
-
   let annotations: any = {}
   const dataset = getRightDataset(key)
   const min = Math.min(...dataset)
   const max = Math.max(...dataset)
-  console.log('generateAnnotations', key, color, min, max)
-
   // const annotations: any = {}
   main.myPlan?.AllPlans.forEach((plan, i) => {
     if (plan[key] && plan[key] > min && plan[key] < (max * 1.2)) {
-      console.log('generateAnnotations', key, plan.name)
       const color1 = (i + 1) * 100
       const color2 = (i + 2) * 100
       annotations = {
@@ -302,18 +295,21 @@ const getUsages = async () => {
   if (data) {
     // find biggest value between mlu and mlu_real
     // console.log('data', data)
-    dataMAUValues.value.fill(0)
-    dataStorageValues.value.fill(0)
-    dataBandwidthValues.value.fill(0)
+    const tmpMAU = new Array(daysInCurrentMonth() + 1).fill(0)
+    const tmpStorage = new Array(daysInCurrentMonth() + 1).fill(0)
+    const tmpBandwidth = new Array(daysInCurrentMonth() + 1).fill(0)
     data.forEach((item: definitions['app_stats']) => {
       const dayNumber = Number(item.date_id.slice(8))
-      dataMAUValues.value[dayNumber] += item.devices
-      dataStorageValues.value[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
-      dataBandwidthValues.value[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
+      tmpMAU[dayNumber] += item.devices || 0
+      tmpStorage[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
+      tmpBandwidth[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
     })
-    dataMAUValues.value = accumulateData(dataMAUValues.value)
-    dataStorageValues.value = accumulateData(dataStorageValues.value)
-    dataBandwidthValues.value = accumulateData(dataBandwidthValues.value)
+    dataMAUValues.value.length = 0
+    dataStorageValues.value.length = 0
+    dataBandwidthValues.value.length = 0
+    dataMAUValues.value.push(...accumulateData(tmpMAU))
+    dataStorageValues.value.push(...accumulateData(tmpStorage))
+    dataBandwidthValues.value.push(...accumulateData(tmpBandwidth))
     rebuildAnnotations()
   }
 }
