@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.17.0](https://github.com/Cap-go/capgo/compare/1.17.0-alpha.1...1.17.0) (2022-08-22)
+
+
+### Bug Fixes
+
+* display phone ([5dcff4c](https://github.com/Cap-go/capgo/commit/5dcff4c24812211ec0126e21841d0ba270e51c41))
+
 ## [1.17.0-alpha.1](https://github.com/Cap-go/capgo/compare/1.17.0-alpha.0...1.17.0-alpha.1) (2022-08-22)
 
 
