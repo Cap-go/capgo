@@ -22,5 +22,6 @@
   "deno.enablePaths": [
     "./supabase/functions"
   ],
-  "nuxt.isNuxtApp": false
+  "nuxt.isNuxtApp": false,
+  "java.configuration.updateBuildConfiguration": "disabled"
 }
