@@ -410,7 +410,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
             <IonLabel>New</IonLabel>
           </IonSegmentButton>
         </IonSegment>
-        <div v-if="segmentModel === 'new'" class="flex col-auto bg-white">
+        <div v-if="segmentModel === 'new'" class="flex col-auto bg-white flex-col sm:flex-row">
           <LineChart class="my-8 mx-auto w-100 h-100" v-bind="MAUProps" />
           <LineChart class="my-8 mx-auto w-100 h-100" v-bind="StorageProps" />
           <LineChart class="my-8 mx-auto w-100 h-100" v-bind="BandwidthProps" />
