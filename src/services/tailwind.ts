@@ -1,6 +1,3 @@
-import Processor from 'windicss'
-import config from '../../windi.config'
-
-export const useTailwind = () => {
-  return new Processor(config)
+export const useTailwindColor = () => {
+  return JSON.parse(import.meta.env.windiColors)
 }

@@ -10,9 +10,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 import VueI18n from '@intlify/vite-plugin-vue-i18n'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
+import Processor from 'windicss'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
+import config from './windi.config'
 
+const tw = new Processor(config)
 const getUrl = (): string => {
   if (branch === 'local')
     return `http://${getRightKey('base_domain')}`
@@ -44,6 +47,7 @@ export default defineConfig({
       domain: getUrl(),
       logsnag: 'c124f5e9d0ce5bdd14bbb48f815d5583',
       crisp: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
+      windiColors: JSON.stringify(tw.allConfig.theme.colors),
     }, { defineOn: 'import.meta.env' }),
 
     // https://github.com/hannoeru/vite-plugin-pages

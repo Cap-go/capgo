@@ -22,9 +22,9 @@ import Spinner from '~/components/Spinner.vue'
 import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
-import { useTailwind } from '~/services/tailwind'
+import { useTailwindColor } from '~/services/tailwind'
 
-const tw = useTailwind()
+const tw = useTailwindColor()
 
 const crisp = new CapacitorCrispWeb()
 const openSupport = () => {
@@ -152,8 +152,8 @@ const MAUData = computed<ChartData<'line'>>(() => ({
   datasets: [{
     label: 'MAU',
     data: dataMAUValues.value,
-    borderColor: (tw.allConfig.theme.colors.emerald as any)[100],
-    backgroundColor: (tw.allConfig.theme.colors.emerald as any)[200],
+    borderColor: tw.emerald[100],
+    backgroundColor: tw.emerald[200],
   }],
 }))
 const StorageData = computed<ChartData<'line'>>(() => ({
@@ -161,8 +161,8 @@ const StorageData = computed<ChartData<'line'>>(() => ({
   datasets: [{
     label: 'Storage',
     data: dataStorageValues.value,
-    borderColor: (tw.allConfig.theme.colors.azure as any)[100],
-    backgroundColor: (tw.allConfig.theme.colors.azure as any)[200],
+    borderColor: tw.azure[100],
+    backgroundColor: tw.azure[200],
   }],
 }))
 const BandwidthData = computed<ChartData<'line'>>(() => ({
@@ -170,8 +170,8 @@ const BandwidthData = computed<ChartData<'line'>>(() => ({
   datasets: [{
     label: 'Bandwidth',
     data: dataBandwidthValues.value,
-    borderColor: (tw.allConfig.theme.colors.rose as any)[100],
-    backgroundColor: (tw.allConfig.theme.colors.rose as any)[200],
+    borderColor: tw.rose[100],
+    backgroundColor: tw.rose[200],
   }],
 }))
 
@@ -222,7 +222,7 @@ const generateAnnotations = (key: 'mau' | 'storage' | 'bandwidth', color: string
       const color2 = (i + 2) * 100
       annotations = {
         ...annotations,
-        ...createAnotation(plan.id, plan[key], plan.name, (tw.allConfig.theme.colors as any)[color][color1], (tw.allConfig.theme.colors as any)[color][color2]),
+        ...createAnotation(plan.id, plan[key], plan.name, tw[color][color1], tw[color][color2]),
       }
     }
   })
