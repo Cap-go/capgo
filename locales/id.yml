@@ -80,11 +80,17 @@ channel:
   add: Menambahkan
   beta-channel: saluran beta
   cannot-delete-device: Tidak dapat menghapus perangkat
+  confirm-public-desc: >-
+    Menjadikan saluran ini publik akan membuatnya mengirim pembaruan ke semua
+    pengguna Anda. 
+
+    Semua saluran publik lainnya akan menjadi pribadi.
   copy: Salin URL
   device: Perangkat
   device-deleted: Perangkat dihapus
   invit: Ketik email untuk mengundang
   is_public: Saluran publik
+  make-now: Publikasikan
   make_it: Buat itu
   makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi
   makepublic: Saluran Anda bersifat pribadi, klik untuk menjadikannya publik
@@ -99,6 +105,9 @@ channel:
   v3: Pengaturan V3
 channel-deleted: Saluran dihapus
 days: hari
+defined-as: Didefinisikan sebagai
+defined-as-private: didefinisikan sebagai pribadi
+defined-as-public: didefinisikan sebagai publik
 device:
   channel: Tautan saluran
   created_at: Dibuat di

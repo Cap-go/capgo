@@ -212,24 +212,41 @@ const addUser = async () => {
   }
 }
 const makePublic = async (val = true) => {
-  if (!channel.value || !id.value)
-    return
-  const { error } = await supabase
-    .from<definitions['channels']>('channels')
-    .update({ public: val })
-    .eq('id', id.value)
-  if (error) {
-    console.error(error)
-  }
-  else {
-    channel.value.public = val
-    const toast = await toastController
-      .create({
-        message: `Defined as ${val ? 'public' : 'private'}`,
-        duration: 2000,
-      })
-    await toast.present()
-  }
+  const alert = await alertController.create({
+    header: t('account.delete_sure'),
+    message: t('channel.confirm-public-desc'),
+    buttons: [
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+        cssClass: 'secondary',
+      },
+      {
+        text: t('channel.make-now'),
+        handler: async () => {
+          if (!channel.value || !id.value)
+            return
+          const { error } = await supabase
+            .from<definitions['channels']>('channels')
+            .update({ public: val })
+            .eq('id', id.value)
+          if (error) {
+            console.error(error)
+          }
+          else {
+            channel.value.public = val
+            const toast = await toastController
+              .create({
+                message: t(val ? 'defined-as-public' : 'defined-as-private'),
+                duration: 2000,
+              })
+            await toast.present()
+          }
+        },
+      },
+    ],
+  })
+  await alert.present()
 }
 const didCancel = async (name: string) => {
   const alert = await alertController

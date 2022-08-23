@@ -78,11 +78,17 @@ channel:
   add: Dodać
   beta-channel: Kanał beta
   cannot-delete-device: Nie można usunąć urządzenia
+  confirm-public-desc: >-
+    Upublicznienie tego kanału spowoduje, że będzie on wysyłać aktualizacje do
+    wszystkich Twoich użytkowników. 
+
+    Wszystkie inne kanały publiczne staną się prywatne.
   copy: Kopiuj URL
   device: Urządzenie
   device-deleted: Urządzenie usunięte
   invit: Wpisz e-mail, aby zaprosić
   is_public: Kanał publiczny
+  make-now: Upublicznij
   make_it: Zrób to
   makeprivate: Twój kanał jest publiczny, kliknij, aby ustawić go jako prywatny
   makepublic: Twój kanał jest prywatny, kliknij, aby upublicznić
@@ -97,6 +103,9 @@ channel:
   v3: Ustawienia V3
 channel-deleted: Kanał usunięty
 days: dni
+defined-as: Zdefiniowana jako
+defined-as-private: zdefiniowany jako prywatny
+defined-as-public: zdefiniowany jako publiczny
 device:
   channel: Link do kanału
   created_at: Utworzono w

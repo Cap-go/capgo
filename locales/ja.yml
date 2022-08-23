@@ -74,11 +74,15 @@ channel:
   add: 追加
   beta-channel: ベータチャンネル
   cannot-delete-device: デバイスを削除できません
+  confirm-public-desc: |-
+    このチャネルを公開すると、すべてのユーザーに更新が送信されます。
+    他のすべての公開チャネルは非公開になります。
   copy: URLをコピー
   device: 端末
   device-deleted: デバイスが削除されました
   invit: 招待するメールアドレスを入力
   is_public: チャンネル公開
+  make-now: 公表します
   make_it: 成功する
   makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします
   makepublic: チャンネルは非公開です。クリックして公開してください
@@ -93,6 +97,9 @@ channel:
   v3: V3設定
 channel-deleted: チャンネルが削除されました
 days: 日々
+defined-as: として定義
+defined-as-private: プライベートと定義
+defined-as-public: パブリックと定義
 device:
   channel: チャネルリンク
   created_at: で作成

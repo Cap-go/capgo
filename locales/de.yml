@@ -80,11 +80,17 @@ channel:
   add: Hinzufügen
   beta-channel: Beta-Kanal
   cannot-delete-device: Gerät kann nicht gelöscht werden
+  confirm-public-desc: >-
+    Wenn Sie diesen Kanal öffentlich machen, werden Updates an alle Ihre
+    Benutzer gesendet. 
+
+    Alle anderen öffentlichen Kanäle werden privat.
   copy: URL kopieren
   device: Gerät
   device-deleted: Gerät gelöscht
   invit: Geben Sie die einzuladende E-Mail-Adresse ein
   is_public: Kanal öffentlich
+  make-now: Veröffentlichen
   make_it: Mach es
   makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen
   makepublic: Dein Kanal ist privat, klicke hier, um ihn öffentlich zu machen
@@ -99,6 +105,9 @@ channel:
   v3: V3-Einstellungen
 channel-deleted: Kanal gelöscht
 days: Tage
+defined-as: Definiert als
+defined-as-private: als privat definiert
+defined-as-public: als öffentlich definiert
 device:
   channel: Kanallink
   created_at: Hergestellt in

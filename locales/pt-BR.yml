@@ -78,11 +78,17 @@ channel:
   add: Adicionar
   beta-channel: Canal beta
   cannot-delete-device: Não é possível excluir o dispositivo
+  confirm-public-desc: >-
+    Tornar este canal público fará com que ele envie atualizações para todos os
+    seus usuários. 
+
+    Todos os outros canais públicos se tornarão privados.
   copy: Copiar URL
   device: Dispositivo
   device-deleted: Dispositivo excluído
   invit: Digite o e-mail para convidar
   is_public: Público do canal
+  make-now: Tornar público
   make_it: Faça
   makeprivate: Seu canal é público, clique para torná-lo privado
   makepublic: Seu canal é privado, clique para torná-lo público
@@ -97,6 +103,9 @@ channel:
   v3: Configurações V3
 channel-deleted: Canal excluído
 days: dias
+defined-as: Definido como
+defined-as-private: definido como privado
+defined-as-public: definido como público
 device:
   channel: Link do canal
   created_at: Criado em

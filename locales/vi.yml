@@ -78,11 +78,17 @@ channel:
   add: Thêm vào
   beta-channel: Kênh beta
   cannot-delete-device: Không thể xóa thiết bị
+  confirm-public-desc: >-
+    Đặt kênh này ở chế độ công khai sẽ làm cho kênh gửi thông tin cập nhật đến
+    tất cả người dùng của bạn. 
+
+    Tất cả các kênh công khai khác sẽ trở thành riêng tư.
   copy: Sao chép URL
   device: Thiết bị
   device-deleted: Đã xóa thiết bị
   invit: Nhập email để mời
   is_public: Kênh công khai
+  make-now: Công bố công khai
   make_it: Làm cho nó
   makeprivate: Kênh của bạn ở chế độ công khai, hãy nhấp để đặt kênh đó ở chế độ riêng tư
   makepublic: Kênh của bạn ở chế độ riêng tư, hãy nhấp để đặt kênh ở chế độ công khai
@@ -97,6 +103,9 @@ channel:
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
 days: ngày
+defined-as: Định nghĩa là
+defined-as-private: được định nghĩa là riêng tư
+defined-as-public: được định nghĩa là công khai
 device:
   channel: Liên kết kênh
   created_at: Được tạo lúc

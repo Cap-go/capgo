@@ -74,11 +74,15 @@ channel:
   add: 추가하다
   beta-channel: 베타 채널
   cannot-delete-device: 장치를 삭제할 수 없습니다
+  confirm-public-desc: |-
+    이 채널을 공개하면 모든 사용자에게 업데이트가 전송됩니다. 
+    다른 모든 공개 채널은 비공개가 됩니다.
   copy: URL 복사
   device: 장치
   device-deleted: 기기가 삭제됨
   invit: 초대할 이메일 입력
   is_public: 채널 공개
+  make-now: 공개적으로해라
   make_it: 만들어
   makeprivate: 채널이 공개되어 있습니다. 비공개로 설정하려면 클릭하세요.
   makepublic: 채널이 비공개입니다. 공개하려면 클릭하세요.
@@ -93,6 +97,9 @@ channel:
   v3: V3 설정
 channel-deleted: 채널 삭제됨
 days: 날
+defined-as: 로써 정의 된
+defined-as-private: 비공개로 정의
+defined-as-public: 공개로 정의
 device:
   channel: 채널 링크
   created_at: 만든 시간

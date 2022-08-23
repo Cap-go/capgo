@@ -80,11 +80,17 @@ channel:
   add: Ajouter
   beta-channel: Chaîne bêta
   cannot-delete-device: Impossible de supprimer l'appareil
+  confirm-public-desc: >-
+    Rendre cette chaîne publique lui fera envoyer des mises à jour à tous vos
+    utilisateurs. 
+
+    Toutes les autres chaînes publiques deviendront privées.
   copy: Copier le lien
   device: Appareil
   device-deleted: Appareil supprimé
   invit: Tapez l'e-mail pour inviter
   is_public: Chaîne publique
+  make-now: Rendre publique
   make_it: Fais-le
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
   makepublic: Votre chaîne est privée, cliquez pour la rendre publique
@@ -99,6 +105,9 @@ channel:
   v3: Paramètres V3
 channel-deleted: Chaîne supprimée
 days: jours
+defined-as: Défini comme
+defined-as-private: défini comme privé
+defined-as-public: défini comme public
 device:
   channel: Lien de chaîne
   created_at: Créé à

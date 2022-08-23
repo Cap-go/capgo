@@ -78,11 +78,17 @@ channel:
   add: Ekle
   beta-channel: Beta kanalı
   cannot-delete-device: Cihaz silinemiyor
+  confirm-public-desc: >-
+    Bu kanalı herkese açık hale getirmek, tüm kullanıcılarınıza güncellemeler
+    göndermesini sağlayacaktır. 
+
+    Diğer tüm genel kanallar özel hale gelecektir.
   copy: Url'yi kopyala
   device: Cihaz
   device-deleted: Cihaz silindi
   invit: Davet etmek için e-posta yazın
   is_public: genel kanal
+  make-now: Kamu yapmak
   make_it: Bunu yapmak
   makeprivate: Kanalınız herkese açık, özel yapmak için tıklayın
   makepublic: Kanalınız gizli, herkese açık yapmak için tıklayın
@@ -97,6 +103,9 @@ channel:
   v3: V3 ayarları
 channel-deleted: Kanal silindi
 days: günler
+defined-as: olarak tanımlandı
+defined-as-private: özel olarak tanımlanmış
+defined-as-public: kamu olarak tanımlanan
 device:
   channel: Kanal bağlantısı
   created_at: 'Şu saatte oluşturuldu:'

@@ -74,11 +74,15 @@ channel:
   add: Add
   beta-channel: Beta channel
   cannot-delete-device: Cannot delete device
+  confirm-public-desc: |-
+    Making this channel public will make it send updates to all yours users. 
+    All other public channels will become private.
   copy: Copy URL
   device: Device
   device-deleted: Device deleted
   invit: Type email to invite
   is_public: Channel public
+  make-now: Make public
   make_it: Make it
   makeprivate: Your channel is public, click to make it private
   makepublic: Your channel is private, click to make it public
@@ -93,6 +97,9 @@ channel:
   v3: V3 settings
 channel-deleted: Channel deleted
 days: days
+defined-as: Defined as
+defined-as-private: defined as private
+defined-as-public: defined as public
 device:
   channel: Channel link
   created_at: Created at
