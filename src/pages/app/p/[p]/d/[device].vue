@@ -186,7 +186,7 @@ const delDevVersion = async (device: string) => {
 }
 const updateOverride = async () => {
   const buttons = []
-  if (channelDevice.value) {
+  if (deviceOverride.value) {
     buttons.push({
       text: t('button.remove'),
       handler: async () => {
