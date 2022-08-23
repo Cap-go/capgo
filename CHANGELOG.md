@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.18.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.17.1-alpha.0...1.18.0-alpha.0) (2022-08-23)
+
+
+### Features
+
+* add auto unpublic other channels ([ea3fc76](https://github.com/Cap-go/capgo/commit/ea3fc763d9f2c0b5fedb02e7577a73644a4466e2))
+
 ### [1.17.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.17.0...1.17.1-alpha.0) (2022-08-22)
 
 
