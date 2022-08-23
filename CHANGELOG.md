@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.18.0-alpha.1](https://github.com/Cap-go/capgo/compare/1.18.0-alpha.0...1.18.0-alpha.1) (2022-08-23)
+
+
+### Bug Fixes
+
+* issue with channels ([acd621c](https://github.com/Cap-go/capgo/commit/acd621ce6e6c44b55e868e86ebcfa1c4f9b80c9c))
+
 ## [1.18.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.17.1-alpha.0...1.18.0-alpha.0) (2022-08-23)
 
 
