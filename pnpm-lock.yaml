@@ -6,7 +6,7 @@ specifiers:
   '@capacitor-community/keep-awake': ^3.0.0
   '@capacitor-community/native-audio': ^3.0.4
   '@capacitor/action-sheet': ^4.0.1
-  '@capacitor/android': ^4.0.1
+  '@capacitor/android': ^4.1.0
   '@capacitor/app': ^4.0.1
   '@capacitor/app-launcher': ^4.0.1
   '@capacitor/assets': 1.0.0-next.5
@@ -14,13 +14,13 @@ specifiers:
   '@capacitor/camera': ^4.0.1
   '@capacitor/cli': ^4.0.1
   '@capacitor/clipboard': ^4.0.1
-  '@capacitor/core': ^4.0.1
+  '@capacitor/core': ^4.1.0
   '@capacitor/device': ^4.0.1
   '@capacitor/dialog': ^4.0.1
   '@capacitor/filesystem': ^4.0.1
   '@capacitor/geolocation': ^4.0.1
   '@capacitor/haptics': ^4.0.1
-  '@capacitor/ios': ^4.0.1
+  '@capacitor/ios': ^4.1.0
   '@capacitor/keyboard': ^4.0.1
   '@capacitor/local-notifications': ^4.0.1
   '@capacitor/motion': ^4.0.1
@@ -34,17 +34,17 @@ specifiers:
   '@capacitor/text-zoom': ^4.0.1
   '@capacitor/toast': ^4.0.1
   '@capawesome/capacitor-file-picker': ^0.4.0
-  '@capawesome/capacitor-screen-orientation': ^2.0.0
-  '@capgo/capacitor-flash': ^1.2.9
-  '@capgo/capacitor-mute': ^1.1.3
-  '@capgo/capacitor-screen-recorder': ^1.2.4
-  '@capgo/capacitor-updater': 4.0.0-alpha.42
+  '@capawesome/capacitor-screen-orientation': ^2.0.1
+  '@capgo/capacitor-flash': ^1.2.10
+  '@capgo/capacitor-mute': ^1.1.4
+  '@capgo/capacitor-screen-recorder': ^1.2.5
+  '@capgo/capacitor-updater': 4.0.0-alpha.49
   '@iconify-json/carbon': 1.1.7
   '@iconify-json/ion': 1.1.3
   '@iconify-json/ls': 1.1.2
   '@intlify/vite-plugin-vue-i18n': 6.0.1
-  '@ionic/vue': 6.2.2
-  '@ionic/vue-router': 6.2.2
+  '@ionic/vue': 6.2.3
+  '@ionic/vue-router': 6.2.3
   '@supabase/supabase-js': 1.35.6
   '@teamhive/capacitor-video-recorder': ^5.0.0
   '@types/fs-extra': ^9.0.13
@@ -57,13 +57,13 @@ specifiers:
   '@vue/server-renderer': 3.2.37
   '@vuelidate/core': 2.0.0-alpha.44
   '@vuelidate/validators': 2.0.0-alpha.31
-  '@vueuse/core': 9.1.0
+  '@vueuse/core': 9.1.1
   base64-arraybuffer: 1.0.2
-  capacitor-native-biometric: 4.1.2
+  capacitor-native-biometric: 4.1.3
   capacitor-rate-app: ^3.0.0
   capacitor-set-version: ^2.0.7
   chart.js: ^3.9.1
-  chartjs-plugin-annotation: ^2.0.0
+  chartjs-plugin-annotation: ^2.0.1
   copy-text-to-clipboard: ^3.0.1
   critters: 0.0.16
   cross-env: ^7.0.3
@@ -71,7 +71,7 @@ specifiers:
   dayjs: 1.11.5
   eslint: 8.21.0
   eslint-plugin-cypress: ^2.12.1
-  firebase: 9.9.2
+  firebase: 9.9.3
   generate-password-browser: ^1.1.0
   https-localhost: 4.7.1
   json2csv: ^5.0.7
@@ -106,56 +106,56 @@ specifiers:
 
 dependencies:
   '@capacitor-community/http': 1.4.1
-  '@capacitor-community/keep-awake': 3.0.0_@capacitor+core@4.0.1
-  '@capacitor-community/native-audio': 3.0.4_@capacitor+core@4.0.1
-  '@capacitor/action-sheet': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/android': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/app': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/app-launcher': 4.0.1_@capacitor+core@4.0.1
+  '@capacitor-community/keep-awake': 3.0.0_@capacitor+core@4.1.0
+  '@capacitor-community/native-audio': 3.0.4_@capacitor+core@4.1.0
+  '@capacitor/action-sheet': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/android': 4.1.0_@capacitor+core@4.1.0
+  '@capacitor/app': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/app-launcher': 4.0.1_@capacitor+core@4.1.0
   '@capacitor/assets': 1.0.0-next.5_tyvfw3xlkeib37wbsln4bvkpbm
-  '@capacitor/browser': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/camera': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/clipboard': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/core': 4.0.1
-  '@capacitor/device': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/dialog': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/filesystem': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/geolocation': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/haptics': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/ios': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/keyboard': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/local-notifications': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/motion': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/network': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/preferences': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/push-notifications': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/screen-reader': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/share': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/splash-screen': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/status-bar': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/text-zoom': 4.0.1_@capacitor+core@4.0.1
-  '@capacitor/toast': 4.0.1_@capacitor+core@4.0.1
-  '@capawesome/capacitor-file-picker': 0.4.0_@capacitor+core@4.0.1
-  '@capawesome/capacitor-screen-orientation': 2.0.0_@capacitor+core@4.0.1
-  '@capgo/capacitor-flash': 1.2.9_@capacitor+core@4.0.1
-  '@capgo/capacitor-mute': 1.1.3_@capacitor+core@4.0.1
-  '@capgo/capacitor-screen-recorder': 1.2.4_@capacitor+core@4.0.1
-  '@capgo/capacitor-updater': 4.0.0-alpha.42_@capacitor+core@4.0.1
-  '@ionic/vue': 6.2.2
-  '@ionic/vue-router': 6.2.2
+  '@capacitor/browser': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/camera': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/clipboard': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/core': 4.1.0
+  '@capacitor/device': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/dialog': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/filesystem': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/geolocation': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/haptics': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/ios': 4.1.0_@capacitor+core@4.1.0
+  '@capacitor/keyboard': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/local-notifications': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/motion': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/network': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/preferences': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/push-notifications': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/screen-reader': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/share': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/splash-screen': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/status-bar': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/text-zoom': 4.0.1_@capacitor+core@4.1.0
+  '@capacitor/toast': 4.0.1_@capacitor+core@4.1.0
+  '@capawesome/capacitor-file-picker': 0.4.0_@capacitor+core@4.1.0
+  '@capawesome/capacitor-screen-orientation': 2.0.1_@capacitor+core@4.1.0
+  '@capgo/capacitor-flash': 1.2.10_@capacitor+core@4.1.0
+  '@capgo/capacitor-mute': 1.1.4_@capacitor+core@4.1.0
+  '@capgo/capacitor-screen-recorder': 1.2.5_@capacitor+core@4.1.0
+  '@capgo/capacitor-updater': 4.0.0-alpha.49_@capacitor+core@4.1.0
+  '@ionic/vue': 6.2.3
+  '@ionic/vue-router': 6.2.3
   '@supabase/supabase-js': 1.35.6
-  '@teamhive/capacitor-video-recorder': 5.0.0_@capacitor+core@4.0.1
+  '@teamhive/capacitor-video-recorder': 5.0.0_@capacitor+core@4.1.0
   '@vuelidate/core': 2.0.0-alpha.44_vue@3.2.37
   '@vuelidate/validators': 2.0.0-alpha.31_vue@3.2.37
-  '@vueuse/core': 9.1.0_vue@3.2.37
+  '@vueuse/core': 9.1.1_vue@3.2.37
   base64-arraybuffer: 1.0.2
-  capacitor-native-biometric: 4.1.2
-  capacitor-rate-app: 3.0.0_@capacitor+core@4.0.1
+  capacitor-native-biometric: 4.1.3
+  capacitor-rate-app: 3.0.0_@capacitor+core@4.1.0
   chart.js: 3.9.1
-  chartjs-plugin-annotation: 2.0.0_chart.js@3.9.1
+  chartjs-plugin-annotation: 2.0.1_chart.js@3.9.1
   copy-text-to-clipboard: 3.0.1
   dayjs: 1.11.5
-  firebase: 9.9.2
+  firebase: 9.9.3
   generate-password-browser: 1.1.0
   json2csv: 5.0.7
   logsnag: 0.1.3
@@ -1485,28 +1485,28 @@ packages:
       '@capacitor/ios': 3.6.0_@capacitor+core@3.6.0
     dev: false
 
-  /@capacitor-community/keep-awake/3.0.0_@capacitor+core@4.0.1:
+  /@capacitor-community/keep-awake/3.0.0_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-amK9qcQOtsLNBEQ+THXLtNRgHds6SmJUsZ5ZrxGfcqBK8NKzalljejqLUkx2wIbB4ixsKKlrtzlwByyuRGAK+w==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor-community/native-audio/3.0.4_@capacitor+core@4.0.1:
+  /@capacitor-community/native-audio/3.0.4_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-WvVbcNKJpTvGwiJw9A1bmsZv/fi94pZ4Z1pYB+k65VfpAXjlBuFMexZprSwbVgb9WoHtYoY3T/Nj4BIH2QMgDg==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/action-sheet/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/action-sheet/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-8F4TT05KCvSccGZjezEXPgiRvjuwQRpVUApTTVNQaEgHP9vPhuzfQB9hp9NByR8IfuHMwAlJGSnoFp7fZ6xHuw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/android/3.6.0_@capacitor+core@3.6.0:
@@ -1517,28 +1517,28 @@ packages:
       '@capacitor/core': 3.6.0
     dev: false
 
-  /@capacitor/android/4.0.1_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-JXToVdVYe4icOcPG8GOIiRoGSu3zQcZW965o2HUxWC0vQF3Xh0/ntbNL/J1Vf7HODyUkiRnozvzDzn6nWoVQEQ==}
+  /@capacitor/android/4.1.0_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-aYHvpYVlS6WC+bG9jJfwqgHMxTw3e8f3taNnl/y9qCjglmMmtFcZWFAVLlOleVK4Q7olSirqjx37f0ppvxRTLg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/app-launcher/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/app-launcher/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-53bMqQ1x5yYpuJSi2bUtzCmOnKG4cy9fe3lM/7sdEypjZxLqG4fvZVd/7Z2dlbEdfD2kMAF44KXQMM6Jtr/SSQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/app/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/app/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-frPft9TMJL70jWq5jmxwGSBddZVvsWxX5Agj2i19WJerk37aTgljB05HRr/YLg6mF1G/NIXmmFJZDY8MEgirDg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/assets/1.0.0-next.5_tyvfw3xlkeib37wbsln4bvkpbm:
@@ -1570,20 +1570,20 @@ packages:
       - typescript
     dev: false
 
-  /@capacitor/browser/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/browser/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-tPOA/eYDJdDeMFd+A3I8teuGfPP0GEqhWtMzH8z5r2tW40iJ/mL8qH5NgVLMZ3uvs7gN2LfQTCMNJvl0F/WdBw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/camera/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/camera/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-ys8DV8gpnIGum23XFf25BtkEIoH4CpSDt8IT0F3DVLEQDFeepZbTsY4o+LuZ0cm4Gr0tl6Gi2wCbgcasezLY+w==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/cli/3.6.0:
@@ -1637,12 +1637,12 @@ packages:
       - supports-color
     dev: true
 
-  /@capacitor/clipboard/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/clipboard/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-DO5fC6ax5Tm/4K77NjxRLu/bdyvO6FDCK38w05CE4LHvi3RF4LTM8EgnmIrEGKxwwbH5VloTeca9Cu6bsMXPiA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/core/3.6.0:
@@ -1651,26 +1651,26 @@ packages:
       tslib: 2.4.0
     dev: false
 
-  /@capacitor/core/4.0.1:
-    resolution: {integrity: sha512-gita0j7UPoGyHejAUsrW1OrkyDSp7gfHn45fkeQclHRSz7UWLF4hqE1R/6INsVmIFu/amIApxfHed8h3m/Fm7g==}
+  /@capacitor/core/4.1.0:
+    resolution: {integrity: sha512-bMYFnC5l5n11D/kLTz9TOOJfUH+nQqYRwzG7h5h4AXIm8aFxH5ZY3iFlDZd7R4xcyrlnfxzfoooSH9trPjRBLA==}
     dependencies:
       tslib: 2.4.0
     dev: false
 
-  /@capacitor/device/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/device/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-D0jJFQYifmsgcz4X9MEEKH5E36ARK2CJcUCXJbcuFTChHSxK+ly7Kd6PZC73Y5GkEZIjpebWAWo5F3w9S4hsYQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/dialog/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/dialog/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-mHcTU+z2SiGL0azdr4Pn9Qzq+AHKBIoDzAOUVAco+OyFsASdMu/+d/DB2MipA4VvO2QNnbcvvtSFwDnCoyg+aw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/filesystem/1.1.0_@capacitor+core@3.6.0:
@@ -1681,32 +1681,32 @@ packages:
       '@capacitor/core': 3.6.0
     dev: false
 
-  /@capacitor/filesystem/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/filesystem/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-raaXRHi9Uy9OZw/PuiIhh0ozNdrU+U3Vh06eEDlhfegyA3mR8GmeB3IhwqqnTj7OQTKreN1XgcgR6grvgoLR/g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/geolocation/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/geolocation/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-5dxXfDU1rCkn8xrXk6cQwUr+F2ZRycZoU5zi8MFVnH7JvHruV3B152Uz+urRkF/GtKQrgvxEW78GbejOW+nfYw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/gradle-parse/1.0.23:
     resolution: {integrity: sha512-ofISWQqbGoDbkr51sDzHCx2tL2+Ry+rNhx3+Qrlfg2LUobzBfwbXBXvDVNgpHR92J8Xo7KyCU4FbvGfYwBAyOA==}
     dev: false
 
-  /@capacitor/haptics/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/haptics/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-ZLVoLdK1Md/xIRRrDOnrLCKGRg8UENY1ShpKcysPN1z1MgcpvB/9Nbqczm3RH24zyo3MP/7homkqMzUGxPBlwQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/ios/3.6.0_@capacitor+core@3.6.0:
@@ -1717,52 +1717,52 @@ packages:
       '@capacitor/core': 3.6.0
     dev: false
 
-  /@capacitor/ios/4.0.1_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-46qigDiPKHXxihSSjXDIbuF8/1O9xWVgMzJpEFJhhhav+vHy6/SDc2liKLhmqCwH2OzZGxk+IlSGlkc4Oyorkw==}
+  /@capacitor/ios/4.1.0_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-zkv48Xc5QwdL7TIT4YpXwgISrA5Cuy59KyN+uq3ovr+L/y5SgtKAOg7pATRBYT7CFgFLqkey/PQKcTjbcxhyaA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/keyboard/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/keyboard/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-JZVci2v9jAKH0sIoNNZzmw/cWGXWf+KneLt0yDr/6YSs/2/tfuH10yOrUOhgrKFkR+fFj/rddTClQXUQ8Rqcrg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/local-notifications/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/local-notifications/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-7OX8k1HUKLo5W8LnkHi0Pesshdn2oGbgcw/1cUd37u9hG5S1Y9a0dNjnlYi9BGfV03Bpjxr5P6q1BhKDCwb3wg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/motion/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/motion/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-xbC12HBX5kSEVZaHAnoHZeDhVLs9bz8VPmlhaMaNHfDa8NF2Op8NT1U6vhV63coMyQRCptpHrTHKt9ILghwPJw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/network/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/network/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-04xR3DtxxyibaQQGNLUGYxgLzlZtsucaUUikCFLijuxSKSM/tW8frDKpWdwx7yG/dOYLMYmAqaSFcelz5GRGpw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/preferences/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/preferences/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-FffJjKS4XcodUj/rtFtWizQ9q/oYDSn5opZ+JYwj/EkjiMWMhY/Pk9lN3vwQfp+VJrTt3hjr+bwKXjhTbYBqKw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@capacitor/project/1.1.1_tyvfw3xlkeib37wbsln4bvkpbm:
@@ -1797,108 +1797,108 @@ packages:
       - typescript
     dev: false
 
-  /@capacitor/push-notifications/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/push-notifications/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-M6MQbs6rP/8JvQVF0UI1jq0dKRcfi0MGEKQLOOjLI6p4pqp4FVi6gpc+Ww2mtvXJGcIhyhIwziuH9dRl0FTT5Q==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/screen-reader/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/screen-reader/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-/UzrrdtpE9sOF8fKg3+iMN5EqvO1aQ+7zKfyVMZP9u+XceL7HA3AqeHKx5Asa/FiE5PWN6aAGtTiMUpnGqjCKg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/share/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/share/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-czqYavgW+rMrlcgZkLHJ4Xwr+7E/T2YxxZ5tVtdqxANlKCw/qUL2tpNx3wphiC8lWj9wLUWFjgrBBDeZSlPYdQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/splash-screen/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/splash-screen/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-7hklUx69aZDonuLP1R5X4ZTGgZLwX8RTj9/3U1905Kz/XflcT7Rhighbad+uZBaOU+L/8Vm6Y3RlR3rFj4ELVA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/status-bar/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/status-bar/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-BmEyOf3m/hAf8bO4hCX0m5gpQPSgd05mGYl+9E841WUZeJjcYlmiG/EBshAUb2uGCVtyNaG36yPXB0r0Ypg+rw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/text-zoom/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/text-zoom/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-BIecDYzHjJnMIfv3dsO2FnCv9JRS3FxhV1kos84n3JjAVcy4SsOtvTd2YBU8gAU6JXQ4FUQp7Z1EncDAvsiw3g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capacitor/toast/4.0.1_@capacitor+core@4.0.1:
+  /@capacitor/toast/4.0.1_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-caBbhbDPg11R4F/Xb/HKpmIDjXxQbKocVTYLN577AymmyQBUJQgiADTYYnG+Viom41mG9crirZ9WKjARG9lR0w==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capawesome/capacitor-file-picker/0.4.0_@capacitor+core@4.0.1:
+  /@capawesome/capacitor-file-picker/0.4.0_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-viyq6c3J3aUghSfuLhjON0IUz5537OrBh4N/oSdty9CJr2UvSrNbSdol5OoyOtPCOLHagULFE4lt0LdKL9V8LQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capawesome/capacitor-screen-orientation/2.0.0_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-issRxAYGtTc+t5CuVGso2YOrQhCEQJKreUlWyu2mOL8/TQFXiggBzxKkqLe2rLYPkEXcx37iQO1Eqql1dLTVTQ==}
+  /@capawesome/capacitor-screen-orientation/2.0.1_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-nwd6jz7UOda3wAOrKsfiV5aqjTDTIplEZR2Kjb68lKPW7Lu1Q/emTLyFI4qzQEpwqq0BzWIsVmtVFiTIlo0XtQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capgo/capacitor-flash/1.2.9_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-0RNOYSQ/KrIguAp64I0RQFa2FCa6OyQ8jxx5iiFTZ/UPJuYZHaOGFqDnUCGEWIrT6y47oQphhfnS+7X1QQeNyg==}
+  /@capgo/capacitor-flash/1.2.10_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-KSgLD9DRcYeuG4DDFq1p8wjktgQbGb6rf4tXxpbCY5mQ2tF/M9qsK4m7woTtopB8j83Ka3tRU1+UPfOYxD7i4Q==}
     peerDependencies:
       '@capacitor/core': ^3.0.0 || ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capgo/capacitor-mute/1.1.3_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-BuABfEGuMM8eiRtvt+6Jb49JZbf9EKIoYjNW3IBw37GSngcz8+TQQ1g3WwnUjji2jIbwJM92GFl3J3QmoDcpkA==}
+  /@capgo/capacitor-mute/1.1.4_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-6s7BS5Vom5+ylgM1je7PDt7W0mv41ko58pwxXYyANnm1JbXtz3s/1bmV0IyQgeVIkLA8764csZs82EHo9dyacw==}
     peerDependencies:
       '@capacitor/core': ^3.0.0 || ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capgo/capacitor-screen-recorder/1.2.4_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-UR8Vk01l96n/5hOb+uUdIzi3/+Iqta6UNR2gP3G/1hKIIjFUTHd61kOhEmycFVhvQxAFrTFT0jei1xE7/YjyYw==}
+  /@capgo/capacitor-screen-recorder/1.2.5_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-sm+exCzziv82+7lroTtwkyy0hMvG42nO+yvseZFZz92SpKSbLV2bdrgs6ZtWE8tUwcPX+NyZSL4qytfbGnebHg==}
     peerDependencies:
       '@capacitor/core': ^3.0.0 || ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
-  /@capgo/capacitor-updater/4.0.0-alpha.42_@capacitor+core@4.0.1:
-    resolution: {integrity: sha512-xrjUfhGgQV8AatTDJTGJ5Pu1GyiSLdGgGABrthcr6znkhYSViylHqDRwSB2t/BFE6hD2zBbWE5Gy+St5yHZOvg==}
+  /@capgo/capacitor-updater/4.0.0-alpha.49_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-phgJVv/tctJMSyERgYPTUUifdyHwh0H9CsMAyEKgiwsZ7smaRIzWHwFyW7A1x9pkySjoCVSZQLKsz0xGgHXtjQ==}
     peerDependencies:
-      '@capacitor/core': ^3.0.0 || ^4.0.0
+      '@capacitor/core': ^3.0.0 || ^4.0.0 || ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@changesets/apply-release-plan/5.0.5:
@@ -2163,14 +2163,14 @@ packages:
       - supports-color
     dev: true
 
-  /@firebase/analytics-compat/0.1.13_ntdu3hfexp42gsr3dmzonffheq:
+  /@firebase/analytics-compat/0.1.13_kowmy6vzi2xcdysg3n6ul4qaae:
     resolution: {integrity: sha512-QC1DH/Dwc8fBihn0H+jocBWyE17GF1fOCpCrpAiQ2u16F/NqsVDVG4LjIqdhq963DXaXneNY7oDwa25Up682AA==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/analytics': 0.8.0_@firebase+app@0.7.30
+      '@firebase/analytics': 0.8.0_@firebase+app@0.7.31
       '@firebase/analytics-types': 0.7.0
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2182,27 +2182,27 @@ packages:
     resolution: {integrity: sha512-DNE2Waiwy5+zZnCfintkDtBfaW6MjIG883474v6Z0K1XZIvl76cLND4iv0YUb48leyF+PJK1KO2XrgHb/KpmhQ==}
     dev: false
 
-  /@firebase/analytics/0.8.0_@firebase+app@0.7.30:
+  /@firebase/analytics/0.8.0_@firebase+app@0.7.31:
     resolution: {integrity: sha512-wkcwainNm8Cu2xkJpDSHfhBSdDJn86Q1TZNmLWc67VrhZUHXIKXxIqb65/tNUVE+I8+sFiDDNwA+9R3MqTQTaA==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
-      '@firebase/installations': 0.5.12_@firebase+app@0.7.30
+      '@firebase/installations': 0.5.12_@firebase+app@0.7.31
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
       tslib: 2.4.0
     dev: false
 
-  /@firebase/app-check-compat/0.2.12_ntdu3hfexp42gsr3dmzonffheq:
+  /@firebase/app-check-compat/0.2.12_kowmy6vzi2xcdysg3n6ul4qaae:
     resolution: {integrity: sha512-GFppNLlUyMN9Iq31ME/+GkjRVKlc+MeanzUKQ9UaR73ZsYH3oX3Ja+xjoYgixaVJDDG+ofBYR7ZXTkkQdSR/pw==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-check': 0.5.12_@firebase+app@0.7.30
+      '@firebase/app-check': 0.5.12_@firebase+app@0.7.31
       '@firebase/app-check-types': 0.4.0
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
@@ -2219,22 +2219,22 @@ packages:
     resolution: {integrity: sha512-SsWafqMABIOu7zLgWbmwvHGOeQQVQlwm42kwwubsmfLmL4Sf5uGpBfDhQ0CAkpi7bkJ/NwNFKafNDL9prRNP0Q==}
     dev: false
 
-  /@firebase/app-check/0.5.12_@firebase+app@0.7.30:
+  /@firebase/app-check/0.5.12_@firebase+app@0.7.31:
     resolution: {integrity: sha512-l+MmvupSGT/F+I5ei7XjhEfpoL4hLVJr0vUwcG5NEf2hAkQnySli9fnbl9fZu1BJaQ2kthrMmtg1gcbcM9BUCQ==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
       tslib: 2.4.0
     dev: false
 
-  /@firebase/app-compat/0.1.31:
-    resolution: {integrity: sha512-oH3F4Pf0/Q0WTyNynMlaoM1qjUTTu7ofDdAWUOgr9BH9gftIClqeCulltXSQH3DO3XUE61pIIpIakAWQ7zzumA==}
+  /@firebase/app-compat/0.1.32:
+    resolution: {integrity: sha512-dChnJsnHxih0MYQxCWBPAruqK2M4ba/t+DvKu8IcRpd4FkcUQ8FO19Z963nCdXyu2T6cxPcwCopKWaWlymBVVA==}
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
@@ -2245,8 +2245,8 @@ packages:
     resolution: {integrity: sha512-6fbHQwDv2jp/v6bXhBw2eSRbNBpxHcd1NBF864UksSMVIqIyri9qpJB1Mn6sGZE+bnDsSQBC5j2TbMxYsJQkQg==}
     dev: false
 
-  /@firebase/app/0.7.30:
-    resolution: {integrity: sha512-uJRMShpCWCrW6eO+/UuN0ExgztPMpK/w/AUryHJh7Ll4lFkc71pqE9P/XlfE+XXi0zkWoXVgPeLAQDkUJwgmMA==}
+  /@firebase/app/0.7.31:
+    resolution: {integrity: sha512-pqCkY2wC5pRBVH1oYliD9E0aSW6qisuMy7meaCtGzwaVcE8AFMhW9xhxHuBMpX1291+2iimUZWnCxSL9DaUUGA==}
     dependencies:
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
@@ -2255,13 +2255,13 @@ packages:
       tslib: 2.4.0
     dev: false
 
-  /@firebase/auth-compat/0.2.18_53yvy43rwpg2c45kgeszsxtrca:
+  /@firebase/auth-compat/0.2.18_kg6iqletipudcxzgqetrtqyldy:
     resolution: {integrity: sha512-Fw2PJS0G/tGrfyEBcYJQ42sfy5+sANrK5xd7tuzgV7zLFW5rYkHUIZngXjuOBwLOcfO2ixa/FavfeJle3oJ38Q==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
-      '@firebase/auth': 0.20.5_@firebase+app@0.7.30
+      '@firebase/app-compat': 0.1.32
+      '@firebase/auth': 0.20.5_@firebase+app@0.7.31
       '@firebase/auth-types': 0.11.0_pbfwexsq7uf6mrzcwnikj3g37m
       '@firebase/component': 0.5.17
       '@firebase/util': 1.6.3
@@ -2296,12 +2296,12 @@ packages:
       '@firebase/util': 1.6.3
     dev: false
 
-  /@firebase/auth/0.20.5_@firebase+app@0.7.30:
+  /@firebase/auth/0.20.5_@firebase+app@0.7.31:
     resolution: {integrity: sha512-SbKj7PCAuL0lXEToUOoprc1im2Lr/bzOePXyPC7WWqVgdVBt0qovbfejlzKYwJLHUAPg9UW1y3XYe3IlbXr77w==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
@@ -2321,12 +2321,12 @@ packages:
       tslib: 2.4.0
     dev: false
 
-  /@firebase/database-compat/0.2.4_@firebase+app-types@0.7.0:
-    resolution: {integrity: sha512-VtsGixO5mTjNMJn6PwxAJEAR70fj+3blCXIdQKel3q+eYGZAfdqxox1+tzZDnf9NWBJpaOgAHPk3JVDxEo9NFQ==}
+  /@firebase/database-compat/0.2.5_@firebase+app-types@0.7.0:
+    resolution: {integrity: sha512-fj88gwtNJMcJBDjcTMbCuYEiVzuGb76rTOaaiAOqxR+unzvvbs2KU5KbFyl83jcpIjY6NIt+xXNrCXpzo7Zp3g==}
     dependencies:
       '@firebase/component': 0.5.17
-      '@firebase/database': 0.13.4_@firebase+app-types@0.7.0
-      '@firebase/database-types': 0.9.12
+      '@firebase/database': 0.13.5_@firebase+app-types@0.7.0
+      '@firebase/database-types': 0.9.13
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2334,15 +2334,15 @@ packages:
       - '@firebase/app-types'
     dev: false
 
-  /@firebase/database-types/0.9.12:
-    resolution: {integrity: sha512-FP4UYx1/bIOYSbTFmKajKKaEjXZKCQFUNZNIxaiCEZmsXb4vt0PJAmBufJf6LJLsaXNoywkcTyPYwjsotviyxg==}
+  /@firebase/database-types/0.9.13:
+    resolution: {integrity: sha512-dIJ1zGe3EHMhwcvukTOPzYlFYFIG1Et5Znl7s7y/ZTN2/toARRNnsv1qCKvqevIMYKvIrRsYOYfOXDS8l1YIJA==}
     dependencies:
       '@firebase/app-types': 0.7.0
       '@firebase/util': 1.6.3
     dev: false
 
-  /@firebase/database/0.13.4_@firebase+app-types@0.7.0:
-    resolution: {integrity: sha512-NW7bOoiaC4sJCj6DY/m9xHoFNa0CK32YPMCh6FiMweLCDQbOZM8Ql/Kn6yyuxCb7K7ypz9eSbRlCWQJsJRQjhg==}
+  /@firebase/database/0.13.5_@firebase+app-types@0.7.0:
+    resolution: {integrity: sha512-QmX73yi8URk36NAbykXeuAcJCjDtx3BzuxKJO3sL9B4CtjNFAfpWawVxoaaThocDWNAyMJxFhiL1kkaVraH7Lg==}
     dependencies:
       '@firebase/auth-interop-types': 0.1.6_pbfwexsq7uf6mrzcwnikj3g37m
       '@firebase/component': 0.5.17
@@ -2354,14 +2354,14 @@ packages:
       - '@firebase/app-types'
     dev: false
 
-  /@firebase/firestore-compat/0.1.23_53yvy43rwpg2c45kgeszsxtrca:
+  /@firebase/firestore-compat/0.1.23_kg6iqletipudcxzgqetrtqyldy:
     resolution: {integrity: sha512-QfcuyMAavp//fQnjSfCEpnbWi7spIdKaXys1kOLu7395fLr+U6ykmto1HUMCSz8Yus9cEr/03Ujdi2SUl2GUAA==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
-      '@firebase/firestore': 3.4.14_@firebase+app@0.7.30
+      '@firebase/firestore': 3.4.14_@firebase+app@0.7.31
       '@firebase/firestore-types': 2.5.0_pbfwexsq7uf6mrzcwnikj3g37m
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2381,13 +2381,13 @@ packages:
       '@firebase/util': 1.6.3
     dev: false
 
-  /@firebase/firestore/3.4.14_@firebase+app@0.7.30:
+  /@firebase/firestore/3.4.14_@firebase+app@0.7.31:
     resolution: {integrity: sha512-F4Pqd5OUBtJaAWWC39C0vrMLIdZtx7jsO7sARFHSiOZY/8bikfH9YovIRkpxk7OSs3HT/SgVdK0B1vISGNSnJA==}
     engines: {node: '>=10.10.0'}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
@@ -2400,14 +2400,14 @@ packages:
       - encoding
     dev: false
 
-  /@firebase/functions-compat/0.2.4_53yvy43rwpg2c45kgeszsxtrca:
+  /@firebase/functions-compat/0.2.4_kg6iqletipudcxzgqetrtqyldy:
     resolution: {integrity: sha512-Crfn6il1yXGuXkjSd8nKrqR4XxPvuP19g64bXpM6Ix67qOkQg676kyOuww0FF17xN0NSXHfG8Pyf+CUrx8wJ5g==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
-      '@firebase/functions': 0.8.4_54flq6t3lt2vkv56b3wekvuqsq
+      '@firebase/functions': 0.8.4_lwgt3sk4yfjgasfpmvix4ixi2u
       '@firebase/functions-types': 0.5.0
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2421,12 +2421,12 @@ packages:
     resolution: {integrity: sha512-qza0M5EwX+Ocrl1cYI14zoipUX4gI/Shwqv0C1nB864INAD42Dgv4v94BCyxGHBg2kzlWy8PNafdP7zPO8aJQA==}
     dev: false
 
-  /@firebase/functions/0.8.4_54flq6t3lt2vkv56b3wekvuqsq:
+  /@firebase/functions/0.8.4_lwgt3sk4yfjgasfpmvix4ixi2u:
     resolution: {integrity: sha512-o1bB0xMyQKe+b246zGnjwHj4R6BH4mU2ZrSaa/3QvTpahUQ3hqYfkZPLOXCU7+vEFxHb3Hd4UUjkFhxoAcPqLA==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/app-check-interop-types': 0.1.0
       '@firebase/auth-interop-types': 0.1.6_pbfwexsq7uf6mrzcwnikj3g37m
       '@firebase/component': 0.5.17
@@ -2439,14 +2439,14 @@ packages:
       - encoding
     dev: false
 
-  /@firebase/installations-compat/0.1.12_53yvy43rwpg2c45kgeszsxtrca:
+  /@firebase/installations-compat/0.1.12_kg6iqletipudcxzgqetrtqyldy:
     resolution: {integrity: sha512-BIhFpWIn/GkuOa+jnXkp3SDJT2RLYJF6MWpinHIBKFJs7MfrgYZ3zQ1AlhobDEql+bkD1dK4dB5sNcET2T+EyA==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
-      '@firebase/installations': 0.5.12_@firebase+app@0.7.30
+      '@firebase/installations': 0.5.12_@firebase+app@0.7.31
       '@firebase/installations-types': 0.4.0_@firebase+app-types@0.7.0
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2463,12 +2463,12 @@ packages:
       '@firebase/app-types': 0.7.0
     dev: false
 
-  /@firebase/installations/0.5.12_@firebase+app@0.7.30:
+  /@firebase/installations/0.5.12_@firebase+app@0.7.31:
     resolution: {integrity: sha512-Zq43fCE0PB5tGJ3ojzx5RNQzKdej1188qgAk22rwjuhP7npaG/PlJqDG1/V0ZjTLRePZ1xGrfXSPlA17c/vtNw==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
       '@firebase/util': 1.6.3
       idb: 7.0.1
@@ -2481,14 +2481,14 @@ packages:
       tslib: 2.4.0
     dev: false
 
-  /@firebase/messaging-compat/0.1.16_ntdu3hfexp42gsr3dmzonffheq:
+  /@firebase/messaging-compat/0.1.16_kowmy6vzi2xcdysg3n6ul4qaae:
     resolution: {integrity: sha512-uG7rWcXJzU8vvlEBFpwG1ndw/GURrrmKcwsHopEWbsPGjMRaVWa7XrdKbvIR7IZohqPzcC/V9L8EeqF4Q4lz8w==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
-      '@firebase/messaging': 0.9.16_@firebase+app@0.7.30
+      '@firebase/messaging': 0.9.16_@firebase+app@0.7.31
       '@firebase/util': 1.6.3
       tslib: 2.4.0
     transitivePeerDependencies:
@@ -2499,29 +2499,29 @@ packages:
     resolution: {integrity: sha512-DbvUl/rXAZpQeKBnwz0NYY5OCqr2nFA0Bj28Fmr3NXGqR4PAkfTOHuQlVtLO1Nudo3q0HxAYLa68ZDAcuv2uKQ==}
     dev: false
 
-  /@firebase/messaging/0.9.16_@firebase+app@0.7.30:
+  /@firebase/messaging/0.9.16_@firebase+app@0.7.31:
     resolution: {integrity: sha512-Yl9gGrAvJF6C1gg3+Cr2HxlL6APsDEkrorkFafmSP1l+rg1epZKoOAcKJbSF02Vtb50wfb9FqGGy8tzodgETxg==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
-      '@firebase/installations': 0.5.12_@firebase+app@0.7.30
+      '@firebase/installations': 0.5.12_@firebase+app@0.7.31
       '@firebase/messaging-interop-types': 0.1.0
       '@firebase/util': 1.6.3
       idb: 7.0.1
       tslib: 2.4.0
     dev: false
 
-  /@firebase/performance-compat/0.1.12_ntdu3hfexp42gsr3dmzonffheq:
+  /@firebase/performance-compat/0.1.12_kowmy6vzi2xcdysg3n6ul4qaae:
     resolution: {integrity: sha512-IBORzUeGY1MGdZnsix9Mu5z4+C3WHIwalu0usxvygL0EZKHztGG8bppYPGH/b5vvg8QyHs9U+Pn1Ot2jZhffQQ==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
-      '@firebase/performance': 0.5.12_@firebase+app@0.7.30
+      '@firebase/performance': 0.5.12_@firebase+app@0.7.31
       '@firebase/performance-types': 0.1.0
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2533,36 +2533,28 @@ packages:
     resolution: {integrity: sha512-6p1HxrH0mpx+622Ql6fcxFxfkYSBpE3LSuwM7iTtYU2nw91Hj6THC8Bc8z4nboIq7WvgsT/kOTYVVZzCSlXl8w==}
     dev: false
 
-  /@firebase/performance/0.5.12_@firebase+app@0.7.30:
+  /@firebase/performance/0.5.12_@firebase+app@0.7.31:
     resolution: {integrity: sha512-MPVTkOkGrm2SMQgI1FPNBm85y2pPqlPb6VDjIMCWkVpAr6G1IZzUT24yEMySRcIlK/Hh7/Qu1Nu5ASRzRuX6+Q==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
-      '@firebase/installations': 0.5.12_@firebase+app@0.7.30
+      '@firebase/installations': 0.5.12_@firebase+app@0.7.31
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
       tslib: 2.4.0
     dev: false
 
-  /@firebase/polyfill/0.3.36:
-    resolution: {integrity: sha512-zMM9oSJgY6cT2jx3Ce9LYqb0eIpDE52meIzd/oe/y70F+v9u1LDqk5kUF5mf16zovGBWMNFmgzlsh6Wj0OsFtg==}
-    dependencies:
-      core-js: 3.6.5
-      promise-polyfill: 8.1.3
-      whatwg-fetch: 2.0.4
-    dev: false
-
-  /@firebase/remote-config-compat/0.1.12_ntdu3hfexp42gsr3dmzonffheq:
+  /@firebase/remote-config-compat/0.1.12_kowmy6vzi2xcdysg3n6ul4qaae:
     resolution: {integrity: sha512-Yz7Gtb2rLa7ykXZX9DnSTId8CXd++jFFLW3foUImrYwJEtWgLJc7gwkRfd1M73IlKGNuQAY+DpUNF0n1dLbecA==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
       '@firebase/logger': 0.3.3
-      '@firebase/remote-config': 0.3.11_@firebase+app@0.7.30
+      '@firebase/remote-config': 0.3.11_@firebase+app@0.7.31
       '@firebase/remote-config-types': 0.2.0
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2574,27 +2566,27 @@ packages:
     resolution: {integrity: sha512-hqK5sCPeZvcHQ1D6VjJZdW6EexLTXNMJfPdTwbD8NrXUw6UjWC4KWhLK/TSlL0QPsQtcKRkaaoP+9QCgKfMFPw==}
     dev: false
 
-  /@firebase/remote-config/0.3.11_@firebase+app@0.7.30:
+  /@firebase/remote-config/0.3.11_@firebase+app@0.7.31:
     resolution: {integrity: sha512-qA84dstrvVpO7rWT/sb2CLv1kjHVmz59SRFPKohJJYFBcPOGK4Pe4FWWhKAE9yg1Gnl0qYAGkahOwNawq3vE0g==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
-      '@firebase/installations': 0.5.12_@firebase+app@0.7.30
+      '@firebase/installations': 0.5.12_@firebase+app@0.7.31
       '@firebase/logger': 0.3.3
       '@firebase/util': 1.6.3
       tslib: 2.4.0
     dev: false
 
-  /@firebase/storage-compat/0.1.17_53yvy43rwpg2c45kgeszsxtrca:
+  /@firebase/storage-compat/0.1.17_kg6iqletipudcxzgqetrtqyldy:
     resolution: {integrity: sha512-nOYmnpI0gwoz5nROseMi9WbmHGf+xumfsOvdPyMZAjy0VqbDnpKIwmTUZQBdR+bLuB5oIkHQsvw9nbb1SH+PzQ==}
     peerDependencies:
       '@firebase/app-compat': 0.x
     dependencies:
-      '@firebase/app-compat': 0.1.31
+      '@firebase/app-compat': 0.1.32
       '@firebase/component': 0.5.17
-      '@firebase/storage': 0.9.9_@firebase+app@0.7.30
+      '@firebase/storage': 0.9.9_@firebase+app@0.7.31
       '@firebase/storage-types': 0.6.0_pbfwexsq7uf6mrzcwnikj3g37m
       '@firebase/util': 1.6.3
       tslib: 2.4.0
@@ -2614,12 +2606,12 @@ packages:
       '@firebase/util': 1.6.3
     dev: false
 
-  /@firebase/storage/0.9.9_@firebase+app@0.7.30:
+  /@firebase/storage/0.9.9_@firebase+app@0.7.31:
     resolution: {integrity: sha512-Zch7srLT2SIh9y2nCVv/4Kne0HULn7OPkmreY70BJTUJ+g5WLRjggBq6x9fV5ls9V38iqMWfn4prxzX8yIc08A==}
     peerDependencies:
       '@firebase/app': 0.x
     dependencies:
-      '@firebase/app': 0.7.30
+      '@firebase/app': 0.7.31
       '@firebase/component': 0.5.17
       '@firebase/util': 1.6.3
       node-fetch: 2.6.7
@@ -2819,8 +2811,8 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/core/6.2.2:
-    resolution: {integrity: sha512-neE+JhtQ7Kb4nGoKR3e55edHQot5BZTw+woV9+pbyCXP1jGeyFeWWPYBYYOkm05TSEkHgh0v6NkV9y31k8GTNw==}
+  /@ionic/core/6.2.3:
+    resolution: {integrity: sha512-TqSVN5nfDC8Ovcfgv6PH6FsNY8P9Awl2zSXVMBpgr5CSFNOb6xB4U8utdhMtJbuo/OYgqAbjSVq+pD4RiBt1rw==}
     dependencies:
       '@stencil/core': 2.16.1
       ionicons: 6.0.2
@@ -2920,16 +2912,16 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/vue-router/6.2.2:
-    resolution: {integrity: sha512-1T3QyX1q1p92a8AhmyrPlCMZ9MeunIlXSYpwsb2cnEMKckCei/la0SXGqxTVkszgwW4nYoebAud6/0NEtZl2cQ==}
+  /@ionic/vue-router/6.2.3:
+    resolution: {integrity: sha512-QbJjeKF5nFoMpDbU9NMM29BoH268oBNFCweXzexQEZ9gEfvuWlQw+WcMSdvCt7EU3wW3uGVfz7bvKEFm/piFxQ==}
     dependencies:
-      '@ionic/vue': 6.2.2
+      '@ionic/vue': 6.2.3
     dev: false
 
-  /@ionic/vue/6.2.2:
-    resolution: {integrity: sha512-jxFW/FFCW6PB5daOGrBlHzZiabS+1A2MUExLQmBoVvw8Dt5gypv1J6oMWKqdVlBDOU7wqozkFjqioeK3c5sPSA==}
+  /@ionic/vue/6.2.3:
+    resolution: {integrity: sha512-ulE8PJPh6SotlD86tx5JkV6517vG07UKb1WaSpeNkpFScvA4yFcIMLE+c3EHUJ8oNaN3wYamH2Aj6TRkLwBH4w==}
     dependencies:
-      '@ionic/core': 6.2.2
+      '@ionic/core': 6.2.3
       ionicons: 6.0.2
     dev: false
 
@@ -4138,12 +4130,12 @@ packages:
       defer-to-connect: 2.0.1
     dev: true
 
-  /@teamhive/capacitor-video-recorder/5.0.0_@capacitor+core@4.0.1:
+  /@teamhive/capacitor-video-recorder/5.0.0_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-ty5TzjeZRYYva569l0jH/PwGFOLd6WsMgMBN4/qxkmRgHB/+bGRPlO7VFMhxwnn1FXCsx47XZtCYVJPwLpV5VA==}
     peerDependencies:
       '@capacitor/core': ^3.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /@trysound/sax/0.2.0:
@@ -4788,24 +4780,24 @@ packages:
       - vue
     dev: false
 
-  /@vueuse/core/9.1.0_vue@3.2.37:
-    resolution: {integrity: sha512-BIroqvXEqt826aE9r3K5cox1zobuPuAzdYJ36kouC2TVhlXvFKIILgFVWrpp9HZPwB3aLzasmG3K87q7TSyXZg==}
+  /@vueuse/core/9.1.1_vue@3.2.37:
+    resolution: {integrity: sha512-QfuaNWRDMQcCUwXylCyYhPC3ScS9Tiiz4J0chdwr3vOemBwRToSywq8MP+ZegKYFnbETzRY8G/5zC+ca30wrRQ==}
     dependencies:
       '@types/web-bluetooth': 0.0.15
-      '@vueuse/metadata': 9.1.0
-      '@vueuse/shared': 9.1.0_vue@3.2.37
+      '@vueuse/metadata': 9.1.1
+      '@vueuse/shared': 9.1.1_vue@3.2.37
       vue-demi: 0.13.7_vue@3.2.37
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
     dev: false
 
-  /@vueuse/metadata/9.1.0:
-    resolution: {integrity: sha512-8OEhlog1iaAGTD3LICZ8oBGQdYeMwByvXetOtAOZCJOzyCRSwqwdggTsmVZZ1rkgYIEqgUBk942AsAPwM21s6A==}
+  /@vueuse/metadata/9.1.1:
+    resolution: {integrity: sha512-XZ2KtSW+85LLHB/IdGILPAtbIVHasPsAW7aqz3BRMzJdAQWRiM/FGa1OKBwLbXtUw/AmjKYFlZJo7eOFIBXRog==}
     dev: false
 
-  /@vueuse/shared/9.1.0_vue@3.2.37:
-    resolution: {integrity: sha512-pB/3njQu4tfJJ78ajELNda0yMG6lKfpToQW7Soe09CprF1k3QuyoNi1tBNvo75wBDJWD+LOnr+c4B5HZ39jY/Q==}
+  /@vueuse/shared/9.1.1_vue@3.2.37:
+    resolution: {integrity: sha512-c+IfcOYmHiHqoEa3ED1Tbpue5GHmoUmTp8PtO4YbczthtY155Rt6DmWhjxMLXBF1Bcidagxljmp/7xtAzEHXLw==}
     dependencies:
       vue-demi: 0.13.7_vue@3.2.37
     transitivePeerDependencies:
@@ -5828,18 +5820,18 @@ packages:
     resolution: {integrity: sha512-0zaSO+TnCHtHJIbpLroX7nsD+vYuOVjl3uzFbJO1wMVbuveJA0RK2WcQA9ZUIOiO0/ArMiMgHJLxfEZhQiC0kw==}
     dev: true
 
-  /capacitor-native-biometric/4.1.2:
-    resolution: {integrity: sha512-tzrWzPdrJHsc3Sg1Ue95mYMIwhckRZOiUBRIQpB2tihZm6xi/7uHMWY32HPVzAjQjIn0VXH48TVvciNpvgLBGg==}
+  /capacitor-native-biometric/4.1.3:
+    resolution: {integrity: sha512-I2DcDE7Nydz2gthJgoecdJD5g6ugvKM5qgGuwoniDA6+pwgMLnwPzBwBYdbRaVdUD9K6xZKO4VojFbsDdwqjvw==}
     dependencies:
       '@capacitor/core': 3.6.0
     dev: false
 
-  /capacitor-rate-app/3.0.0_@capacitor+core@4.0.1:
+  /capacitor-rate-app/3.0.0_@capacitor+core@4.1.0:
     resolution: {integrity: sha512-r2r26923Ehi30EV7ueKYYqhqkdJmvcVOYyaGCpRYlt8TNCaQzSBEuGrtBbXwOQemj1VK5rKUYUjAZ2lpSHAfMQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.0.1
+      '@capacitor/core': 4.1.0
     dev: false
 
   /capacitor-set-version/2.0.7:
@@ -5962,8 +5954,8 @@ packages:
     resolution: {integrity: sha512-Ro2JbLmvg83gXF5F4sniaQ+lTbSv18E+TIf2cOeiH1Iqd2PGFOtem+DUufMZsCJwFE7ywPOpfXFBwRTGq7dh6w==}
     dev: false
 
-  /chartjs-plugin-annotation/2.0.0_chart.js@3.9.1:
-    resolution: {integrity: sha512-Gd8X+uaWuD63qHSf4R9SvFIdHbxmP1RBsKfdlQt7oFgsyDYjqP2y0WrbEs1UoE7OXJDm8lfZes2tQQNhEL/EZw==}
+  /chartjs-plugin-annotation/2.0.1_chart.js@3.9.1:
+    resolution: {integrity: sha512-I+bbmiGuxW68DuhFuCS+oSJN4bzX9d3Z+xJ34+4YhrC68+fncRZgNARgJYqlkCD9s+JQohCkZ0iK/GNr+3Ug2A==}
     peerDependencies:
       chart.js: ^3.7.0
     dependencies:
@@ -6586,12 +6578,6 @@ packages:
       browserslist: 4.17.0
       semver: 7.0.0
     dev: true
-
-  /core-js/3.6.5:
-    resolution: {integrity: sha512-vZVEEwZoIsI+vPEuoF9Iqf5H7/M3eeQqWlQnYa8FSKKePuYTf5MWnxb5SDAzCa60b3JBRS5g9b+Dq7b1y/RCrA==}
-    deprecated: core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.
-    requiresBuild: true
-    dev: false
 
   /core-util-is/1.0.2:
     resolution: {integrity: sha512-3lqz5YjWTYnW6dlDa5TLaTCcShfar1e40rmcJVwCBJC6mWlFuj0eCHIElmG1g5kyuJ/GD+8Wn4FFCcz4gJPfaQ==}
@@ -9153,35 +9139,34 @@ packages:
       pkg-dir: 4.2.0
     dev: false
 
-  /firebase/9.9.2:
-    resolution: {integrity: sha512-zhWUEyBQbwWhLEYhULwZ0A6eRuHP/EP2bpwASpHkI1QQgO1GVqkyCZEpp/feGSDve0COhv9oWC1wOuAzrQrV6g==}
+  /firebase/9.9.3:
+    resolution: {integrity: sha512-lU1FstWqfVZQfz4+TWCZvqJYbwZMyoyP0X/xD/YIfrtXgquOMEDTpoasH4P79N9y3I8iV+6gQHuVmpK+AX2elg==}
     dependencies:
-      '@firebase/analytics': 0.8.0_@firebase+app@0.7.30
-      '@firebase/analytics-compat': 0.1.13_ntdu3hfexp42gsr3dmzonffheq
-      '@firebase/app': 0.7.30
-      '@firebase/app-check': 0.5.12_@firebase+app@0.7.30
-      '@firebase/app-check-compat': 0.2.12_ntdu3hfexp42gsr3dmzonffheq
-      '@firebase/app-compat': 0.1.31
+      '@firebase/analytics': 0.8.0_@firebase+app@0.7.31
+      '@firebase/analytics-compat': 0.1.13_kowmy6vzi2xcdysg3n6ul4qaae
+      '@firebase/app': 0.7.31
+      '@firebase/app-check': 0.5.12_@firebase+app@0.7.31
+      '@firebase/app-check-compat': 0.2.12_kowmy6vzi2xcdysg3n6ul4qaae
+      '@firebase/app-compat': 0.1.32
       '@firebase/app-types': 0.7.0
-      '@firebase/auth': 0.20.5_@firebase+app@0.7.30
-      '@firebase/auth-compat': 0.2.18_53yvy43rwpg2c45kgeszsxtrca
-      '@firebase/database': 0.13.4_@firebase+app-types@0.7.0
-      '@firebase/database-compat': 0.2.4_@firebase+app-types@0.7.0
-      '@firebase/firestore': 3.4.14_@firebase+app@0.7.30
-      '@firebase/firestore-compat': 0.1.23_53yvy43rwpg2c45kgeszsxtrca
-      '@firebase/functions': 0.8.4_54flq6t3lt2vkv56b3wekvuqsq
-      '@firebase/functions-compat': 0.2.4_53yvy43rwpg2c45kgeszsxtrca
-      '@firebase/installations': 0.5.12_@firebase+app@0.7.30
-      '@firebase/installations-compat': 0.1.12_53yvy43rwpg2c45kgeszsxtrca
-      '@firebase/messaging': 0.9.16_@firebase+app@0.7.30
-      '@firebase/messaging-compat': 0.1.16_ntdu3hfexp42gsr3dmzonffheq
-      '@firebase/performance': 0.5.12_@firebase+app@0.7.30
-      '@firebase/performance-compat': 0.1.12_ntdu3hfexp42gsr3dmzonffheq
-      '@firebase/polyfill': 0.3.36
-      '@firebase/remote-config': 0.3.11_@firebase+app@0.7.30
-      '@firebase/remote-config-compat': 0.1.12_ntdu3hfexp42gsr3dmzonffheq
-      '@firebase/storage': 0.9.9_@firebase+app@0.7.30
-      '@firebase/storage-compat': 0.1.17_53yvy43rwpg2c45kgeszsxtrca
+      '@firebase/auth': 0.20.5_@firebase+app@0.7.31
+      '@firebase/auth-compat': 0.2.18_kg6iqletipudcxzgqetrtqyldy
+      '@firebase/database': 0.13.5_@firebase+app-types@0.7.0
+      '@firebase/database-compat': 0.2.5_@firebase+app-types@0.7.0
+      '@firebase/firestore': 3.4.14_@firebase+app@0.7.31
+      '@firebase/firestore-compat': 0.1.23_kg6iqletipudcxzgqetrtqyldy
+      '@firebase/functions': 0.8.4_lwgt3sk4yfjgasfpmvix4ixi2u
+      '@firebase/functions-compat': 0.2.4_kg6iqletipudcxzgqetrtqyldy
+      '@firebase/installations': 0.5.12_@firebase+app@0.7.31
+      '@firebase/installations-compat': 0.1.12_kg6iqletipudcxzgqetrtqyldy
+      '@firebase/messaging': 0.9.16_@firebase+app@0.7.31
+      '@firebase/messaging-compat': 0.1.16_kowmy6vzi2xcdysg3n6ul4qaae
+      '@firebase/performance': 0.5.12_@firebase+app@0.7.31
+      '@firebase/performance-compat': 0.1.12_kowmy6vzi2xcdysg3n6ul4qaae
+      '@firebase/remote-config': 0.3.11_@firebase+app@0.7.31
+      '@firebase/remote-config-compat': 0.1.12_kowmy6vzi2xcdysg3n6ul4qaae
+      '@firebase/storage': 0.9.9_@firebase+app@0.7.31
+      '@firebase/storage-compat': 0.1.17_kg6iqletipudcxzgqetrtqyldy
       '@firebase/util': 1.6.3
     transitivePeerDependencies:
       - bufferutil
@@ -13661,10 +13646,6 @@ packages:
   /process-nextick-args/2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
 
-  /promise-polyfill/8.1.3:
-    resolution: {integrity: sha512-MG5r82wBzh7pSKDRa9y+vllNHz3e3d4CNj1PQE4BQYxLme0gKYYBm9YENq+UkEikyZ0XbiGWxYlVw3Rl9O/U8g==}
-    dev: false
-
   /prompts/2.4.2:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
     engines: {node: '>= 6'}
@@ -16358,10 +16339,6 @@ packages:
     resolution: {integrity: sha512-ZMjC3ho+KXo0BfJb7JgtQ5IBuvnShdlACNkKkdsqBmYw3bPAaJfPeYUo6tLUaT5tG/Gkh7xkpBhKRQ9e7pyg9Q==}
     engines: {node: '>=6'}
     dev: true
-
-  /whatwg-fetch/2.0.4:
-    resolution: {integrity: sha512-dcQ1GWpOD/eEQ97k66aiEVpNnapVj90/+R+SXTPYGHpYBBypfKJEQjLrvMZ7YXbKm21gXd4NcuxUTjiv1YtLng==}
-    dev: false
 
   /whatwg-url/5.0.0:
     resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
