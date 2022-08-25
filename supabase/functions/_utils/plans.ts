@@ -28,7 +28,7 @@ export const getPlans = async (): Promise<definitions['plans'][]> => {
     .from<definitions['plans']>('plans')
     .select()
     .order('price_m')
-    .neq('name', 'free')
+    .neq('stripe_id', 'free')
   return plans || []
 }
 

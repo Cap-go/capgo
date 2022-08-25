@@ -9,6 +9,7 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { openVersion } from '~/services/versions'
@@ -32,6 +33,7 @@ const supabase = useSupabase()
 const auth = supabase.auth.user()
 const packageId = ref<string>('')
 const id = ref<number>()
+const loading = ref(true)
 const channel = ref<definitions['channels'] & Channel>()
 const users = ref<(definitions['channel_users'] & ChannelUsers)[]>()
 const newUser = ref<string>()
@@ -144,12 +146,14 @@ const getChannel = async () => {
 }
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
+    loading.value = true
     packageId.value = route.params.p as string
     packageId.value = packageId.value.replace(/--/g, '.')
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getUsers()
     await getDevices()
+    loading.value = false
   }
 })
 
@@ -386,29 +390,30 @@ const inviteUser = async (userId: string) => {
         </IonToolbar>
       </IonHeader>
       <IonList ref="listRef">
-        <IonListHeader>
-          <span class="text-vista-blue-500">
-            {{ channel?.name }}
-          </span>
-        </IonListHeader>
-        <IonItem>
-          <IonLabel class="my-6 font-extrabold">
-            {{ t('channel.is_public') }}
-          </IonLabel>
-          <IonButtons slot="end">
-            <IonToggle
-              color="secondary"
-              :checked="channel?.public"
-              @ion-change="makePublic($event.detail.checked)"
-            />
-          </IonButtons>
-        </IonItem>
-        <IonItemDivider>
-          <IonLabel>
-            {{ t('channel.v3') }}
-          </IonLabel>
-        </IonItemDivider>
-        <!-- <IonItem>
+        <template v-if="!loading">
+          <IonListHeader>
+            <span class="text-vista-blue-500">
+              {{ channel?.name }}
+            </span>
+          </IonListHeader>
+          <IonItem>
+            <IonLabel class="my-6 font-extrabold">
+              {{ t('channel.is_public') }}
+            </IonLabel>
+            <IonButtons slot="end">
+              <IonToggle
+                color="secondary"
+                :checked="channel?.public"
+                @ion-change="makePublic($event.detail.checked)"
+              />
+            </IonButtons>
+          </IonItem>
+          <IonItemDivider>
+            <IonLabel>
+              {{ t('channel.v3') }}
+            </IonLabel>
+          </IonItemDivider>
+          <!-- <IonItem>
           <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
           <IonToggle
 
@@ -417,78 +422,82 @@ const inviteUser = async (userId: string) => {
             @ion-change="saveChannelChange('beta', $event.target.checked)"
           />
         </IonItem> -->
-        <IonItem>
-          <IonLabel>Disable auto downgrade under native</IonLabel>
-          <IonToggle
-            color="secondary"
-            :checked="channel?.disableAutoUpdateUnderNative"
-            @ion-change="saveChannelChange('disableAutoUpdateUnderNative', $event.target.checked)"
-          />
-        </IonItem>
-        <IonItem>
-          <IonLabel>Disable auto upgrade above major</IonLabel>
-          <IonToggle
-            color="secondary"
-            :checked="channel?.disableAutoUpdateToMajor"
-            @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
-          />
-        </IonItem>
-        <IonItemDivider>
-          <IonLabel>
-            {{ t('channel.users') }}
-          </IonLabel>
-        </IonItemDivider>
-        <IonItem>
-          <IonLabel position="floating">
-            {{ t('channel.invit') }}
-          </IonLabel>
-          <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
-          <div slot="end" class="h-full flex items-center justify-center">
-            <IonButton color="secondary" @click="addUser()">
-              {{ t('channel.add') }}
-            </IonButton>
-          </div>
-        </IonItem>
-        <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
-          <IonLabel>
-            <div class="col-span-6 flex flex-col">
-              <div class="flex justify-between items-center">
-                <h2 class="text-sm text-azure-500">
-                  {{ usr.user_id.first_name }}  {{ usr.user_id.last_name }}
-                </h2>
-                <p>{{ usr.user_id.email }}</p>
-              </div>
+          <IonItem>
+            <IonLabel>Disable auto downgrade under native</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.disableAutoUpdateUnderNative"
+              @ion-change="saveChannelChange('disableAutoUpdateUnderNative', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItem>
+            <IonLabel>Disable auto upgrade above major</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.disableAutoUpdateToMajor"
+              @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItemDivider>
+            <IonLabel>
+              {{ t('channel.users') }}
+            </IonLabel>
+          </IonItemDivider>
+          <IonItem>
+            <IonLabel position="floating">
+              {{ t('channel.invit') }}
+            </IonLabel>
+            <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
+            <div slot="end" class="h-full flex items-center justify-center">
+              <IonButton color="secondary" @click="addUser()">
+                {{ t('channel.add') }}
+              </IonButton>
             </div>
-          </IonLabel>
-        </IonItem>
-        <IonItemDivider v-if="devices?.length">
-          <IonLabel>
-            {{ t('package.devices-list') }}
-          </IonLabel>
-        </IonItemDivider>
-        <!-- add item with searchbar -->
-        <IonItem v-if="devices?.length">
-          <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
-        </IonItem>
-        <template v-for="d in devicesFilter" :key="d.device_id">
-          <IonItemSliding>
-            <IonItem class="cursor-pointer">
-              <IonLabel>
-                <h2 class="text-sm text-azure-500">
-                  {{ d.device_id }}
-                </h2>
-              </IonLabel>
-              <IonNote slot="end">
-                {{ formatDate(d.created_at) }}
-              </IonNote>
-            </IonItem>
-            <IonItemOptions side="end">
-              <IonItemOption color="warning" @click="deleteDevice(d)">
-                Delete
-              </IonItemOption>
-            </IonItemOptions>
-          </IonItemSliding>
+          </IonItem>
+          <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
+            <IonLabel>
+              <div class="col-span-6 flex flex-col">
+                <div class="flex justify-between items-center">
+                  <h2 class="text-sm text-azure-500">
+                    {{ usr.user_id.first_name }}  {{ usr.user_id.last_name }}
+                  </h2>
+                  <p>{{ usr.user_id.email }}</p>
+                </div>
+              </div>
+            </IonLabel>
+          </IonItem>
+          <IonItemDivider v-if="devices?.length">
+            <IonLabel>
+              {{ t('package.devices-list') }}
+            </IonLabel>
+          </IonItemDivider>
+          <!-- add item with searchbar -->
+          <IonItem v-if="devices?.length">
+            <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
+          </IonItem>
+          <template v-for="d in devicesFilter" :key="d.device_id">
+            <IonItemSliding>
+              <IonItem class="cursor-pointer">
+                <IonLabel>
+                  <h2 class="text-sm text-azure-500">
+                    {{ d.device_id }}
+                  </h2>
+                </IonLabel>
+                <IonNote slot="end">
+                  {{ formatDate(d.created_at) }}
+                </IonNote>
+              </IonItem>
+              <IonItemOptions side="end">
+                <IonItemOption color="warning" @click="deleteDevice(d)">
+                  Delete
+                </IonItemOption>
+              </IonItemOptions>
+            </IonItemSliding>
+          </template>
         </template>
+        <div v-else class="flex justify-center">
+          <Spinner />
+        </div>
       </IonList>
     </IonContent>
     <IonModal :is-open="newUserModalOpen" :swipe-to-close="true">
