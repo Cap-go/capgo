@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.153.0/http/server.ts'
 import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
