@@ -41,7 +41,7 @@ def capacitor_pods
   pod 'CapgoCapacitorFlash', :path => '../../node_modules/.pnpm/@capgo+capacitor-flash@1.2.10_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-flash'
   pod 'CapgoCapacitorMute', :path => '../../node_modules/.pnpm/@capgo+capacitor-mute@1.1.4_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-mute'
   pod 'CapgoCapacitorScreenRecorder', :path => '../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.5_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-screen-recorder'
-  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.49_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-updater'
+  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.51_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-updater'
   pod 'TeamhiveCapacitorVideoRecorder', :path => '../../node_modules/.pnpm/@teamhive+capacitor-video-recorder@5.0.0_@capacitor+core@4.1.0/node_modules/@teamhive/capacitor-video-recorder'
   pod 'CapacitorNativeBiometric', :path => '../../node_modules/.pnpm/capacitor-native-biometric@4.1.3/node_modules/capacitor-native-biometric'
   pod 'CapacitorRateApp', :path => '../../node_modules/.pnpm/capacitor-rate-app@3.0.0_@capacitor+core@4.1.0/node_modules/capacitor-rate-app'
