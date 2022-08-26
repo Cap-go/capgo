@@ -93,9 +93,9 @@ http://ionicframework.com/docs/theming/ */
 }
 
 @media (prefers-color-scheme: dark) {
-  #app-loader {
-    background-color: black;
-  }
+  /* #app-loader { */
+    /* background-color: black; */
+  /* } */
 /*
  * Dark Colors
  * -------------------------------------------
