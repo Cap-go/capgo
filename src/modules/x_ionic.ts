@@ -3,7 +3,6 @@ import type { HttpOptions, HttpParams } from '@capacitor-community/http'
 import { Http } from '@capacitor-community/http'
 import type { URLOpenListenerEvent } from '@capacitor/app'
 import { App } from '@capacitor/app'
-import { SplashScreen } from '@capacitor/splash-screen'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
@@ -23,6 +22,7 @@ import '@ionic/vue/css/text-alignment.css'
 import '@ionic/vue/css/text-transformation.css'
 import '@ionic/vue/css/flex-utils.css'
 import '@ionic/vue/css/display.css'
+import { hideLoader } from '~/services/loader'
 const appUrl = import.meta.env.VITE_APP_URL as string
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 
@@ -31,8 +31,22 @@ export const install: UserModule = ({ app, router }) => {
   app.use(IonicVue)
   const main = useMainStore()
   // const regexpToken = /#access_token=(.+?)&/
-
   if (isPlatform('capacitor')) {
+    // let downloadStarted = false
+    // setTimeout(async () => {
+    //   if (!downloadStarted)
+    //     SplashScreen.hide()
+    // }, 1000)
+    // CapacitorUpdater.addListener('download', async () => {
+    //   downloadStarted = true
+    // })
+    // CapacitorUpdater.addListener('updateAvailable', async (res) => {
+    //   if (downloadStarted) {
+    //     CapacitorUpdater.set({
+    //       id: res.bundle.id,
+    //     })
+    //   }
+    // })
     CapacitorUpdater.notifyAppReady()
     App.addListener('appUrlOpen', async (event: URLOpenListenerEvent) => {
       const loading = await loadingController.create({
@@ -72,7 +86,7 @@ export const install: UserModule = ({ app, router }) => {
       if (slug) {
         router.push(slug)
         await loading.dismiss()
-        SplashScreen.hide()
+        hideLoader()
       }
     })
   }

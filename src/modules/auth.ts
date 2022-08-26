@@ -5,6 +5,7 @@ import { useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
 import type { PlanRes } from '~/services/plans'
 import { useLogSnag } from '~/services/logsnag'
+import { hideLoader } from '~/services/loader'
 
 const guard = async (next: any, to: string, from: string) => {
   const supabase = useSupabase()
@@ -59,12 +60,16 @@ const guard = async (next: any, to: string, from: string) => {
       next('/onboarding/activation')
     else
       next()
+    hideLoader()
   }
   else if (from !== 'login' && !auth && to !== '/home') {
     main.auth = null
     next('/login')
   }
-  else { next() }
+  else {
+    hideLoader()
+    next()
+  }
 }
 
 // // vueuse/head https://github.com/vueuse/head
