@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.7](https://github.com/Cap-go/capgo/compare/1.18.6...1.18.7) (2022-08-26)
+
+
+### Bug Fixes
+
+* loader color ([db3ce52](https://github.com/Cap-go/capgo/commit/db3ce5216a02e7fadc745c1ef1fbf4593f9da0bd))
+
 ### [1.18.6](https://github.com/Cap-go/capgo/compare/1.18.5...1.18.6) (2022-08-26)
 
 
