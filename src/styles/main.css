@@ -77,7 +77,25 @@ http://ionicframework.com/docs/theming/ */
     --ion-color-light-tint: #f5f6f9;
 }
   
-  @media (prefers-color-scheme: dark) {
+#app-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: white;
+  z-index: 100;
+  background-image: url('/capgo.png');
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position: center;
+  background-size: 150px 150px;
+}
+
+@media (prefers-color-scheme: dark) {
+  #app-loader {
+    background-color: black;
+  }
 /*
  * Dark Colors
  * -------------------------------------------
@@ -154,20 +172,6 @@ http://ionicframework.com/docs/theming/ */
     --ion-color-light-tint: #383a3e;
   }
 
-#app-loader {
-  position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: white;
-    z-index: 100;
-    background-image: url('/capgo.png');
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    background-position: center;
-    background-size: 150px 150px;
-}
 /*
  * iOS Dark Theme
  * -------------------------------------------
