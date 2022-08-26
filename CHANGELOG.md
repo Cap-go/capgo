@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.8](https://github.com/Cap-go/capgo/compare/1.18.7...1.18.8) (2022-08-26)
+
+
+### Bug Fixes
+
+* remove color for now ([401c023](https://github.com/Cap-go/capgo/commit/401c023f6a98510c810922a5a5d86d613375a06c))
+
 ### [1.18.7](https://github.com/Cap-go/capgo/compare/1.18.6...1.18.7) (2022-08-26)
 
 
