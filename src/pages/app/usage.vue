@@ -188,7 +188,7 @@ const getUsages = async () => {
       if (item.date_id.length > 7) {
         const dayNumber = Number(item.date_id.slice(8))
         datas.value.mau[dayNumber] += item.devices || 0
-        datas.value.storage[dayNumber] += item.version_size ? item.version_size * 0.000001 : 0
+        datas.value.storage[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
         datas.value.bandwidth[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
       }
     })
