@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.12](https://github.com/Cap-go/capgo/compare/1.18.11...1.18.12) (2022-08-28)
+
+
+### Bug Fixes
+
+* remove usage of payment_status function ([aa49e69](https://github.com/Cap-go/capgo/commit/aa49e6939c4ab421ede170712c411b168ea20ade))
+
 ### [1.18.11](https://github.com/Cap-go/capgo/compare/1.18.10...1.18.11) (2022-08-28)
 
 
