@@ -44,7 +44,7 @@ declare global {
       cross_origin_cookies: boolean
     }
     CRISP_READY_TRIGGER: () => void
-    pushToCrisp: (data: any) => void
+    pushToCrisp: (data: string) => void
     CRISP_WEBSITE_ID: string
     CRISP_TOKEN_ID: string
   }
@@ -53,7 +53,7 @@ declare global {
 export class CapacitorCrispWeb {
   ifrm: HTMLIFrameElement = document.createElement('iframe')
   isReady = false
-  tmpArr: any[] = []
+  tmpArr: unknown[] = []
 
   constructor() {
     this.createStyle()
@@ -90,12 +90,14 @@ export class CapacitorCrispWeb {
     this.ifrm.id = 'crisp-chat-iframe'
 
     this.ifrm.style.padding
-    = 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+      = 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
   }
 
   private createIframe() {
     if (!this.ifrm.contentWindow || !this.ifrm.contentDocument) {
-      console.error('iframe not created, missing contentWindow or contentDocument')
+      console.error(
+        'iframe not created, missing contentWindow or contentDocument',
+      )
       return
     }
     if (!this.ifrm.contentWindow.$crisp)
@@ -139,7 +141,8 @@ export class CapacitorCrispWeb {
       this.closeMessenger()
     }
     // fill with svg icon cross
-    b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 256C0 114.6 114.6 0 256 0C397.4 0 512 114.6 512 256C512 397.4 397.4 512 256 512C114.6 512 0 397.4 0 256zM175 208.1L222.1 255.1L175 303C165.7 312.4 165.7 327.6 175 336.1C184.4 346.3 199.6 346.3 208.1 336.1L255.1 289.9L303 336.1C312.4 346.3 327.6 346.3 336.1 336.1C346.3 327.6 346.3 312.4 336.1 303L289.9 255.1L336.1 208.1C346.3 199.6 346.3 184.4 336.1 175C327.6 165.7 312.4 165.7 303 175L255.1 222.1L208.1 175C199.6 165.7 184.4 165.7 175 175C165.7 184.4 165.7 199.6 175 208.1V208.1z"/></svg>'
+    b.innerHTML
+      = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 256C0 114.6 114.6 0 256 0C397.4 0 512 114.6 512 256C512 397.4 397.4 512 256 512C114.6 512 0 397.4 0 256zM175 208.1L222.1 255.1L175 303C165.7 312.4 165.7 327.6 175 336.1C184.4 346.3 199.6 346.3 208.1 336.1L255.1 289.9L303 336.1C312.4 346.3 327.6 346.3 336.1 336.1C346.3 327.6 346.3 312.4 336.1 303L289.9 255.1L336.1 208.1C346.3 199.6 346.3 184.4 336.1 175C327.6 165.7 312.4 165.7 303 175L255.1 222.1L208.1 175C199.6 165.7 184.4 165.7 175 175C165.7 184.4 165.7 199.6 175 208.1V208.1z"/></svg>'
     this.ifrm.contentDocument.body.appendChild(b)
   }
 
@@ -147,7 +150,7 @@ export class CapacitorCrispWeb {
     if (!this.ifrm.contentWindow)
       return
     this.ifrm.contentWindow.$crisp.push(
-    // ['safe', true],
+      // ['safe', true],
       ['do', 'chat:open'],
       [
         'on',
@@ -168,7 +171,7 @@ export class CapacitorCrispWeb {
     )
   }
 
-  private push(...args: any[]) {
+  private push(...args: unknown[]) {
     if (!this.ifrm.contentWindow?.$crisp || !this.isReady) {
       console.log('crisp not ready yet')
       this.tmpArr.push(...args)
@@ -178,6 +181,7 @@ export class CapacitorCrispWeb {
       this.tmpArr.forEach((arg) => {
         this.ifrm.contentWindow?.pushToCrisp(JSON.stringify(arg))
       })
+      this.tmpArr.length = 0
     }
     args.forEach((arg) => {
       this.ifrm.contentWindow?.pushToCrisp(JSON.stringify(arg))
@@ -211,32 +215,17 @@ export class CapacitorCrispWeb {
     email?: string
     avatar?: string
   }): Promise<void> {
-    const arr = []
-    if (data.nickname) {
-      arr.push([
-        'set',
-        'user:nickname',
-        [data.nickname],
-      ])
-    }
-
-    if (data.email)
-      arr.push(['set', 'user:email', [data.email]])
-
-    if (data.phone)
-      arr.push(['set', 'user:phone', [data.phone]])
-
-    if (data.avatar)
-      arr.push(['set', 'user:avatar', [data.avatar]])
+    const arr = [
+      ...(data.nickname ? [['set', 'user:nickname', data.nickname]] : []),
+      ...(data.phone ? [['set', 'user:phone', data.phone]] : []),
+      ...(data.email ? [['set', 'user:email', data.email]] : []),
+      ...(data.avatar ? [['set', 'user:avatar', data.avatar]] : []),
+    ]
     this.push(...arr)
   }
 
   async pushEvent(data: { name: string; color: eventColor }): Promise<void> {
-    this.push([
-      'set',
-      'session:event',
-      [[[data.name, null, data.color]]],
-    ])
+    this.push(['set', 'session:event', [[[data.name, null, data.color]]]])
   }
 
   async setCompany(data: {
@@ -246,56 +235,30 @@ export class CapacitorCrispWeb {
     employment?: [title: string, role: string]
     geolocation?: [country: string, city: string]
   }): Promise<void> {
-    const meta: any = {}
-    if (data.url)
-      meta.url = data.url
+    const meta = {
+      ...(data.url && { url: data.url }),
+      ...(data.description && { description: data.description }),
+      ...(data.employment && { employment: data.employment }),
+      ...(data.geolocation && { geolocation: data.geolocation }),
+    }
 
-    if (data.description)
-      meta.description = data.description
-
-    if (data.employment)
-      meta.employment = data.employment
-
-    if (data.geolocation)
-      meta.geolocation = data.geolocation
-
-    this.push([
-      'set',
-      'user:company',
-      [data.name, meta],
-    ])
+    this.push(['set', 'user:company', [data.name, meta]])
   }
 
   async setInt(data: { key: string; value: number }): Promise<void> {
-    this.push([
-      'set',
-      'session:data',
-      [data.key, data.value],
-    ])
+    this.push(['set', 'session:data', [data.key, data.value]])
   }
 
   async setString(data: { key: string; value: string }): Promise<void> {
-    this.push([
-      'set',
-      'session:data',
-      [data.key, data.value],
-    ])
+    this.push(['set', 'session:data', [data.key, data.value]])
   }
 
   async sendMessage(data: { value: string }): Promise<void> {
-    this.push([
-      'do',
-      'message:send',
-      ['text', data.value],
-    ])
+    this.push(['do', 'message:send', ['text', data.value]])
   }
 
   async setSegment(data: { segment: string }): Promise<void> {
-    this.push([
-      'set',
-      'session:segments',
-      [[data.segment]],
-    ])
+    this.push(['set', 'session:segments', [[data.segment]]])
   }
 
   async reset(): Promise<void> {
