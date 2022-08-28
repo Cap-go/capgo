@@ -20,7 +20,7 @@ defineProps({
 })
 const emit = defineEmits(['searchInput'])
 const { t } = useI18n()
-const onSearch = (val: string) => {
+const onSearch = (val: string | undefined) => {
   emit('searchInput', val)
 }
 </script>
@@ -31,7 +31,7 @@ const onSearch = (val: string) => {
       <IonButtons v-if="!noBack && !big" slot="start">
         <IonBackButton :default-href="defaultBack" :text="t('button.back')" />
       </IonButtons>
-      <IonTitle :color="color" :size="big ? 'large' : ''">
+      <IonTitle :color="color" :size="big ? 'large' : undefined">
         {{ title }}
       </IonTitle>
     </IonToolbar>
