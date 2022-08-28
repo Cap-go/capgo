@@ -160,6 +160,7 @@ notificationSettings:
   validate: Xác thực
 onboarding:
   loading: Đang tải
+one-day-left: Còn lại một ngày
 package:
   cannot-delete-version: Không thể xóa phiên bản
   channels: Kênh truyền hình
@@ -222,6 +223,7 @@ plan:
   versions: Phiên bản
   whats-included: Bao gồm những gì
   yearly-billing: Thanh toán hàng năm
+plan-inactive: Kế hoạch không hoạt động
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 projects:
   list: Của bạn
@@ -253,6 +255,7 @@ stats:
   subtitle: Tháng trước
   title: Số liệu thống kê
   versions: Phiên bản
+trial-left: ngày còn lại
 trial-plan-expired: Gói dùng thử đã hết hạn
 trial-plan-expires-in: Gói dùng thử sẽ hết hạn sau
 upgrade: Nâng cấp
@@ -260,5 +263,6 @@ upgrade-now: Nâng cấp ngay bây giờ
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
+you-reached-the-limi: Đạt tới giới hạn
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

@@ -1,9 +1,9 @@
 import type { definitions } from '~/types/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
-import { useSupabase } from '~/services/supabase'
+import { isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
-import type { PlanRes } from '~/services/plans'
+// import type { PlanRes } from '~/services/plans'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
 
@@ -19,14 +19,19 @@ const guard = async (next: any, to: string, from: string) => {
     console.log('set auth', auth)
     if (!main.user && auth) {
       try {
-        supabase.functions.invoke<PlanRes>('payment_status', {})
-          .then((res) => {
-            console.log('payment_status', res)
-            if (res.data)
-              main.myPlan = res.data
-          }).catch((err) => {
-            console.log('error payment_status', err)
-          })
+        isTrial(auth?.id).then((res) => {
+          console.log('isTrial', res)
+          main.trialDaysLeft = res
+        })
+        isPaying(auth?.id).then((res) => {
+          main.paying = res
+        })
+        isGoodPlan(auth?.id).then((res) => {
+          main.goodPlan = res
+        })
+        isCanceled(auth?.id).then((res) => {
+          main.canceled = res
+        })
         const { data, error } = await supabase
           .from<definitions['users']>('users')
           .select()

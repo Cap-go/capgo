@@ -17,10 +17,10 @@ import { CapacitorCrispWeb } from '~/services/crisp-web'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import TitleHead from '~/components/TitleHead.vue'
-import type { PlanRes, Stats } from '~/services/plans'
+import type { Stats } from '~/services/plans'
 import Spinner from '~/components/Spinner.vue'
 import type { definitions } from '~/types/supabase'
-import { useSupabase } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { useTailwindColor } from '~/services/tailwind'
 
@@ -46,6 +46,20 @@ const monthdays = () => {
   arr.pop()
   return arr
 }
+const plans = ref<definitions['plans'][]>([])
+const displayPlans = computed(() => {
+  return plans.value.filter(plan => plan.stripe_id !== 'free')
+})
+const stats = ref({
+  max_app: 0,
+  max_channel: 0,
+  max_version: 0,
+  max_shared: 0,
+  max_update: 0,
+  max_device: 0,
+} as Stats)
+const planSuggest = ref('')
+const planCurrrent = ref('')
 const dataStatsLabels = ref(monthdays())
 const dataMAUValues = ref(new Array(daysInCurrentMonth()).fill(0))
 const dataStorageValues = ref(new Array(daysInCurrentMonth()).fill(0))
@@ -53,7 +67,7 @@ const dataBandwidthValues = ref(new Array(daysInCurrentMonth()).fill(0))
 const snag = useLogSnag()
 const supabase = useSupabase()
 const isLoading = ref(false)
-const segmentModel = ref<'new' | 'old'>('old')
+const segmentModel = ref<'new' | 'old'>('new')
 const isMobile = isPlatform('capacitor')
 const segmentVal = ref<'m' | 'y'>('m')
 const isYearly = computed(() => segmentVal.value === 'y')
@@ -61,7 +75,7 @@ const route = useRoute()
 const main = useMainStore()
 
 const getStat = (name: string): number => {
-  return main.myPlan?.stats[name as keyof Stats] || 0
+  return stats.value[name as keyof Stats] || 0
 }
 
 const planFeatures = (plan: definitions['plans']) => [
@@ -82,9 +96,8 @@ const planFeatures = (plan: definitions['plans']) => [
   plan.progressive_deploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
 
-const currentPlanSuggest = computed(() => main.myPlan?.AllPlans.find(plan => plan.name === main.myPlan?.planSuggest))
-
-const currentPlan = computed(() => main.myPlan?.AllPlans.find(plan => plan.name === main.myPlan?.plan))
+const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
+const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
 
 const getCurrentPlanSuggestStat = (name: string): number => {
   const key = name.replace('max_', '')
@@ -117,12 +130,10 @@ const formatName = (name: string): string => {
   return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace('max_', '')
 }
 
-const stats = (): keyof Stats => {
+const getStats = (): keyof Stats => {
   // get keys of Stats interface
-  if (!main.myPlan?.stats)
-    return [] as unknown as keyof Stats
 
-  const res: keyof Stats = Object.keys(main.myPlan?.stats).filter(key => key !== 'max_device') as unknown as keyof Stats
+  const res: keyof Stats = Object.keys(stats.value).filter(key => key !== 'max_device') as unknown as keyof Stats
   return res
 }
 
@@ -216,7 +227,7 @@ const generateAnnotations = (key: 'mau' | 'storage' | 'bandwidth', color: string
   const min = Math.min(...dataset)
   const max = Math.max(...dataset)
   // const annotations: any = {}
-  main.myPlan?.AllPlans.forEach((plan, i) => {
+  plans.value.forEach((plan, i) => {
     if (plan[key] && plan[key] > min && plan[key] < (max * 1.2)) {
       const color1 = (i + 1) * 100
       const color2 = (i + 2) * 100
@@ -287,12 +298,18 @@ const rebuildAnnotations = () => {
 const getUsages = async () => {
   // get aapp_stats
   const date_id = new Date().toISOString().slice(0, 7)
-  const { data } = await supabase
+  const { data: oldStats, error: errorOldStats } = await supabase
+    .rpc<Stats>('get_max_stats', { userid: main.user?.id, dateid: date_id })
+    .single()
+  const { data, error } = await supabase
     .from<definitions['app_stats']>('app_stats')
     .select()
     .eq('user_id', main.user?.id)
     .like('date_id', `${date_id}%`)
-  if (data) {
+  if (oldStats && !errorOldStats)
+    stats.value = oldStats
+
+  if (data && !error) {
     // find biggest value between mlu and mlu_real
     // console.log('data', data)
     const tmpMAU = new Array(daysInCurrentMonth() + 1).fill(0)
@@ -314,18 +331,27 @@ const getUsages = async () => {
   }
 }
 
-watch(
-  () => main.myPlan,
-  (myPlan, prevMyPlan) => {
-    if (!prevMyPlan && myPlan) {
-      getUsages()
-      // reGenerate annotations
+const loadData = async () => {
+  await getPlans().then((pls) => {
+    plans.value.length = 0
+    plans.value.push(...pls)
+  })
+  await getUsages()
+  await findBestPlan(stats.value).then(res => planSuggest.value = res)
+  if (main.auth?.id)
+    await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
+}
 
+watch(
+  () => plans.value,
+  (myPlan, prevMyPlan) => {
+    if (myPlan) {
+      loadData()
+      // reGenerate annotations
       isLoading.value = false
     }
     else if (prevMyPlan && !myPlan) { isLoading.value = true }
-  },
-)
+  })
 
 watchEffect(async () => {
   if (route.path === '/app/usage') {
@@ -345,7 +371,7 @@ watchEffect(async () => {
       }
     }
     else if (main.user?.id) {
-      getUsages()
+      loadData()
       snag.publish({
         channel: 'usage',
         event: 'User visit',
@@ -362,14 +388,10 @@ watchEffect(async () => {
 const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
-    // await getAllMax()
-    console.log('refreshData')
-    const res = await supabase.functions.invoke<PlanRes>('payment_status', {})
-    if (res.data)
-      main.myPlan = res.data
+    loadData()
   }
-  catch (error) {
-    console.error(error)
+  catch (err) {
+    console.log(err)
   }
   isLoading.value = false
   evt?.target?.complete()
@@ -388,20 +410,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
         <Spinner />
       </div>
       <IonList v-if="!isLoading">
-        <IonItemDivider v-if="currentPlanSuggest">
-          <IonLabel>
-            {{ t('your-current-suggested-plan-is') }}
-            <a href="https://capgo.app/pricing" class="!text-pumpkin-orange-500 font-bold inline cursor-pointer" target="_blank">{{ currentPlanSuggest.name }}</a>
-          </IonLabel>
-        </IonItemDivider>
-        <IonItemDivider v-if="currentPlan">
-          <IonLabel>
-            {{ t('your-current-plan-is') }}
-            <div class="!text-pumpkin-orange-500 font-bold inline" target="_blank">
-              {{ currentPlan.name }}
-            </div>
-          </IonLabel>
-        </IonItemDivider>
         <IonSegment :value="segmentModel" @ion-change="modelChanged($event)">
           <IonSegmentButton value="old">
             <IonLabel>Old pricing model</IonLabel>
@@ -416,7 +424,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
           <LineChart class="my-8 mx-auto w-100 h-100" v-bind="BandwidthProps" />
         </div>
         <div v-else>
-          <IonItem v-for="s in stats()" :key="s">
+          <IonItem v-for="s in getStats()" :key="s">
             <p class="w-40 first-letter:uppercase">
               {{ formatName(s) }}
             </p>
@@ -432,6 +440,20 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonItem>
         </div>
+        <IonItemDivider v-if="currentPlanSuggest">
+          <IonLabel>
+            {{ t('your-current-suggested-plan-is') }}
+            <a href="https://capgo.app/pricing" class="!text-pumpkin-orange-500 font-bold inline cursor-pointer" target="_blank">{{ currentPlanSuggest.name }}</a>
+          </IonLabel>
+        </IonItemDivider>
+        <IonItemDivider v-if="currentPlan">
+          <IonLabel>
+            {{ t('your-current-plan-is') }}
+            <div class="!text-pumpkin-orange-500 font-bold inline" target="_blank">
+              {{ currentPlan.name }}
+            </div>
+          </IonLabel>
+        </IonItemDivider>
       </IonList>
       <div v-if="!isMobile && !isLoading" class="bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto py-24 px-4 sm:px-6 lg:px-8">
@@ -452,7 +474,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
             </IonSegment>
           </div>
           <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
-            <div v-for="p in main.myPlan?.AllPlans" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
+            <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
               <div class="p-6">
                 <h2 class="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100">
                   {{ p.name }}

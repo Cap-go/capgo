@@ -154,6 +154,7 @@ notificationSettings:
   validate: Validate
 onboarding:
   loading: Loading
+one-day-left: One day left
 package:
   cannot-delete-version: Cannot delete version
   channels: Channels
@@ -214,6 +215,7 @@ plan:
   versions: Versions
   whats-included: What's included
   yearly-billing: Yearly billing
+plan-inactive: Plan inactive
 please-upgrade: Please upgrade your plan to add more users
 projects:
   list: Yours
@@ -243,12 +245,14 @@ stats:
   subtitle: Last month
   title: Stats
   versions: Versions
+trial-left: days left
 trial-plan-expired: Trial Expired
-trial-plan-expires-in: Trial expires in
+trial-plan-expires-in: Trial ends in
 upgrade: Upgrade
 upgrade-now: Upgrade now
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
+you-reached-the-limi: Limit reached
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is
