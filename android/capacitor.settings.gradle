@@ -93,7 +93,7 @@ include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.5_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-screen-recorder/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.51_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.0.0-alpha.55_@capacitor+core@4.1.0/node_modules/@capgo/capacitor-updater/android')
 
 include ':capacitor-native-biometric'
 project(':capacitor-native-biometric').projectDir = new File('../node_modules/.pnpm/capacitor-native-biometric@4.1.3/node_modules/capacitor-native-biometric/android')
