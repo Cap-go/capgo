@@ -11,6 +11,8 @@
     "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
     "release": "standard-version -t \"\"",
     "sync": "cap sync",
+    "sync:ios": "cap sync ios",
+    "sync:android": "cap sync android",
     "serve": "vite",
     "dev-serve": "BRANCH=development vite",
     "local-serve": "BRANCH=local vite",

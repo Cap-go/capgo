@@ -28,4 +28,4 @@ brew install pnpm
 # Install dependencies
 pnpm install --frozen-lockfile
 npm run mobile
-npm run sync
+npm run sync:ios
