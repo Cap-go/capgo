@@ -25,10 +25,7 @@ jobs:
           restore-keys: ${{ runner.os }}-brew-
       - name: Install Supabase CLI Homebrew dependencies
         run: |
-          env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase
-      - name: Install dependencies
-        id: install_code
-        run: pnpm i   
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase  
       - name: Get pnpm store directory
         id: pnpm-cache
         run: |
@@ -39,7 +36,10 @@ jobs:
           path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-     
+            ${{ runner.os }}-pnpm-store-
+      - name: Install dependencies
+        id: install_code
+        run: pnpm i
       - name: Lint
         id: lint_code
         run: pnpm lint
