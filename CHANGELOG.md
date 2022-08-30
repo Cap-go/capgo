@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.28](https://github.com/Cap-go/capgo/compare/1.18.27...1.18.28) (2022-08-30)
+
+
+### Bug Fixes
+
+* use cache pnpm action ([8dad187](https://github.com/Cap-go/capgo/commit/8dad1877676084ba09e9d0eb1481a7b7e209d05a))
+
 ### [1.18.27](https://github.com/Cap-go/capgo/compare/1.18.26...1.18.27) (2022-08-30)
 
 
