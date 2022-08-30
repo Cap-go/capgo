@@ -5,6 +5,7 @@ import { createRouter, createWebHistory } from '@ionic/vue-router'
 // import { createRouter, createWebHistory } from 'vue-router'
 import generatedRoutes from 'virtual:generated-pages'
 import { setupLayouts } from 'virtual:generated-layouts'
+import type { Router } from 'vue-router'
 import App from './App.vue'
 
 /* Core CSS required for Ionic components to work properly */
@@ -43,7 +44,10 @@ const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL
 app.use(router)
 initPlausible(import.meta.env.domain as string)
 // install all modules under `modules/`
-Object.values(import.meta.globEager('./modules/*.ts')).map(i => i.install?.({ app, router, routes }))
+type UserModule = (ctx: { app: typeof app; router: Router }) => void
+
+Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
+  .forEach(i => i.install?.({ app, router }))
 
 router.isReady().then(() => {
   app.mount('#app')
