@@ -28,4 +28,4 @@ brew install pnpm
 # Install dependencies
 pnpm install --frozen-lockfile
 npm run mobile
-npx cap sync
+npm run sync
