@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.30](https://github.com/Cap-go/capgo/compare/1.18.29...1.18.30) (2022-08-30)
+
+
+### Bug Fixes
+
+* install node in xcode cloud ([cee1cc9](https://github.com/Cap-go/capgo/commit/cee1cc996567a10ec3fe9773d1612c59a8835333))
+
 ### [1.18.29](https://github.com/Cap-go/capgo/compare/1.18.28...1.18.29) (2022-08-30)
 
 
