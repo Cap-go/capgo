@@ -11,10 +11,14 @@ jobs:
     name: "Build code and release"
     steps:
       - name: Check out
-        uses: actions/checkout@v2
-      - uses: pnpm/action-setup@v2.2.2
+        uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
         with:
           version: latest
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'pnpm'
       - name: Configure Homebrew cache
         uses: actions/cache@v3
         with:
@@ -25,21 +29,10 @@ jobs:
           restore-keys: ${{ runner.os }}-brew-
       - name: Install Supabase CLI Homebrew dependencies
         run: |
-          env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase  
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: |
-          echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase
       - name: Install dependencies
         id: install_code
-        run: pnpm i
+        run: pnpm install --frozen-lockfile
       - name: Lint
         id: lint_code
         run: pnpm lint

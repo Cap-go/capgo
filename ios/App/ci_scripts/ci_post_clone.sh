@@ -13,6 +13,6 @@ brew link node@16
 brew install pnpm
 
 # Install dependencies
-pnpm i
+pnpm install --frozen-lockfile
 npm run mobile
 npx cap sync
