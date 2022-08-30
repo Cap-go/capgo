@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+echo "POST CLONE"
 set -x
 
 # Install CocoaPods and yarn using Homebrew.
