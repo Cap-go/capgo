@@ -15,8 +15,17 @@ jobs:
       - uses: pnpm/action-setup@v2.2.2
         with:
           version: latest
-      - name: Install Supabase CLI
-        run: brew install supabase/tap/supabase
+      - name: Configure Homebrew cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/foo--*
+            ~/Library/Caches/Homebrew/downloads/*--foo-*
+          key: brew-${{ hashFiles('.github/brew-formulae') }}
+          restore-keys: brew-
+      - name: Install Supabase CLI Homebrew dependencies
+        run: |
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase
       - name: Install dependencies
         id: install_code
         run: pnpm i        
