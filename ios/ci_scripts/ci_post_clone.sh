@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Install CocoaPods and yarn using Homebrew.
 brew install cocoapods
