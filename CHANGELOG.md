@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.22](https://github.com/Cap-go/capgo/compare/1.18.21...1.18.22) (2022-08-30)
+
+
+### Bug Fixes
+
+* ci xcode ([5331986](https://github.com/Cap-go/capgo/commit/5331986450e6854e1ca6c3a914fedf5f7a52683b))
+
 ### [1.18.21](https://github.com/Cap-go/capgo/compare/1.18.20...1.18.21) (2022-08-30)
 
 
