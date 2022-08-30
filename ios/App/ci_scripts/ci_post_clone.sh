@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-echo "POST CLONE"
 set -x
 
 export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
