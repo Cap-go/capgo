@@ -4,6 +4,7 @@ set -x
 
 export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
 brew install cocoapods
+pod install
 # have to add node yourself
 NODE_VER=16
 VERSION=$(curl -s https://nodejs.org/dist/latest-v$NODE_VER.x/ | sed -nE 's|.*>node-(.*)\.pkg</a>.*|\1|p')
