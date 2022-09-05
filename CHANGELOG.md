@@ -2,6 +2,265 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.40-alpha.0](https://github.com/Cap-go/capgo/compare/1.18.0-alpha.3...1.18.40-alpha.0) (2022-09-05)
+
+### [1.18.39](https://github.com/Cap-go/capgo/compare/1.18.38...1.18.39) (2022-09-05)
+
+### [1.18.38](https://github.com/Cap-go/capgo/compare/1.18.37...1.18.38) (2022-08-31)
+
+
+### Bug Fixes
+
+* try to fix xcode CI ([fe507cb](https://github.com/Cap-go/capgo/commit/fe507cb0f57d3df747d4bb0389504852ee280cc0))
+* xcode ci ([e783ce4](https://github.com/Cap-go/capgo/commit/e783ce43d378088880d1083eb6ccbf6c0eeaca93))
+
+### [1.18.37](https://github.com/Cap-go/capgo/compare/1.18.36...1.18.37) (2022-08-31)
+
+
+### Bug Fixes
+
+* remove useless package ([a7a2bef](https://github.com/Cap-go/capgo/commit/a7a2bef13f7a641c042255e5e586a964c594f45e))
+
+### [1.18.36](https://github.com/Cap-go/capgo/compare/1.18.35...1.18.36) (2022-08-30)
+
+
+### Bug Fixes
+
+* issue plausible tracking ([cbf4cbb](https://github.com/Cap-go/capgo/commit/cbf4cbbf50200669a3729577abb92e128ba2287d))
+
+### [1.18.35](https://github.com/Cap-go/capgo/compare/1.18.34...1.18.35) (2022-08-30)
+
+
+### Bug Fixes
+
+* module import ([96e5868](https://github.com/Cap-go/capgo/commit/96e586894d1af9829eed9296483ea7bded2a92bf))
+
+### [1.18.34](https://github.com/Cap-go/capgo/compare/1.18.33...1.18.34) (2022-08-30)
+
+
+### Bug Fixes
+
+* remove useless echo ([2529912](https://github.com/Cap-go/capgo/commit/2529912459b3ca8d28d81ba4f943c4d3cd1ce8e5))
+
+### [1.18.33](https://github.com/Cap-go/capgo/compare/1.18.32...1.18.33) (2022-08-30)
+
+
+### Bug Fixes
+
+* run only ios in xcode cloud ([1e6127b](https://github.com/Cap-go/capgo/commit/1e6127b91b73ddf8a7ecdbf8ef5eef111ab1a726))
+
+### [1.18.32](https://github.com/Cap-go/capgo/compare/1.18.31...1.18.32) (2022-08-30)
+
+
+### Bug Fixes
+
+* script xcode ([bae3b01](https://github.com/Cap-go/capgo/commit/bae3b01e8eafc33469d88617c4f8c48ece8f46a4))
+
+### [1.18.31](https://github.com/Cap-go/capgo/compare/1.18.30...1.18.31) (2022-08-30)
+
+
+### Bug Fixes
+
+* pnpm cache ([d3694e2](https://github.com/Cap-go/capgo/commit/d3694e2dcdcf38d4f91934281044d21bf8219f40))
+
+### [1.18.30](https://github.com/Cap-go/capgo/compare/1.18.29...1.18.30) (2022-08-30)
+
+
+### Bug Fixes
+
+* install node in xcode cloud ([cee1cc9](https://github.com/Cap-go/capgo/commit/cee1cc996567a10ec3fe9773d1612c59a8835333))
+
+### [1.18.29](https://github.com/Cap-go/capgo/compare/1.18.28...1.18.29) (2022-08-30)
+
+
+### Bug Fixes
+
+* readme ([51422d8](https://github.com/Cap-go/capgo/commit/51422d851173fe5b81f8d39cc636456ed1452622))
+
+### [1.18.28](https://github.com/Cap-go/capgo/compare/1.18.27...1.18.28) (2022-08-30)
+
+
+### Bug Fixes
+
+* use cache pnpm action ([8dad187](https://github.com/Cap-go/capgo/commit/8dad1877676084ba09e9d0eb1481a7b7e209d05a))
+
+### [1.18.27](https://github.com/Cap-go/capgo/compare/1.18.26...1.18.27) (2022-08-30)
+
+
+### Bug Fixes
+
+* path of post_clone ([7d252d7](https://github.com/Cap-go/capgo/commit/7d252d7c79423e0092ab1aff59cdd48d55a00e94))
+
+### [1.18.26](https://github.com/Cap-go/capgo/compare/1.18.25...1.18.26) (2022-08-30)
+
+### [1.18.25](https://github.com/Cap-go/capgo/compare/1.18.24...1.18.25) (2022-08-30)
+
+
+### Bug Fixes
+
+* try to log anything ([25be6f9](https://github.com/Cap-go/capgo/commit/25be6f9d8349a64c72690389dad114ffe50906f6))
+
+### [1.18.24](https://github.com/Cap-go/capgo/compare/1.18.23...1.18.24) (2022-08-30)
+
+
+### Bug Fixes
+
+* issue || for deploy + opti ([1fa6d3d](https://github.com/Cap-go/capgo/commit/1fa6d3d3001ed6f353e36dc2500c16f3ad47f44f))
+
+### [1.18.23](https://github.com/Cap-go/capgo/compare/1.18.22...1.18.23) (2022-08-30)
+
+
+### Bug Fixes
+
+* make build faster by using || ([baa3693](https://github.com/Cap-go/capgo/commit/baa3693de59265d922c99bf3e79a0197e705f03e))
+
+### [1.18.22](https://github.com/Cap-go/capgo/compare/1.18.21...1.18.22) (2022-08-30)
+
+
+### Bug Fixes
+
+* ci xcode ([5331986](https://github.com/Cap-go/capgo/commit/5331986450e6854e1ca6c3a914fedf5f7a52683b))
+
+### [1.18.21](https://github.com/Cap-go/capgo/compare/1.18.20...1.18.21) (2022-08-30)
+
+
+### Bug Fixes
+
+* build time ci actions ([4956016](https://github.com/Cap-go/capgo/commit/4956016298b689527dcd6caad13971f51a4b7678))
+
+### [1.18.20](https://github.com/Cap-go/capgo/compare/1.18.19...1.18.20) (2022-08-30)
+
+
+### Bug Fixes
+
+* ci script ([f2f0597](https://github.com/Cap-go/capgo/commit/f2f0597b538458d6a65705c79de958542eb3ff43))
+
+### [1.18.19](https://github.com/Cap-go/capgo/compare/1.18.18...1.18.19) (2022-08-30)
+
+
+### Bug Fixes
+
+* ci script ([94b251f](https://github.com/Cap-go/capgo/commit/94b251f6d82ff44d07f11abefd2caf571b94bdaa))
+
+### [1.18.18](https://github.com/Cap-go/capgo/compare/1.18.17...1.18.18) (2022-08-30)
+
+
+### Bug Fixes
+
+* script ci xcode ([b7ff310](https://github.com/Cap-go/capgo/commit/b7ff3106e0c5f59b0b76b7d6f70224fde2a543c4))
+
+### [1.18.17](https://github.com/Cap-go/capgo/compare/1.18.16...1.18.17) (2022-08-30)
+
+
+### Bug Fixes
+
+* test ci xcode cloud ([8303a3b](https://github.com/Cap-go/capgo/commit/8303a3bce85d85b3f947bbe37f7d6a561b86b5d1))
+
+### [1.18.16](https://github.com/Cap-go/capgo/compare/1.18.15...1.18.16) (2022-08-28)
+
+### [1.18.15](https://github.com/Cap-go/capgo/compare/1.18.14...1.18.15) (2022-08-28)
+
+
+### Bug Fixes
+
+* title ([3b93740](https://github.com/Cap-go/capgo/commit/3b937405cf87ce113b1f3d8220c3a7c00796fed4))
+
+### [1.18.14](https://github.com/Cap-go/capgo/compare/1.18.13...1.18.14) (2022-08-28)
+
+
+### Bug Fixes
+
+* for first day of the month ([0297acf](https://github.com/Cap-go/capgo/commit/0297acfb218d7d36c0a8e2587561177ad0cff72c))
+
+### [1.18.13](https://github.com/Cap-go/capgo/compare/1.18.12...1.18.13) (2022-08-28)
+
+
+### Bug Fixes
+
+* dependency and charts ([6c69d53](https://github.com/Cap-go/capgo/commit/6c69d5372e67ee1b0de36b9608af2261b6454839))
+
+### [1.18.12](https://github.com/Cap-go/capgo/compare/1.18.11...1.18.12) (2022-08-28)
+
+
+### Bug Fixes
+
+* remove usage of payment_status function ([aa49e69](https://github.com/Cap-go/capgo/commit/aa49e6939c4ab421ede170712c411b168ea20ade))
+
+### [1.18.11](https://github.com/Cap-go/capgo/compare/1.18.10...1.18.11) (2022-08-28)
+
+
+### Bug Fixes
+
+* upgrade updater ([bbd6cd0](https://github.com/Cap-go/capgo/commit/bbd6cd0e2b334f8c0209f8dc81b4eadabc30d629))
+
+### [1.18.10](https://github.com/Cap-go/capgo/compare/1.18.9...1.18.10) (2022-08-28)
+
+
+### Bug Fixes
+
+* crisp in not ready ([57821e3](https://github.com/Cap-go/capgo/commit/57821e3d82a0d87ba3b51782fcc1cad51c44e79d))
+
+### [1.18.9](https://github.com/Cap-go/capgo/compare/1.18.8...1.18.9) (2022-08-27)
+
+
+### Bug Fixes
+
+* remove deprecated ([2bace0e](https://github.com/Cap-go/capgo/commit/2bace0edf88f43701de6593de067f07251826d08))
+
+### [1.18.8](https://github.com/Cap-go/capgo/compare/1.18.7...1.18.8) (2022-08-26)
+
+
+### Bug Fixes
+
+* remove color for now ([401c023](https://github.com/Cap-go/capgo/commit/401c023f6a98510c810922a5a5d86d613375a06c))
+
+### [1.18.7](https://github.com/Cap-go/capgo/compare/1.18.6...1.18.7) (2022-08-26)
+
+
+### Bug Fixes
+
+* loader color ([db3ce52](https://github.com/Cap-go/capgo/commit/db3ce5216a02e7fadc745c1ef1fbf4593f9da0bd))
+
+### [1.18.6](https://github.com/Cap-go/capgo/compare/1.18.5...1.18.6) (2022-08-26)
+
+
+### Bug Fixes
+
+* add loader in web ([415e76a](https://github.com/Cap-go/capgo/commit/415e76adcfe0f1966870e47db187a228af5d6002))
+
+### [1.18.5](https://github.com/Cap-go/capgo/compare/1.18.4...1.18.5) (2022-08-26)
+
+### [1.18.4](https://github.com/Cap-go/capgo/compare/1.18.3...1.18.4) (2022-08-25)
+
+
+### Bug Fixes
+
+* issue in prod ([48cd130](https://github.com/Cap-go/capgo/commit/48cd1307e8871d46c577e5b42b97387c65218215))
+* version updater ([4280f6d](https://github.com/Cap-go/capgo/commit/4280f6d75abc55c5c637f22a70725ae0d705d71d))
+
+### [1.18.3](https://github.com/Cap-go/capgo/compare/1.18.2...1.18.3) (2022-08-24)
+
+
+### Bug Fixes
+
+* remove free from plan list ([0ca4f92](https://github.com/Cap-go/capgo/commit/0ca4f92fce8ed426ad4e04ebd3b69d3cd416dfd6))
+
+### [1.18.2](https://github.com/Cap-go/capgo/compare/1.18.1...1.18.2) (2022-08-24)
+
+
+### Bug Fixes
+
+* issue revert with v4 ([b4d85f1](https://github.com/Cap-go/capgo/commit/b4d85f1a6876fc5fa8add1977a4bc72c43307653))
+
+### [1.18.1](https://github.com/Cap-go/capgo/compare/1.18.0...1.18.1) (2022-08-23)
+
+
+### Bug Fixes
+
+* issue missing remove option ([48a412d](https://github.com/Cap-go/capgo/commit/48a412d54bfc5ef91c3ba8b275fd2b1383e8c30d))
+
+## [1.18.0](https://github.com/Cap-go/capgo/compare/1.18.0-alpha.1...1.18.0) (2022-08-23)
+
 ### [1.18.39](https://github.com/Cap-go/capgo/compare/1.18.38...1.18.39) (2022-09-05)
 
 ### [1.18.38](https://github.com/Cap-go/capgo/compare/1.18.37...1.18.38) (2022-08-31)
