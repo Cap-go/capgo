@@ -86,7 +86,7 @@ pnpm dev
 
 ### Build
 
-To build the App, run
+To build the App in mobile, run
 
 ```bash
 pnpm mobile

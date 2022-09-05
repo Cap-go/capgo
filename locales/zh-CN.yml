@@ -154,6 +154,7 @@ notificationSettings:
   validate: 证实
 onboarding:
   loading: 正在加载
+one-day-left: 还剩一天
 package:
   cannot-delete-version: 无法删除版本
   channels: 频道
@@ -214,6 +215,7 @@ plan:
   versions: 版本
   whats-included: 包括什么
   yearly-billing: 每年计费
+plan-inactive: 计划无效
 please-upgrade: 请升级您的计划以添加更多用户
 projects:
   list: 你的
@@ -245,6 +247,7 @@ stats:
   subtitle: 上个月
   title: 统计数据
   versions: 版本
+trial-left: 剩余天数
 trial-plan-expired: 试用计划已过期
 trial-plan-expires-in: 试用计划将于
 upgrade: 升级
@@ -252,5 +255,6 @@ upgrade-now: 现在升级
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
+you-reached-the-limi: 达到上限
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是

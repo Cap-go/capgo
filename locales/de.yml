@@ -164,6 +164,7 @@ notificationSettings:
   validate: Bestätigen
 onboarding:
   loading: Wird geladen
+one-day-left: Ein Tag übrig
 package:
   cannot-delete-version: Version kann nicht gelöscht werden
   channels: Kanäle
@@ -228,6 +229,7 @@ plan:
   versions: Versionen
   whats-included: Was ist inbegriffen
   yearly-billing: Jährliche Abrechnung
+plan-inactive: Planen Sie inaktiv
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 projects:
   list: Deine
@@ -261,8 +263,9 @@ stats:
   subtitle: Letzten Monat
   title: Statistiken
   versions: Versionen
+trial-left: Tage übrig
 trial-plan-expired: Testplan abgelaufen
-trial-plan-expires-in: Der Testplan läuft ab in
+trial-plan-expires-in: Der Prozess endet in
 upgrade: Aktualisierung
 upgrade-now: Jetzt upgraden
 usage:
@@ -270,5 +273,6 @@ usage:
     Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten
     aktualisiert
   title: Verwendungszweck
+you-reached-the-limi: Limit erreicht
 your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist

@@ -160,6 +160,7 @@ notificationSettings:
   validate: Подтвердить
 onboarding:
   loading: Загрузка
+one-day-left: В один прекрасный день покинул
 package:
   cannot-delete-version: Не могу удалить версию
   channels: каналы
@@ -220,6 +221,7 @@ plan:
   versions: Версии
   whats-included: Что включено
   yearly-billing: Годовой биллинг
+plan-inactive: План неактивен
 please-upgrade: Обновите план, чтобы добавить больше пользователей
 projects:
   list: Ваш
@@ -251,6 +253,7 @@ stats:
   subtitle: Прошлый месяц
   title: Статистика
   versions: Версии
+trial-left: дней осталось
 trial-plan-expired: Срок действия пробного плана истек
 trial-plan-expires-in: Срок действия пробного плана истекает через
 upgrade: Обновление
@@ -260,5 +263,6 @@ usage:
     Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
     минут.
   title: использование
+you-reached-the-limi: Достигнуто ограничение
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'

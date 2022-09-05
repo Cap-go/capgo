@@ -1,5 +1,6 @@
-import { serve } from 'https://deno.land/std@0.152.0/http/server.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { serve } from 'https://deno.land/std@0.154.0/http/server.ts'
+import type { AppStatsIncrement } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
@@ -72,6 +73,24 @@ serve(async (event: Request) => {
             return
           // console.log('app', app.app_id, devices, versions, shared, channels)
           const month_id = new Date().toISOString().slice(0, 7)
+          // check if today is first day of the month
+          const versionSize = versions.data?.reduce((acc, cur) => acc + ((cur.metadata as any).size || 0), 0) || 0
+          if (new Date().getDate() === 1) {
+            const today_id = new Date().toISOString().slice(0, 10)
+            const increment: AppStatsIncrement = {
+              app_id: app.app_id,
+              date_id: today_id,
+              bandwidth: 0,
+              mlu: 0,
+              mlu_real: 0,
+              devices: 0,
+              version_size: versionSize,
+              channels: 0,
+              shared: 0,
+              versions: 0,
+            }
+            all.push(updateOrAppStats(increment, today_id, app.user_id))
+          }
           const newData: definitions['app_stats'] = {
             app_id: app.app_id,
             date_id: month_id,
@@ -81,7 +100,7 @@ serve(async (event: Request) => {
             devices: devices.count || 0,
             mlu_real: mlu_real.count || 0,
             versions: versions.data?.length || 0,
-            version_size: versions.data?.reduce((acc, cur) => acc + ((cur.metadata as any).size || 0), 0) || 0,
+            version_size: versionSize,
             shared: shared.count || 0,
           }
           // console.log('newData', newData)

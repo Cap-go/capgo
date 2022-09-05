@@ -8,18 +8,23 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16]
     name: "Build code and release"
     steps:
-      - name: Check out
-        uses: actions/checkout@v2
-      - uses: pnpm/action-setup@v2.2.2
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
         with:
-          version: latest
-      - name: Install Supabase CLI
-        run: brew install supabase/tap/supabase
+          version: 7
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
       - name: Install dependencies
         id: install_code
-        run: pnpm i        
+        run: pnpm install --frozen-lockfile
       - name: Lint
         id: lint_code
         run: pnpm lint
@@ -30,6 +35,17 @@ jobs:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Configure Homebrew cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/supabase--*
+            ~/Library/Caches/Homebrew/downloads/*--supabase-*
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/brew-formulae') }}
+          restore-keys: ${{ runner.os }}-brew-
+      - name: Install Supabase CLI Homebrew dependencies
+        run: |
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod

@@ -21,32 +21,41 @@ const route = useRoute()
 const { t } = useI18n()
 const isMobile = isPlatform('capacitor')
 
+const setBannerState = () => {
+  if (main.canceled) {
+    bannerText.value = t('plan-inactive')
+    bannerColor.value = 'warning'
+  }
+  else if (!main.paying && main.trialDaysLeft > 1) {
+    bannerText.value = `${main.trialDaysLeft} ${t('trial-left')}`
+    if (main.trialDaysLeft <= 7)
+      bannerColor.value = 'warning'
+    else
+      bannerColor.value = 'success'
+  }
+  else if (!main.paying && main.trialDaysLeft === 1) {
+    bannerText.value = t('one-day-left')
+    bannerColor.value = 'warning'
+  }
+  else if (!main.paying && !main.canUseMore) {
+    bannerText.value = t('trial-plan-expired')
+    bannerColor.value = 'warning'
+  }
+  else if (main.paying && !main.canUseMore) {
+    bannerText.value = t('you-reached-the-limi')
+    bannerColor.value = 'warning'
+  }
+}
 watch(
-  () => main.myPlan,
-  (myPlan, prevMyPlan) => {
-    if (route.path === '/app/usage' || prevMyPlan)
+  () => main.trialDaysLeft,
+  (trialDaysLeft, prevTrialDaysLeft) => {
+    console.log('trialDaysLeft', trialDaysLeft)
+    if (route.path === '/app/usage' || !prevTrialDaysLeft || !trialDaysLeft)
       return
-    if (myPlan && !myPlan?.paying && myPlan?.trialDaysLeft !== 0) {
-      bannerText.value = `${t('trial-plan-expires-in')} ${parseInt(myPlan.trialDaysLeft)} ${t('days')}`
-      if (myPlan?.trialDaysLeft <= 7)
-        bannerColor.value = 'warning'
-      else
-        bannerColor.value = 'success'
-    }
-    else if (myPlan && !myPlan?.canUseMore && !myPlan?.payment?.status) {
-      bannerText.value = t('trial-plan-expired')
-      bannerColor.value = 'warning'
-    }
-    else if (myPlan && !myPlan?.canUseMore && myPlan.paying) {
-      bannerText.value = 'You reached the limit of your plan'
-      bannerColor.value = 'warning'
-    }
-    else if (!myPlan?.canUseMore) {
-      bannerText.value = 'Your plan is currently inactive'
-      bannerColor.value = 'warning'
-    }
+    setBannerState()
   },
 )
+setBannerState()
 </script>
 
 <template>

@@ -5,9 +5,9 @@ import { email, required } from '@vuelidate/validators'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { SplashScreen } from '@capacitor/splash-screen'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import { hideLoader } from '~/services/loader'
 
 const route = useRoute()
 const supabase = useSupabase()
@@ -42,8 +42,6 @@ const nextLogin = async () => {
   router.push('/app/home')
   setTimeout(async () => {
     isLoading.value = false
-    if (isPlatform('capacitor'))
-      SplashScreen.hide()
   }, 500)
 }
 
@@ -107,7 +105,7 @@ const checkLogin = async () => {
   }
   else {
     isLoading.value = false
-    SplashScreen.hide()
+    hideLoader()
     fixIOS()
   }
 }

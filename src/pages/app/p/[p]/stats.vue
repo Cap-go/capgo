@@ -11,7 +11,7 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { DoughnutChart, useDoughnutChart } from 'vue-chart-3'
+import { Doughnut } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
 import { subDays } from 'date-fns'
 import { formatDate } from '~/services/date'
@@ -47,8 +47,8 @@ const isDisabled = ref(false)
 const downloads = ref(0)
 const versions = ref<definitions['app_versions'][]>([])
 const devices = ref<(definitions['devices'] & Device)[]>([])
-const dataDevValues = ref([30, 40, 60, 70, 5])
-const dataDevLabels = ref(['Paris', 'Nîmes', 'Toulon', 'Perpignan', 'Autre'])
+const dataDevValues = ref([] as number[])
+const dataDevLabels = ref([] as string[])
 const isLoadingSub = ref(false)
 const stats = ref<(definitions['stats'] & Stat)[]>([])
 const filtered = ref<(definitions['stats'] & Stat)[]>([])
@@ -93,12 +93,12 @@ const getAllDevices = async () => {
       offset += 100
     }
     prevLenght = data ? data.length : 0
+    buildGraph()
   }
 }
 
 const loadData = async () => {
   try {
-    await getAllDevices()
     const { data: dataVersions } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
@@ -106,6 +106,7 @@ const loadData = async () => {
       .eq('deleted', false)
       .order('created_at', { ascending: false })
     versions.value = dataVersions || versions.value
+    await getAllDevices()
     // console.log('devices', devices.value)
     buildGraph()
   }
@@ -184,8 +185,8 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await refreshStatsData()
-    await loadData()
     await getLastDownload()
+    await loadData()
   }
   catch (error) {
     console.error(error)
@@ -201,7 +202,7 @@ interface RefresherCustomEvent extends CustomEvent {
   target: HTMLIonRefresherElement
 }
 
-const testData = computed<ChartData<'doughnut'>>(() => ({
+const chartData = computed<ChartData<'doughnut'>>(() => ({
   labels: dataDevLabels.value,
   datasets: [
     {
@@ -216,8 +217,7 @@ const testData = computed<ChartData<'doughnut'>>(() => ({
     },
   ],
 }))
-
-const options = computed<ChartOptions<'doughnut'>>(() => ({
+const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
   plugins: {
     legend: {
       position: 'left',
@@ -229,10 +229,10 @@ const options = computed<ChartOptions<'doughnut'>>(() => ({
   },
 }))
 
-const { doughnutChartProps } = useDoughnutChart({
-  chartData: testData,
-  options,
-})
+// const { doughnutChartProps } = useDoughnutChart({
+//   chartData: testData,
+//   options,
+// })
 
 watchEffect(async () => {
   if (route.path.endsWith('/stats')) {
@@ -291,7 +291,8 @@ watchEffect(async () => {
             </div>
           </div>
         </div>
-        <DoughnutChart class="my-8 mx-auto w-100 h-100" v-bind="doughnutChartProps" />
+        <Doughnut class="my-8 mx-auto w-100 h-100" :chart-data="chartData" :chart-options="chartOptions" />
+        <!-- <DoughnutChart class="my-8 mx-auto w-100 h-100" v-bind="doughnutChartProps" /> -->
         <IonList>
           <div v-if="isLoadingSub" class="chat-items flex justify-center">
             <Spinner />

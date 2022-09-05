@@ -186,7 +186,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="t('projects.title')" no-back big color="warning" /> -->
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>

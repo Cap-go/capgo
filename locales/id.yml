@@ -162,6 +162,7 @@ notificationSettings:
   validate: Mengesahkan
 onboarding:
   loading: Memuat
+one-day-left: Tinggal satu hari lagi
 package:
   cannot-delete-version: Tidak dapat menghapus versi
   channels: saluran
@@ -222,6 +223,7 @@ plan:
   versions: Versi
   whats-included: Apa yang termasuk?
   yearly-billing: Penagihan tahunan
+plan-inactive: Rencana tidak aktif
 please-upgrade: Harap tingkatkan paket Anda untuk menambahkan lebih banyak pengguna
 projects:
   list: Milikmu
@@ -253,6 +255,7 @@ stats:
   subtitle: Bulan lalu
   title: Statistik
   versions: Versi
+trial-left: hari tersisa
 trial-plan-expired: Paket Uji Coba Kedaluwarsa
 trial-plan-expires-in: Rencana Percobaan berakhir dalam
 upgrade: Meningkatkan
@@ -262,5 +265,6 @@ usage:
     Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
     menit
   title: Penggunaan
+you-reached-the-limi: Batas tercapai
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

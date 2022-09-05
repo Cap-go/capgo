@@ -154,6 +154,7 @@ notificationSettings:
   validate: 확인
 onboarding:
   loading: 로딩 중
+one-day-left: 하루 남았다
 package:
   cannot-delete-version: 버전을 삭제할 수 없습니다
   channels: 채널
@@ -214,6 +215,7 @@ plan:
   versions: 버전
   whats-included: 포함된 항목
   yearly-billing: 연간 청구
+plan-inactive: 비활성 계획
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 projects:
   list: 당신 것
@@ -245,6 +247,7 @@ stats:
   subtitle: 지난 달
   title: 통계
   versions: 버전
+trial-left: 남은 일수
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: 평가판은 다음 날짜에 만료됩니다.
 upgrade: 업그레이드
@@ -252,5 +255,6 @@ upgrade-now: 지금 업그레이드
 usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법
+you-reached-the-limi: 한도 도달
 your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은
