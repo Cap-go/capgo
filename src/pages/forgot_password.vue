@@ -213,6 +213,11 @@ watchEffect(() => {
                 </form>
               </div>
             </div>
+            <div class="flex flex-row w-full justify-center mt-5">
+              <router-link to="/login" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
+                Back to login page
+              </router-link>
+            </div>
           </div>
         </div>
       </section>
