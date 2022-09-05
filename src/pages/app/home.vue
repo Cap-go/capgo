@@ -13,10 +13,10 @@ import {
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import Steps from '../onboarding/Steps.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
-import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
 import { formatDate } from '~/services/date'
 
@@ -185,13 +185,12 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
 
 <template>
   <IonPage>
-    <TitleHead :title="t('projects.title')" no-back color="warning" />
     <IonContent :fullscreen="true">
       <!-- <TitleHead :title="t('projects.title')" no-back big color="warning" /> -->
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>
-      <IonList ref="listRef">
+      <IonList v-if="apps && apps?.length > 0" ref="listRef">
         <IonItemDivider>
           <IonLabel>
             {{ t('projects.list') }}
@@ -284,6 +283,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
           </IonLabel>
         </IonItem>
       </IonList>
+      <Steps v-else />
     </IonContent>
   </IonPage>
 </template>

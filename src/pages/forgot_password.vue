@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { IonButton, IonContent, IonInput, IonItem, IonPage, IonSpinner, toastController } from '@ionic/vue'
+import { IonContent, IonPage, toastController } from '@ionic/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { email, minLength, required, sameAs } from '@vuelidate/validators'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
-import TitleHead from '~/components/TitleHead.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -89,88 +88,134 @@ watchEffect(() => {
 
 <template>
   <IonPage>
-    <TitleHead :big="true" :title="t('forgot.heading')" />
     <IonContent :fullscreen="true">
-      <div class="grid lg:w-1/2 mx-auto w-full h-full min-h-screen p-8">
-        <form
-          class="mt-8 relative grid item-center"
-          @submit.prevent="submit"
-        >
-          <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
-            {{ errorMessage }}
-          </p>
+      <section class="w-full h-full flex my-auto py-10 sm:py-8 lg:py-2">
+        <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
+          <div class="max-w-2xl mx-auto text-center">
+            <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/6 mb-6">
+            <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
+              Reset your password
+            </h1>
+            <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
+              We will send you an email with a link to reset your password.
+            </p>
+          </div>
 
-          <div v-if="step === 1" class="py-1">
-            <IonInput
-              v-model="form.email"
-              :disabled="isLoading"
-              required
-              inputmode="email"
-              class="text-left border-b-2 z-0 ion-padding-start"
-              :placeholder="t('forgot.email')"
-              type="email"
-            />
-            <div v-for="(error, index) of v$.email.$errors" :key="index">
-              <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
-                {{ t('forgot.email') }}: {{ error.$message }}
-              </p>
-            </div>
-          </div>
-          <div v-if="step === 2">
-            <div class="py-1">
-              <IonItem class="ion-no-padding">
-                <IonInput v-model="form.password" :disabled="isLoading" required class="text-left border-b-2 z-0 ion-padding-start" :placeholder="t('login.password')" :type="showPassword ? 'text' : 'password'" />
-                <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
-                <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
-              </IonItem>
-              <div v-for="(error, index) of v$.password.$errors" :key="index">
-                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
-                  {{ t('register.password') }}: {{ error.$message }}
-                </p>
+          <div class="relative max-w-md mx-auto mt-8 md:mt-4">
+            <div class="overflow-hidden bg-white rounded-md shadow-md">
+              <div class="px-4 py-6 sm:px-8 sm:py-7">
+                <form @submit.prevent="submit">
+                  <div class="space-y-5">
+                    <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                      {{ errorMessage }}
+                    </p>
+                    <div v-if="step === 1">
+                      <label for="" class="text-base font-medium text-gray-900"> Email address </label>
+                      <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                          </svg>
+                        </div>
+
+                        <input
+                          id="emailInput"
+                          v-model="form.email"
+                          inputmode="email" autocomplete="email"
+                          name="email"
+                          type="email"
+                          :disabled="isLoading"
+                          :placeholder="t('login.email')"
+                          :required="true"
+                          class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        >
+                        <div v-for="(error, index) of v$.email.$errors" :key="index">
+                          <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                            {{ t('login.email') }}: {{ error.$message }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div v-if="step === 2">
+                      <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
+                            />
+                          </svg>
+                        </div>
+
+                        <input
+                          id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " :required="true"
+                          class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        >
+                      </div>
+                      <div>
+                        <div v-for="(error, index) of v$.password.$errors" :key="index">
+                          <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+                            {{ t('login.password') }}: {{ error.$message }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div v-if="step === 2">
+                      <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
+                            />
+                          </svg>
+                        </div>
+
+                        <input
+                          id="passwordInput2" v-model="form.repeatPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" :type="showPassword2 ? 'text' : 'password'" :placeholder="t('register.confirm-password') " :required="true"
+                          class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        >
+                      </div>
+                      <div>
+                        <div v-for="(error, index) of v$.password.$errors" :key="index">
+                          <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+                            {{ t('login.password') }}: {{ error.$message }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <button type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-blue-600 border border-transparent rounded-md focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
+                        <svg v-if="isLoading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-900 inline-block align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle
+                            class="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            stroke-width="4"
+                          />
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-muted-blue-700 border border-transparent rounded-md focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
+                          Reset Password
+                        </button>
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
             </div>
-            <div class="py-1">
-              <IonItem class="ion-no-padding">
-                <IonInput v-model="form.repeatPassword" :disabled="isLoading" required class="text-left border-b-2 z-0 ion-padding-start" :placeholder="t('register.confirm-password')" :type="showPassword2 ? 'text' : 'password'" />
-                <img v-if="showPassword2" src="/eye-open.png" alt="password" @click="showPassword2 = !showPassword2">
-                <img v-else src="/eye-close.png" alt="password" @click="showPassword2 = !showPassword2">
-              </IonItem>
-              <div v-for="(error, index) of v$.repeatPassword.$errors" :key="index">
-                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
-                  {{ t('register.confirm-password') }}: {{ error.$message }}
-                </p>
-              </div>
-            </div>
           </div>
-          <IonButton
-            :disabled="isLoading"
-            size="large"
-            color="secondary"
-            shape="round"
-            type="submit"
-            class="mt-8 text-white text-center"
-          >
-            <span v-if="!isLoading" class="ion-padding-horizontal rounded-4xl font-bold">
-              {{ t('register.next') }}
-            </span>
-            <IonSpinner v-else name="crescent" color="light" />
-          </IonButton>
-          <a
-            class="
-                block
-                align-baseline
-                font-bold
-                text-sm
-                text-center
-                text-pumpkin-orange-500
-                hover:underline
-                mt-4"
-            href="/login"
-          >
-            {{ t('register.already-account') }}
-          </a>
-        </form>
-      </div>
+        </div>
+      </section>
     </IonContent>
   </IonPage>
 </template>
