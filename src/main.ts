@@ -36,7 +36,7 @@ import 'virtual:windi-devtools'
 import { initPlausible } from './services/plausible'
 
 const app = createApp(App)
-
+console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
 
 const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }]
