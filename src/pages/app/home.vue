@@ -1,37 +1,22 @@
 <script setup lang="ts">
-import type { RefresherCustomEvent } from '@ionic/vue'
 import {
   IonContent,
-  IonItem, IonItemDivider, IonItemOption,
-  IonItemOptions, IonItemSliding,
-  IonLabel,
-  IonList,
   IonPage,
-  IonRefresher, IonRefresherContent, alertController,
-  toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import Steps from '../onboarding/Steps.vue'
+import Dashboard from '../dashboard/Dashboard.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { openVersion } from '~/services/versions'
-import { formatDate } from '~/services/date'
 
-const listRef = ref()
-const { t } = useI18n()
 const isLoading = ref(false)
 const route = useRoute()
-const router = useRouter()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
 const apps = ref<definitions['apps'][]>()
 const sharedApps = ref<(definitions['channel_users'] & ChannelUserApp)[]>()
-const openPackage = (appId: string) => {
-  router.push(`/app/package/${appId.replace(/\./g, '--')}`)
-}
 
 interface ChannelUserApp {
   app_id: definitions['apps']
@@ -50,88 +35,6 @@ const getMyApps = async () => {
     apps.value = []
 }
 
-const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.delete-message')} ${name}?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
-}
-
-const deleteApp = async (app: definitions['apps']) => {
-  console.log('deleteApp', app)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('package.name')))
-    return
-  try {
-    const { data, error: vError } = await supabase
-      .from<definitions['app_versions']>('app_versions')
-      .select()
-      .eq('app_id', app.app_id)
-      .eq('user_id', app.user_id)
-
-    if (data && data.length) {
-      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
-      const { error: delError } = await supabase
-        .storage
-        .from('apps')
-        .remove(filesToRemove)
-      if (delError) {
-        const toast = await toastController
-          .create({
-            message: t('cannot-delete-app-version'),
-            duration: 2000,
-          })
-        await toast.present()
-        return
-      }
-    }
-
-    const { error: dbAppError } = await supabase
-      .from<definitions['apps']>('apps')
-      .delete()
-      .eq('app_id', app.app_id)
-      .eq('user_id', app.user_id)
-    if (vError || dbAppError) {
-      const toast = await toastController
-        .create({
-          message: t('cannot-delete-app'),
-          duration: 2000,
-        })
-      await toast.present()
-    }
-    else {
-      const toast = await toastController
-        .create({
-          message: 'App deleted',
-          duration: 2000,
-        })
-      await toast.present()
-      await getMyApps()
-    }
-  }
-  catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('cannot-delete-app'),
-        duration: 2000,
-      })
-    await toast.present()
-  }
-}
 const getSharedWithMe = async () => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
@@ -169,27 +72,12 @@ watchEffect(async () => {
     isLoading.value = false
   }
 })
-const refreshData = async (evt: RefresherCustomEvent | null = null) => {
-  isLoading.value = true
-  try {
-    await getMyApps()
-    await getSharedWithMe()
-  }
-  catch (error) {
-    console.error(error)
-  }
-  isLoading.value = false
-  evt?.target?.complete()
-}
 </script>
 
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent />
-      </IonRefresher>
-      <IonList v-if="apps && apps?.length > 0" ref="listRef">
+      <!-- <IonList v-if="apps && apps?.length > 0" ref="listRef">
         <IonItemDivider>
           <IonLabel>
             {{ t('projects.list') }}
@@ -281,8 +169,12 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
             </div>
           </IonLabel>
         </IonItem>
-      </IonList>
-      <Steps v-else />
+      </IonList> -->
+      <Dashboard v-if="!isLoading && apps && apps?.length > 0" />
+      <Steps v-else-if="!isLoading" />
+      <div v-else class="flex justify-center">
+        <Spinner />
+      </div>
     </IonContent>
   </IonPage>
 </template>

@@ -21,7 +21,15 @@
     })()
   </script>
 </head>
-<body>
+<body class="font-inter antialiased bg-slate-100 text-slate-600">
+  <script>
+    if (localStorage.getItem('sidebar-expanded') === 'true')
+  document.querySelector('body').classList.add('sidebar-expanded')
+
+else
+  document.querySelector('body').classList.remove('sidebar-expanded')
+
+  </script>
   <div id="app-loader"></div>
   <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>

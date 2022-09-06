@@ -24,21 +24,13 @@ import '@ionic/vue/css/text-transformation.css'
 import '@ionic/vue/css/flex-utils.css'
 import '@ionic/vue/css/display.css'
 
-// windicss layers
-import 'virtual:windi-base.css'
-import 'virtual:windi-components.css'
 // your custom styles here
-import './styles/main.css'
-// windicss utilities should be the last style import
-import 'virtual:windi-utilities.css'
-// windicss devtools support (dev only)
-import 'virtual:windi-devtools'
+import './styles/style.css'
 import { initPlausible } from './services/plausible'
 
 const app = createApp(App)
 
 // setup up pages with layouts
-
 const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }]
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 app.use(router)
