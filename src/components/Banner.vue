@@ -5,57 +5,54 @@ import {
   IonToolbar,
   isPlatform,
 } from '@ionic/vue'
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
 import { useMainStore } from '~/stores/main'
 
 defineProps({
   text: { type: String, default: '' },
   color: { type: String, default: '' },
 })
-const bannerText = ref('')
-const bannerColor = ref('')
 const main = useMainStore()
-const route = useRoute()
 const { t } = useI18n()
 const isMobile = isPlatform('capacitor')
 
-const setBannerState = () => {
-  if (main.canceled) {
-    bannerText.value = t('plan-inactive')
-    bannerColor.value = 'warning'
-  }
-  else if (!main.paying && main.trialDaysLeft > 1) {
-    bannerText.value = `${main.trialDaysLeft} ${t('trial-left')}`
-    if (main.trialDaysLeft <= 7)
-      bannerColor.value = 'warning'
-    else
-      bannerColor.value = 'success'
-  }
-  else if (!main.paying && main.trialDaysLeft === 1) {
-    bannerText.value = t('one-day-left')
-    bannerColor.value = 'warning'
-  }
-  else if (!main.paying && !main.canUseMore) {
-    bannerText.value = t('trial-plan-expired')
-    bannerColor.value = 'warning'
-  }
-  else if (main.paying && !main.canUseMore) {
-    bannerText.value = t('you-reached-the-limi')
-    bannerColor.value = 'warning'
-  }
-}
-watch(
-  () => main.trialDaysLeft,
-  (trialDaysLeft, prevTrialDaysLeft) => {
-    console.log('trialDaysLeft', trialDaysLeft)
-    if (route.path === '/app/usage' || !prevTrialDaysLeft || !trialDaysLeft)
-      return
-    setBannerState()
-  },
-)
-setBannerState()
+const bannerText = computed(() => {
+  if (main.canceled)
+    return t('plan-inactive')
+
+  else if (!main.paying && main.trialDaysLeft > 1)
+    return `${main.trialDaysLeft} ${t('trial-left')}`
+
+  else if (!main.paying && main.trialDaysLeft === 1)
+    return t('one-day-left')
+
+  else if (!main.paying && !main.canUseMore)
+    return t('trial-plan-expired')
+
+  else if (main.paying && !main.canUseMore)
+    return t('you-reached-the-limi')
+
+  return null
+})
+const bannerColor = computed(() => {
+  if (main.canceled)
+    return 'warning'
+
+  else if (!main.paying && main.trialDaysLeft > 1 && main.trialDaysLeft <= 7)
+    return 'warning'
+
+  else if (!main.paying && main.trialDaysLeft === 1)
+    return 'warning'
+
+  else if (!main.paying && !main.canUseMore)
+    return 'warning'
+
+  else if (main.paying && !main.canUseMore)
+    return 'warning'
+
+  return 'success'
+})
 </script>
 
 <template>
