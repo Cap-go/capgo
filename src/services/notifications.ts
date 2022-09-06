@@ -13,7 +13,7 @@ const firebaseConfig = import.meta.env.VITE_FIREBASE_CONFIG
 
 const registerToken = async (token: string) => {
   const supabase = useSupabase()
-  console.log(`Push registration success, token: ${token}`)
+  // console.log(`Push registration success, token: ${token}`)
   const { error } = await supabase
     .from('notification_token')
     .insert([
@@ -29,7 +29,7 @@ const registerToken = async (token: string) => {
 export const initNotif = () => {
 // Initialize Firebase
   if (!isPlatform('capacitor')) {
-    console.log('register web', firebaseConfig)
+    // console.log('register web', firebaseConfig)
     const app = initializeApp(JSON.parse(firebaseConfig as string))
     const messaging = getMessaging(app)
     getToken(messaging, { vapidKey: import.meta.env.VITE_VAPID_KEY as string }).then(async (currentToken) => {
@@ -47,10 +47,11 @@ export const initNotif = () => {
       else {
         // Show permission request UI
         console.log('No registration token available. Request permission to generate one.')
+        PushNotifications.requestPermissions()
         // ...
       }
     }).catch((err) => {
-      console.log('An error occurred while retrieving token. ', err)
+      console.error('An error occurred while retrieving token. ', err)
       // ...
     })
   }
@@ -69,11 +70,11 @@ export const initNotif = () => {
     // Some issue with our setup and push will not work
     PushNotifications.addListener('registrationError',
       (error: any) => {
-        console.log(`Error on registration: ${JSON.stringify(error)}`)
+        console.error(`Error on registration: ${JSON.stringify(error)}`)
       },
     )
     PushNotifications.checkPermissions().then(({ receive }) => {
-      console.log('checkPermissions', receive)
+      // console.log('checkPermissions', receive)
       if (receive === 'granted')
         PushNotifications.register()
     })
@@ -85,7 +86,7 @@ export const listenNotif = (router: Router) => {
     const app = initializeApp(JSON.parse(firebaseConfig as string))
     const messaging = getMessaging(app)
     onMessage(messaging, (payload) => {
-      console.log('Message received. ', payload)
+      // console.log('Message received. ', payload)
       // ...
       const isNotInChatPages = window.location.pathname !== '/app/chats' && window.location.pathname.search('/chat/') === -1
       if (isNotInChatPages && payload.notification?.title) {

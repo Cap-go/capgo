@@ -21,7 +21,7 @@ interface Module {
 }
 const modules = ref([] as Module[])
 Object.keys(dependencies).forEach((dep) => {
-  console.log('dep', dep)
+  // console.log('dep', dep)
   if (dep.includes('capacitor')) {
     modules.value.push({
       name: dep,
@@ -30,7 +30,7 @@ Object.keys(dependencies).forEach((dep) => {
     })
   }
 })
-console.log('modules', modules.value)
+// console.log('modules', modules.value)
 </script>
 
 <template>

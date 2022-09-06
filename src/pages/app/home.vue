@@ -71,7 +71,7 @@ const didCancel = async (name: string) => {
 }
 
 const deleteApp = async (app: definitions['apps']) => {
-  console.log('deleteApp', app)
+  // console.log('deleteApp', app)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   if (await didCancel(t('package.name')))

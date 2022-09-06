@@ -54,7 +54,7 @@ export const install: UserModule = ({ app, router }) => {
       })
       await loading.present()
       let { url } = event
-      console.log('url', url)
+      // console.log('url', url)
       if (url.startsWith(supabaseUrl)) {
         const urlParams = Object.fromEntries(new URLSearchParams(url.split('?')[1]) as any) as HttpParams
         const options: HttpOptions = {
@@ -67,7 +67,7 @@ export const install: UserModule = ({ app, router }) => {
             url = response.url
         }
         catch (e) {
-          console.log('error', e)
+          console.error('appUrlOpen', e)
           const toast = await toastController.create({
             message: 'Cannot handle this redirect',
             duration: 2000,
@@ -75,7 +75,7 @@ export const install: UserModule = ({ app, router }) => {
           return toast.present()
         }
       }
-      console.log('url', url)
+      // console.log('url', url)
       if (!url.startsWith(appUrl)) {
         await loading.dismiss()
         return

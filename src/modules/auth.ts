@@ -16,11 +16,11 @@ const guard = async (next: any, to: string, from: string) => {
 
   if (auth && !main.auth) {
     main.auth = auth
-    console.log('set auth', auth)
+    // console.log('set auth', auth)
     if (!main.user && auth) {
       try {
         isTrial(auth?.id).then((res) => {
-          console.log('isTrial', res)
+          // console.log('isTrial', res)
           main.trialDaysLeft = res
         })
         isPaying(auth?.id).then((res) => {
@@ -56,7 +56,7 @@ const guard = async (next: any, to: string, from: string) => {
         })
       }
       catch (error) {
-        console.log('error', error)
+        console.error('auth', error)
       }
     }
     setUserId(auth.id)

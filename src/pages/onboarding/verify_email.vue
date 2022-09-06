@@ -16,9 +16,8 @@ const isLoading = ref(true)
 const user = ref<User | null>(null)
 
 const updateDb = async () => {
-  console.log('update db')
+  // console.log('update db')
   let session = supabase.auth.session()!
-
   if (!session) {
     const logSession = await autoAuth(route)
     if (!logSession)
@@ -29,7 +28,7 @@ const updateDb = async () => {
       user.value = logSession.user
   }
   else {
-    console.log('session user', session?.user)
+    // console.log('session user', session?.user)
     user.value = session.user
   }
   if (!user.value?.id)
@@ -47,7 +46,7 @@ const updateDb = async () => {
       },
     )
   if (error)
-    console.log('updateDb', error)
+    console.error('updateDb', error)
   router.push('/onboarding/activation')
 
   isLoading.value = false

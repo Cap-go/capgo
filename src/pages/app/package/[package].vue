@@ -189,7 +189,7 @@ const didCancel = async (name: string) => {
 }
 
 const deleteChannel = async (channel: definitions['channels']) => {
-  console.log('deleteChannel', channel)
+  // console.log('deleteChannel', channel)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   if (await didCancel(t('channel.title')))
@@ -229,7 +229,7 @@ const deleteChannel = async (channel: definitions['channels']) => {
 }
 
 const deleteVersion = async (version: definitions['app_versions']) => {
-  console.log('deleteVersion', version)
+  // console.log('deleteVersion', version)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   if (await didCancel(t('device.version')))
@@ -346,7 +346,7 @@ const ASChannelChooser = async (v: definitions['app_versions']) => {
     text: t('button.cancel'),
     role: 'cancel',
     handler: () => {
-      console.log('Cancel clicked')
+      // console.log('Cancel clicked')
     },
   })
   const actionSheet = await actionSheetController.create({
@@ -377,7 +377,7 @@ const ASVersion = async (v: (definitions['app_versions'] & definitions['app_vers
         text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
-          console.log('Cancel clicked')
+          // console.log('Cancel clicked')
         },
       },
     ],

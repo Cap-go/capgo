@@ -50,7 +50,7 @@ const getUsers = async () => {
   if (!channel.value)
     return
   try {
-    const { data: dataUsers } = await supabase
+    const { data, error } = await supabase
       .from<definitions['channel_users'] & ChannelUsers>('channel_users')
       .select(`
           id,
@@ -65,11 +65,11 @@ const getUsers = async () => {
         `)
       .eq('channel_id', id.value)
       .eq('app_id', channel.value.version.app_id)
-    if (dataUsers && dataUsers.length)
-      users.value = dataUsers
-    else
-      console.log('no users')
-    // console.log('users', users.value)
+    if (error) {
+      console.error('no channel users', error)
+      return
+    }
+    users.value = data
   }
   catch (error) {
     console.error(error)
@@ -105,7 +105,7 @@ const saveChannelChange = async (key: string, val: boolean) => {
       .update(update)
       .eq('id', id.value)
     if (error)
-      console.log('no channel update', error)
+      console.error('no channel update', error)
   }
   catch (error) {
     console.error(error)
@@ -115,7 +115,7 @@ const getChannel = async () => {
   if (!id.value)
     return
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from<definitions['channels'] & Channel>('channels')
       .select(`
           id,
@@ -134,11 +134,11 @@ const getChannel = async () => {
         `)
       .eq('id', id.value)
       .single()
-    if (data)
-      channel.value = data
-    else
-      console.log('no channel')
-    console.log('channel', channel.value)
+    if (error) {
+      console.error('no channel', error)
+      return
+    }
+    channel.value = data
   }
   catch (error) {
     console.error(error)
@@ -168,8 +168,7 @@ const existUser = async (email: string): Promise<string> => {
 }
 
 const addUser = async () => {
-  console.log('newUser', newUser.value)
-
+  // console.log('newUser', newUser.value)
   if (!channel.value || !auth)
     return
   if (!main.canUseMore && (main.trialDaysLeft || 0) <= 0) {
@@ -299,7 +298,7 @@ const presentActionSheet = async (usr: definitions['users']) => {
         text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
-          console.log('Cancel clicked')
+          // console.log('Cancel clicked')
         },
       },
     ],
@@ -316,7 +315,7 @@ const devicesFilter = computed(() => {
   return devices.value
 })
 const deleteDevice = async (device: definitions['channel_devices']) => {
-  console.log('deleteDevice', device)
+  // console.log('deleteDevice', device)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
   if (await didCancel(t('channel.device')))

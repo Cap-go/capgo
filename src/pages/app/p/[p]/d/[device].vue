@@ -36,13 +36,17 @@ const channelDevice = ref<definitions['channel_devices'] & ChannelDev>()
 
 const getVersion = async () => {
   try {
-    const { data: dataVersions } = await supabase
+    const { data, error } = await supabase
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
-    versions.value = dataVersions || versions.value
+    if (error) {
+      console.error('getVersion', error)
+      return
+    }
+    versions.value = data || versions.value
   }
   catch (error) {
     console.error(error)
@@ -50,7 +54,7 @@ const getVersion = async () => {
 }
 const getChannels = async () => {
   try {
-    const { data: dataChannels } = await supabase
+    const { data, error } = await supabase
       .from<definitions['channels'] & Channel>('channels')
       .select(`
         id,
@@ -59,14 +63,18 @@ const getChannels = async () => {
         updated_at
       `)
       .eq('app_id', packageId.value)
-    channels.value = dataChannels || channels.value
+    if (error) {
+      console.error('getChannels', error)
+      return
+    }
+    channels.value = data || []
   }
   catch (error) {
     console.error(error)
   }
 }
 const getChannelOverride = async () => {
-  const { data: dataDev } = await supabase
+  const { data, error } = await supabase
     .from<definitions['channel_devices'] & ChannelDev>('channel_devices')
     .select(`
       device_id,
@@ -82,10 +90,14 @@ const getChannelOverride = async () => {
     `)
     .eq('app_id', packageId.value)
     .single()
-  channelDevice.value = dataDev || undefined
+  if (error) {
+    console.error('getChannelOverride', error)
+    return
+  }
+  channelDevice.value = data || undefined
 }
 const getDeviceOverride = async () => {
-  const { data: dataDev } = await supabase
+  const { data, error } = await supabase
     .from<definitions['devices_override'] & Device>('devices_override')
     .select(`
       device_id,
@@ -98,13 +110,17 @@ const getDeviceOverride = async () => {
     `)
     .eq('app_id', packageId.value)
     .single()
-  deviceOverride.value = dataDev || undefined
+  if (error) {
+    console.error('getDeviceOverride', error)
+    return
+  }
+  deviceOverride.value = data || undefined
 }
 const getDevice = async () => {
   if (!id.value)
     return
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from<definitions['devices'] & Device>('devices')
       .select(`
           device_id,
@@ -123,11 +139,11 @@ const getDevice = async () => {
         `)
       .eq('device_id', id.value)
       .single()
-    if (data)
+    if (data && !error)
       device.value = data
     else
-      console.log('no channel')
-    console.log('channel', device.value)
+      console.error('no devices', error)
+    // console.log('device', device.value)
   }
   catch (error) {
     console.error(error)
@@ -235,7 +251,7 @@ const updateOverride = async () => {
     text: t('button.cancel'),
     role: 'cancel',
     handler: () => {
-      console.log('Cancel clicked')
+      // console.log('Cancel clicked')
     },
   })
   const actionSheet = await actionSheetController.create({
@@ -314,7 +330,7 @@ const updateChannel = async () => {
     text: t('button.cancel'),
     role: 'cancel',
     handler: () => {
-      console.log('Cancel clicked')
+      // console.log('Cancel clicked')
     },
   })
   const actionSheet = await actionSheetController.create({
