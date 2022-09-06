@@ -499,7 +499,7 @@ const inviteUser = async (userId: string) => {
         </div>
       </IonList>
     </IonContent>
-    <IonModal :is-open="newUserModalOpen" :swipe-to-close="true">
+    <IonModal :is-open="newUserModalOpen" :can-dismiss="true">
       <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />
     </IonModal>
   </IonPage>
