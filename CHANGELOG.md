@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.19.0](https://github.com/Cap-go/capgo/compare/1.18.40...1.19.0) (2022-09-06)
+
+
+### Features
+
+* add version in logs ([9d3031f](https://github.com/Cap-go/capgo/commit/9d3031f7a5b63e38109dd15e112729bd3669f58b))
+
+
+### Bug Fixes
+
+* remove useless console ([1f0a089](https://github.com/Cap-go/capgo/commit/1f0a089bfb15cad60e75f2c1ff6ce9d665f9cf2e))
+
 ### [1.18.40](https://github.com/Cap-go/capgo/compare/1.18.39...1.18.40) (2022-09-06)
 
 
