@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.40](https://github.com/Cap-go/capgo/compare/1.18.39...1.18.40) (2022-09-06)
+
+
+### Bug Fixes
+
+* remove order in device ([0f022ea](https://github.com/Cap-go/capgo/commit/0f022ea8a659610bb9c720833b4cacfce923f8fc))
+
 ### [1.18.39](https://github.com/Cap-go/capgo/compare/1.18.38...1.18.39) (2022-09-05)
 
 ### [1.18.38](https://github.com/Cap-go/capgo/compare/1.18.37...1.18.38) (2022-08-31)
