@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.19.3](https://github.com/Cap-go/capgo/compare/1.19.2...1.19.3) (2022-09-06)
+
+
+### Bug Fixes
+
+* issue with multi channel override ([8a55885](https://github.com/Cap-go/capgo/commit/8a55885e0394f56366e368a37816478daf8a492b))
+
 ### [1.19.2](https://github.com/Cap-go/capgo/compare/1.19.1...1.19.2) (2022-09-06)
 
 
