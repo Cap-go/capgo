@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.19.1](https://github.com/Cap-go/capgo/compare/1.19.0...1.19.1) (2022-09-06)
+
+
+### Bug Fixes
+
+* banner issue ([96f8fc8](https://github.com/Cap-go/capgo/commit/96f8fc8f50784103861dba71d75821ed74fcc1cb))
+
 ## [1.19.0](https://github.com/Cap-go/capgo/compare/1.18.40...1.19.0) (2022-09-06)
 
 
