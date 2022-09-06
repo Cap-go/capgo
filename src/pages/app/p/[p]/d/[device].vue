@@ -265,6 +265,21 @@ const delDevChannel = async (device: string) => {
 }
 const updateChannel = async () => {
   const buttons = []
+  if (channelDevice.value) {
+    buttons.push({
+      text: t('button.remove'),
+      handler: async () => {
+        device.value?.device_id && delDevChannel(device.value?.device_id)
+        const toast = await toastController
+          .create({
+            message: t('device.unlink_channel'),
+            duration: 2000,
+          })
+        await toast.present()
+        await loadData()
+      },
+    })
+  }
   for (const channel of channels.value) {
     buttons.push({
       text: channel.name,
@@ -292,21 +307,6 @@ const updateChannel = async () => {
           await toast.present()
         }
         isLoading.value = false
-      },
-    })
-  }
-  if (channelDevice.value) {
-    buttons.push({
-      text: t('button.remove'),
-      handler: async () => {
-        device.value?.device_id && delDevChannel(device.value?.device_id)
-        const toast = await toastController
-          .create({
-            message: t('device.unlink_channel'),
-            duration: 2000,
-          })
-        await toast.present()
-        await loadData()
       },
     })
   }
