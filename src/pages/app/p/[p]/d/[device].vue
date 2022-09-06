@@ -89,6 +89,7 @@ const getChannelOverride = async () => {
       updated_at
     `)
     .eq('app_id', packageId.value)
+    .eq('device_id', id.value)
     .single()
   if (error) {
     console.error('getChannelOverride', error)
@@ -109,6 +110,7 @@ const getDeviceOverride = async () => {
       updated_at
     `)
     .eq('app_id', packageId.value)
+    .eq('device_id', id.value)
     .single()
   if (error) {
     console.error('getDeviceOverride', error)
