@@ -14,6 +14,11 @@ export interface AppStatsIncrement {
   shared: number
   versions: number
 }
+export interface VersionStatsIncrement {
+  app_id: string
+  version_id: number
+  devices: number
+}
 export const supabaseClient = createClient(
   // Supabase API URL - env var exported by default.
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -48,6 +53,13 @@ export const updateOrCreateVersion = async (update: Partial<definitions['app_ver
       .from<definitions['app_versions']>('app_versions')
       .insert(update)
   }
+}
+
+export const updateVersionStats = async (increment: VersionStatsIncrement) => {
+  const { error } = await supabaseAdmin
+    .rpc('increment_version_stats', increment)
+  if (error)
+    console.error('increment_stats', error)
 }
 
 export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: string, user_id: string) => {

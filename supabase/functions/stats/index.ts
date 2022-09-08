@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.154.0/http/server.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 
 interface AppStats {
@@ -37,15 +37,26 @@ serve(async (event: Request) => {
       app_id: body.app_id,
       version_build: body.version_build,
     }
-
+    const all = []
     const { data, error } = await supabaseAdmin
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.app_id)
       .eq('name', body.version_name || 'unknown')
     if (data && data.length && !error) {
+      const oldVersion = data[0].id
       stat.version = data[0].id
       device.version = data[0].id
+      all.push(updateVersionStats({
+        app_id: body.app_id,
+        version_id: data[0].id,
+        devices: 1,
+      }))
+      all.push(updateVersionStats({
+        app_id: body.app_id,
+        version_id: oldVersion,
+        devices: -1,
+      }))
     }
     else {
       console.log('switch to onprem', body.app_id)
@@ -54,12 +65,13 @@ serve(async (event: Request) => {
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
     }
-    await supabaseAdmin
+    all.push(supabaseAdmin
       .from(deviceDb)
-      .upsert(device)
-    await supabaseAdmin
+      .upsert(device))
+    all.push(supabaseAdmin
       .from(statsDb)
-      .insert(stat)
+      .insert(stat))
+    await Promise.all(all)
     return sendRes()
   }
   catch (e) {

@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.154.0/http/server.ts'
-import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
+import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
