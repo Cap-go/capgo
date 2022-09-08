@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.40-alpha.2](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.1...1.18.40-alpha.2) (2022-09-08)
+
+
+### Bug Fixes
+
+* delete useless images ([e7daf26](https://github.com/Cap-go/capgo/commit/e7daf26e34d113dbb9e2762a9c0d8406e450ce92))
+
 ### [1.18.40-alpha.1](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.0...1.18.40-alpha.1) (2022-09-08)
 
 ### [1.18.40-alpha.0](https://github.com/Cap-go/capgo/compare/1.18.0-alpha.3...1.18.40-alpha.0) (2022-09-05)
