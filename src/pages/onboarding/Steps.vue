@@ -3,11 +3,11 @@ import { toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useRoute, useRouter } from 'vue-router'
+import { copyOutline } from 'ionicons/icons'
+import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
-import { copyOutline } from 'ionicons/icons'
 import { useMainStore } from '~/stores/main'
-import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
 const isLoading = ref(false)
@@ -18,7 +18,6 @@ const app = ref<definitions['apikeys']>()
 const router = useRouter()
 const main = useMainStore()
 const { t } = useI18n()
-
 
 const copyToast = async (text: string, stepNb: number) => {
   copy(text)
@@ -56,7 +55,7 @@ watchEffect(async () => {
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="text-center">
         <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
-          Start using Capgo ! 
+          Start using Capgo !
         </h2>
         <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
           Add your first app to your account and let's push updates !
@@ -97,7 +96,7 @@ watchEffect(async () => {
             </div>
             <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
               Log to the Capgo CLI<br>
-              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest login ${app!.key}`, 2)">npx @capgo/cli@latest login 
+              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest login ${app!.key}`, 2)">npx @capgo/cli@latest login
                 <span class="font-bold">[API key]</span>{{ ' ' }}
                 <ion-icon :icon="copyOutline" class="text-muted-blue-800" />
               </code>
@@ -156,7 +155,7 @@ watchEffect(async () => {
             @click="main.logout().then(() => router.replace('/login'))"
           >
             {{ t("account.logout") }}
-          </button>        
+          </button>
         </div>
       </div>
     </div>

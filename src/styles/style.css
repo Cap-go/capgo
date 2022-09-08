@@ -13,6 +13,9 @@
 @import 'additional-styles/flatpickr.css';
 @import 'additional-styles/theme.css';
 
+.btn {
+  @apply p-2 rounded
+}
 
 #app-loader {
   position: absolute;

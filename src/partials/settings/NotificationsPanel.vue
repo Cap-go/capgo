@@ -1,19 +1,51 @@
-<script>
-import { ref } from 'vue'
+<script setup lang="ts">
+import { IonToggle } from '@ionic/vue'
+import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useSupabase } from '~/services/supabase'
 
-export default {
-  name: 'NotificationsPanel',
-  setup() {
-    const comments = ref('On')
-    const messages = ref('On')
-    const mentions = ref('Off')
+const { t } = useI18n()
+const supabase = useSupabase()
+const isLoading = ref(false)
+const form = reactive({
+  enableNotifications: false,
+  optForNewsletters: false,
+})
 
-    return {
-      comments,
-      messages,
-      mentions,
-    }
-  },
+let user = supabase.auth.user()
+
+form.enableNotifications = !!user?.user_metadata?.activation?.enableNotifications
+form.optForNewsletters = !!user?.user_metadata?.activation?.optForNewsletters
+
+const submitNotif = async () => {
+  isLoading.value = true
+  const activation = user?.user_metadata?.activation || {}
+  const { data, error } = await supabase.auth.update({
+    data: {
+      activation: {
+        ...activation,
+        enableNotifications: form.enableNotifications,
+      },
+    },
+  })
+  if (!error && data)
+    user = data
+  isLoading.value = false
+}
+const submitDoi = async () => {
+  isLoading.value = true
+  const activation = user?.user_metadata?.activation || {}
+  const { data, error } = await supabase.auth.update({
+    data: {
+      activation: {
+        ...activation,
+        optForNewsletters: form.optForNewsletters,
+      },
+    },
+  })
+  if (!error && data)
+    user = data
+  isLoading.value = false
 }
 </script>
 
@@ -21,167 +53,28 @@ export default {
   <div class="grow">
     <!-- Panel body -->
     <div class="p-6 space-y-6">
-      <h2 class="text-2xl text-slate-800 font-bold mb-5">
+      <h2 class="text-2xl text-slate-800 font-bold ">
         My Notifications
       </h2>
 
-      <!-- General -->
-      <section>
-        <h3 class="text-xl leading-snug text-slate-800 font-bold mb-1">
-          General
-        </h3>
-        <ul>
-          <li class="flex justify-between items-center py-3 border-b border-slate-200">
-            <!-- Left -->
-            <div>
-              <div class="text-slate-800 font-semibold">
-                Comments and replies
-              </div>
-              <div class="text-sm">
-                Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit.
-              </div>
-            </div>
-            <!-- Right -->
-            <div class="flex items-center ml-4">
-              <div class="text-sm text-slate-400 italic mr-2">
-                {{ comments }}
-              </div>
-              <div class="form-switch">
-                <input id="comments" v-model="comments" type="checkbox" class="sr-only" true-value="On" false-value="Off">
-                <label class="bg-slate-400" for="comments">
-                  <span class="bg-white shadow-sm" aria-hidden="true" />
-                  <span class="sr-only">Enable smart sync</span>
-                </label>
-              </div>
-            </div>
-          </li>
-          <li class="flex justify-between items-center py-3 border-b border-slate-200">
-            <!-- Left -->
-            <div>
-              <div class="text-slate-800 font-semibold">
-                Messages
-              </div>
-              <div class="text-sm">
-                Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit.
-              </div>
-            </div>
-            <!-- Right -->
-            <div class="flex items-center ml-4">
-              <div class="text-sm text-slate-400 italic mr-2">
-                {{ messages }}
-              </div>
-              <div class="form-switch">
-                <input id="messages" v-model="messages" type="checkbox" class="sr-only" true-value="On" false-value="Off">
-                <label class="bg-slate-400" for="messages">
-                  <span class="bg-white shadow-sm" aria-hidden="true" />
-                  <span class="sr-only">Enable smart sync</span>
-                </label>
-              </div>
-            </div>
-          </li>
-          <li class="flex justify-between items-center py-3 border-b border-slate-200">
-            <!-- Left -->
-            <div>
-              <div class="text-slate-800 font-semibold">
-                Mentions
-              </div>
-              <div class="text-sm">
-                Excepteur sint occaecat cupidatat non in culpa qui officia deserunt mollit.
-              </div>
-            </div>
-            <!-- Right -->
-            <div class="flex items-center ml-4">
-              <div class="text-sm text-slate-400 italic mr-2">
-                {{ mentions }}
-              </div>
-              <div class="form-switch">
-                <input id="mentions" v-model="mentions" type="checkbox" class="sr-only" true-value="On" false-value="Off">
-                <label class="bg-slate-400" for="mentions">
-                  <span class="bg-white shadow-sm" aria-hidden="true" />
-                  <span class="sr-only">Enable smart sync</span>
-                </label>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <!-- Shares -->
-      <section>
-        <h3 class="text-xl leading-snug text-slate-800 font-bold mb-1">
-          Shares
-        </h3>
-        <ul>
-          <li class="flex justify-between items-center py-3 border-b border-slate-200">
-            <!-- Left -->
-            <div>
-              <div class="text-slate-800 font-semibold">
-                Shares of my content
-              </div>
-              <div class="text-sm">
-                Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit.
-              </div>
-            </div>
-            <!-- Right -->
-            <div class="flex items-center ml-4">
-              <button class="btn-sm border-slate-200 hover:border-slate-300 shadow-sm">
-                Manage
-              </button>
-            </div>
-          </li>
-          <li class="flex justify-between items-center py-3 border-b border-slate-200">
-            <!-- Left -->
-            <div>
-              <div class="text-slate-800 font-semibold">
-                Team invites
-              </div>
-              <div class="text-sm">
-                Excepteur sint occaecat cupidatat non in culpa qui officia deserunt mollit.
-              </div>
-            </div>
-            <!-- Right -->
-            <div class="flex items-center ml-4">
-              <button class="btn-sm border-slate-200 hover:border-slate-300 shadow-sm">
-                Manage
-              </button>
-            </div>
-          </li>
-          <li class="flex justify-between items-center py-3 border-b border-slate-200">
-            <!-- Left -->
-            <div>
-              <div class="text-slate-800 font-semibold">
-                Smart connection
-              </div>
-              <div class="text-sm">
-                Excepteur sint occaecat cupidatat non in culpa qui officia deserunt mollit.
-              </div>
-            </div>
-            <!-- Right -->
-            <div class="flex items-center ml-4">
-              <div class="text-sm text-slate-400 italic mr-2 hidden md:block">
-                Active
-              </div>
-              <button class="btn-sm border-slate-200 hover:border-slate-300 shadow-sm text-rose-500">
-                Disable
-              </button>
-            </div>
-          </li>
-        </ul>
-      </section>
-    </div>
-
-    <!-- Panel footer -->
-    <footer>
-      <div class="flex flex-col px-6 py-5 border-t border-slate-200">
-        <div class="flex self-end">
-          <button class="btn border-slate-200 hover:border-slate-300 text-slate-600">
-            Cancel
-          </button>
-          <button class="btn bg-indigo-500 hover:bg-indigo-600 text-white ml-3">
-            Save Changes
-          </button>
+      <div class="mx-auto w-full">
+        <div class="py-4 px-6">
+          <div class="flex justify-between items-center my-2">
+            <label for="notification" class="justify-self-start text-xl">{{ t('activation.notification') }}</label>
+            <IonToggle v-model="form.enableNotifications" color="success" @ion-change="submitNotif()" />
+          </div>
+          <p class="col-span-2 text-left">
+            {{ t('activation.notification-desc') }}
+          </p>
+          <div class="flex justify-between items-center mb-2 mt-4">
+            <label for="notification" class="justify-self-start text-xl w-64">{{ t('activation.doi') }}</label>
+            <IonToggle v-model="form.optForNewsletters" color="success" @ion-change="submitDoi()" />
+          </div>
+          <p class="col-span-2 text-left">
+            {{ t('activation.doi-desc') }}
+          </p>
         </div>
       </div>
-    </footer>
+    </div>
   </div>
 </template>

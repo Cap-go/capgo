@@ -192,7 +192,7 @@ watchEffect(() => {
                     </div>
 
                     <div>
-                      <button type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-blue-600 border border-transparent rounded-md focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
+                      <button type="submit" class="inline-flex items-center justify-center w-full">
                         <svg v-if="isLoading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-900 inline-block align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle
                             class="opacity-25"

@@ -262,7 +262,7 @@ const submit = async () => {
 
                     <div class="col-span-2 w-1/2 mx-auto">
                       <button
-                        :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-muted-blue-600 border border-transparent rounded-md focus:outline-none hover:bg-muted-blue-700 focus:bg-muted-blue-700"
+                        :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-muted-blue-600 border border-transparent rounded-md focus:outline-none hover:bg-blue-700 focus:bg-blue-700"
                       >
                         <span v-if="!isLoading" class="rounded-4xl">
                           {{ t("register.next") }}

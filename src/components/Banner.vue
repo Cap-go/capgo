@@ -50,7 +50,7 @@ watch(
   () => main.trialDaysLeft,
   (trialDaysLeft, prevTrialDaysLeft) => {
     console.log('trialDaysLeft', trialDaysLeft)
-    if (route.path === '/app/usage' || !prevTrialDaysLeft || !trialDaysLeft)
+    if (route.path === '/dashboard/settings/plans' || !prevTrialDaysLeft || !trialDaysLeft)
       return
     setBannerState()
   },
@@ -65,10 +65,10 @@ setBannerState()
         {{ bannerText }}
       </p>
     </IonTitle>
-    <IonButton v-if="!isMobile" id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
+    <IonButton v-if="!isMobile" id="banner" slot="end" href="/dashboard/settings/plans" color="secondary" class="text-white">
       {{ t('upgrade') }}
     </IonButton>
-    <IonButton v-if="isMobile" id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
+    <IonButton v-if="isMobile" id="banner" slot="end" href="/dashboard/settings/plans" color="secondary" class="text-white">
       {{ t('see-usage') }}
     </IonButton>
   </IonToolbar>

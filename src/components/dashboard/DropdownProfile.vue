@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import UserAvatar from '../../images/user-avatar-32.png'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
 
@@ -17,7 +16,7 @@ const main = useMainStore()
 const planCurrent = ref('')
 
 if (main.auth?.id)
-  await getCurrentPlanName(main.auth?.id).then(res => planCurrent.value = res)
+  getCurrentPlanName(main.auth?.id).then(res => planCurrent.value = res)
 
 const dropdownOpen = ref(false)
 
@@ -46,9 +45,9 @@ onUnmounted(() => {
       :aria-expanded="dropdownOpen"
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
-      <img class="w-8 h-8 rounded-full" :src="UserAvatar" width="32" height="32" alt="User">
+      <img class="w-8 h-8 rounded-full" :src="main.user?.image_url" width="32" height="32" alt="User">
       <div class="flex items-center truncate">
-        <span class="truncate ml-2 text-sm font-medium group-hover:text-slate-800">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
+        <span class="truncate ml-2 text-sm font-medium group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
         <svg class="w-3 h-3 shrink-0 ml-1 fill-current text-slate-400" viewBox="0 0 12 12">
           <path d="M5.9 11.4L.5 6l1.4-1.4 4 4 4-4L11.3 6z" />
         </svg>
@@ -77,12 +76,12 @@ onUnmounted(() => {
           @focusout="dropdownOpen = false"
         >
           <li>
-            <router-link class="font-medium text-sm text-indigo-500 hover:text-indigo-600 flex items-center py-1 px-3" to="/dashboard/settings/account" @click="dropdownOpen = false">
+            <router-link class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" to="/dashboard/settings/account" @click="dropdownOpen = false">
               Settings
             </router-link>
           </li>
           <li>
-            <button class="font-medium text-sm text-indigo-500 hover:text-indigo-600 flex items-center py-1 px-3" @click="main.logout().then(() => router.replace('/login'))">
+            <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="main.logout().then(() => router.replace('/login'))">
               Sign Out
             </button>
           </li>

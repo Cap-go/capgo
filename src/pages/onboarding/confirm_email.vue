@@ -24,7 +24,7 @@ const { t } = useI18n()
                 </p>
                 <div class="mt-8">
                   <span
-                    class="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold leading-5 text-indigo-600 transition-all duration-200 bg-indigo-100 border border-transparent rounded-md"
+                    class="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold leading-5 text-blue-600 transition-all duration-200 bg-blue-100 border border-transparent rounded-md"
                   >
                     Thank you for choosing Capgo !
                   </span>

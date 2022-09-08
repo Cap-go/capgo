@@ -67,6 +67,7 @@ module.exports = {
         },
       },
       colors: {
+        ...colors,
         'gray': colors.gray,
         'amber': colors.amber,
         'rose': colors.rose,
@@ -215,7 +216,6 @@ module.exports = {
     },
   },
   plugins: [
-
     require('@tailwindcss/forms'),
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {
