@@ -26,7 +26,6 @@ const acronym = computed(() => {
     return main.user?.last_name[0]
   return '??'
 })
-main.user.image_url = ''
 
 if (main.auth?.id)
   getCurrentPlanName(main.auth?.id).then(res => planCurrent.value = res)
