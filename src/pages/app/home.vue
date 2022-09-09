@@ -159,7 +159,7 @@ watchEffect(async () => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <Dashboard v-if="apps.length > 0 && sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
+      <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
       <Steps v-else-if="!isLoading" :onboarding="true" />
       <div v-else class="flex justify-center">
         <Spinner />
