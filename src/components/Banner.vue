@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  IonButton,
   IonTitle,
   IonToolbar,
   isPlatform,
@@ -56,18 +55,18 @@ const bannerColor = computed(() => {
 </script>
 
 <template>
-  <IonToolbar v-if="bannerText" id="banner-toolbar" mode="ios" :color="bannerColor">
+  <IonToolbar v-if="bannerText" id="banner-toolbar" mode="ios" :color="bannerColor" class="z-0">
     <IonTitle>
       <p class="text-white text-center">
         {{ bannerText }}
       </p>
     </IonTitle>
-    <IonButton v-if="!isMobile" id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
+    <router-link v-if="!isMobile" id="banner" slot="end" to="/dashboard/settings/plans" class="text-white bg-blue-600 px-2 py-1 rounded hover:bg-blue-500">
       {{ t('upgrade') }}
-    </IonButton>
-    <IonButton v-if="isMobile" id="banner" slot="end" href="/app/usage" color="secondary" class="text-white">
+    </router-link>
+    <router-link v-else id="banner" slot="end" to="/app/home" class="text-white bg-blue-600 px-2 py-1 rounded hover:bg-blue-500">
       {{ t('see-usage') }}
-    </IonButton>
+    </router-link>
   </IonToolbar>
 </template>
 

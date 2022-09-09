@@ -244,11 +244,12 @@ export interface paths {
           app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
           versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
           mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
           date_id?: parameters["rowFilter.app_stats_onprem.date_id"];
-          devices?: parameters["rowFilter.app_stats_onprem.devices"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -302,11 +303,12 @@ export interface paths {
           app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
           versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
           mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
           date_id?: parameters["rowFilter.app_stats_onprem.date_id"];
-          devices?: parameters["rowFilter.app_stats_onprem.devices"];
         };
         header: {
           /** Preference */
@@ -324,11 +326,12 @@ export interface paths {
           app_id?: parameters["rowFilter.app_stats_onprem.app_id"];
           created_at?: parameters["rowFilter.app_stats_onprem.created_at"];
           updated_at?: parameters["rowFilter.app_stats_onprem.updated_at"];
+          channels?: parameters["rowFilter.app_stats_onprem.channels"];
           mlu?: parameters["rowFilter.app_stats_onprem.mlu"];
           versions?: parameters["rowFilter.app_stats_onprem.versions"];
+          shared?: parameters["rowFilter.app_stats_onprem.shared"];
           mlu_real?: parameters["rowFilter.app_stats_onprem.mlu_real"];
           date_id?: parameters["rowFilter.app_stats_onprem.date_id"];
-          devices?: parameters["rowFilter.app_stats_onprem.devices"];
         };
         body: {
           /** app_stats_onprem */
@@ -1000,9 +1003,9 @@ export interface paths {
     get: {
       parameters: {
         query: {
+          id?: parameters["rowFilter.deleted_account.id"];
           created_at?: parameters["rowFilter.deleted_account.created_at"];
           email?: parameters["rowFilter.deleted_account.email"];
-          id?: parameters["rowFilter.deleted_account.id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1053,9 +1056,9 @@ export interface paths {
     delete: {
       parameters: {
         query: {
+          id?: parameters["rowFilter.deleted_account.id"];
           created_at?: parameters["rowFilter.deleted_account.created_at"];
           email?: parameters["rowFilter.deleted_account.email"];
-          id?: parameters["rowFilter.deleted_account.id"];
         };
         header: {
           /** Preference */
@@ -1070,9 +1073,9 @@ export interface paths {
     patch: {
       parameters: {
         query: {
+          id?: parameters["rowFilter.deleted_account.id"];
           created_at?: parameters["rowFilter.deleted_account.created_at"];
           email?: parameters["rowFilter.deleted_account.email"];
-          id?: parameters["rowFilter.deleted_account.id"];
         };
         body: {
           /** deleted_account */
@@ -1320,7 +1323,6 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_override.device_id"];
           version?: parameters["rowFilter.devices_override.version"];
           app_id?: parameters["rowFilter.devices_override.app_id"];
-          created_by?: parameters["rowFilter.devices_override.created_by"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1376,7 +1378,6 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_override.device_id"];
           version?: parameters["rowFilter.devices_override.version"];
           app_id?: parameters["rowFilter.devices_override.app_id"];
-          created_by?: parameters["rowFilter.devices_override.created_by"];
         };
         header: {
           /** Preference */
@@ -1396,7 +1397,6 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_override.device_id"];
           version?: parameters["rowFilter.devices_override.version"];
           app_id?: parameters["rowFilter.devices_override.app_id"];
-          created_by?: parameters["rowFilter.devices_override.created_by"];
         };
         body: {
           /** devices_override */
@@ -1638,6 +1638,7 @@ export interface paths {
           storage?: parameters["rowFilter.plans.storage"];
           bandwidth?: parameters["rowFilter.plans.bandwidth"];
           mau?: parameters["rowFilter.plans.mau"];
+          market_desc?: parameters["rowFilter.plans.market_desc"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1708,6 +1709,7 @@ export interface paths {
           storage?: parameters["rowFilter.plans.storage"];
           bandwidth?: parameters["rowFilter.plans.bandwidth"];
           mau?: parameters["rowFilter.plans.mau"];
+          market_desc?: parameters["rowFilter.plans.market_desc"];
         };
         header: {
           /** Preference */
@@ -1742,6 +1744,7 @@ export interface paths {
           storage?: parameters["rowFilter.plans.storage"];
           bandwidth?: parameters["rowFilter.plans.bandwidth"];
           mau?: parameters["rowFilter.plans.mau"];
+          market_desc?: parameters["rowFilter.plans.market_desc"];
         };
         body: {
           /** plans */
@@ -2211,44 +2214,6 @@ export interface paths {
       };
     };
   };
-  "/rpc/increment_stats": {
-    post: {
-      parameters: {
-        body: {
-          args: {
-            /** Format: integer */
-            mlu: number;
-            /** Format: integer */
-            devices: number;
-            /** Format: character varying */
-            date_id: string;
-            /** Format: integer */
-            version_size: number;
-            /** Format: integer */
-            shared: number;
-            /** Format: integer */
-            bandwidth: number;
-            /** Format: integer */
-            channels: number;
-            /** Format: character varying */
-            app_id: string;
-            /** Format: integer */
-            versions: number;
-            /** Format: integer */
-            mlu_real: number;
-          };
-        };
-        header: {
-          /** Preference */
-          Prefer?: parameters["preferParams"];
-        };
-      };
-      responses: {
-        /** OK */
-        200: unknown;
-      };
-    };
-  };
   "/rpc/is_app_owner": {
     post: {
       parameters: {
@@ -2356,6 +2321,26 @@ export interface paths {
     };
   };
   "/rpc/get_current_plan_name": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_canceled": {
     post: {
       parameters: {
         body: {
@@ -2873,7 +2858,11 @@ export interface definitions {
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id: string;
-    /** Format: uuid */
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
     user_id: string;
     /**
      * Format: timestamp with time zone
@@ -2926,10 +2915,14 @@ export interface definitions {
      * @default now()
      */
     updated_at?: string;
+    /** Format: smallint */
+    channels?: number;
     /** Format: bigint */
     mlu?: number;
     /** Format: bigint */
     versions?: number;
+    /** Format: bigint */
+    shared?: number;
     /** Format: bigint */
     mlu_real?: number;
     /**
@@ -2938,8 +2931,6 @@ export interface definitions {
      * This is a Primary Key.<pk/>
      */
     date_id: string;
-    /** Format: bigint */
-    devices?: number;
   };
   app_versions: {
     /**
@@ -3079,7 +3070,7 @@ export interface definitions {
      * @description Note:
      * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
      */
-    created_by: string;
+    created_by?: string;
     /**
      * Format: text
      * @description Note:
@@ -3190,19 +3181,19 @@ export interface definitions {
   };
   deleted_account: {
     /**
-     * Format: timestamp with time zone
-     * @default now()
-     */
-    created_at?: string;
-    /** Format: character varying */
-    email: string;
-    /**
      * Format: uuid
      * @description Note:
      * This is a Primary Key.<pk/>
      * @default extensions.uuid_generate_v4()
      */
     id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /** Format: character varying */
+    email: string;
   };
   devices: {
     /**
@@ -3315,12 +3306,6 @@ export interface definitions {
      * This is a Foreign Key to `apps.app_id`.<fk table='apps' column='app_id'/>
      */
     app_id: string;
-    /**
-     * Format: uuid
-     * @description Note:
-     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
-     */
-    created_by?: string;
   };
   global_stats: {
     /**
@@ -3428,15 +3413,20 @@ export interface definitions {
      */
     id: string;
     /** Format: character varying */
-    price_m_id: string;
+    price_m_id?: string;
     /** Format: character varying */
-    price_y_id: string;
+    price_y_id?: string;
     /** Format: bigint */
     storage: number;
     /** Format: bigint */
     bandwidth: number;
     /** Format: bigint */
     mau: number;
+    /**
+     * Format: character varying
+     * @default
+     */
+    market_desc?: string;
   };
   stats: {
     /**
@@ -3608,11 +3598,7 @@ export interface definitions {
      * @default false
      */
     legalAccepted: boolean;
-    /**
-     * Format: character varying
-     * @description Note:
-     * This is a Foreign Key to `stripe_info.customer_id`.<fk table='stripe_info' column='customer_id'/>
-     */
+    /** Format: character varying */
     customer_id?: string;
   };
 }
@@ -3700,16 +3686,18 @@ export interface parameters {
   "rowFilter.app_stats_onprem.created_at": string;
   /** Format: timestamp with time zone */
   "rowFilter.app_stats_onprem.updated_at": string;
+  /** Format: smallint */
+  "rowFilter.app_stats_onprem.channels": string;
   /** Format: bigint */
   "rowFilter.app_stats_onprem.mlu": string;
   /** Format: bigint */
   "rowFilter.app_stats_onprem.versions": string;
   /** Format: bigint */
+  "rowFilter.app_stats_onprem.shared": string;
+  /** Format: bigint */
   "rowFilter.app_stats_onprem.mlu_real": string;
   /** Format: character varying */
   "rowFilter.app_stats_onprem.date_id": string;
-  /** Format: bigint */
-  "rowFilter.app_stats_onprem.devices": string;
   /** @description app_versions */
   "body.app_versions": definitions["app_versions"];
   /** Format: bigint */
@@ -3822,12 +3810,12 @@ export interface parameters {
   "rowFilter.channels.beta": string;
   /** @description deleted_account */
   "body.deleted_account": definitions["deleted_account"];
+  /** Format: uuid */
+  "rowFilter.deleted_account.id": string;
   /** Format: timestamp with time zone */
   "rowFilter.deleted_account.created_at": string;
   /** Format: character varying */
   "rowFilter.deleted_account.email": string;
-  /** Format: uuid */
-  "rowFilter.deleted_account.id": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */
@@ -3880,8 +3868,6 @@ export interface parameters {
   "rowFilter.devices_override.version": string;
   /** Format: character varying */
   "rowFilter.devices_override.app_id": string;
-  /** Format: uuid */
-  "rowFilter.devices_override.created_by": string;
   /** @description global_stats */
   "body.global_stats": definitions["global_stats"];
   /** Format: timestamp with time zone */
@@ -3950,6 +3936,8 @@ export interface parameters {
   "rowFilter.plans.bandwidth": string;
   /** Format: bigint */
   "rowFilter.plans.mau": string;
+  /** Format: character varying */
+  "rowFilter.plans.market_desc": string;
   /** @description stats */
   "body.stats": definitions["stats"];
   /** Format: bigint */

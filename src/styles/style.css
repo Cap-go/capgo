@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=fallback');
+
+@import './markdown.css';
+@import './ionic.css'
+
+/* Additional styles */
+@import 'additional-styles/utility-patterns.css';
+@import 'additional-styles/range-slider.css';
+@import 'additional-styles/toggle-switch.css';
+@import 'additional-styles/flatpickr.css';
+@import 'additional-styles/theme.css';
+
+.btn {
+  @apply p-2 rounded
+}
+
+#app-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: white;
+  z-index: 100;
+  background-image: url('/capgo.png');
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position: center;
+  background-size: 150px 150px;
+}
+
+@font-face {
+  font-family: 'AirbnbCerealLight';
+  font-style: normal;
+  font-weight: normal;
+  src: url('../../fonts/AirbnbCerealLight.woff');
+}
+@font-face {
+  font-family: 'AirbnbCerealMedium';
+  font-style: normal;
+  font-weight: normal;
+  src: url('../../fonts/AirbnbCerealMedium.woff');
+}
+@font-face {
+  font-family: 'AirbnbCerealBold';
+  font-style: normal;
+  font-weight: normal;
+  src: url('../../fonts/AirbnbCerealBold.woff');
+}
+

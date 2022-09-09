@@ -4,7 +4,7 @@ import { isPlatform } from '@ionic/vue'
 export const hideLoader = async () => {
   const appLoader = document.querySelector('#app-loader')
   if (appLoader) {
-    appLoader.setAttribute('style', 'z-index: -10;')
+    appLoader.setAttribute('style', 'visibility: hidden;')
     if (isPlatform('capacitor'))
       SplashScreen.hide()
   }

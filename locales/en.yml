@@ -139,7 +139,7 @@ login:
   connexion: Login
   create-new: Create new account
   email: Email
-  forgot: forgot
+  forgot: Forgot
   hello: Hello
   login-in: Login in
   or: or
@@ -224,16 +224,16 @@ projects:
 register:
   already-account: You already have an account?
   check-email: Please check your email and verify
-  confirm-email: Confirm email
+  confirm-email: Confirm your email
   confirm-password: Confirm password
   desc: Fill the following fields to complete your registration
   email: Email
-  first-name: first name
+  first-name: First name
   heading: Registration
-  last-name: last name
+  last-name: Last name
   lowerCaseError: Should contain lowercase letters
-  next: Next
-  password: password
+  next: Register
+  password: Password
   password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters

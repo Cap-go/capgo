@@ -79,7 +79,6 @@ export class CapacitorCrispWeb {
     this.ifrm.style.position = 'absolute'
     this.ifrm.style.bottom = '0'
     this.ifrm.style.right = '0'
-    this.ifrm.style.zIndex = '-1'
     this.ifrm.style.display = 'none'
     this.ifrm.style.width = '100%'
     this.ifrm.style.height = '100%'
@@ -195,11 +194,11 @@ export class CapacitorCrispWeb {
   }
 
   async closeMessenger(): Promise<void> {
-    this.ifrm.style.zIndex = '-1'
+    this.ifrm.style.visibility = 'hidden'
   }
 
   async openMessenger(): Promise<void> {
-    this.ifrm.style.zIndex = '10'
+    this.ifrm.style.visibility = 'visible'
     this.ifrm.style.display = 'block'
   }
 

@@ -2,6 +2,7 @@
 import type { ChartData } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
+import { isDark } from '~/composables'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -69,16 +70,25 @@ const chartData = ref<ChartData<'line'>>({
   datasets: [{
     label: props.title,
     data: accumulateData.value,
-    borderColor: props.colors[100],
+    borderColor: props.colors[400],
     backgroundColor: props.colors[200],
   }],
 })
 const chartOptions = {
-  plugins: {
-    title: {
-      display: true,
-      text: `${props.title} usage`,
+  scales: {
+    y: {
+      ticks: {
+        color: `${isDark.value ? 'white' : 'black'}`,
+      },
     },
+    x: {
+      ticks: {
+        color: `${isDark.value ? 'white' : 'black'}`,
+      },
+    }
+    ,
+  },
+  plugins: {
     annotation: {
       annotations: generateAnnotations.value,
     },
@@ -88,5 +98,5 @@ const chartOptions = {
 </script>
 
 <template>
-  <Line class="my-8 mx-auto w-100 h-100" :chart-data="chartData" :chart-options="chartOptions" />
+  <Line class="" :chart-data="chartData" :chart-options="chartOptions" />
 </template>
