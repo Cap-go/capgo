@@ -3,6 +3,7 @@ import { isPlatform } from '@ionic/vue'
 import { ref } from 'vue'
 import { openPortal } from '~/services/stripe'
 
+const version = import.meta.env.VITE_APP_VERSION
 const isMobile = ref(isPlatform('capacitor'))
 </script>
 
@@ -51,6 +52,9 @@ const isMobile = ref(isPlatform('capacitor'))
             </svg>
             <span class="text-sm font-medium text-slate-600 dark:text-white">Billing</span>
           </a>
+        </li>
+        <li class="pt-2 text-gray-300">
+          {{ version }}
         </li>
       </ul>
     </div>

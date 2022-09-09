@@ -16,6 +16,8 @@ const isLoading = ref(false)
 const router = useRouter()
 const { t } = useI18n()
 
+const version = import.meta.env.VITE_APP_VERSION
+
 const form = reactive({
   email: '',
   password: '',
@@ -222,6 +224,9 @@ onMounted(checkLogin)
                         Don’t have an account? <br> <router-link to="/register" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
                           Create a free account
                         </router-link>
+                      </p>
+                      <p class="pt-2 text-gray-300">
+                        {{ version }}
                       </p>
                     </div>
                   </div>
