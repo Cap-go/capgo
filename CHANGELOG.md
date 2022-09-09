@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.20.5](https://github.com/Cap-go/capgo/compare/1.20.4...1.20.5) (2022-09-09)
+
+
+### Bug Fixes
+
+* add app_versions_meta for external app ([bed9747](https://github.com/Cap-go/capgo/commit/bed974737dae760d8b75e1b99f697a365c6a4542))
+* add back version to login page ([4ca4b91](https://github.com/Cap-go/capgo/commit/4ca4b914d75945afcf9facad1644040448ef2a41))
+
 ### [1.20.4](https://github.com/Cap-go/capgo/compare/1.20.3...1.20.4) (2022-09-09)
 
 
