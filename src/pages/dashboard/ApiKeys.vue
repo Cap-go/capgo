@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { IonIcon, toastController } from '@ionic/vue'
+import { toastController } from '@ionic/vue'
+// import { IonIcon, toastController } from '@ionic/vue'
 import { ref } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
-import { addOutline } from 'ionicons/icons'
+// import { addOutline } from 'ionicons/icons'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Sidebar from '~/components/Sidebar.vue'
@@ -87,9 +88,9 @@ geKeys()
       </main>
     </div>
   </div>
-  <button
+  <!-- <button
     class="fixed z-90 bottom-10 right-8 bg-blue-600 w-16 h-16 rounded-full drop-shadow-lg flex justify-center items-center text-white text-3xl hover:bg-muted-blue-700 hover:drop-shadow-2xl focus:border-muted-blue-100 focus:border-2"
   >
     <IonIcon :icon="addOutline" />
-  </button>
+  </button> -->
 </template>
