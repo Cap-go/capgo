@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.20.0](https://github.com/Cap-go/capgo/compare/1.20.0-alpha.0...1.20.0) (2022-09-09)
+
 ## [1.20.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.4...1.20.0-alpha.0) (2022-09-09)
 
 ### [1.19.5](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.2...1.19.5) (2022-09-08)
