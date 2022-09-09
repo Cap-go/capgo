@@ -22,7 +22,18 @@ serve(async (event: Request) => {
     const record = body.record
 
     if (!record.bucket_id) {
-      console.log('Cannot find bucket_id')
+      console.log('No bucket_id')
+      const { error: dbError } = await supabaseAdmin
+        .from<definitions['app_versions_meta']>('app_versions_meta')
+        .insert({
+          id: record.id,
+          app_id: record.app_id,
+          user_id: record.user_id,
+          checksum: '',
+          size: 0,
+        })
+      if (dbError)
+        console.error('Cannot create app version meta', dbError)
       return sendRes()
     }
 
