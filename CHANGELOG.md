@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.20.14](https://github.com/Cap-go/capgo/compare/1.20.13...1.20.14) (2022-09-09)
+
+
+### Bug Fixes
+
+* remove force no image ([e2a000e](https://github.com/Cap-go/capgo/commit/e2a000ef24f1ec4c438d065a722481355c2f2067))
+
 ### [1.20.13](https://github.com/Cap-go/capgo/compare/1.20.12...1.20.13) (2022-09-09)
 
 
