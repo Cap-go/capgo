@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import Help from '../components/dashboard/DropdownHelp.vue'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 import Banner from './Banner.vue'
 
@@ -31,9 +30,6 @@ defineEmits(['toggleSidebar'])
 
         <!-- Header: Right side -->
         <div class="flex items-center space-x-3">
-          <Help align="right" />
-          <!-- Divider -->
-          <hr class="w-px h-6 bg-slate-200">
           <UserMenu align="right" />
         </div>
       </div>
