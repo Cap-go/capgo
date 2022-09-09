@@ -252,6 +252,8 @@ plan:
     desc: Am besten für Kleinunternehmer
   mau: Monatlich aktive Benutzer
   monthly-billing: Monatliche Abrechnung
+  payasyougo:
+    desc: Am besten für Scaling-Unternehmen
   pricing-plans: Preispläne
   progressive_deploy: Progressive Bereitstellung
   shared_channel: Geteilter Kanal

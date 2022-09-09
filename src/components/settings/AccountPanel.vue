@@ -2,7 +2,7 @@
 import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
 import {
-  actionSheetController,
+  IonSpinner, actionSheetController,
 } from '@ionic/vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { computed, reactive, ref, watchEffect } from 'vue'

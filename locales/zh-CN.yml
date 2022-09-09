@@ -236,6 +236,8 @@ plan:
     desc: 最适合小企业主
   mau: 月活跃用户
   monthly-billing: 每月计费
+  payasyougo:
+    desc: 最适合规模化企业
   pricing-plans: 定价计划
   progressive_deploy: 渐进式部署
   shared_channel: 共享频道

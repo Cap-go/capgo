@@ -243,6 +243,8 @@ plan:
   storage: GB Storage
   team:
     desc: Best for big business owners
+  payasyougo:
+    desc: Best for scalling enterprises
   update: Update
   updates: Updates
   version: Version

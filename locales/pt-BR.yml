@@ -244,6 +244,8 @@ plan:
     desc: Melhor para pequenos empresários
   mau: Usuários ativos mensais
   monthly-billing: Faturamento mensal
+  payasyougo:
+    desc: Melhor para escalar empresas
   pricing-plans: Planos de preços
   progressive_deploy: Implantação progressiva
   shared_channel: Canal compartilhado

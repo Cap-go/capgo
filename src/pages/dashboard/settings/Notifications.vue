@@ -1,26 +1,13 @@
-<script>
+<script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
 import NotificationsPanel from '../../../components/settings/NotificationsPanel.vue'
 
-export default {
-  name: 'Notifications',
-  components: {
-    Sidebar,
-    Navbar,
-    SettingsSidebar,
-    NotificationsPanel,
-  },
-  setup() {
-    const sidebarOpen = ref(false)
-
-    return {
-      sidebarOpen,
-    }
-  },
-}
+const { t } = useI18n()
+const sidebarOpen = ref(false)
 </script>
 
 <template>

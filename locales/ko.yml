@@ -236,6 +236,8 @@ plan:
     desc: 소상공인에게 최고
   mau: 월간 활성 사용자
   monthly-billing: 월별 청구
+  payasyougo:
+    desc: 기업을 호출하는 데 가장 적합
   pricing-plans: 요금제
   progressive_deploy: 점진적 배포
   shared_channel: 공유 채널

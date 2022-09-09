@@ -1,26 +1,13 @@
-<script>
+<script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
 import PlansPanel from '../../../components/settings/PlansPanel.vue'
 
-export default {
-  name: 'Apps',
-  components: {
-    Sidebar,
-    Navbar,
-    SettingsSidebar,
-    PlansPanel,
-  },
-  setup() {
-    const sidebarOpen = ref(false)
-
-    return {
-      sidebarOpen,
-    }
-  },
-}
+const { t } = useI18n()
+const sidebarOpen = ref(false)
 </script>
 
 <template>

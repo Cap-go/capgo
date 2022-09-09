@@ -248,6 +248,8 @@ plan:
     desc: Idéal pour les propriétaires de petites entreprises
   mau: Utilisateurs actifs mensuels
   monthly-billing: Facturation mensuelle
+  payasyougo:
+    desc: Idéal pour les entreprises évolutives
   pricing-plans: Forfaits tarifaires
   progressive_deploy: Déploiement progressif
   shared_channel: Chaîne partagée

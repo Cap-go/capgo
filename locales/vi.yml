@@ -244,6 +244,8 @@ plan:
     desc: Tốt nhất cho chủ doanh nghiệp nhỏ
   mau: Người dùng hoạt động hàng tháng
   monthly-billing: Thanh toán hàng tháng
+  payasyougo:
+    desc: Tốt nhất cho các doanh nghiệp đang khai thác
   pricing-plans: Các gói định giá
   progressive_deploy: Triển khai liên tục
   shared_channel: Kênh chia sẻ

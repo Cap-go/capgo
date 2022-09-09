@@ -236,6 +236,8 @@ plan:
     desc: 中小企業の所有者に最適
   mau: 月間アクティブ ユーザー数
   monthly-billing: 毎月の請求
+  payasyougo:
+    desc: 企業のスケーリングに最適
   pricing-plans: 料金プラン
   progressive_deploy: プログレッシブデプロイ
   shared_channel: 共有チャネル

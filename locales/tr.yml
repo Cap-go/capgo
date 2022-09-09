@@ -246,6 +246,8 @@ plan:
     desc: Küçük işletme sahipleri için en iyisi
   mau: Aylık aktif kullanıcılar
   monthly-billing: Aylık faturalandırma
+  payasyougo:
+    desc: Ölçekli işletmeler için en iyisi
   pricing-plans: Fiyatlandırma Planları
   progressive_deploy: aşamalı dağıtım
   shared_channel: Paylaşılan Kanal
