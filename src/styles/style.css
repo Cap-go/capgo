@@ -14,6 +14,7 @@
 @import 'additional-styles/theme.css';
 
 html {
+  @apply dark:bg-gray-900;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
