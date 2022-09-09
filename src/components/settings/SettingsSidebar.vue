@@ -54,21 +54,5 @@ const isMobile = ref(isPlatform('capacitor'))
         </li>
       </ul>
     </div>
-    <!-- Group 2 -->
-    <div>
-      <div class="text-xs font-semibold text-slate-400 dark:text-white uppercase mb-3">
-        Experience
-      </div>
-      <ul class="flex flex-nowrap md:block mr-3 md:mr-0">
-        <li class="mr-0.5 md:mr-0 md:mb-0.5">
-          <a class="flex items-center px-2.5 py-2 rounded whitespace-nowrap" href="https://discord.gg/VnYRvBfgA6" target="_blank" rel="noreferrer">
-            <svg class="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-white mr-2" viewBox="0 0 16 16">
-              <path d="M7.001 3h2v4h-2V3zm1 7a1 1 0 110-2 1 1 0 010 2zM15 16a1 1 0 01-.6-.2L10.667 13H1a1 1 0 01-1-1V1a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1zM2 11h9a1 1 0 01.6.2L14 13V2H2v9z" />
-            </svg>
-            <span class="text-sm font-medium text-slate-600 dark:text-white">Discord</span>
-          </a>
-        </li>
-      </ul>
-    </div>
   </div>
 </template>

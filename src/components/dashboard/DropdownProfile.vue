@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
+import { openChat } from '~/services/crips'
 
 const props = defineProps({
   align: {
@@ -72,6 +73,7 @@ onUnmounted(() => {
         </div>
         <ul
           ref="dropdown"
+          class="space-y-2"
           @focusin="dropdownOpen = true"
           @focusout="dropdownOpen = false"
         >
@@ -80,6 +82,13 @@ onUnmounted(() => {
               Settings
             </router-link>
           </li>
+          <hr>
+          <li>
+            <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="openChat">
+              Support
+            </button>
+          </li>
+          <hr>
           <li>
             <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="main.logout().then(() => router.replace('/login'))">
               Sign Out

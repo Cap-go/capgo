@@ -128,10 +128,6 @@
 		"classpath": "com.epicshaggy.biometric.NativeBiometric"
 	},
 	{
-		"pkg": "capacitor-plugin-safe-area",
-		"classpath": "com.zhuxian.safearea.SafeAreaPlugin"
-	},
-	{
 		"pkg": "capacitor-rate-app",
 		"classpath": "com.capacitor.rateapp.CapacitorRateAppPlugin"
 	}

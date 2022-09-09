@@ -13,6 +13,10 @@
 @import 'additional-styles/flatpickr.css';
 @import 'additional-styles/theme.css';
 
+html {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
 .btn {
   @apply p-2 rounded
 }
