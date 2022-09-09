@@ -187,7 +187,7 @@ watchEffect(async () => {
           {{ t('the') }} <span class="underline font-bold">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
 
-        <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8 dark:text-gray-500 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
+        <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8 dark:text-gray-300 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
           <IonSegmentButton class="h-10" value="m">
             <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
           </IonSegmentButton>
