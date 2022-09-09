@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.20.2](https://github.com/Cap-go/capgo/compare/1.20.1...1.20.2) (2022-09-09)
+
+
+### Bug Fixes
+
+* Safe area and support button ([13d871e](https://github.com/Cap-go/capgo/commit/13d871e4ce91929eb24a5c17d43907601e12e311))
+
 ### [1.20.1](https://github.com/Cap-go/capgo/compare/1.20.0...1.20.1) (2022-09-09)
 
 
