@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.20.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.4...1.20.0-alpha.0) (2022-09-09)
+
+### [1.19.5](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.2...1.19.5) (2022-09-08)
+
+
+### Bug Fixes
+
+* stats ([825e79f](https://github.com/Cap-go/capgo/commit/825e79f7417fe95d0365535e16656d46bcecbb4f))
+
+### [1.19.4](https://github.com/Cap-go/capgo/compare/1.19.3...1.19.4) (2022-09-07)
+
+### [1.19.3](https://github.com/Cap-go/capgo/compare/1.19.2...1.19.3) (2022-09-06)
+
+
+### Bug Fixes
+
+* issue with multi channel override ([8a55885](https://github.com/Cap-go/capgo/commit/8a55885e0394f56366e368a37816478daf8a492b))
+
+### [1.19.2](https://github.com/Cap-go/capgo/compare/1.19.1...1.19.2) (2022-09-06)
+
+
+### Bug Fixes
+
+* deprecated ([670878d](https://github.com/Cap-go/capgo/commit/670878d62017516fa0a052f33fdc176b20d757b0))
+
+### [1.19.1](https://github.com/Cap-go/capgo/compare/1.19.0...1.19.1) (2022-09-06)
+
+
+### Bug Fixes
+
+* banner issue ([96f8fc8](https://github.com/Cap-go/capgo/commit/96f8fc8f50784103861dba71d75821ed74fcc1cb))
+
+## [1.19.0](https://github.com/Cap-go/capgo/compare/1.18.40...1.19.0) (2022-09-06)
+
+
+### Features
+
+* add version in logs ([9d3031f](https://github.com/Cap-go/capgo/commit/9d3031f7a5b63e38109dd15e112729bd3669f58b))
+
+
+### Bug Fixes
+
+* remove useless console ([1f0a089](https://github.com/Cap-go/capgo/commit/1f0a089bfb15cad60e75f2c1ff6ce9d665f9cf2e))
+
+### [1.18.40](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.0...1.18.40) (2022-09-06)
+
+
+### Bug Fixes
+
+* remove order in device ([0f022ea](https://github.com/Cap-go/capgo/commit/0f022ea8a659610bb9c720833b4cacfce923f8fc))
+
 ### [1.19.5](https://github.com/Cap-go/capgo/compare/1.19.4...1.19.5) (2022-09-08)
 
 
