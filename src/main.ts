@@ -25,8 +25,8 @@ import '@ionic/vue/css/flex-utils.css'
 import '@ionic/vue/css/display.css'
 
 // your custom styles here
-import './styles/style.css'
 import './styles/import.css'
+import './styles/style.css'
 import { initPlausible } from './services/plausible'
 
 const app = createApp(App)
