@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.20.3](https://github.com/Cap-go/capgo/compare/1.20.2...1.20.3) (2022-09-09)
+
+
+### Bug Fixes
+
+* status bar dark mode ([98da83c](https://github.com/Cap-go/capgo/commit/98da83cf4163ee1c1cd6f6309910fa541f1ab706))
+
 ### [1.20.2](https://github.com/Cap-go/capgo/compare/1.20.1...1.20.2) (2022-09-09)
 
 
