@@ -53,11 +53,11 @@ const submitDoi = async () => {
   <div class="grow">
     <!-- Panel body -->
     <div class="p-6 space-y-6">
-      <h2 class="text-2xl text-slate-800 font-bold ">
+      <h2 class="text-2xl text-slate-800 dark:text-white font-bold ">
         My Notifications
       </h2>
 
-      <div class="mx-auto w-full">
+      <div class="mx-auto w-full dark:text-white">
         <div class="py-4 px-6">
           <div class="flex justify-between items-center my-2">
             <label for="notification" class="justify-self-start text-xl">{{ t('activation.notification') }}</label>

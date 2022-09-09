@@ -30,16 +30,16 @@ const lastDayEvolution = evolution(props.datas as number[])
 </script>
 
 <template>
-  <div class="flex flex-col col-span-full sm:col-span-6 xl:col-span-4 bg-white shadow-lg rounded-sm border border-slate-200">
+  <div class="flex flex-col col-span-full sm:col-span-6 xl:col-span-4 bg-white shadow-lg rounded-sm border border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <div class="px-5 pt-5">
-      <h2 class="text-2xl font-semibold text-slate-800 mb-2">
+      <h2 class="text-2xl font-semibold dark:text-white text-slate-800 mb-2">
         {{ title }}
       </h2>
-      <div class="text-xs font-semibold text-slate-400 uppercase mb-1">
+      <div class="text-xs font-semibold dark:text-white text-slate-400 uppercase mb-1">
         Usage
       </div>
       <div class="flex items-start">
-        <div class="text-3xl font-bold text-slate-800 mr-2">
+        <div class="text-3xl font-bold dark:text-white text-slate-800 mr-2">
           {{ total.toLocaleString() }} {{ unit }}
         </div>
         <div class="text-sm font-semibold text-white px-1.5 bg-emerald-500 rounded-full">

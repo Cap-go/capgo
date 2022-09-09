@@ -46,26 +46,15 @@ const datas = ref({
 const snag = useLogSnag()
 const supabase = useSupabase()
 const isLoading = ref(false)
-const segmentModel = ref<'new' | 'old'>('new')
 const segmentVal = ref<'m' | 'y'>('m')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
 
 const planFeatures = (plan: definitions['plans']) => [
-  ...(segmentModel.value !== 'new'
-    ? [
-        plan.app > 1 ? `${plan.app} ${t('plan.applications')}` : `${plan.app} ${t('plan.application')}`,
-        plan.channel > 1 ? `${plan.channel} ${t('plan.channels')}` : `${plan.channel} ${t('plan.channel')}`,
-        plan.version > 1 ? `${plan.version} ${t('plan.versions')}` : `${plan.version} ${t('plan.version')}`,
-        plan.shared > 1 ? `${plan.shared} ${t('plan.shared_channels')}` : `${plan.shared} ${t('plan.shared_channel')}`,
-        plan.update > 1 ? `${plan.update} ${t('plan.updates')}` : `${plan.update} ${t('plan.update')}`,
-      ]
-    : [
-        plan.mau > 1 ? `${plan.mau} ${t('plan.mau')}` : `${plan.mau} ${t('plan.mau')}`,
-        plan.storage > 1 ? `${plan.storage} ${t('plan.storage')}` : `${plan.storage} ${t('plan.storage')}`,
-        plan.bandwidth > 1 ? `${plan.bandwidth} ${t('plan.bandwidth')}` : `${plan.bandwidth} ${t('plan.bandwidth')}`,
-      ]),
+  `${plan.mau.toLocaleString()} ${t('plan.mau')}`,
+  `${plan.storage.toLocaleString()} ${t('plan.storage')}`,
+  `${plan.bandwidth.toLocaleString()} ${t('plan.bandwidth')}`,
   plan.abtest ? t('plan.abtest') : false,
   plan.progressive_deploy ? t('plan.progressive_deploy') : false,
 ].filter(Boolean)
@@ -186,17 +175,19 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="!isLoading" class="bg-white">
+  <div v-if="!isLoading" class="bg-white dark:bg-gray-800">
     <div class="max-w-7xl mx-auto pt-6 px-4 sm:px-6 lg:px-8">
       <div class="sm:flex sm:flex-col sm:align-center">
-        <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center">
+        <h1 class="text-5xl font-extrabold text-gray-900 dark:text-white sm:text-center">
           {{ t('plan.pricing-plans') }}
         </h1>
-        <p class="mt-5 text-xl text-gray-700 sm:text-center">
-          {{ t('plan.desc') }}<br>Your are a {{ currentPlan?.name }} plan member<br>The {{ currentPlanSuggest?.name }} plan is the best plan for your needs
+        <p class="mt-5 text-xl text-gray-700 dark:text-white  sm:text-center">
+          {{ t('plan.desc') }}<br>
+          Your are a <span class="underline font-bold">{{ currentPlan?.name }}</span> plan member.<br>
+          The <span class="underline font-bold">{{ currentPlanSuggest?.name }}</span> plan is the best plan for your needs.
         </p>
 
-        <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8" mode="ios" @ion-change="segmentChanged($event)">
+        <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8 dark:text-gray-500 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
           <IonSegmentButton class="h-10" value="m">
             <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
           </IonSegmentButton>
@@ -206,24 +197,24 @@ watchEffect(async () => {
         </IonSegment>
       </div>
       <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
-        <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
+        <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div class="p-6">
-            <h2 class="text-lg leading-6 font-medium text-gray-900">
+            <h2 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
               {{ p.name }}
             </h2>
-            <p class="mt-4 text-sm text-gray-500">
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">
               {{ t(p.description) }}
             </p>
             <p class="mt-8">
-              <span class="text-4xl font-extrabold text-gray-900">€{{ getPrice(p, segmentVal) }}</span>
-              <span class="text-base font-medium text-gray-500">/{{ isYearly ? 'yr' : 'mo' }}</span>
+              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
+              <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ isYearly ? 'yr' : 'mo' }}</span>
             </p>
-            <div v-if="p.stripe_id !== 'free'" class="cursor-pointer mt-8 block w-full bg-gray-800 border border-gray-800 rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-gray-900" @click="openChangePlan(p.stripe_id)">
+            <button v-if="p.stripe_id !== 'free'" class="mt-8 block w-full bg-gray-800 dark:bg-white border border-gray-800 rounded-md py-2 text-sm font-semibold text-white dark:text-black text-center hover:bg-gray-900 dark:hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:dark:bg-gray-400" :disabled="currentPlan?.name === p.name" @click="openChangePlan(p.stripe_id)">
               {{ t('plan.buy') }} {{ p.name }}
-            </div>
+            </button>
           </div>
           <div class="pt-6 pb-8 px-6">
-            <h3 class="text-xs font-medium text-gray-900 tracking-wide uppercase">
+            <h3 class="text-xs font-medium text-gray-900 dark:text-white tracking-wide uppercase">
               {{ t('plan.whats-included') }}
             </h3>
             <ul role="list" class="mt-6 space-y-4">
@@ -231,7 +222,7 @@ watchEffect(async () => {
                 <svg class="flex-shrink-0 h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
-                <span class="text-sm text-gray-500">{{ f }}</span>
+                <span class="text-sm text-gray-500 dark:text-gray-100">{{ f }}</span>
               </li>
             </ul>
           </div>
@@ -240,7 +231,7 @@ watchEffect(async () => {
       <section class="py-12 sm:py-16 lg:py-20">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="max-w-2xl mx-auto text-center">
-            <h2 class="text-3xl font-bold text-white-900 sm:text-4xl xl:text-5xl font-pj">
+            <h2 class="text-3xl font-bold text-white-900 sm:text-4xl xl:text-5xl font-pj dark:text-white">
               Need more ? Contact us for tailored plan
             </h2>
           </div>

@@ -253,7 +253,7 @@ watchEffect(async () => {
     >
       <!-- Panel body -->
       <div class="p-6 space-y-6">
-        <h2 class="text-2xl text-slate-800 font-bold mb-5">
+        <h2 class="text-2xl text-slate-800 dark:text-white font-bold mb-5">
           My Account
         </h2>
         <!-- Picture -->
@@ -272,18 +272,18 @@ watchEffect(async () => {
         </section>
         <!-- Personal Info -->
         <section>
-          <h3 class="text-xl leading-snug text-slate-800 font-bold mb-1">
+          <h3 class="text-xl leading-snug text-slate-800 dark:text-white font-bold mb-1">
             Personal Informations
           </h3>
-          <div class="text-sm">
+          <div class="text-sm dark:text-gray-100">
             You can change your personal informations here.
           </div>
 
           <div class="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1" for="name">First Name</label>
+              <label class="block text-sm font-medium mb-1 dark:text-white" for="name">First Name</label>
               <input
-                v-model="form.first_name" class="form-input w-full"
+                v-model="form.first_name" class="form-input w-full dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 autofocus
                 required
@@ -297,9 +297,9 @@ watchEffect(async () => {
               </div>
             </div>
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1" for="business-id">Last Name</label>
+              <label class="block text-sm font-medium mb-1 dark:text-white" for="business-id">Last Name</label>
               <input
-                v-model="form.last_name" class="form-input w-full"
+                v-model="form.last_name" class="form-input w-full dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 required
                 :placeholder="t('accountProfile.last-name')"
@@ -314,9 +314,9 @@ watchEffect(async () => {
           </div>
           <div class="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1" for="location">Email</label>
+              <label class="block text-sm font-medium mb-1 dark:text-white" for="location">Email</label>
               <input
-                v-model="form.email" class="form-input w-full hover:cursor-not-allowed"
+                v-model="form.email" class="form-input w-full dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
                 required
                 disabled
                 inputmode="email"
@@ -325,10 +325,10 @@ watchEffect(async () => {
               >
             </div>
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1" for="location">Country</label>
+              <label class="block text-sm font-medium mb-1 dark:text-white" for="location">Country</label>
               <input
                 v-model="form.country"
-                class="form-input w-full"
+                class="form-input w-full dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 required
                 :placeholder="t('accountProfile.country')"

@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { toastController } from '@ionic/vue'
+import { IonIcon, toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useRoute, useRouter } from 'vue-router'
-import { copyOutline } from 'ionicons/icons'
+import { arrowBack, copyOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
+
+const props = defineProps<{
+  onboarding: boolean
+}>()
 
 const route = useRoute()
 const isLoading = ref(false)
@@ -53,13 +57,22 @@ watchEffect(async () => {
 <template>
   <section class="py-12 bg-gray-50 sm:py-16 lg:py-20">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-      <div class="text-center">
+      <div v-if="props.onboarding" class="text-center">
         <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
           Start using Capgo !
         </h2>
         <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
           Add your first app to your account and let's push updates !
         </p>
+        <p class="mx-auto mt-2 text-md font-normal text-muted-blue-300 font-pj">
+          Pro tip: you can copy the <span class="text-pumpkin-orange-900">commands</span> by clicking on them.
+        </p>
+      </div>
+
+      <div v-else class="text-center">
+        <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
+          Add another app
+        </h2>
         <p class="mx-auto mt-2 text-md font-normal text-muted-blue-300 font-pj">
           Pro tip: you can copy the <span class="text-pumpkin-orange-900">commands</span> by clicking on them.
         </p>
@@ -75,7 +88,7 @@ watchEffect(async () => {
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 Copy your{{ ' ' }}
                 <span v-if="app" class="cursor-pointer text-pumpkin-orange-700 font-bold" @click="copyToast(app!.key, 1)">
-                  API key<ion-icon :icon="copyOutline" class="text-muted-blue-800 ml-2" />
+                  API key<IonIcon :icon="copyOutline" class="text-muted-blue-800 ml-2" />
                 </span>
                 <span v-else class="text-pumpkin-orange-700 font-bold">
                   API key
@@ -98,7 +111,7 @@ watchEffect(async () => {
               Log to the Capgo CLI<br>
               <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest login ${app!.key}`, 2)">npx @capgo/cli@latest login
                 <span class="font-bold">[API key]</span>{{ ' ' }}
-                <ion-icon :icon="copyOutline" class="text-muted-blue-800" />
+                <IonIcon :icon="copyOutline" class="text-muted-blue-800" />
               </code>
             </p>
           </div>
@@ -113,7 +126,7 @@ watchEffect(async () => {
             </div>
             <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
               Add your app to your account<br>
-              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast('npx @capgo/cli@latest add [appId]', 3)">npx @capgo/cli@latest add [appId] <ion-icon :icon="copyOutline" class="text-muted-blue-800" /></code>
+              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast('npx @capgo/cli@latest add [appId]', 3)">npx @capgo/cli@latest add [appId] <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
               <br>
               <span class="text-sm">App ID example: com.example.app</span>
             </p>
@@ -129,7 +142,7 @@ watchEffect(async () => {
             </div>
             <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
               Build your code & Upload your version<br>
-              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest upload --channel production`, 4)">npx @capgo/cli@latest upload --channel production <ion-icon :icon="copyOutline" class="text-muted-blue-800" /></code>
+              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest upload --channel production`, 4)">npx @capgo/cli@latest upload --channel production <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
             </p>
           </div>
         </div>
@@ -149,7 +162,7 @@ watchEffect(async () => {
             </div>
           </div>
         </div>
-        <div class="text-center">
+        <div v-if="onboarding" class="text-center">
           <button
             class="mx-auto font-bold text-pumpkin-orange-500"
             @click="main.logout().then(() => router.replace('/login'))"
@@ -160,4 +173,11 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
+  <a
+    title="Go back"
+    href="/app/home"
+    class="fixed z-90 bottom-10 right-8 bg-blue-600 w-20 h-20 rounded-full drop-shadow-lg flex justify-center items-center text-white text-4xl hover:bg-muted-blue-700 hover:drop-shadow-2xl focus:border-muted-blue-100 focus:border-2"
+  >
+    <IonIcon :icon="arrowBack" />
+  </a>
 </template>

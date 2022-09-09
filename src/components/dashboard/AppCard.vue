@@ -62,11 +62,11 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="cursor-pointer" @click="openPackage(app.app_id)">
+  <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
     <td class="p-2">
       <div class="flex flex-wrap items-center">
         <img :src="app.icon_url" class="shrink-0 mr-2 sm:mr-3" width="36" height="36">
-        <div class="text-slate-800 max-w-max">
+        <div class="max-w-max">
           {{ props.app.name }}
         </div>
       </div>

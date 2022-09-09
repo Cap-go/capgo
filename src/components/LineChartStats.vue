@@ -2,6 +2,7 @@
 import type { ChartData } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
+import { isDark } from '~/composables'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -74,6 +75,19 @@ const chartData = ref<ChartData<'line'>>({
   }],
 })
 const chartOptions = {
+  scales: {
+    y: {
+      ticks: {
+        color: `${isDark.value ? 'white' : 'black'}`,
+      },
+    },
+    x: {
+      ticks: {
+        color: `${isDark.value ? 'white' : 'black'}`,
+      },
+    }
+    ,
+  },
   plugins: {
     annotation: {
       annotations: generateAnnotations.value,

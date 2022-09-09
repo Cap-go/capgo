@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import Sidebar from '../../partials/Sidebar.vue'
-import Navbar from '../../partials/Navbar.vue'
-import WelcomeBanner from '../../partials/dashboard/WelcomeBanner.vue'
+import { IonIcon } from '@ionic/vue'
+import { addOutline } from 'ionicons/icons'
+import Sidebar from '../../components/Sidebar.vue'
+import Navbar from '../../components/Navbar.vue'
+import WelcomeBanner from '../../components/dashboard/WelcomeBanner.vue'
+import Steps from '../onboarding/Steps.vue'
 import { useMainStore } from '~/stores/main'
-import Usage from '~/partials/dashboard/Usage.vue'
-import TopApps from '~/partials/dashboard/TopApps.vue'
+import Usage from '~/components/dashboard/Usage.vue'
+import TopApps from '~/components/dashboard/TopApps.vue'
 import type { definitions } from '~/types/supabase'
-import SharedApps from '~/partials/dashboard/SharedApps.vue'
+import SharedApps from '~/components/dashboard/SharedApps.vue'
 
 interface ChannelUserApp {
   app_id: definitions['apps']
@@ -23,10 +26,14 @@ const props = defineProps<{
 
 const main = useMainStore()
 const sidebarOpen = ref(false)
+
+const stepsOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white">
+  <Steps v-if="stepsOpen" :onboarding="false" />
+
+  <div v-else class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
 
@@ -51,6 +58,12 @@ const sidebarOpen = ref(false)
           </div>
         </div>
       </main>
+      <button
+        class="fixed z-90 bottom-10 right-8 bg-blue-600 w-16 h-16 rounded-full drop-shadow-lg flex justify-center items-center text-white text-3xl hover:bg-muted-blue-700 hover:drop-shadow-2xl focus:border-muted-blue-100 focus:border-2"
+        @click="stepsOpen = true"
+      >
+        <IonIcon :icon="addOutline" />
+      </button>
     </div>
   </div>
 </template>

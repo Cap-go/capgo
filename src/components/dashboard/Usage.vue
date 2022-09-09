@@ -77,7 +77,6 @@ const getUsages = async () => {
     .like('date_id', `${date_id}%`)
   if (oldStats && !errorOldStats)
     stats.value = oldStats
-  console.log('error', error)
 
   if (data && !error) {
     datas.value.mau = new Array(daysInCurrentMonth() + 1).fill(0)

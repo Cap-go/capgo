@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IonIcon } from '@ionic/vue'
-import { keyOutline } from 'ionicons/icons'
+import { bookOutline, keyOutline, logoDiscord } from 'ionicons/icons'
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -54,7 +54,7 @@ watch(sidebarExpanded, () => {
           </svg>
         </button>
         <!-- Logo -->
-        <router-link class="flex flex-row items-center space-x-2" to="/">
+        <router-link class="flex flex-row items-center space-x-2" to="/app/home">
           <img src="../../assets/icon-foreground.png" class="h-[32px] w-[32px]">
           <span class="lg:hidden lg:sidebar-expanded:block 2xl:block font-medium text-slate-200 hover:text-white truncate transition duration-150 text-xl">Capgo</span>
         </router-link>
@@ -71,7 +71,7 @@ watch(sidebarExpanded, () => {
           <ul class="mt-3">
             <!-- Dashboard -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('app/home')) && 'hover:text-slate-200'" href="/app/home">
+              <router-link class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('app/home')) && 'hover:text-slate-200'" to="/app/home">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <svg class="shrink-0 h-6 w-6" viewBox="0 0 24 24">
@@ -81,27 +81,25 @@ watch(sidebarExpanded, () => {
                     </svg>
                     <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Dashboard</span>
                   </div>
-
                 </div>
-              </a>
+              </router-link>
             </li>
 
             <!-- API Keys -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && 'hover:text-slate-200'" href="/dashboard/apikeys">
+              <router-link class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && 'hover:text-slate-200'" to="/dashboard/apikeys">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <IonIcon :icon="keyOutline" class="text-slate-400 w-6 text-2xl" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && '!text-blue-500'" />
                     <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">API Keys</span>
                   </div>
-
                 </div>
-              </a>
+              </router-link>
             </li>
 
             <!-- Settings -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('settings')) && 'hover:text-slate-200'" href="/dashboard/settings/account">
+              <router-link class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('settings')) && 'hover:text-slate-200'" to="/dashboard/settings/account">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <svg class="shrink-0 h-6 w-6" viewBox="0 0 24 24">
@@ -112,7 +110,30 @@ watch(sidebarExpanded, () => {
                     </svg>
                     <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Settings</span>
                   </div>
+                </div>
+              </router-link>
+            </li>
 
+            <!-- Documentation -->
+            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
+              <a class="block text-slate-200 hover:text-white truncate transition duration-150" target="_blank" rel="noreferrer" href="https://docs.capgo.app/">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <IonIcon :icon="bookOutline" class="text-slate-400 w-6 text-2xl" />
+                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Documentation</span>
+                  </div>
+                </div>
+              </a>
+            </li>
+
+            <!-- Discord -->
+            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
+              <a class="block text-slate-200 hover:text-white truncate transition duration-150" target="_blank" rel="noreferrer" href="https://discord.gg/VnYRvBfgA6">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <IonIcon :icon="logoDiscord" class="text-slate-400 w-6 text-2xl" />
+                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Discord</span>
+                  </div>
                 </div>
               </a>
             </li>

@@ -7,7 +7,6 @@ const safeArea = ref(0)
 
 const getSafeArea = async () => {
   SafeArea.getStatusBarHeight().then(({ statusBarHeight }) => {
-    console.log(statusBarHeight, 'statusbarHeight')
     safeArea.value = statusBarHeight
   })
 }

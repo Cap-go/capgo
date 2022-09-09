@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Help from '../components/dashboard/DropdownHelp.vue'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
+import Banner from './Banner.vue'
 
 const props = defineProps({
   sidebarOpen: {
@@ -37,5 +38,6 @@ defineEmits(['toggleSidebar'])
         </div>
       </div>
     </div>
+    <Banner />
   </header>
 </template>

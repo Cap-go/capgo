@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import Sidebar from '../../../partials/Sidebar.vue'
-import Navbar from '../../../partials/Navbar.vue'
-import SettingsSidebar from '../../../partials/settings/SettingsSidebar.vue'
-import AccountPanel from '../../../partials/settings/AccountPanel.vue'
+import Sidebar from '../../../components/Sidebar.vue'
+import Navbar from '../../../components/Navbar.vue'
+import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
+import AccountPanel from '../../../components/settings/AccountPanel.vue'
 
 const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white">
+  <div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
 
@@ -23,13 +23,13 @@ const sidebarOpen = ref(false)
           <!-- Page header -->
           <div class="mb-8">
             <!-- Title -->
-            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold">
+            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
               Settings ⚙️
             </h1>
           </div>
 
           <!-- Content -->
-          <div class="bg-white shadow-lg rounded-sm mb-8">
+          <div class="bg-white dark:bg-gray-800 shadow-lg rounded-sm mb-8">
             <div class="flex flex-col md:flex-row md:-mr-px">
               <SettingsSidebar />
               <AccountPanel />

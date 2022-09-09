@@ -5,20 +5,11 @@ import {
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { SafeArea } from 'capacitor-plugin-safe-area'
 import Dashboard from '../dashboard/Dashboard.vue'
 import Steps from '../onboarding/Steps.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
-
-const safeArea = ref(0)
-
-const getSafeArea = async () => {
-  SafeArea.getStatusBarHeight().then(({ statusBarHeight }) => {
-    console.log(statusBarHeight, 'statusbarHeight')
-    safeArea.value = statusBarHeight
-  })
-}
+import Spinner from '~/components/Spinner.vue'
 
 const isLoading = ref(false)
 const route = useRoute()
@@ -78,7 +69,6 @@ watchEffect(async () => {
     isLoading.value = true
     await getMyApps()
     await getSharedWithMe()
-    await getSafeArea()
     isLoading.value = false
   }
 })
@@ -87,8 +77,8 @@ watchEffect(async () => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <Dashboard v-if="!isLoading && apps.length > 0" :apps="apps" :shared-apps="sharedApps" />
-      <Steps v-else-if="!isLoading" />
+      <Dashboard v-if="apps.length > 0 && sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
+      <Steps v-else-if="!isLoading" :onboarding="true" />
       <div v-else class="flex justify-center">
         <Spinner />
       </div>
