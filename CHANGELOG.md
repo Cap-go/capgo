@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.20.1](https://github.com/Cap-go/capgo/compare/1.20.0...1.20.1) (2022-09-09)
+
+
+### Bug Fixes
+
+* Supabase types ([64ad495](https://github.com/Cap-go/capgo/commit/64ad495dc15a426ffa48bef76fb479b91e0fc172))
+
 ## [1.20.0](https://github.com/Cap-go/capgo/compare/1.20.0-alpha.0...1.20.0) (2022-09-09)
 
 ## [1.20.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.4...1.20.0-alpha.0) (2022-09-09)
