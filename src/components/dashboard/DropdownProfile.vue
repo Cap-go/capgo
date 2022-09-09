@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useMainStore } from '~/stores/main'
@@ -17,6 +17,16 @@ const { t } = useI18n()
 const router = useRouter()
 const main = useMainStore()
 const planCurrent = ref('')
+const acronym = computed(() => {
+  if (main.user?.first_name && main.user.last_name)
+    return main.user?.first_name[0] + main.user?.last_name[0]
+  else if (main.user?.first_name)
+    return main.user?.first_name[0]
+  else if (main.user?.last_name)
+    return main.user?.last_name[0]
+  return '??'
+})
+main.user.image_url = ''
 
 if (main.auth?.id)
   getCurrentPlanName(main.auth?.id).then(res => planCurrent.value = res)
@@ -48,7 +58,10 @@ onUnmounted(() => {
       :aria-expanded="dropdownOpen"
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
-      <img class="w-8 h-8 rounded-full" :src="main.user?.image_url" width="32" height="32" alt="User">
+      <img v-if="main.user?.image_url" class="w-8 h-8 rounded-full" :src="main.user?.image_url" width="32" height="32" alt="User">
+      <div v-else class="rounded-full border-white border p-1">
+        {{ acronym }}
+      </div>
       <div class="flex items-center truncate">
         <span class="truncate ml-2 text-sm font-medium group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
         <svg class="w-3 h-3 shrink-0 ml-1 fill-current text-slate-400" viewBox="0 0 12 12">
