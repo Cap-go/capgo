@@ -150,7 +150,7 @@ const deleteAccount = async () => {
         text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
-          console.log('Cancel clicked')
+          // console.log('Cancel clicked')
         },
       },
     ],
@@ -179,7 +179,7 @@ const presentActionSheet = async () => {
         text: t('button.cancel'),
         role: 'cancel',
         handler: () => {
-          console.log('Cancel clicked')
+          // console.log('Cancel clicked')
         },
       },
     ],

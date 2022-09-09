@@ -35,6 +35,88 @@ const getMyApps = async () => {
     apps.value = []
 }
 
+const didCancel = async (name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
+
+const deleteApp = async (app: definitions['apps']) => {
+  // console.log('deleteApp', app)
+  if (listRef.value)
+    listRef.value.$el.closeSlidingItems()
+  if (await didCancel(t('package.name')))
+    return
+  try {
+    const { data, error: vError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+
+    if (data && data.length) {
+      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
+      const { error: delError } = await supabase
+        .storage
+        .from('apps')
+        .remove(filesToRemove)
+      if (delError) {
+        const toast = await toastController
+          .create({
+            message: t('cannot-delete-app-version'),
+            duration: 2000,
+          })
+        await toast.present()
+        return
+      }
+    }
+
+    const { error: dbAppError } = await supabase
+      .from<definitions['apps']>('apps')
+      .delete()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+    if (vError || dbAppError) {
+      const toast = await toastController
+        .create({
+          message: t('cannot-delete-app'),
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      const toast = await toastController
+        .create({
+          message: 'App deleted',
+          duration: 2000,
+        })
+      await toast.present()
+      await getMyApps()
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: t('cannot-delete-app'),
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
 const getSharedWithMe = async () => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')

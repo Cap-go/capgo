@@ -29,7 +29,7 @@ import './styles/style.css'
 import { initPlausible } from './services/plausible'
 
 const app = createApp(App)
-
+console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
 const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }]
 const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })

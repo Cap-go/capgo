@@ -111,7 +111,7 @@ export class CapacitorCrispWeb {
     this.ifrm.contentWindow.CRISP_READY_TRIGGER = () => {
       if (!this.ifrm.contentWindow)
         return
-      console.log('crisp iframe ready')
+      // console.log('crisp iframe ready')
       this.isReady = true
       this.push([])
     }
@@ -172,7 +172,7 @@ export class CapacitorCrispWeb {
 
   private push(...args: unknown[]) {
     if (!this.ifrm.contentWindow?.$crisp || !this.isReady) {
-      console.log('crisp not ready yet')
+      // console.log('crisp not ready yet')
       this.tmpArr.push(...args)
       return
     }
