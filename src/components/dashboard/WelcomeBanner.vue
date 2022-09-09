@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
+import { useI18n } from 'vue-i18n'
 import { useMainStore } from '~/stores/main'
 
 const main = useMainStore()
+const { t } = useI18n()
 const dayPeriod = dayjs().hour() < 12 ? 'morning' : 'afternoon'
 </script>
 
@@ -53,9 +55,9 @@ const dayPeriod = dayjs().hour() < 12 ? 'morning' : 'afternoon'
     <!-- Content -->
     <div class="relative">
       <h1 class="text-2xl md:text-3xl text-slate-800 font-bold mb-1">
-        Good {{ dayPeriod }}, {{ main.user?.first_name }} 👋
+        {{ t('good') }} {{ t(dayPeriod) }}, {{ main.user?.first_name }} 👋
       </h1>
-      <p>Welcome to your Capgo Dashboard</p>
+      <p>{{ t('welcome-to-your-capg') }}</p>
     </div>
   </div>
 </template>

@@ -123,7 +123,7 @@ onMounted(checkLogin)
         <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="max-w-2xl mx-auto text-center">
             <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/6 mb-6">
-            <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
+            <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
               Welcome to Capgo !
             </h1>
             <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">

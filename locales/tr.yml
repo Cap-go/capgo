@@ -15,6 +15,7 @@ account:
   privacy: Gizlilik Politikası
   support: Destek
   usage: kullanım
+account-settings: Hesap ayarları
 accountPassword:
   confirmPassword: Şifreyi Onayla
   errorMsg: Hata oluştu, lütfen tekrar deneyin
@@ -42,11 +43,17 @@ activation:
   notification: Bildirimler
   notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
   validate: Doğrula
+add-another-app: Başka bir uygulama ekle
+add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
+add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
+afternoon: öğleden sonra
 alert:
   confirm-delete: Silmeyi Onayla
   delete-message: |-
     Bu eylem geri alınamaz. 
     Bunu silmek istediğinizden emin misiniz
+api-key: API anahtarı
+api-keys: API Anahtarları
 apikeys:
   all: anahtarlar
   checkbelow: daha fazla bilgi almak için aşağıdaki bağlantıyı kontrol edin
@@ -58,7 +65,9 @@ apikeys:
   links: Bağlantılar
   title: API anahtarları
   updater: kapasitör-güncelleyici
+app-id-example: Uygulama kimliği örneği
 bigger-app-size: Daha büyük uygulama boyutu
+build-your-code-and-: Kodunuzu oluşturun
 bulk-upload: Toplu yükleme
 button:
   about: Hakkımda
@@ -73,6 +82,7 @@ button:
   tabs: Sekmeler
   toggle_dark: Karanlık modu değiştir
   toggle_langs: Dilleri değiştir
+by-clicking-on-them: üzerlerine tıklayarak.
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-channel: Kanal silinemiyor
@@ -105,7 +115,10 @@ channel:
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
 channel-deleted: Kanal silindi
+commands: komutlar
+copy-your: seninkini kopyala
 custom-domain: Özel alan
+dashboard: Gösterge Paneli
 days: günler
 defined-as: olarak tanımlandı
 defined-as-private: özel olarak tanımlanmış
@@ -131,11 +144,14 @@ device:
   version: sürüm
 devices:
   title: cihazlar
+discover-your-dashbo: Kontrol panelinizi keşfedin!
+documentation: belgeler
 forgot:
   check_email: Şifrenizi sıfırlamak için bağlantıyı almak için e-postanızı kontrol edin
   email: E-posta
   heading: Parolanızı mı unuttunuz
   success: şifre başarıyla güncellendi
+good: İyi
 intro:
   aka: Ayrıca şöyle bilinir
   desc: Görüşlü Vite Başlangıç Şablonu
@@ -147,6 +163,7 @@ last-upload: Son yükleme
 last-version: Son sürüm
 limit-reached: Sınıra ulaşıldı
 loading-more-data: Daha fazla veri yükleniyor...
+log-to-the-capgo-cli: Capgo CLI'da oturum açın
 login:
   andpass: Ve şifre
   connexion: Giriş yapmak
@@ -162,6 +179,7 @@ module:
   heading: Modüller
 monthly-active-users: Aylık aktif kullanıcılar
 more-version-storage: Daha fazla sürüm Depolama
+morning: sabah
 my-account: Hesabım
 my-notifications: Bildirimlerim
 name: İsim
@@ -200,6 +218,7 @@ package:
       kaldırın
   version-deleted: Sürüm silindi
   versions: Sürümler
+pages: Sayfalar
 password:
   heading: Şifre oluştur
   new: Yeni Şifre
@@ -246,11 +265,14 @@ plan-inactive: Plan inaktif
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
 plan-member: planı üyesi.
 plans: Planlar
+please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Lütfen daha fazla kullanıcı eklemek için planınızı yükseltin
+pro-tip-you-can-copy: 'Profesyonel ipucu:'
 projects:
   list: senin
   sharedlist: Benimle paylaştı
   title: Projeler
+refresh-this-page: Bu sayfayı yenile
 register:
   already-account: Zaten bir hesabınız var mı?
   check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
@@ -270,10 +292,12 @@ register:
 see-usage: Kullanıma bakın
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
+sign-out: Oturumu Kapat
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
+start-using-capgo: Capgo'yu kullanmaya başlayın!
 stats:
   devices: cihazlar
   downloads: İndirilenler
@@ -281,7 +305,11 @@ stats:
   title: istatistikler
   versions: Sürümler
 submit: Göndermek
+terms-of-use: Kullanım Şartları
+thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
+title: Başlık
+top-apps: Popüler uygulamalar
 trial-left: Kalan günler
 trial-plan-expired: Deneme Planının Süresi Doldu
 trial-plan-expires-in: 'Deneme Planı şu tarihte sona eriyor:'
@@ -291,7 +319,10 @@ upgrade-now: Hemen Yükselt
 usage:
   success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
   title: kullanım
+welcome-to-your-capg: Capgo Kontrol Panelinize hoş geldiniz
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
+your-api-key: 'API anahtarınız:'
+your-are-a: Senin alanın
 your-current-plan-is: Şu anki planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'

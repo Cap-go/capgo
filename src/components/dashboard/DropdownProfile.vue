@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
 import { openChat } from '~/services/crips'
@@ -11,6 +12,7 @@ const props = defineProps({
     default: 'left',
   },
 })
+const { t } = useI18n()
 
 const router = useRouter()
 const main = useMainStore()
@@ -79,19 +81,19 @@ onUnmounted(() => {
         >
           <li>
             <router-link class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" to="/dashboard/settings/account" @click="dropdownOpen = false">
-              Settings
+              {{ t('settings') }}
             </router-link>
           </li>
           <hr>
           <li>
             <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="openChat">
-              Support
+              {{ t('account.support') }}
             </button>
           </li>
           <hr>
           <li>
             <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="main.logout().then(() => router.replace('/login'))">
-              Sign Out
+              {{ t('sign-out') }}
             </button>
           </li>
         </ul>

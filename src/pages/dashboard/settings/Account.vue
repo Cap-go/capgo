@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
 import AccountPanel from '../../../components/settings/AccountPanel.vue'
 
+const { t } = useI18n()
 const sidebarOpen = ref(false)
 </script>
 
@@ -24,7 +26,7 @@ const sidebarOpen = ref(false)
           <div class="mb-8">
             <!-- Title -->
             <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
-              Settings ⚙️
+              {{ t('settings') }} ⚙️
             </h1>
           </div>
 

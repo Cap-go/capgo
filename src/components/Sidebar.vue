@@ -2,6 +2,7 @@
 import { IonIcon } from '@ionic/vue'
 import { bookOutline, keyOutline, logoDiscord } from 'ionicons/icons'
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 const props = defineProps < {
@@ -9,6 +10,7 @@ const props = defineProps < {
 }>()
 defineEmits(['closeSidebar'])
 
+const { t } = useI18n()
 const trigger = ref(null)
 const sidebar = ref(null)
 
@@ -66,7 +68,7 @@ watch(sidebarExpanded, () => {
         <div>
           <h3 class="text-xs uppercase text-slate-500 font-semibold pl-3">
             <span class="hidden lg:block lg:sidebar-expanded:hidden 2xl:hidden text-center w-6" aria-hidden="true">•••</span>
-            <span class="lg:hidden lg:sidebar-expanded:block 2xl:block">Pages</span>
+            <span class="lg:hidden lg:sidebar-expanded:block 2xl:block">{{ t('pages') }}</span>
           </h3>
           <ul class="mt-3">
             <!-- Dashboard -->
@@ -79,7 +81,7 @@ watch(sidebarExpanded, () => {
                       <path class="fill-current text-slate-600" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('app/home')) && 'text-blue-600'" d="M12 3c-4.963 0-9 4.037-9 9s4.037 9 9 9 9-4.037 9-9-4.037-9-9-9z" />
                       <path class="fill-current text-slate-400" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('app/home')) && 'text-blue-200'" d="M12 15c-1.654 0-3-1.346-3-3 0-.462.113-.894.3-1.285L6 6l4.714 3.301A2.973 2.973 0 0112 9c1.654 0 3 1.346 3 3s-1.346 3-3 3z" />
                     </svg>
-                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Dashboard</span>
+                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">{{ t('dashboard') }}</span>
                   </div>
                 </div>
               </router-link>
@@ -91,14 +93,14 @@ watch(sidebarExpanded, () => {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <IonIcon :icon="keyOutline" class="text-slate-400 w-6 text-2xl" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && '!text-blue-500'" />
-                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">API Keys</span>
+                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">{{ t('api-keys') }}</span>
                   </div>
                 </div>
               </router-link>
             </li>
 
             <!-- Settings -->
-            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
+            <!-- <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
               <router-link class="block text-slate-200 hover:text-white truncate transition duration-150" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('settings')) && 'hover:text-slate-200'" to="/dashboard/settings/account">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
@@ -112,7 +114,7 @@ watch(sidebarExpanded, () => {
                   </div>
                 </div>
               </router-link>
-            </li>
+            </li> -->
 
             <!-- Documentation -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
@@ -120,7 +122,7 @@ watch(sidebarExpanded, () => {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <IonIcon :icon="bookOutline" class="text-slate-400 w-6 text-2xl" />
-                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Documentation</span>
+                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">{{ t('documentation') }}</span>
                   </div>
                 </div>
               </a>
@@ -132,7 +134,7 @@ watch(sidebarExpanded, () => {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <IonIcon :icon="logoDiscord" class="text-slate-400 w-6 text-2xl" />
-                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Discord</span>
+                    <span class="text-sm font-medium ml-3 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">{{ t('account.discord') }}</span>
                   </div>
                 </div>
               </a>

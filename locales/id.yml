@@ -15,6 +15,7 @@ account:
   privacy: Rahasia pribadi
   support: Mendukung
   usage: penggunaan
+account-settings: Pengaturan akun
 accountPassword:
   confirmPassword: Setujui password
   errorMsg: Terjadi kesalahan, silakan coba lagi
@@ -44,11 +45,17 @@ activation:
     Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru
     tersedia
   validate: Mengesahkan
+add-another-app: Tambahkan aplikasi lain
+add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
+add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan mari dorong pembaruan!
+afternoon: sore
 alert:
   confirm-delete: Konfirmasi Hapus
   delete-message: |-
     Tindakan ini tidak dapat dibalik. 
     Apa kamu yakin ingin menghapus ini
+api-key: Kunci API
+api-keys: Kunci API
 apikeys:
   all: kunci
   checkbelow: cek di bawah link untuk mendapatkan informasi lebih lanjut
@@ -60,7 +67,9 @@ apikeys:
   links: Tautan
   title: kunci API
   updater: kapasitor-pembaru
+app-id-example: Contoh ID Aplikasi
 bigger-app-size: Ukuran aplikasi lebih besar
+build-your-code-and-: Buat kode Anda
 bulk-upload: Unggah massal
 button:
   about: Tentang
@@ -75,6 +84,7 @@ button:
   tabs: tab
   toggle_dark: Ubah ke mode gelap
   toggle_langs: Ubah bahasa
+by-clicking-on-them: dengan mengkliknya.
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-channel: Tidak dapat menghapus saluran
@@ -107,7 +117,10 @@ channel:
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
 channel-deleted: Saluran dihapus
+commands: perintah
+copy-your: Salin Anda
 custom-domain: Domain khusus
+dashboard: Dasbor
 days: hari
 defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai pribadi
@@ -133,11 +146,14 @@ device:
   version: 'Versi: kapan'
 devices:
   title: Perangkat
+discover-your-dashbo: Temukan dasbor Anda!
+documentation: Dokumentasi
 forgot:
   check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
   email: Surel
   heading: Tidak ingat kata sandi
   success: Kata sandi berhasil diperbarui
+good: Bagus
 intro:
   aka: Juga diketahui sebagai
   desc: Template awal vite
@@ -149,6 +165,7 @@ last-upload: Unggahan terakhir
 last-version: Versi terakhir
 limit-reached: Batas tercapai
 loading-more-data: Memuat lebih banyak data...
+log-to-the-capgo-cli: Masuk ke Capgo CLI
 login:
   andpass: Dan kata sandi
   connexion: Gabung
@@ -164,6 +181,7 @@ module:
   heading: Modul
 monthly-active-users: Pengguna aktif bulanan
 more-version-storage: Penyimpanan versi lebih banyak
+morning: pagi
 my-account: Akun saya
 my-notifications: Notifikasi Saya
 name: Nama
@@ -200,6 +218,7 @@ package:
     is-used-in-device: digunakan dalam penggantian perangkat, batalkan tautannya terlebih dahulu
   version-deleted: Versi dihapus
   versions: Versi
+pages: halaman
 password:
   heading: Buat Kata Sandi
   new: kata sandi baru
@@ -244,11 +263,14 @@ plan-inactive: Rencana tidak aktif
 plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
 plan-member: anggota rencana.
 plans: Rencana
+please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Harap tingkatkan paket Anda untuk menambahkan lebih banyak pengguna
+pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
 projects:
   list: Milikmu
   sharedlist: Dibagikan dengan saya
   title: Proyek
+refresh-this-page: Segarkan halaman ini
 register:
   already-account: Anda sudah memiliki akun?
   check-email: Silakan periksa email Anda dan verifikasi
@@ -268,10 +290,12 @@ register:
 see-usage: Lihat penggunaan
 settings: Pengaturan
 shared-apps: Aplikasi yang Dibagikan
+sign-out: Keluar
 something-went-wrong-try-again-later: |-
   Ada yang salah! 
   Coba lagi nanti.
 special-api-access: Akses API khusus
+start-using-capgo: Mulai gunakan Capgo!
 stats:
   devices: Perangkat
   downloads: Unduhan
@@ -279,7 +303,11 @@ stats:
   title: Statistik
   versions: Versi
 submit: Kirim
+terms-of-use: Syarat Penggunaan
+thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
+title: judul
+top-apps: Aplikasi teratas
 trial-left: hari tersisa
 trial-plan-expired: Paket Uji Coba Kedaluwarsa
 trial-plan-expires-in: Rencana Percobaan berakhir dalam
@@ -291,7 +319,10 @@ usage:
     Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
     menit
   title: Penggunaan
+welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai
+your-api-key: 'Kunci API Anda:'
+your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

@@ -53,10 +53,10 @@ const submit = async () => {
           <div class="max-w-2xl mx-auto text-center">
             <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/6 mb-6">
             <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
-              Terms of Use
+              {{ t('terms-of-use') }}
             </h1>
             <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
-              Please choose your preferences
+              {{ t('please-choose-your-p') }}
             </p>
           </div>
 

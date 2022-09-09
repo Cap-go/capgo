@@ -58,7 +58,7 @@ geKeys()
           <div class="mb-8">
             <!-- Title -->
             <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
-              API Keys 🔑
+              {{ t('api-keys') }} 🔑
             </h1>
           </div>
 

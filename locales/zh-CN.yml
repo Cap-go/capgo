@@ -15,6 +15,7 @@ account:
   privacy: 隐私政策
   support: 支持
   usage: 用法
+account-settings: 帐号设定
 accountPassword:
   confirmPassword: 确认密码
   errorMsg: 发生错误，请重试
@@ -40,11 +41,17 @@ activation:
   notification: 通知
   notification-desc: 我接受在有新应用版本可用时接收通知
   validate: 证实
+add-another-app: 添加其他应用
+add-your-app-to-your: 将您的应用添加到您的帐户
+add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
+afternoon: 下午
 alert:
   confirm-delete: 确认删除
   delete-message: |-
     这个动作是不可逆的。
     你确定要删除这个吗
+api-key: API 密钥
+api-keys: API 密钥
 apikeys:
   all: 钥匙
   checkbelow: 检查下面的链接以获取更多信息
@@ -54,7 +61,9 @@ apikeys:
   links: 链接
   title: API 密钥
   updater: 电容更新器
+app-id-example: 应用 ID 示例
 bigger-app-size: 更大的应用程序大小
+build-your-code-and-: 构建你的代码
 bulk-upload: 批量上传
 button:
   about: 关于
@@ -69,6 +78,7 @@ button:
   tabs: 标签
   toggle_dark: 切换深色模式
   toggle_langs: 切换语言
+by-clicking-on-them: 通过点击它们。
 cannot-delete-app: 无法删除应用
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-channel: 无法删除频道
@@ -99,7 +109,10 @@ channel:
   users: 与用户共享
   v3: V3 设置
 channel-deleted: 频道已删除
+commands: 命令
+copy-your: 复制你的
 custom-domain: 自定义域
+dashboard: 仪表板
 days: 天
 defined-as: 定义为
 defined-as-private: 定义为私有
@@ -125,11 +138,14 @@ device:
   version: 版本
 devices:
   title: 设备
+discover-your-dashbo: 发现您的仪表板！
+documentation: 文档
 forgot:
   check_email: 检查您的电子邮件以获取重置密码的链接
   email: 电子邮件
   heading: 忘记密码
   success: 密码更新成功
+good: 好的
 intro:
   aka: 也叫
   desc: 固执己见的 Vite 项目模板
@@ -141,6 +157,7 @@ last-upload: 上次上传
 last-version: 最新版本
 limit-reached: 达到上限
 loading-more-data: 正在加载更多数据...
+log-to-the-capgo-cli: 登录 Capgo CLI
 login:
   andpass: 和密码
   connexion: 登录
@@ -156,6 +173,7 @@ module:
   heading: 模块
 monthly-active-users: 月活跃用户
 more-version-storage: 更多版本存储
+morning: 早晨
 my-account: 我的帐户
 my-notifications: 我的通知
 name: 姓名
@@ -192,6 +210,7 @@ package:
     is-used-in-device: 在设备覆盖中使用，请先取消链接
   version-deleted: 版本已删除
   versions: 版本
+pages: 页面
 password:
   heading: 创建密码
   new: 新密码
@@ -236,11 +255,14 @@ plan-inactive: 计划无效
 plan-is-the-best-pla: 计划是满足您需求的最佳计划。
 plan-member: 计划成员。
 plans: 计划
+please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
+pro-tip-you-can-copy: 专业提示：您可以复制
 projects:
   list: 你的
   sharedlist: 与我分享
   title: 项目
+refresh-this-page: 刷新此页面
 register:
   already-account: 你已经有一个账户吗？
   check-email: 请检查您的电子邮件并验证
@@ -260,10 +282,12 @@ register:
 see-usage: 查看用法
 settings: 设置
 shared-apps: 共享应用程序
+sign-out: 登出
 something-went-wrong-try-again-later: |-
   有些不对劲！
   稍后再试。
 special-api-access: 特殊 API 访问
+start-using-capgo: 开始使用 Capgo！
 stats:
   devices: 设备
   downloads: 下载
@@ -271,7 +295,11 @@ stats:
   title: 统计数据
   versions: 版本
 submit: 提交
+terms-of-use: 使用条款
+thank-you-for-choosi: 感谢您选择 Capgo！
 the: 这
+title: 标题
+top-apps: 热门应用
 trial-left: 剩余天数
 trial-plan-expired: 试用计划已过期
 trial-plan-expires-in: 试用计划将于
@@ -281,7 +309,10 @@ upgrade-now: 现在升级
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
+welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到上限
+your-api-key: 您的 API 密钥：
+your-are-a: 你是一个
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是

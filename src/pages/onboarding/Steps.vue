@@ -59,23 +59,20 @@ watchEffect(async () => {
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div v-if="props.onboarding" class="text-center">
         <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
-          Start using Capgo !
+          {{ t('start-using-capgo') }}
         </h2>
         <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
-          Add your first app to your account and let's push updates !
+          {{ t('add-your-first-app-t') }}
         </p>
         <p class="mx-auto mt-2 text-md font-normal text-muted-blue-300 font-pj">
-          Pro tip: you can copy the <span class="text-pumpkin-orange-900">commands</span> by clicking on them.
+          {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
         </p>
       </div>
 
       <div v-else class="text-center">
         <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
-          Add another app
+          {{ t('add-another-app') }}
         </h2>
-        <p class="mx-auto mt-2 text-md font-normal text-muted-blue-300 font-pj">
-          Pro tip: you can copy the <span class="text-pumpkin-orange-900">commands</span> by clicking on them.
-        </p>
       </div>
 
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
@@ -86,15 +83,15 @@ watchEffect(async () => {
                 1
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-                Copy your{{ ' ' }}
+                {{ t('copy-your') }}{{ ' ' }}
                 <span v-if="app" class="cursor-pointer text-pumpkin-orange-700 font-bold" @click="copyToast(app!.key, 1)">
-                  API key<IonIcon :icon="copyOutline" class="text-muted-blue-800 ml-2" />
+                  {{ t('api-key') }}<IonIcon :icon="copyOutline" class="text-muted-blue-800 ml-2" />
                 </span>
                 <span v-else class="text-pumpkin-orange-700 font-bold">
-                  API key
+                  {{ t('api-key') }}
                 </span>
                 <br>
-                <span class="text-sm">Your API key: {{ app?.key }}</span>
+                <span class="text-sm">{{ t('your-api-key') }} {{ app?.key }}</span>
               </p>
             </div>
           </div>
@@ -108,9 +105,9 @@ watchEffect(async () => {
               2
             </div>
             <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-              Log to the Capgo CLI<br>
+              {{ t('log-to-the-capgo-cli') }}<br>
               <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest login ${app!.key}`, 2)">npx @capgo/cli@latest login
-                <span class="font-bold">[API key]</span>{{ ' ' }}
+                <span class="font-bold">[{{ t('api-key') }}]</span>{{ ' ' }}
                 <IonIcon :icon="copyOutline" class="text-muted-blue-800" />
               </code>
             </p>
@@ -125,10 +122,10 @@ watchEffect(async () => {
               3
             </div>
             <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-              Add your app to your account<br>
+              {{ t('add-your-app-to-your') }}<br>
               <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast('npx @capgo/cli@latest add [appId]', 3)">npx @capgo/cli@latest add [appId] <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
               <br>
-              <span class="text-sm">App ID example: com.example.app</span>
+              <span class="text-sm">{{ t('app-id-example') }}: com.example.app</span>
             </p>
           </div>
         </div>
@@ -141,7 +138,7 @@ watchEffect(async () => {
               4
             </div>
             <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-              Build your code & Upload your version<br>
+              {{ t('build-your-code-and-') }}<br>
               <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest upload --channel production`, 4)">npx @capgo/cli@latest upload --channel production <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
             </p>
           </div>
@@ -156,8 +153,8 @@ watchEffect(async () => {
                 🚀
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-                Discover your dashboard !<br>
-                <a href="/app/home" class="text-pumpkin-orange-700 text-lg cursor-pointer">Refresh this page</a>
+                {{ t('discover-your-dashbo') }}<br>
+                <a href="/app/home" class="text-pumpkin-orange-700 text-lg cursor-pointer">{{ t('refresh-this-page') }}</a>
               </p>
             </div>
           </div>

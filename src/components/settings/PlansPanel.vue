@@ -183,7 +183,7 @@ watchEffect(async () => {
         </h1>
         <p class="mt-5 text-xl text-gray-700 dark:text-white  sm:text-center">
           {{ t('plan.desc') }}<br>
-          Your are a <span class="underline font-bold">{{ currentPlan?.name }}</span> {{ t('plan-member') }}<br>
+          {{ t('your-are-a') }} <span class="underline font-bold">{{ currentPlan?.name }}</span> {{ t('plan-member') }}<br>
           {{ t('the') }} <span class="underline font-bold">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
 

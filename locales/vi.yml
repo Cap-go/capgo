@@ -15,6 +15,7 @@ account:
   privacy: Chính sách bảo mật
   support: Hỗ trợ
   usage: cách sử dụng
+account-settings: Cài đặt tài khoản
 accountPassword:
   confirmPassword: Xác nhận mật khẩu
   errorMsg: Đã xảy ra lỗi, vui lòng thử lại
@@ -42,11 +43,17 @@ activation:
   notification: Thông báo
   notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
   validate: Xác thực
+add-another-app: Thêm ứng dụng khác
+add-your-app-to-your: Thêm ứng dụng của bạn vào tài khoản của bạn
+add-your-first-app-t: Thêm ứng dụng đầu tiên vào tài khoản của bạn và hãy cập nhật!
+afternoon: buổi chiều
 alert:
   confirm-delete: Xác nhận Xóa
   delete-message: |-
     Hành động này là không thể đảo ngược. 
     Bạn có chắc chắn muốn xóa cái này không
+api-key: Mã API
+api-keys: Khóa API
 apikeys:
   all: chìa khóa
   checkbelow: kiểm tra bên dưới liên kết để nhận thêm thông tin
@@ -58,7 +65,9 @@ apikeys:
   links: Liên kết
   title: Khóa API
   updater: trình cập nhật tụ điện
+app-id-example: Ví dụ về ID ứng dụng
 bigger-app-size: Kích thước ứng dụng lớn hơn
+build-your-code-and-: Xây dựng mã của bạn
 bulk-upload: Tải lên hàng loạt
 button:
   about: Về
@@ -73,6 +82,7 @@ button:
   tabs: Các tab
   toggle_dark: Chuyển đổi chế độ tối
   toggle_langs: Thay đổi ngôn ngữ
+by-clicking-on-them: bằng cách nhấp vào chúng.
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-channel: Không thể xóa kênh
@@ -105,7 +115,10 @@ channel:
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
+commands: lệnh
+copy-your: Sao chép của bạn
 custom-domain: Tên miền tùy chọn
+dashboard: bảng điều khiển
 days: ngày
 defined-as: Định nghĩa là
 defined-as-private: được định nghĩa là riêng tư
@@ -131,11 +144,14 @@ device:
   version: Phiên bản
 devices:
   title: Thiết bị
+discover-your-dashbo: Khám phá trang tổng quan của bạn!
+documentation: Tài liệu
 forgot:
   check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
   email: E-mail
   heading: Quên mật khẩu
   success: Đã cập nhật mật khẩu thành công
+good: Tốt
 intro:
   aka: Cũng được biết đến như là
   desc: Ý kiến cá nhân Vite Template để bắt đầu
@@ -147,6 +163,7 @@ last-upload: Lần tải lên cuối cùng
 last-version: Phiên bản cuối cùng
 limit-reached: Đạt tới giới hạn
 loading-more-data: Đang tải thêm dữ liệu ...
+log-to-the-capgo-cli: Đăng nhập vào Capgo CLI
 login:
   andpass: Và mật khẩu
   connexion: Đăng nhập
@@ -162,6 +179,7 @@ module:
   heading: Mô-đun
 monthly-active-users: Người dùng hoạt động hàng tháng
 more-version-storage: Thêm phiên bản Bộ nhớ
+morning: buổi sáng
 my-account: Tài khoản của tôi
 my-notifications: Thông báo của tôi
 name: Tên
@@ -200,6 +218,7 @@ package:
       đó
   version-deleted: Phiên bản đã bị xóa
   versions: Phiên bản
+pages: Các trang
 password:
   heading: Tạo mật khẩu
   new: mật khẩu mới
@@ -244,11 +263,14 @@ plan-inactive: Kế hoạch không hoạt động
 plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
 plan-member: thành viên kế hoạch.
 plans: Các kế hoạch
+please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
+pro-tip-you-can-copy: 'Mẹo chuyên nghiệp: bạn có thể sao chép'
 projects:
   list: Của bạn
   sharedlist: Chia sẻ với tôi
   title: Dự án
+refresh-this-page: Làm mới trang này
 register:
   already-account: Bạn đã có tài khoản?
   check-email: Vui lòng kiểm tra email của bạn và xác minh
@@ -268,10 +290,12 @@ register:
 see-usage: Xem mức sử dụng
 settings: Cài đặt
 shared-apps: Ứng dụng được chia sẻ
+sign-out: Đăng xuất
 something-went-wrong-try-again-later: |-
   Đã xảy ra lỗi! 
   Thử lại sau.
 special-api-access: Quyền truy cập API đặc biệt
+start-using-capgo: Bắt đầu sử dụng Capgo!
 stats:
   devices: Thiết bị
   downloads: Tải xuống
@@ -279,7 +303,11 @@ stats:
   title: Số liệu thống kê
   versions: Phiên bản
 submit: Nộp
+terms-of-use: Điều khoản sử dụng
+thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
+title: Tiêu đề
+top-apps: Những ứng dụng hàng đầu
 trial-left: ngày còn lại
 trial-plan-expired: Gói dùng thử đã hết hạn
 trial-plan-expires-in: Gói dùng thử sẽ hết hạn sau
@@ -289,7 +317,10 @@ upgrade-now: Nâng cấp ngay bây giờ
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
+welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của bạn ở đây.
 you-reached-the-limi: Đạt tới giới hạn
+your-api-key: 'Khóa API của bạn:'
+your-are-a: Của bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

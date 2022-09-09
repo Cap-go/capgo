@@ -1,17 +1,19 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AppCard from './AppCard.vue'
 import type { definitions } from '~/types/supabase'
 
 const props = defineProps<{
   apps: definitions['apps'][]
 }>()
+const { t } = useI18n()
 </script>
 
 <template>
   <div id="my_apps" class="col-span-full xl:col-span-16 bg-white shadow-lg rounded-sm border border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <header class="px-5 py-4 border-b border-slate-100">
       <h2 class="font-semibold text-slate-800 dark:text-white">
-        Top Apps
+        {{ t('top-apps') }}
       </h2>
     </header>
     <div class="p-3">
@@ -23,22 +25,22 @@ const props = defineProps<{
             <tr>
               <th class="p-2">
                 <div class="font-semibold text-left">
-                  Name
+                  {{ t('name') }}
                 </div>
               </th>
               <th class="p-2">
                 <div class="font-semibold text-center">
-                  Last version
+                  {{ t('last-version') }}
                 </div>
               </th>
               <th class="p-2">
                 <div class="font-semibold text-center">
-                  Last upload
+                  {{ t('last-upload') }}
                 </div>
               </th>
               <th class="p-2">
                 <div class="font-semibold text-center">
-                  Devices
+                  {{ t('devices.title') }}
                 </div>
               </th>
             </tr>

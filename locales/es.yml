@@ -15,6 +15,7 @@ account:
   privacy: Política de privacidad
   support: Apoyo
   usage: uso
+account-settings: Configuraciones de la cuenta
 accountPassword:
   confirmPassword: Confirmar contraseña
   errorMsg: Ocurrió un error, inténtalo de nuevo
@@ -46,11 +47,17 @@ activation:
     Acepto recibir notificaciones cuando haya una nueva versión de la aplicación
     disponible
   validate: Validar
+add-another-app: Agregar otra aplicación
+add-your-app-to-your: Agrega tu aplicación a tu cuenta
+add-your-first-app-t: ¡Agregue su primera aplicación a su cuenta y empujemos las actualizaciones!
+afternoon: tarde
 alert:
   confirm-delete: Confirmar eliminación
   delete-message: |-
     Esta acción no es reversible. 
     Estás seguro que quieres eliminar esto
+api-key: Clave API
+api-keys: Claves API
 apikeys:
   all: teclas
   checkbelow: verifique debajo del enlace para obtener más información
@@ -62,7 +69,9 @@ apikeys:
   links: Enlaces
   title: claves API
   updater: actualizador de condensadores
+app-id-example: Ejemplo de ID de aplicación
 bigger-app-size: Tamaño de aplicación más grande
+build-your-code-and-: Crea tu código
 bulk-upload: Carga masiva
 button:
   about: Acerca de
@@ -77,6 +86,7 @@ button:
   tabs: Pestañas
   toggle_dark: Alternar modo oscuro
   toggle_langs: Cambiar idiomas
+by-clicking-on-them: haciendo clic en ellos.
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-version: No se puede eliminar la versión de la aplicación
 cannot-delete-channel: No se puede eliminar el canal
@@ -109,7 +119,10 @@ channel:
   users: Compartido con los usuarios
   v3: configuración V3
 channel-deleted: Canal eliminado
+commands: comandos
+copy-your: copia tu
 custom-domain: Dominio personalizado
+dashboard: Tablero
 days: dias
 defined-as: Definido como
 defined-as-private: definido como privado
@@ -135,6 +148,8 @@ device:
   version: Versión
 devices:
   title: Dispositivos
+discover-your-dashbo: ¡Descubre tu tablero!
+documentation: Documentación
 forgot:
   check_email: >-
     Revise su correo electrónico para obtener el enlace para restablecer su
@@ -142,6 +157,7 @@ forgot:
   email: Correo electrónico
   heading: Se te olvidó tu contraseña
   success: Contraseña actualizada exitosamente
+good: Bueno
 intro:
   aka: También conocido como
   desc: Plantilla de Inicio de Vite Dogmática
@@ -153,6 +169,7 @@ last-upload: Última subida
 last-version: Última versión
 limit-reached: Límite alcanzado
 loading-more-data: Cargando más datos...
+log-to-the-capgo-cli: Inicie sesión en la CLI de Capgo
 login:
   andpass: Y contraseña
   connexion: Acceso
@@ -168,6 +185,7 @@ module:
   heading: Módulos
 monthly-active-users: Usuarios activos mensuales
 more-version-storage: Más almacenamiento de versiones
+morning: Mañana
 my-account: Mi cuenta
 my-notifications: Mis Notificaciones
 name: Nombre
@@ -204,6 +222,7 @@ package:
     is-used-in-device: se usa en una anulación de dispositivo, desvincúlelo primero
   version-deleted: Versión eliminada
   versions: Versiones
+pages: Paginas
 password:
   heading: Crear contraseña
   new: Nueva contraseña
@@ -250,11 +269,14 @@ plan-inactive: Plan inactivo
 plan-is-the-best-pla: plan es el mejor plan para sus necesidades.
 plan-member: miembro del plan.
 plans: planes
+please-choose-your-p: Por favor elige tus preferencias
 please-upgrade: Actualice su plan para agregar más usuarios
+pro-tip-you-can-copy: 'Consejo profesional: puedes copiar el'
 projects:
   list: Tuya
   sharedlist: Comparte conmigo
   title: Proyectos
+refresh-this-page: Actualizar esta página
 register:
   already-account: ¿Ya tienes una cuenta?
   check-email: Por favor revise su correo electrónico y verifique
@@ -276,10 +298,12 @@ register:
 see-usage: Ver uso
 settings: Ajustes
 shared-apps: Aplicaciones compartidas
+sign-out: Desconectar
 something-went-wrong-try-again-later: |-
   ¡Algo salió mal! 
   Vuelva a intentarlo más tarde.
 special-api-access: Acceso especial a la API
+start-using-capgo: ¡Empieza a usar Capgo!
 stats:
   devices: Dispositivos
   downloads: Descargas
@@ -287,7 +311,11 @@ stats:
   title: Estadísticas
   versions: Versiones
 submit: Enviar
+terms-of-use: Términos de Uso
+thank-you-for-choosi: ¡Gracias por elegir Capgo!
 the: los
+title: título
+top-apps: Mejores aplicaciones
 trial-left: Días restantes
 trial-plan-expired: Plan de prueba caducado
 trial-plan-expires-in: El juicio termina en
@@ -297,7 +325,10 @@ upgrade-now: Actualizar ahora
 usage:
   success: Su plan ha sido configurado, esta página se actualizará en unos minutos.
   title: Uso
+welcome-to-your-capg: Bienvenido a tu panel de control de Capgo
 you-can-change-your-: Puede cambiar su información personal aquí.
 you-reached-the-limi: Límite alcanzado
+your-api-key: 'Su clave API:'
+your-are-a: Tu area
 your-current-plan-is: Su plan actual es
 your-current-suggested-plan-is: Su plan sugerido actual es

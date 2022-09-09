@@ -15,6 +15,7 @@ account:
   privacy: Privacy policy
   support: Support
   usage: usage
+account-settings: Account Settings
 accountPassword:
   confirmPassword: Confirm password
   errorMsg: Error happened, please try again
@@ -40,9 +41,15 @@ activation:
   notification: Notifications
   notification-desc: I accept to receive notification when new app version are available
   validate: Validate
+add-another-app: Add another app
+add-your-app-to-your: Add your app to your account
+add-your-first-app-t: Add your first app to your account and let's push updates !
+afternoon: afternoon
 alert:
   confirm-delete: Confirm Delete
   delete-message: This action is not reversible. Are you sure you want to delete this
+api-key: API key
+api-keys: API Keys
 apikeys:
   all: keys
   checkbelow: check below the link to get more informations
@@ -54,7 +61,9 @@ apikeys:
   links: Links
   title: API keys
   updater: capacitor-updater
+app-id-example: App ID example
 bigger-app-size: Bigger app size
+build-your-code-and-: Build your code & Upload your version
 bulk-upload: Bulk upload
 button:
   about: About
@@ -69,6 +78,7 @@ button:
   tabs: Tabs
   toggle_dark: Toggle dark mode
   toggle_langs: Change languages
+by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
@@ -99,7 +109,10 @@ channel:
   users: Shared with users
   v3: V3 settings
 channel-deleted: Channel deleted
+commands: commands
+copy-your: Copy your
 custom-domain: Custom domain
+dashboard: Dashboard
 days: days
 defined-as: Defined as
 defined-as-private: defined as private
@@ -125,11 +138,14 @@ device:
   version: Version
 devices:
   title: Devices
+discover-your-dashbo: Discover your dashboard !
+documentation: Documentation
 forgot:
   check_email: Check your email to get the link to reset your password
   email: Email
   heading: Forgot password
   success: Password updated successfully
+good: Good
 intro:
   aka: Also known as
   desc: Opinionated Vite Starter Template
@@ -141,6 +157,7 @@ last-upload: Last upload
 last-version: Last version
 limit-reached: Limit reached
 loading-more-data: Loading more data...
+log-to-the-capgo-cli: Log to the Capgo CLI
 login:
   andpass: And password
   connexion: Login
@@ -156,6 +173,7 @@ module:
   heading: Modules
 monthly-active-users: Monthly active users
 more-version-storage: More version Storage
+morning: morning
 my-account: My Account
 my-notifications: My Notifications
 name: Name
@@ -190,6 +208,7 @@ package:
     is-used-in-device: is used in a device override, unlink it first
   version-deleted: Version deleted
   versions: Versions
+pages: Pages
 password:
   heading: Create Password
   new: New Password
@@ -234,11 +253,14 @@ plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.
 plan-member: plan member.
 plans: Plans
+please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
+pro-tip-you-can-copy: 'Pro tip: you can copy the'
 projects:
   list: Yours
   sharedlist: Shared with me
   title: Projects
+refresh-this-page: Refresh this page
 register:
   already-account: You already have an account?
   check-email: Please check your email and verify
@@ -258,8 +280,10 @@ register:
 see-usage: See usage
 settings: Settings
 shared-apps: Shared Apps
+sign-out: Sign Out
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
+start-using-capgo: Start using Capgo !
 stats:
   devices: Devices
   downloads: Downloads
@@ -267,8 +291,11 @@ stats:
   title: Stats
   versions: Versions
 submit: Submit
+terms-of-use: Terms of Use
+thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 title: title
+top-apps: Top Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
@@ -278,7 +305,10 @@ upgrade-now: Upgrade now
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
+welcome-to-your-capg: Welcome to your Capgo Dashboard
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
+your-api-key: 'Your API key:'
+your-are-a: Your are a
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is

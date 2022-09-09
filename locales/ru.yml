@@ -15,6 +15,7 @@ account:
   privacy: Политика конфиденциальности
   support: Служба поддержки
   usage: использование
+account-settings: Настройки учетной записи
 accountPassword:
   confirmPassword: Подтвердить Пароль
   errorMsg: Произошла ошибка, попробуйте еще раз
@@ -42,11 +43,19 @@ activation:
   notification: Уведомления
   notification-desc: Я согласен получать уведомления о появлении новой версии приложения
   validate: Подтвердить
+add-another-app: Добавить другое приложение
+add-your-app-to-your: Добавьте свое приложение в свой аккаунт
+add-your-first-app-t: >-
+  Добавьте свое первое приложение в свою учетную запись и давайте получать
+  обновления!
+afternoon: после полудня
 alert:
   confirm-delete: Подтвердите удаление
   delete-message: |-
     Это действие необратимо. 
     Вы уверены, что хотите удалить это
+api-key: ключ API
+api-keys: Ключи API
 apikeys:
   all: ключи
   checkbelow: проверьте ссылку ниже, чтобы получить больше информации
@@ -58,7 +67,9 @@ apikeys:
   links: Ссылки
   title: ключи API
   updater: конденсатор-обновитель
+app-id-example: Пример идентификатора приложения
 bigger-app-size: Большой размер приложения
+build-your-code-and-: Создайте свой код
 bulk-upload: Массовая загрузка
 button:
   about: О шаблоне
@@ -73,6 +84,7 @@ button:
   tabs: Вкладки
   toggle_dark: Включить темный режим
   toggle_langs: Сменить язык
+by-clicking-on-them: нажав на них.
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-version: Не могу удалить версию приложения
 cannot-delete-channel: Не могу удалить канал
@@ -105,7 +117,10 @@ channel:
   users: Доступно пользователям
   v3: Настройки версии 3
 channel-deleted: Канал удален
+commands: команды
+copy-your: Скопируйте свой
 custom-domain: Пользовательский домен
+dashboard: Приборная доска
 days: дни
 defined-as: Определяется как
 defined-as-private: определяется как частный
@@ -131,11 +146,14 @@ device:
   version: Версия
 devices:
   title: Устройства
+discover-your-dashbo: Откройте для себя панель инструментов!
+documentation: Документация
 forgot:
   check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
   email: Эл. адрес
   heading: Забыл пароль
   success: Пароль успешно обновлен
+good: Хороший
 intro:
   aka: Также известен как
   desc: Самостоятельный начальный шаблон Vite
@@ -147,6 +165,7 @@ last-upload: Последняя загрузка
 last-version: Последняя версия
 limit-reached: Достигнут предел
 loading-more-data: Загрузка дополнительных данных...
+log-to-the-capgo-cli: Войдите в интерфейс командной строки Capgo
 login:
   andpass: И пароль
   connexion: Авторизоваться
@@ -162,6 +181,7 @@ module:
   heading: Модули
 monthly-active-users: Ежемесячные активные пользователи
 more-version-storage: Дополнительная версия Хранение
+morning: утро
 my-account: Мой счет
 my-notifications: Мои уведомления
 name: Имя
@@ -198,6 +218,7 @@ package:
     is-used-in-device: используется в переопределении устройства, сначала отсоедините его
   version-deleted: Версия удалена
   versions: Версии
+pages: Страницы
 password:
   heading: Придумайте пароль
   new: Новый пароль
@@ -242,11 +263,14 @@ plan-inactive: План неактивен
 plan-is-the-best-pla: план - лучший план для ваших нужд.
 plan-member: член плана.
 plans: Планы
+please-choose-your-p: Пожалуйста, выберите ваши предпочтения
 please-upgrade: Обновите план, чтобы добавить больше пользователей
+pro-tip-you-can-copy: 'Совет: вы можете скопировать'
 projects:
   list: Ваш
   sharedlist: Поделился со мной
   title: Проекты
+refresh-this-page: Обновить эту страницу
 register:
   already-account: У вас уже есть аккаунт?
   check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
@@ -266,10 +290,12 @@ register:
 see-usage: См. использование
 settings: Настройки
 shared-apps: Общие приложения
+sign-out: Выход
 something-went-wrong-try-again-later: |-
   Что-то пошло не так! 
   Попробуйте позже.
 special-api-access: Специальный доступ к API
+start-using-capgo: Начните использовать Capgo!
 stats:
   devices: Устройства
   downloads: Загрузки
@@ -277,6 +303,10 @@ stats:
   title: Статистика
   versions: Версии
 submit: Представлять на рассмотрение
+terms-of-use: Условия эксплуатации
+thank-you-for-choosi: Спасибо, что выбрали Капго!
+title: заглавие
+top-apps: Лучшие приложения
 trial-left: дней осталось
 trial-plan-expired: Срок действия пробного плана истек
 trial-plan-expires-in: Срок действия пробного плана истекает через
@@ -288,7 +318,10 @@ usage:
     Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
     минут.
   title: использование
+welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.
 you-reached-the-limi: Достигнуто ограничение
+your-api-key: 'Ваш ключ API:'
+your-are-a: Вы
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'
