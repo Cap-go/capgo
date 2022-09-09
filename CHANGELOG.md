@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.20.8](https://github.com/Cap-go/capgo/compare/1.20.7...1.20.8) (2022-09-09)
+
+
+### Bug Fixes
+
+* add back free plan ([1b22c3f](https://github.com/Cap-go/capgo/commit/1b22c3f37fe3d9e6f336813ca473d6dca84bfd03))
+
 ### [1.20.7](https://github.com/Cap-go/capgo/compare/1.20.6...1.20.7) (2022-09-09)
 
 
