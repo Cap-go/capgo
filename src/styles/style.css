@@ -1,6 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=fallback');
 
 @import './markdown.css';
@@ -13,6 +10,9 @@
 @import 'additional-styles/flatpickr.css';
 @import 'additional-styles/theme.css';
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 html {
   @apply dark:bg-gray-900;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
