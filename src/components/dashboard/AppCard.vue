@@ -7,6 +7,7 @@ import { useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   app: definitions['apps']
+  channel: string
 }>()
 interface Device {
   version: {
@@ -23,17 +24,19 @@ const devices = ref<(definitions['devices'])[]>([])
 const devicesNb = ref(0)
 
 const loadData = async () => {
-  try {
-    const { data: dataDev, count } = await supabase
-      .from<definitions['devices'] & Device>('devices').select('*', { count: 'exact' })
-      .eq('app_id', props.app.app_id)
-    if (!dataDev)
-      return
-    devices.value.push(...dataDev)
-    devicesNb.value = count || 0
-  }
-  catch (error) {
-    console.error(error)
+  if (!props.channel) {
+    try {
+      const { data: dataDev, count } = await supabase
+        .from<definitions['devices'] & Device>('devices').select('*', { count: 'exact' })
+        .eq('app_id', props.app.app_id)
+      if (!dataDev)
+        return
+      devices.value.push(...dataDev)
+      devicesNb.value = count || 0
+    }
+    catch (error) {
+      console.error(error)
+    }
   }
 }
 
@@ -82,8 +85,11 @@ watchEffect(async () => {
       </div>
     </td>
     <td class="p-2">
-      <div v-if="!isLoading" class="text-center">
+      <div v-if="!isLoading && !props.channel" class="text-center">
         {{ devicesNb }}
+      </div>
+      <div v-else class="text-center">
+        {{ props.channel }}
       </div>
     </td>
   </tr>

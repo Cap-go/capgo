@@ -58,6 +58,8 @@ apikeys:
   links: Links
   title: Chaves de API
   updater: atualizador de capacitor
+bigger-app-size: Maior tamanho de aplicativo
+bulk-upload: Upload em massa
 button:
   about: Sobre
   back: Voltar
@@ -74,6 +76,7 @@ button:
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-version: Não é possível excluir a versão do aplicativo
 cannot-delete-channel: Não é possível excluir o canal
+change: Mudar
 channel:
   add: Adicionar
   beta-channel: Canal beta
@@ -102,10 +105,12 @@ channel:
   users: Compartilhado com usuários
   v3: Configurações V3
 channel-deleted: Canal excluído
+custom-domain: Domínio personalizado
 days: dias
 defined-as: Definido como
 defined-as-private: definido como privado
 defined-as-public: definido como público
+delete-account: Deletar conta
 device:
   channel: Link do canal
   created_at: Criado em
@@ -138,6 +143,8 @@ intro:
   hi: Olá, {name}!
   whats-your-name: Qual é o seu nome?
 invalid-auth: autenticação inválida
+last-upload: Último upload
+last-version: Última versão
 limit-reached: Limite alcançado
 loading-more-data: Carregando mais dados...
 login:
@@ -154,13 +161,22 @@ login:
 module:
   heading: Módulos
 monthly-active-users: Usuários ativos mensais
+more-version-storage: Mais versões de armazenamento
+my-account: Minha conta
+my-notifications: Minhas notificações
+name: Nome
+need-more-contact-us: |-
+  Preciso de mais ? 
+  Contacte-nos para um plano à medida
 not-found: Não encontrado
 notificationSettings:
   heading: Configurações de notificação
   validate: Validar
+notifications: Notificações
 onboarding:
   loading: Carregando
 one-day-left: Falta um dia
+open-sidebar: Abrir barra lateral
 package:
   cannot-delete-version: Não é possível excluir a versão
   channels: Canais
@@ -189,6 +205,7 @@ password:
 pckage:
   version:
     is-used-in-channel: é usado em um canal, desvincule-o primeiro
+personal-information: Informações pessoais
 plan:
   abtest: Teste A/B
   application: Inscrição
@@ -224,6 +241,9 @@ plan:
   whats-included: O que está incluído
   yearly-billing: Faturamento anual
 plan-inactive: Plano inativo
+plan-is-the-best-pla: plano é o melhor plano para suas necessidades.
+plan-member: membro do plano.
+plans: Planos
 please-upgrade: Atualize seu plano para adicionar mais usuários
 projects:
   list: Seu
@@ -246,23 +266,30 @@ register:
   specialError: Deve conter caracteres especiais
   upperCaseError: Deve conter letras maiúsculas
 see-usage: Ver uso
+settings: Definições
+shared-apps: Aplicativos compartilhados
 something-went-wrong-try-again-later: |-
   Algo deu errado! 
   Tente mais tarde.
+special-api-access: Acesso especial à API
 stats:
   devices: Dispositivos
   downloads: Transferências
   subtitle: Mês passado
   title: Estatísticas
   versions: Versões
+submit: Enviar
+the: o
 trial-left: dias restantes
 trial-plan-expired: Plano de avaliação expirado
 trial-plan-expires-in: O Plano de Avaliação expira em
+unlimited-updates: Atualizações ilimitadas
 upgrade: Melhoria
 upgrade-now: Atualize agora
 usage:
   success: Seu plano foi configurado esta página será atualizada, em alguns minutos
   title: Uso
+you-can-change-your-: Você pode alterar suas informações pessoais aqui.
 you-reached-the-limi: Limite alcançado
 your-current-plan-is: Seu plano atual é
 your-current-suggested-plan-is: Seu plano sugerido atual é

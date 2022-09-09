@@ -54,7 +54,7 @@ const submitDoi = async () => {
     <!-- Panel body -->
     <div class="p-6 space-y-6">
       <h2 class="text-2xl text-slate-800 dark:text-white font-bold ">
-        My Notifications
+        {{ t('my-notifications') }}
       </h2>
 
       <div class="mx-auto w-full dark:text-white">

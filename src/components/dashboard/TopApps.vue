@@ -46,7 +46,7 @@ const props = defineProps<{
           <!-- Table body -->
           <tbody class="text-sm font-medium divide-y divide-slate-100">
             <!-- Row -->
-            <AppCard v-for="app in props.apps" :key="app.app_id" :app="app" />
+            <AppCard v-for="app in props.apps" :key="app.app_id" :app="app" channel="" />
           </tbody>
         </table>
       </div>

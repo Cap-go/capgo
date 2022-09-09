@@ -58,6 +58,8 @@ apikeys:
   links: Bağlantılar
   title: API anahtarları
   updater: kapasitör-güncelleyici
+bigger-app-size: Daha büyük uygulama boyutu
+bulk-upload: Toplu yükleme
 button:
   about: Hakkımda
   back: Geri
@@ -74,6 +76,7 @@ button:
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-channel: Kanal silinemiyor
+change: Değiştirmek
 channel:
   add: Ekle
   beta-channel: Beta kanalı
@@ -102,10 +105,12 @@ channel:
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
 channel-deleted: Kanal silindi
+custom-domain: Özel alan
 days: günler
 defined-as: olarak tanımlandı
 defined-as-private: özel olarak tanımlanmış
 defined-as-public: kamu olarak tanımlanan
+delete-account: Hesabı sil
 device:
   channel: Kanal bağlantısı
   created_at: 'Şu saatte oluşturuldu:'
@@ -138,6 +143,8 @@ intro:
   hi: Merhaba, {name}!
   whats-your-name: Adınız nedir?
 invalid-auth: geçersiz yetkilendirme
+last-upload: Son yükleme
+last-version: Son sürüm
 limit-reached: Sınıra ulaşıldı
 loading-more-data: Daha fazla veri yükleniyor...
 login:
@@ -154,13 +161,22 @@ login:
 module:
   heading: Modüller
 monthly-active-users: Aylık aktif kullanıcılar
+more-version-storage: Daha fazla sürüm Depolama
+my-account: Hesabım
+my-notifications: Bildirimlerim
+name: İsim
+need-more-contact-us: |-
+  Daha fazlasına ihtiyaç var ? 
+  Size özel plan için bize ulaşın
 not-found: Bulunamadı
 notificationSettings:
   heading: Bildirim ayarları
   validate: Doğrula
+notifications: Bildirimler
 onboarding:
   loading: Yükleniyor
 one-day-left: Bir gün kaldı
+open-sidebar: Kenar çubuğunu aç
 package:
   cannot-delete-version: Sürüm silinemiyor
   channels: Kanallar
@@ -191,6 +207,7 @@ password:
 pckage:
   version:
     is-used-in-channel: bir kanalda kullanılıyorsa, önce bağlantısını kaldırın
+personal-information: Kişisel bilgiler
 plan:
   abtest: A / B testi
   application: Başvuru
@@ -226,6 +243,9 @@ plan:
   whats-included: Neler dahil
   yearly-billing: Yıllık faturalandırma
 plan-inactive: Plan inaktif
+plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
+plan-member: planı üyesi.
+plans: Planlar
 please-upgrade: Lütfen daha fazla kullanıcı eklemek için planınızı yükseltin
 projects:
   list: senin
@@ -248,23 +268,30 @@ register:
   specialError: Özel karakterler içermelidir
   upperCaseError: Büyük harfler içermelidir
 see-usage: Kullanıma bakın
+settings: Ayarlar
+shared-apps: Paylaşılan Uygulamalar
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
+special-api-access: Özel API erişimi
 stats:
   devices: cihazlar
   downloads: İndirilenler
   subtitle: Geçen ay
   title: istatistikler
   versions: Sürümler
+submit: Göndermek
+the: bu
 trial-left: Kalan günler
 trial-plan-expired: Deneme Planının Süresi Doldu
 trial-plan-expires-in: 'Deneme Planı şu tarihte sona eriyor:'
+unlimited-updates: Sınırsız güncelleme
 upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
 usage:
   success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
   title: kullanım
+you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
 your-current-plan-is: Şu anki planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'

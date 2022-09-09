@@ -60,6 +60,8 @@ apikeys:
   links: Liens
   title: Clés API
   updater: condensateur de mise à jour
+bigger-app-size: Taille d'application plus grande
+bulk-upload: Transfert groupé
 button:
   about: À propos de
   back: Retour
@@ -76,6 +78,7 @@ button:
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-channel: Impossible de supprimer la chaîne
+change: Changer
 channel:
   add: Ajouter
   beta-channel: Chaîne bêta
@@ -104,10 +107,12 @@ channel:
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
 channel-deleted: Chaîne supprimée
+custom-domain: Domaine personnalisé
 days: jours
 defined-as: Défini comme
 defined-as-private: défini comme privé
 defined-as-public: défini comme public
+delete-account: Supprimer le compte
 device:
   channel: Lien de chaîne
   created_at: Créé à
@@ -142,6 +147,8 @@ intro:
   hi: Salut, {name}!
   whats-your-name: Comment t'appelles-tu ?
 invalid-auth: authentification invalide
+last-upload: Dernier téléchargement
+last-version: Dernière version
 limit-reached: Limite atteinte
 loading-more-data: Chargement de plus de données...
 login:
@@ -158,13 +165,22 @@ login:
 module:
   heading: Modules
 monthly-active-users: Utilisateurs actifs mensuels
+more-version-storage: Plus de version Stockage
+my-account: Mon compte
+my-notifications: mes notifications
+name: Nom
+need-more-contact-us: |-
+  Besoin de plus ? 
+  Contactez-nous pour un plan sur mesure
 not-found: Page non trouvée
 notificationSettings:
   heading: Réglages des notifications
   validate: Valider
+notifications: Avis
 onboarding:
   loading: Chargement
 one-day-left: Reste un jour
+open-sidebar: Ouvrir la barre latérale
 package:
   cannot-delete-version: Impossible de supprimer la version
   channels: Chaînes
@@ -193,6 +209,7 @@ password:
 pckage:
   version:
     is-used-in-channel: est utilisé dans un canal, dissociez-le d'abord
+personal-information: Informations personnelles
 plan:
   abtest: Test A/B
   application: Application
@@ -228,6 +245,9 @@ plan:
   whats-included: Ce qui est inclu
   yearly-billing: Facturation annuelle
 plan-inactive: Forfait inactif
+plan-is-the-best-pla: plan est le meilleur plan pour vos besoins.
+plan-member: membre du régime.
+plans: Des plans
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 projects:
   list: Tous vos projets
@@ -252,16 +272,22 @@ register:
   specialError: Doit contenir des caractères spéciaux
   upperCaseError: Doit contenir des lettres majuscules
 see-usage: Voir l'utilisation
+settings: Réglages
+shared-apps: Applications partagées
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
+special-api-access: Accès API spécial
 stats:
   devices: Dispositifs
   downloads: Téléchargements
   subtitle: Le mois dernier
   title: Statistiques
   versions: Versions
+submit: Soumettre
+the: La
 trial-left: Jours restants
 trial-plan-expired: Plan d'essai expiré
 trial-plan-expires-in: Le procès se termine dans
+unlimited-updates: Mises à jour illimitées
 upgrade: Améliorer
 upgrade-now: Mettre à jour maintenant
 usage:
@@ -269,6 +295,7 @@ usage:
     Votre plan a été configuré, cette page sera mise à jour dans quelques
     minutes
   title: Usage
+you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-reached-the-limi: Limite atteinte
 your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré actuel est

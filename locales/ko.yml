@@ -54,6 +54,8 @@ apikeys:
   links: 연결
   title: API 키
   updater: 커패시터 업데이터
+bigger-app-size: 더 큰 앱 크기
+bulk-upload: 일괄 업로드
 button:
   about: 소개
   back: 뒤로가기
@@ -70,6 +72,7 @@ button:
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
 cannot-delete-channel: 채널을 삭제할 수 없습니다
+change: 변화
 channel:
   add: 추가하다
   beta-channel: 베타 채널
@@ -96,10 +99,12 @@ channel:
   users: 사용자와 공유
   v3: V3 설정
 channel-deleted: 채널 삭제됨
+custom-domain: 사용자 정의 도메인
 days: 날
 defined-as: 로써 정의 된
 defined-as-private: 비공개로 정의
 defined-as-public: 공개로 정의
+delete-account: 계정 삭제
 device:
   channel: 채널 링크
   created_at: 만든 시간
@@ -132,6 +137,8 @@ intro:
   hi: 안녕, {name}!
   whats-your-name: 이름이 뭐예요?
 invalid-auth: 잘못된 인증
+last-upload: 마지막 업로드
+last-version: 마지막 버전
 limit-reached: 한도 도달
 loading-more-data: 추가 데이터 로드 중...
 login:
@@ -148,13 +155,22 @@ login:
 module:
   heading: 모듈
 monthly-active-users: 월간 활성 사용자
+more-version-storage: 더 많은 버전 저장
+my-account: 내 계정
+my-notifications: 내 알림
+name: 이름
+need-more-contact-us: |-
+  더 필요하세요? 
+  맞춤형 플랜 문의
 not-found: 찾을 수 없습니다
 notificationSettings:
   heading: 알림 설정
   validate: 확인
+notifications: 알림
 onboarding:
   loading: 로딩 중
 one-day-left: 하루 남았다
+open-sidebar: 사이드바 열기
 package:
   cannot-delete-version: 버전을 삭제할 수 없습니다
   channels: 채널
@@ -183,6 +199,7 @@ password:
 pckage:
   version:
     is-used-in-channel: 채널에서 사용 중이면 먼저 연결을 해제하십시오.
+personal-information: 개인정보
 plan:
   abtest: A/B 테스트
   application: 애플리케이션
@@ -216,6 +233,9 @@ plan:
   whats-included: 포함된 항목
   yearly-billing: 연간 청구
 plan-inactive: 비활성 계획
+plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.
+plan-member: 플랜 회원.
+plans: 계획
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 projects:
   list: 당신 것
@@ -238,23 +258,30 @@ register:
   specialError: 특수 문자를 포함해야 합니다.
   upperCaseError: 대문자를 포함해야 합니다.
 see-usage: 사용법 보기
+settings: 설정
+shared-apps: 공유 앱
 something-went-wrong-try-again-later: |-
   문제가 발생했습니다! 
   나중에 다시 시도하세요.
+special-api-access: 특수 API 액세스
 stats:
   devices: 장치
   downloads: 다운로드
   subtitle: 지난 달
   title: 통계
   versions: 버전
+submit: 제출하다
+the: 그만큼
 trial-left: 남은 일수
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: 평가판은 다음 날짜에 만료됩니다.
+unlimited-updates: 무제한 업데이트
 upgrade: 업그레이드
 upgrade-now: 지금 업그레이드
 usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법
+you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-reached-the-limi: 한도 도달
 your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은

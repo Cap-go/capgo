@@ -58,6 +58,8 @@ apikeys:
   links: Liên kết
   title: Khóa API
   updater: trình cập nhật tụ điện
+bigger-app-size: Kích thước ứng dụng lớn hơn
+bulk-upload: Tải lên hàng loạt
 button:
   about: Về
   back: Quay lại
@@ -74,6 +76,7 @@ button:
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-channel: Không thể xóa kênh
+change: Biến đổi
 channel:
   add: Thêm vào
   beta-channel: Kênh beta
@@ -102,10 +105,12 @@ channel:
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
+custom-domain: Tên miền tùy chọn
 days: ngày
 defined-as: Định nghĩa là
 defined-as-private: được định nghĩa là riêng tư
 defined-as-public: được định nghĩa là công khai
+delete-account: Xóa tài khoản
 device:
   channel: Liên kết kênh
   created_at: Được tạo lúc
@@ -138,6 +143,8 @@ intro:
   hi: Hi, {name}!
   whats-your-name: Tên bạn là gì?
 invalid-auth: xác thực không hợp lệ
+last-upload: Lần tải lên cuối cùng
+last-version: Phiên bản cuối cùng
 limit-reached: Đạt tới giới hạn
 loading-more-data: Đang tải thêm dữ liệu ...
 login:
@@ -154,13 +161,22 @@ login:
 module:
   heading: Mô-đun
 monthly-active-users: Người dùng hoạt động hàng tháng
+more-version-storage: Thêm phiên bản Bộ nhớ
+my-account: Tài khoản của tôi
+my-notifications: Thông báo của tôi
+name: Tên
+need-more-contact-us: |-
+  Cần thêm? 
+  Liên hệ với chúng tôi để có kế hoạch phù hợp
 not-found: Không tìm thấy
 notificationSettings:
   heading: Thiết lập thông báo
   validate: Xác thực
+notifications: Thông báo
 onboarding:
   loading: Đang tải
 one-day-left: Còn lại một ngày
+open-sidebar: Mở thanh bên
 package:
   cannot-delete-version: Không thể xóa phiên bản
   channels: Kênh truyền hình
@@ -191,6 +207,7 @@ password:
 pckage:
   version:
     is-used-in-channel: được sử dụng trong một kênh, trước tiên hãy hủy liên kết kênh đó
+personal-information: Thông tin cá nhân
 plan:
   abtest: Thử nghiệm A / B
   application: Ứng dụng
@@ -224,6 +241,9 @@ plan:
   whats-included: Bao gồm những gì
   yearly-billing: Thanh toán hàng năm
 plan-inactive: Kế hoạch không hoạt động
+plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
+plan-member: thành viên kế hoạch.
+plans: Các kế hoạch
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 projects:
   list: Của bạn
@@ -246,23 +266,30 @@ register:
   specialError: Phải chứa các ký tự đặc biệt
   upperCaseError: Nên chứa các chữ cái in hoa
 see-usage: Xem mức sử dụng
+settings: Cài đặt
+shared-apps: Ứng dụng được chia sẻ
 something-went-wrong-try-again-later: |-
   Đã xảy ra lỗi! 
   Thử lại sau.
+special-api-access: Quyền truy cập API đặc biệt
 stats:
   devices: Thiết bị
   downloads: Tải xuống
   subtitle: Tháng trước
   title: Số liệu thống kê
   versions: Phiên bản
+submit: Nộp
+the: Các
 trial-left: ngày còn lại
 trial-plan-expired: Gói dùng thử đã hết hạn
 trial-plan-expires-in: Gói dùng thử sẽ hết hạn sau
+unlimited-updates: Cập nhật không giới hạn
 upgrade: Nâng cấp
 upgrade-now: Nâng cấp ngay bây giờ
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
+you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của bạn ở đây.
 you-reached-the-limi: Đạt tới giới hạn
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là

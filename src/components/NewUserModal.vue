@@ -154,7 +154,7 @@ const submit = async () => {
             class="ion-margin-top w-45 mx-auto font-semibold"
           >
             <span v-if="!isLoading" class="rounded-4xl">
-              Submit
+              {{ t('submit') }}
             </span>
             <IonSpinner v-else name="crescent" color="light" />
           </IonButton>

@@ -60,6 +60,8 @@ apikeys:
   links: Tautan
   title: kunci API
   updater: kapasitor-pembaru
+bigger-app-size: Ukuran aplikasi lebih besar
+bulk-upload: Unggah massal
 button:
   about: Tentang
   back: Kembali
@@ -76,6 +78,7 @@ button:
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-channel: Tidak dapat menghapus saluran
+change: Mengubah
 channel:
   add: Menambahkan
   beta-channel: saluran beta
@@ -104,10 +107,12 @@ channel:
   users: Dibagikan dengan pengguna
   v3: Pengaturan V3
 channel-deleted: Saluran dihapus
+custom-domain: Domain khusus
 days: hari
 defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai pribadi
 defined-as-public: didefinisikan sebagai publik
+delete-account: Hapus akun
 device:
   channel: Tautan saluran
   created_at: Dibuat di
@@ -140,6 +145,8 @@ intro:
   hi: Halo, {name}!
   whats-your-name: Siapa nama anda?
 invalid-auth: autentik tidak valid
+last-upload: Unggahan terakhir
+last-version: Versi terakhir
 limit-reached: Batas tercapai
 loading-more-data: Memuat lebih banyak data...
 login:
@@ -156,13 +163,22 @@ login:
 module:
   heading: Modul
 monthly-active-users: Pengguna aktif bulanan
+more-version-storage: Penyimpanan versi lebih banyak
+my-account: Akun saya
+my-notifications: Notifikasi Saya
+name: Nama
+need-more-contact-us: |-
+  Butuh lebih? 
+  Hubungi kami untuk paket yang disesuaikan
 not-found: Tidak ditemukan
 notificationSettings:
   heading: Akun
   validate: Mengesahkan
+notifications: Pemberitahuan
 onboarding:
   loading: Memuat
 one-day-left: Tinggal satu hari lagi
+open-sidebar: Buka bilah sisi
 package:
   cannot-delete-version: Tidak dapat menghapus versi
   channels: saluran
@@ -191,6 +207,7 @@ password:
 pckage:
   version:
     is-used-in-channel: digunakan dalam saluran, batalkan tautannya terlebih dahulu
+personal-information: Informasi pribadi
 plan:
   abtest: Pengujian A/B
   application: Aplikasi
@@ -224,6 +241,9 @@ plan:
   whats-included: Apa yang termasuk?
   yearly-billing: Penagihan tahunan
 plan-inactive: Rencana tidak aktif
+plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
+plan-member: anggota rencana.
+plans: Rencana
 please-upgrade: Harap tingkatkan paket Anda untuk menambahkan lebih banyak pengguna
 projects:
   list: Milikmu
@@ -246,18 +266,24 @@ register:
   specialError: Harus mengandung karakter khusus
   upperCaseError: Harus mengandung huruf besar
 see-usage: Lihat penggunaan
+settings: Pengaturan
+shared-apps: Aplikasi yang Dibagikan
 something-went-wrong-try-again-later: |-
   Ada yang salah! 
   Coba lagi nanti.
+special-api-access: Akses API khusus
 stats:
   devices: Perangkat
   downloads: Unduhan
   subtitle: Bulan lalu
   title: Statistik
   versions: Versi
+submit: Kirim
+the: Itu
 trial-left: hari tersisa
 trial-plan-expired: Paket Uji Coba Kedaluwarsa
 trial-plan-expires-in: Rencana Percobaan berakhir dalam
+unlimited-updates: Pembaruan tanpa batas
 upgrade: Meningkatkan
 upgrade-now: Tingkatkan sekarang
 usage:
@@ -265,6 +291,7 @@ usage:
     Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
     menit
   title: Penggunaan
+you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah

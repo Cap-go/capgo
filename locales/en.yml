@@ -54,6 +54,8 @@ apikeys:
   links: Links
   title: API keys
   updater: capacitor-updater
+bigger-app-size: Bigger app size
+bulk-upload: Bulk upload
 button:
   about: About
   back: Back
@@ -70,6 +72,7 @@ button:
 cannot-delete-app: Cannot delete App
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
+change: Change
 channel:
   add: Add
   beta-channel: Beta channel
@@ -96,10 +99,12 @@ channel:
   users: Shared with users
   v3: V3 settings
 channel-deleted: Channel deleted
+custom-domain: Custom domain
 days: days
 defined-as: Defined as
 defined-as-private: defined as private
 defined-as-public: defined as public
+delete-account: Delete Account
 device:
   channel: Channel link
   created_at: Created at
@@ -132,6 +137,8 @@ intro:
   hi: Hi, {name}!
   whats-your-name: What's your name?
 invalid-auth: invalid auth
+last-upload: Last upload
+last-version: Last version
 limit-reached: Limit reached
 loading-more-data: Loading more data...
 login:
@@ -148,13 +155,20 @@ login:
 module:
   heading: Modules
 monthly-active-users: Monthly active users
+more-version-storage: More version Storage
+my-account: My Account
+my-notifications: My Notifications
+name: Name
+need-more-contact-us: Need more ? Contact us for tailored plan
 not-found: Not found
 notificationSettings:
   heading: Notification settings
   validate: Validate
+notifications: Notifications
 onboarding:
   loading: Loading
 one-day-left: One day left
+open-sidebar: Open sidebar
 package:
   cannot-delete-version: Cannot delete version
   channels: Channels
@@ -183,6 +197,7 @@ password:
 pckage:
   version:
     is-used-in-channel: is used in a channel, unlink it first
+personal-information: Personal Informations
 plan:
   abtest: A / B testing
   application: Application
@@ -216,6 +231,9 @@ plan:
   whats-included: What's included
   yearly-billing: Yearly billing
 plan-inactive: Plan inactive
+plan-is-the-best-pla: plan is the best plan for your needs.
+plan-member: plan member.
+plans: Plans
 please-upgrade: Please upgrade your plan to add more users
 projects:
   list: Yours
@@ -238,21 +256,29 @@ register:
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
 see-usage: See usage
+settings: Settings
+shared-apps: Shared Apps
 something-went-wrong-try-again-later: Something went wrong! Try again later.
+special-api-access: Special API access
 stats:
   devices: Devices
   downloads: Downloads
   subtitle: Last month
   title: Stats
   versions: Versions
+submit: Submit
+the: The
+title: title
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
+unlimited-updates: Unlimited updates
 upgrade: Upgrade
 upgrade-now: Upgrade now
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
+you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is

@@ -183,8 +183,8 @@ watchEffect(async () => {
         </h1>
         <p class="mt-5 text-xl text-gray-700 dark:text-white  sm:text-center">
           {{ t('plan.desc') }}<br>
-          Your are a <span class="underline font-bold">{{ currentPlan?.name }}</span> plan member.<br>
-          The <span class="underline font-bold">{{ currentPlanSuggest?.name }}</span> plan is the best plan for your needs.
+          Your are a <span class="underline font-bold">{{ currentPlan?.name }}</span> {{ t('plan-member') }}<br>
+          {{ t('the') }} <span class="underline font-bold">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
 
         <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8 dark:text-gray-500 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
@@ -232,7 +232,7 @@ watchEffect(async () => {
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="max-w-2xl mx-auto text-center">
             <h2 class="text-3xl font-bold text-white-900 sm:text-4xl xl:text-5xl font-pj dark:text-white">
-              Need more ? Contact us for tailored plan
+              {{ t('need-more-contact-us') }}
             </h2>
           </div>
 
@@ -251,21 +251,21 @@ watchEffect(async () => {
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                           </svg>
-                          Unlimited updates
+                          {{ t('unlimited-updates') }}
                         </li>
 
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                           </svg>
-                          Bigger app size
+                          {{ t('bigger-app-size') }}
                         </li>
 
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                           </svg>
-                          More version Storage
+                          {{ t('more-version-storage') }}
                         </li>
                       </ul>
                     </div>
@@ -276,21 +276,21 @@ watchEffect(async () => {
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                           </svg>
-                          Custom domain
+                          {{ t('custom-domain') }}
                         </li>
 
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                           </svg>
-                          Special API access
+                          {{ t('special-api-access') }}
                         </li>
 
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                           </svg>
-                          Bulk upload
+                          {{ t('bulk-upload') }}
                         </li>
                       </ul>
                     </div>

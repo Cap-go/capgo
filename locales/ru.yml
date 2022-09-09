@@ -58,6 +58,8 @@ apikeys:
   links: Ссылки
   title: ключи API
   updater: конденсатор-обновитель
+bigger-app-size: Большой размер приложения
+bulk-upload: Массовая загрузка
 button:
   about: О шаблоне
   back: Назад
@@ -74,6 +76,7 @@ button:
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-version: Не могу удалить версию приложения
 cannot-delete-channel: Не могу удалить канал
+change: Изменять
 channel:
   add: Добавлять
   beta-channel: Бета-канал
@@ -102,10 +105,12 @@ channel:
   users: Доступно пользователям
   v3: Настройки версии 3
 channel-deleted: Канал удален
+custom-domain: Пользовательский домен
 days: дни
 defined-as: Определяется как
 defined-as-private: определяется как частный
 defined-as-public: определяется как общественное
+delete-account: Удалить аккаунт
 device:
   channel: Ссылка на канал
   created_at: Создано на
@@ -138,6 +143,8 @@ intro:
   hi: Привет, {name}!
   whats-your-name: Как тебя зовут?
 invalid-auth: недействительная авторизация
+last-upload: Последняя загрузка
+last-version: Последняя версия
 limit-reached: Достигнут предел
 loading-more-data: Загрузка дополнительных данных...
 login:
@@ -154,13 +161,22 @@ login:
 module:
   heading: Модули
 monthly-active-users: Ежемесячные активные пользователи
+more-version-storage: Дополнительная версия Хранение
+my-account: Мой счет
+my-notifications: Мои уведомления
+name: Имя
+need-more-contact-us: |-
+  Нужно больше ? 
+  Свяжитесь с нами для индивидуального плана
 not-found: Не найден
 notificationSettings:
   heading: Настройки уведомлений
   validate: Подтвердить
+notifications: Уведомления
 onboarding:
   loading: Загрузка
 one-day-left: В один прекрасный день покинул
+open-sidebar: Открыть боковую панель
 package:
   cannot-delete-version: Не могу удалить версию
   channels: каналы
@@ -189,6 +205,7 @@ password:
 pckage:
   version:
     is-used-in-channel: используется в канале, сначала отсоедините его
+personal-information: Персональная информация
 plan:
   abtest: А/Б тестирование
   application: Заявление
@@ -222,6 +239,9 @@ plan:
   whats-included: Что включено
   yearly-billing: Годовой биллинг
 plan-inactive: План неактивен
+plan-is-the-best-pla: план - лучший план для ваших нужд.
+plan-member: член плана.
+plans: Планы
 please-upgrade: Обновите план, чтобы добавить больше пользователей
 projects:
   list: Ваш
@@ -244,18 +264,23 @@ register:
   specialError: Должен содержать специальные символы
   upperCaseError: Должен содержать заглавные буквы
 see-usage: См. использование
+settings: Настройки
+shared-apps: Общие приложения
 something-went-wrong-try-again-later: |-
   Что-то пошло не так! 
   Попробуйте позже.
+special-api-access: Специальный доступ к API
 stats:
   devices: Устройства
   downloads: Загрузки
   subtitle: Прошлый месяц
   title: Статистика
   versions: Версии
+submit: Представлять на рассмотрение
 trial-left: дней осталось
 trial-plan-expired: Срок действия пробного плана истек
 trial-plan-expires-in: Срок действия пробного плана истекает через
+unlimited-updates: Неограниченные обновления
 upgrade: Обновление
 upgrade-now: Обнови сейчас
 usage:
@@ -263,6 +288,7 @@ usage:
     Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
     минут.
   title: использование
+you-can-change-your-: Вы можете изменить свою личную информацию здесь.
 you-reached-the-limi: Достигнуто ограничение
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'

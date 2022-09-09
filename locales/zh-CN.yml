@@ -54,6 +54,8 @@ apikeys:
   links: 链接
   title: API 密钥
   updater: 电容更新器
+bigger-app-size: 更大的应用程序大小
+bulk-upload: 批量上传
 button:
   about: 关于
   back: 返回
@@ -70,6 +72,7 @@ button:
 cannot-delete-app: 无法删除应用
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-channel: 无法删除频道
+change: 改变
 channel:
   add: 添加
   beta-channel: 测试通道
@@ -96,10 +99,12 @@ channel:
   users: 与用户共享
   v3: V3 设置
 channel-deleted: 频道已删除
+custom-domain: 自定义域
 days: 天
 defined-as: 定义为
 defined-as-private: 定义为私有
 defined-as-public: 定义为公开
+delete-account: 删除帐户
 device:
   channel: 频道链接
   created_at: 创建于
@@ -132,6 +137,8 @@ intro:
   hi: 你好，{name}
   whats-your-name: 输入你的名字
 invalid-auth: 无效的身份验证
+last-upload: 上次上传
+last-version: 最新版本
 limit-reached: 达到上限
 loading-more-data: 正在加载更多数据...
 login:
@@ -148,13 +155,22 @@ login:
 module:
   heading: 模块
 monthly-active-users: 月活跃用户
+more-version-storage: 更多版本存储
+my-account: 我的帐户
+my-notifications: 我的通知
+name: 姓名
+need-more-contact-us: |-
+  需要更多 ？
+  联系我们获取量身定制的计划
 not-found: 未找到页面
 notificationSettings:
   heading: 通知设置
   validate: 证实
+notifications: 通知
 onboarding:
   loading: 正在加载
 one-day-left: 还剩一天
+open-sidebar: 打开侧边栏
 package:
   cannot-delete-version: 无法删除版本
   channels: 频道
@@ -183,6 +199,7 @@ password:
 pckage:
   version:
     is-used-in-channel: 在频道中使用，请先取消链接
+personal-information: 个人信息
 plan:
   abtest: A/B 测试
   application: 应用
@@ -216,6 +233,9 @@ plan:
   whats-included: 包括什么
   yearly-billing: 每年计费
 plan-inactive: 计划无效
+plan-is-the-best-pla: 计划是满足您需求的最佳计划。
+plan-member: 计划成员。
+plans: 计划
 please-upgrade: 请升级您的计划以添加更多用户
 projects:
   list: 你的
@@ -238,23 +258,30 @@ register:
   specialError: 应包含特殊字符
   upperCaseError: 应包含大写字母
 see-usage: 查看用法
+settings: 设置
+shared-apps: 共享应用程序
 something-went-wrong-try-again-later: |-
   有些不对劲！
   稍后再试。
+special-api-access: 特殊 API 访问
 stats:
   devices: 设备
   downloads: 下载
   subtitle: 上个月
   title: 统计数据
   versions: 版本
+submit: 提交
+the: 这
 trial-left: 剩余天数
 trial-plan-expired: 试用计划已过期
 trial-plan-expires-in: 试用计划将于
+unlimited-updates: 无限更新
 upgrade: 升级
 upgrade-now: 现在升级
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
+you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到上限
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是

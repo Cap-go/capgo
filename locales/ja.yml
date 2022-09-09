@@ -54,6 +54,8 @@ apikeys:
   links: リンク
   title: APIキー
   updater: コンデンサアップデータ
+bigger-app-size: アプリのサイズが大きい
+bulk-upload: 一括アップロード
 button:
   about: これは？
   back: 戻る
@@ -70,6 +72,7 @@ button:
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-channel: チャネルを削除できません
+change: 変化する
 channel:
   add: 追加
   beta-channel: ベータチャンネル
@@ -96,10 +99,12 @@ channel:
   users: ユーザーと共有
   v3: V3設定
 channel-deleted: チャンネルが削除されました
+custom-domain: カスタム ドメイン
 days: 日々
 defined-as: として定義
 defined-as-private: プライベートと定義
 defined-as-public: パブリックと定義
+delete-account: アカウントを削除する
 device:
   channel: チャネルリンク
   created_at: で作成
@@ -132,6 +137,8 @@ intro:
   hi: こんにちは、{name}!
   whats-your-name: 君の名は。
 invalid-auth: 無効な認証
+last-upload: 最後のアップロード
+last-version: 最後のバージョン
 limit-reached: 制限に達しました
 loading-more-data: より多くのデータを読み込んでいます...
 login:
@@ -148,13 +155,22 @@ login:
 module:
   heading: モジュール
 monthly-active-users: 月間アクティブ ユーザー数
+more-version-storage: より多くのバージョン ストレージ
+my-account: マイアカウント
+my-notifications: 私の通知
+name: 名前
+need-more-contact-us: |-
+  もっといります ？
+  オーダーメイドプランはお問い合わせください
 not-found: 見つかりませんでした
 notificationSettings:
   heading: 通知設定
   validate: 検証
+notifications: 通知
 onboarding:
   loading: 読み込み中
 one-day-left: 残り一日
+open-sidebar: サイドバーを開く
 package:
   cannot-delete-version: バージョンを削除できません
   channels: チャネル
@@ -183,6 +199,7 @@ password:
 pckage:
   version:
     is-used-in-channel: チャネルで使用されている場合は、最初にリンクを解除してください
+personal-information: 個人情報
 plan:
   abtest: A/Bテスト
   application: 応用
@@ -216,6 +233,9 @@ plan:
   whats-included: 含まれているもの
   yearly-billing: 年間請求
 plan-inactive: プランの非アクティブ
+plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。
+plan-member: 企画メンバー。
+plans: 予定
 please-upgrade: プランをアップグレードして、ユーザーを追加してください
 projects:
   list: あなたのもの
@@ -238,23 +258,30 @@ register:
   specialError: 特殊文字を含める必要があります
   upperCaseError: 大文字を含める必要があります
 see-usage: 使用法を見る
+settings: 設定
+shared-apps: 共有アプリ
 something-went-wrong-try-again-later: |-
   何かがうまくいかなかった！
   あとでもう一度試してみてください。
+special-api-access: 特別な API アクセス
 stats:
   devices: デバイス
   downloads: ダウンロード
   subtitle: 先月
   title: 統計
   versions: バージョン
+submit: 送信
+the: の
 trial-left: 残りの日数
 trial-plan-expired: 試用プランの有効期限が切れました
 trial-plan-expires-in: 試用プランの有効期限は
+unlimited-updates: 無制限のアップデート
 upgrade: アップグレード
 upgrade-now: 今すぐアップグレード
 usage:
   success: プランが設定されましたこのページは数分で更新されます
   title: 使用法
+you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました
 your-current-plan-is: あなたの現在の計画は
 your-current-suggested-plan-is: 現在提案されている計画は

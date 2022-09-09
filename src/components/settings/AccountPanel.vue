@@ -254,7 +254,7 @@ watchEffect(async () => {
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="text-2xl text-slate-800 dark:text-white font-bold mb-5">
-          My Account
+          {{ t('my-account') }}
         </h2>
         <!-- Picture -->
         <section>
@@ -266,17 +266,17 @@ watchEffect(async () => {
               >
             </div>
             <button class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded" @click="presentActionSheet">
-              Change
+              {{ t('change') }}
             </button>
           </div>
         </section>
         <!-- Personal Info -->
         <section>
           <h3 class="text-xl leading-snug text-slate-800 dark:text-white font-bold mb-1">
-            Personal Informations
+            {{ t('personal-information') }}
           </h3>
           <div class="text-sm dark:text-gray-100">
-            You can change your personal informations here.
+            {{ t('you-can-change-your-') }}
           </div>
 
           <div class="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
@@ -343,7 +343,7 @@ watchEffect(async () => {
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
             <button class="btn p-2 rounded bg-red-400 border-red-200 hover:bg-red-600 text-white" @click="deleteAccount()">
-              Delete Account
+              {{ t('delete-account') }}
             </button>
             <button
               class="btn p-2 rounded bg-blue-500 hover:bg-blue-600 text-white ml-3"
