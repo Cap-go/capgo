@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.18.40-alpha.4](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.3...1.18.40-alpha.4) (2022-09-09)
+
+
+### Bug Fixes
+
+* remove old dropdown ([cbad050](https://github.com/Cap-go/capgo/commit/cbad0503a6709a684336a0f31846f2e8bb1536e6))
+
 ### [1.18.40-alpha.3](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.2...1.18.40-alpha.3) (2022-09-09)
 
 ### [1.18.40-alpha.2](https://github.com/Cap-go/capgo/compare/1.18.40-alpha.1...1.18.40-alpha.2) (2022-09-08)
