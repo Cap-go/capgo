@@ -150,6 +150,16 @@ const deleteAccount = async () => {
   await actionSheet.present()
 }
 
+const acronym = computed(() => {
+  if (main.user?.first_name && main.user.last_name)
+    return main.user?.first_name[0] + main.user?.last_name[0]
+  else if (main.user?.first_name)
+    return main.user?.first_name[0]
+  else if (main.user?.last_name)
+    return main.user?.last_name[0]
+  return '??'
+})
+
 const presentActionSheet = async () => {
   const actionSheet = await actionSheetController.create({
     buttons: [
@@ -261,9 +271,12 @@ watchEffect(async () => {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                class="w-40 h-40 object-cover rounded-full" :src="main.user?.image_url || '../../../assets/icon-foreground.png'"
+                v-if="main.user?.image_url" class="w-20 h-20 object-cover rounded-full" :src="main.user?.image_url"
                 width="80" height="80" alt="User upload"
               >
+              <div v-else class="w-20 h-20 rounded-full flex justify-center items-center border-white border text-4xl">
+                <p>{{ acronym }}</p>
+              </div>
             </div>
             <button class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded" @click="presentActionSheet">
               {{ t('change') }}

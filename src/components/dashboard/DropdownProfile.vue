@@ -58,8 +58,8 @@ onUnmounted(() => {
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
       <img v-if="main.user?.image_url" class="w-8 h-8 rounded-full" :src="main.user?.image_url" width="32" height="32" alt="User">
-      <div v-else class="rounded-full border-white border p-1">
-        {{ acronym }}
+      <div v-else class="w-8 h-8 rounded-full flex justify-center items-center border-white border">
+        <p>{{ acronym }}</p>
       </div>
       <div class="flex items-center truncate">
         <span class="truncate ml-2 text-sm font-medium group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
