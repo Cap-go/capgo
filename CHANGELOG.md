@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.21.0](https://github.com/Cap-go/capgo/compare/1.20.17...1.21.0) (2022-09-10)
+
+
+### Features
+
+* make onboarding reactive of user account actions ([fa667de](https://github.com/Cap-go/capgo/commit/fa667de4ebf778b4750f0cb6afe722c0c34bbd20))
+
 ### [1.20.17](https://github.com/Cap-go/capgo/compare/1.20.16...1.20.17) (2022-09-10)
 
 
