@@ -44,6 +44,7 @@ activation:
     dell'app
   validate: Convalidare
 add-another-app: Aggiungi un'altra app
+add-this-code-to-you: Aggiungi questo codice al tuo progetto
 add-your-app-to-your: Aggiungi la tua app al tuo account
 add-your-first-app-t: Aggiungi la tua prima app al tuo account e spingiamo gli aggiornamenti!
 afternoon: pomeriggio
@@ -117,6 +118,7 @@ channel:
   v3: Impostazioni V3
 channel-deleted: Canale cancellato
 commands: comandi
+copied-to-clipboard: Copiato negli appunti
 copy-your: Copia il tuo
 custom-domain: Dominio personalizzato
 dashboard: Pannello di controllo
@@ -153,6 +155,8 @@ forgot:
   heading: Ha dimenticato la password
   success: Password aggiornata correttamente
 good: Bene
+in-your-main-file: Nel tuo file principale
+into-your-app-folder: Nella cartella dell'app.
 intro:
   aka: Conosciuto anche come
   desc: Modello per una Applicazione Vite
@@ -309,6 +313,7 @@ submit: Invia
 terms-of-use: Termini di utilizzo
 thank-you-for-choosi: Grazie per aver scelto Capgo!
 the: Il
+this-page-will-self-: Questa pagina si aggiornerà automaticamente
 title: titolo
 top-apps: Migliori applicazioni
 trial-left: giorni rimasti

@@ -42,6 +42,7 @@ activation:
   notification-desc: 새 앱 버전을 사용할 수 있을 때 알림 수신에 동의합니다.
   validate: 확인
 add-another-app: 다른 앱 추가
+add-this-code-to-you: 이 코드를 프로젝트에 추가
 add-your-app-to-your: 계정에 앱 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
 afternoon: 오후
@@ -110,6 +111,7 @@ channel:
   v3: V3 설정
 channel-deleted: 채널 삭제됨
 commands: 명령
+copied-to-clipboard: 클립보드에 복사됨
 copy-your: 복사
 custom-domain: 사용자 정의 도메인
 dashboard: 계기반
@@ -146,6 +148,8 @@ forgot:
   heading: 비밀번호를 잊으 셨나요
   success: 비밀번호가 성공적으로 업데이트되었습니다.
 good: 좋은
+in-your-main-file: 기본 파일에서
+into-your-app-folder: 앱 폴더로.
 intro:
   aka: 또한 ~으로 알려진
   desc: Vite 애플리케이션 템플릿
@@ -300,6 +304,7 @@ submit: 제출하다
 terms-of-use: 이용약관
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
+this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
 title: 제목
 top-apps: 인기 앱
 trial-left: 남은 일수

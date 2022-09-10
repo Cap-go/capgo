@@ -46,6 +46,7 @@ activation:
     verfügbar sind
   validate: Bestätigen
 add-another-app: Fügen Sie eine weitere App hinzu
+add-this-code-to-you: Fügen Sie diesen Code Ihrem Projekt hinzu
 add-your-app-to-your: Fügen Sie Ihre App zu Ihrem Konto hinzu
 add-your-first-app-t: >-
   Fügen Sie Ihrem Konto Ihre erste App hinzu und lassen Sie uns Updates
@@ -120,6 +121,7 @@ channel:
   v3: V3-Einstellungen
 channel-deleted: Kanal gelöscht
 commands: Befehle
+copied-to-clipboard: In die Zwischenablage kopiert
 copy-your: Kopieren Sie Ihre
 custom-domain: Benutzerdefinierten Domain
 dashboard: Armaturenbrett
@@ -158,6 +160,8 @@ forgot:
   heading: Passwort vergessen
   success: Passwort erfolgreich aktualisiert
 good: Gut
+in-your-main-file: In Ihrer Hauptdatei
+into-your-app-folder: In Ihren App-Ordner.
 intro:
   aka: Auch bekannt als
   desc: Vite Startvorlage mit Vorlieben
@@ -318,6 +322,7 @@ submit: Einreichen
 terms-of-use: Nutzungsbedingungen
 thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
 the: Das
+this-page-will-self-: Diese Seite wird sich selbst aktualisieren
 title: Titel
 top-apps: Top Anwendungen
 trial-left: Tage übrig

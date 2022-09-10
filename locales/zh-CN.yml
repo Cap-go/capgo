@@ -42,6 +42,7 @@ activation:
   notification-desc: 我接受在有新应用版本可用时接收通知
   validate: 证实
 add-another-app: 添加其他应用
+add-this-code-to-you: 将此代码添加到您的项目中
 add-your-app-to-your: 将您的应用添加到您的帐户
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
 afternoon: 下午
@@ -110,6 +111,7 @@ channel:
   v3: V3 设置
 channel-deleted: 频道已删除
 commands: 命令
+copied-to-clipboard: 已复制到剪贴板
 copy-your: 复制你的
 custom-domain: 自定义域
 dashboard: 仪表板
@@ -146,6 +148,8 @@ forgot:
   heading: 忘记密码
   success: 密码更新成功
 good: 好的
+in-your-main-file: 在你的主文件中
+into-your-app-folder: 进入您的应用程序文件夹。
 intro:
   aka: 也叫
   desc: 固执己见的 Vite 项目模板
@@ -300,6 +304,7 @@ submit: 提交
 terms-of-use: 使用条款
 thank-you-for-choosi: 感谢您选择 Capgo！
 the: 这
+this-page-will-self-: 此页面将自动刷新
 title: 标题
 top-apps: 热门应用
 trial-left: 剩余天数

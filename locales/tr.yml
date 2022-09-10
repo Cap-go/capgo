@@ -44,6 +44,7 @@ activation:
   notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
   validate: Doğrula
 add-another-app: Başka bir uygulama ekle
+add-this-code-to-you: Bu kodu projenize ekleyin
 add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
 afternoon: öğleden sonra
@@ -116,6 +117,7 @@ channel:
   v3: V3 ayarları
 channel-deleted: Kanal silindi
 commands: komutlar
+copied-to-clipboard: Panoya kopyalandı
 copy-your: seninkini kopyala
 custom-domain: Özel alan
 dashboard: Gösterge Paneli
@@ -152,6 +154,8 @@ forgot:
   heading: Parolanızı mı unuttunuz
   success: şifre başarıyla güncellendi
 good: İyi
+in-your-main-file: Ana dosyanızda
+into-your-app-folder: Uygulama klasörünüze.
 intro:
   aka: Ayrıca şöyle bilinir
   desc: Görüşlü Vite Başlangıç Şablonu
@@ -310,6 +314,7 @@ submit: Göndermek
 terms-of-use: Kullanım Şartları
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
+this-page-will-self-: Bu sayfa kendini yenileyecek
 title: Başlık
 top-apps: Popüler uygulamalar
 trial-left: Kalan günler

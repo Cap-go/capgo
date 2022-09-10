@@ -44,6 +44,7 @@ activation:
   notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
   validate: Xác thực
 add-another-app: Thêm ứng dụng khác
+add-this-code-to-you: Thêm mã này vào dự án của bạn
 add-your-app-to-your: Thêm ứng dụng của bạn vào tài khoản của bạn
 add-your-first-app-t: Thêm ứng dụng đầu tiên vào tài khoản của bạn và hãy cập nhật!
 afternoon: buổi chiều
@@ -116,6 +117,7 @@ channel:
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
 commands: lệnh
+copied-to-clipboard: Sao chép vào clipboard
 copy-your: Sao chép của bạn
 custom-domain: Tên miền tùy chọn
 dashboard: bảng điều khiển
@@ -152,6 +154,8 @@ forgot:
   heading: Quên mật khẩu
   success: Đã cập nhật mật khẩu thành công
 good: Tốt
+in-your-main-file: Trong tệp chính của bạn
+into-your-app-folder: Vào thư mục ứng dụng của bạn.
 intro:
   aka: Cũng được biết đến như là
   desc: Ý kiến cá nhân Vite Template để bắt đầu
@@ -308,6 +312,7 @@ submit: Nộp
 terms-of-use: Điều khoản sử dụng
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
+this-page-will-self-: Trang này sẽ tự làm mới
 title: Tiêu đề
 top-apps: Những ứng dụng hàng đầu
 trial-left: ngày còn lại

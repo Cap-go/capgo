@@ -46,6 +46,7 @@ activation:
     tersedia
   validate: Mengesahkan
 add-another-app: Tambahkan aplikasi lain
+add-this-code-to-you: Tambahkan kode ini ke proyek Anda
 add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan mari dorong pembaruan!
 afternoon: sore
@@ -118,6 +119,7 @@ channel:
   v3: Pengaturan V3
 channel-deleted: Saluran dihapus
 commands: perintah
+copied-to-clipboard: Disalin ke papan klip
 copy-your: Salin Anda
 custom-domain: Domain khusus
 dashboard: Dasbor
@@ -154,6 +156,8 @@ forgot:
   heading: Tidak ingat kata sandi
   success: Kata sandi berhasil diperbarui
 good: Bagus
+in-your-main-file: Di file utama Anda
+into-your-app-folder: Ke folder aplikasi Anda.
 intro:
   aka: Juga diketahui sebagai
   desc: Template awal vite
@@ -308,6 +312,7 @@ submit: Kirim
 terms-of-use: Syarat Penggunaan
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
+this-page-will-self-: Halaman ini akan menyegarkan diri sendiri
 title: judul
 top-apps: Aplikasi teratas
 trial-left: hari tersisa

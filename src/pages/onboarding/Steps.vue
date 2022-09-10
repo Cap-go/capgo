@@ -12,25 +12,58 @@ import { useMainStore } from '~/stores/main'
 const props = defineProps<{
   onboarding: boolean
 }>()
+const emit = defineEmits(['done'])
 
 const route = useRoute()
 const isLoading = ref(false)
-const step = ref(1)
+const step = ref(0)
+const appId = ref<string>()
+const realtimeListener = ref(false)
+const mySubscription = ref()
 const supabase = useSupabase()
 const auth = supabase.auth.user()
-const app = ref<definitions['apikeys']>()
 const router = useRouter()
 const main = useMainStore()
 const { t } = useI18n()
 
-const copyToast = async (text: string, stepNb: number) => {
+const steps = ref([
+  {
+    title: t('log-to-the-capgo-cli'),
+    command: 'npx @capgo/cli@latest login [APIKEY]',
+    subtitle: '',
+  },
+  {
+    title: t('add-your-app-to-your'),
+    command: 'npx @capgo/cli@latest add',
+    subtitle: `${t('into-your-app-folder')}`,
+  },
+  {
+    title: t('add-this-code-to-you'),
+    command: `import { CapacitorUpdater } from '@capgo/capacitor-updater'
+CapacitorUpdater.notifyAppReady()`,
+    subtitle: t('in-your-main-file'),
+  },
+  {
+    title: t('build-your-code-and-'),
+    command: 'npx @capgo/cli@latest upload',
+    subtitle: '',
+  },
+  {
+    title: t('discover-your-dashbo'),
+    command: '',
+    subtitle: t('this-page-will-self-'),
+  },
+])
+
+const copyToast = async (text: string) => {
   copy(text)
   const toast = await toastController
     .create({
-      message: 'Copied to clipboard',
+      message: t('copied-to-clipboard'),
       duration: 2000,
     })
-  step.value = stepNb + 1
+  if (!realtimeListener.value)
+    step.value += 1
   await toast.present()
 }
 const getKey = async (retry = true): Promise<void> => {
@@ -38,15 +71,45 @@ const getKey = async (retry = true): Promise<void> => {
   const { data } = await supabase
     .from<definitions['apikeys']>('apikeys')
     .select()
-    .eq('user_id', auth?.id).eq('mode', 'all').single()
+    .eq('user_id', auth?.id).eq('mode', 'all')
   if (data)
-    app.value = data
+    steps.value[0].command = `npx @capgo/cli@latest login ${data[0].key}`
 
   else if (retry && auth?.id)
     return getKey(false)
 
   isLoading.value = false
 }
+watchEffect(async () => {
+  if (step.value === 1 && !realtimeListener.value) {
+    console.log('watch app change step 1')
+    realtimeListener.value = true
+    mySubscription.value = supabase
+      .from<definitions['apps']>(`apps:user_id=eq.${main.auth?.id}`)
+      .on('INSERT', (payload) => {
+        console.log('Change received step 1!', payload)
+        step.value += 1
+        appId.value = payload.new.id || ''
+        realtimeListener.value = false
+        mySubscription.value.unsubscribe()
+      })
+      .subscribe()
+  }
+  else if (step.value === 4 && !realtimeListener.value) {
+    console.log('watch app change step 4')
+    realtimeListener.value = true
+    mySubscription.value = supabase
+      .from<definitions['app_versions']>(`app_versions:app_id=eq.${appId.value}`)
+      .on('INSERT', (payload) => {
+        console.log('Change received step 3!', payload)
+        step.value += 1
+        realtimeListener.value = false
+        mySubscription.value.unsubscribe()
+        emit('done')
+      })
+      .subscribe()
+  }
+})
 
 watchEffect(async () => {
   if (route.path === '/app/home')
@@ -76,89 +139,28 @@ watchEffect(async () => {
       </div>
 
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
-        <div class="relative">
-          <div :class="[step < 1 ? 'opacity-30' : '']" class=" relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
+        <template v-for="(s, i) in steps" :key="i">
+          <div v-if="i > 0" class="bg-gray-200 w-1 h-10 mx-auto" />
+
+          <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
               <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-                1
+                <template v-if="i < 4">
+                  {{ i + 1 }}
+                </template>
+                <template v-else>
+                  🚀
+                </template>
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-                {{ t('copy-your') }}{{ ' ' }}
-                <span v-if="app" class="cursor-pointer text-pumpkin-orange-700 font-bold" @click="copyToast(app!.key, 1)">
-                  {{ t('api-key') }}<IonIcon :icon="copyOutline" class="text-muted-blue-800 ml-2" />
-                </span>
-                <span v-else class="text-pumpkin-orange-700 font-bold">
-                  {{ t('api-key') }}
-                </span>
-                <br>
-                <span class="text-sm">{{ t('your-api-key') }} {{ app?.key }}</span>
+                {{ s.title }}<br>
+                <code v-if="s.command" class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(s.command)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
+                <br v-if="s.command">
+                <span class="text-sm">{{ s.subtitle }}</span>
               </p>
             </div>
           </div>
-        </div>
-
-        <div class="bg-gray-200 w-1 h-10 mx-auto" />
-
-        <div :class="[step < 2 ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-          <div class="flex items-start sm:items-center">
-            <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-              2
-            </div>
-            <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-              {{ t('log-to-the-capgo-cli') }}<br>
-              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest login ${app!.key}`, 2)">npx @capgo/cli@latest login
-                <span class="font-bold">[{{ t('api-key') }}]</span>{{ ' ' }}
-                <IonIcon :icon="copyOutline" class="text-muted-blue-800" />
-              </code>
-            </p>
-          </div>
-        </div>
-
-        <div class="bg-gray-200 w-1 h-10 mx-auto" />
-
-        <div :class="[step < 3 ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-          <div class="flex items-start sm:items-center">
-            <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-              3
-            </div>
-            <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-              {{ t('add-your-app-to-your') }}<br>
-              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast('npx @capgo/cli@latest add [appId]', 3)">npx @capgo/cli@latest add [appId] <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
-              <br>
-              <span class="text-sm">{{ t('app-id-example') }}: com.example.app</span>
-            </p>
-          </div>
-        </div>
-
-        <div class="bg-gray-200 w-1 h-10 mx-auto" />
-
-        <div :class="[step < 4 ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-          <div class="flex items-start sm:items-center">
-            <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-              4
-            </div>
-            <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-              {{ t('build-your-code-and-') }}<br>
-              <code class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(`npx @capgo/cli@latest upload --channel production`, 4)">npx @capgo/cli@latest upload --channel production <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
-            </p>
-          </div>
-        </div>
-
-        <div class="bg-gray-200 w-1 h-10 mx-auto" />
-
-        <div class="relative pb-24">
-          <div :class="[step < 5 ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
-            <div class="flex items-start sm:items-center">
-              <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-                🚀
-              </div>
-              <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
-                {{ t('discover-your-dashbo') }}<br>
-                <a href="/app/home" class="text-pumpkin-orange-700 text-lg cursor-pointer">{{ t('refresh-this-page') }}</a>
-              </p>
-            </div>
-          </div>
-        </div>
+        </template>
         <div v-if="onboarding" class="text-center">
           <button
             class="mx-auto font-bold text-pumpkin-orange-500"

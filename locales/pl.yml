@@ -44,6 +44,7 @@ activation:
     dostępna
   validate: Uprawomocnić
 add-another-app: Dodaj kolejną aplikację
+add-this-code-to-you: Dodaj ten kod do swojego projektu
 add-your-app-to-your: Dodaj swoją aplikację do swojego konta
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i przesyłaj aktualizacje!
 afternoon: wieczór
@@ -116,6 +117,7 @@ channel:
   v3: Ustawienia V3
 channel-deleted: Kanał usunięty
 commands: polecenia
+copied-to-clipboard: Skopiowane do schowka
 copy-your: Skopiuj swój
 custom-domain: Domena niestandardowa
 dashboard: Panel
@@ -152,6 +154,8 @@ forgot:
   heading: Zapomniałeś hasła
   success: Hasło zostało zmienione
 good: Dobrze
+in-your-main-file: W twoim głównym pliku
+into-your-app-folder: Do folderu aplikacji.
 intro:
   aka: Znany też jako
   desc: Opiniowany szablon startowy Vite
@@ -306,6 +310,7 @@ submit: Składać
 terms-of-use: Warunki korzystania
 thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 the: The
+this-page-will-self-: Ta strona odświeży się automatycznie
 title: tytuł
 top-apps: Najpopularniejsze aplikacje
 trial-left: Pozostałe dni

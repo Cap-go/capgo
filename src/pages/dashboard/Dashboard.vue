@@ -28,10 +28,14 @@ const main = useMainStore()
 const sidebarOpen = ref(false)
 
 const stepsOpen = ref(false)
+
+const onboardingDone = () => {
+  stepsOpen.value = !stepsOpen.value
+}
 </script>
 
 <template>
-  <Steps v-if="stepsOpen" :onboarding="false" />
+  <Steps v-if="stepsOpen" :onboarding="false" @done="onboardingDone" />
 
   <div v-else class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
     <!-- Sidebar -->

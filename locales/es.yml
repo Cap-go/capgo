@@ -48,6 +48,7 @@ activation:
     disponible
   validate: Validar
 add-another-app: Agregar otra aplicación
+add-this-code-to-you: Agrega este código a tu proyecto
 add-your-app-to-your: Agrega tu aplicación a tu cuenta
 add-your-first-app-t: ¡Agregue su primera aplicación a su cuenta y empujemos las actualizaciones!
 afternoon: tarde
@@ -120,6 +121,7 @@ channel:
   v3: configuración V3
 channel-deleted: Canal eliminado
 commands: comandos
+copied-to-clipboard: Copiado al portapapeles
 copy-your: copia tu
 custom-domain: Dominio personalizado
 dashboard: Tablero
@@ -158,6 +160,8 @@ forgot:
   heading: Se te olvidó tu contraseña
   success: Contraseña actualizada exitosamente
 good: Bueno
+in-your-main-file: En su archivo principal
+into-your-app-folder: En la carpeta de tu aplicación.
 intro:
   aka: También conocido como
   desc: Plantilla de Inicio de Vite Dogmática
@@ -316,6 +320,7 @@ submit: Enviar
 terms-of-use: Términos de Uso
 thank-you-for-choosi: ¡Gracias por elegir Capgo!
 the: los
+this-page-will-self-: Esta página se actualizará automáticamente
 title: título
 top-apps: Mejores aplicaciones
 trial-left: Días restantes

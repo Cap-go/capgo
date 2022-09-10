@@ -120,6 +120,10 @@ const getMyApps = async () => {
 //   }
 // }
 
+const onboardingDone = async () => {
+  await getMyApps()
+}
+
 const getSharedWithMe = async () => {
   const { data } = await supabase
     .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
@@ -163,7 +167,7 @@ watchEffect(async () => {
   <IonPage>
     <IonContent :fullscreen="true">
       <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
-      <Steps v-else-if="!isLoading" :onboarding="true" />
+      <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
       <div v-else class="flex justify-center">
         <Spinner />
       </div>

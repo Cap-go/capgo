@@ -42,6 +42,7 @@ activation:
   notification-desc: I accept to receive notification when new app version are available
   validate: Validate
 add-another-app: Add another app
+add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
 afternoon: afternoon
@@ -110,6 +111,7 @@ channel:
   v3: V3 settings
 channel-deleted: Channel deleted
 commands: commands
+copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
 custom-domain: Custom domain
 dashboard: Dashboard
@@ -146,6 +148,8 @@ forgot:
   heading: Forgot password
   success: Password updated successfully
 good: Good
+in-your-main-file: In your main file
+into-your-app-folder: Into your app folder.
 intro:
   aka: Also known as
   desc: Opinionated Vite Starter Template
@@ -234,6 +238,8 @@ plan:
     desc: Best for small business owners
   mau: Monthly active users
   monthly-billing: Monthly billing
+  payasyougo:
+    desc: Best for scalling enterprises
   pricing-plans: Pricing Plans
   progressive_deploy: Progressive deploy
   shared_channel: Shared Channel
@@ -243,8 +249,6 @@ plan:
   storage: GB Storage
   team:
     desc: Best for big business owners
-  payasyougo:
-    desc: Best for scalling enterprises
   update: Update
   updates: Updates
   version: Version
@@ -296,6 +300,7 @@ submit: Submit
 terms-of-use: Terms of Use
 thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
+this-page-will-self-: This page will self refresh
 title: title
 top-apps: Top Apps
 trial-left: days left

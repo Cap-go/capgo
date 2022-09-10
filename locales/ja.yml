@@ -42,6 +42,7 @@ activation:
   notification-desc: 新しいアプリのバージョンが利用可能になったときに通知を受け取ることに同意します
   validate: 検証
 add-another-app: 別のアプリを追加
+add-this-code-to-you: このコードをプロジェクトに追加します
 add-your-app-to-your: アプリをアカウントに追加する
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
 afternoon: 午後
@@ -110,6 +111,7 @@ channel:
   v3: V3設定
 channel-deleted: チャンネルが削除されました
 commands: コマンド
+copied-to-clipboard: クリップボードにコピーしました
 copy-your: あなたのコピー
 custom-domain: カスタム ドメイン
 dashboard: ダッシュボード
@@ -146,6 +148,8 @@ forgot:
   heading: パスワードをお忘れですか
   success: パスワードが正常に更新されました
 good: 良い
+in-your-main-file: メインファイルで
+into-your-app-folder: アプリ フォルダーに移動します。
 intro:
   aka: としても知られている
   desc: 固執された Vite スターターテンプレート
@@ -300,6 +304,7 @@ submit: 送信
 terms-of-use: 利用規約
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 the: の
+this-page-will-self-: このページは自動的に更新されます
 title: 題名
 top-apps: トップアプリ
 trial-left: 残りの日数
