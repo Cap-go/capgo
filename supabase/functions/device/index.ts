@@ -64,8 +64,8 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
     .eq('device_id', body.device_id)
     .single()
   if (dbError || !dataDevice) {
-    console.log('Cannot find device', dbError)
-    return sendRes({ status: 'Cannot find device', error: dbError }, 400)
+    console.log('Cannot find device', body, dbError)
+    return sendRes({ status: 'Cannot find device', error: dbError, payload: body }, 400)
   }
   // if version_id set device_override to it
   if (body.version_id) {
@@ -100,7 +100,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       .eq('device_id', body.device_id)
       .eq('app_id', body.app_id)
   }
-  // if channel_id set channel_override to it
+  // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
     const { data: dataChannel, error: dbError } = await supabaseAdmin
