@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import {
-  toastController,
-} from '@ionic/vue'
-import { computed, ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, watch } from 'vue'
 import colors from 'tailwindcss/colors'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import type { Stats } from '~/services/plans'
 import type { definitions } from '~/types/supabase'
 import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
-import { useLogSnag } from '~/services/logsnag'
 
-const { t } = useI18n()
 const daysInCurrentMonth = () => new Date().getDate()
 const plans = ref<definitions['plans'][]>([])
 
@@ -32,21 +25,9 @@ const datas = ref({
   storage: [] as number[],
   bandwidth: [] as number[],
 })
-const snag = useLogSnag()
 const supabase = useSupabase()
 const isLoading = ref(false)
-const route = useRoute()
 const main = useMainStore()
-
-const showToastMessage = async (message: string) => {
-  const toast = await toastController
-    .create({
-      position: 'middle',
-      message,
-      duration: 4000,
-    })
-  await toast.present()
-}
 
 const allLimits = computed(() => {
   return plans.value.reduce((p, plan) => {
@@ -117,38 +98,6 @@ watch(
     }
     else if (prevMyPlan && !myPlan) { isLoading.value = true }
   })
-
-watchEffect(async () => {
-  if (route.path === '/app/home') {
-    // if session_id is in url params show modal success plan setup
-    if (route.query.session_id) {
-      showToastMessage(t('usage.success'))
-      if (main.user?.id) {
-        snag.publish({
-          channel: 'usage',
-          event: 'User subscribe',
-          icon: '📊',
-          tags: {
-            'user-id': main.user?.id,
-          },
-          notify: false,
-        }).catch()
-      }
-    }
-    else if (main.user?.id) {
-      loadData()
-      snag.publish({
-        channel: 'usage',
-        event: 'User visit',
-        icon: '📊',
-        tags: {
-          'user-id': main.user?.id,
-        },
-        notify: false,
-      }).catch()
-    }
-  }
-})
 </script>
 
 <template>

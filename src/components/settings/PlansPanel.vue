@@ -71,8 +71,9 @@ const segmentChanged = (e: SegmentCustomEvent) => {
 }
 
 const openChangePlan = (planId: string) => {
+  // get the current url
   if (planId)
-    openCheckout(planId)
+    openCheckout(planId, window.location.href, window.location.href)
 }
 const showToastMessage = async (message: string) => {
   const toast = await toastController
@@ -150,7 +151,7 @@ watchEffect(async () => {
         snag.publish({
           channel: 'usage',
           event: 'User subscribe',
-          icon: '📊',
+          icon: '💰',
           tags: {
             'user-id': main.user?.id,
           },
@@ -163,7 +164,7 @@ watchEffect(async () => {
       snag.publish({
         channel: 'usage',
         event: 'User visit',
-        icon: '📊',
+        icon: '💳',
         tags: {
           'user-id': main.user?.id,
         },

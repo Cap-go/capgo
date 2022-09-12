@@ -21,6 +21,7 @@ serve(async (event: Request) => {
   try {
     console.log('body')
     const body = (await event.json()) as PortalData
+    console.log('body', body)
     console.log('auth')
     const { user: auth, error } = await supabaseAdmin.auth.api.getUser(
       authorization?.split('Bearer ')[1],
