@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
+import { useLogSnag } from '~/services/logsnag'
 
 const props = defineProps<{
   onboarding: boolean
@@ -25,6 +26,7 @@ const auth = supabase.auth.user()
 const router = useRouter()
 const main = useMainStore()
 const { t } = useI18n()
+const snag = useLogSnag()
 
 const steps = ref([
   {
@@ -54,7 +56,19 @@ CapacitorUpdater.notifyAppReady()`,
     subtitle: t('this-page-will-self-'),
   },
 ])
-
+const setLog = () => {
+  if (!props.onboarding && main.user?.id) {
+    snag.publish({
+      channel: 'onboarding',
+      event: `step-${step.value}`,
+      icon: '👶',
+      tags: {
+        'user-id': main.user.id,
+      },
+      notify: false,
+    }).catch()
+  }
+}
 const copyToast = async (text: string) => {
   copy(text)
   const toast = await toastController
@@ -62,8 +76,10 @@ const copyToast = async (text: string) => {
       message: t('copied-to-clipboard'),
       duration: 2000,
     })
-  if (!realtimeListener.value)
+  if (!realtimeListener.value) {
+    setLog()
     step.value += 1
+  }
   await toast.present()
 }
 const getKey = async (retry = true): Promise<void> => {
@@ -82,12 +98,13 @@ const getKey = async (retry = true): Promise<void> => {
 }
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch app change step 1')
+    // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
       .from<definitions['apps']>(`apps:user_id=eq.${main.auth?.id}`)
       .on('INSERT', (payload) => {
-        console.log('Change received step 1!', payload)
+        // console.log('Change received step 1!', payload)
+        setLog()
         step.value += 1
         appId.value = payload.new.id || ''
         realtimeListener.value = false
@@ -96,12 +113,13 @@ watchEffect(async () => {
       .subscribe()
   }
   else if (step.value === 4 && !realtimeListener.value) {
-    console.log('watch app change step 4')
+    // console.log('watch app change step 4')
     realtimeListener.value = true
     mySubscription.value = supabase
       .from<definitions['app_versions']>(`app_versions:app_id=eq.${appId.value}`)
       .on('INSERT', (payload) => {
-        console.log('Change received step 3!', payload)
+        // console.log('Change received step 4!', payload)
+        setLog()
         step.value += 1
         realtimeListener.value = false
         mySubscription.value.unsubscribe()

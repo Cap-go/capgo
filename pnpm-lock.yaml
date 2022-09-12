@@ -38,7 +38,7 @@ specifiers:
   '@capgo/capacitor-flash': ^1.2.10
   '@capgo/capacitor-mute': ^1.1.4
   '@capgo/capacitor-screen-recorder': ^1.2.5
-  '@capgo/capacitor-updater': 4.0.0-alpha.55
+  '@capgo/capacitor-updater': 4.2.1
   '@iconify-json/carbon': 1.1.7
   '@iconify-json/ion': 1.1.3
   '@iconify-json/ls': 1.1.2
@@ -146,7 +146,7 @@ dependencies:
   '@capgo/capacitor-flash': 1.2.10_@capacitor+core@4.1.0
   '@capgo/capacitor-mute': 1.1.4_@capacitor+core@4.1.0
   '@capgo/capacitor-screen-recorder': 1.2.5_@capacitor+core@4.1.0
-  '@capgo/capacitor-updater': 4.0.0-alpha.55_@capacitor+core@4.1.0
+  '@capgo/capacitor-updater': 4.2.1_@capacitor+core@4.1.0
   '@ionic/vue': 6.2.4
   '@ionic/vue-router': 6.2.4
   '@supabase/supabase-js': 1.35.6
@@ -210,7 +210,7 @@ devDependencies:
   postcss: 8.4.16
   sass: 1.54.5
   standard-version: 9.5.0
-  tailwindcss: 3.1.8
+  tailwindcss: 3.1.8_postcss@8.4.16
   typescript: 4.8.2
   unplugin-icons: 0.14.8_jz6tpbhhn2upnbiwxxr6wx7age
   vite: 3.0.9_sass@1.54.5
@@ -1926,8 +1926,8 @@ packages:
       '@capacitor/core': 4.1.0
     dev: false
 
-  /@capgo/capacitor-updater/4.0.0-alpha.55_@capacitor+core@4.1.0:
-    resolution: {integrity: sha512-7F2DmBoqcFVJCglDOAEAKrmJMdpUzHtaaAPFOZ/rh4lg3IsVRmqah0UQk6CZZelB61mYcz6SxECNB/HS/zfzXg==}
+  /@capgo/capacitor-updater/4.2.1_@capacitor+core@4.1.0:
+    resolution: {integrity: sha512-440BldPv0SxvrXDkg6KtNCcXeZ1JFhoFsn4J0AvocGr+Gmkc71qVFwQxxNPQVPhXsvAWs1j7CIcg4cOM3TheDA==}
     peerDependencies:
       '@capacitor/core': ^3.0.0 || ^4.0.0 || ^4.0.0
     dependencies:
@@ -4154,7 +4154,7 @@ packages:
       tailwindcss: '>=3.0.0 || >= 3.0.0-alpha.1'
     dependencies:
       mini-svg-data-uri: 1.4.4
-      tailwindcss: 3.1.8
+      tailwindcss: 3.1.8_postcss@8.4.16
     dev: false
 
   /@teamhive/capacitor-video-recorder/5.0.0_@capacitor+core@4.1.0:
@@ -17185,10 +17185,12 @@ packages:
       - supports-color
     dev: true
 
-  /tailwindcss/3.1.8:
+  /tailwindcss/3.1.8_postcss@8.4.16:
     resolution: {integrity: sha512-YSneUCZSFDYMwk+TGq8qYFdCA3yfBRdBlS7txSq0LUmzyeqRe3a8fBQzbz9M3WS/iFT4BNf/nmw9mEzrnSaC0g==}
     engines: {node: '>=12.13.0'}
     hasBin: true
+    peerDependencies:
+      postcss: ^8.0.9
     dependencies:
       arg: 5.0.2
       chokidar: 3.5.3

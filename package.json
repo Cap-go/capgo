@@ -60,7 +60,7 @@
     "@capgo/capacitor-flash": "^1.2.10",
     "@capgo/capacitor-mute": "^1.1.4",
     "@capgo/capacitor-screen-recorder": "^1.2.5",
-    "@capgo/capacitor-updater": "4.0.0-alpha.55",
+    "@capgo/capacitor-updater": "4.2.1",
     "@ionic/vue": "6.2.4",
     "@ionic/vue-router": "6.2.4",
     "@supabase/supabase-js": "1.35.6",
