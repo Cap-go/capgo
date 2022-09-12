@@ -57,7 +57,7 @@ CapacitorUpdater.notifyAppReady()`,
   },
 ])
 const setLog = () => {
-  if (!props.onboarding && main.user?.id) {
+  if (props.onboarding && main.user?.id) {
     snag.publish({
       channel: 'onboarding',
       event: `step-${step.value}`,
