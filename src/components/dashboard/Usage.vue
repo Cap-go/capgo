@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import colors from 'tailwindcss/colors'
+import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import type { Stats } from '~/services/plans'
@@ -9,6 +10,7 @@ import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/servi
 
 const daysInCurrentMonth = () => new Date().getDate()
 const plans = ref<definitions['plans'][]>([])
+const { t } = useI18n()
 
 const stats = ref({
   max_app: 0,
@@ -101,7 +103,7 @@ watch(
 </script>
 
 <template>
-  <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" title="MAU" unit="Users" />
-  <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" title="Storage" unit="GB" />
-  <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" title="Bandwidth" unit="GB" />
+  <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :tilte="t('MAU')" unit="Users" />
+  <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
+  <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
 </template>
