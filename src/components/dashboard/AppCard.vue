@@ -9,30 +9,27 @@ const props = defineProps<{
   app: definitions['apps']
   channel: string
 }>()
-interface Device {
-  version: {
-    name: string
-  }
-}
 
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
 
 const isLoading = ref(true)
-const devices = ref<(definitions['devices'])[]>([])
 const devicesNb = ref(0)
 
 const loadData = async () => {
   if (!props.channel) {
     try {
-      const { data: dataDev, count } = await supabase
-        .from<definitions['devices'] & Device>('devices').select('*', { count: 'exact' })
+      const date_id = new Date().toISOString().slice(0, 7)
+      const { data, error } = await supabase
+        .from<definitions['app_stats']>('app_stats')
+        .select()
         .eq('app_id', props.app.app_id)
-      if (!dataDev)
+        .eq('date_id', date_id)
+        .single()
+      if (!data || error)
         return
-      devices.value.push(...dataDev)
-      devicesNb.value = count || 0
+      devicesNb.value = data?.devices
     }
     catch (error) {
       console.error(error)
@@ -43,7 +40,6 @@ const loadData = async () => {
 const refreshData = async () => {
   isLoading.value = true
   try {
-    devices.value = []
     devicesNb.value = 0
     await loadData()
   }
@@ -68,7 +64,7 @@ watchEffect(async () => {
   <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
     <td class="p-2">
       <div class="flex flex-wrap items-center">
-        <img :src="app.icon_url" class="shrink-0 mr-2 sm:mr-3" width="36" height="36">
+        <img :src="app.icon_url" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
         <div class="max-w-max">
           {{ props.app.name }}
         </div>
