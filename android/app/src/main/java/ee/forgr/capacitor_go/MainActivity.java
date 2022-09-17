@@ -30,7 +30,7 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         super.onCreate(savedInstanceState);
         SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         ShakeDetector sd = new ShakeDetector(this);
-        sd.start(sensorManager);
+        sd.start(sensorManager, SensorManager.SENSOR_DELAY_GAME);
     }
 
     @Override
