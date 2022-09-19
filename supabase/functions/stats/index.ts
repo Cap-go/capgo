@@ -44,7 +44,6 @@ serve(async (event: Request) => {
       .eq('app_id', body.app_id)
       .eq('name', body.version_name || 'unknown')
     if (data && data.length && !error) {
-      const oldVersion = data[0].id
       stat.version = data[0].id
       device.version = data[0].id
       all.push(updateVersionStats({
@@ -52,11 +51,19 @@ serve(async (event: Request) => {
         version_id: data[0].id,
         devices: 1,
       }))
-      all.push(updateVersionStats({
-        app_id: body.app_id,
-        version_id: oldVersion,
-        devices: -1,
-      }))
+      const { data: deviceData, error: deviceError } = await supabaseAdmin
+        .from<definitions['devices']>(deviceDb)
+        .select()
+        .eq('app_id', body.app_id)
+        .eq('device_id', body.device_id)
+        .single()
+      if (deviceData && !deviceError) {
+        all.push(updateVersionStats({
+          app_id: body.app_id,
+          version_id: deviceData.version,
+          devices: -1,
+        }))
+      }
     }
     else {
       console.log('switch to onprem', body.app_id)
