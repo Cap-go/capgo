@@ -89,17 +89,7 @@ const loadData = async () => {
   isLoading.value = false
 }
 
-watch(
-  () => plans.value,
-  (myPlan, prevMyPlan) => {
-    if (myPlan && !prevMyPlan) {
-      loadData()
-      // reGenerate annotations
-      isLoading.value = false
-      console.log('usage', datas.value)
-    }
-    else if (prevMyPlan && !myPlan) { isLoading.value = true }
-  })
+loadData()
 </script>
 
 <template>
