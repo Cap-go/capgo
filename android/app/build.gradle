@@ -6,8 +6,8 @@ android {
         applicationId "ee.forgr.capacitor_go"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-		versionCode 12118999
-		versionName "1.21.18"
+		versionCode 12119999
+		versionName "1.21.19"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
