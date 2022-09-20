@@ -1,4 +1,62 @@
 workflows:
+  ionic-capacitor-android-workflow:
+    name: Ionic Capacitor Android Workflow
+    max_build_duration: 120
+    instance_type: mac_mini
+    environment:
+      groups:
+        - keystore_credentials # Comment this out if you are using code-signing-identities <-- (Includes CM_KEYSTORE, CM_KEYSTORE_PASSWORD, CM_KEY_PASSWORD, CM_KEY_ALIAS)
+        - google_play # <-- (Includes GCLOUD_SERVICE_ACCOUNT_CREDENTIALS)
+        - other
+      # Add the group environment variables in Codemagic UI (either in Application/Team variables) - https://docs.codemagic.io/variables/environment-variable-groups/
+      node: latest
+    triggering:
+      events:
+        - push
+        - tag
+        - pull_request
+      branch_patterns:
+        - pattern: develop
+          include: true
+          source: true
+    scripts:
+      - name: Install npm dependencies for Ionic Capacitor project
+        script: |
+          pnpm install
+      - name: Update dependencies and copy to native project
+        script: |
+          npx cap sync  
+      - name: Build JS bundle
+        script: |
+          pnpm run mobile  
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Set up keystore
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > /tmp/keystore.keystore
+          cat >> "$CM_BUILD_DIR/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=/tmp/keystore.keystore
+          EOF
+      - name: Build Android release
+        script: |
+          cd android
+          ./gradlew assembleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.apk
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal # <-- Any default or custom track that is not in ‘draft’ status
+      email:
+        recipients:
+          - martindonadieu@gmail.com
+        notify:
+          success: false     # To not receive a notification when a build succeeds
+          failure: true     # To not receive a notification when a build fails
   ionic-capacitor-ios-workflow:
     name: Ionic Capacitor iOS Workflow
     max_build_duration: 120
@@ -28,7 +86,7 @@ workflows:
       - name: Install pnpm dependencies for Ionic project
         script: |
           pnpm install
-      - name: Update dependencies and copy web assets to native project
+      - name: Update dependencies and copy to native project
         script: |
           npx cap sync  
       - name: Build JS bundle
