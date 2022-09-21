@@ -42,7 +42,7 @@
     "@capacitor/filesystem": "^4.0.1",
     "@capacitor/geolocation": "^4.0.1",
     "@capacitor/haptics": "^4.0.1",
-    "@capacitor/ios": "^4.1.0",
+    "@capacitor/ios": "^4.2.0",
     "@capacitor/keyboard": "^4.0.1",
     "@capacitor/local-notifications": "^4.0.1",
     "@capacitor/motion": "^4.0.1",
