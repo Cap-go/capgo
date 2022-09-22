@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.21.21](https://github.com/Cap-go/capgo/compare/1.21.20...1.21.21) (2022-09-22)
+
+
+### Bug Fixes
+
+* **version:** @capacitor/ios ([466dde7](https://github.com/Cap-go/capgo/commit/466dde7682ac1bc7da0d29b9a37ff5e02a4948b0))
+
+### [1.21.20](https://github.com/Cap-go/capgo/compare/1.21.19...1.21.20) (2022-09-21)
+
+
+### Bug Fixes
+
+* cap deps ([f525371](https://github.com/Cap-go/capgo/commit/f525371da3ec69766e71f396f66c950058a78ea1))
+
+### [1.21.19](https://github.com/Cap-go/capgo/compare/1.21.18...1.21.19) (2022-09-20)
+
+### [1.21.18](https://github.com/Cap-go/capgo/compare/1.21.17...1.21.18) (2022-09-20)
+
+### [1.21.17](https://github.com/Cap-go/capgo/compare/1.21.16...1.21.17) (2022-09-20)
+
+### [1.21.16](https://github.com/Cap-go/capgo/compare/1.21.15...1.21.16) (2022-09-20)
+
+
+### Bug Fixes
+
+* dependencies ([3412711](https://github.com/Cap-go/capgo/commit/3412711bfb14e5d043be92405773a11c05df89a1))
+
 ### [1.21.15](https://github.com/Cap-go/capgo/compare/1.21.14...1.21.15) (2022-09-20)
 
 ### [1.21.14](https://github.com/Cap-go/capgo/compare/1.21.13...1.21.14) (2022-09-19)
