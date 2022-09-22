@@ -20,7 +20,7 @@ specifiers:
   '@capacitor/filesystem': ^4.0.1
   '@capacitor/geolocation': ^4.0.1
   '@capacitor/haptics': ^4.0.1
-  '@capacitor/ios': 4.2.0
+  '@capacitor/ios': ^4.1.0
   '@capacitor/keyboard': ^4.0.1
   '@capacitor/local-notifications': ^4.0.1
   '@capacitor/motion': ^4.0.1
@@ -128,7 +128,7 @@ dependencies:
   '@capacitor/filesystem': 4.0.1_@capacitor+core@4.2.0
   '@capacitor/geolocation': 4.0.1_@capacitor+core@4.2.0
   '@capacitor/haptics': 4.0.1_@capacitor+core@4.2.0
-  '@capacitor/ios': 4.2.0_@capacitor+core@4.2.0
+  '@capacitor/ios': 4.1.0_@capacitor+core@4.2.0
   '@capacitor/keyboard': 4.0.1_@capacitor+core@4.2.0
   '@capacitor/local-notifications': 4.0.1_@capacitor+core@4.2.0
   '@capacitor/motion': 4.0.1_@capacitor+core@4.2.0
@@ -1734,8 +1734,8 @@ packages:
       '@capacitor/core': 3.6.0
     dev: false
 
-  /@capacitor/ios/4.2.0_@capacitor+core@4.2.0:
-    resolution: {integrity: sha512-YOncOJHMB1QhgmWBk3Ml8IT+KoN131zlmtCBtx9Szzc6/LvzG/NMojVqfl996k37gRw9sYHrvNP01sn22IijSA==}
+  /@capacitor/ios/4.1.0_@capacitor+core@4.2.0:
+    resolution: {integrity: sha512-zkv48Xc5QwdL7TIT4YpXwgISrA5Cuy59KyN+uq3ovr+L/y5SgtKAOg7pATRBYT7CFgFLqkey/PQKcTjbcxhyaA==}
     peerDependencies:
       '@capacitor/core': ^4.1.0
     dependencies:
