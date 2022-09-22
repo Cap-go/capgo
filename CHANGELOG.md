@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.21.21](https://github.com/Cap-go/capgo/compare/1.21.20...1.21.21) (2022-09-22)
+
+
+### Bug Fixes
+
+* **version:** @capacitor/ios ([466dde7](https://github.com/Cap-go/capgo/commit/466dde7682ac1bc7da0d29b9a37ff5e02a4948b0))
+
 ### [1.21.20](https://github.com/Cap-go/capgo/compare/1.21.19...1.21.20) (2022-09-21)
 
 
