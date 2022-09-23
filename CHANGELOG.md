@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.21.25](https://github.com/Cap-go/capgo/compare/1.21.24...1.21.25) (2022-09-23)
+
+
+### Bug Fixes
+
+* remove android build for now ([affdb26](https://github.com/Cap-go/capgo/commit/affdb261380f779f545c2a1cb4872fd403fc7db9))
+
 ### [1.21.24](https://github.com/Cap-go/capgo/compare/1.21.23...1.21.24) (2022-09-23)
 
 
