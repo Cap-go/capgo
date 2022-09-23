@@ -47,6 +47,7 @@ initPlausible(import.meta.env.pls_domain as string)
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app; router: Router }) => void
 
+
 Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
   .forEach(i => i.install?.({ app, router }))
 
