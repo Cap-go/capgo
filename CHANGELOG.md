@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.22.0](https://github.com/Cap-go/capgo/compare/1.21.25...1.22.0) (2022-09-26)
+
+
+### Features
+
+* add ios, android disabler ([abfb3a0](https://github.com/Cap-go/capgo/commit/abfb3a0a169ff971f29e9e7ea67067deaa898c61))
+
 ### [1.21.25](https://github.com/Cap-go/capgo/compare/1.21.24...1.21.25) (2022-09-23)
 
 
