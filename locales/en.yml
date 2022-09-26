@@ -143,6 +143,8 @@ device:
   version: Version
 devices:
   title: Devices
+disable-auto-downgra: Disable auto downgrade under native
+disable-auto-upgrade: Disable auto upgrade above major
 discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
 forgot:

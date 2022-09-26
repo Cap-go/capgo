@@ -130,6 +130,8 @@ const getChannel = async () => {
           created_at,
           disableAutoUpdateUnderNative,
           disableAutoUpdateToMajor,
+          ios,
+          android,
           updated_at
         `)
       .eq('id', id.value)
@@ -171,7 +173,7 @@ const addUser = async () => {
   // console.log('newUser', newUser.value)
   if (!channel.value || !auth)
     return
-  if (!main.canUseMore && (main.trialDaysLeft || 0) <= 0) {
+  if (!main.canUseMore && (main.trialDaysLeft.value || 0) <= 0) {
     // show alert for upgrade plan and return
     const alert = await alertController.create({
       header: t('limit-reached'),
@@ -409,7 +411,7 @@ const inviteUser = async (userId: string) => {
           </IonItem>
           <IonItemDivider>
             <IonLabel>
-              {{ t('channel.v3') }}
+              {{ t('settings') }}
             </IonLabel>
           </IonItemDivider>
           <!-- <IonItem>
@@ -422,7 +424,7 @@ const inviteUser = async (userId: string) => {
           />
         </IonItem> -->
           <IonItem>
-            <IonLabel>Disable auto downgrade under native</IonLabel>
+            <IonLabel>{{ t('disable-auto-downgra') }}</IonLabel>
             <IonToggle
               color="secondary"
               :checked="channel?.disableAutoUpdateUnderNative"
@@ -430,11 +432,27 @@ const inviteUser = async (userId: string) => {
             />
           </IonItem>
           <IonItem>
-            <IonLabel>Disable auto upgrade above major</IonLabel>
+            <IonLabel>t('disable-auto-upgrade')</IonLabel>
             <IonToggle
               color="secondary"
               :checked="channel?.disableAutoUpdateToMajor"
               @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItem>
+            <IonLabel>IOS</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.ios"
+              @ion-change="saveChannelChange('ios', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItem>
+            <IonLabel>Android</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.android"
+              @ion-change="saveChannelChange('android', $event.target.checked)"
             />
           </IonItem>
           <IonItemDivider>

@@ -149,6 +149,8 @@ device:
   version: Wersja
 devices:
   title: Urządzenia
+disable-auto-downgra: Wyłącz automatyczną zmianę wersji na wersję natywną
+disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej głównej
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: Dokumentacja
 forgot:

@@ -153,6 +153,8 @@ device:
   version: Ausführung
 devices:
   title: Geräte
+disable-auto-downgra: Deaktivieren Sie das automatische Downgrade unter native
+disable-auto-upgrade: Deaktivieren Sie das automatische Upgrade über Major
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 forgot:

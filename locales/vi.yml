@@ -149,6 +149,8 @@ device:
   version: Phiên bản
 devices:
   title: Thiết bị
+disable-auto-downgra: Tắt tự động hạ cấp dưới gốc
+disable-auto-upgrade: Tắt nâng cấp tự động trên chính
 discover-your-dashbo: Khám phá trang tổng quan của bạn!
 documentation: Tài liệu
 forgot:

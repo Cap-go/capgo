@@ -151,6 +151,8 @@ device:
   version: Version
 devices:
   title: Dispositifs
+disable-auto-downgra: Désactiver la rétrogradation automatique sous natif
+disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus du majeur
 discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: Documentation
 forgot:

@@ -143,6 +143,8 @@ device:
   version: 版本
 devices:
   title: 设备
+disable-auto-downgra: 在 native 下禁用自动降级
+disable-auto-upgrade: 禁用主要以上的自动升级
 discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
 forgot:

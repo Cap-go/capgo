@@ -151,6 +151,8 @@ device:
   version: Версия
 devices:
   title: Устройства
+disable-auto-downgra: Отключить автоматическое понижение версии под нативным
+disable-auto-upgrade: Отключить автоматическое обновление выше основного
 discover-your-dashbo: Откройте для себя панель инструментов!
 documentation: Документация
 forgot:

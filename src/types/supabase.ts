@@ -27,6 +27,8 @@ export interface paths {
           disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
           disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           beta?: parameters["rowFilter.channels.beta"];
+          ios?: parameters["rowFilter.channels.ios"];
+          android?: parameters["rowFilter.channels.android"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -88,6 +90,8 @@ export interface paths {
           disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
           disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           beta?: parameters["rowFilter.channels.beta"];
+          ios?: parameters["rowFilter.channels.ios"];
+          android?: parameters["rowFilter.channels.android"];
         };
         header: {
           /** Preference */
@@ -113,6 +117,8 @@ export interface paths {
           disableAutoUpdateUnderNative?: parameters["rowFilter.channels.disableAutoUpdateUnderNative"];
           disableAutoUpdateToMajor?: parameters["rowFilter.channels.disableAutoUpdateToMajor"];
           beta?: parameters["rowFilter.channels.beta"];
+          ios?: parameters["rowFilter.channels.ios"];
+          android?: parameters["rowFilter.channels.android"];
         };
         body: {
           /** channels */
@@ -2940,7 +2946,17 @@ export interface definitions {
      * Format: boolean
      * @default false
      */
-    beta?: boolean;
+    beta: boolean;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    ios: boolean;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    android: boolean;
   };
   deleted_account: {
     /**
@@ -3731,6 +3747,10 @@ export interface parameters {
   "rowFilter.channels.disableAutoUpdateToMajor": string;
   /** Format: boolean */
   "rowFilter.channels.beta": string;
+  /** Format: boolean */
+  "rowFilter.channels.ios": string;
+  /** Format: boolean */
+  "rowFilter.channels.android": string;
   /** @description deleted_account */
   "body.deleted_account": definitions["deleted_account"];
   /** Format: timestamp with time zone */

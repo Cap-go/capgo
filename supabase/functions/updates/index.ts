@@ -68,6 +68,8 @@ serve(async (event: Request) => {
           beta,
           disableAutoUpdateUnderNative,
           disableAutoUpdateToMajor,
+          ios,
+          android
           version (
             id,
             name,
@@ -178,6 +180,26 @@ serve(async (event: Request) => {
     }
 
     // console.log('check disableAutoUpdateToMajor', device_id)
+    if (!channel.ios && platform === 'ios') {
+      console.log('Cannot upgrade ios it\t disabled', device_id)
+      await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, version.id)
+      return sendRes({
+        major: true,
+        message: 'Cannot upgrade ios it\t disabled',
+        version: version.name,
+        old: version_name,
+      }, 200)
+    }
+    if (!channel.android && platform === 'android') {
+      console.log('Cannot upgrade android it\t disabled', device_id)
+      await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, version.id)
+      return sendRes({
+        major: true,
+        message: 'Cannot upgrade android it\t disabled',
+        version: version.name,
+        old: version_name,
+      }, 200)
+    }
     if (channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
       console.log('Cannot upgrade major version', device_id)
       await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, version.id)

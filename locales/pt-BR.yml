@@ -149,6 +149,8 @@ device:
   version: Versão
 devices:
   title: Dispositivos
+disable-auto-downgra: Desative o downgrade automático em nativo
+disable-auto-upgrade: Desativar atualização automática acima do principal
 discover-your-dashbo: Descubra o seu painel!
 documentation: Documentação
 forgot:

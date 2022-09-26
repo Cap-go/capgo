@@ -150,6 +150,8 @@ device:
   version: Versione
 devices:
   title: Dispositivi
+disable-auto-downgra: Disabilita il downgrade automatico in nativo
+disable-auto-upgrade: Disabilita l'aggiornamento automatico sopra major
 discover-your-dashbo: Scopri la tua dashboard!
 documentation: Documentazione
 forgot:
