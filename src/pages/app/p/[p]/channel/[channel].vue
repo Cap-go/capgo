@@ -432,7 +432,7 @@ const inviteUser = async (userId: string) => {
             />
           </IonItem>
           <IonItem>
-            <IonLabel>t('disable-auto-upgrade')</IonLabel>
+            <IonLabel>{{ t('disable-auto-upgrade') }}</IonLabel>
             <IonToggle
               color="secondary"
               :checked="channel?.disableAutoUpdateToMajor"
