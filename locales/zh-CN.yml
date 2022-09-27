@@ -321,6 +321,7 @@ upgrade-now: 现在升级
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
+version-builtin: 内置版本
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到上限

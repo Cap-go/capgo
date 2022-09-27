@@ -317,6 +317,7 @@ upgrade-now: Upgrade now
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
+version-builtin: Version builtin
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached

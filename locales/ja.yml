@@ -321,6 +321,7 @@ upgrade-now: 今すぐアップグレード
 usage:
   success: プランが設定されましたこのページは数分で更新されます
   title: 使用法
+version-builtin: バージョン組み込み
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
 you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました

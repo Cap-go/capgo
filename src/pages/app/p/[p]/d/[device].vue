@@ -135,6 +135,7 @@ const getDevice = async () => {
             bucket_id,
             created_at
           ),
+          version_build,
           created_at,
           plugin_version,
           updated_at
@@ -396,6 +397,16 @@ watchEffect(async () => {
           </IonLabel>
           <IonNote slot="end">
             {{ device.version.name }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('version-builtin') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ device.version_build }}
           </IonNote>
         </IonItem>
         <IonItem v-if="device">

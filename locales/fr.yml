@@ -335,6 +335,7 @@ usage:
     Votre plan a été configuré, cette page sera mise à jour dans quelques
     minutes
   title: Usage
+version-builtin: Version intégrée
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-reached-the-limi: Limite atteinte

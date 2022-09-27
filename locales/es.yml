@@ -337,6 +337,7 @@ upgrade-now: Actualizar ahora
 usage:
   success: Su plan ha sido configurado, esta página se actualizará en unos minutos.
   title: Uso
+version-builtin: Versión incorporada
 welcome-to-your-capg: Bienvenido a tu panel de control de Capgo
 you-can-change-your-: Puede cambiar su información personal aquí.
 you-reached-the-limi: Límite alcanzado

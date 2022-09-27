@@ -329,6 +329,7 @@ upgrade-now: Nâng cấp ngay bây giờ
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
+version-builtin: Nội trang phiên bản
 welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của bạn ở đây.
 you-reached-the-limi: Đạt tới giới hạn

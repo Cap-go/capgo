@@ -331,6 +331,7 @@ upgrade-now: Hemen Yükselt
 usage:
   success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
   title: kullanım
+version-builtin: Sürüm yerleşik
 welcome-to-your-capg: Capgo Kontrol Panelinize hoş geldiniz
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
