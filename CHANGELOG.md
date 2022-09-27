@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.24.0](https://github.com/Cap-go/capgo/compare/1.23.1...1.24.0) (2022-09-27)
+
+
+### Features
+
+* add version_build to device info stored ([989ce66](https://github.com/Cap-go/capgo/commit/989ce66c7b015ab0c921d49532be882dd9db3659))
+
 ### [1.23.1](https://github.com/Cap-go/capgo/compare/1.23.0...1.23.1) (2022-09-27)
 
 
