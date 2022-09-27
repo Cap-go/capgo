@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.23.0](https://github.com/Cap-go/capgo/compare/1.22.2...1.23.0) (2022-09-27)
+
+
+### Features
+
+* add first insight ([6e3f087](https://github.com/Cap-go/capgo/commit/6e3f087f9fd779e89716e8dd640669be2342f8d3))
+
 ### [1.22.2](https://github.com/Cap-go/capgo/compare/1.22.1...1.22.2) (2022-09-26)
 
 ### [1.22.1](https://github.com/Cap-go/capgo/compare/1.22.0...1.22.1) (2022-09-26)
