@@ -2,11 +2,20 @@ import { serve } from 'https://deno.land/std@0.157.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
+import { logsnag } from '../_utils/_logsnag.ts'
 
+interface UserStats {
+  users: number
+  trial: number
+  need_upgrade: number
+  not_paying: number
+  paying: number
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
   stars: Promise<number>
+  users: PromiseLike<UserStats>
 }
 
 const getGithubStars = async (): Promise<number> => {
@@ -27,6 +36,74 @@ const getStats = (): GlobalStats => {
         console.log('count_all_updates', res.error)
       return res.data || 0
     }),
+    users: supabaseAdmin.from<definitions['users']>('users')
+      .select().then(async (res) => {
+        if (res.error || !res.data) {
+          console.log('get users', res.error)
+          return {
+            users: 0,
+            trial: 0,
+            need_upgrade: 0,
+            paying: 0,
+          } as UserStats
+        }
+        const data: UserStats = {
+          users: res.data.length,
+          trial: 0,
+          need_upgrade: 0,
+          not_paying: 0,
+          paying: 0,
+        }
+        const all = []
+        for (const user of res.data) {
+          all.push(supabaseAdmin
+            .rpc<boolean>('is_trial', { userid: user.id })
+            .single().then((res) => {
+              data.trial += res.data ? 1 : 0
+            }))
+          all.push(supabaseAdmin
+            .rpc<boolean>('is_good_plan', { userid: user.id })
+            .single().then((res) => {
+              data.need_upgrade += res.data ? 0 : 1
+            }))
+          all.push(supabaseAdmin
+            .rpc<boolean>('is_paying', { userid: user.id })
+            .single().then((res) => {
+              data.paying += res.data ? 1 : 0
+              data.not_paying += res.data ? 0 : 1
+            }))
+        }
+        await Promise.all(all)
+        data.need_upgrade -= data.not_paying
+        data.not_paying -= data.trial
+        await Promise.all([
+          logsnag.insight({
+            title: 'User Count',
+            value: data.users,
+            icon: '👨',
+          }),
+          logsnag.insight({
+            title: 'User need upgrade',
+            value: data.need_upgrade,
+            icon: '🤒',
+          }),
+          logsnag.insight({
+            title: 'User trial',
+            value: data.trial,
+            icon: '👶',
+          }),
+          logsnag.insight({
+            title: 'User paying',
+            value: data.paying,
+            icon: '💰',
+          }),
+          logsnag.insight({
+            title: 'User not paying',
+            value: data.not_paying,
+            icon: '🥲',
+          })])
+        return data
+      }),
     stars: getGithubStars(),
   }
 }
@@ -43,7 +120,7 @@ serve(async (event: Request) => {
   }
   try {
     const res = getStats()
-    const [apps, updates, stars] = await Promise.all([res.apps, res.updates, res.stars])
+    const [apps, updates, stars, users] = await Promise.all([res.apps, res.updates, res.stars, res.users])
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
@@ -52,6 +129,7 @@ serve(async (event: Request) => {
       apps,
       updates,
       stars,
+      ...users,
     }
     // console.log('newData', newData)
     await supabaseAdmin

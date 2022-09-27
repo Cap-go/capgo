@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import type { Stats } from '../_utils/plans.ts'
+import { logsnag } from '../_utils/_logsnag.ts'
 
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
@@ -25,6 +26,9 @@ serve(async (event: Request) => {
       return sendRes({ status: 'error', message: 'no apps' })
     // explore all apps
     const all = []
+    let trial = 0
+    let needUpgrade = 0
+    let paying = 0
     // find all trial users
     for (const user of users) {
       all.push(supabaseAdmin
@@ -32,12 +36,14 @@ serve(async (event: Request) => {
         .single()
         .then(async (res) => {
           if (res.data) {
+            trial += 1
             return supabaseAdmin
               .from<definitions['stripe_info']>('stripe_info')
               .update({ is_good_plan: true })
               .eq('customer_id', user.customer_id)
               .then()
           }
+          // try {
           const { data: is_good_plan } = await supabaseAdmin
             .rpc<boolean>('is_good_plan', { userid: user.id })
             .single()
@@ -52,15 +58,47 @@ serve(async (event: Request) => {
               all.push(addEventPerson(user.email, {}, 'user:need_upgrade', 'red'))
             else if (get_max_stats)
               all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))
+            needUpgrade += 1
+          }
+          else {
+            paying += 1
           }
           return supabaseAdmin
             .from<definitions['stripe_info']>('stripe_info')
             .update({ is_good_plan: !!is_good_plan })
             .eq('customer_id', user.customer_id)
             .then()
+          // }
+          // catch (error) {
+          //   console.log('Error', error)
+          //   return Promise.reject(error)
+          // }
         }))
     }
     await Promise.all(all)
+    // logsnag send insight
+    console.log('trial', trial, 'needUpgrade', needUpgrade, 'paying', paying, 'total', users.length)
+    // await Promise.all([
+    //   logsnag.insight({
+    //     title: 'User Count',
+    //     value: users.length,
+    //     icon: '👨',
+    //   }),
+    //   logsnag.insight({
+    //     title: 'User need upgrade',
+    //     value: needUpgrade,
+    //     icon: '🤒',
+    //   }),
+    //   logsnag.insight({
+    //     title: 'User trial',
+    //     value: trial,
+    //     icon: '👶',
+    //   }),
+    //   logsnag.insight({
+    //     title: 'User paying',
+    //     value: paying,
+    //     icon: '💰',
+    //   })])
     return sendRes()
   }
   catch (e) {
