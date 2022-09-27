@@ -134,6 +134,7 @@ serve(async (event: Request) => {
       platform: platform as definitions['devices']['platform'],
       plugin_version,
       version: version.id,
+      version_build,
       updated_at: new Date().toISOString(),
     })
     // console.log('updateOrCreateDevice done')
