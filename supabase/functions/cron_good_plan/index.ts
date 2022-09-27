@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import type { Stats } from '../_utils/plans.ts'
+import { logsnag } from '../_utils/_logsnag.ts'
 
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
@@ -25,12 +26,16 @@ serve(async (event: Request) => {
       return sendRes({ status: 'error', message: 'no apps' })
     // explore all apps
     const all = []
+    let trial = 0
+    let paying = 0
+    // find all trial users
     for (const user of users) {
       all.push(supabaseAdmin
         .rpc<boolean>('is_trial', { userid: user.id })
         .single()
         .then(async (res) => {
           if (res.data) {
+            trial += 1
             return supabaseAdmin
               .from<definitions['stripe_info']>('stripe_info')
               .update({ is_good_plan: true })
@@ -52,6 +57,9 @@ serve(async (event: Request) => {
             else if (get_max_stats)
               all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))
           }
+          else {
+            paying += 1
+          }
           return supabaseAdmin
             .from<definitions['stripe_info']>('stripe_info')
             .update({ is_good_plan: !!is_good_plan })
@@ -59,6 +67,22 @@ serve(async (event: Request) => {
             .then()
         }))
     }
+    // logsnag send insight
+    all.push(logsnag.insight({
+      title: 'User Count',
+      value: users.length,
+      icon: '👨',
+    }))
+    all.push(logsnag.insight({
+      title: 'User trial',
+      value: trial,
+      icon: '👶',
+    }))
+    all.push(logsnag.insight({
+      title: 'User paying',
+      value: paying,
+      icon: '💰',
+    }))
     await Promise.all(all)
     return sendRes()
   }
