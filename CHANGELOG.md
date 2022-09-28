@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.5](https://github.com/Cap-go/capgo/compare/1.24.4...1.24.5) (2022-09-28)
+
+
+### Bug Fixes
+
+* absolut button issue mobile ([a9628d0](https://github.com/Cap-go/capgo/commit/a9628d03ea03c2f100f2aa81137e377a6d376378))
+
 ### [1.24.4](https://github.com/Cap-go/capgo/compare/1.24.3...1.24.4) (2022-09-28)
 
 
