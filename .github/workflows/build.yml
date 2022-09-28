@@ -35,6 +35,9 @@ jobs:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
       - name: Configure Homebrew cache
         uses: actions/cache@v3
         with:
@@ -45,7 +48,7 @@ jobs:
           restore-keys: ${{ runner.os }}-brew-
       - name: Install Supabase CLI Homebrew dependencies
         run: |
-          $(/home/linuxbrew/.linuxbrew/bin/brew shellenv) env HOMEBREW_NO_AUTO_UPDATE=1 brew install supabase/tap/supabase
+          brew install supabase/tap/supabase
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
