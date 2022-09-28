@@ -38,14 +38,13 @@ jobs:
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
-      - name: Configure Homebrew cache
+      - name: Cache Homebrew Bundler RubyGems
+        id: cache
         uses: actions/cache@v3
         with:
-          path: |
-            ~/Library/Caches/Homebrew/supabase--*
-            ~/Library/Caches/Homebrew/downloads/*--supabase-*
-          key: ${{ runner.os }}-brew-${{ hashFiles('.github/brew-formulae') }}
-          restore-keys: ${{ runner.os }}-brew-
+          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+          key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+          restore-keys: ${{ runner.os }}-rubygems-
       - name: Install Supabase CLI Homebrew dependencies
         run: |
           brew install supabase/tap/supabase
