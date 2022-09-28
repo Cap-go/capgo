@@ -13,13 +13,18 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Doughnut } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
-import { subDays } from 'date-fns'
+// import { subDays } from 'date-fns'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
 
+interface Version {
+  id: {
+    name: string
+  }
+}
 interface Device {
   version: {
     name: string
@@ -45,7 +50,7 @@ const search = ref('')
 const isLoading = ref(true)
 const isDisabled = ref(false)
 const downloads = ref(0)
-const versions = ref<definitions['app_versions'][]>([])
+const versions = ref<(definitions['app_versions_meta'] & Version)[]>([])
 const devices = ref<(definitions['devices'] & Device)[]>([])
 const dataDevValues = ref([] as number[])
 const dataDevLabels = ref([] as string[])
@@ -59,9 +64,22 @@ const statsFiltered = computed(() => {
   return stats.value
 })
 
+const MAU = computed(() => {
+  return versions.value.reduce((p, c) => {
+    return p + (c.devices || 0)
+  }, 0)
+})
+// const buildGraph = () => {
+//   const vals = devices.value.reduce((past, d) => {
+//     past[d.version.name] = past[d.version.name] ? past[d.version.name] + 1 : 1
+//     return past
+//   }, { } as any)
+//   dataDevValues.value = Object.values(vals)
+//   dataDevLabels.value = Object.keys(vals)
+// }
 const buildGraph = () => {
-  const vals = devices.value.reduce((past, d) => {
-    past[d.version.name] = past[d.version.name] ? past[d.version.name] + 1 : 1
+  const vals = versions.value.reduce((past, d) => {
+    past[d.id.name] = past[d.id.name] ? past[d.id.name] + 1 : 1
     return past
   }, { } as any)
   dataDevValues.value = Object.values(vals)
@@ -70,11 +88,11 @@ const buildGraph = () => {
 
 const getAllDevices = async () => {
   let offset = 0
-  let prevLenght = 1
-  const date = subDays(new Date(), 30).toUTCString()
-  while (prevLenght) {
-    const { data } = await supabase.from<definitions['devices'] & Device>('devices')
-      .select(`
+  // let prevLenght = 1
+  // const date = subDays(new Date(), 30).toUTCString()
+  // while (prevLenght) {
+  const { data } = await supabase.from<definitions['devices'] & Device>('devices')
+    .select(`
         device_id,
         platform,
         plugin_version,
@@ -84,26 +102,33 @@ const getAllDevices = async () => {
         created_at,
         updated_at
       `)
-      .eq('app_id', id.value)
-      .gt('updated_at', date)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + 100)
-    if (data && data.length) {
-      devices.value.push(...data)
-      offset += 100
-    }
-    prevLenght = data ? data.length : 0
-    buildGraph()
+    .eq('app_id', id.value)
+  // .gt('updated_at', date)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + 100)
+  if (data && data.length) {
+    devices.value.push(...data)
+    offset += 100
   }
+  //   prevLenght = data ? data.length : 0
+  //   buildGraph()
+  // }
 }
 
 const loadData = async () => {
   try {
     const { data: dataVersions } = await supabase
-      .from<definitions['app_versions']>('app_versions')
-      .select()
+      .from<definitions['app_versions_meta'] & Version>('app_versions_meta')
+      .select(`
+        id (
+            name
+        ),
+        devices,
+        created_at,
+        updated_at
+      `)
       .eq('app_id', id.value)
-      .eq('deleted', false)
+      // .eq('deleted', false)
       .order('created_at', { ascending: false })
     versions.value = dataVersions || versions.value
     await getAllDevices()
@@ -261,7 +286,7 @@ watchEffect(async () => {
           <div class="flex flex-col justify-center px-4 py-4 bg-white border border-gray-300 rounded">
             <div>
               <p class="text-3xl font-semibold text-center text-gray-800">
-                {{ devices.length }}
+                {{ MAU }}
               </p>
               <p class="text-sm text-center text-gray-500">
                 {{ t('monthly-active-users') }}
