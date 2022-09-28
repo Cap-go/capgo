@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
-import { IonIcon, IonFab, IonFabButton } from '@ionic/vue'
+import { IonFab, IonFabButton, IonIcon } from '@ionic/vue'
 import { addOutline } from 'ionicons/icons'
 import { useRoute } from 'vue-router'
 import Sidebar from '../../components/Sidebar.vue'
@@ -72,10 +72,10 @@ watchEffect(async () => {
         </div>
       </main>
     </div>
-    <ion-fab v-if="!stepsOpen" vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button color="secondary" @click="stepsOpen = true">
-        <ion-icon :icon="addOutline"></ion-icon>
-      </ion-fab-button>
-    </ion-fab>
+    <IonFab v-if="!stepsOpen" slot="fixed" vertical="bottom" horizontal="end">
+      <IonFabButton color="secondary" @click="stepsOpen = true">
+        <IonIcon :icon="addOutline" />
+      </IonFabButton>
+    </IonFab>
   </div>
 </template>

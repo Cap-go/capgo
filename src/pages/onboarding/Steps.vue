@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IonIcon, toastController, IonFab, IonFabButton } from '@ionic/vue'
+import { IonFab, IonFabButton, IonIcon, toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useRoute, useRouter } from 'vue-router'
@@ -190,9 +190,9 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button color="secondary" @click="emit('done')">
-        <ion-icon :icon="arrowBack"></ion-icon>
-      </ion-fab-button>
-  </ion-fab>
+  <IonFab slot="fixed" vertical="bottom" horizontal="end">
+    <IonFabButton color="secondary" @click="emit('done')">
+      <IonIcon :icon="arrowBack" />
+    </IonFabButton>
+  </IonFab>
 </template>
