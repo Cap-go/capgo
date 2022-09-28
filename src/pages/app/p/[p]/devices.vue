@@ -161,9 +161,16 @@ const onSearch = (val: string) => {
           <template v-for="d in deviceFiltered" :key="d.device_id">
             <IonItem class="cursor-pointer" @click="openDevice(d)">
               <IonLabel>
-                <h2 class="text-sm text-azure-500">
-                  {{ d.device_id }} {{ d.platform }} {{ d.version.name }}
-                </h2>
+                <div class="col-span-6 flex flex-col">
+                  <div class="flex justify-between items-center">
+                    <h3 class="py-1 text-sm text-azure-500">
+                      {{ d.device_id }}
+                    </h3>
+                  </div>
+                  <p class="text-xs text-true-gray-400 truncate font-black-light">
+                    {{ d.platform }} {{ d.version.name }}
+                  </p>
+                </div>
               </IonLabel>
               <IonNote slot="end">
                 {{ formatDate(d.updated_at) }}
