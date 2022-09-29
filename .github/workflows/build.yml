@@ -96,7 +96,7 @@ jobs:
         id: build_code
         run: pnpm mobile
       - name: Build bundle
-        run: npx ionic capacitor build android --release --prod --no-open
+        run: npx @ionic/cli capacitor build android --release --prod --no-open
       - name: Extract Android signing key from env
         run: |
           echo "${{ secrets.ANDROID_RELEASE_KEYSTORE }}" > android/release.jks.base64
@@ -137,7 +137,7 @@ jobs:
           run: pnpm mobile
 
         - name: Build ipa
-          run: npx ionic capacitor build ios --release --prod --no-open
+          run: npx @ionic/cli capacitor build ios --release --prod --no-open
 
         - name: 'Download Provisioning Profiles'
           id: provisioning
