@@ -3,10 +3,10 @@ import { useI18n } from 'vue-i18n'
 import AppCard from './AppCard.vue'
 import type { definitions } from '~/types/supabase'
 
-const emit = defineEmits(['reload'])
 const props = defineProps<{
   apps: (definitions['apps'])[]
 }>()
+const emit = defineEmits(['reload'])
 const { t } = useI18n()
 </script>
 
@@ -44,8 +44,7 @@ const { t } = useI18n()
                   {{ t('MAU') }}
                 </div>
               </th>
-              <th class="p-2">
-              </th>
+              <th class="p-2" />
             </tr>
           </thead>
           <!-- Table body -->

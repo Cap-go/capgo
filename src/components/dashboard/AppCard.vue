@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { alertController, toastController } from '@ionic/vue'
-import IconTrash from '~icons/heroicons/trash'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import IconTrash from '~icons/heroicons/trash'
 import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { useI18n } from 'vue-i18n'
 
-const emit = defineEmits(['reload'])
 const props = defineProps<{
   app: definitions['apps']
   channel: string
 }>()
-
+const emit = defineEmits(['reload'])
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
@@ -21,7 +20,6 @@ const supabase = useSupabase()
 const isLoading = ref(true)
 const devicesNb = ref(0)
 const { t } = useI18n()
-
 
 const didCancel = async (name: string) => {
   const alert = await alertController
@@ -175,9 +173,9 @@ watchEffect(async () => {
         {{ props.channel }}
       </div>
     </td>
-    <td class="p-2" v-if="!channel" @click.stop="deleteApp(app)">
+    <td v-if="!channel" class="p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
-        <IconTrash/>
+        <IconTrash />
       </div>
     </td>
   </tr>

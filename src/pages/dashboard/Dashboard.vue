@@ -19,12 +19,11 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
-const emit = defineEmits(['reloadApp', 'reloadShared'])
 const props = defineProps<{
   apps: definitions['apps'][]
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
 }>()
-
+const emit = defineEmits(['reloadApp', 'reloadShared'])
 const isLoading = ref(false)
 const route = useRoute()
 const main = useMainStore()
