@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import AppCard from './AppCard.vue'
 import type { definitions } from '~/types/supabase'
 
+const emit = defineEmits(['reload'])
 const props = defineProps<{
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
 }>()
@@ -54,7 +55,7 @@ interface ChannelUserApp {
           <!-- Table body -->
           <tbody class="text-sm font-medium divide-y divide-slate-100">
             <!-- Row -->
-            <AppCard v-for="app in props.sharedApps" :key="app.app_id.app_id" :app="app.app_id" :channel="app.channel_id.name" />
+            <AppCard v-for="(app, i) in props.sharedApps" :key="app.app_id.app_id + i" :app="app.app_id" :channel="app.channel_id.name"  @reload="emit('reload')" />
           </tbody>
         </table>
       </div>

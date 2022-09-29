@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { alertController, toastController } from '@ionic/vue'
+import IconTrash from '~icons/heroicons/trash'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { useI18n } from 'vue-i18n'
 
+const emit = defineEmits(['reload'])
 const props = defineProps<{
   app: definitions['apps']
   channel: string
@@ -16,6 +20,89 @@ const supabase = useSupabase()
 
 const isLoading = ref(true)
 const devicesNb = ref(0)
+const { t } = useI18n()
+
+
+const didCancel = async (name: string) => {
+  const alert = await alertController
+    .create({
+      header: t('alert.confirm-delete'),
+      message: `${t('alert.delete-message')} ${name}?`,
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button.delete'),
+          id: 'confirm-button',
+        },
+      ],
+    })
+  await alert.present()
+  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
+
+const deleteApp = async (app: definitions['apps']) => {
+  // console.log('deleteApp', app)
+  if (await didCancel(t('package.name')))
+    return
+  try {
+    const { data, error: vError } = await supabase
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+
+    if (data && data.length) {
+      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
+      const { error: delError } = await supabase
+        .storage
+        .from('apps')
+        .remove(filesToRemove)
+      if (delError) {
+        const toast = await toastController
+          .create({
+            message: t('cannot-delete-app-version'),
+            duration: 2000,
+          })
+        await toast.present()
+        return
+      }
+    }
+
+    const { error: dbAppError } = await supabase
+      .from<definitions['apps']>('apps')
+      .delete()
+      .eq('app_id', app.app_id)
+      .eq('user_id', app.user_id)
+    if (vError || dbAppError) {
+      const toast = await toastController
+        .create({
+          message: t('cannot-delete-app'),
+          duration: 2000,
+        })
+      await toast.present()
+    }
+    else {
+      const toast = await toastController
+        .create({
+          message: 'App deleted',
+          duration: 2000,
+        })
+      await toast.present()
+      await emit('reload')
+    }
+  }
+  catch (error) {
+    const toast = await toastController
+      .create({
+        message: t('cannot-delete-app'),
+        duration: 2000,
+      })
+    await toast.present()
+  }
+}
 
 const loadData = async () => {
   if (!props.channel) {
@@ -86,6 +173,11 @@ watchEffect(async () => {
       </div>
       <div v-else class="text-center">
         {{ props.channel }}
+      </div>
+    </td>
+    <td class="p-2" v-if="!channel" @click.stop="deleteApp(app)">
+      <div class="text-center">
+        <IconTrash/>
       </div>
     </td>
   </tr>

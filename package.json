@@ -100,6 +100,7 @@
     "@capacitor/cli": "^4.3.0",
     "@capacitor/core": "^4.3.0",
     "@iconify-json/carbon": "1.1.8",
+    "@iconify-json/heroicons": "^1.1.4",
     "@iconify-json/ion": "1.1.4",
     "@iconify-json/ls": "1.1.2",
     "@intlify/vite-plugin-vue-i18n": "6.0.3",

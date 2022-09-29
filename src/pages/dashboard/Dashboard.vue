@@ -19,6 +19,7 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
+const emit = defineEmits(['reloadApp', 'reloadShared'])
 const props = defineProps<{
   apps: definitions['apps'][]
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
@@ -65,9 +66,9 @@ watchEffect(async () => {
             <!-- Line chart (Acme Plus) -->
             <Usage v-if="!isLoading" />
             <!-- Table (Top Channels) -->
-            <TopApps :apps="props.apps" />
+            <TopApps :apps="props.apps" @reload="emit('reloadApp')" />
 
-            <SharedApps :shared-apps="props.sharedApps" />
+            <SharedApps :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
           </div>
         </div>
       </main>

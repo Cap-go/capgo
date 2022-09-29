@@ -39,87 +39,6 @@ const getMyApps = async () => {
     apps.value = []
 }
 
-// const didCancel = async (name: string) => {
-//   const alert = await alertController
-//     .create({
-//       header: t('alert.confirm-delete'),
-//       message: `${t('alert.delete-message')} ${name}?`,
-//       buttons: [
-//         {
-//           text: t('button.cancel'),
-//           role: 'cancel',
-//         },
-//         {
-//           text: t('button.delete'),
-//           id: 'confirm-button',
-//         },
-//       ],
-//     })
-//   await alert.present()
-//   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
-// }
-
-// const deleteApp = async (app: definitions['apps']) => {
-//   // console.log('deleteApp', app)
-//   if (await didCancel(t('package.name')))
-//     return
-//   try {
-//     const { data, error: vError } = await supabase
-//       .from<definitions['app_versions']>('app_versions')
-//       .select()
-//       .eq('app_id', app.app_id)
-//       .eq('user_id', app.user_id)
-
-//     if (data && data.length) {
-//       const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
-//       const { error: delError } = await supabase
-//         .storage
-//         .from('apps')
-//         .remove(filesToRemove)
-//       if (delError) {
-//         const toast = await toastController
-//           .create({
-//             message: t('cannot-delete-app-version'),
-//             duration: 2000,
-//           })
-//         await toast.present()
-//         return
-//       }
-//     }
-
-//     const { error: dbAppError } = await supabase
-//       .from<definitions['apps']>('apps')
-//       .delete()
-//       .eq('app_id', app.app_id)
-//       .eq('user_id', app.user_id)
-//     if (vError || dbAppError) {
-//       const toast = await toastController
-//         .create({
-//           message: t('cannot-delete-app'),
-//           duration: 2000,
-//         })
-//       await toast.present()
-//     }
-//     else {
-//       const toast = await toastController
-//         .create({
-//           message: 'App deleted',
-//           duration: 2000,
-//         })
-//       await toast.present()
-//       await getMyApps()
-//     }
-//   }
-//   catch (error) {
-//     const toast = await toastController
-//       .create({
-//         message: t('cannot-delete-app'),
-//         duration: 2000,
-//       })
-//     await toast.present()
-//   }
-// }
-
 const onboardingDone = async () => {
   await getMyApps()
 }
@@ -166,7 +85,7 @@ watchEffect(async () => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
+      <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
       <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
       <div v-else class="flex justify-center">
         <Spinner />

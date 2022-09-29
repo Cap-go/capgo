@@ -40,6 +40,7 @@ specifiers:
   '@capgo/capacitor-screen-recorder': ^1.2.6
   '@capgo/capacitor-updater': 4.3.4
   '@iconify-json/carbon': 1.1.8
+  '@iconify-json/heroicons': ^1.1.4
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
   '@intlify/vite-plugin-vue-i18n': 6.0.3
@@ -186,6 +187,7 @@ devDependencies:
   '@capacitor/cli': 4.3.0
   '@capacitor/core': 4.3.0
   '@iconify-json/carbon': 1.1.8
+  '@iconify-json/heroicons': 1.1.4
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
   '@intlify/vite-plugin-vue-i18n': 6.0.3_vite@3.0.9+vue-i18n@9.2.2
@@ -2500,6 +2502,12 @@ packages:
 
   /@iconify-json/carbon/1.1.8:
     resolution: {integrity: sha512-aSoMgvZyvIXadLbMXcfS+qy8CVxSExvvp8Vd/nCrupLFc0KLKSukRInnVNc63zaHqoe1NBf5xUrgfyRYYfaKWQ==}
+    dependencies:
+      '@iconify/types': 2.0.0
+    dev: true
+
+  /@iconify-json/heroicons/1.1.4:
+    resolution: {integrity: sha512-6UonUR+IG3/mWi4PNQJOQkaOiQjmCbZV4d33QOvUI0Nt4AoMByvIJ1EmQX3rjNx4B5Cv4APW3DM5z3gMCQGueQ==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
