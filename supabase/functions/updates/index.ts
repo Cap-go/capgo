@@ -69,7 +69,7 @@ serve(async (event: Request) => {
           disableAutoUpdateUnderNative,
           disableAutoUpdateToMajor,
           ios,
-          android
+          android,
           version (
             id,
             name,
