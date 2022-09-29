@@ -95,6 +95,9 @@ jobs:
       - name: Build
         id: build_code
         run: pnpm mobile
+      - name: Sync
+        id: sync_code
+        run: npx cap sync
       - name: Build bundle
         run: cd android/ && ./gradlew assembleRelease
       - name: Extract Android signing key from env
@@ -135,7 +138,9 @@ jobs:
         - name: Build
           id: build_code
           run: pnpm mobile
-
+        - name: Sync
+          id: sync_code
+          run: npx cap sync
         - name: Install native packages
           run: cd ios/App && pod install
 
