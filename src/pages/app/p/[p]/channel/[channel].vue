@@ -173,7 +173,7 @@ const addUser = async () => {
   // console.log('newUser', newUser.value)
   if (!channel.value || !auth)
     return
-  if (!main.canUseMore && (main.trialDaysLeft.value || 0) <= 0) {
+  if (!main.canUseMore && (main.trialDaysLeft || 0) <= 0) {
     // show alert for upgrade plan and return
     const alert = await alertController.create({
       header: t('limit-reached'),
@@ -182,12 +182,12 @@ const addUser = async () => {
         {
           text: t('button.cancel'),
           role: 'cancel',
-          cssClass: 'secondary',
         },
         {
           text: t('upgrade-now'),
+          id: 'confirm-button',
           handler: () => {
-            router.push('/usage')
+            router.push('/dashboard/settings/plans')
           },
         },
       ],
@@ -224,10 +224,10 @@ const makePublic = async (val = true) => {
       {
         text: t('button.cancel'),
         role: 'cancel',
-        cssClass: 'secondary',
       },
       {
         text: t('channel.make-now'),
+        id: 'confirm-button',
         handler: async () => {
           if (!channel.value || !id.value)
             return
@@ -522,3 +522,9 @@ const inviteUser = async (userId: string) => {
     </IonModal>
   </IonPage>
 </template>
+<style>
+  #confirm-button {
+    background-color: theme('colors.red.500');
+    color: theme('colors.white');
+  }
+</style>

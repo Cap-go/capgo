@@ -2,19 +2,15 @@
 import {
   IonContent,
   IonPage,
-  // alertController,
-  // toastController,
 } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-// import { useI18n } from 'vue-i18n'
 import Dashboard from '../dashboard/Dashboard.vue'
 import Steps from '../onboarding/Steps.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 
-// const { t } = useI18n()
 const isLoading = ref(false)
 const route = useRoute()
 const supabase = useSupabase()
