@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.25.0](https://github.com/Cap-go/capgo/compare/1.24.18...1.25.0) (2022-09-29)
+
+
+### Features
+
+* add back delete app ([39aed0b](https://github.com/Cap-go/capgo/commit/39aed0b636dcf14a23b8d1fb6725d6cb471cbed3))
+
 ### [1.24.18](https://github.com/Cap-go/capgo/compare/1.24.17...1.24.18) (2022-09-29)
 
 
