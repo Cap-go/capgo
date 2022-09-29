@@ -79,7 +79,8 @@ const MAU = computed(() => {
 // }
 const buildGraph = () => {
   const vals = versions.value.reduce((past, d) => {
-    past[d.id.name] = past[d.id.name] ? past[d.id.name] + 1 : 1
+    if (d.devices)
+      past[d.id.name] = d.devices || 0
     return past
   }, { } as any)
   dataDevValues.value = Object.values(vals)
@@ -316,7 +317,7 @@ watchEffect(async () => {
             </div>
           </div>
         </div>
-        <Doughnut class="my-8 mx-auto w-100 h-100" :chart-data="chartData" :chart-options="chartOptions" />
+        <Doughnut class="my-8 mx-auto w-full h-full md:w-1/3" :chart-data="chartData" :chart-options="chartOptions" />
         <!-- <DoughnutChart class="my-8 mx-auto w-100 h-100" v-bind="doughnutChartProps" /> -->
         <IonList>
           <div v-if="isLoadingSub" class="chat-items flex justify-center">
