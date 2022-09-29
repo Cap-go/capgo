@@ -122,7 +122,6 @@ dependencies:
   '@capacitor/browser': 4.0.1_@capacitor+core@4.3.0
   '@capacitor/camera': 4.1.1_@capacitor+core@4.3.0
   '@capacitor/clipboard': 4.0.1_@capacitor+core@4.3.0
-  '@capacitor/core': 4.3.0
   '@capacitor/device': 4.0.1_@capacitor+core@4.3.0
   '@capacitor/dialog': 4.0.1_@capacitor+core@4.3.0
   '@capacitor/filesystem': 4.1.1_@capacitor+core@4.3.0
@@ -185,6 +184,7 @@ dependencies:
 devDependencies:
   '@antfu/eslint-config': 0.27.0_ypn2ylkkyfa5i233caldtndbqa
   '@capacitor/cli': 4.3.0
+  '@capacitor/core': 4.3.0
   '@iconify-json/carbon': 1.1.8
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
@@ -1672,7 +1672,6 @@ packages:
     resolution: {integrity: sha512-zb225feaiHYcttHqw7SnKVj9gjOh3yoM2ol0Efky4kd80qZvqPHt7nRI1XZmGUKid5j3AVggULd5rRke5OEOXQ==}
     dependencies:
       tslib: 2.4.0
-    dev: false
 
   /@capacitor/device/4.0.1_@capacitor+core@4.3.0:
     resolution: {integrity: sha512-D0jJFQYifmsgcz4X9MEEKH5E36ARK2CJcUCXJbcuFTChHSxK+ly7Kd6PZC73Y5GkEZIjpebWAWo5F3w9S4hsYQ==}
