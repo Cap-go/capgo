@@ -109,3 +109,56 @@ jobs:
           name: app-release
           path: android/app/build/outputs/bundle/release/app-release-signed.aab
           retention-days: 60
+  build_ios:
+      runs-on: macOS-latest
+      strategy:
+        matrix:
+          node-version: [16]
+      steps:
+        - uses: actions/checkout@v3
+        - uses: pnpm/action-setup@v2
+          with:
+            version: 7
+        - name: Use Node.js ${{ matrix.node-version }}
+          uses: actions/setup-node@v3
+          with:
+            node-version: ${{ matrix.node-version }}
+            cache: 'pnpm'
+        - name: Setup java
+          uses: actions/setup-java@v3
+          with:
+              distribution: 'zulu'
+              java-version: '11'
+        - name: Install dependencies
+          id: install_code
+          run: pnpm install --frozen-lockfile
+        - name: Build
+          id: build_code
+          run: pnpm mobile
+
+        - name: Build ipa
+            run: ionic capacitor build ios --release --prod --no-open
+
+        - name: 'Download Provisioning Profiles'
+          id: provisioning
+          uses: apple-actions/download-provisioning-profiles@v1
+          with: 
+            bundle-id: 'com.example.App'
+            profile-type: 'IOS_APP_STORE'
+            issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+            api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+            api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+      
+        - name: 'Another example step'
+          run: echo ${{ steps.provisioning.outputs.profiles }}
+
+        - name: Archive
+            run: xcodebuild -workspace ios/App/App.xcworkspace
+              -scheme App clean archive -configuration release
+              -sdk iphoneos -allowProvisioningUpdates DEVELOPMENT_TEAM=${{secrets.APPLE_TEAM_ID}} -archivePath ios/App/App.xcarchive
+        - name: Upload release bundle
+          uses: actions/upload-artifact@v2
+          with:
+            name: app-release
+            path: android/app/build/outputs/bundle/release/app-release-signed.aab
+            retention-days: 60
