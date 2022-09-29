@@ -14,6 +14,7 @@ interface AppInfos {
   version_name: string
   version_build: string
   plugin_version: string
+  version_os: string
   platform: string
   app_id: string
   device_id: string
@@ -34,6 +35,7 @@ serve(async (event: Request) => {
       platform,
       app_id,
       device_id,
+      version_os,
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
@@ -136,6 +138,7 @@ serve(async (event: Request) => {
       platform: platform as definitions['devices']['platform'],
       plugin_version,
       version: version.id,
+      os_version: version_os,
       version_build,
       updated_at: new Date().toISOString(),
     })
