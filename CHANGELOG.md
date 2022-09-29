@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.15](https://github.com/Cap-go/capgo/compare/1.24.14...1.24.15) (2022-09-29)
+
+
+### Bug Fixes
+
+* npx script ([cb1e8dd](https://github.com/Cap-go/capgo/commit/cb1e8dd58a78884c7b5b161d59d718e416227ee9))
+
 ### [1.24.14](https://github.com/Cap-go/capgo/compare/1.24.13...1.24.14) (2022-09-29)
 
 
