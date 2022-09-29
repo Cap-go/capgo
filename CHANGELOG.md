@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.25.6](https://github.com/Cap-go/capgo/compare/1.25.5...1.25.6) (2022-09-29)
+
+
+### Bug Fixes
+
+* alert button colors ([6a5456e](https://github.com/Cap-go/capgo/commit/6a5456ec7333a3d1c4ba9116f302259d32b97777))
+
 ### [1.25.5](https://github.com/Cap-go/capgo/compare/1.25.4...1.25.5) (2022-09-29)
 
 
