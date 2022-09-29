@@ -137,7 +137,7 @@ jobs:
           run: pnpm mobile
 
         - name: Build ipa
-            run: ionic capacitor build ios --release --prod --no-open
+          run: ionic capacitor build ios --release --prod --no-open
 
         - name: 'Download Provisioning Profiles'
           id: provisioning
@@ -153,12 +153,13 @@ jobs:
           run: echo ${{ steps.provisioning.outputs.profiles }}
 
         - name: Archive
-            run: xcodebuild -workspace ios/App/App.xcworkspace
-              -scheme App clean archive -configuration release
-              -sdk iphoneos -allowProvisioningUpdates DEVELOPMENT_TEAM=${{secrets.APPLE_TEAM_ID}} -archivePath ios/App/App.xcarchive
-        - name: Upload release bundle
-          uses: actions/upload-artifact@v2
-          with:
-            name: app-release
-            path: android/app/build/outputs/bundle/release/app-release-signed.aab
-            retention-days: 60
+          run: xcodebuild -workspace ios/App/App.xcworkspace
+            -scheme App clean archive -configuration release
+            -sdk iphoneos -allowProvisioningUpdates DEVELOPMENT_TEAM=${{secrets.APPLE_TEAM_ID}} -archivePath ios/App/App.xcarchive
+        - name: 'Upload app to TestFlight'
+          uses: apple-actions/upload-testflight-build@v1
+          with: 
+            app-path: 'path/to/application.ipa' 
+            issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+            api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+            api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
