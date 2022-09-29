@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.24.16](https://github.com/Cap-go/capgo/compare/1.24.15...1.24.16) (2022-09-29)
+
+
+### Bug Fixes
+
+* add cap core ([a3214fe](https://github.com/Cap-go/capgo/commit/a3214fefacaafbd395d63b3a68c0ce4949076d6f))
+
 ### [1.24.15](https://github.com/Cap-go/capgo/compare/1.24.14...1.24.15) (2022-09-29)
 
 
