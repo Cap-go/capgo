@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.25.9](https://github.com/Cap-go/capgo/compare/1.25.8...1.25.9) (2022-09-30)
+
+
+### Bug Fixes
+
+* ios build ([6c1f5ff](https://github.com/Cap-go/capgo/commit/6c1f5ffd818edc2b20878c3873175fb0ccc33744))
+
 ### [1.25.8](https://github.com/Cap-go/capgo/compare/1.25.7...1.25.8) (2022-09-30)
 
 
