@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.25.8](https://github.com/Cap-go/capgo/compare/1.25.7...1.25.8) (2022-09-30)
+
+
+### Bug Fixes
+
+* lint issue ([e2e10a4](https://github.com/Cap-go/capgo/commit/e2e10a4a169ee9288d185f76c56d88de4c1f4637))
+
 ### [1.25.7](https://github.com/Cap-go/capgo/compare/1.25.6...1.25.7) (2022-09-30)
 
 ### [1.25.6](https://github.com/Cap-go/capgo/compare/1.25.5...1.25.6) (2022-09-29)
