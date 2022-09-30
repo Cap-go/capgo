@@ -512,6 +512,7 @@ watchEffect(async () => {
     </IonContent>
   </IonPage>
 </template>
+
 <style>
   #confirm-button {
     background-color: theme('colors.red.500');

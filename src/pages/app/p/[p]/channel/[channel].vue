@@ -522,6 +522,7 @@ const inviteUser = async (userId: string) => {
     </IonModal>
   </IonPage>
 </template>
+
 <style>
   #confirm-button {
     background-color: theme('colors.red.500');
