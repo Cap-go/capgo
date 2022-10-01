@@ -22,6 +22,8 @@ import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { openVersion } from '~/services/versions'
 import TitleHead from '~/components/TitleHead.vue'
+import MobileStats from '~/components/MobileStats.vue'
+import Usage from '~/components/dashboard/Usage.vue'
 
 interface InfiniteScrollCustomEvent extends CustomEvent {
   target: HTMLIonInfiniteScrollElement
@@ -306,9 +308,6 @@ const openChannel = (channel: definitions['channels']) => {
 const openDevices = () => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/devices`)
 }
-const openStats = () => {
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/stats`)
-}
 const setChannel = async (v: definitions['app_versions'], channel: definitions['channels']) => {
   return supabase
     .from<definitions['channels']>('channels')
@@ -412,7 +411,6 @@ watchEffect(async () => {
   <IonPage>
     <TitleHead :title="app?.name" default-back="/app" color="warning" />
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="app?.name" no-back big condense color="warning" /> -->
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>
@@ -420,17 +418,10 @@ watchEffect(async () => {
         <Spinner />
       </div>
       <div v-else>
+        <div class="grid grid-cols-16 gap-6 md:mx-10">
+          <Usage :app-id="id" />
+        </div>
         <IonList ref="listRef">
-          <IonItem class="cursor-pointer" @click="openStats()">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('package.mobiles-stats') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </IonNote>
-          </IonItem>
           <IonItem class="cursor-pointer" @click="openDevices()">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
