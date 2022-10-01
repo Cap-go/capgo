@@ -21,7 +21,6 @@ const accumulateData = computed(() => {
 })
 const monthdays = () => {
   const arr = [...Array(daysInCurrentMonth() + 1).keys()]
-  arr.pop()
   return arr
 }
 const createAnotation = (id: string, y: number, title: string, lineColor: string, bgColor: string) => {
