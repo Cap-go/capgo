@@ -53,20 +53,21 @@ const allLimits = computed(() => {
 
 const getAppStats = async () => {
   const date_id = new Date().toISOString().slice(0, 7)
-  if  (props.appId) {
+  if (props.appId) {
     console.log('appID', props.appId)
     return supabase
-    .from<definitions['app_stats']>('app_stats')
-    .select()
-    .eq('user_id', main.user?.id)
-    .eq('app_id', props.appId)
-    .like('date_id', `${date_id}%`)
-  } else {
+      .from<definitions['app_stats']>('app_stats')
+      .select()
+      .eq('user_id', main.user?.id)
+      .eq('app_id', props.appId)
+      .like('date_id', `${date_id}%`)
+  }
+  else {
     return supabase
-    .from<definitions['app_stats']>('app_stats')
-    .select()
-    .eq('user_id', main.user?.id)
-    .like('date_id', `${date_id}%`)
+      .from<definitions['app_stats']>('app_stats')
+      .select()
+      .eq('user_id', main.user?.id)
+      .like('date_id', `${date_id}%`)
   }
 }
 
@@ -114,5 +115,5 @@ loadData()
   <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :tilte="t('MAU')" unit="Users" />
   <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
   <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
-  <MobileStats v-if="appId"/>
+  <MobileStats v-if="appId" />
 </template>

@@ -22,7 +22,6 @@ import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { openVersion } from '~/services/versions'
 import TitleHead from '~/components/TitleHead.vue'
-import MobileStats from '~/components/MobileStats.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 
 interface InfiniteScrollCustomEvent extends CustomEvent {

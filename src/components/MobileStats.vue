@@ -70,9 +70,8 @@ const getLastDownload = async () => {
     .eq('app_id', id.value)
     .eq('date_id', date_id)
     .single()
-  if (data) {
+  if (data)
     downloads.value = Math.max(data.mlu, data.mlu_real)
-  }
 }
 
 const chartData = computed<ChartData<'doughnut'>>(() => ({
@@ -114,30 +113,31 @@ watchEffect(async () => {
     catch (error) {
       console.error(error)
     }
-  } else {
+  }
+  else {
     isLoading.value = true
   }
 })
 </script>
 
 <template>
-    <div v-if="isLoading" class="chat-items flex justify-center">
-      <Spinner />
-    </div>
-    <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-      <div class="px-5 pt-5">
-        <h2 class="mb-2 text-2xl font-semibold dark:text-white text-slate-800">
-          {{ t('stats.versions') }}
-        </h2>
-        <div class="mb-1 text-xs font-semibold uppercase dark:text-white text-slate-400">
-          {{ t('usage.title') }}
-        </div>
-        <div class="flex items-start">
-          <div class="mr-2 text-3xl font-bold dark:text-white text-slate-800">
-            {{ versions.length.toLocaleString() }}
-          </div>
+  <div v-if="isLoading" class="chat-items flex justify-center">
+    <Spinner />
+  </div>
+  <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+    <div class="px-5 pt-5">
+      <h2 class="mb-2 text-2xl font-semibold dark:text-white text-slate-800">
+        {{ t('stats.versions') }}
+      </h2>
+      <div class="mb-1 text-xs font-semibold uppercase dark:text-white text-slate-400">
+        {{ t('usage.title') }}
+      </div>
+      <div class="flex items-start">
+        <div class="mr-2 text-3xl font-bold dark:text-white text-slate-800">
+          {{ versions.length.toLocaleString() }}
         </div>
       </div>
-      <Doughnut class="w-full px-3 mx-auto my-3 h-max" :chart-data="chartData" :chart-options="chartOptions" />
+    </div>
+    <Doughnut class="w-full px-3 mx-auto my-3 h-max" :chart-data="chartData" :chart-options="chartOptions" />
   </div>
 </template>
