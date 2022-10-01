@@ -20,7 +20,7 @@ const props = defineProps({
 const { t } = useI18n()
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
 const total = computed(() => {
-  return sum(props.datas.slice(0, -1) as number[])
+  return sum(props.datas as number[])
 })
 const evolution = (arr: number[]) => {
   const oldTotal = sum(arr.slice(0, -2))
