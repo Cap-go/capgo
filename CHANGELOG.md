@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.26.0](https://github.com/Cap-go/capgo/compare/1.25.14...1.26.0) (2022-10-01)
+
+
+### Features
+
+* new stats by apps ([e3c526f](https://github.com/Cap-go/capgo/commit/e3c526f04c107372d8544d8206778914f7364869))
+
 ### [1.25.14](https://github.com/Cap-go/capgo/compare/1.25.13...1.25.14) (2022-10-01)
 
 
