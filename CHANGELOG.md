@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.25.14](https://github.com/Cap-go/capgo/compare/1.25.13...1.25.14) (2022-10-01)
+
+
+### Bug Fixes
+
+* % for first day ([9151895](https://github.com/Cap-go/capgo/commit/91518956ea0165da0a2f6d736c6100d28b9231bd))
+
 ### [1.25.13](https://github.com/Cap-go/capgo/compare/1.25.12...1.25.13) (2022-10-01)
 
 
