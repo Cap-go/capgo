@@ -25,7 +25,7 @@ const total = computed(() => {
 const evolution = (arr: number[]) => {
   const oldTotal = sum(arr.slice(0, -2))
   const diff = total.value - oldTotal
-  return diff / oldTotal * 100
+  return diff / (arr.length > 2 ? oldTotal: diff) * 100
 }
 
 const lastDayEvolution = evolution(props.datas as number[])
