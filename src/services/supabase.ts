@@ -2,7 +2,7 @@ import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import type { Stats } from './plans'
+import type { StatsV2 } from './plans'
 import type { definitions } from '~/types/supabase'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
@@ -111,13 +111,13 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
 
 export const findBestPlan = async (stats: StatsV2): Promise<string> => {
   // console.log('findBestPlan', stats)
-  const storage = Math.round((stats.storage || 0)  / 1024 / 1024 / 1024)
-  const bandwidth = Math.round((stats.bandwidth || 0)  / 1024 / 1024 / 1024)
+  const storage = Math.round((stats.storage || 0) / 1024 / 1024 / 1024)
+  const bandwidth = Math.round((stats.bandwidth || 0) / 1024 / 1024 / 1024)
   const { data, error } = await useSupabase()
     .rpc<string>('find_best_plan_v2', {
       mau: stats.mau || 0,
-      storage: storage,
-      bandwidth: bandwidth,
+      storage,
+      bandwidth,
     })
     .single()
   if (error)

@@ -4,6 +4,6 @@ import { IonPage } from '@ionic/vue'
 
 <template>
   <IonPage>
-    <RouterView></RouterView>
+    <RouterView />
   </IonPage>
 </template>

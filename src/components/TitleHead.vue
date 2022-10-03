@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
   IonButton,
-  IonIcon,
   IonButtons,
   IonHeader,
+  IonIcon,
   IonSearchbar,
   IonTitle,
   IonToolbar,
@@ -28,11 +28,10 @@ const onSearch = (val: string | undefined) => {
   emit('searchInput', val)
 }
 const back = () => {
-  if(window.history.length > 2) {
+  if (window.history.length > 2)
     router.back()
-  } else {
+  else
     router.push(props.defaultBack)
-  }
 }
 </script>
 
@@ -41,8 +40,8 @@ const back = () => {
     <IonToolbar mode="ios">
       <IonButtons v-if="!noBack && !big" slot="start">
         <IonButton @click="back">
-          <IonIcon slot="start" :icon="chevronBackOutline"></IonIcon>
-          {{t('button.back')}}
+          <IonIcon slot="start" :icon="chevronBackOutline" />
+          {{ t('button.back') }}
         </IonButton>
       </IonButtons>
       <IonTitle :color="color" :size="big ? 'large' : undefined">
