@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.27.2](https://github.com/Cap-go/capgo/compare/1.27.1...1.27.2) (2022-10-03)
+
+
+### Bug Fixes
+
+* remove add app button in mobile ([c06af28](https://github.com/Cap-go/capgo/commit/c06af28939bf5616cd960581b7386275b18408c3))
+
 ### [1.27.1](https://github.com/Cap-go/capgo/compare/1.27.0...1.27.1) (2022-10-03)
 
 
