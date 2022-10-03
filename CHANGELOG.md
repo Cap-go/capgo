@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.27.0](https://github.com/Cap-go/capgo/compare/1.26.2...1.27.0) (2022-10-03)
+
+
+### Features
+
+* use the new pricing system in the limits front and back ([293a101](https://github.com/Cap-go/capgo/commit/293a10140a8e487b24f76f81141829bc19ce9c46))
+
 ### [1.26.2](https://github.com/Cap-go/capgo/compare/1.26.1...1.26.2) (2022-10-03)
 
 
