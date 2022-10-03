@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
-import { IonFab, IonFabButton, IonIcon } from '@ionic/vue'
+import { IonFab, IonFabButton, IonIcon, isPlatform } from '@ionic/vue'
 import { addOutline } from 'ionicons/icons'
 import { useRoute } from 'vue-router'
 import Sidebar from '../../components/Sidebar.vue'
@@ -19,6 +19,7 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
+const isMobile = isPlatform('capacitor')
 const props = defineProps<{
   apps: definitions['apps'][]
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
@@ -72,7 +73,7 @@ watchEffect(async () => {
         </div>
       </main>
     </div>
-    <IonFab v-if="!stepsOpen" slot="fixed" vertical="bottom" horizontal="end">
+    <IonFab v-if="!stepsOpen && isMobile" slot="fixed" vertical="bottom" horizontal="end">
       <IonFabButton color="secondary" @click="stepsOpen = true">
         <IonIcon :icon="addOutline" />
       </IonFabButton>
