@@ -4,6 +4,16 @@ import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
+const alldayofMonth = () => {
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const days = []
+  for (const i = firstDay; i <= lastDay; i.setDate(i.getDate() + 1)) {
+    days.push(i.toISOString().slice(0, 10))
+  }
+  return days
+}
 const getApp = (userId: string, appId: string) => {
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -30,10 +40,16 @@ const getApp = (userId: string, appId: string) => {
       .eq('app_id', appId)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
+    bandwidth: supabaseAdmin
+      .from<definitions['app_stats']>('app_stats')
+      .select()
+      .eq('app_id', appId)
+      .in('date_id', alldayofMonth()),
     versions: supabaseAdmin
-      .storage
-      .from('apps')
-      .list(`${userId}/${appId}/versions`),
+      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .select()
+      .eq('app_id', appId)
+      .eq('user_id', userId),
     shared: supabaseAdmin
       .from<definitions['channel_users']>('channel_users')
       .select('id', { count: 'exact', head: true })
@@ -67,14 +83,15 @@ serve(async (event: Request) => {
       if (!app.id)
         continue
       const res = getApp(app.user_id, app.app_id)
-      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices])
-        .then(([app, mlu, mlu_real, versions, shared, channels, devices]) => {
+      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.bandwidth])
+        .then(([app, mlu, mlu_real, versions, shared, channels, devices, bandwidth]) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, devices, versions, shared, channels)
           const month_id = new Date().toISOString().slice(0, 7)
           // check if today is first day of the month
-          const versionSize = versions.data?.reduce((acc, cur) => acc + ((cur.metadata as any).size || 0), 0) || 0
+          const versionSize = versions.data?.reduce((acc, cur) => acc + (cur.size|| 0), 0) || 0
+          const bandwidthTotal = bandwidth.data?.reduce((acc, cur) => acc + (cur.bandwidth || 0), 0) || 0
           if (new Date().getDate() === 1) {
             const today_id = new Date().toISOString().slice(0, 10)
             const increment: AppStatsIncrement = {
@@ -102,6 +119,7 @@ serve(async (event: Request) => {
             versions: versions.data?.length || 0,
             version_size: versionSize,
             shared: shared.count || 0,
+            bandwidth: bandwidthTotal,
           }
           // console.log('newData', newData)
           return supabaseAdmin
