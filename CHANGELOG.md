@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.26.2](https://github.com/Cap-go/capgo/compare/1.26.1...1.26.2) (2022-10-03)
+
+
+### Bug Fixes
+
+* app stats add bandwidth ([f3a0ef1](https://github.com/Cap-go/capgo/commit/f3a0ef1e1e5260ef43f92d82e640996936356bb3))
+
 ### [1.26.1](https://github.com/Cap-go/capgo/compare/1.26.0...1.26.1) (2022-10-01)
 
 
