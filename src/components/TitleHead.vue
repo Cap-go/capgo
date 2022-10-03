@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import {
-  IonBackButton,
+  IonButton,
+  IonIcon,
   IonButtons,
   IonHeader,
   IonSearchbar,
   IonTitle,
   IonToolbar,
 } from '@ionic/vue'
+import { chevronBackOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import Banner from '~/components/Banner.vue'
 
-defineProps({
+const props = defineProps({
   defaultBack: { type: String, default: '/app' },
   noBack: { type: Boolean, default: false },
   color: { type: String, default: 'default' },
@@ -19,9 +22,17 @@ defineProps({
   search: { type: Boolean, default: false },
 })
 const emit = defineEmits(['searchInput'])
+const router = useRouter()
 const { t } = useI18n()
 const onSearch = (val: string | undefined) => {
   emit('searchInput', val)
+}
+const back = () => {
+  if(window.history.length > 2) {
+    router.back()
+  } else {
+    router.push(props.defaultBack)
+  }
 }
 </script>
 
@@ -29,7 +40,10 @@ const onSearch = (val: string | undefined) => {
   <IonHeader :collapse="big ? 'condense' : undefined">
     <IonToolbar mode="ios">
       <IonButtons v-if="!noBack && !big" slot="start">
-        <IonBackButton :default-href="defaultBack" :text="t('button.back')" />
+        <IonButton @click="back">
+          <IonIcon slot="start" :icon="chevronBackOutline"></IonIcon>
+          {{t('button.back')}}
+        </IonButton>
       </IonButtons>
       <IonTitle :color="color" :size="big ? 'large' : undefined">
         {{ title }}

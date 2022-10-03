@@ -11,7 +11,7 @@ import { useRoute } from 'vue-router'
 import { CapacitorCrispWeb } from '~/services/crisp-web'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import type { Stats } from '~/services/plans'
+import type { StatsV2 } from '~/services/plans'
 import type { definitions } from '~/types/supabase'
 import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
@@ -23,26 +23,17 @@ const openSupport = () => {
 }
 
 const { t } = useI18n()
-const daysInCurrentMonth = () => new Date().getDate()
 const plans = ref<definitions['plans'][]>([])
 const displayPlans = computed(() => {
   return plans.value.filter(plan => plan.stripe_id !== 'free')
 })
 const stats = ref({
-  max_app: 0,
-  max_channel: 0,
-  max_version: 0,
-  max_shared: 0,
-  max_update: 0,
-  max_device: 0,
-} as Stats)
+  mau: 0,
+  storage: 0,
+  bandwidth: 0,
+} as StatsV2)
 const planSuggest = ref('')
 const planCurrrent = ref('')
-const datas = ref({
-  mau: [] as number[],
-  storage: [] as number[],
-  bandwidth: [] as number[],
-})
 const snag = useLogSnag()
 const supabase = useSupabase()
 const isLoading = ref(false)
@@ -93,31 +84,11 @@ const getUsages = async () => {
   // get aapp_stats
   const date_id = new Date().toISOString().slice(0, 7)
   const { data: oldStats, error: errorOldStats } = await supabase
-    .rpc<Stats>('get_max_stats', { userid: main.user?.id, dateid: date_id })
+    .rpc<StatsV2>('get_total_stats', { userid: main.user?.id, dateid: date_id })
     .single()
-  const { data, error } = await supabase
-    .from<definitions['app_stats']>('app_stats')
-    .select()
-    .eq('user_id', main.user?.id)
-    .like('date_id', `${date_id}%`)
   if (oldStats && !errorOldStats)
     stats.value = oldStats
-
-  if (data && !error) {
-    datas.value.mau = new Array(daysInCurrentMonth() + 1).fill(0)
-    datas.value.storage = new Array(daysInCurrentMonth() + 1).fill(0)
-    datas.value.bandwidth = new Array(daysInCurrentMonth() + 1).fill(0)
-    data.forEach((item: definitions['app_stats']) => {
-      if (item.date_id.length > 7) {
-        const dayNumber = Number(item.date_id.slice(8))
-        datas.value.mau[dayNumber] += item.devices || 0
-        datas.value.storage[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
-        datas.value.bandwidth[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
-      }
-    })
-  }
 }
-
 const loadData = async () => {
   isLoading.value = true
   await getPlans().then((pls) => {

@@ -54,7 +54,7 @@ export const autoAuth = async (route: RouteLocationNormalizedLoaded) => {
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await useSupabase()
-    .rpc<boolean>('is_good_plan', { userid: userId })
+    .rpc<boolean>('is_good_plan_v2', { userid: userId })
     .single()
   if (error)
     throw error
@@ -109,14 +109,15 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
   return data || 'Free'
 }
 
-export const findBestPlan = async (stats: Stats): Promise<string> => {
+export const findBestPlan = async (stats: StatsV2): Promise<string> => {
+  // console.log('findBestPlan', stats)
+  const storage = Math.round((stats.storage || 0)  / 1024 / 1024 / 1024)
+  const bandwidth = Math.round((stats.bandwidth || 0)  / 1024 / 1024 / 1024)
   const { data, error } = await useSupabase()
-    .rpc<string>('find_best_plan', {
-      apps_n: stats.max_app || 0,
-      channels_n: stats.max_channel || 0,
-      updates_n: stats.max_update || 0,
-      versions_n: stats.max_version || 0,
-      shared_n: stats.max_shared || 0,
+    .rpc<string>('find_best_plan_v2', {
+      mau: stats.mau || 0,
+      storage: storage,
+      bandwidth: bandwidth,
     })
     .single()
   if (error)

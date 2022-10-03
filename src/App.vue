@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { IonApp, IonRouterOutlet } from '@ionic/vue'
+import { IonApp } from '@ionic/vue'
 </script>
 
 <template>
   <IonApp class="bg-white/90 dark:bg-gray-900/90">
-    <IonRouterOutlet />
+    <RouterView />
   </IonApp>
 </template>

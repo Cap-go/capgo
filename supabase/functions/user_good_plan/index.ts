@@ -3,8 +3,7 @@ import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
-import type { Stats } from '../_utils/plans.ts'
-import { logsnag } from '../_utils/_logsnag.ts'
+import type { StatsV2 } from '../_utils/plans.ts'
 
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
@@ -52,9 +51,9 @@ serve(async (event: Request) => {
             // create dateid var with yyyy-mm with dayjs
             const dateid = new Date().toISOString().slice(0, 7)
             const { data: get_max_stats } = await supabaseAdmin
-              .rpc<Stats>('get_max_stats', { userid: user.id, dateid })
+              .rpc<StatsV2>('get_total_stats', { userid: user.id, dateid })
               .single()
-            if (get_max_stats && get_max_stats?.max_device > 100)
+            if (get_max_stats && get_max_stats?.mau > 100)
               all.push(addEventPerson(user.email, {}, 'user:need_upgrade', 'red'))
             else if (get_max_stats)
               all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))

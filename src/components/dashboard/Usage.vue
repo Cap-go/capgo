@@ -4,7 +4,7 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import type { Stats } from '~/services/plans'
+import type { StatsV2 } from '~/services/plans'
 import type { definitions } from '~/types/supabase'
 import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
@@ -17,13 +17,10 @@ const plans = ref<definitions['plans'][]>([])
 const { t } = useI18n()
 
 const stats = ref({
-  max_app: 0,
-  max_channel: 0,
-  max_version: 0,
-  max_shared: 0,
-  max_update: 0,
-  max_device: 0,
-} as Stats)
+  mau: 0,
+  storage: 0,
+  bandwidth: 0,
+} as StatsV2)
 const planSuggest = ref('')
 const planCurrrent = ref('')
 const datas = ref({
@@ -74,12 +71,12 @@ const getAppStats = async () => {
 const getUsages = async () => {
   // get aapp_stats
   const date_id = new Date().toISOString().slice(0, 7)
-  const { data: oldStats, error: errorOldStats } = await supabase
-    .rpc<Stats>('get_max_stats', { userid: main.user?.id, dateid: date_id })
+  const { data: totalStats, error: errorOldStats } = await supabase
+    .rpc<StatsV2>('get_total_stats', { userid: main.user?.id, dateid: date_id })
     .single()
   const { data, error } = await getAppStats()
-  if (oldStats && !errorOldStats)
-    stats.value = oldStats
+  if (totalStats && !errorOldStats)
+    stats.value = totalStats
   if (data && !error) {
     datas.value.mau = new Array(daysInCurrentMonth() + 1).fill(0)
     datas.value.storage = new Array(daysInCurrentMonth() + 1).fill(0)

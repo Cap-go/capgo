@@ -3,7 +3,6 @@ import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
-// import type { PlanRes } from '~/services/plans'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
 

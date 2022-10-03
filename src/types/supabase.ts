@@ -237,6 +237,11 @@ export interface paths {
           apps?: parameters["rowFilter.global_stats.apps"];
           updates?: parameters["rowFilter.global_stats.updates"];
           stars?: parameters["rowFilter.global_stats.stars"];
+          users?: parameters["rowFilter.global_stats.users"];
+          paying?: parameters["rowFilter.global_stats.paying"];
+          trial?: parameters["rowFilter.global_stats.trial"];
+          need_upgrade?: parameters["rowFilter.global_stats.need_upgrade"];
+          not_paying?: parameters["rowFilter.global_stats.not_paying"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -292,6 +297,11 @@ export interface paths {
           apps?: parameters["rowFilter.global_stats.apps"];
           updates?: parameters["rowFilter.global_stats.updates"];
           stars?: parameters["rowFilter.global_stats.stars"];
+          users?: parameters["rowFilter.global_stats.users"];
+          paying?: parameters["rowFilter.global_stats.paying"];
+          trial?: parameters["rowFilter.global_stats.trial"];
+          need_upgrade?: parameters["rowFilter.global_stats.need_upgrade"];
+          not_paying?: parameters["rowFilter.global_stats.not_paying"];
         };
         header: {
           /** Preference */
@@ -311,6 +321,11 @@ export interface paths {
           apps?: parameters["rowFilter.global_stats.apps"];
           updates?: parameters["rowFilter.global_stats.updates"];
           stars?: parameters["rowFilter.global_stats.stars"];
+          users?: parameters["rowFilter.global_stats.users"];
+          paying?: parameters["rowFilter.global_stats.paying"];
+          trial?: parameters["rowFilter.global_stats.trial"];
+          need_upgrade?: parameters["rowFilter.global_stats.need_upgrade"];
+          not_paying?: parameters["rowFilter.global_stats.not_paying"];
         };
         body: {
           /** global_stats */
@@ -598,6 +613,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_onprem.device_id"];
           os_version?: parameters["rowFilter.devices_onprem.os_version"];
           id?: parameters["rowFilter.devices_onprem.id"];
+          version_build?: parameters["rowFilter.devices_onprem.version_build"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -657,6 +673,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_onprem.device_id"];
           os_version?: parameters["rowFilter.devices_onprem.os_version"];
           id?: parameters["rowFilter.devices_onprem.id"];
+          version_build?: parameters["rowFilter.devices_onprem.version_build"];
         };
         header: {
           /** Preference */
@@ -680,6 +697,7 @@ export interface paths {
           device_id?: parameters["rowFilter.devices_onprem.device_id"];
           os_version?: parameters["rowFilter.devices_onprem.os_version"];
           id?: parameters["rowFilter.devices_onprem.id"];
+          version_build?: parameters["rowFilter.devices_onprem.version_build"];
         };
         body: {
           /** devices_onprem */
@@ -2486,6 +2504,28 @@ export interface paths {
       };
     };
   };
+  "/rpc/get_total_stats": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: character varying */
+            dateid: string;
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/increment_version_stats": {
     post: {
       parameters: {
@@ -2549,6 +2589,26 @@ export interface paths {
             appid: string;
             /** Format: character varying */
             name_version: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/is_good_plan_v2": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
           };
         };
         header: {
@@ -2644,6 +2704,30 @@ export interface paths {
       };
     };
   };
+  "/rpc/find_best_plan_v2": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: bigint */
+            bandwidth: number;
+            /** Format: bigint */
+            mau: number;
+            /** Format: bigint */
+            storage: number;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/is_app_shared": {
     post: {
       parameters: {
@@ -2693,6 +2777,30 @@ export interface paths {
           args: {
             /** Format: uuid */
             userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/find_fit_plan_v2": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: bigint */
+            bandwidth: number;
+            /** Format: bigint */
+            mau: number;
+            /** Format: bigint */
+            storage: number;
           };
         };
         header: {
@@ -2995,6 +3103,16 @@ export interface definitions {
     updates: number;
     /** Format: bigint */
     stars: number;
+    /** Format: bigint */
+    users?: number;
+    /** Format: bigint */
+    paying?: number;
+    /** Format: bigint */
+    trial?: number;
+    /** Format: bigint */
+    need_upgrade?: number;
+    /** Format: bigint */
+    not_paying?: number;
   };
   plans: {
     /**
@@ -3159,6 +3277,11 @@ export interface definitions {
      * @default extensions.uuid_generate_v4()
      */
     id: string;
+    /**
+     * Format: text
+     * @default builtin
+     */
+    version_build?: string;
   };
   stats_onprem: {
     /**
@@ -3779,6 +3902,16 @@ export interface parameters {
   "rowFilter.global_stats.updates": string;
   /** Format: bigint */
   "rowFilter.global_stats.stars": string;
+  /** Format: bigint */
+  "rowFilter.global_stats.users": string;
+  /** Format: bigint */
+  "rowFilter.global_stats.paying": string;
+  /** Format: bigint */
+  "rowFilter.global_stats.trial": string;
+  /** Format: bigint */
+  "rowFilter.global_stats.need_upgrade": string;
+  /** Format: bigint */
+  "rowFilter.global_stats.not_paying": string;
   /** @description plans */
   "body.plans": definitions["plans"];
   /** Format: timestamp with time zone */
@@ -3863,6 +3996,8 @@ export interface parameters {
   "rowFilter.devices_onprem.os_version": string;
   /** Format: uuid */
   "rowFilter.devices_onprem.id": string;
+  /** Format: text */
+  "rowFilter.devices_onprem.version_build": string;
   /** @description stats_onprem */
   "body.stats_onprem": definitions["stats_onprem"];
   /** Format: bigint */
