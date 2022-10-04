@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.27.3](https://github.com/Cap-go/capgo/compare/1.27.2...1.27.3) (2022-10-04)
+
+
+### Bug Fixes
+
+* lint issue ([cafd2da](https://github.com/Cap-go/capgo/commit/cafd2dacdc3c11c22be9ef84785d8df964714e60))
+
 ### [1.27.2](https://github.com/Cap-go/capgo/compare/1.27.1...1.27.2) (2022-10-03)
 
 
