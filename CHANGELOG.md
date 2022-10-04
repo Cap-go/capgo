@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.27.6](https://github.com/Cap-go/capgo/compare/1.27.5...1.27.6) (2022-10-04)
+
+
+### Bug Fixes
+
+* make brew faster ([d08e1e0](https://github.com/Cap-go/capgo/commit/d08e1e0a55b90a48ed004fe85da2f6e7816059a7))
+
 ### [1.27.5](https://github.com/Cap-go/capgo/compare/1.27.4...1.27.5) (2022-10-04)
 
 
