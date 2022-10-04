@@ -47,7 +47,7 @@ jobs:
           restore-keys: ${{ runner.os }}-rubygems-
       - name: Install Supabase CLI Homebrew dependencies
         run: |
-          brew install supabase/tap/supabase
+          HOMEBREW_NO_INSTALL_CLEANUP=1 brew install supabase/tap/supabase
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
