@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.27.7](https://github.com/Cap-go/capgo/compare/1.27.6...1.27.7) (2022-10-04)
+
+
+### Bug Fixes
+
+* disable parralel for supabase deploy ([fc1bb91](https://github.com/Cap-go/capgo/commit/fc1bb91e9caeec65845533bb7e091032702d102b))
+
 ### [1.27.6](https://github.com/Cap-go/capgo/compare/1.27.5...1.27.6) (2022-10-04)
 
 
