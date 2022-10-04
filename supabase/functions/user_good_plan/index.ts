@@ -3,7 +3,7 @@ import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
-import type { StatsV2 } from '../_utils/plans.ts'
+import { findBestPlan, getCurrentPlanName, StatsV2 } from '../_utils/plans.ts'
 
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
@@ -25,9 +25,6 @@ serve(async (event: Request) => {
       return sendRes({ status: 'error', message: 'no apps' })
     // explore all apps
     const all = []
-    let trial = 0
-    let needUpgrade = 0
-    let paying = 0
     // find all trial users
     for (const user of users) {
       all.push(supabaseAdmin
@@ -35,7 +32,6 @@ serve(async (event: Request) => {
         .single()
         .then(async (res) => {
           if (res.data) {
-            trial += 1
             return supabaseAdmin
               .from<definitions['stripe_info']>('stripe_info')
               .update({ is_good_plan: true })
@@ -43,9 +39,13 @@ serve(async (event: Request) => {
               .then()
           }
           // try {
-          const { data: is_good_plan } = await supabaseAdmin
+          const { data: is_good_plan, error } = await supabaseAdmin
             .rpc<boolean>('is_good_plan', { userid: user.id })
             .single()
+          if (error) {
+            console.log('is_good_plan error', user.id, error)
+            return Promise.resolve()
+          }
           console.log('is_good_plan', user.id, is_good_plan)
           if (!is_good_plan) {
             // create dateid var with yyyy-mm with dayjs
@@ -53,51 +53,24 @@ serve(async (event: Request) => {
             const { data: get_max_stats } = await supabaseAdmin
               .rpc<StatsV2>('get_total_stats', { userid: user.id, dateid })
               .single()
-            if (get_max_stats && get_max_stats?.mau > 100)
-              all.push(addEventPerson(user.email, {}, 'user:need_upgrade', 'red'))
-            else if (get_max_stats)
-              all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))
-            needUpgrade += 1
-          }
-          else {
-            paying += 1
+              const current_plan = await getCurrentPlanName(user.id)
+              if (get_max_stats) {
+                const best_plan = await findBestPlan(get_max_stats)
+                const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
+                if (best_plan === 'Free')
+                  all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))
+                else if (best_plan !== current_plan) 
+                  all.push(addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red'))
+              } 
           }
           return supabaseAdmin
             .from<definitions['stripe_info']>('stripe_info')
             .update({ is_good_plan: !!is_good_plan })
             .eq('customer_id', user.customer_id)
             .then()
-          // }
-          // catch (error) {
-          //   console.log('Error', error)
-          //   return Promise.reject(error)
-          // }
         }))
     }
     await Promise.all(all)
-    // logsnag send insight
-    console.log('trial', trial, 'needUpgrade', needUpgrade, 'paying', paying, 'total', users.length)
-    // await Promise.all([
-    //   logsnag.insight({
-    //     title: 'User Count',
-    //     value: users.length,
-    //     icon: '👨',
-    //   }),
-    //   logsnag.insight({
-    //     title: 'User need upgrade',
-    //     value: needUpgrade,
-    //     icon: '🤒',
-    //   }),
-    //   logsnag.insight({
-    //     title: 'User trial',
-    //     value: trial,
-    //     icon: '👶',
-    //   }),
-    //   logsnag.insight({
-    //     title: 'User paying',
-    //     value: paying,
-    //     icon: '💰',
-    //   })])
     return sendRes()
   }
   catch (e) {
