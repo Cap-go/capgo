@@ -1,9 +1,7 @@
 import { serve } from 'https://deno.land/std@0.158.0/http/server.ts'
-import { addEventPerson } from '../_utils/crisp.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
-import type { StatsV2 } from '../_utils/plans.ts'
 
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
@@ -23,42 +21,12 @@ serve(async (event: Request) => {
 
     if (!users || !users.length)
       return sendRes({ status: 'error', message: 'no apps' })
-    // explore all apps
     const all = []
-    // find all trial users
     for (const user of users) {
       all.push(supabaseAdmin
-        .rpc<boolean>('is_trial', { userid: user.id })
-        .single()
-        .then(async (res) => {
-          if (res.data) {
-            return supabaseAdmin
-              .from<definitions['stripe_info']>('stripe_info')
-              .update({ is_good_plan: true })
-              .eq('customer_id', user.customer_id)
-              .then()
-          }
-          const { data: is_good_plan } = await supabaseAdmin
-            .rpc<boolean>('is_good_plan', { userid: user.id })
-            .single()
-          console.log('is_good_plan', user.id, is_good_plan)
-          if (!is_good_plan) {
-            // create dateid var with yyyy-mm with dayjs
-            const dateid = new Date().toISOString().slice(0, 7)
-            const { data: get_max_stats } = await supabaseAdmin
-              .rpc<StatsV2>('get_total_stats', { userid: user.id, dateid })
-              .single()
-            if (get_max_stats && get_max_stats?.mau > 100)
-              all.push(addEventPerson(user.email, {}, 'user:need_upgrade', 'red'))
-            else if (get_max_stats)
-              all.push(addEventPerson(user.email, {}, 'user:need_more_time', 'blue'))
-          }
-          return supabaseAdmin
-            .from<definitions['stripe_info']>('stripe_info')
-            .update({ is_good_plan: !!is_good_plan })
-            .eq('customer_id', user.customer_id)
-            .then()
-        }))
+        .from<definitions['users']>('users')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', user.id))
     }
     await Promise.all(all)
     return sendRes()

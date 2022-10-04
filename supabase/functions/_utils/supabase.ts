@@ -157,7 +157,7 @@ export const updateOrCreateDevice = async (update: Partial<definitions['devices'
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin
-    .rpc<boolean>('is_good_plan', { userid: userId })
+    .rpc<boolean>('is_good_plan_v2', { userid: userId })
     .single()
   if (error)
     throw error

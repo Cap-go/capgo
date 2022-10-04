@@ -62,7 +62,7 @@ const getStats = (): GlobalStats => {
               data.trial += res.data ? 1 : 0
             }))
           all.push(supabaseAdmin
-            .rpc<boolean>('is_good_plan', { userid: user.id })
+            .rpc<boolean>('is_good_plan_v2', { userid: user.id })
             .single().then((res) => {
               data.need_upgrade += res.data ? 0 : 1
             }))
@@ -76,32 +76,32 @@ const getStats = (): GlobalStats => {
         await Promise.all(all)
         data.need_upgrade -= data.not_paying
         data.not_paying -= data.trial
-        await Promise.all([
-          logsnag.insight({
+        await logsnag.insight([
+          {
             title: 'User Count',
             value: data.users,
             icon: '👨',
-          }),
-          logsnag.insight({
+          },
+          {
             title: 'User need upgrade',
             value: data.need_upgrade,
             icon: '🤒',
-          }),
-          logsnag.insight({
+          },
+          {
             title: 'User trial',
             value: data.trial,
             icon: '👶',
-          }),
-          logsnag.insight({
+          },
+          {
             title: 'User paying',
             value: data.paying,
             icon: '💰',
-          }),
-          logsnag.insight({
+          },
+          {
             title: 'User not paying',
             value: data.not_paying,
             icon: '🥲',
-          })])
+          }])
         return data
       }),
     stars: getGithubStars(),
