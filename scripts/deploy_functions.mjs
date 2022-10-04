@@ -15,6 +15,7 @@ try {
   console.log('projectRef', projectRef)
   await outputFile('./supabase/.temp/project-ref', projectRef)
   // for in folders
+  const all = []
   for (const folder of folders) {
     const fileNoJWT = `./supabase/functions/${folder}/.no_verify_jwt`
     const fileNoDeploy = `./supabase/functions/${folder}/.no_deploy`
@@ -26,19 +27,20 @@ try {
     }
     if (!existsSync(fileNoDeploy)) {
       console.log(`Upload ${folder}${no_verify_jwt ? ' no_verify_jwt' : ''}`)
-      await exec(command).then((r) => {
+      all.push(exec(command).then((r) => {
         if (r.stderr) {
           console.error(folder, r.stderr)
           exit(1)
         }
+        console.log(`Done ${folder} ✅`)
         return r
-      })
-      console.log('Done ✅')
+      }))
     }
     else {
-      console.log('Ignored ⏭')
+      console.log(`Ignored ${folder} ⏭`)
     }
   }
+  await Promise.all(all)
 }
 catch (e) {
   console.error(e) // should contain code (exit code) and signal (that caused the termination).
