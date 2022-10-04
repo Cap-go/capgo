@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.28.0](https://github.com/Cap-go/capgo/compare/1.27.7...1.28.0) (2022-10-04)
+
+
+### Features
+
+* use new email for each plan upgrade ([79d486d](https://github.com/Cap-go/capgo/commit/79d486d16abb06f05c0efef4a7f3393e1b559fc8))
+
 ### [1.27.7](https://github.com/Cap-go/capgo/compare/1.27.6...1.27.7) (2022-10-04)
 
 
