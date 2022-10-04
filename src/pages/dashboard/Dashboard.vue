@@ -19,12 +19,12 @@ interface ChannelUserApp {
     version: definitions['app_versions']
   }
 }
-const isMobile = isPlatform('capacitor')
 const props = defineProps<{
   apps: definitions['apps'][]
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
+const isMobile = isPlatform('capacitor')
 const isLoading = ref(false)
 const route = useRoute()
 const main = useMainStore()
