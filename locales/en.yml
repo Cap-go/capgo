@@ -197,26 +197,26 @@ onboarding:
 one-day-left: One day left
 open-sidebar: Open sidebar
 package:
-  cannot-delete-version: Cannot delete version
+  cannot-delete-version: Cannot delete bundle
   channels: Channels
   device_list: Devices list
   devices: See devices statistics
   devices-list: Devices linked
-  download: Download version
+  download: Download bundle
   externally: stored externally
   link_channel: Link to channel
-  link_version: Link to version
+  link_version: Link to bundle
   mobiles-stats: Mobiles stats
   name: App
   not_available: Package not found
-  set: Set version to channel
+  set: Set bundle to channel
   stats: stats
-  test: Launch version
+  test: Launch bundle
   title: info
   version:
     is-used-in-device: is used in a device override, unlink it first
-  version-deleted: Version deleted
-  versions: Versions
+  version-deleted: Bundle deleted
+  versions: Bundle
 pages: Pages
 password:
   heading: Create Password
