@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.28.3](https://github.com/Cap-go/capgo/compare/1.28.2...1.28.3) (2022-10-05)
+
+
+### Bug Fixes
+
+* rename version in bundle ([c672771](https://github.com/Cap-go/capgo/commit/c6727711a2130cc93e1a57396ad8af9644e8a792))
+
 ### [1.28.2](https://github.com/Cap-go/capgo/compare/1.28.1...1.28.2) (2022-10-05)
 
 
