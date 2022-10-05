@@ -70,6 +70,15 @@ export const isTrial = async (userId: string): Promise<number> => {
 
   return data || 0
 }
+export const isAdmin = async (userId: string): Promise<boolean> => {
+  const { data, error } = await useSupabase()
+    .rpc<boolean>('is_admin', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || 0
+}
 export const isCanceled = async (userId: string): Promise<boolean> => {
   const { data, error } = await useSupabase()
     .rpc<boolean>('is_canceled', { userid: userId })

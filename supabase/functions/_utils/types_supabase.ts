@@ -2662,6 +2662,26 @@ export interface paths {
       };
     };
   };
+  "/rpc/is_admin": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/exist_app": {
     post: {
       parameters: {
@@ -3179,9 +3199,9 @@ export interface definitions {
     price_m_id: string;
     /** Format: character varying */
     price_y_id: string;
-    /** Format: bigint */
+    /** Format: double precision */
     storage: number;
-    /** Format: bigint */
+    /** Format: double precision */
     bandwidth: number;
     /** Format: bigint */
     mau: number;
@@ -3948,9 +3968,9 @@ export interface parameters {
   "rowFilter.plans.price_m_id": string;
   /** Format: character varying */
   "rowFilter.plans.price_y_id": string;
-  /** Format: bigint */
+  /** Format: double precision */
   "rowFilter.plans.storage": string;
-  /** Format: bigint */
+  /** Format: double precision */
   "rowFilter.plans.bandwidth": string;
   /** Format: bigint */
   "rowFilter.plans.mau": string;
