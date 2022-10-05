@@ -3,11 +3,11 @@ import { computed, reactive, ref } from 'vue'
 import {
   IonSpinner,
 } from '@ionic/vue'
+import useVuelidate from '@vuelidate/core'
+import { required } from '@vuelidate/validators'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
-import useVuelidate from '@vuelidate/core';
-import { required } from '@vuelidate/validators';
 
 const form = reactive({
   uuid: '',
@@ -142,9 +142,9 @@ const reset = () => {
                             v-if="oldId"
                             class="btn p-2 rounded bg-red-500 hover:bg-red-600 text-white ml-3"
                             :disabled="isLoading"
-                            @click="reset()"
                             color="secondary"
                             shape="round"
+                            @click="reset()"
                           >
                             <span v-if="!isLoading" class="rounded-4xl">
                               Reset

@@ -111,18 +111,18 @@ loadData()
 <template>
   <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :tilte="t('MAU')" unit="Users" />
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600"></div>
+    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
   </div>
   <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600"></div>
+    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
   </div>
   <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600"></div>
+    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
   </div>
   <MobileStats v-if="!isLoading && appId" />
   <div v-else-if="appId" class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600"></div>
+    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
   </div>
 </template>
