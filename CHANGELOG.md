@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.30.0](https://github.com/Cap-go/capgo/compare/1.29.0...1.30.0) (2022-10-05)
+
+
+### Features
+
+* add reset spoof ([75113e1](https://github.com/Cap-go/capgo/commit/75113e1d04df07df0c1d0644f60c1e6fad55f775))
+
 ## [1.29.0](https://github.com/Cap-go/capgo/compare/1.28.3...1.29.0) (2022-10-05)
 
 
