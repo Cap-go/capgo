@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.31.0](https://github.com/Cap-go/capgo/compare/1.30.2...1.31.0) (2022-10-05)
+
+
+### Features
+
+* add checksum to api ([86c044d](https://github.com/Cap-go/capgo/commit/86c044da8499ef3d6b32b4f5965f4eaec2ef3e3d))
+
 ### [1.30.2](https://github.com/Cap-go/capgo/compare/1.30.1...1.30.2) (2022-10-05)
 
 
