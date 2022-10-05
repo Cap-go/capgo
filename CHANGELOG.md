@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.29.0](https://github.com/Cap-go/capgo/compare/1.28.3...1.29.0) (2022-10-05)
+
+
+### Features
+
+* add admin panel for user spoofing ([a536002](https://github.com/Cap-go/capgo/commit/a536002aeeb046915eb67eb3aec87d3a56ae2a48))
+
 ### [1.28.3](https://github.com/Cap-go/capgo/compare/1.28.2...1.28.3) (2022-10-05)
 
 
