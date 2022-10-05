@@ -119,7 +119,7 @@ export const checkPlan = async (user: definitions['users']): Promise<void> => {
           if (get_max_stats) {
             const best_plan = await findBestPlan(get_max_stats)
             const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-            if (best_plan === 'Free') {
+            if (best_plan === 'Free' && current_plan === 'Free') {
               await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
               console.log('best_plan is free', user.id)
             }
