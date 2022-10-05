@@ -13,6 +13,7 @@ const form = reactive({
   uuid: '',
 })
 const isLoading = ref(false)
+const oldId = ref(localStorage.getItem('supabase.old_id'))
 const sidebarOpen = ref(false)
 const rules = computed(() => ({
   uuid: { required },
@@ -33,9 +34,31 @@ const submit = async () => {
   }
   const data = JSON.parse(textData)
   console.log('data', data)
+  localStorage.setItem('supabase.old_id', data.currentSession.user.id)
   data.currentSession.user.id = form.uuid
   localStorage.setItem('supabase.auth.token', JSON.stringify(data))
-  isLoading.value = false
+  // reload page
+  setTimeout(() => {
+    isLoading.value = false
+    window.location.reload()
+  }, 1000)
+}
+const reset = () => {
+  isLoading.value = true
+  const textData = localStorage.getItem('supabase.auth.token')
+  if (!textData) {
+    isLoading.value = false
+    return
+  }
+  const data = JSON.parse(textData)
+  data.currentSession.user.id = oldId.value
+  localStorage.setItem('supabase.auth.token', JSON.stringify(data))
+  localStorage.removeItem('supabase.old_id')
+  // reload page
+  setTimeout(() => {
+    isLoading.value = false
+    window.location.reload()
+  }, 1000)
 }
 </script>
 
@@ -112,6 +135,19 @@ const submit = async () => {
                           >
                             <span v-if="!isLoading" class="rounded-4xl">
                               Spoof
+                            </span>
+                            <IonSpinner v-else name="crescent" color="light" />
+                          </button>
+                          <button
+                            v-if="oldId"
+                            class="btn p-2 rounded bg-red-500 hover:bg-red-600 text-white ml-3"
+                            :disabled="isLoading"
+                            @click="reset()"
+                            color="secondary"
+                            shape="round"
+                          >
+                            <span v-if="!isLoading" class="rounded-4xl">
+                              Reset
                             </span>
                             <IonSpinner v-else name="crescent" color="light" />
                           </button>

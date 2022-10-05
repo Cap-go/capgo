@@ -13,8 +13,7 @@ const isMobile = ref(isPlatform('capacitor'))
 const isUserAdmin = ref(false)
 if (main.auth?.id)
   isAdmin(main.auth?.id).then(res => {
-    isUserAdmin.value = !!res
-    console.log('isUserAdmin', res)  
+    isUserAdmin.value = !!res || !!localStorage.getItem('supabase.old_id')
   })
 </script>
 
