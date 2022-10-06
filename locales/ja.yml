@@ -145,6 +145,7 @@ device:
   version: バージョン
 devices:
   title: デバイス
+devices-using-this-b: このバンドルを使用するデバイス
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
 disable-auto-upgrade: メジャーを超える自動アップグレードを無効にする
 discover-your-dashbo: あなたのダッシュボードを見つけてください！

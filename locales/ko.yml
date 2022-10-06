@@ -145,6 +145,7 @@ device:
   version: 버전
 devices:
   title: 장치
+devices-using-this-b: 이 번들을 사용하는 기기
 disable-auto-downgra: 기본에서 자동 다운그레이드 비활성화
 disable-auto-upgrade: 메이저 위의 자동 업그레이드 비활성화
 discover-your-dashbo: 대시보드를 발견하십시오!

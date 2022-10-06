@@ -151,6 +151,7 @@ device:
   version: sürüm
 devices:
   title: cihazlar
+devices-using-this-b: Bu paketi kullanan cihazlar
 disable-auto-downgra: Yerel olarak otomatik düşürmeyi devre dışı bırak
 disable-auto-upgrade: Binbaşı üzerinde otomatik yükseltmeyi devre dışı bırak
 discover-your-dashbo: Kontrol panelinizi keşfedin!

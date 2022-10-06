@@ -151,6 +151,7 @@ device:
   version: Versão
 devices:
   title: Dispositivos
+devices-using-this-b: Dispositivos que usam este pacote
 disable-auto-downgra: Desative o downgrade automático em nativo
 disable-auto-upgrade: Desativar atualização automática acima do principal
 discover-your-dashbo: Descubra o seu painel!

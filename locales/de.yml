@@ -155,6 +155,7 @@ device:
   version: Ausführung
 devices:
   title: Geräte
+devices-using-this-b: Geräte, die dieses Paket verwenden
 disable-auto-downgra: Deaktivieren Sie das automatische Downgrade unter native
 disable-auto-upgrade: Deaktivieren Sie das automatische Upgrade über Major
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!

@@ -145,6 +145,7 @@ device:
   version: Version
 devices:
   title: Devices
+devices-using-this-b: Devices using this bundle
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 discover-your-dashbo: Discover your dashboard !

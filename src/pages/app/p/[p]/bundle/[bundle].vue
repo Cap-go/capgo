@@ -176,11 +176,11 @@ const getVersion = async () => {
   }
 }
 watchEffect(async () => {
-  if (route.path.includes('/version/')) {
+  if (route.path.includes('/bundle/')) {
     loading.value = true
     packageId.value = route.params.p as string
     packageId.value = packageId.value.replace(/--/g, '.')
-    id.value = Number(route.params.version as string)
+    id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
     await getDevices()
@@ -298,7 +298,7 @@ const devicesFilter = computed(() => {
           </IonItem>
           <IonItemDivider v-if="devices?.length">
             <IonLabel>
-              {{ t('package.devices-list') }}
+              {{ t('devices-using-this-b') }}
             </IonLabel>
           </IonItemDivider>
           <!-- add item with searchbar -->

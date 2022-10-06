@@ -153,6 +153,7 @@ device:
   version: 'Versi: kapan'
 devices:
   title: Perangkat
+devices-using-this-b: Perangkat yang menggunakan bundel ini
 disable-auto-downgra: Nonaktifkan penurunan versi otomatis di bawah asli
 disable-auto-upgrade: Nonaktifkan peningkatan otomatis di atas mayor
 discover-your-dashbo: Temukan dasbor Anda!

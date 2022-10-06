@@ -151,6 +151,7 @@ device:
   version: Wersja
 devices:
   title: Urządzenia
+devices-using-this-b: Urządzenia korzystające z tego pakietu
 disable-auto-downgra: Wyłącz automatyczną zmianę wersji na wersję natywną
 disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej głównej
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!

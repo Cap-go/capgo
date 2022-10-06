@@ -304,7 +304,7 @@ const openChannel = (channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
 }
 const openVersion = (version: definitions['app_versions']) => {
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/version/${version.id}`)
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/bundle/${version.id}`)
 }
 const openDevices = () => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/devices`)

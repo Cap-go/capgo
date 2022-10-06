@@ -155,6 +155,7 @@ device:
   version: Versión
 devices:
   title: Dispositivos
+devices-using-this-b: Dispositivos que usan este paquete
 disable-auto-downgra: Deshabilitar la degradación automática en nativo
 disable-auto-upgrade: Deshabilitar la actualización automática por encima de la principal
 discover-your-dashbo: ¡Descubre tu tablero!
