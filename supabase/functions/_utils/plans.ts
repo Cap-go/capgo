@@ -7,6 +7,22 @@ export interface StatsV2 {
   bandwidth: number
 }
 
+const planToInt = (plan: string) => {
+  switch (plan) {
+    case 'Free':
+      return 0
+    case 'Solo':
+      return 1
+    case 'Maker':
+      return 2
+    case 'Team':
+      return 3
+    case 'Pay as you go':
+      return 4
+    default:
+      return 0
+  }
+}
 export const getPlans = async (): Promise<definitions['plans'][]> => {
   const { data: plans } = await supabaseAdmin
     .from<definitions['plans']>('plans')
@@ -123,7 +139,7 @@ export const checkPlan = async (user: definitions['users']): Promise<void> => {
               await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
               console.log('best_plan is free', user.id)
             }
-            else if (best_plan !== current_plan)  {
+            else if (best_plan !== current_plan && planToInt(best_plan) > planToInt(current_plan))  {
               await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
               console.log(`user:upgrade_to_${bestPlanKey}`, user.id)
             }
