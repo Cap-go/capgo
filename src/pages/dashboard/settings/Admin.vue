@@ -20,6 +20,7 @@ const sidebarOpen = ref(false)
 const rules = computed(() => ({
   uuid: { required },
 }))
+console.log('setLogAs', oldId.value)
 
 const v$ = useVuelidate(rules, form)
 const submit = async () => {
@@ -37,7 +38,7 @@ const setLogAs = (id: string) => {
     return
   }
   const data = JSON.parse(textData)
-  if (!oldId)
+  if (!oldId.value)
     localStorage.setItem('supabase.old_id', data.currentSession.user.id)
   data.currentSession.user.id = id
   localStorage.setItem('supabase.auth.token', JSON.stringify(data))
