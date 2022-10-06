@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watchEffect } from 'vue'
 import {
   IonSpinner,
 } from '@ionic/vue'
@@ -8,7 +8,9 @@ import { required } from '@vuelidate/validators'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
+import { useRoute } from 'vue-router'
 
+const route = useRoute()
 const form = reactive({
   uuid: '',
 })
@@ -25,17 +27,18 @@ const submit = async () => {
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect)
     isLoading.value = false
-
-  // edit localstorage supabase.auth.token JSON to change uuid
+  setLogAs(form.uuid)
+}
+const setLogAs = (id: string) => {
   const textData = localStorage.getItem('supabase.auth.token')
   if (!textData) {
     isLoading.value = false
     return
   }
   const data = JSON.parse(textData)
-  console.log('data', data)
-  localStorage.setItem('supabase.old_id', data.currentSession.user.id)
-  data.currentSession.user.id = form.uuid
+  if (!oldId)
+    localStorage.setItem('supabase.old_id', data.currentSession.user.id)
+  data.currentSession.user.id = id
   localStorage.setItem('supabase.auth.token', JSON.stringify(data))
   // reload page
   setTimeout(() => {
@@ -43,6 +46,14 @@ const submit = async () => {
     window.location.reload()
   }, 1000)
 }
+watchEffect(async () => {
+  if (route.path.includes('/admin/')) {
+    const id = route.query.uuid as string
+    // remove query param
+    window.history.pushState({}, document.title, window.location.pathname)
+    setLogAs(id)
+  }
+})
 const reset = () => {
   isLoading.value = true
   const textData = localStorage.getItem('supabase.auth.token')
