@@ -15,7 +15,7 @@ const form = reactive({
   uuid: '',
 })
 const isLoading = ref(false)
-const oldId = ref(localStorage.getItem('supabase.old_id'))
+const oldId = ref(!!localStorage.getItem('supabase.old_id'))
 const sidebarOpen = ref(false)
 const rules = computed(() => ({
   uuid: { required },
