@@ -10,7 +10,7 @@ import {
   IonItemOptions, IonItemSliding,
   IonLabel, IonList,
   IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
-  actionSheetController, alertController, isPlatform, toastController,
+  alertController, toastController,
 } from '@ionic/vue'
 import { chevronForwardOutline } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
@@ -20,7 +20,6 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { openVersion } from '~/services/versions'
 import TitleHead from '~/components/TitleHead.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 
@@ -36,7 +35,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
+// const auth = supabase.auth.user()
 const id = ref('')
 const search = ref('')
 const isLoading = ref(false)
@@ -304,83 +303,11 @@ const deleteVersion = async (version: definitions['app_versions']) => {
 const openChannel = (channel: definitions['channels']) => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
 }
+const openVersion = (version: definitions['app_versions']) => {
+  router.push(`/app/p/${id.value.replace(/\./g, '--')}/version/${version.id}`)
+}
 const openDevices = () => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/devices`)
-}
-const setChannel = async (v: definitions['app_versions'], channel: definitions['channels']) => {
-  return supabase
-    .from<definitions['channels']>('channels')
-    .update({
-      version: v.id,
-    })
-    .eq('id', channel.id)
-}
-const ASChannelChooser = async (v: definitions['app_versions']) => {
-  // const buttons
-  const buttons = []
-  for (const channel of channels.value) {
-    buttons.push({
-      text: channel.name,
-      handler: async () => {
-        isLoading.value = true
-        try {
-          await setChannel(v, channel)
-          await loadData()
-        }
-        catch (error) {
-          console.error(error)
-          const toast = await toastController
-            .create({
-              message: 'Cannot test app something wrong happened',
-              duration: 2000,
-            })
-          await toast.present()
-        }
-        isLoading.value = false
-      },
-    })
-  }
-  buttons.push({
-    text: t('button.cancel'),
-    role: 'cancel',
-    handler: () => {
-      // console.log('Cancel clicked')
-    },
-  })
-  const actionSheet = await actionSheetController.create({
-    header: t('package.link_channel'),
-    buttons,
-  })
-  await actionSheet.present()
-}
-const ASVersion = async (v: (definitions['app_versions'] & definitions['app_versions_meta'])) => {
-  const actionSheet = await actionSheetController.create({
-    header: `Checksum ${v.checksum}`,
-    buttons: [
-      {
-        text: isPlatform('capacitor') ? t('package.test') : t('package.download'),
-        handler: () => {
-          actionSheet.dismiss()
-          openVersion(v, auth?.id || '')
-        },
-      },
-      {
-        text: t('package.set'),
-        handler: () => {
-          actionSheet.dismiss()
-          ASChannelChooser(v)
-        },
-      },
-      {
-        text: t('button.cancel'),
-        role: 'cancel',
-        handler: () => {
-          // console.log('Cancel clicked')
-        },
-      },
-    ],
-  })
-  await actionSheet.present()
 }
 interface Channel {
   id: string
@@ -467,7 +394,7 @@ watchEffect(async () => {
           </IonItem>
           <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>
-              <IonItem class="cursor-pointer" @click="ASVersion(v)">
+              <IonItem class="cursor-pointer" @click="openVersion(v)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
                     {{ v.name }} ( {{ showSize(v) }} )

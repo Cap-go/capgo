@@ -73,6 +73,7 @@ app-id-example: Przykład identyfikatora aplikacji
 bigger-app-size: Większy rozmiar aplikacji
 build-your-code-and-: Zbuduj swój kod
 bulk-upload: Przesyłanie zbiorcze
+bundle-number: Numer pakietu
 button:
   about: O nas
   back: Wróć
@@ -119,6 +120,7 @@ channel:
   users: Udostępnione użytkownikom
   v3: Ustawienia V3
 channel-deleted: Kanał usunięty
+checksum: Suma kontrolna
 commands: polecenia
 copied-to-clipboard: Skopiowane do schowka
 copy-your: Skopiuj swój
@@ -159,7 +161,9 @@ forgot:
   heading: Zapomniałeś hasła
   success: Hasło zostało zmienione
 good: Dobrze
+id: ID
 in-your-main-file: W twoim głównym pliku
+informations: Informacje
 into-your-app-folder: Do folderu aplikacji.
 intro:
   aka: Znany też jako
@@ -300,6 +304,7 @@ see-usage: Zobacz użycie
 settings: Ustawienia
 shared-apps: Udostępnione aplikacje
 sign-out: Wyloguj się
+size: Rozmiar
 something-went-wrong-try-again-later: |-
   Coś poszło nie tak! 
   Spróbuj ponownie później.
@@ -322,8 +327,10 @@ trial-left: Pozostałe dni
 trial-plan-expired: Plan próbny wygasł
 trial-plan-expires-in: Plan próbny wygasa za
 unlimited-updates: Nieograniczone aktualizacje
+updated-at: Zaktualizowano w
 upgrade: Uaktualnić
 upgrade-now: Ulepsz teraz
+url: URL
 usage:
   success: >-
     Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka

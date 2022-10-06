@@ -73,6 +73,7 @@ app-id-example: Uygulama kimliği örneği
 bigger-app-size: Daha büyük uygulama boyutu
 build-your-code-and-: Kodunuzu oluşturun
 bulk-upload: Toplu yükleme
+bundle-number: Paket numarası
 button:
   about: Hakkımda
   back: Geri
@@ -119,6 +120,7 @@ channel:
   users: Kullanıcılarla paylaşıldı
   v3: V3 ayarları
 channel-deleted: Kanal silindi
+checksum: sağlama toplamı
 commands: komutlar
 copied-to-clipboard: Panoya kopyalandı
 copy-your: seninkini kopyala
@@ -159,7 +161,9 @@ forgot:
   heading: Parolanızı mı unuttunuz
   success: şifre başarıyla güncellendi
 good: İyi
+id: İD
 in-your-main-file: Ana dosyanızda
+informations: bilgiler
 into-your-app-folder: Uygulama klasörünüze.
 intro:
   aka: Ayrıca şöyle bilinir
@@ -304,6 +308,7 @@ see-usage: Kullanıma bakın
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
 sign-out: Oturumu Kapat
+size: Boyut
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
@@ -326,8 +331,10 @@ trial-left: Kalan günler
 trial-plan-expired: Deneme Planının Süresi Doldu
 trial-plan-expires-in: 'Deneme Planı şu tarihte sona eriyor:'
 unlimited-updates: Sınırsız güncelleme
+updated-at: 'Güncellenme tarihi:'
 upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
+url: URL
 usage:
   success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
   title: kullanım

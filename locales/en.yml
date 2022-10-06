@@ -69,6 +69,7 @@ app-id-example: App ID example
 bigger-app-size: Bigger app size
 build-your-code-and-: Build your code & Upload your version
 bulk-upload: Bulk upload
+bundle-number: Bundle number
 button:
   about: About
   back: Back
@@ -113,6 +114,7 @@ channel:
   users: Shared with users
   v3: V3 settings
 channel-deleted: Channel deleted
+checksum: Checksum
 commands: commands
 copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
@@ -153,7 +155,9 @@ forgot:
   heading: Forgot password
   success: Password updated successfully
 good: Good
+id: id
 in-your-main-file: In your main file
+informations: Informations
 into-your-app-folder: Into your app folder.
 intro:
   aka: Also known as
@@ -292,6 +296,7 @@ see-usage: See usage
 settings: Settings
 shared-apps: Shared Apps
 sign-out: Sign Out
+size: Size
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
 start-using-capgo: Start using Capgo !
@@ -312,8 +317,10 @@ trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
 unlimited-updates: Unlimited updates
+updated-at: Updated at
 upgrade: Upgrade
 upgrade-now: Upgrade now
+url: URL
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage

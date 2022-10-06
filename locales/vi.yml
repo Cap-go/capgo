@@ -73,6 +73,7 @@ app-id-example: Ví dụ về ID ứng dụng
 bigger-app-size: Kích thước ứng dụng lớn hơn
 build-your-code-and-: Xây dựng mã của bạn
 bulk-upload: Tải lên hàng loạt
+bundle-number: Số gói
 button:
   about: Về
   back: Quay lại
@@ -119,6 +120,7 @@ channel:
   users: Được chia sẻ với người dùng
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
+checksum: Checksum
 commands: lệnh
 copied-to-clipboard: Sao chép vào clipboard
 copy-your: Sao chép của bạn
@@ -159,7 +161,9 @@ forgot:
   heading: Quên mật khẩu
   success: Đã cập nhật mật khẩu thành công
 good: Tốt
+id: Tôi
 in-your-main-file: Trong tệp chính của bạn
+informations: Thông tin
 into-your-app-folder: Vào thư mục ứng dụng của bạn.
 intro:
   aka: Cũng được biết đến như là
@@ -302,6 +306,7 @@ see-usage: Xem mức sử dụng
 settings: Cài đặt
 shared-apps: Ứng dụng được chia sẻ
 sign-out: Đăng xuất
+size: Kích thước
 something-went-wrong-try-again-later: |-
   Đã xảy ra lỗi! 
   Thử lại sau.
@@ -324,8 +329,10 @@ trial-left: ngày còn lại
 trial-plan-expired: Gói dùng thử đã hết hạn
 trial-plan-expires-in: Gói dùng thử sẽ hết hạn sau
 unlimited-updates: Cập nhật không giới hạn
+updated-at: Cập nhật tại
 upgrade: Nâng cấp
 upgrade-now: Nâng cấp ngay bây giờ
+url: URL
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng

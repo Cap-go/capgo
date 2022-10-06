@@ -69,6 +69,7 @@ app-id-example: 앱 ID 예시
 bigger-app-size: 더 큰 앱 크기
 build-your-code-and-: 코드 작성
 bulk-upload: 일괄 업로드
+bundle-number: 번들 번호
 button:
   about: 소개
   back: 뒤로가기
@@ -113,6 +114,7 @@ channel:
   users: 사용자와 공유
   v3: V3 설정
 channel-deleted: 채널 삭제됨
+checksum: 체크섬
 commands: 명령
 copied-to-clipboard: 클립보드에 복사됨
 copy-your: 복사
@@ -153,7 +155,9 @@ forgot:
   heading: 비밀번호를 잊으 셨나요
   success: 비밀번호가 성공적으로 업데이트되었습니다.
 good: 좋은
+id: ID
 in-your-main-file: 기본 파일에서
+informations: 정보
 into-your-app-folder: 앱 폴더로.
 intro:
   aka: 또한 ~으로 알려진
@@ -294,6 +298,7 @@ see-usage: 사용법 보기
 settings: 설정
 shared-apps: 공유 앱
 sign-out: 로그아웃
+size: 크기
 something-went-wrong-try-again-later: |-
   문제가 발생했습니다! 
   나중에 다시 시도하세요.
@@ -316,8 +321,10 @@ trial-left: 남은 일수
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: 평가판은 다음 날짜에 만료됩니다.
 unlimited-updates: 무제한 업데이트
+updated-at: 업데이트 날짜
 upgrade: 업그레이드
 upgrade-now: 지금 업그레이드
+url: URL
 usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법

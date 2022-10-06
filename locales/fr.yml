@@ -75,6 +75,7 @@ app-id-example: Exemple d'ID d'application
 bigger-app-size: Taille d'application plus grande
 build-your-code-and-: Construisez votre code
 bulk-upload: Transfert groupé
+bundle-number: Numéro de forfait
 button:
   about: À propos de
   back: Retour
@@ -121,6 +122,7 @@ channel:
   users: Partagé avec les utilisateurs
   v3: Paramètres V3
 channel-deleted: Chaîne supprimée
+checksum: Somme de contrôle
 commands: commandes
 copied-to-clipboard: Copié dans le presse-papier
 copy-your: Copiez votre
@@ -163,7 +165,9 @@ forgot:
   heading: Mot de passe oublié
   success: Mot de passe mis à jour avec succès
 good: Bien
+id: identifiant
 in-your-main-file: Dans votre fichier principal
+informations: Informations
 into-your-app-folder: Dans votre dossier d'application.
 intro:
   aka: Aussi connu sous le nom de
@@ -308,6 +312,7 @@ see-usage: Voir l'utilisation
 settings: Réglages
 shared-apps: Applications partagées
 sign-out: Se déconnecter
+size: Taille
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
 special-api-access: Accès API spécial
 start-using-capgo: Commencez à utiliser Capgo !
@@ -328,8 +333,10 @@ trial-left: Jours restants
 trial-plan-expired: Plan d'essai expiré
 trial-plan-expires-in: Le procès se termine dans
 unlimited-updates: Mises à jour illimitées
+updated-at: Mis à jour à
 upgrade: Améliorer
 upgrade-now: Mettre à jour maintenant
+url: URL
 usage:
   success: >-
     Votre plan a été configuré, cette page sera mise à jour dans quelques

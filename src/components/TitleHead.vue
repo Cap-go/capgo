@@ -19,9 +19,10 @@ const props = defineProps({
   color: { type: String, default: 'default' },
   title: { type: String, default: '' },
   big: { type: Boolean, default: false },
+  plusIcon: { type: String, default: '' },
   search: { type: Boolean, default: false },
 })
-const emit = defineEmits(['searchInput'])
+const emit = defineEmits(['searchInput', 'plusClick'])
 const router = useRouter()
 const { t } = useI18n()
 const onSearch = (val: string | undefined) => {
@@ -47,6 +48,11 @@ const back = () => {
       <IonTitle :color="color" :size="big ? 'large' : undefined">
         {{ title }}
       </IonTitle>
+      <IonButtons v-if="plusIcon" slot="end">
+        <IonButton @click="emit('plusClick')">
+          <IonIcon :icon="plusIcon" />
+        </IonButton>
+      </IonButtons>
     </IonToolbar>
     <IonToolbar v-if="search">
       <IonSearchbar @ion-change="onSearch($event.detail.value)" />
