@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watchEffect } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import {
   IonSpinner,
 } from '@ionic/vue'
@@ -30,6 +30,7 @@ const submit = async () => {
   setLogAs(form.uuid)
 }
 const setLogAs = (id: string) => {
+  console.log('setLogAs', id)
   const textData = localStorage.getItem('supabase.auth.token')
   if (!textData) {
     isLoading.value = false
@@ -46,14 +47,17 @@ const setLogAs = (id: string) => {
     window.location.reload()
   }, 1000)
 }
-watchEffect(async () => {
-  if (route.path.includes('/admin/')) {
-    const id = route.query.uuid as string
-    // remove query param
-    window.history.pushState({}, document.title, window.location.pathname)
-    setLogAs(id)
+if (route.path.includes('/admin')) {
+  const id = route.query.uuid as string
+  // remove query param
+  window.history.pushState({}, document.title, window.location.pathname)
+  if (id) {
+    isLoading.value = false
+    setTimeout(() => {
+      setLogAs(id)
+    }, 1000)
   }
-})
+}
 const reset = () => {
   isLoading.value = true
   const textData = localStorage.getItem('supabase.auth.token')
