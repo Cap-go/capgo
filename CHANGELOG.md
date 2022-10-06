@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.31.3](https://github.com/Cap-go/capgo/compare/1.31.2...1.31.3) (2022-10-06)
+
+
+### Bug Fixes
+
+* remove dup code ([1d74472](https://github.com/Cap-go/capgo/commit/1d7447254d4f334ba3c93183d065a82b45549358))
+
 ### [1.31.2](https://github.com/Cap-go/capgo/compare/1.31.1...1.31.2) (2022-10-06)
 
 
