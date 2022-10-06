@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.31.2](https://github.com/Cap-go/capgo/compare/1.31.1...1.31.2) (2022-10-06)
+
+
+### Bug Fixes
+
+* prevent email for downgrade plan ([2f2bf37](https://github.com/Cap-go/capgo/commit/2f2bf375bbbfb622abdc2fdb8c88eb39a5de0232))
+
 ### [1.31.1](https://github.com/Cap-go/capgo/compare/1.31.0...1.31.1) (2022-10-05)
 
 
