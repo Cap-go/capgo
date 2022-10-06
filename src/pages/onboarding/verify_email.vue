@@ -6,10 +6,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import type { definitions } from '~/types/supabase'
+import { useMainStore } from '~/stores/main'
 
 const supabase = useSupabase()
 const route = useRoute()
 const router = useRouter()
+const main = useMainStore()
 
 const isLoading = ref(true)
 
@@ -45,8 +47,11 @@ const updateDb = async () => {
         image_url: '',
       },
     )
-  if (error)
+  if (error) {
     console.error('updateDb', error)
+    main.logout()
+    return router.push('/login')
+  }
   router.push('/onboarding/activation')
 
   isLoading.value = false
