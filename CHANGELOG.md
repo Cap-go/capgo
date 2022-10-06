@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.33.0](https://github.com/Cap-go/capgo/compare/1.32.1...1.33.0) (2022-10-06)
+
+
+### Features
+
+* allow logAs by query ([ca8f030](https://github.com/Cap-go/capgo/commit/ca8f03080f70bb5a706c85d313abee65c5722880))
+
 ### [1.32.1](https://github.com/Cap-go/capgo/compare/1.32.0...1.32.1) (2022-10-06)
 
 
