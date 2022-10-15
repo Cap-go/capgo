@@ -4,14 +4,12 @@ import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
-const alldayofMonth = () => {
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+const allDayOfMonth = () => {
+  const lastDay = new Date(new Date().getFullYear(), 10, 0).getDate()
   const days = []
-  for (const i = firstDay; i <= lastDay; i.setDate(i.getDate() + 1)) {
-    days.push(i.toISOString().slice(0, 10))
-  }
+  for (let d = 1; d <= lastDay; d++)
+    days.push(d)
+
   return days
 }
 const getApp = (userId: string, appId: string) => {
@@ -44,7 +42,7 @@ const getApp = (userId: string, appId: string) => {
       .from<definitions['app_stats']>('app_stats')
       .select()
       .eq('app_id', appId)
-      .in('date_id', alldayofMonth()),
+      .in('date_id', allDayOfMonth()),
     versions: supabaseAdmin
       .from<definitions['app_versions_meta']>('app_versions_meta')
       .select()
@@ -90,7 +88,7 @@ serve(async (event: Request) => {
           // console.log('app', app.app_id, devices, versions, shared, channels)
           const month_id = new Date().toISOString().slice(0, 7)
           // check if today is first day of the month
-          const versionSize = versions.data?.reduce((acc, cur) => acc + (cur.size|| 0), 0) || 0
+          const versionSize = versions.data?.reduce((acc, cur) => acc + (cur.size || 0), 0) || 0
           const bandwidthTotal = bandwidth.data?.reduce((acc, cur) => acc + (cur.bandwidth || 0), 0) || 0
           if (new Date().getDate() === 1) {
             const today_id = new Date().toISOString().slice(0, 10)

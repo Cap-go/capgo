@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
+import { logsnag } from '../_utils/_logsnag.ts'
 
 serve(async (event: Request) => {
   if (!event.headers.get('stripe-signature') || !Deno.env.get('STRIPE_WEBHOOK_SECRET') || !Deno.env.get('STRIPE_SECRET_KEY'))
@@ -68,6 +69,15 @@ serve(async (event: Request) => {
           plan: plan.name,
         }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'green')
         await addEventPerson(user.email, {}, 'user:upgrade', 'green')
+        await logsnag.publish({
+          channel: 'usage',
+          event: 'User subscribe',
+          icon: '💰',
+          tags: {
+            'user-id': user.id,
+          },
+          notify: true,
+        }).catch()
       }
       else { await updatePerson(user.email, undefined, ['Not_found']) }
     }
@@ -81,6 +91,15 @@ serve(async (event: Request) => {
           return sendRes(dbError, 500)
         await updatePerson(user.email, undefined, ['Canceled'])
         await addEventPerson(user.email, {}, 'user:cancel', 'red')
+        await logsnag.publish({
+          channel: 'usage',
+          event: 'User cancel',
+          icon: '⚠️',
+          tags: {
+            'user-id': user.id,
+          },
+          notify: true,
+        }).catch()
       }
     }
     else {

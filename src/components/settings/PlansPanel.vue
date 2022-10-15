@@ -118,17 +118,6 @@ watchEffect(async () => {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
       showToastMessage(t('usage.success'))
-      if (main.user?.id) {
-        snag.publish({
-          channel: 'usage',
-          event: 'User subscribe',
-          icon: '💰',
-          tags: {
-            'user-id': main.user?.id,
-          },
-          notify: false,
-        }).catch()
-      }
     }
     else if (main.user?.id) {
       loadData()

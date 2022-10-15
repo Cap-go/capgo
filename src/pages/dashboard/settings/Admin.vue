@@ -5,10 +5,10 @@ import {
 } from '@ionic/vue'
 import useVuelidate from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
+import { useRoute } from 'vue-router'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
-import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const form = reactive({
@@ -23,13 +23,6 @@ const rules = computed(() => ({
 console.log('setLogAs', oldId.value)
 
 const v$ = useVuelidate(rules, form)
-const submit = async () => {
-  isLoading.value = true
-  const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect)
-    isLoading.value = false
-  setLogAs(form.uuid)
-}
 const setLogAs = (id: string) => {
   console.log('setLogAs', id)
   const textData = localStorage.getItem('supabase.auth.token')
@@ -47,6 +40,13 @@ const setLogAs = (id: string) => {
     isLoading.value = false
     window.location.reload()
   }, 1000)
+}
+const submit = async () => {
+  isLoading.value = true
+  const isFormCorrect = await v$.value.$validate()
+  if (!isFormCorrect)
+    isLoading.value = false
+  setLogAs(form.uuid)
 }
 if (route.path.includes('/admin')) {
   const id = route.query.uuid as string

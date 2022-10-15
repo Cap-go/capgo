@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import {
-actionSheetController,
-  IonContent, IonHeader,
-  IonItem, IonItemDivider,
-  IonLabel, IonList, IonListHeader, IonNote,
-  IonPage, IonSearchbar, IonTitle, IonToolbar, isPlatform, toastController,
+  IonContent,
+  IonHeader, IonItem,
+  IonItemDivider, IonLabel,
+  IonList, IonListHeader, IonNote, IonPage,
+  IonSearchbar, IonTitle, IonToolbar, actionSheetController, isPlatform, toastController,
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { addOutline } from 'ionicons/icons'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
-import { addOutline } from 'ionicons/icons'
 import { openVersion } from '~/services/versions'
 
 const { t } = useI18n()
@@ -53,11 +53,11 @@ const getChannels = async () => {
   if (!version.value)
     return
   const { data: dataChannel } = await supabase
-      .from<definitions['channels']>('channels')
-      .select()
-      .eq('app_id', version.value.app_id)
-      .order('updated_at', { ascending: false })
-    channels.value = dataChannel || channels.value
+    .from<definitions['channels']>('channels')
+    .select()
+    .eq('app_id', version.value.app_id)
+    .order('updated_at', { ascending: false })
+  channels.value = dataChannel || channels.value
 }
 const bytesToMb = (bytes: number) => {
   const res = bytes / 1024 / 1024
@@ -73,7 +73,7 @@ const showSize = computed(() => {
     return t('package.not_available')
 })
 const setChannel = async (channel: definitions['channels']) => {
-  if(!version.value)
+  if (!version.value)
     return
   return supabase
     .from<definitions['channels']>('channels')
@@ -83,7 +83,7 @@ const setChannel = async (channel: definitions['channels']) => {
     .eq('id', channel.id)
 }
 const ASChannelChooser = async () => {
-  if(!version.value)
+  if (!version.value)
     return
   const buttons = []
   for (const channel of channels.value) {
@@ -125,7 +125,7 @@ const openPannel = async () => {
         text: isPlatform('capacitor') ? t('package.test') : t('package.download'),
         handler: () => {
           actionSheet.dismiss()
-          if(!version.value)
+          if (!version.value)
             return
           openVersion(version.value, auth?.id || '')
         },
@@ -160,10 +160,10 @@ const getVersion = async () => {
       .eq('id', id.value)
       .single()
     const { data: dataVersionsMeta, error: dataVersionsError } = await supabase
-    .from<definitions['app_versions_meta']>('app_versions_meta')
-    .select()
-    .eq('id', id.value)
-    .single()
+      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .select()
+      .eq('id', id.value)
+      .single()
     if (error || dataVersionsError) {
       console.error('no version', error, dataVersionsError)
       return

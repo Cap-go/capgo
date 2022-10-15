@@ -1,6 +1,8 @@
-import { addEventPerson } from "./crisp.ts";
+import { logsnag } from '../_utils/_logsnag.ts'
+import { addEventPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { definitions } from './types_supabase.ts'
+
 export interface StatsV2 {
   mau: number
   storage: number
@@ -53,13 +55,13 @@ export const isPaying = async (userId: string): Promise<boolean> => {
 }
 
 export const findBestPlan = async (stats: StatsV2): Promise<string> => {
-  const storage = Math.round((stats.storage || 0)  / 1024 / 1024 / 1024)
-  const bandwidth = Math.round((stats.bandwidth || 0)  / 1024 / 1024 / 1024)
+  const storage = Math.round((stats.storage || 0) / 1024 / 1024 / 1024)
+  const bandwidth = Math.round((stats.bandwidth || 0) / 1024 / 1024 / 1024)
   const { data, error } = await supabaseAdmin
     .rpc<string>('find_best_plan_v2', {
       mau: stats.mau || 0,
-      storage: storage,
-      bandwidth: bandwidth,
+      storage,
+      bandwidth,
     })
     .single()
   if (error)
@@ -105,51 +107,69 @@ export const getMaxstats = async (userId: string, dateId: string): Promise<Stats
 export const checkPlan = async (user: definitions['users']): Promise<void> => {
   // console.log('checkPlan', user.id)
   try {
-      const isTrial = await supabaseAdmin
-          .rpc<boolean>('is_trial', { userid: user.id })
-          .single()
+    const isTrial = await supabaseAdmin
+      .rpc<boolean>('is_trial', { userid: user.id })
+      .single()
 
-      if (isTrial.data) {
-        await supabaseAdmin
-          .from<definitions['stripe_info']>('stripe_info')
-          .update({ is_good_plan: true })
-          .eq('customer_id', user.customer_id)
-          .then()
-        return Promise.resolve()
-      }
-      const { data: is_good_plan, error } = await supabaseAdmin
-        .rpc<boolean>('is_good_plan_v2', { userid: user.id })
+    if (isTrial.data) {
+      await supabaseAdmin
+        .from<definitions['stripe_info']>('stripe_info')
+        .update({ is_good_plan: true })
+        .eq('customer_id', user.customer_id)
+        .then()
+      return Promise.resolve()
+    }
+    const { data: is_good_plan, error } = await supabaseAdmin
+      .rpc<boolean>('is_good_plan_v2', { userid: user.id })
+      .single()
+    if (error) {
+      console.log('is_good_plan error', user.id, error)
+      return Promise.reject(error)
+    }
+    if (!is_good_plan) {
+      console.log('is_good_plan_v2', user.id, is_good_plan)
+      // create dateid var with yyyy-mm with dayjs
+      const dateid = new Date().toISOString().slice(0, 7)
+      const { data: get_max_stats } = await supabaseAdmin
+        .rpc<StatsV2>('get_total_stats', { userid: user.id, dateid })
         .single()
-      if (error) {
-        console.log('is_good_plan error', user.id, error)
-        return Promise.reject(error)
+      const current_plan = await getCurrentPlanName(user.id)
+      if (get_max_stats) {
+        const best_plan = await findBestPlan(get_max_stats)
+        const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
+        if (best_plan === 'Free' && current_plan === 'Free') {
+          await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
+          console.log('best_plan is free', user.id)
+          await logsnag.publish({
+            channel: 'usage',
+            event: 'User need more time',
+            icon: '⏰',
+            tags: {
+              'user-id': user?.id,
+            },
+            notify: false,
+          }).catch()
+        }
+        else if (planToInt(best_plan) > planToInt(current_plan)) {
+          await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
+          console.log(`user:upgrade_to_${bestPlanKey}`, user.id)
+          await logsnag.publish({
+            channel: 'usage',
+            event: `User need upgrade to ${bestPlanKey}`,
+            icon: '⚠️',
+            tags: {
+              'user-id': user?.id,
+            },
+            notify: false,
+          }).catch()
+        }
       }
-      if (!is_good_plan) {
-        console.log('is_good_plan_v2', user.id, is_good_plan)
-        // create dateid var with yyyy-mm with dayjs
-        const dateid = new Date().toISOString().slice(0, 7)
-        const { data: get_max_stats } = await supabaseAdmin
-          .rpc<StatsV2>('get_total_stats', { userid: user.id, dateid })
-          .single()
-          const current_plan = await getCurrentPlanName(user.id)
-          if (get_max_stats) {
-            const best_plan = await findBestPlan(get_max_stats)
-            const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-            if (best_plan === 'Free' && current_plan === 'Free') {
-              await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
-              console.log('best_plan is free', user.id)
-            }
-            else if (planToInt(best_plan) > planToInt(current_plan))  {
-              await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
-              console.log(`user:upgrade_to_${bestPlanKey}`, user.id)
-            }
-          } 
-      }
-      return supabaseAdmin
-            .from<definitions['stripe_info']>('stripe_info')
-            .update({ is_good_plan: !!is_good_plan })
-            .eq('customer_id', user.customer_id)
-            .then()
+    }
+    return supabaseAdmin
+      .from<definitions['stripe_info']>('stripe_info')
+      .update({ is_good_plan: !!is_good_plan })
+      .eq('customer_id', user.customer_id)
+      .then()
   }
   catch (e) {
     console.log('Error', e)

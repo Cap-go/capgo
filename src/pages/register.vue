@@ -10,10 +10,8 @@ import { useRouter } from 'vue-router'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
-import { useLogSnag } from '~/services/logsnag'
 
 const router = useRouter()
-const snag = useLogSnag()
 const supabase = useSupabase()
 const { t } = useI18n()
 const form = reactive({
@@ -89,15 +87,6 @@ const submit = async () => {
     errorMessage.value = error?.message || 'user not found'
     return
   }
-  snag.publish({
-    channel: 'user-register',
-    event: 'User Joined',
-    icon: '🎉',
-    tags: {
-      'user-id': user.id,
-    },
-    notify: true,
-  }).catch()
   router.push('/onboarding/confirm_email')
 }
 </script>

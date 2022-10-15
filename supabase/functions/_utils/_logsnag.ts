@@ -5,15 +5,14 @@ const lsg = new LogSnag({
   project: Deno.env.get('LOGSNAG_PROJECT') || '',
 })
 
-const insight = async (data: { title: string, value: number, icon: string }[]) => {
+const insight = async (data: { title: string; value: number; icon: string }[]) => {
   const all = []
-  for (const d of data) {
+  for (const d of data)
     all.push(lsg.insight(d))
-  }
+
   await Promise.all(all)
 }
 
-const logsnag = {...lsg, insight}
+const logsnag = { publish: lsg.publish, insight }
 export { logsnag }
-
 

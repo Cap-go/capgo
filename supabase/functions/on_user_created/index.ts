@@ -4,6 +4,7 @@ import { createCustomer } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
+import { logsnag } from '../_utils/_logsnag.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
@@ -54,6 +55,15 @@ serve(async (event: Request) => {
       product_id: 'free',
     })
     await addEventPerson(record.email, {}, 'user:register', 'green')
+    await logsnag.publish({
+      channel: 'user-register',
+      event: 'User Joined',
+      icon: '🎉',
+      tags: {
+        'user-id': record.id,
+      },
+      notify: true,
+    }).catch()
     console.log('stripe_info done')
     const { error: dbError } = await supabaseAdmin
       .from<definitions['users']>('users')

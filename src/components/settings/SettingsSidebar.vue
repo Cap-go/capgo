@@ -67,7 +67,7 @@ if (main.auth?.id) {
         <router-link v-if="isUserAdmin" v-slot="{ href, navigate, isExactActive }" to="/dashboard/settings/admin" custom>
           <li class="mr-0.5 md:mr-0 md:mb-0.5">
             <a class="flex items-center px-2.5 py-2 rounded whitespace-nowrap" :class="isExactActive && 'bg-blue-50 dark:bg-gray-900'" :href="href" @click="navigate">
-              <svg class="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-white mr-2" :class="isExactActive && 'text-blue-400'"  xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" id="footer-sample-full" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path stroke-linecap="round" d="M12 7v6m0 3.5v.5"></path></g></svg>
+              <svg id="footer-sample-full" class="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-white mr-2" :class="isExactActive && 'text-blue-400'" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path stroke-linecap="round" d="M12 7v6m0 3.5v.5" /></g></svg>
               <span class="text-sm font-medium text-slate-600 dark:text-white" :class="isExactActive ? 'text-blue-500' : 'hover:text-slate-700 dark:hover:text-slate-300'">Admin</span>
             </a>
           </li>
