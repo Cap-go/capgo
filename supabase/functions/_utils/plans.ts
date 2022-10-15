@@ -140,6 +140,7 @@ export const checkPlan = async (user: definitions['users']): Promise<void> => {
         // TODO create a rpc method to calculate % of plan usage.
         // TODO send email for 50%, 70%, 90% of current plan usage.
         // TODO Allow upgrade email to be send again every 30 days
+        // TODO send to logsnag maker opportunity by been in crisp
 
         if (best_plan === 'Free' && current_plan === 'Free') {
           await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')

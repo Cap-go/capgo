@@ -9,12 +9,14 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
+import { CapacitorCrispWeb } from '~/services/crisp-web'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done'])
 
+const crisp = new CapacitorCrispWeb()
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
@@ -67,6 +69,10 @@ const setLog = () => {
       },
       notify: false,
     }).catch()
+    crisp.pushEvent({ name: `user:step-${step.value}`, color: 'blue' })
+    if (step.value === 4)
+      crisp.pushEvent({ name: 'user:onboarding-done', color: 'green' })
+    // TODO add emailing on onboarding done to send blog article versioning
   }
 }
 const copyToast = async (text: string) => {
