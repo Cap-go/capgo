@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.34.0](https://github.com/Cap-go/capgo/compare/1.33.5...1.34.0) (2022-10-16)
+
+
+### Features
+
+* add crisp event for onboarding ([6c04f3d](https://github.com/Cap-go/capgo/commit/6c04f3db408c57b5771681095b301b64b7f069f0))
+
 ### [1.33.5](https://github.com/Cap-go/capgo/compare/1.33.4...1.33.5) (2022-10-06)
 
 
