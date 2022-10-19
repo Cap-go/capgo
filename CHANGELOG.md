@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.35.1](https://github.com/Cap-go/capgo/compare/1.35.0...1.35.1) (2022-10-19)
+
+
+### Bug Fixes
+
+* remove parallel jobs ([826dc16](https://github.com/Cap-go/capgo/commit/826dc16e3789e1f268f33b0c5ec72f934b31c95f))
+
 ## [1.35.0](https://github.com/Cap-go/capgo/compare/1.34.2...1.35.0) (2022-10-17)
 
 
