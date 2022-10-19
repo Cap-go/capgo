@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.35.2](https://github.com/Cap-go/capgo/compare/1.35.1...1.35.2) (2022-10-19)
+
+
+### Bug Fixes
+
+* devices list replace created_at by updated_at ([1fdbd73](https://github.com/Cap-go/capgo/commit/1fdbd738753854feb43e63c4c09a3594d8a23c59))
+
 ### [1.35.1](https://github.com/Cap-go/capgo/compare/1.35.0...1.35.1) (2022-10-19)
 
 
