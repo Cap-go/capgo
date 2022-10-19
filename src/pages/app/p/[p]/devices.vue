@@ -66,7 +66,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
       `)
       .eq('app_id', id.value)
       .gt('updated_at', lastDay.toISOString())
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataDev)
       return
@@ -150,24 +150,24 @@ const onSearch = (val: string) => {
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>
-      <div v-if="isLoading" class="chat-items flex justify-center">
+      <div v-if="isLoading" class="flex justify-center chat-items">
         <Spinner />
       </div>
       <div v-else>
         <IonList>
-          <div v-if="isLoadingSub" class="chat-items flex justify-center">
+          <div v-if="isLoadingSub" class="flex justify-center chat-items">
             <Spinner />
           </div>
           <template v-for="d in deviceFiltered" :key="d.device_id">
             <IonItem class="cursor-pointer" @click="openDevice(d)">
               <IonLabel>
-                <div class="col-span-6 flex flex-col">
-                  <div class="flex justify-between items-center">
+                <div class="flex flex-col col-span-6">
+                  <div class="flex items-center justify-between">
                     <h3 class="py-1 text-sm text-azure-500">
                       {{ d.device_id }}
                     </h3>
                   </div>
-                  <p class="text-xs text-true-gray-400 truncate font-black-light">
+                  <p class="text-xs truncate text-true-gray-400 font-black-light">
                     {{ d.platform }} {{ d.version.name }}
                   </p>
                 </div>
