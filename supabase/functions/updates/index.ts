@@ -8,7 +8,7 @@ interface Channel {
   version: definitions['app_versions']
 }
 interface ChannelDev {
-  channel_id: Channel
+  channel_id: definitions['channels'] & Channel
 }
 interface AppInfos {
   version_name: string
@@ -61,7 +61,7 @@ serve(async (event: Request) => {
       plugin_version,
       version_name)
 
-    const { data: channel, error: dbError } = await supabaseAdmin
+    const { data: channelData, error: dbError } = await supabaseAdmin
       .from<definitions['channels'] & Channel>('channels')
       .select(`
           id,
@@ -91,7 +91,16 @@ serve(async (event: Request) => {
           device_id,
           app_id,
           channel_id (
+            id,
+            created_at,
+            created_by,
             name,
+            app_id,
+            beta,
+            disableAutoUpdateUnderNative,
+            disableAutoUpdateToMajor,
+            ios,
+            android,
             version (
               id,
               name,
@@ -105,6 +114,7 @@ serve(async (event: Request) => {
         `)
       .eq('device_id', device_id)
       .eq('app_id', app_id)
+      .single()
     const { data: devicesOverride } = await supabaseAdmin
       .from<definitions['devices_override'] & Channel>('devices_override')
       .select(`
@@ -122,13 +132,15 @@ serve(async (event: Request) => {
         `)
       .eq('device_id', device_id)
       .eq('app_id', app_id)
-    if (dbError || !channel) {
+      .single()
+    if (dbError || !channelData) {
       console.log(id, 'Cannot get channel', app_id, `no public channel ${JSON.stringify(dbError)}`)
       return sendRes({
         message: 'Cannot get channel',
         err: `no public channel ${JSON.stringify(dbError)}`,
       }, 200)
     }
+    let channel = channelData
     const trial = await isTrial(channel.created_by)
     const paying = await isGoodPlan(channel.created_by)
     let version: definitions['app_versions'] = channel.version
@@ -151,13 +163,14 @@ serve(async (event: Request) => {
         err: 'not good plan',
       }, 200)
     }
-    if (channelOverride && channelOverride.length) {
-      console.log(id, 'Set channel override', app_id, channelOverride[0].channel_id.version.name)
-      version = channelOverride[0].channel_id.version
+    if (channelOverride) {
+      console.log(id, 'Set channel override', app_id, channelOverride.channel_id.version.name)
+      version = channelOverride.channel_id.version
+      channel = channelOverride.channel_id
     }
-    if (devicesOverride && devicesOverride.length) {
-      console.log(id, 'Set device override', app_id, devicesOverride[0].version.name)
-      version = devicesOverride[0].version
+    if (devicesOverride) {
+      console.log(id, 'Set device override', app_id, devicesOverride.version.name)
+      version = devicesOverride.version
     }
 
     if (!version.bucket_id && !version.external_url) {
@@ -186,7 +199,7 @@ serve(async (event: Request) => {
     }
 
     // console.log('check disableAutoUpdateToMajor', device_id)
-    if (!channel.ios && platform === 'ios') {
+    if (!devicesOverride && !channel.ios && platform === 'ios') {
       console.log(id, 'Cannot upgrade ios it\t disabled', device_id)
       await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, version.id)
       return sendRes({
@@ -196,7 +209,7 @@ serve(async (event: Request) => {
         old: version_name,
       }, 200)
     }
-    if (!channel.android && platform === 'android') {
+    if (!devicesOverride && !channel.android && platform === 'android') {
       console.log(id, 'Cannot upgrade android it\t disabled', device_id)
       await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, version.id)
       return sendRes({
@@ -206,7 +219,7 @@ serve(async (event: Request) => {
         old: version_name,
       }, 200)
     }
-    if (channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
+    if (!devicesOverride && channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
       console.log(id, 'Cannot upgrade major version', device_id)
       await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, version.id)
       return sendRes({
@@ -218,7 +231,7 @@ serve(async (event: Request) => {
     }
 
     console.log(id, 'check disableAutoUpdateUnderNative', device_id)
-    if (channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+    if (!devicesOverride && channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
       await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, version.id)
       console.log(id, 'Cannot revert under native version', device_id)
       return sendRes({
