@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.36.0](https://github.com/Cap-go/capgo/compare/1.35.4...1.36.0) (2022-10-20)
+
+
+### Features
+
+* add logs in device page ([fd7d289](https://github.com/Cap-go/capgo/commit/fd7d289a7d08688463657866daae10a41dad10fc))
+
 ### [1.35.4](https://github.com/Cap-go/capgo/compare/1.35.3...1.35.4) (2022-10-19)
 
 ### [1.35.3](https://github.com/Cap-go/capgo/compare/1.35.2...1.35.3) (2022-10-19)
