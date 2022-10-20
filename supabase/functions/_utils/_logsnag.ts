@@ -1,4 +1,5 @@
-import { LogSnag } from 'https://deno.land/x/logsnag@0.1.3/src/mod.ts'
+// import { LogSnag } from 'https://deno.land/x/logsnag@0.1.3/src/mod.ts'
+import { LogSnag } from 'https://cdn.skypack.dev/logsnag@0.1.4?dts'
 
 const lsg = new LogSnag({
   token: Deno.env.get('LOGSNAG_TOKEN') || '',
