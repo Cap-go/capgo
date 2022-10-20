@@ -1,4 +1,4 @@
-import { LogSnag } from 'https://cdn.skypack.dev/logsnag@0.1.4-beta.1'
+import { LogSnag } from 'https://cdn.skypack.dev/logsnag@0.1.4/'
 
 const lsg = new LogSnag({
   token: Deno.env.get('LOGSNAG_TOKEN') || '',
