@@ -22,13 +22,15 @@ const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
 const total = computed(() => {
   return sum(props.datas as number[])
 })
-const evolution = (arr: number[]) => {
+const lastDayEvolution = computed(() => {
+  const arr = props.datas as number[]
   const oldTotal = sum(arr.slice(0, -2))
   const diff = total.value - oldTotal
-  return diff / (arr.length > 2 ? oldTotal : diff) * 100
-}
+  const res = diff / (arr.length > 2 ? oldTotal : diff) * 100
+  return res
+})
 
-const lastDayEvolution = evolution(props.datas as number[])
+// const lastDayEvolution = evolution(props.datas as number[])
 </script>
 
 <template>
@@ -44,7 +46,7 @@ const lastDayEvolution = evolution(props.datas as number[])
         <div class="mr-2 text-3xl font-bold dark:text-white text-slate-800">
           {{ total.toLocaleString() }} {{ unit }}
         </div>
-        <div class="text-sm font-semibold text-white px-1.5 bg-emerald-500 rounded-full">
+        <div v-if="lastDayEvolution" class="text-sm font-semibold text-white px-1.5 bg-emerald-500 rounded-full">
           {{ lastDayEvolution < 0 ? '-' : '+' }}{{ lastDayEvolution.toFixed(2) }}%
         </div>
       </div>
