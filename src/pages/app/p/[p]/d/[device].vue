@@ -10,7 +10,6 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { subDays } from 'date-fns'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
@@ -111,6 +110,7 @@ const onSearchLog = async (val: string | undefined) => {
         device_id,
         action,
         platform,
+        version_build,
         version (
             name
         ),
@@ -133,6 +133,7 @@ const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
         device_id,
         action,
         platform,
+        version_build,
         version (
             name
         ),
@@ -559,7 +560,7 @@ watchEffect(async () => {
           <IonItem>
             <IonLabel>
               <h2 class="text-sm text-azure-500">
-                {{ s.device_id }} {{ s.platform }} {{ s.action }} {{ s.version.name }}
+                {{ s.action }} {{ s.version.name }}, builtin {{ s.version_build }}
               </h2>
             </IonLabel>
             <IonNote slot="end">
