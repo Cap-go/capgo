@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import {
-  IonContent, IonItem,
-  IonItemDivider, IonLabel, IonList, IonListHeader, IonNote, IonPage,
+  IonContent, IonInfiniteScroll,
+  IonInfiniteScrollContent,
+  IonItem,
+  IonItemDivider,
+  IonLabel, IonList, IonListHeader, IonNote, IonPage, IonSearchbar,
   actionSheetController, alertController, toastController,
 } from '@ionic/vue'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { subDays } from 'date-fns'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import TitleHead from '~/components/TitleHead.vue'
+import Spinner from '~/components/Spinner.vue'
 
 interface Device {
   version: definitions['app_versions']
@@ -21,19 +26,39 @@ interface Channel {
 interface ChannelDev {
   channel_id: definitions['channels'] & Channel
 }
+interface InfiniteScrollCustomEvent extends CustomEvent {
+  target: HTMLIonInfiniteScrollElement
+}
+interface Stat {
+  version: {
+    name: string
+  }
+}
+const fetchLimit = 40
+let fetchOffset = 0
+const isDisabled = ref(false)
 const { t } = useI18n()
 const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
+const search = ref<string>('')
 const id = ref<string>()
 const auth = supabase.auth.user()
 const isLoading = ref(true)
+const isLoadingSub = ref(true)
 const device = ref<definitions['devices'] & Device>()
+const logs = ref<(definitions['stats'] & Stat)[]>([])
+const filtered = ref<(definitions['stats'] & Stat)[]>([])
 const deviceOverride = ref<definitions['devices_override'] & Device>()
 const channels = ref<(definitions['channels'] & Channel)[]>([])
 const versions = ref<definitions['app_versions'][]>([])
 const channelDevice = ref<definitions['channel_devices'] & ChannelDev>()
 
+const logFiltered = computed(() => {
+  if (search.value)
+    return filtered.value
+  return logs.value
+})
 const getVersion = async () => {
   try {
     const { data, error } = await supabase
@@ -72,6 +97,65 @@ const getChannels = async () => {
   catch (error) {
     console.error(error)
   }
+}
+const onSearchLog = async (val: string | undefined) => {
+  if (val === undefined) {
+    search.value = ''
+    return
+  }
+  search.value = val
+  isLoadingSub.value = true
+  const { data: dataStats } = await supabase
+    .from<(definitions['stats'] & Stat)>('stats')
+    .select(`
+        device_id,
+        action,
+        platform,
+        version (
+            name
+        ),
+        created_at,
+        updated_at
+      `)
+    .eq('device_id', id.value)
+    .order('created_at', { ascending: false })
+    .like('action', `%${search.value}%`)
+  logs.value = dataStats || []
+  isLoadingSub.value = false
+}
+const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
+  isLoadingSub.value = true
+  try {
+    // create a date object for the last day of the previous month with dayjs
+    const { data: dataStats } = await supabase
+      .from<(definitions['stats'] & Stat)>('stats')
+      .select(`
+        device_id,
+        action,
+        platform,
+        version (
+            name
+        ),
+        created_at,
+        updated_at
+      `)
+      .eq('device_id', id.value)
+      .order('created_at', { ascending: false })
+      .range(fetchOffset, fetchOffset + fetchLimit - 1)
+    if (!dataStats)
+      return
+    logs.value.push(...dataStats)
+    if (dataStats.length === fetchLimit)
+      fetchOffset += fetchLimit
+    else
+      isDisabled.value = true
+  }
+  catch (error) {
+    console.error(error)
+  }
+  isLoadingSub.value = false
+  if (event)
+    event.target.complete()
 }
 const getChannelOverride = async () => {
   const { data, error } = await supabase
@@ -155,12 +239,15 @@ const getDevice = async () => {
 
 const loadData = async () => {
   isLoading.value = true
+  logs.value = []
+  fetchOffset = 0
   await Promise.all([
     getDevice(),
     getDeviceOverride(),
     getChannelOverride(),
     getChannels(),
     getVersion(),
+    loadStatsData(),
   ])
   isLoading.value = false
 }
@@ -459,6 +546,37 @@ watchEffect(async () => {
             {{ channelDevice?.channel_id.name || t('device.no_channel') }}
           </IonNote>
         </IonItem>
+      </IonList>
+      <IonList>
+        <IonListHeader>
+          <IonLabel>Logs</IonLabel>
+        </IonListHeader>
+        <div v-if="isLoadingSub" class="flex justify-center chat-items">
+          <Spinner />
+        </div>
+        <IonSearchbar v-if="!isLoadingSub" @ion-change="onSearchLog($event.detail.value)" />
+        <template v-for="s in logFiltered" :key="s.id">
+          <IonItem>
+            <IonLabel>
+              <h2 class="text-sm text-azure-500">
+                {{ s.device_id }} {{ s.platform }} {{ s.action }} {{ s.version.name }}
+              </h2>
+            </IonLabel>
+            <IonNote slot="end">
+              {{ formatDate(s.created_at) }}
+            </IonNote>
+          </IonItem>
+        </template>
+        <IonInfiniteScroll
+          threshold="100px"
+          :disabled="isDisabled || !!search"
+          @ion-infinite="loadStatsData($event)"
+        >
+          <IonInfiniteScrollContent
+            loading-spinner="bubbles"
+            :loading-text="t('loading-more-data')"
+          />
+        </IonInfiniteScroll>
       </IonList>
     </IonContent>
   </IonPage>
