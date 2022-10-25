@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.12](https://github.com/Cap-go/capgo/compare/1.36.11...1.36.12) (2022-10-25)
+
+
+### Bug Fixes
+
+* double timeout ([39e5154](https://github.com/Cap-go/capgo/commit/39e5154a49a75cfef168fed42ec6261af2ef18cb))
+
 ### [1.36.11](https://github.com/Cap-go/capgo/compare/1.36.10...1.36.11) (2022-10-25)
 
 
