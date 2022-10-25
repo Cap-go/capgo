@@ -146,7 +146,7 @@ jobs:
           id: provisioning
           uses: apple-actions/download-provisioning-profiles@v1
           with:
-            bundle-id: 'ee.forgr.capgo'
+            bundle-id: 'ee.forgr.capacitorgo'
             profile-type: 'IOS_APP_STORE'
             issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
             api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
