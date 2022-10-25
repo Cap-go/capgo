@@ -139,8 +139,6 @@ jobs:
         - name: Sync
           id: sync_code
           run: npx cap sync
-        - name: Install native packages
-          run: cd ios/App && pod install
 
         - name: 'Download Provisioning Profiles'
           id: provisioning
