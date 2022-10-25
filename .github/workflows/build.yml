@@ -137,6 +137,8 @@ jobs:
             issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
             api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
             api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        - name: Copy profile
+          run: cp /Users/runner/Library/MobileDevice/Provisioning\ Profiles/* ios    
         - name: Archive
           run: npx cap build ios
         # - name: Archive
