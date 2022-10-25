@@ -39,7 +39,7 @@ def capacitor_pods
   pod 'CapawesomeCapacitorFilePicker', :path => '../../node_modules/.pnpm/@capawesome+capacitor-file-picker@0.5.2_@capacitor+core@4.4.0/node_modules/@capawesome/capacitor-file-picker'
   pod 'CapawesomeCapacitorScreenOrientation', :path => '../../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.1_@capacitor+core@4.4.0/node_modules/@capawesome/capacitor-screen-orientation'
   pod 'CapgoCapacitorFlash', :path => '../../node_modules/.pnpm/@capgo+capacitor-flash@1.2.11_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-flash'
-  pod 'CapgoCapacitorMute', :path => '../../node_modules/.pnpm/@capgo+capacitor-mute@1.1.5_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute'
+  pod 'CapgoCapacitorMute', :path => '../../node_modules/.pnpm/@capgo+capacitor-mute@1.1.7_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute'
   pod 'CapgoCapacitorScreenRecorder', :path => '../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.6_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-screen-recorder'
   pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@4.4.9_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-updater'
   pod 'TeamhiveCapacitorVideoRecorder', :path => '../../node_modules/.pnpm/@teamhive+capacitor-video-recorder@5.0.0_@capacitor+core@4.4.0/node_modules/@teamhive/capacitor-video-recorder'
@@ -55,4 +55,11 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  installer.pods_project.targets.each do |target|
+    if target.respond_to?(:product_type) and target.product_type == "com.apple.product-type.bundle"
+      target.build_configurations.each do |config|
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      end
+    end
+  end
 end

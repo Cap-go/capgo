@@ -87,7 +87,7 @@ include ':capgo-capacitor-flash'
 project(':capgo-capacitor-flash').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-flash@1.2.11_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-flash/android')
 
 include ':capgo-capacitor-mute'
-project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.5_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute/android')
+project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.7_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute/android')
 
 include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.6_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-screen-recorder/android')

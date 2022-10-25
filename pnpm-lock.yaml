@@ -33,10 +33,10 @@ specifiers:
   '@capacitor/status-bar': ^4.0.1
   '@capacitor/text-zoom': ^4.0.1
   '@capacitor/toast': ^4.0.1
-  '@capawesome/capacitor-file-picker': 0.5.2
+  '@capawesome/capacitor-file-picker': ^0.5.2
   '@capawesome/capacitor-screen-orientation': ^2.0.1
   '@capgo/capacitor-flash': ^1.2.11
-  '@capgo/capacitor-mute': ^1.1.5
+  '@capgo/capacitor-mute': ^1.1.7
   '@capgo/capacitor-screen-recorder': ^1.2.6
   '@capgo/capacitor-updater': 4.4.9
   '@iconify-json/carbon': 1.1.8
@@ -144,7 +144,7 @@ dependencies:
   '@capawesome/capacitor-file-picker': 0.5.2_@capacitor+core@4.4.0
   '@capawesome/capacitor-screen-orientation': 2.0.1_@capacitor+core@4.4.0
   '@capgo/capacitor-flash': 1.2.11_@capacitor+core@4.4.0
-  '@capgo/capacitor-mute': 1.1.5_@capacitor+core@4.4.0
+  '@capgo/capacitor-mute': 1.1.7_@capacitor+core@4.4.0
   '@capgo/capacitor-screen-recorder': 1.2.6_@capacitor+core@4.4.0
   '@capgo/capacitor-updater': 4.4.9_@capacitor+core@4.4.0
   '@ionic/vue': 6.3.2
@@ -1857,8 +1857,8 @@ packages:
       '@capacitor/core': 4.4.0
     dev: false
 
-  /@capgo/capacitor-mute/1.1.5_@capacitor+core@4.4.0:
-    resolution: {integrity: sha512-n+cjN71/ci+AUAtGnC2JXCoCfeesmZmH+1DE9OWKi4kAWyS26iysWDZ0bjWu3ZIFUlmIhFvGzCnIvRLY78nuMQ==}
+  /@capgo/capacitor-mute/1.1.7_@capacitor+core@4.4.0:
+    resolution: {integrity: sha512-D4RzxcKNnt0zxH8vTMu1S6yixaXyzjZyOYA56LXsqPCzXCY7j3Mpz7ilR1uLOWjXS2dhfaJW3YqNOQoYg/dDtg==}
     peerDependencies:
       '@capacitor/core': ^3.0.0 || ^4.0.0
     dependencies:
