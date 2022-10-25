@@ -98,8 +98,6 @@ jobs:
       - name: Sync
         id: sync_code
         run: npx cap sync
-      - name: Build bundle
-        run: cd android/ && ./gradlew assembleRelease
       - name: Extract Android signing key from env
         run: |
           echo "${{ secrets.ANDROID_RELEASE_KEYSTORE }}" > android/release.jks.base64
