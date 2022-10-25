@@ -69,49 +69,49 @@ jobs:
         if: "!contains(github.ref, '-alpha.')"
         id: create_release_prod
         run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
-#   build_android:
-#     runs-on: ubuntu-latest
-#     strategy:
-#       matrix:
-#         node-version: [16]
-#     steps:
-#       - uses: actions/checkout@v3
-#       - uses: pnpm/action-setup@v2
-#         with:
-#           version: 7
-#       - name: Use Node.js ${{ matrix.node-version }}
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: ${{ matrix.node-version }}
-#           cache: 'pnpm'
-#       - name: Setup java
-#         uses: actions/setup-java@v3
-#         with:
-#             distribution: 'zulu'
-#             java-version: '11'
-#       - name: Install dependencies
-#         id: install_code
-#         run: pnpm install --frozen-lockfile
-#       - name: Build
-#         id: build_code
-#         run: pnpm mobile
-#       - name: Sync
-#         id: sync_code
-#         run: npx cap sync
-#       - name: Build bundle
-#         run: cd android/ && ./gradlew assembleRelease
-#       - name: Extract Android signing key from env
-#         run: |
-#           echo "${{ secrets.ANDROID_RELEASE_KEYSTORE }}" > android/release.jks.base64
-#           base64 -d android/release.jks.base64 > android/release.decrypted.jks
-#       - name: Sign dev build
-#         run: jarsigner -keystore android/release.decrypted.jks -storepass "${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}" -signedjar ./android/app/build/outputs/bundle/release/app-release-signed.aab ./android/app/build/outputs/bundle/release/app-release.aab captime-forgr
-#       - name: Upload release bundle
-#         uses: actions/upload-artifact@v2
-#         with:
-#           name: app-release
-#           path: android/app/build/outputs/bundle/release/app-release-signed.aab
-#           retention-days: 60
+  build_android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Setup java
+        uses: actions/setup-java@v3
+        with:
+            distribution: 'zulu'
+            java-version: '11'
+      - name: Install dependencies
+        id: install_code
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        id: build_code
+        run: pnpm mobile
+      - name: Sync
+        id: sync_code
+        run: npx cap sync
+      - name: Build bundle
+        run: cd android/ && ./gradlew assembleRelease
+      - name: Extract Android signing key from env
+        run: |
+          echo "${{ secrets.ANDROID_RELEASE_KEYSTORE }}" > android/release.jks.base64
+          base64 -d android/release.jks.base64 > android/release.decrypted.jks
+      - name: Sign dev build
+        run: npx cap build android --keystorepath android/release.decrypted.jks --keystorepass ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }} --keystorealias captime-forgr --keystorealiaspass ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }} --androidreleasetype AAB
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v2
+        with:
+          name: app-release
+          path: android/app/release/app-release-signed.aab
+          retention-days: 60
 #   build_ios:
 #       runs-on: macOS-latest
 #       strategy:
