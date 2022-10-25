@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.13](https://github.com/Cap-go/capgo/compare/1.36.12...1.36.13) (2022-10-25)
+
+
+### Bug Fixes
+
+* cap mute build ([e4a5bb5](https://github.com/Cap-go/capgo/commit/e4a5bb5abf5aecb50957680c68c309ae2bd6ed58))
+
 ### [1.36.12](https://github.com/Cap-go/capgo/compare/1.36.11...1.36.12) (2022-10-25)
 
 
