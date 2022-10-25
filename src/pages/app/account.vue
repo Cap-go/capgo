@@ -141,8 +141,10 @@ const deleteAccount = async () => {
             errorMessage.value = t('something-went-wrong-try-again-later')
           }
           else {
-            await main.logout()
-            router.replace('/login')
+            setTimeout(() => {
+              main.logout()
+              return router.replace('/login')
+            }, 1000)
           }
         },
       },
@@ -193,15 +195,15 @@ const presentActionSheet = async () => {
     <TitleHead :title="t('account.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
       <!-- <TitleHead :title="t('account.heading')" no-back big color="warning" /> -->
-      <div class="py-16 px-6">
+      <div class="px-6 py-16">
         <div
           v-if="!main.user?.image_url"
-          class="mt-8 mx-auto w-40 h-40 bg-pumpkin-orange-500 rounded-5xl grid place-content-center"
+          class="grid w-40 h-40 mx-auto mt-8 bg-pumpkin-orange-500 rounded-5xl place-content-center"
           @click="presentActionSheet"
         >
           <svg
             v-if="isLoading"
-            class="animate-spin h-5 w-5 text-white inline-block align-middle"
+            class="inline-block w-5 h-5 text-white align-middle animate-spin"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -224,22 +226,22 @@ const presentActionSheet = async () => {
         </div>
         <img
           v-else
-          class="mt-8 mx-auto w-40 h-40 object-cover rounded-5xl"
+          class="object-cover w-40 h-40 mx-auto mt-8 rounded-5xl"
           :src="main.user?.image_url"
           @click="presentActionSheet"
         >
 
-        <h2 class="text-center mt-4 text-2xl text-black-light">
+        <h2 class="mt-4 text-2xl text-center text-black-light">
           {{ `${main.user?.first_name} ${main.user?.last_name}` }}
         </h2>
-        <p class="text-center text-azure-500 font-bold">
+        <p class="font-bold text-center text-azure-500">
           <span class="uppercase">{{ main.user?.country }}</span>
         </p>
 
-        <ul class="grid grid-rows-4 gap-y-5 mt-12 mb-6">
+        <ul class="grid grid-rows-4 mt-12 mb-6 gap-y-5">
           <li>
             <router-link
-              class="flex justify-between items-center"
+              class="flex items-center justify-between"
               to="/app/profile_details"
             >
               <span class="font-bold">
@@ -250,7 +252,7 @@ const presentActionSheet = async () => {
           </li>
           <li>
             <router-link
-              class="flex justify-between items-center"
+              class="flex items-center justify-between"
               to="/app/change_password"
             >
               <span class="font-bold">
@@ -261,7 +263,7 @@ const presentActionSheet = async () => {
           </li>
           <li>
             <router-link
-              class="flex justify-between items-center"
+              class="flex items-center justify-between"
               to="/app/usage"
             >
               <span class="font-bold first-letter:uppercase">
@@ -273,7 +275,7 @@ const presentActionSheet = async () => {
           <li>
             <div
               v-if="!isMobile"
-              class="flex justify-between items-center cursor-pointer"
+              class="flex items-center justify-between cursor-pointer"
               @click="openPortal"
             >
               <span class="font-bold">
@@ -284,7 +286,7 @@ const presentActionSheet = async () => {
           </li>
           <li>
             <router-link
-              class="flex justify-between items-center"
+              class="flex items-center justify-between"
               to="/app/apikeys"
             >
               <span class="font-bold">
@@ -295,7 +297,7 @@ const presentActionSheet = async () => {
           </li>
           <li>
             <router-link
-              class="flex justify-between items-center"
+              class="flex items-center justify-between"
               to="/app/notification_settings"
             >
               <span class="font-bold">
@@ -306,7 +308,7 @@ const presentActionSheet = async () => {
           </li>
           <li>
             <a
-              class="flex justify-between items-center"
+              class="flex items-center justify-between"
               href="https://discord.gg/VnYRvBfgA6"
               target="_blank"
             >
@@ -318,7 +320,7 @@ const presentActionSheet = async () => {
           </li>
           <li>
             <div
-              class="flex justify-between items-center cursor-pointer"
+              class="flex items-center justify-between cursor-pointer"
               @click="openChat"
             >
               <span class="font-bold">
@@ -329,20 +331,20 @@ const presentActionSheet = async () => {
           </li>
         </ul>
         <a
-          class="block text-center text-sm text-muted-blue-500 underline mt-4"
+          class="block mt-4 text-sm text-center underline text-muted-blue-500"
           href="https://capgo.app/tos/"
           target="_blank"
         >
           {{ t("account.legal") }}
         </a>
         <a
-          class="block text-center text-sm text-muted-blue-500 underline mt-4"
+          class="block mt-4 text-sm text-center underline text-muted-blue-500"
           href="https://capgo.app/privacy/"
           target="_blank"
         >
           {{ t("account.privacy") }}
         </a>
-        <div class="mx-auto text-center mt-4">
+        <div class="mx-auto mt-4 text-center">
           <button
             class="mx-auto font-bold text-muted-blue-500"
             @click="deleteAccount()"
@@ -350,7 +352,7 @@ const presentActionSheet = async () => {
             {{ t("account.delete-account") }}
           </button>
         </div>
-        <div class="mx-auto text-center mt-4">
+        <div class="mx-auto mt-4 text-center">
           <button
             class="mx-auto font-bold text-pumpkin-orange-500"
             @click="main.logout().then(() => router.replace('/login'))"
@@ -358,7 +360,7 @@ const presentActionSheet = async () => {
             {{ t("account.logout") }}
           </button>
         </div>
-        <div class="mx-auto text-center mt-4">
+        <div class="mx-auto mt-4 text-center">
           <button class="mx-auto font-bold text-dusk-500">
             Version {{ version }}
           </button>

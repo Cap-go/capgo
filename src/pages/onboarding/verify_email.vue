@@ -49,8 +49,10 @@ const updateDb = async () => {
     )
   if (error) {
     console.error('updateDb', error)
-    main.logout()
-    return router.push('/login')
+    setTimeout(() => {
+      main.logout()
+      return router.replace('/login')
+    }, 1000)
   }
   router.push('/onboarding/activation')
 
