@@ -109,24 +109,16 @@ jobs:
   #         retention-days: 60
   build_ios:
       runs-on: macOS-latest
-      strategy:
-        matrix:
-          node-version: [16]
       steps:
         - uses: actions/checkout@v3
         - uses: pnpm/action-setup@v2
           with:
             version: 7
-        - name: Use Node.js ${{ matrix.node-version }}
+        - name: Use Node.js 16
           uses: actions/setup-node@v3
           with:
-            node-version: ${{ matrix.node-version }}
+            node-version: 16
             cache: 'pnpm'
-        - name: Setup java
-          uses: actions/setup-java@v3
-          with:
-              distribution: 'zulu'
-              java-version: '11'
         - name: Install dependencies
           id: install_code
           run: pnpm install --frozen-lockfile
@@ -136,7 +128,6 @@ jobs:
         - name: Sync
           id: sync_code
           run: npx cap sync
-
         - name: 'Download Provisioning Profiles'
           id: provisioning
           uses: apple-actions/download-provisioning-profiles@v1
@@ -146,10 +137,6 @@ jobs:
             issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
             api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
             api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-      
-        - name: 'Another example step'
-          run: echo ${{ steps.provisioning.outputs.profiles }}
-
         - name: Archive
           run: npx cap build ios
         # - name: Archive
