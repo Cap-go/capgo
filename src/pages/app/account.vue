@@ -143,7 +143,9 @@ const deleteAccount = async () => {
           else {
             setTimeout(() => {
               main.logout()
-              return router.replace('/login')
+              setTimeout(() => {
+                return router.replace('/login')
+              }, 1000)
             }, 1000)
           }
         },
