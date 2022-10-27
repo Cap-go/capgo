@@ -133,16 +133,18 @@ jobs:
             ruby-version: '2.7.2'
         - uses: maierj/fastlane-action@v2.3.0
           env:
-            APPLE_USER: ${{ secrets.APPLE_USER }}
-            APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-            APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-            APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+            DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+            APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+            APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+            APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
             CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
-            MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-            MATCH_USERNAME: ${{ secrets.APPLE_USER }}
+            MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
             MATCH_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           with:
-            lane: ios beta
+            lane: match
         # - name: Install fastlane CLI
         #   run: |
         #     HOMEBREW_NO_INSTALL_CLEANUP=1 brew install fastlane
