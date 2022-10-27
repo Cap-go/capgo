@@ -112,7 +112,7 @@ jobs:
           encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
       - name: Decode Google Play Confi File
         uses: timheuer/base64-to-file@v1
-        id: android_google_play_config
+        id: service_account_json_file
         with:
           fileName: "serviceAccount.json"
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
