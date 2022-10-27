@@ -44,12 +44,6 @@ platform :ios do
       duration: 1200,            
       in_house: false
     )
-    
-    increment_build_number(xcodeproj: "your_project_name.xcodeproj")
-    
-    cocoapods(
-      clean_install: true
-    )
 
     match(
       type: 'appstore',
@@ -62,8 +56,8 @@ platform :ios do
 
     gym(
       configuration: "Release",
-      workspace: "your_project_workspace.xcworkspace",
-      scheme: "your_schema",
+      workspace: "./ios/App/App.xcworkspace",
+      scheme: "App",
       export_method: "app-store",
       export_options: {
         provisioningProfiles: { 
@@ -79,7 +73,7 @@ platform :ios do
       skip_submission: true,
       distribute_external: false,
       notify_external_testers: false,
-      ipa: "./your_app_name.ipa"
+      ipa: "./App.ipa"
     )
 
     delete_temp_keychain(keychain_name)
