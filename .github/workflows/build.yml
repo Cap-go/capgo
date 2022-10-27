@@ -137,6 +137,7 @@ jobs:
             APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
             APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
             CERTIFICATE_STORE_URL: ${{ secrets.CERTIFICATE_STORE_URL }}
+            # MATCH_GIT_BASIC_AUTHORIZATION: 
             MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           run: fastlane ios beta
         - name: Upload release bundle

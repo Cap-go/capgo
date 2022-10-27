@@ -5,7 +5,7 @@ const lsg = Deno.env.get('LOGSNAG_TOKEN')
     token: Deno.env.get('LOGSNAG_TOKEN') || '',
     project: Deno.env.get('LOGSNAG_PROJECT') || '',
   })
-  : { publish: () => {}, insight: () => {} }
+  : { publish: () => Promise.resolve(true), insight: () => Promise.resolve(true) }
 
 const insight = async (data: { title: string; value: number; icon: string }[]) => {
   const all = []

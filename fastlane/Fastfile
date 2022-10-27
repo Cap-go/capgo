@@ -41,6 +41,7 @@ platform :ios do
 	
 	match(
 		git_url: ENV['CERTIFICATE_STORE_URL'],
+		# git_basic_authorization: Base64.encode64("<Github username>:<Github Personal Access Token>"),
 		type: "appstore", 
 		app_identifier: "x.y.z", 
 		api_key: api_key,
