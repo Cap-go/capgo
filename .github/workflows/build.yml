@@ -111,15 +111,15 @@ jobs:
           base64 -d -i play_config.json.b64 > play_config.json
         env:
           PLAY_CONFIG_JSON: ${{ secrets.PLAY_CONFIG_JSON }}
-        - uses: maierj/fastlane-action@v2.3.0
-          with:
-            lane: android beta
-        - name: Upload release bundle
-          uses: actions/upload-artifact@v2
-          with:
-            name: ios-release
-            path: ./App.ipa
-            retention-days: 60
+      - uses: maierj/fastlane-action@v2.3.0
+        with:
+          lane: android beta
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v2
+        with:
+          name: ios-release
+          path: ./App.ipa
+          retention-days: 60
   # build_ios:
   #     runs-on: macOS-latest
   #     steps:
