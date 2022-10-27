@@ -59,11 +59,11 @@ platform :ios do
       workspace: "./ios/App/App.xcworkspace",
       scheme: "App",
       export_method: "app-store",
-    #   export_options: {
-    #     provisioningProfiles: { 
-    #         DEVELOPER_APP_ID => "#{DEVELOPER_APP_ID}"
-    #     }
-    #   }
+      export_options: {
+        provisioningProfiles: { 
+            DEVELOPER_APP_ID => "#{PROVISIONING_PROFILE_SPECIFIER}"
+        }
+      }
     )
 
     pilot(
