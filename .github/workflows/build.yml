@@ -95,7 +95,7 @@ jobs:
       - name: Create Keystore Config file
         run: |
           echo "$ANDROID_KEYSTORE_FILE" > keystore.jks.b64
-          base64 -d -i keystore.jks.b64 > android/keystore.jks
+          base64 -d -i keystore.jks.b64 > android/app/keystore.jks
         env:
           ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
       - name: Create Google Play Config file
