@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.25](https://github.com/Cap-go/capgo/compare/1.36.24...1.36.25) (2022-10-27)
+
+
+### Bug Fixes
+
+* use fastlane for ios deploy ([c526c7f](https://github.com/Cap-go/capgo/commit/c526c7f563de5355de702d639fe7e5aea2b0adeb))
+
 ### [1.36.24](https://github.com/Cap-go/capgo/compare/1.36.23...1.36.24) (2022-10-27)
 
 
