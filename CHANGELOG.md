@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.27](https://github.com/Cap-go/capgo/compare/1.36.26...1.36.27) (2022-10-27)
+
+
+### Bug Fixes
+
+* fastlane + build ([75bfb06](https://github.com/Cap-go/capgo/commit/75bfb06ad8318c85dc6f5f2a7e91619c72256bc1))
+
 ### [1.36.26](https://github.com/Cap-go/capgo/compare/1.36.25...1.36.26) (2022-10-27)
 
 
