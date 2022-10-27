@@ -128,28 +128,20 @@ jobs:
         - name: Sync
           id: sync_code
           run: npx cap sync
-
-        - name: 'Download Provisioning Profiles'
-          id: provisioning
-          uses: apple-actions/download-provisioning-profiles@v1
-          with:
-            bundle-id: 'ee.forgr.capacitorgo'
-            profile-type: 'IOS_APP_STORE'
-            issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
-            api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
-            api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }} 
-        - name: Archive
+        - name: Install fastlane CLI
+          run: |
+            HOMEBREW_NO_INSTALL_CLEANUP=1 brew install fastlane
+        - name: Archive IOS
           env:
-            PROFILE_PATH: /Users/runner/Library/MobileDevice/Provisioning\ Profiles
-          run: npx cap build ios
-        # - name: Archive
-        #   run: xcodebuild -workspace ios/App/App.xcworkspace
-        #     -scheme App clean archive -configuration release
-        #     -sdk iphoneos -allowProvisioningUpdates DEVELOPMENT_TEAM=${{secrets.APPLE_TEAM_ID}} -archivePath ios/App/App.xcarchive
-        - name: 'Upload app to TestFlight'
-          uses: apple-actions/upload-testflight-build@v1
-          with: 
-            app-path: 'ios/App/App.xcarchive' 
-            issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
-            api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
-            api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+            APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+            APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+            APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+            CERTIFICATE_STORE_URL: ${{ secrets.CERTIFICATE_STORE_URL }}
+            MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
+          run: fastlane ios beta
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v2
+        with:
+          name: ios-release
+          path: ios/App/App.ipa
+          retention-days: 60

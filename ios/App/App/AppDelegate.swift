@@ -23,7 +23,6 @@ public class func topViewController(_ base: UIViewController? = UIApplication.sh
 
 extension UIWindow {
     open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
-        let defaults = UserDefaults.standard
         if motion == .motionShake {
             let appName = "app"
             let title = "Preview \(appName) Menu"

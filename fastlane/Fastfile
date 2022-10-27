@@ -1,0 +1,122 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Push a new beta build to TestFlight"
+  lane :beta do
+
+	api_key = app_store_connect_api_key(
+		key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],
+		issuer_id: ENV['APP_STORE_CONNECT_API_ISSUER_ID'],
+		key_content: ENV['APP_STORE_CONNECT_API_KEY_CONTENT']
+	)
+
+	def ensure_temp_keychain(name)
+		delete_keychain(
+			name: name
+		) if File.exist? File.expand_path("~/Library/Keychains/#{name}-db")
+		create_keychain(
+			name: name,
+			password: 'temppassword',
+			unlock: true,
+			timeout: 0
+		)
+	end
+
+	ensure_temp_keychain 'login.keychain'
+	
+	match(
+		git_url: ENV['CERTIFICATE_STORE_URL'],
+		type: "appstore", 
+		app_identifier: "x.y.z", 
+		api_key: api_key,
+		readonly: true,
+		keychain_name: "login.keychain",
+		keychain_password: "temppassword"
+	)
+	
+	update_code_signing_settings(
+	  use_automatic_signing: false,
+	  path: "./ios/App/App.xcodeproj",
+	  code_sign_identity: "iPhone Distribution"
+	)
+
+	sync_code_signing(
+		readonly: true,
+		type: "appstore", 
+		git_url: ENV['CERTIFICATE_STORE_GITLAB_URL'],
+		app_identifier: "x.y.z", 
+		api_key: api_key,
+		keychain_name: "login.keychain",
+		keychain_password: "temppassword",
+		git_full_name: "<user_nam>",
+		git_user_email: "<user_email>",
+		platform: "ios"
+	)
+
+	update_project_provisioning(
+		xcodeproj: "./ios/App/App.xcodeproj",
+		profile: ENV['sigh_com.iak.msi_appstore_profile-path']
+	)
+
+	build_app(
+		configuration: "Release",
+		output_name: "App.ipa",
+		output_directory: ".",
+		workspace: "./ios/App/App.xcworkspace",
+		scheme: "App"
+	) 
+
+	upload_to_testflight(
+		api_key: api_key,
+		ipa: "App.ipa",
+		skip_waiting_for_build_processing: true
+	)
+	
+  end
+end
+
+platform :android do
+  desc "Push a new beta build to the Internal Test Track"
+  lane :internal do
+
+	gradle(
+		project_dir: "./android",
+		gradle_path: "./gradlew",
+		build_type: "Release",
+		task: "assemble",
+		print_command: false,
+		properties: {
+			"android.injected.signing.store.file" => ENV['KEY_STORE'],
+			"android.injected.signing.store.password" => ENV['KEY_STORE_PASSWORD'],
+			"android.injected.signing.key.alias" => ENV['KEY_ALIAS'],
+			"android.injected.signing.key.password" => ENV['KEY_PASSWORD'],
+		}
+	) 
+
+	supply(
+		package_name: "x.y.z",
+		track: 'internal',
+		skip_upload_images: true,
+		skip_upload_metadata: true,
+		skip_upload_screenshots: true,
+		json_key_data: ENV['PLAY_CREDENTIALS_JSON']
+	)
+	
+	
+  end
+end
