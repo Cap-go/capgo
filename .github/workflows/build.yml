@@ -134,15 +134,20 @@ jobs:
         - uses: maierj/fastlane-action@v2.3.0
           env:
             DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
-            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
-            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-            FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+            DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
+            PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
+            TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
             APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
             APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
             APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
             CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
             MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
             MATCH_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
+
           with:
             lane: closed_beta
         # - name: Install fastlane CLI
