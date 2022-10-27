@@ -146,7 +146,7 @@ jobs:
             GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
             FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
             MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
-            MATCH_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
+            MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
 
           with:
             lane: closed_beta
