@@ -117,8 +117,8 @@ jobs:
       - name: Upload release bundle
         uses: actions/upload-artifact@v2
         with:
-          name: ios-release
-          path: ./App.ipa
+          name: android-release
+          path: ./android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 60
   # build_ios:
   #     runs-on: macOS-latest
