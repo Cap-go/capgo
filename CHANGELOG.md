@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.43](https://github.com/Cap-go/capgo/compare/1.36.42...1.36.43) (2022-10-27)
+
+
+### Bug Fixes
+
+* remove forced id ([b6ab7a6](https://github.com/Cap-go/capgo/commit/b6ab7a62e111543482c594fc400061c99dfcaf1a))
+
 ### [1.36.42](https://github.com/Cap-go/capgo/compare/1.36.41...1.36.42) (2022-10-27)
 
 
