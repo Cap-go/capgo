@@ -10,6 +10,9 @@ APPLE_KEY_ID = ENV["APPLE_KEY_ID"]
 APPLE_KEY_CONTENT = ENV["APPLE_KEY_CONTENT"]
 GIT_USERNAME = ENV["GIT_USERNAME"]
 GIT_TOKEN = ENV["GIT_TOKEN"]
+KEYSTORE_KEY_ALIAS = ENV["KEYSTORE_KEY_ALIAS"]
+KEYSTORE_KEY_PASSWORD = ENV["KEYSTORE_KEY_PASSWORD"]
+KEYSTORE_STORE_PASSWORD = ENV["KEYSTORE_STORE_PASSWORD"]
 
 def delete_temp_keychain(name)
   delete_keychain(
@@ -83,7 +86,15 @@ end
 platform :android do
     desc "Deploy a beta version to the Google Play"
     lane :beta do
-        gradle(task: "clean bundleRelease", project_dir: 'android/')
+        gradle(
+          task: "clean bundleRelease",
+          project_dir: 'android/'
+          properties: {
+            "android.injected.signing.store.file" => "keystore.jks",
+            "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
+            "android.injected.signing.key.alias" => "#{KEYSTORE_KEY_ALIAS}",
+            "android.injected.signing.key.password" => "#{KEYSTORE_KEY_PASSWORD}",
+          })
         upload_to_play_store(track: 'beta')
     end
 end
