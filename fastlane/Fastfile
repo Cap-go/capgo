@@ -90,7 +90,7 @@ platform :android do
           task: "clean bundleRelease",
           project_dir: 'android/',
           properties: {
-            "android.injected.signing.store.file" => "keystore.jks",
+            "android.injected.signing.store.file" => "./keystore.jks",
             "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
             "android.injected.signing.key.alias" => "#{KEYSTORE_KEY_ALIAS}",
             "android.injected.signing.key.password" => "#{KEYSTORE_KEY_PASSWORD}",
