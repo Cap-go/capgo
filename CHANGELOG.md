@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.53](https://github.com/Cap-go/capgo/compare/1.36.52...1.36.53) (2022-10-27)
+
+
+### Bug Fixes
+
+* make artifact upload well ([1c645ff](https://github.com/Cap-go/capgo/commit/1c645ff62cc76a01424b16a3874ee266479785fa))
+
 ### [1.36.52](https://github.com/Cap-go/capgo/compare/1.36.51...1.36.52) (2022-10-27)
 
 
