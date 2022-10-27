@@ -106,6 +106,7 @@ jobs:
           PLAY_CONFIG_JSON: ${{ secrets.PLAY_CONFIG_JSON }}
       - uses: maierj/fastlane-action@v2.3.0
         env:
+          KEYSTORE_PATH: ${{ secrets.GITHUB_WORKSPACE }}/android/app/keystore.jks
           DEVELOPER_PACKAGE_NAME: ${{ secrets.DEVELOPER_PACKAGE_NAME }}
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
