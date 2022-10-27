@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.1](https://github.com/Cap-go/capgo/compare/1.37.0...1.37.1) (2022-10-27)
+
+
+### Bug Fixes
+
+* align andriod build ([de7efaf](https://github.com/Cap-go/capgo/commit/de7efaf713f3f69f0909a8d860307320fcf22d5f))
+
 ## [1.37.0](https://github.com/Cap-go/capgo/compare/1.36.53...1.37.0) (2022-10-27)
 
 
