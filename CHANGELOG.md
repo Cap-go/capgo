@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.52](https://github.com/Cap-go/capgo/compare/1.36.51...1.36.52) (2022-10-27)
+
+
+### Bug Fixes
+
+* fastlane missing vars ([a9495b5](https://github.com/Cap-go/capgo/commit/a9495b50615dc8ddd57ac1f8509f997c1b4f6f45))
+* scripts ([92c405a](https://github.com/Cap-go/capgo/commit/92c405af5f74d3aec68df6f6ffe7ce1c575ab2e2))
+* try with all vars ([0afe70d](https://github.com/Cap-go/capgo/commit/0afe70d66f7ac3c70062b71ebd657e609da547f6))
+
 ### [1.36.51](https://github.com/Cap-go/capgo/compare/1.36.50...1.36.51) (2022-10-27)
 
 
