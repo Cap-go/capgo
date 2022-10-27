@@ -88,7 +88,8 @@ platform :android do
     lane :beta do
         gradle(
           task: "clean bundleRelease",
-          project_dir: 'android/'
+          project_dir: 'android/',
+          build_type: "Release",
           properties: {
             "android.injected.signing.store.file" => "keystore.jks",
             "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
