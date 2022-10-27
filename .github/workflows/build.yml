@@ -139,9 +139,9 @@ jobs:
             CERTIFICATE_STORE_URL: ${{ secrets.CERTIFICATE_STORE_URL }}
             MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           run: fastlane ios beta
-      - name: Upload release bundle
-        uses: actions/upload-artifact@v2
-        with:
-          name: ios-release
-          path: ios/App/App.ipa
-          retention-days: 60
+        - name: Upload release bundle
+          uses: actions/upload-artifact@v2
+          with:
+            name: ios-release
+            path: ios/App/App.ipa
+            retention-days: 60
