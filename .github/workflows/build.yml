@@ -135,7 +135,7 @@ jobs:
           env:
             DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
             DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
-            PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            # PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
             TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
             TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
             APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
