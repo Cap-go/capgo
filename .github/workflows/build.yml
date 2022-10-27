@@ -137,7 +137,8 @@ jobs:
             APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
             APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
             APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-            CERTIFICATE_STORE_URL: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+            CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+            MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
             MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           with:
             lane: match
