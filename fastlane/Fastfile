@@ -102,7 +102,7 @@ platform :android do
           json_key: ANDROID_JSON_KEY_FILE,
           track: 'beta',
           skip_upload_metadata: true,
-          skip_upload_changelog: true,
+          skip_upload_changelogs: true,
           skip_upload_images: true,
           skip_upload_screenshots: true,
         )
