@@ -142,7 +142,7 @@ jobs:
             MATCH_USERNAME: ${{ secrets.APPLE_USER }}
             MATCH_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           with:
-            lane: match
+            lane: ios beta
         # - name: Install fastlane CLI
         #   run: |
         #     HOMEBREW_NO_INSTALL_CLEANUP=1 brew install fastlane
