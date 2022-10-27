@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.2](https://github.com/Cap-go/capgo/compare/1.37.1...1.37.2) (2022-10-27)
+
+
+### Bug Fixes
+
+* gradle path ([10b95fa](https://github.com/Cap-go/capgo/commit/10b95fa0e87427b415c78d3673a96ff73c3c03f1))
+
 ### [1.37.1](https://github.com/Cap-go/capgo/compare/1.37.0...1.37.1) (2022-10-27)
 
 
