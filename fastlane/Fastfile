@@ -42,7 +42,6 @@ platform :ios do
 	match(
 		git_url: ENV['CERTIFICATE_STORE_URL'],
 		type: "appstore", 
-		app_identifier: "x.y.z", 
 		api_key: api_key,
 		readonly: true,
 		keychain_name: "login.keychain",
