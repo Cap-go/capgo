@@ -58,7 +58,7 @@ platform :ios do
 	sync_code_signing(
 		readonly: true,
 		type: "appstore", 
-		git_url: ENV['CERTIFICATE_STORE_GITLAB_URL'],
+		git_url: ENV['CERTIFICATE_STORE_URL'],
 		app_identifier: "x.y.z", 
 		api_key: api_key,
 		keychain_name: "login.keychain",

@@ -1,5 +1,5 @@
 app_identifier("ee.forgr.capacitorgo") # The bundle identifier of your app
-apple_id("martindonadieu@gmail.com") # Your Apple Developer Portal username
+apple_id(ENV['APPLE_USER']) # Your Apple Developer Portal username
 
 itc_team_id("119045163") # App Store Connect Team ID
 team_id("UVTJ336J2D") # Developer Portal Team ID

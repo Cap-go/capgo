@@ -133,11 +133,11 @@ jobs:
             ruby-version: '2.7.2'
         - uses: maierj/fastlane-action@v2.3.0
           env:
+            APPLE_USER: ${{ secrets.APPLE_USER }}
             APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
             APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
             APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-            MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-            CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+            CERTIFICATE_STORE_URL: https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
             MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           with:
             lane: match
