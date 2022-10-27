@@ -14,6 +14,7 @@ KEYSTORE_PATH = ENV["KEYSTORE_PATH"]
 KEYSTORE_KEY_ALIAS = ENV["KEYSTORE_KEY_ALIAS"]
 KEYSTORE_KEY_PASSWORD = ENV["KEYSTORE_KEY_PASSWORD"]
 KEYSTORE_STORE_PASSWORD = ENV["KEYSTORE_STORE_PASSWORD"]
+ANDROID_JSON_KEY_FILE = ENV['ANDROID_JSON_KEY_FILE']
 
 def delete_temp_keychain(name)
   delete_keychain(
@@ -90,12 +91,20 @@ platform :android do
         gradle(
           task: "clean bundleRelease",
           project_dir: 'android/',
+          print_command: false,
           properties: {
             "android.injected.signing.store.file" => "#{KEYSTORE_PATH}",
             "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
             "android.injected.signing.key.alias" => "#{KEYSTORE_KEY_ALIAS}",
             "android.injected.signing.key.password" => "#{KEYSTORE_KEY_PASSWORD}",
           })
-        upload_to_play_store(track: 'beta')
+        upload_to_play_store(
+          json_key: ANDROID_JSON_KEY_FILE,
+          track: 'beta',
+          skip_upload_metadata: true,
+          skip_upload_changelog: true,
+          skip_upload_images: true,
+          skip_upload_screenshots: true,
+        )
     end
 end
