@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.36.41](https://github.com/Cap-go/capgo/compare/1.36.40...1.36.41) (2022-10-27)
+
+
+### Bug Fixes
+
+* env MATCH_PASSWORD ([92377e3](https://github.com/Cap-go/capgo/commit/92377e3863f633ec3ac08ed4b015dd72b48461b5))
+
 ### [1.36.40](https://github.com/Cap-go/capgo/compare/1.36.39...1.36.40) (2022-10-27)
 
 
