@@ -6,66 +6,66 @@ on:
       - '*'
       
 jobs:
-  # deploy:
-  #   runs-on: ubuntu-latest
-  #   name: "Build code and release"
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: pnpm/action-setup@v2
-  #       with:
-  #         version: 7
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 16
-  #         cache: 'pnpm'
-  #     - name: Install dependencies
-  #       id: install_code
-  #       run: pnpm install --frozen-lockfile
-  #     - name: Lint
-  #       id: lint_code
-  #       run: pnpm lint
-  #     - name: Build
-  #       id: build_code
-  #       run: pnpm mobile
-  #       env:
-  #         VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
-  #         VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
-  #         VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-  #     - name: Set up Homebrew
-  #       id: set-up-homebrew
-  #       uses: Homebrew/actions/setup-homebrew@master
-  #     - name: Cache Homebrew Bundler RubyGems
-  #       id: cache
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: ${{ steps.set-up-homebrew.outputs.gems-path }}
-  #         key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
-  #         restore-keys: ${{ runner.os }}-rubygems-
-  #     - name: Install Supabase CLI Homebrew dependencies
-  #       run: |
-  #         HOMEBREW_NO_INSTALL_CLEANUP=1 brew install supabase/tap/supabase
-  #     - name: Update functions Alpha
-  #       if: "contains(github.ref, '-alpha.')"
-  #       id: update_functions_preprod
-  #       env:
-  #         SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-  #         BRANCH: development
-  #       run: node scripts/deploy_functions.mjs  
-  #     - name: Update functions
-  #       if: "!contains(github.ref, '-alpha.')"
-  #       id: update_functions_prod
-  #       env:
-  #         SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-  #       run: node scripts/deploy_functions.mjs 
-  #     - name: Create Release Alpha
-  #       if: "contains(github.ref, '-alpha.')"
-  #       id: create_release_prepro
-  #       run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
-  #     - name: Create Release Production
-  #       if: "!contains(github.ref, '-alpha.')"
-  #       id: create_release_prod
-  #       run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+  deploy:
+    runs-on: ubuntu-latest
+    name: "Build code and release"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'pnpm'
+      - name: Install dependencies
+        id: install_code
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        id: lint_code
+        run: pnpm lint
+      - name: Build
+        id: build_code
+        run: pnpm mobile
+        env:
+          VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
+          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      - name: Cache Homebrew Bundler RubyGems
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+          key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+          restore-keys: ${{ runner.os }}-rubygems-
+      - name: Install Supabase CLI Homebrew dependencies
+        run: |
+          HOMEBREW_NO_INSTALL_CLEANUP=1 brew install supabase/tap/supabase
+      - name: Update functions Alpha
+        if: "contains(github.ref, '-alpha.')"
+        id: update_functions_preprod
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          BRANCH: development
+        run: node scripts/deploy_functions.mjs  
+      - name: Update functions
+        if: "!contains(github.ref, '-alpha.')"
+        id: update_functions_prod
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+        run: node scripts/deploy_functions.mjs 
+      - name: Create Release Alpha
+        if: "contains(github.ref, '-alpha.')"
+        id: create_release_prepro
+        run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+      - name: Create Release Production
+        if: "!contains(github.ref, '-alpha.')"
+        id: create_release_prod
+        run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
   build_android:
     runs-on: ubuntu-latest
     steps:
@@ -132,53 +132,53 @@ jobs:
           name: android-release
           path: ./android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 60
-  # build_ios:
-  #     runs-on: macOS-latest
-  #     steps:
-  #       - uses: actions/checkout@v3
-  #       - uses: pnpm/action-setup@v2
-  #         with:
-  #           version: 7
-  #       - name: Use Node.js 16
-  #         uses: actions/setup-node@v3
-  #         with:
-  #           node-version: 16
-  #           cache: 'pnpm'
-  #       - name: Install dependencies
-  #         id: install_code
-  #         run: pnpm install --frozen-lockfile
-  #       - name: Build
-  #         id: build_code
-  #         run: pnpm mobile
-  #       - name: Sync
-  #         id: sync_code
-  #         run: npx cap sync
-  #       - uses: ruby/setup-ruby@v1
-  #         with:
-  #           ruby-version: '2.7.2'
-  #       - uses: maierj/fastlane-action@v2.3.0
-  #         env:
-  #           DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
-  #           DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
-  #           PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
-  #           TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
-  #           TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
-  #           APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-  #           APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-  #           APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-  #           CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
-  #           GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
-  #           GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  #           FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
-  #           MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
-  #           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-  #           APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
-  #           DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
-  #         with:
-  #           lane: closed_beta
-  #       - name: Upload release bundle
-  #         uses: actions/upload-artifact@v2
-  #         with:
-  #           name: ios-release
-  #           path: ./App.ipa
-  #           retention-days: 60
+  build_ios:
+      runs-on: macOS-latest
+      steps:
+        - uses: actions/checkout@v3
+        - uses: pnpm/action-setup@v2
+          with:
+            version: 7
+        - name: Use Node.js 16
+          uses: actions/setup-node@v3
+          with:
+            node-version: 16
+            cache: 'pnpm'
+        - name: Install dependencies
+          id: install_code
+          run: pnpm install --frozen-lockfile
+        - name: Build
+          id: build_code
+          run: pnpm mobile
+        - name: Sync
+          id: sync_code
+          run: npx cap sync
+        - uses: ruby/setup-ruby@v1
+          with:
+            ruby-version: '2.7.2'
+        - uses: maierj/fastlane-action@v2.3.0
+          env:
+            DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
+            PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
+            TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
+            APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+            APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+            APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+            CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+            MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
+            MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+            APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+            DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
+          with:
+            lane: closed_beta
+        - name: Upload release bundle
+          uses: actions/upload-artifact@v2
+          with:
+            name: ios-release
+            path: ./App.ipa
+            retention-days: 60
