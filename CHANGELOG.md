@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.22](https://github.com/Cap-go/capgo/compare/1.37.21...1.37.22) (2022-10-28)
+
+
+### Bug Fixes
+
+* android config ([36a93c4](https://github.com/Cap-go/capgo/commit/36a93c441d561c555eabae62d6209f3140dd3c69))
+
 ### [1.37.21](https://github.com/Cap-go/capgo/compare/1.37.20...1.37.21) (2022-10-28)
 
 
