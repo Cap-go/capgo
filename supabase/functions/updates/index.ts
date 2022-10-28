@@ -77,6 +77,7 @@ serve(async (event: Request) => {
           version (
             id,
             name,
+            checksum,
             user_id,
             bucket_id,
             external_url
@@ -104,6 +105,7 @@ serve(async (event: Request) => {
             version (
               id,
               name,
+              checksum,
               user_id,
               bucket_id,
               external_url
@@ -125,6 +127,7 @@ serve(async (event: Request) => {
           version (
             id,
             name,
+            checksum,
             user_id,
             bucket_id,
             external_url
