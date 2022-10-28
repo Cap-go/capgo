@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.20](https://github.com/Cap-go/capgo/compare/1.37.19...1.37.20) (2022-10-28)
+
+
+### Bug Fixes
+
+* add missing checksum ([77fce0c](https://github.com/Cap-go/capgo/commit/77fce0c9c002e5d781bf7990f8618a6c0ce5caa1))
+
 ### [1.37.19](https://github.com/Cap-go/capgo/compare/1.37.18...1.37.19) (2022-10-27)
 
 
