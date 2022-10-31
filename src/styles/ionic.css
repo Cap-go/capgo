@@ -93,7 +93,7 @@ html {
   height: 100vh;
   background-color: white;
   z-index: 100;
-  background-image: url('/capgo.png');
+  background-image: url('/capgo.webp');
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-position: center;

@@ -94,10 +94,10 @@ const submit = async () => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <section class="w-full min-h-screen flex my-auto py-10 sm:py-8 lg:py-8">
+      <section class="flex w-full min-h-screen py-10 my-auto sm:py-8 lg:py-8">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="max-w-2xl mx-auto text-center">
-            <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/6 mb-6">
+            <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
 
             <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
               {{ t("register.heading") }}
@@ -108,7 +108,7 @@ const submit = async () => {
             <div class="overflow-hidden bg-white rounded-md shadow-md">
               <div class="px-4 py-6 sm:px-8 sm:py-7">
                 <form @submit.prevent="submit">
-                  <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                  <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                     {{ errorMessage }}
                   </p>
                   <div class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
@@ -130,7 +130,7 @@ const submit = async () => {
                         >
                       </div>
                       <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-                        <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                        <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                           {{ t("register.first-name") }}: {{ error.$message }}
                         </p>
                       </div>
@@ -154,7 +154,7 @@ const submit = async () => {
                         >
                       </div>
                       <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                        <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                        <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                           {{ t("register.last-name") }}: {{ error.$message }}
                         </p>
                       </div>
@@ -179,7 +179,7 @@ const submit = async () => {
                         >
                       </div>
                       <div v-for="(error, index) of v$.email.$errors" :key="index">
-                        <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                        <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                           {{ t("register.email") }}: {{ error.$message }}
                         </p>
                       </div>
@@ -208,7 +208,7 @@ const submit = async () => {
                         >
                       </div>
                       <div v-for="(error, index) of v$.password.$errors" :key="index">
-                        <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                        <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                           {{ t("register.password") }}: {{ error.$message }}
                         </p>
                       </div>
@@ -237,7 +237,7 @@ const submit = async () => {
                         >
                       </div>
                       <div v-for="(error, index) of v$.repeatPassword.$errors" :key="index">
-                        <p class="text-xs italic mt-2 mb-4">
+                        <p class="mt-2 mb-4 text-xs italic">
                           {{ t("register.confirm-password") }}: {{ error.$message }}
                         </p>
                       </div>
@@ -249,9 +249,9 @@ const submit = async () => {
                       </span>
                     </div>
 
-                    <div class="col-span-2 w-1/2 mx-auto">
+                    <div class="w-1/2 col-span-2 mx-auto">
                       <button
-                        :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-muted-blue-600 border border-transparent rounded-md focus:outline-none hover:bg-blue-700 focus:bg-blue-700"
+                        :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:outline-none hover:bg-blue-700 focus:bg-blue-700"
                       >
                         <span v-if="!isLoading" class="rounded-4xl">
                           {{ t("register.next") }}
@@ -260,7 +260,7 @@ const submit = async () => {
                       </button>
                     </div>
 
-                    <div class="text-center col-span-2">
+                    <div class="col-span-2 text-center">
                       <p class="text-base text-gray-600">
                         <a href="/login" title="" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">{{ t("register.already-account") }}</a>
                       </p>
