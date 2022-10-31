@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.26](https://github.com/Cap-go/capgo/compare/1.37.25...1.37.26) (2022-10-31)
+
+
+### Bug Fixes
+
+* app loader color ([cf4b586](https://github.com/Cap-go/capgo/commit/cf4b586a71031a276bf944afe4766da2b0b73b04))
+
 ### [1.37.25](https://github.com/Cap-go/capgo/compare/1.37.24...1.37.25) (2022-10-31)
 
 
