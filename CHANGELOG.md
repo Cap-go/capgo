@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.25](https://github.com/Cap-go/capgo/compare/1.37.24...1.37.25) (2022-10-31)
+
+
+### Bug Fixes
+
+* logo and remove dup style ([6fbd60b](https://github.com/Cap-go/capgo/commit/6fbd60bf09b7154322cfa85189536ddd1a3e4644))
+
 ### [1.37.24](https://github.com/Cap-go/capgo/compare/1.37.23...1.37.24) (2022-10-30)
 
 
