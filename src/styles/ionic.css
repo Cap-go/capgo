@@ -91,7 +91,7 @@ html {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: white;
+  background-color: theme('colors.gray.900');
   z-index: 100;
   background-image: url('/capgo.webp');
   background-repeat: no-repeat;
