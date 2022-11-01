@@ -38,9 +38,7 @@ end
 
 platform :ios do
   lane :closed_beta do
-    keychain_name = TEMP_KEYCHAIN_USER
-    keychain_password = TEMP_KEYCHAIN_PASSWORD
-    ensure_temp_keychain(keychain_name, keychain_password)
+    ensure_temp_keychain(TEMP_KEYCHAIN_USER, TEMP_KEYCHAIN_PASSWORD)
 
     api_key = app_store_connect_api_key(
       key_id: APPLE_KEY_ID,
@@ -54,8 +52,8 @@ platform :ios do
       type: 'appstore',
       git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
       readonly: true,
-      keychain_name: keychain_name,
-      keychain_password: keychain_password,
+      keychain_name: TEMP_KEYCHAIN_USER,
+      keychain_password: TEMP_KEYCHAIN_PASSWORD,
       api_key: api_key
     )
 
@@ -81,7 +79,7 @@ platform :ios do
       ipa: "./App.ipa"
     )
 
-    delete_temp_keychain(keychain_name)
+    delete_temp_keychain(TEMP_KEYCHAIN_USER)
   end
 end
 
