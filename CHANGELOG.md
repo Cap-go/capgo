@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.29](https://github.com/Cap-go/capgo/compare/1.37.28...1.37.29) (2022-11-02)
+
+
+### Bug Fixes
+
+* disable emulator detect ([192f9dd](https://github.com/Cap-go/capgo/commit/192f9dd1e359c4ea36627078da1e0e309bfc4e2e))
+
 ### [1.37.28](https://github.com/Cap-go/capgo/compare/1.37.27...1.37.28) (2022-11-01)
 
 
