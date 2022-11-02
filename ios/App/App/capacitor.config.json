@@ -16,7 +16,8 @@
 			"androidScaleType": "CENTER_CROP"
 		},
 		"CapacitorUpdater": {
-			"autoUpdate": true
+			"autoUpdate": true,
+			"allowEmulatorProd": false
 		}
 	}
 }

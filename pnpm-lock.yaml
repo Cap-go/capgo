@@ -38,7 +38,7 @@ specifiers:
   '@capgo/capacitor-flash': ^1.2.11
   '@capgo/capacitor-mute': ^1.1.7
   '@capgo/capacitor-screen-recorder': ^1.2.6
-  '@capgo/capacitor-updater': 4.4.9
+  '@capgo/capacitor-updater': 4.6.3
   '@iconify-json/carbon': 1.1.8
   '@iconify-json/heroicons': ^1.1.4
   '@iconify-json/ion': 1.1.4
@@ -146,7 +146,7 @@ dependencies:
   '@capgo/capacitor-flash': 1.2.11_@capacitor+core@4.4.0
   '@capgo/capacitor-mute': 1.1.7_@capacitor+core@4.4.0
   '@capgo/capacitor-screen-recorder': 1.2.6_@capacitor+core@4.4.0
-  '@capgo/capacitor-updater': 4.4.9_@capacitor+core@4.4.0
+  '@capgo/capacitor-updater': 4.6.3_@capacitor+core@4.4.0
   '@ionic/vue': 6.3.2
   '@ionic/vue-router': 6.3.2
   '@supabase/supabase-js': 1.35.7
@@ -1873,10 +1873,10 @@ packages:
       '@capacitor/core': 4.4.0
     dev: false
 
-  /@capgo/capacitor-updater/4.4.9_@capacitor+core@4.4.0:
-    resolution: {integrity: sha512-0wsxb9tbIplqlNJCk7c1puc64T16chVGn1xOzLl34eslrF38SpQCXgbOGwxLitvd9SWzcplxjncUKfXlfaFNaw==}
+  /@capgo/capacitor-updater/4.6.3_@capacitor+core@4.4.0:
+    resolution: {integrity: sha512-65S/hvq67Tidkz6+i8WX3vGa5jwD0J6M+keLcmzn8qeAO9y246XSErYXqyv7xBeA3Wi7nnTGu+FHLJiO/IvvTw==}
     peerDependencies:
-      '@capacitor/core': ^3.0.0 || ^4.0.0 || ^4.0.0
+      '@capacitor/core': ^3.0.0 || ^4.0.0
     dependencies:
       '@capacitor/core': 4.4.0
     dev: false

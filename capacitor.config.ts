@@ -15,6 +15,7 @@ const config: CapacitorConfig = {
     },
     CapacitorUpdater: {
       autoUpdate: true,
+      allowEmulatorProd: false,
     },
   },
 }
