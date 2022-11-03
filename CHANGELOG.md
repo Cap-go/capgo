@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.42.0](https://github.com/Cap-go/capgo/compare/1.41.0...1.42.0) (2022-11-03)
+
+
+### Features
+
+* allow search in device list by custom_id ([ce0a7b5](https://github.com/Cap-go/capgo/commit/ce0a7b5e806066c74cf3492591a6f2a9eed94abd))
+
 ## [1.41.0](https://github.com/Cap-go/capgo/compare/1.40.1...1.41.0) (2022-11-03)
 
 
