@@ -29,6 +29,7 @@ export interface paths {
           beta?: parameters["rowFilter.channels.beta"];
           ios?: parameters["rowFilter.channels.ios"];
           android?: parameters["rowFilter.channels.android"];
+          allow_device_self_set?: parameters["rowFilter.channels.allow_device_self_set"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -92,6 +93,7 @@ export interface paths {
           beta?: parameters["rowFilter.channels.beta"];
           ios?: parameters["rowFilter.channels.ios"];
           android?: parameters["rowFilter.channels.android"];
+          allow_device_self_set?: parameters["rowFilter.channels.allow_device_self_set"];
         };
         header: {
           /** Preference */
@@ -119,6 +121,7 @@ export interface paths {
           beta?: parameters["rowFilter.channels.beta"];
           ios?: parameters["rowFilter.channels.ios"];
           android?: parameters["rowFilter.channels.android"];
+          allow_device_self_set?: parameters["rowFilter.channels.allow_device_self_set"];
         };
         body: {
           /** channels */
@@ -367,6 +370,9 @@ export interface paths {
           bandwidth?: parameters["rowFilter.plans.bandwidth"];
           mau?: parameters["rowFilter.plans.mau"];
           market_desc?: parameters["rowFilter.plans.market_desc"];
+          storage_unit?: parameters["rowFilter.plans.storage_unit"];
+          bandwidth_unit?: parameters["rowFilter.plans.bandwidth_unit"];
+          mau_unit?: parameters["rowFilter.plans.mau_unit"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -438,6 +444,9 @@ export interface paths {
           bandwidth?: parameters["rowFilter.plans.bandwidth"];
           mau?: parameters["rowFilter.plans.mau"];
           market_desc?: parameters["rowFilter.plans.market_desc"];
+          storage_unit?: parameters["rowFilter.plans.storage_unit"];
+          bandwidth_unit?: parameters["rowFilter.plans.bandwidth_unit"];
+          mau_unit?: parameters["rowFilter.plans.mau_unit"];
         };
         header: {
           /** Preference */
@@ -473,6 +482,9 @@ export interface paths {
           bandwidth?: parameters["rowFilter.plans.bandwidth"];
           mau?: parameters["rowFilter.plans.mau"];
           market_desc?: parameters["rowFilter.plans.market_desc"];
+          storage_unit?: parameters["rowFilter.plans.storage_unit"];
+          bandwidth_unit?: parameters["rowFilter.plans.bandwidth_unit"];
+          mau_unit?: parameters["rowFilter.plans.mau_unit"];
         };
         body: {
           /** plans */
@@ -3088,6 +3100,11 @@ export interface definitions {
      * @default true
      */
     android: boolean;
+    /**
+     * Format: boolean
+     * @default false
+     */
+    allow_device_self_set: boolean;
   };
   deleted_account: {
     /**
@@ -3210,6 +3227,12 @@ export interface definitions {
      * @default
      */
     market_desc?: string;
+    /** Format: double precision */
+    storage_unit?: number;
+    /** Format: double precision */
+    bandwidth_unit?: number;
+    /** Format: double precision */
+    mau_unit?: number;
   };
   stripe_info: {
     /**
@@ -3902,6 +3925,8 @@ export interface parameters {
   "rowFilter.channels.ios": string;
   /** Format: boolean */
   "rowFilter.channels.android": string;
+  /** Format: boolean */
+  "rowFilter.channels.allow_device_self_set": string;
   /** @description deleted_account */
   "body.deleted_account": definitions["deleted_account"];
   /** Format: timestamp with time zone */
@@ -3976,6 +4001,12 @@ export interface parameters {
   "rowFilter.plans.mau": string;
   /** Format: character varying */
   "rowFilter.plans.market_desc": string;
+  /** Format: double precision */
+  "rowFilter.plans.storage_unit": string;
+  /** Format: double precision */
+  "rowFilter.plans.bandwidth_unit": string;
+  /** Format: double precision */
+  "rowFilter.plans.mau_unit": string;
   /** @description stripe_info */
   "body.stripe_info": definitions["stripe_info"];
   /** Format: timestamp with time zone */

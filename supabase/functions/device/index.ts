@@ -83,6 +83,9 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
     console.log('Cannot find device', body, dbError)
     return sendRes({ status: 'Cannot find device', error: dbError, payload: body }, 400)
   }
+  if (!body.channel && body.version_id)
+    return sendRes({ status: 'Nothing to update' }, 400)
+
   // if version_id set device_override to it
   if (body.version_id) {
     const { data: dataVersion, error: dbError } = await supabaseAdmin
@@ -132,18 +135,6 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
     if (dbErrorDev || !dataChannelDev) {
       console.log('Cannot find channel override', dbErrorDev)
       return sendRes({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
-    }
-  }
-  else {
-    // delete channel_override
-    const { error: dbErrorDel } = await supabaseAdmin
-      .from<definitions['channel_devices']>('channel_devices')
-      .delete()
-      .eq('device_id', body.device_id)
-      .eq('app_id', body.app_id)
-    if (dbErrorDel) {
-      console.log('Cannot delete channel override', dbErrorDel)
-      return sendRes({ status: 'Cannot delete channel override', error: dbErrorDel }, 400)
     }
   }
   return sendRes()
