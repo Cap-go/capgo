@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.40.1](https://github.com/Cap-go/capgo/compare/1.40.0...1.40.1) (2022-11-03)
+
+
+### Bug Fixes
+
+* use put instead of get ([2f477d1](https://github.com/Cap-go/capgo/commit/2f477d1d4ca10e12db1a061198eef040771ad8e3))
+
 ## [1.40.0](https://github.com/Cap-go/capgo/compare/1.39.0...1.40.0) (2022-11-03)
 
 
