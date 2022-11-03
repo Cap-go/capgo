@@ -116,7 +116,7 @@ watchEffect(async () => {
     await refreshData()
   }
 })
-const searchVersion = async () => {
+const searchDevices = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
     .from<definitions['devices'] & Device>('devices')
@@ -124,6 +124,7 @@ const searchVersion = async () => {
         device_id,
         platform,
         plugin_version,
+        custom_id,
         version (
             name
         ),
@@ -133,13 +134,13 @@ const searchVersion = async () => {
     .eq('app_id', id.value)
     .gt('updated_at', subDays(new Date(), 30).toUTCString())
     .order('created_at', { ascending: false })
-    .like('device_id', `%${search.value}%`)
+    .or(`device_id.like.%${search.value}%,custom_id.like.%${search.value}%`)
   filtered.value = dataVersions || []
   isLoadingSub.value = false
 }
 const onSearch = (val: string) => {
   search.value = val
-  searchVersion()
+  searchDevices()
 }
 </script>
 
@@ -168,7 +169,7 @@ const onSearch = (val: string) => {
                     </h3>
                   </div>
                   <p class="text-xs truncate text-true-gray-400 font-black-light">
-                    {{ d.platform }} {{ d.version.name }}
+                    {{ d.platform }} {{ d.version.name }} {{ d.custom_id }}
                   </p>
                 </div>
               </IonLabel>
