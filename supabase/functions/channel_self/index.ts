@@ -39,7 +39,7 @@ const post = async (event: Request): Promise<Response> => {
     .single()
   if (dbError || !dataDevice) {
     console.log('Cannot find device', body, dbError)
-    return sendRes({ status: 'Cannot find device', error: dbError, payload: body }, 400)
+    return sendRes({ status: 'Cannot find device', error: dbError }, 400)
   }
   if (!body.channel || (dataChannelOverride && !dataChannelOverride?.channel_id.allow_device_self_set))
     return sendRes({ status: 'Nothing to update' }, 400)

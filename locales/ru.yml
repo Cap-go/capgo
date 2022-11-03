@@ -58,6 +58,7 @@ alert:
   delete-message: |-
     Это действие необратимо. 
     Вы уверены, что хотите удалить это
+allow-device-to-self: Разрешить устройствам самостоятельно связываться
 api-key: ключ API
 api-keys: Ключи API
 apikeys:

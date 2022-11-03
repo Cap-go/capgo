@@ -58,6 +58,7 @@ alert:
   delete-message: |-
     Tindakan ini tidak dapat dibalik. 
     Apa kamu yakin ingin menghapus ini
+allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 api-key: Kunci API
 api-keys: Kunci API
 apikeys:

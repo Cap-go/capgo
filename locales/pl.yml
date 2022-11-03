@@ -56,6 +56,7 @@ alert:
   delete-message: |-
     To działanie nie jest odwracalne. 
     Czy na pewno chcesz to usunąć?
+allow-device-to-self: Zezwalaj urządzeniom na samodzielne kojarzenie
 api-key: Klucz API
 api-keys: Klucze API
 apikeys:

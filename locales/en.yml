@@ -52,6 +52,7 @@ afternoon: afternoon
 alert:
   confirm-delete: Confirm Delete
   delete-message: This action is not reversible. Are you sure you want to delete this
+allow-device-to-self: Allow devices to self associate
 api-key: API key
 api-keys: API Keys
 apikeys:

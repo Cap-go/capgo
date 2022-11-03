@@ -60,6 +60,7 @@ alert:
   delete-message: |-
     Esta acción no es reversible. 
     Estás seguro que quieres eliminar esto
+allow-device-to-self: Permitir que los dispositivos se autoasocien
 api-key: Clave API
 api-keys: Claves API
 apikeys:

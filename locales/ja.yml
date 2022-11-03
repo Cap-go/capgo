@@ -54,6 +54,7 @@ alert:
   delete-message: |-
     このアクションは元に戻せません。
     これを削除してもよろしいですか
+allow-device-to-self: デバイスの自己関連付けを許可する
 api-key: API キー
 api-keys: API キー
 apikeys:

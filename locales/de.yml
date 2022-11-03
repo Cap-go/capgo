@@ -60,6 +60,7 @@ alert:
   delete-message: |-
     Diese Aktion ist nicht umkehrbar. 
     Möchten Sie diese wirklich löschen?
+allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
 api-key: API-Schlüssel
 api-keys: API-Schlüssel
 apikeys:
