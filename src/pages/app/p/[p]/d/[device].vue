@@ -286,28 +286,18 @@ const didCancel = async (name: string) => {
 }
 const saveCustomId = async () => {
   console.log('device.value?.custom_id', device.value?.custom_id)
-  const { error } = await supabase
+  await supabase
     .from<definitions['devices']>('devices')
     .update({
       custom_id: device.value?.custom_id,
     }, { returning: 'minimal' })
     .eq('device_id', id.value)
-  if (error) {
-    const toast = await toastController
-      .create({
-        message: t('cannot-save-custom-i'),
-        duration: 2000,
-      })
-    await toast.present()
-  }
-  else {
-    const toast = await toastController
-      .create({
-        message: t('custom-id-saved'),
-        duration: 2000,
-      })
-    await toast.present()
-  }
+  const toast = await toastController
+    .create({
+      message: t('custom-id-saved'),
+      duration: 2000,
+    })
+  await toast.present()
 }
 const delDevVersion = async (device: string) => {
   if (await didCancel(t('channel.device')))
