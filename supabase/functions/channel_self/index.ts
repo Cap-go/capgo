@@ -16,8 +16,8 @@ interface DeviceChannel {
 const post = async (event: Request): Promise<Response> => {
   const body = await event.json() as DeviceLink
   if (!body.device_id || !body.app_id) {
-    console.log('Cannot find device or appi_id')
-    return sendRes({ status: 'Cannot find device' }, 400)
+    console.log('Cannot find device_id or appi_id')
+    return sendRes({ status: 'Cannot find device_id or appi_id' }, 400)
   }
   // find device
   const { data: dataDevice, error: dbError } = await supabaseAdmin
@@ -73,11 +73,64 @@ const post = async (event: Request): Promise<Response> => {
   return sendRes()
 }
 
+const get = async (event: Request): Promise<Response> => {
+  const body = await event.json() as DeviceLink
+  if (!body.device_id || !body.app_id) {
+    console.log('Cannot find device or appi_id')
+    return sendRes({ status: 'Cannot find device' }, 400)
+  }
+  const { data: dataChannel, error: errorChannel } = await supabaseAdmin
+    .from<definitions['channels'] & DeviceChannel>('channels')
+    .select()
+    .eq('app_id', body.app_id)
+    .eq('public', true)
+    .single()
+  const { data: dataChannelOverride, error } = await supabaseAdmin
+    .from<definitions['channel_devices'] & DeviceChannel>('channel_devices')
+    .select(`
+      channel_id (
+        allow_device_self_set,
+        name
+      ),
+    `)
+    .eq('app_id', body.app_id)
+    .eq('device_id', body.device_id)
+    .single()
+  if (error) {
+    return sendRes({
+      error,
+    }, 400)
+  }
+  else if (dataChannelOverride && dataChannelOverride.channel_id) {
+    return sendRes({
+      channel: dataChannelOverride.channel_id.name,
+      status: 'override',
+      allowSet: dataChannelOverride.channel_id.allow_device_self_set,
+    })
+  }
+  if (errorChannel) {
+    return sendRes({
+      error,
+    }, 400)
+  }
+  else if (dataChannel) {
+    return sendRes({
+      channel: dataChannel.name,
+      status: 'default',
+    })
+  }
+  return sendRes({
+    error: 'no channel',
+  }, 400)
+}
+
 serve((event: Request) => {
   const api_mode_string = event.headers.get('api_mode')
 
   if (api_mode_string === 'POST' || (!api_mode_string && event.method === 'POST'))
     return post(event)
+  else if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
+    return get(event)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
