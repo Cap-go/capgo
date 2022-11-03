@@ -73,7 +73,7 @@ const post = async (event: Request): Promise<Response> => {
   return sendRes()
 }
 
-const get = async (event: Request): Promise<Response> => {
+const put = async (event: Request): Promise<Response> => {
   const body = await event.json() as DeviceLink
   if (!body.device_id || !body.app_id) {
     console.log('Cannot find device or appi_id')
@@ -129,8 +129,8 @@ serve((event: Request) => {
 
   if (api_mode_string === 'POST' || (!api_mode_string && event.method === 'POST'))
     return post(event)
-  else if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
-    return get(event)
+  else if (api_mode_string === 'PUT' || (!api_mode_string && event.method === 'PUT'))
+    return put(event)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
