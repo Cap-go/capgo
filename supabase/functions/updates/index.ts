@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.160.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
@@ -77,6 +77,7 @@ serve(async (event: Request) => {
           version (
             id,
             name,
+            checksum,
             user_id,
             bucket_id,
             external_url
@@ -104,6 +105,7 @@ serve(async (event: Request) => {
             version (
               id,
               name,
+              checksum,
               user_id,
               bucket_id,
               external_url
@@ -125,6 +127,7 @@ serve(async (event: Request) => {
           version (
             id,
             name,
+            checksum,
             user_id,
             bucket_id,
             external_url
@@ -246,7 +249,7 @@ serve(async (event: Request) => {
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,
-      checksum: version.checksum,
+      ...(version.checksum ? { checksum: version.checksum } : {}),
       url: signedURL,
     })
   }

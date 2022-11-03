@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.160.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
 import { addDataPerson, addEventPerson, postPerson } from '../_utils/crisp.ts'
 import { createCustomer } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
@@ -55,15 +55,6 @@ serve(async (event: Request) => {
       product_id: 'free',
     })
     await addEventPerson(record.email, {}, 'user:register', 'green')
-    await logsnag.publish({
-      channel: 'user-register',
-      event: 'User Joined',
-      icon: '🎉',
-      tags: {
-        'user-id': record.id,
-      },
-      notify: true,
-    }).catch()
     console.log('stripe_info done')
     const { error: dbError } = await supabaseAdmin
       .from<definitions['users']>('users')
@@ -76,6 +67,15 @@ serve(async (event: Request) => {
       console.log(dbError)
       return sendRes({ message: dbError }, 400)
     }
+    await logsnag.publish({
+      channel: 'user-register',
+      event: 'User Joined',
+      icon: '🎉',
+      tags: {
+        'user-id': record.id,
+      },
+      notify: true,
+    }).catch()
     return sendRes()
   }
   catch (e) {

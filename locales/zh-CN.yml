@@ -54,6 +54,7 @@ alert:
   delete-message: |-
     这个动作是不可逆的。
     你确定要删除这个吗
+allow-device-to-self: 允许设备自我关联
 api-key: API 密钥
 api-keys: API 密钥
 apikeys:

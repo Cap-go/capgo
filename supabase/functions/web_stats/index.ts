@@ -1,8 +1,8 @@
-import { serve } from 'https://deno.land/std@0.160.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { logsnag } from '../_utils/_logsnag.ts'
+import { insights } from '../_utils/_logsnag.ts'
 
 interface UserStats {
   users: number
@@ -76,7 +76,7 @@ const getStats = (): GlobalStats => {
         await Promise.all(all)
         data.need_upgrade -= data.not_paying
         data.not_paying -= data.trial
-        await logsnag.insight([
+        await insights([
           {
             title: 'User Count',
             value: data.users,

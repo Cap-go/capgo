@@ -2,6 +2,466 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.39.0](https://github.com/Cap-go/capgo/compare/1.38.1...1.39.0) (2022-11-03)
+
+
+### Features
+
+* add self associate option ([6f81346](https://github.com/Cap-go/capgo/commit/6f813469ebfda93d09c96e086b3b44089613914e))
+
+### [1.38.1](https://github.com/Cap-go/capgo/compare/1.38.0...1.38.1) (2022-11-03)
+
+
+### Bug Fixes
+
+* naming ([b64c626](https://github.com/Cap-go/capgo/commit/b64c6269077b863c8d7ff4ded8a1de7258397665))
+
+## [1.38.0](https://github.com/Cap-go/capgo/compare/1.37.31...1.38.0) (2022-11-03)
+
+
+### Features
+
+* add device_self ([208ac63](https://github.com/Cap-go/capgo/commit/208ac63d59fea7e9c8f438c418fe5bece5a585f7))
+
+### [1.37.31](https://github.com/Cap-go/capgo/compare/1.37.30...1.37.31) (2022-11-03)
+
+
+### Bug Fixes
+
+* preventy missroute ([74b2d24](https://github.com/Cap-go/capgo/commit/74b2d244c88cec7b8d0924612d2562f6de04a92b))
+
+### [1.37.30](https://github.com/Cap-go/capgo/compare/1.37.29...1.37.30) (2022-11-03)
+
+
+### Bug Fixes
+
+* allow new supabase methods ([accab02](https://github.com/Cap-go/capgo/commit/accab029e0a6f449b2b7aa684af4a14dc80b586b))
+
+### [1.37.29](https://github.com/Cap-go/capgo/compare/1.37.28...1.37.29) (2022-11-02)
+
+
+### Bug Fixes
+
+* disable emulator detect ([192f9dd](https://github.com/Cap-go/capgo/commit/192f9dd1e359c4ea36627078da1e0e309bfc4e2e))
+
+### [1.37.28](https://github.com/Cap-go/capgo/compare/1.37.27...1.37.28) (2022-11-01)
+
+
+### Bug Fixes
+
+* config make it more simple ([6e9329d](https://github.com/Cap-go/capgo/commit/6e9329d38748c5b18501eee6fa15512e780c905f))
+
+### [1.37.27](https://github.com/Cap-go/capgo/compare/1.37.26...1.37.27) (2022-10-31)
+
+
+### Bug Fixes
+
+* space ([c4bb1e4](https://github.com/Cap-go/capgo/commit/c4bb1e493a251258503158b450eac5591a9836dd))
+
+### [1.37.26](https://github.com/Cap-go/capgo/compare/1.37.25...1.37.26) (2022-10-31)
+
+
+### Bug Fixes
+
+* app loader color ([cf4b586](https://github.com/Cap-go/capgo/commit/cf4b586a71031a276bf944afe4766da2b0b73b04))
+
+### [1.37.25](https://github.com/Cap-go/capgo/compare/1.37.24...1.37.25) (2022-10-31)
+
+
+### Bug Fixes
+
+* logo and remove dup style ([6fbd60b](https://github.com/Cap-go/capgo/commit/6fbd60bf09b7154322cfa85189536ddd1a3e4644))
+
+### [1.37.24](https://github.com/Cap-go/capgo/compare/1.37.23...1.37.24) (2022-10-30)
+
+
+### Bug Fixes
+
+* logsnag issue ([5d5e7e3](https://github.com/Cap-go/capgo/commit/5d5e7e3b086372c1bb0658a4de1eff3f330e9a8c))
+
+### [1.37.23](https://github.com/Cap-go/capgo/compare/1.37.22...1.37.23) (2022-10-30)
+
+
+### Bug Fixes
+
+* logsnag issue order ([c710d9f](https://github.com/Cap-go/capgo/commit/c710d9f22d036a43079e2a241902285276a2d95b))
+
+### [1.37.22](https://github.com/Cap-go/capgo/compare/1.37.21...1.37.22) (2022-10-28)
+
+
+### Bug Fixes
+
+* android config ([36a93c4](https://github.com/Cap-go/capgo/commit/36a93c441d561c555eabae62d6209f3140dd3c69))
+
+### [1.37.21](https://github.com/Cap-go/capgo/compare/1.37.20...1.37.21) (2022-10-28)
+
+
+### Bug Fixes
+
+* checksum issue ([4f1fd9a](https://github.com/Cap-go/capgo/commit/4f1fd9accef67becc161dfe494c252c45ddbb4f5))
+
+### [1.37.20](https://github.com/Cap-go/capgo/compare/1.37.19...1.37.20) (2022-10-28)
+
+
+### Bug Fixes
+
+* add missing checksum ([77fce0c](https://github.com/Cap-go/capgo/commit/77fce0c9c002e5d781bf7990f8618a6c0ce5caa1))
+
+### [1.37.19](https://github.com/Cap-go/capgo/compare/1.37.18...1.37.19) (2022-10-27)
+
+
+### Bug Fixes
+
+* remove useless comment ([522629f](https://github.com/Cap-go/capgo/commit/522629f81a3840b6fd4eb40fb6da35a6a0b0b6de))
+
+### [1.37.18](https://github.com/Cap-go/capgo/compare/1.37.17...1.37.18) (2022-10-27)
+
+
+### Bug Fixes
+
+* add back ios and js build ([e95d70e](https://github.com/Cap-go/capgo/commit/e95d70e35016d468da9b3a57193c623fd724920b))
+
+### [1.37.17](https://github.com/Cap-go/capgo/compare/1.37.16...1.37.17) (2022-10-27)
+
+
+### Bug Fixes
+
+* upload_to_play_store args ([ce7937f](https://github.com/Cap-go/capgo/commit/ce7937f7579844bd9d543009f1c06a832b6be826))
+
+### [1.37.16](https://github.com/Cap-go/capgo/compare/1.37.15...1.37.16) (2022-10-27)
+
+
+### Bug Fixes
+
+* google play path ([cede028](https://github.com/Cap-go/capgo/commit/cede028ddb572a7ad990f5470183ee0e4571c7f2))
+
+### [1.37.15](https://github.com/Cap-go/capgo/compare/1.37.14...1.37.15) (2022-10-27)
+
+
+### Bug Fixes
+
+* ci use right path ([3b904e1](https://github.com/Cap-go/capgo/commit/3b904e19c805566d613b56713df660e6c365d7ba))
+
+### [1.37.14](https://github.com/Cap-go/capgo/compare/1.37.13...1.37.14) (2022-10-27)
+
+
+### Bug Fixes
+
+* path ([1fef4d6](https://github.com/Cap-go/capgo/commit/1fef4d68cd736e5a15ee1264ac6bd621580ddb72))
+
+### [1.37.13](https://github.com/Cap-go/capgo/compare/1.37.12...1.37.13) (2022-10-27)
+
+
+### Bug Fixes
+
+* path keystore ([9bde00a](https://github.com/Cap-go/capgo/commit/9bde00ab5eb46f956830d86d178176679c377350))
+
+### [1.37.12](https://github.com/Cap-go/capgo/compare/1.37.11...1.37.12) (2022-10-27)
+
+
+### Bug Fixes
+
+* path ([2961f05](https://github.com/Cap-go/capgo/commit/2961f054dd18bb4681976a12b6c81e0c5d5a4ed6))
+
+### [1.37.11](https://github.com/Cap-go/capgo/compare/1.37.10...1.37.11) (2022-10-27)
+
+
+### Bug Fixes
+
+* ignore ([08f2b67](https://github.com/Cap-go/capgo/commit/08f2b67a45a52d28042c485c479a5b5a6a547364))
+* path keystore ([c5dd51f](https://github.com/Cap-go/capgo/commit/c5dd51fa859b1fbd60ef9db8fbf1d749e082e510))
+
+### [1.37.10](https://github.com/Cap-go/capgo/compare/1.37.9...1.37.10) (2022-10-27)
+
+
+### Bug Fixes
+
+* use less arguments ([5421a90](https://github.com/Cap-go/capgo/commit/5421a90dbfb56bebadc6d642112885d34b3c610b))
+
+### [1.37.9](https://github.com/Cap-go/capgo/compare/1.37.8...1.37.9) (2022-10-27)
+
+
+### Bug Fixes
+
+* build release ([8efd9e8](https://github.com/Cap-go/capgo/commit/8efd9e883d38303eb84dc72f5099a023ded8a9ad))
+
+### [1.37.8](https://github.com/Cap-go/capgo/compare/1.37.7...1.37.8) (2022-10-27)
+
+
+### Bug Fixes
+
+* use more simple config for keystore ([2e9c228](https://github.com/Cap-go/capgo/commit/2e9c22839138f4c6baec9e8703cefedabac4dbfd))
+
+### [1.37.7](https://github.com/Cap-go/capgo/compare/1.37.6...1.37.7) (2022-10-27)
+
+
+### Bug Fixes
+
+* path keystore ([72323a8](https://github.com/Cap-go/capgo/commit/72323a84141841aa2d1bf2f98fd322808654204f))
+
+### [1.37.6](https://github.com/Cap-go/capgo/compare/1.37.5...1.37.6) (2022-10-27)
+
+
+### Bug Fixes
+
+* android ci ([c2ba799](https://github.com/Cap-go/capgo/commit/c2ba7996736d14413f8c1aba6b38fde4e665fd00))
+
+### [1.37.5](https://github.com/Cap-go/capgo/compare/1.37.4...1.37.5) (2022-10-27)
+
+
+### Bug Fixes
+
+* package_name ([87d7f9e](https://github.com/Cap-go/capgo/commit/87d7f9e6df53383d4bcdec6f9bd29a810636575c))
+
+### [1.37.4](https://github.com/Cap-go/capgo/compare/1.37.3...1.37.4) (2022-10-27)
+
+
+### Bug Fixes
+
+* artifact path ([ec701d0](https://github.com/Cap-go/capgo/commit/ec701d04e24b3a2713e504c59e8cf27b83d3467f))
+
+### [1.37.3](https://github.com/Cap-go/capgo/compare/1.37.2...1.37.3) (2022-10-27)
+
+
+### Bug Fixes
+
+* path to json_key_file ([a3cb263](https://github.com/Cap-go/capgo/commit/a3cb2634f7407eeb4eb48f60ffd378e45543ceb7))
+
+### [1.37.2](https://github.com/Cap-go/capgo/compare/1.37.1...1.37.2) (2022-10-27)
+
+
+### Bug Fixes
+
+* gradle path ([10b95fa](https://github.com/Cap-go/capgo/commit/10b95fa0e87427b415c78d3673a96ff73c3c03f1))
+
+### [1.37.1](https://github.com/Cap-go/capgo/compare/1.37.0...1.37.1) (2022-10-27)
+
+
+### Bug Fixes
+
+* align andriod build ([de7efaf](https://github.com/Cap-go/capgo/commit/de7efaf713f3f69f0909a8d860307320fcf22d5f))
+
+## [1.37.0](https://github.com/Cap-go/capgo/compare/1.36.53...1.37.0) (2022-10-27)
+
+
+### Features
+
+* add android build ([fad3190](https://github.com/Cap-go/capgo/commit/fad319017a0d7e0fdb0a39200e70d06a49e675d6))
+
+
+### Bug Fixes
+
+* issue ([3297686](https://github.com/Cap-go/capgo/commit/3297686316768b11ba3a5c6d19a9681b3b64a4f7))
+* merged ([d95ce87](https://github.com/Cap-go/capgo/commit/d95ce8792a6e45e419f338a278511d4d597cf84a))
+
+### [1.36.53](https://github.com/Cap-go/capgo/compare/1.36.52...1.36.53) (2022-10-27)
+
+
+### Bug Fixes
+
+* make artifact upload well ([1c645ff](https://github.com/Cap-go/capgo/commit/1c645ff62cc76a01424b16a3874ee266479785fa))
+
+### [1.36.52](https://github.com/Cap-go/capgo/compare/1.36.51...1.36.52) (2022-10-27)
+
+
+### Bug Fixes
+
+* fastlane missing vars ([a9495b5](https://github.com/Cap-go/capgo/commit/a9495b50615dc8ddd57ac1f8509f997c1b4f6f45))
+* scripts ([92c405a](https://github.com/Cap-go/capgo/commit/92c405af5f74d3aec68df6f6ffe7ce1c575ab2e2))
+* try with all vars ([0afe70d](https://github.com/Cap-go/capgo/commit/0afe70d66f7ac3c70062b71ebd657e609da547f6))
+
+### [1.36.51](https://github.com/Cap-go/capgo/compare/1.36.50...1.36.51) (2022-10-27)
+
+
+### Bug Fixes
+
+* try with automatic ([92d5849](https://github.com/Cap-go/capgo/commit/92d5849f2181d70ecdf04e18ec4eccb34b6ddec3))
+
+### [1.36.50](https://github.com/Cap-go/capgo/compare/1.36.49...1.36.50) (2022-10-27)
+
+
+### Bug Fixes
+
+* "#{DEVELOPER_APP_ID}" ([3e9a2e1](https://github.com/Cap-go/capgo/commit/3e9a2e18d4e9c47e04e1b4fa52ece46f8e4795ba))
+
+### [1.36.49](https://github.com/Cap-go/capgo/compare/1.36.48...1.36.49) (2022-10-27)
+
+
+### Bug Fixes
+
+* add all steps ([32a7aff](https://github.com/Cap-go/capgo/commit/32a7aff12a94ec0b2a78b39e7fe7c2e503dd05d6))
+
+### [1.36.48](https://github.com/Cap-go/capgo/compare/1.36.47...1.36.48) (2022-10-27)
+
+
+### Bug Fixes
+
+* use better env var name ([e519939](https://github.com/Cap-go/capgo/commit/e5199395cc17246dc375bb1f993dabf176478a40))
+
+### [1.36.47](https://github.com/Cap-go/capgo/compare/1.36.46...1.36.47) (2022-10-27)
+
+
+### Bug Fixes
+
+* missing envs var ([af09f8a](https://github.com/Cap-go/capgo/commit/af09f8a67a5a23e4a3a54db2647ee140ac599049))
+
+### [1.36.46](https://github.com/Cap-go/capgo/compare/1.36.45...1.36.46) (2022-10-27)
+
+
+### Bug Fixes
+
+* env vars ([18c28f9](https://github.com/Cap-go/capgo/commit/18c28f95a9e2873160bc8bda70bedd319b4a2dd3))
+
+### [1.36.45](https://github.com/Cap-go/capgo/compare/1.36.44...1.36.45) (2022-10-27)
+
+
+### Bug Fixes
+
+* matchfile ([2dbd3d8](https://github.com/Cap-go/capgo/commit/2dbd3d8dc9e12f19dd89f3f7556ecc5c381a4530))
+
+### [1.36.44](https://github.com/Cap-go/capgo/compare/1.36.43...1.36.44) (2022-10-27)
+
+
+### Bug Fixes
+
+* match config ([5e35398](https://github.com/Cap-go/capgo/commit/5e35398c972e192869d49cba63878391c5446d8d))
+
+### [1.36.43](https://github.com/Cap-go/capgo/compare/1.36.42...1.36.43) (2022-10-27)
+
+
+### Bug Fixes
+
+* remove forced id ([b6ab7a6](https://github.com/Cap-go/capgo/commit/b6ab7a62e111543482c594fc400061c99dfcaf1a))
+
+### [1.36.42](https://github.com/Cap-go/capgo/compare/1.36.41...1.36.42) (2022-10-27)
+
+
+### Bug Fixes
+
+* use ios beta lane ([a8f5bda](https://github.com/Cap-go/capgo/commit/a8f5bda3abea8bbef86d9d9c499f4856c037cfaf))
+
+### [1.36.41](https://github.com/Cap-go/capgo/compare/1.36.40...1.36.41) (2022-10-27)
+
+
+### Bug Fixes
+
+* env MATCH_PASSWORD ([92377e3](https://github.com/Cap-go/capgo/commit/92377e3863f633ec3ac08ed4b015dd72b48461b5))
+
+### [1.36.40](https://github.com/Cap-go/capgo/compare/1.36.39...1.36.40) (2022-10-27)
+
+
+### Bug Fixes
+
+* match auth ([bcc1e5f](https://github.com/Cap-go/capgo/commit/bcc1e5f270682645eaeb9a6f1d2256636ff8b684))
+
+### [1.36.39](https://github.com/Cap-go/capgo/compare/1.36.38...1.36.39) (2022-10-27)
+
+
+### Bug Fixes
+
+* add back match file ([c7d3d59](https://github.com/Cap-go/capgo/commit/c7d3d596a5a2c4dbceff0493e62f5a5bab4d5da2))
+* username and identifier ([bb4d491](https://github.com/Cap-go/capgo/commit/bb4d4910c55c9961ba20c9f93212fd96d030ca4d))
+
+### [1.36.38](https://github.com/Cap-go/capgo/compare/1.36.37...1.36.38) (2022-10-27)
+
+
+### Bug Fixes
+
+* match build ([629f067](https://github.com/Cap-go/capgo/commit/629f06754fbb500b4be3fac0a077e1bdab09e9d9))
+
+### [1.36.37](https://github.com/Cap-go/capgo/compare/1.36.36...1.36.37) (2022-10-27)
+
+
+### Bug Fixes
+
+* fastlane ([d900faa](https://github.com/Cap-go/capgo/commit/d900faa921565cf444a2db727a51c5bd24e0904f))
+
+### [1.36.36](https://github.com/Cap-go/capgo/compare/1.36.35...1.36.36) (2022-10-27)
+
+### [1.36.35](https://github.com/Cap-go/capgo/compare/1.36.34...1.36.35) (2022-10-27)
+
+
+### Bug Fixes
+
+* match ([b3bd969](https://github.com/Cap-go/capgo/commit/b3bd969e323d45f05b7b8b853f5d82894abf0b1c))
+
+### [1.36.34](https://github.com/Cap-go/capgo/compare/1.36.33...1.36.34) (2022-10-27)
+
+
+### Bug Fixes
+
+* comment deploy for now ([cf7095c](https://github.com/Cap-go/capgo/commit/cf7095ccdcd91fffbd9638d3305e04de24bc7957))
+
+### [1.36.33](https://github.com/Cap-go/capgo/compare/1.36.32...1.36.33) (2022-10-27)
+
+
+### Bug Fixes
+
+* git url ([a80e94e](https://github.com/Cap-go/capgo/commit/a80e94eca766bd9cef32b5a6c967510e386190a7))
+
+### [1.36.32](https://github.com/Cap-go/capgo/compare/1.36.31...1.36.32) (2022-10-27)
+
+
+### Bug Fixes
+
+* use prebuild action ([42a3b50](https://github.com/Cap-go/capgo/commit/42a3b5075ea40fb87ed4c46475b245ed9d6b3e3a))
+
+### [1.36.31](https://github.com/Cap-go/capgo/compare/1.36.30...1.36.31) (2022-10-27)
+
+
+### Bug Fixes
+
+* use personal access token ([17ca220](https://github.com/Cap-go/capgo/commit/17ca2205a97b02f8ad23a811835c531ca74e74f0))
+
+### [1.36.30](https://github.com/Cap-go/capgo/compare/1.36.29...1.36.30) (2022-10-27)
+
+
+### Bug Fixes
+
+* only fastlane in ios_build ([9682de2](https://github.com/Cap-go/capgo/commit/9682de2b56201ba8760df3f190467dec41b0914a))
+
+### [1.36.29](https://github.com/Cap-go/capgo/compare/1.36.28...1.36.29) (2022-10-27)
+
+
+### Bug Fixes
+
+* github action ci ([5a67f50](https://github.com/Cap-go/capgo/commit/5a67f500553a8d22ef13ee65ab410781dcdff193))
+
+### [1.36.28](https://github.com/Cap-go/capgo/compare/1.36.27...1.36.28) (2022-10-27)
+
+
+### Bug Fixes
+
+* match issue ([966bbf6](https://github.com/Cap-go/capgo/commit/966bbf637551bb37430015f7886e6af998d9f9cd))
+
+### [1.36.27](https://github.com/Cap-go/capgo/compare/1.36.26...1.36.27) (2022-10-27)
+
+
+### Bug Fixes
+
+* fastlane + build ([75bfb06](https://github.com/Cap-go/capgo/commit/75bfb06ad8318c85dc6f5f2a7e91619c72256bc1))
+
+### [1.36.26](https://github.com/Cap-go/capgo/compare/1.36.25...1.36.26) (2022-10-27)
+
+
+### Bug Fixes
+
+* ci git action ([5251508](https://github.com/Cap-go/capgo/commit/5251508b479a9c009571997182728435f39fd005))
+
+### [1.36.25](https://github.com/Cap-go/capgo/compare/1.36.24...1.36.25) (2022-10-27)
+
+
+### Bug Fixes
+
+* use fastlane for ios deploy ([c526c7f](https://github.com/Cap-go/capgo/commit/c526c7f563de5355de702d639fe7e5aea2b0adeb))
+
+### [1.36.24](https://github.com/Cap-go/capgo/compare/1.36.23...1.36.24) (2022-10-27)
+
+
+### Bug Fixes
+
+* disable logsnag in dev ([548205e](https://github.com/Cap-go/capgo/commit/548205e851d2493dc34402c6a3538d4397060a8d))
+
 ### [1.36.23](https://github.com/Cap-go/capgo/compare/1.36.22...1.36.23) (2022-10-27)
 
 

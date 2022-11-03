@@ -128,6 +128,7 @@ const getChannel = async () => {
             created_at
           ),
           created_at,
+          allow_device_self_set,
           disableAutoUpdateUnderNative,
           disableAutoUpdateToMajor,
           ios,
@@ -437,6 +438,14 @@ const inviteUser = async (userId: string) => {
               color="secondary"
               :checked="channel?.disableAutoUpdateToMajor"
               @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItem>
+            <IonLabel>{{ t('allow-device-to-self') }} ( min 4.7.0)</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.allow_device_self_set"
+              @ion-change="saveChannelChange('allow_device_self_set', $event.target.checked)"
             />
           </IonItem>
           <IonItem>

@@ -11,6 +11,7 @@ node_modules
 .netlify
 ios/App/App/GoogleService-Info.plist
 android/app/google-services.json
+android/google-play-key.json
 
 # Supabase
 **/supabase/.branches
@@ -19,3 +20,8 @@ android/app/google-services.json
 **/supabase/.branches
 **/supabase/.temp
 capgo.paw
+keystore.jks.b64
+play_config.json
+play_config.json.b64
+android/app/keystore.jks
+report.xml

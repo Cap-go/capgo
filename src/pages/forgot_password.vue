@@ -89,10 +89,10 @@ watchEffect(() => {
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <section class="w-full h-full flex my-auto py-10 sm:py-8 lg:py-2">
+      <section class="flex w-full h-full py-10 my-auto sm:py-8 lg:py-2">
         <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="max-w-2xl mx-auto text-center">
-            <img src="/capgo.png" alt="logo" class="mx-auto rounded w-1/6 mb-6">
+            <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
             <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
               Reset your password
             </h1>
@@ -106,7 +106,7 @@ watchEffect(() => {
               <div class="px-4 py-6 sm:px-8 sm:py-7">
                 <form @submit.prevent="submit">
                   <div class="space-y-5">
-                    <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                    <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                       {{ errorMessage }}
                     </p>
                     <div v-if="step === 1">
@@ -130,7 +130,7 @@ watchEffect(() => {
                           class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                         >
                         <div v-for="(error, index) of v$.email.$errors" :key="index">
-                          <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                          <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                             {{ t('login.email') }}: {{ error.$message }}
                           </p>
                         </div>
@@ -157,7 +157,7 @@ watchEffect(() => {
                       </div>
                       <div>
                         <div v-for="(error, index) of v$.password.$errors" :key="index">
-                          <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+                          <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
                             {{ t('login.password') }}: {{ error.$message }}
                           </p>
                         </div>
@@ -184,7 +184,7 @@ watchEffect(() => {
                       </div>
                       <div>
                         <div v-for="(error, index) of v$.password.$errors" :key="index">
-                          <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+                          <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
                             {{ t('login.password') }}: {{ error.$message }}
                           </p>
                         </div>
@@ -193,7 +193,7 @@ watchEffect(() => {
 
                     <div>
                       <button type="submit" class="inline-flex items-center justify-center w-full">
-                        <svg v-if="isLoading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-900 inline-block align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle
                             class="opacity-25"
                             cx="12"
@@ -204,7 +204,7 @@ watchEffect(() => {
                           />
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                        <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 bg-muted-blue-700 border border-transparent rounded-md focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
+                        <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-700 focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
                           Reset Password
                         </button>
                       </button>
@@ -213,7 +213,7 @@ watchEffect(() => {
                 </form>
               </div>
             </div>
-            <div class="flex flex-row w-full justify-center mt-5">
+            <div class="flex flex-row justify-center w-full mt-5">
               <router-link to="/login" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
                 Back to login page
               </router-link>

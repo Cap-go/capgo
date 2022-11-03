@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.160.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
@@ -123,11 +123,11 @@ serve(async (event: Request) => {
     return sendRes({ status: 'Missing apikey' }, 400)
   }
 
-  if (api_mode_string === 'POST')
+  if (api_mode_string === 'POST' || (!api_mode_string && event.method === 'POST'))
     return post(event, apikey)
-  else if (api_mode_string === 'GET')
+  else if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
     return get(event, apikey)
-  else if (api_mode_string === 'DELETE')
+  else if (api_mode_string === 'DELETE' || (!api_mode_string && event.method === 'DELETE'))
     return deleteChannel(event, apikey)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)

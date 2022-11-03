@@ -66,47 +66,60 @@ jobs:
         if: "!contains(github.ref, '-alpha.')"
         id: create_release_prod
         run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
-  # build_android:
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       node-version: [16]
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: pnpm/action-setup@v2
-  #       with:
-  #         version: 7
-  #     - name: Use Node.js ${{ matrix.node-version }}
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: ${{ matrix.node-version }}
-  #         cache: 'pnpm'
-  #     - name: Setup java
-  #       uses: actions/setup-java@v3
-  #       with:
-  #           distribution: 'zulu'
-  #           java-version: '11'
-  #     - name: Install dependencies
-  #       id: install_code
-  #       run: pnpm install --frozen-lockfile
-  #     - name: Build
-  #       id: build_code
-  #       run: pnpm mobile
-  #     - name: Sync
-  #       id: sync_code
-  #       run: npx cap sync
-  #     - name: Extract Android signing key from env
-  #       run: |
-  #         echo "${{ secrets.ANDROID_RELEASE_KEYSTORE }}" > android/release.jks.base64
-  #         base64 -d android/release.jks.base64 > android/release.decrypted.jks
-  #     - name: Sign dev build
-  #       run: npx cap build android --keystorepath android/release.decrypted.jks --keystorepass ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }} --keystorealias captime-forgr --keystorealiaspass ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }} --androidreleasetype AAB
-  #     - name: Upload release bundle
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: app-release
-  #         path: android/app/release/app-release-signed.aab
-  #         retention-days: 60
+  build_android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7
+      - name: Use Node.js 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'pnpm'
+      - name: Install dependencies
+        id: install_code
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        id: build_code
+        run: pnpm mobile
+      - name: Sync
+        id: sync_code
+        run: npx cap sync
+      - name: Setup java
+        uses: actions/setup-java@v3
+        with:
+            distribution: 'zulu'
+            java-version: '11'
+      - name: Decode Keystore File
+        uses: timheuer/base64-to-file@v1
+        id: android_keystore
+        with:
+          fileName: "android_keystore.keystore"
+          encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+      - name: Decode Google Play Confi File
+        uses: timheuer/base64-to-file@v1
+        id: service_account_json_file
+        with:
+          fileName: "serviceAccount.json"
+          encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
+      - uses: maierj/fastlane-action@v2.3.0
+        env:
+          KEYSTORE_PATH: ${{ steps.android_keystore.outputs.filePath }}
+          ANDROID_JSON_KEY_FILE: ${{ steps.service_account_json_file.outputs.filePath }}
+          DEVELOPER_PACKAGE_NAME: ${{ secrets.DEVELOPER_PACKAGE_NAME }}
+          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+        with:
+          lane: android beta
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v2
+        with:
+          name: android-release
+          path: ./android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 60
   build_ios:
       runs-on: macOS-latest
       steps:
@@ -128,28 +141,32 @@ jobs:
         - name: Sync
           id: sync_code
           run: npx cap sync
-
-        - name: 'Download Provisioning Profiles'
-          id: provisioning
-          uses: apple-actions/download-provisioning-profiles@v1
+        - uses: ruby/setup-ruby@v1
           with:
-            bundle-id: 'ee.forgr.capacitorgo'
-            profile-type: 'IOS_APP_STORE'
-            issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
-            api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
-            api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }} 
-        - name: Archive
+            ruby-version: '2.7.2'
+        - uses: maierj/fastlane-action@v2.3.0
           env:
-            PROFILE_PATH: /Users/runner/Library/MobileDevice/Provisioning\ Profiles
-          run: npx cap build ios
-        # - name: Archive
-        #   run: xcodebuild -workspace ios/App/App.xcworkspace
-        #     -scheme App clean archive -configuration release
-        #     -sdk iphoneos -allowProvisioningUpdates DEVELOPMENT_TEAM=${{secrets.APPLE_TEAM_ID}} -archivePath ios/App/App.xcarchive
-        - name: 'Upload app to TestFlight'
-          uses: apple-actions/upload-testflight-build@v1
-          with: 
-            app-path: 'ios/App/App.xcarchive' 
-            issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
-            api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
-            api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+            DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
+            PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+            TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
+            TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
+            APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+            APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+            APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+            CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+            MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
+            MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+            APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+            DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
+          with:
+            lane: closed_beta
+        - name: Upload release bundle
+          uses: actions/upload-artifact@v2
+          with:
+            name: ios-release
+            path: ./App.ipa
+            retention-days: 60

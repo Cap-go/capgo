@@ -56,6 +56,7 @@ alert:
   delete-message: |-
     Bu eylem geri alınamaz. 
     Bunu silmek istediğinizden emin misiniz
+allow-device-to-self: Cihazların kendi kendine ilişki kurmasına izin ver
 api-key: API anahtarı
 api-keys: API Anahtarları
 apikeys:
