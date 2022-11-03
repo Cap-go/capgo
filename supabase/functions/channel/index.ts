@@ -123,11 +123,11 @@ serve(async (event: Request) => {
     return sendRes({ status: 'Missing apikey' }, 400)
   }
 
-  if (api_mode_string === 'POST' || event.method === 'POST')
+  if (api_mode_string === 'POST' || (!api_mode_string && event.method === 'POST'))
     return post(event, apikey)
-  else if (api_mode_string === 'GET' || event.method === 'GET')
+  else if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
     return get(event, apikey)
-  else if (api_mode_string === 'DELETE' || event.method === 'DELETE')
+  else if (api_mode_string === 'DELETE' || (!api_mode_string && event.method === 'DELETE'))
     return deleteChannel(event, apikey)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)

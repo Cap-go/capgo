@@ -84,9 +84,9 @@ serve(async (event: Request) => {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  if (api_mode_string === 'GET' || event.method === 'GET')
+  if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
     return get(event, apikey)
-  else if (api_mode_string === 'DELETE' || event.method === 'DELETE')
+  else if (api_mode_string === 'DELETE' || (!api_mode_string && event.method === 'DELETE'))
     return deleteVersion(event, apikey)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
