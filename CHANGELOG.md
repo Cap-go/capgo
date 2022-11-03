@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.41.0](https://github.com/Cap-go/capgo/compare/1.40.1...1.41.0) (2022-11-03)
+
+
+### Features
+
+* add custom ID in device ([0d4b557](https://github.com/Cap-go/capgo/commit/0d4b5579adfcfaeed2638c14f0fe1e75d3a0aeb0))
+
 ### [1.40.1](https://github.com/Cap-go/capgo/compare/1.40.0...1.40.1) (2022-11-03)
 
 
