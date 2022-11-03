@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.31](https://github.com/Cap-go/capgo/compare/1.37.30...1.37.31) (2022-11-03)
+
+
+### Bug Fixes
+
+* preventy missroute ([74b2d24](https://github.com/Cap-go/capgo/commit/74b2d244c88cec7b8d0924612d2562f6de04a92b))
+
 ### [1.37.30](https://github.com/Cap-go/capgo/compare/1.37.29...1.37.30) (2022-11-03)
 
 
