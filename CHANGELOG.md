@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.38.0](https://github.com/Cap-go/capgo/compare/1.37.31...1.38.0) (2022-11-03)
+
+
+### Features
+
+* add device_self ([208ac63](https://github.com/Cap-go/capgo/commit/208ac63d59fea7e9c8f438c418fe5bece5a585f7))
+
 ### [1.37.31](https://github.com/Cap-go/capgo/compare/1.37.30...1.37.31) (2022-11-03)
 
 
