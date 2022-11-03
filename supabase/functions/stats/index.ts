@@ -6,6 +6,7 @@ import type { definitions } from '../_utils/types_supabase.ts'
 interface AppStats {
   platform: string
   action: string
+  custom_id?: string
   device_id: string
   version_name?: string
   plugin_version?: string
@@ -28,6 +29,7 @@ serve(async (event: Request) => {
       app_id: body.app_id,
       plugin_version: body.plugin_version || '2.3.3',
       os_version: body.version_os,
+      custom_id: body.custom_id || '',
     }
 
     const stat: Partial<definitions['stats']> = {
@@ -67,7 +69,7 @@ serve(async (event: Request) => {
     }
     else {
       console.log('switch to onprem', body.app_id)
-      device.version = body.version_name || 'unknown'
+      device.version = body.version_name || 'unknown' as any
       stat.version = body.version || 0
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`

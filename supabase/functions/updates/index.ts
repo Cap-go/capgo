@@ -12,6 +12,7 @@ interface ChannelDev {
 }
 interface AppInfos {
   version_name: string
+  custom_id?: string
   version_build: string
   plugin_version: string
   version_os: string
@@ -33,6 +34,7 @@ serve(async (event: Request) => {
     } = body
     const {
       platform,
+      custom_id = '',
       app_id,
       device_id,
       version_os,
@@ -49,6 +51,7 @@ serve(async (event: Request) => {
       console.log('Cannot get all vars', platform,
         app_id,
         device_id,
+        custom_id,
         version_build,
         version_name)
       return sendRes({ message: 'missing appid' }, 400)
@@ -57,6 +60,7 @@ serve(async (event: Request) => {
     console.log(id, 'Headers', platform,
       app_id,
       device_id,
+      custom_id,
       version_build,
       plugin_version,
       version_name)
@@ -154,6 +158,7 @@ serve(async (event: Request) => {
       plugin_version,
       version: version.id,
       os_version: version_os,
+      custom_id,
       version_build,
       updated_at: new Date().toISOString(),
     })

@@ -2,6 +2,7 @@
 import {
   IonContent, IonInfiniteScroll,
   IonInfiniteScrollContent,
+  IonInput,
   IonItem,
   IonItemDivider,
   IonLabel, IonList, IonListHeader, IonNote, IonPage, IonSearchbar,
@@ -214,6 +215,7 @@ const getDevice = async () => {
           app_id,
           platform,
           os_version,
+          custom_id,
           version (
             name,
             app_id,
@@ -281,6 +283,31 @@ const didCancel = async (name: string) => {
     })
   await alert.present()
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+}
+const saveCustomId = async () => {
+  console.log('device.value?.custom_id', device.value?.custom_id)
+  const { error } = await supabase
+    .from<definitions['devices']>('devices')
+    .update({
+      custom_id: device.value?.custom_id,
+    }, { returning: 'minimal' })
+    .eq('device_id', id.value)
+  if (error) {
+    const toast = await toastController
+      .create({
+        message: t('cannot-save-custom-i'),
+        duration: 2000,
+      })
+    await toast.present()
+  }
+  else {
+    const toast = await toastController
+      .create({
+        message: t('custom-id-saved'),
+        duration: 2000,
+      })
+    await toast.present()
+  }
 }
 const delDevVersion = async (device: string) => {
   if (await didCancel(t('channel.device')))
@@ -470,6 +497,16 @@ watchEffect(async () => {
         <IonItem v-if="device">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
+              {{ t('custom-id') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            <IonInput v-model="device.custom_id" @ion-blur="saveCustomId()" />
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
               {{ t('device.plugin_version') }}
             </h2>
           </IonLabel>
@@ -500,21 +537,21 @@ watchEffect(async () => {
         <IonItem v-if="device">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
-              {{ t('device.last_update') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ formatDate(device.updated_at) }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
               {{ t('device.os_version') }}
             </h2>
           </IonLabel>
           <IonNote slot="end">
             {{ device.os_version || 'unknow' }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('device.last_update') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ formatDate(device.updated_at) }}
           </IonNote>
         </IonItem>
         <IonItem v-if="device">

@@ -1826,6 +1826,7 @@ export interface paths {
           os_version?: parameters["rowFilter.devices.os_version"];
           date_id?: parameters["rowFilter.devices.date_id"];
           version_build?: parameters["rowFilter.devices.version_build"];
+          custom_id?: parameters["rowFilter.devices.custom_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1886,6 +1887,7 @@ export interface paths {
           os_version?: parameters["rowFilter.devices.os_version"];
           date_id?: parameters["rowFilter.devices.date_id"];
           version_build?: parameters["rowFilter.devices.version_build"];
+          custom_id?: parameters["rowFilter.devices.custom_id"];
         };
         header: {
           /** Preference */
@@ -1910,6 +1912,7 @@ export interface paths {
           os_version?: parameters["rowFilter.devices.os_version"];
           date_id?: parameters["rowFilter.devices.date_id"];
           version_build?: parameters["rowFilter.devices.version_build"];
+          custom_id?: parameters["rowFilter.devices.custom_id"];
         };
         body: {
           /** devices */
@@ -3749,6 +3752,11 @@ export interface definitions {
      * @default builtin
      */
     version_build?: string;
+    /**
+     * Format: text
+     * @default ::text
+     */
+    custom_id: string;
   };
   app_versions_meta: {
     /**
@@ -4255,6 +4263,8 @@ export interface parameters {
   "rowFilter.devices.date_id": string;
   /** Format: text */
   "rowFilter.devices.version_build": string;
+  /** Format: text */
+  "rowFilter.devices.custom_id": string;
   /** @description app_versions_meta */
   "body.app_versions_meta": definitions["app_versions_meta"];
   /** Format: timestamp with time zone */

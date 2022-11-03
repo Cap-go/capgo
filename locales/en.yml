@@ -88,6 +88,7 @@ by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
+cannot-save-custom-i: Cannot save custom ID
 change: Change
 channel:
   add: Add
@@ -120,6 +121,8 @@ commands: commands
 copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
 custom-domain: Custom domain
+custom-id: Custom ID
+custom-id-saved: Custom ID saved
 dashboard: Dashboard
 days: days
 defined-as: Defined as

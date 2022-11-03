@@ -94,6 +94,7 @@ by-clicking-on-them: dengan mengkliknya.
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-channel: Tidak dapat menghapus saluran
+cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 change: Mengubah
 channel:
   add: Menambahkan
@@ -128,6 +129,8 @@ commands: perintah
 copied-to-clipboard: Disalin ke papan klip
 copy-your: Salin Anda
 custom-domain: Domain khusus
+custom-id: ID Khusus
+custom-id-saved: ID khusus disimpan
 dashboard: Dasbor
 days: hari
 defined-as: Didefinisikan sebagai

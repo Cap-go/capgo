@@ -94,6 +94,7 @@ by-clicking-on-them: нажав на них.
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-version: Не могу удалить версию приложения
 cannot-delete-channel: Не могу удалить канал
+cannot-save-custom-i: Не удается сохранить пользовательский идентификатор
 change: Изменять
 channel:
   add: Добавлять
@@ -128,6 +129,8 @@ commands: команды
 copied-to-clipboard: Скопировано в буфер обмена
 copy-your: Скопируйте свой
 custom-domain: Пользовательский домен
+custom-id: Пользовательский идентификатор
+custom-id-saved: Пользовательский идентификатор сохранен
 dashboard: Приборная доска
 days: дни
 defined-as: Определяется как

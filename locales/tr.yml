@@ -92,6 +92,7 @@ by-clicking-on-them: üzerlerine tıklayarak.
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-channel: Kanal silinemiyor
+cannot-save-custom-i: Özel kimlik kaydedilemiyor
 change: Değiştirmek
 channel:
   add: Ekle
@@ -126,6 +127,8 @@ commands: komutlar
 copied-to-clipboard: Panoya kopyalandı
 copy-your: seninkini kopyala
 custom-domain: Özel alan
+custom-id: özel kimlik
+custom-id-saved: Özel kimlik kaydedildi
 dashboard: Gösterge Paneli
 days: günler
 defined-as: olarak tanımlandı

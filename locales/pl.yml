@@ -92,6 +92,7 @@ by-clicking-on-them: klikając na nie.
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
 cannot-delete-channel: Nie można usunąć kanału
+cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
 change: Zmiana
 channel:
   add: Dodać
@@ -126,6 +127,8 @@ commands: polecenia
 copied-to-clipboard: Skopiowane do schowka
 copy-your: Skopiuj swój
 custom-domain: Domena niestandardowa
+custom-id: Identyfikator niestandardowy
+custom-id-saved: Zapisano niestandardowy identyfikator
 dashboard: Panel
 days: dni
 defined-as: Zdefiniowana jako

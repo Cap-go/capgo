@@ -88,6 +88,7 @@ by-clicking-on-them: 通过点击它们。
 cannot-delete-app: 无法删除应用
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-channel: 无法删除频道
+cannot-save-custom-i: 无法保存自定义 ID
 change: 改变
 channel:
   add: 添加
@@ -120,6 +121,8 @@ commands: 命令
 copied-to-clipboard: 已复制到剪贴板
 copy-your: 复制你的
 custom-domain: 自定义域
+custom-id: 自定义 ID
+custom-id-saved: 自定义 ID 已保存
 dashboard: 仪表板
 days: 天
 defined-as: 定义为

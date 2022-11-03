@@ -96,6 +96,7 @@ by-clicking-on-them: haciendo clic en ellos.
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-version: No se puede eliminar la versión de la aplicación
 cannot-delete-channel: No se puede eliminar el canal
+cannot-save-custom-i: No se puede guardar la identificación personalizada
 change: Cambio
 channel:
   add: Agregar
@@ -130,6 +131,8 @@ commands: comandos
 copied-to-clipboard: Copiado al portapapeles
 copy-your: copia tu
 custom-domain: Dominio personalizado
+custom-id: Identificación personalizada
+custom-id-saved: ID personalizado guardado
 dashboard: Tablero
 days: dias
 defined-as: Definido como

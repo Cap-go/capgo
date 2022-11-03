@@ -96,6 +96,7 @@ by-clicking-on-them: indem Sie darauf klicken.
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-version: App-Version kann nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
+cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
 change: Veränderung
 channel:
   add: Hinzufügen
@@ -130,6 +131,8 @@ commands: Befehle
 copied-to-clipboard: In die Zwischenablage kopiert
 copy-your: Kopieren Sie Ihre
 custom-domain: Benutzerdefinierten Domain
+custom-id: Benutzerdefinierte ID
+custom-id-saved: Benutzerdefinierte ID gespeichert
 dashboard: Armaturenbrett
 days: Tage
 defined-as: Definiert als

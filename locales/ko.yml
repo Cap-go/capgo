@@ -88,6 +88,7 @@ by-clicking-on-them: 클릭하여.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
 cannot-delete-channel: 채널을 삭제할 수 없습니다
+cannot-save-custom-i: 사용자 정의 ID를 저장할 수 없습니다
 change: 변화
 channel:
   add: 추가하다
@@ -120,6 +121,8 @@ commands: 명령
 copied-to-clipboard: 클립보드에 복사됨
 copy-your: 복사
 custom-domain: 사용자 정의 도메인
+custom-id: 맞춤 ID
+custom-id-saved: 맞춤 ID가 저장되었습니다.
 dashboard: 계기반
 days: 날
 defined-as: 로써 정의 된

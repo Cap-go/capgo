@@ -88,6 +88,7 @@ by-clicking-on-them: それらをクリックして。
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-channel: チャネルを削除できません
+cannot-save-custom-i: カスタム ID を保存できません
 change: 変化する
 channel:
   add: 追加
@@ -120,6 +121,8 @@ commands: コマンド
 copied-to-clipboard: クリップボードにコピーしました
 copy-your: あなたのコピー
 custom-domain: カスタム ドメイン
+custom-id: カスタム ID
+custom-id-saved: カスタム ID を保存しました
 dashboard: ダッシュボード
 days: 日々
 defined-as: として定義

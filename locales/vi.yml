@@ -92,6 +92,7 @@ by-clicking-on-them: bằng cách nhấp vào chúng.
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-channel: Không thể xóa kênh
+cannot-save-custom-i: Không thể lưu ID tùy chỉnh
 change: Biến đổi
 channel:
   add: Thêm vào
@@ -126,6 +127,8 @@ commands: lệnh
 copied-to-clipboard: Sao chép vào clipboard
 copy-your: Sao chép của bạn
 custom-domain: Tên miền tùy chọn
+custom-id: ID tùy chỉnh
+custom-id-saved: ID tùy chỉnh đã được lưu
 dashboard: bảng điều khiển
 days: ngày
 defined-as: Định nghĩa là
