@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.37.30](https://github.com/Cap-go/capgo/compare/1.37.29...1.37.30) (2022-11-03)
+
+
+### Bug Fixes
+
+* allow new supabase methods ([accab02](https://github.com/Cap-go/capgo/commit/accab029e0a6f449b2b7aa684af4a14dc80b586b))
+
 ### [1.37.29](https://github.com/Cap-go/capgo/compare/1.37.28...1.37.29) (2022-11-02)
 
 
