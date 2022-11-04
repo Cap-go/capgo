@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.44.0](https://github.com/Cap-go/capgo/compare/1.43.2...1.44.0) (2022-11-04)
+
+
+### Features
+
+* add invalid IP system ([1220651](https://github.com/Cap-go/capgo/commit/12206518868221b8c3f978e77be86d990db62811))
+
 ### [1.43.2](https://github.com/Cap-go/capgo/compare/1.43.1...1.43.2) (2022-11-04)
 
 
