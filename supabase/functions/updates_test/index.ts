@@ -3,6 +3,7 @@ import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
+import { invalidIp } from '../_utils/invalids_ip.ts'
 
 interface Channel {
   version: definitions['app_versions']
@@ -25,6 +26,11 @@ serve(async (event: Request) => {
   // create random id
   const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   console.log('event', event)
+  if (await invalidIp((event.headers as any)['x-forwarded-for'].split(','))) {
+    console.error('invalid ip', (event.headers as any)['x-forwarded-for'])
+    return sendRes({ message: 'invalid ip' }, 400)
+  }
+
   try {
     const body = (await event.json()) as AppInfos
     console.log(id, 'body', body)
