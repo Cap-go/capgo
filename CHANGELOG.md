@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.43.2](https://github.com/Cap-go/capgo/compare/1.43.1...1.43.2) (2022-11-04)
+
+
+### Bug Fixes
+
+* disable allowEmulatorProd so see if there a difference ([9395024](https://github.com/Cap-go/capgo/commit/9395024366b697d6280978acd602a32ec981b5bb))
+
 ### [1.43.1](https://github.com/Cap-go/capgo/compare/1.43.0...1.43.1) (2022-11-04)
 
 
