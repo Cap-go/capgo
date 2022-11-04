@@ -15,7 +15,7 @@ const config: CapacitorConfig = {
     },
     CapacitorUpdater: {
       autoUpdate: true,
-      allowEmulatorProd: false,
+      allowEmulatorProd: true,
       updateUrl: 'https://xvwzpoazmxkqosrdewyv.functions.supabase.co/updates_test',
     },
   },
