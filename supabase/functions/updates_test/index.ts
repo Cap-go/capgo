@@ -26,8 +26,9 @@ serve(async (event: Request) => {
   // create random id
   const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   console.log('event', event)
-  if (await invalidIp((event.headers as any)['x-forwarded-for'].split(','))) {
-    console.error('invalid ip', (event.headers as any)['x-forwarded-for'])
+  const xForwardedFor = event.headers.get('x-forwarded-for') || ''
+  if (await invalidIp(xForwardedFor.split(',')[0])) {
+    console.error('invalid ip', xForwardedFor)
     return sendRes({ message: 'invalid ip' }, 400)
   }
 
