@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.44.2](https://github.com/Cap-go/capgo/compare/1.44.1...1.44.2) (2022-11-06)
+
+
+### Bug Fixes
+
+* custom id set ([370809f](https://github.com/Cap-go/capgo/commit/370809fee5bc75f24f50aeb2e9f32fcaebf200ca))
+
 ### [1.44.1](https://github.com/Cap-go/capgo/compare/1.44.0...1.44.1) (2022-11-04)
 
 
