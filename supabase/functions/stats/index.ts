@@ -29,7 +29,7 @@ serve(async (event: Request) => {
       app_id: body.app_id,
       plugin_version: body.plugin_version || '2.3.3',
       os_version: body.version_os,
-      custom_id: body.custom_id || '',
+      ...(body.custom_id ? { custom_id: body.custom_id } : {}),
     }
 
     const stat: Partial<definitions['stats']> = {

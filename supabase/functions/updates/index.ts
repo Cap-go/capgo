@@ -158,7 +158,7 @@ serve(async (event: Request) => {
       plugin_version,
       version: version.id,
       os_version: version_os,
-      custom_id,
+      ...(custom_id ? { custom_id } : {}),
       version_build,
       updated_at: new Date().toISOString(),
     })
