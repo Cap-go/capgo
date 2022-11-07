@@ -107,7 +107,7 @@ channel:
   device: Thiết bị
   device-deleted: Đã xóa thiết bị
   invit: Nhập email để mời
-  is_public: Kênh công khai
+  is_public: Kênh mặc định
   make-now: Công bố công khai
   make_it: Làm cho nó
   makeprivate: Kênh của bạn ở chế độ công khai, hãy nhấp để đặt kênh đó ở chế độ riêng tư

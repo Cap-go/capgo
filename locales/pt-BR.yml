@@ -107,7 +107,7 @@ channel:
   device: Dispositivo
   device-deleted: Dispositivo excluído
   invit: Digite o e-mail para convidar
-  is_public: Público do canal
+  is_public: Padrão do canal
   make-now: Tornar público
   make_it: Faça
   makeprivate: Seu canal é público, clique para torná-lo privado

@@ -101,7 +101,7 @@ channel:
   device: 장치
   device-deleted: 기기가 삭제됨
   invit: 초대할 이메일 입력
-  is_public: 채널 공개
+  is_public: 채널 기본값
   make-now: 공개적으로해라
   make_it: 만들어
   makeprivate: 채널이 공개되어 있습니다. 비공개로 설정하려면 클릭하세요.

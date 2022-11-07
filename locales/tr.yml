@@ -107,7 +107,7 @@ channel:
   device: Cihaz
   device-deleted: Cihaz silindi
   invit: Davet etmek için e-posta yazın
-  is_public: genel kanal
+  is_public: Kanal varsayılanı
   make-now: Kamu yapmak
   make_it: Bunu yapmak
   makeprivate: Kanalınız herkese açık, özel yapmak için tıklayın

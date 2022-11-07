@@ -111,7 +111,7 @@ channel:
   device: Dispositivo
   device-deleted: Dispositivo eliminado
   invit: Escriba el correo electrónico para invitar
-  is_public: canal publico
+  is_public: Canal predeterminado
   make-now: Hacer público
   make_it: Hazlo
   makeprivate: Tu canal es público, haz clic para hacerlo privado

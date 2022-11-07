@@ -111,7 +111,7 @@ channel:
   device: Gerät
   device-deleted: Gerät gelöscht
   invit: Geben Sie die einzuladende E-Mail-Adresse ein
-  is_public: Kanal öffentlich
+  is_public: Kanalvorgabe
   make-now: Veröffentlichen
   make_it: Mach es
   makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen

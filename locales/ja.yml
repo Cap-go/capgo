@@ -101,7 +101,7 @@ channel:
   device: 端末
   device-deleted: デバイスが削除されました
   invit: 招待するメールアドレスを入力
-  is_public: チャンネル公開
+  is_public: チャネルのデフォルト
   make-now: 公表します
   make_it: 成功する
   makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします

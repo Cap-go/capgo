@@ -101,7 +101,7 @@ channel:
   device: Device
   device-deleted: Device deleted
   invit: Type email to invite
-  is_public: Channel public
+  is_public: Channel default
   make-now: Make public
   make_it: Make it
   makeprivate: Your channel is public, click to make it private

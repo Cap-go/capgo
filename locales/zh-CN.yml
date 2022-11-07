@@ -101,7 +101,7 @@ channel:
   device: 设备
   device-deleted: 设备已删除
   invit: 输入电子邮件以邀请
-  is_public: 公开频道
+  is_public: 频道默认
   make-now: 公开
   make_it: 做了
   makeprivate: 您的频道是公开的，点击将其设为私密

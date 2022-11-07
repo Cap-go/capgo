@@ -109,7 +109,7 @@ channel:
   device: Perangkat
   device-deleted: Perangkat dihapus
   invit: Ketik email untuk mengundang
-  is_public: Saluran publik
+  is_public: Standar saluran
   make-now: Publikasikan
   make_it: Buat itu
   makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi

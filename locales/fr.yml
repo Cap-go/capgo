@@ -109,7 +109,7 @@ channel:
   device: Appareil
   device-deleted: Appareil supprimé
   invit: Tapez l'e-mail pour inviter
-  is_public: Chaîne publique
+  is_public: Canal par défaut
   make-now: Rendre publique
   make_it: Fais-le
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
