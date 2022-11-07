@@ -103,16 +103,17 @@ channel:
   beta-channel: Beta-Kanal
   cannot-delete-device: Gerät kann nicht gelöscht werden
   confirm-public-desc: >-
-    Wenn Sie diesen Kanal öffentlich machen, werden Updates an alle Ihre
-    Benutzer gesendet. 
+    Wenn Sie diesen Kanal als Standard festlegen, werden Updates an alle Ihre
+    Benutzer gesendet.
 
-    Alle anderen öffentlichen Kanäle werden privat.
+
+    Andere Standardkanäle sind nicht mehr Standard.
   copy: URL kopieren
   device: Gerät
   device-deleted: Gerät gelöscht
   invit: Geben Sie die einzuladende E-Mail-Adresse ein
   is_public: Kanalvorgabe
-  make-now: Veröffentlichen
+  make-now: Machen Standard
   make_it: Mach es
   makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen
   makepublic: Dein Kanal ist privat, klicke hier, um ihn öffentlich zu machen
@@ -136,8 +137,8 @@ custom-id-saved: Benutzerdefinierte ID gespeichert
 dashboard: Armaturenbrett
 days: Tage
 defined-as: Definiert als
-defined-as-private: als privat definiert
-defined-as-public: als öffentlich definiert
+defined-as-private: als normal definiert
+defined-as-public: als Standard definiert
 delete-account: Konto löschen
 device:
   channel: Kanallink

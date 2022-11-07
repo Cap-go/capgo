@@ -95,14 +95,15 @@ channel:
   beta-channel: ベータチャンネル
   cannot-delete-device: デバイスを削除できません
   confirm-public-desc: |-
-    このチャネルを公開すると、すべてのユーザーに更新が送信されます。
-    他のすべての公開チャネルは非公開になります。
+    このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
+
+    他のデフォルト チャネルはデフォルトではなくなります。
   copy: URLをコピー
   device: 端末
   device-deleted: デバイスが削除されました
   invit: 招待するメールアドレスを入力
   is_public: チャネルのデフォルト
-  make-now: 公表します
+  make-now: デフォルトにする
   make_it: 成功する
   makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします
   makepublic: チャンネルは非公開です。クリックして公開してください
@@ -126,8 +127,8 @@ custom-id-saved: カスタム ID を保存しました
 dashboard: ダッシュボード
 days: 日々
 defined-as: として定義
-defined-as-private: プライベートと定義
-defined-as-public: パブリックと定義
+defined-as-private: 通常と定義
+defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
 device:
   channel: チャネルリンク

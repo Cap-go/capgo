@@ -95,14 +95,15 @@ channel:
   beta-channel: 测试通道
   cannot-delete-device: 无法删除设备
   confirm-public-desc: |-
-    公开此频道将使其向您的所有用户发送更新。
-    所有其他公共频道将变为私人频道。
+    将此频道设为默认将使其向您的所有用户发送更新。
+
+    其他默认频道将不再默认。
   copy: 复制网址
   device: 设备
   device-deleted: 设备已删除
   invit: 输入电子邮件以邀请
   is_public: 频道默认
-  make-now: 公开
+  make-now: 使默认
   make_it: 做了
   makeprivate: 您的频道是公开的，点击将其设为私密
   makepublic: 您的频道是私人频道，点击将其设为公开
@@ -126,8 +127,8 @@ custom-id-saved: 自定义 ID 已保存
 dashboard: 仪表板
 days: 天
 defined-as: 定义为
-defined-as-private: 定义为私有
-defined-as-public: 定义为公开
+defined-as-private: 定义为正常
+defined-as-public: 定义为默认值
 delete-account: 删除帐户
 device:
   channel: 频道链接

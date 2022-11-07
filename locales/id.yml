@@ -101,16 +101,17 @@ channel:
   beta-channel: saluran beta
   cannot-delete-device: Tidak dapat menghapus perangkat
   confirm-public-desc: >-
-    Menjadikan saluran ini publik akan membuatnya mengirim pembaruan ke semua
-    pengguna Anda. 
+    Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
+    semua pengguna Anda.
 
-    Semua saluran publik lainnya akan menjadi pribadi.
+
+    Saluran default lainnya tidak akan menjadi default lagi.
   copy: Salin URL
   device: Perangkat
   device-deleted: Perangkat dihapus
   invit: Ketik email untuk mengundang
   is_public: Standar saluran
-  make-now: Publikasikan
+  make-now: Jadikan default
   make_it: Buat itu
   makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi
   makepublic: Saluran Anda bersifat pribadi, klik untuk menjadikannya publik
@@ -134,8 +135,8 @@ custom-id-saved: ID khusus disimpan
 dashboard: Dasbor
 days: hari
 defined-as: Didefinisikan sebagai
-defined-as-private: didefinisikan sebagai pribadi
-defined-as-public: didefinisikan sebagai publik
+defined-as-private: didefinisikan sebagai normal
+defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
 device:
   channel: Tautan saluran

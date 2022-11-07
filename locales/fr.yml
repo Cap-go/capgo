@@ -101,16 +101,17 @@ channel:
   beta-channel: Chaîne bêta
   cannot-delete-device: Impossible de supprimer l'appareil
   confirm-public-desc: >-
-    Rendre cette chaîne publique lui fera envoyer des mises à jour à tous vos
-    utilisateurs. 
+    Si vous définissez ce canal par défaut, il enverra des mises à jour à tous
+    vos utilisateurs.
 
-    Toutes les autres chaînes publiques deviendront privées.
+
+    Les autres canaux par défaut ne seront plus par défaut.
   copy: Copier le lien
   device: Appareil
   device-deleted: Appareil supprimé
   invit: Tapez l'e-mail pour inviter
   is_public: Canal par défaut
-  make-now: Rendre publique
+  make-now: Faire défaut
   make_it: Fais-le
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
   makepublic: Votre chaîne est privée, cliquez pour la rendre publique
@@ -134,8 +135,8 @@ custom-id-saved: Identifiant personnalisé enregistré
 dashboard: Tableau de bord
 days: jours
 defined-as: Défini comme
-defined-as-private: défini comme privé
-defined-as-public: défini comme public
+defined-as-private: défini comme normal
+defined-as-public: défini par défaut
 delete-account: Supprimer le compte
 device:
   channel: Lien de chaîne

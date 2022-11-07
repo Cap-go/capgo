@@ -99,16 +99,17 @@ channel:
   beta-channel: Canal beta
   cannot-delete-device: Não é possível excluir o dispositivo
   confirm-public-desc: >-
-    Tornar este canal público fará com que ele envie atualizações para todos os
-    seus usuários. 
+    Tornar este canal padrão fará com que ele envie atualizações para todos os
+    seus usuários.
 
-    Todos os outros canais públicos se tornarão privados.
+
+    Outros canais padrão não serão mais padrão.
   copy: Copiar URL
   device: Dispositivo
   device-deleted: Dispositivo excluído
   invit: Digite o e-mail para convidar
   is_public: Padrão do canal
-  make-now: Tornar público
+  make-now: Tornar padrão
   make_it: Faça
   makeprivate: Seu canal é público, clique para torná-lo privado
   makepublic: Seu canal é privado, clique para torná-lo público
@@ -132,8 +133,8 @@ custom-id-saved: ID personalizado salvo
 dashboard: Painel
 days: dias
 defined-as: Definido como
-defined-as-private: definido como privado
-defined-as-public: definido como público
+defined-as-private: definido como normal
+defined-as-public: definido como padrão
 delete-account: Deletar conta
 device:
   channel: Link do canal

@@ -99,16 +99,17 @@ channel:
   beta-channel: Kênh beta
   cannot-delete-device: Không thể xóa thiết bị
   confirm-public-desc: >-
-    Đặt kênh này ở chế độ công khai sẽ làm cho kênh gửi thông tin cập nhật đến
-    tất cả người dùng của bạn. 
+    Đặt kênh này làm mặc định sẽ làm cho kênh gửi cập nhật cho tất cả người dùng
+    của bạn.
 
-    Tất cả các kênh công khai khác sẽ trở thành riêng tư.
+
+    Các kênh mặc định khác sẽ không còn là mặc định nữa.
   copy: Sao chép URL
   device: Thiết bị
   device-deleted: Đã xóa thiết bị
   invit: Nhập email để mời
   is_public: Kênh mặc định
-  make-now: Công bố công khai
+  make-now: Làm mặc định
   make_it: Làm cho nó
   makeprivate: Kênh của bạn ở chế độ công khai, hãy nhấp để đặt kênh đó ở chế độ riêng tư
   makepublic: Kênh của bạn ở chế độ riêng tư, hãy nhấp để đặt kênh ở chế độ công khai
@@ -132,8 +133,8 @@ custom-id-saved: ID tùy chỉnh đã được lưu
 dashboard: bảng điều khiển
 days: ngày
 defined-as: Định nghĩa là
-defined-as-private: được định nghĩa là riêng tư
-defined-as-public: được định nghĩa là công khai
+defined-as-private: được định nghĩa là bình thường
+defined-as-public: được định nghĩa là mặc định
 delete-account: Xóa tài khoản
 device:
   channel: Liên kết kênh

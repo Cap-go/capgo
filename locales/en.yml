@@ -95,14 +95,14 @@ channel:
   beta-channel: Beta channel
   cannot-delete-device: Cannot delete device
   confirm-public-desc: |-
-    Making this channel public will make it send updates to all yours users. 
-    All other public channels will become private.
+    Making this channel default will make it send updates to all yours users. 
+    Others default channels will not be default anymore.
   copy: Copy URL
   device: Device
   device-deleted: Device deleted
   invit: Type email to invite
   is_public: Channel default
-  make-now: Make public
+  make-now: Make default
   make_it: Make it
   makeprivate: Your channel is public, click to make it private
   makepublic: Your channel is private, click to make it public
@@ -126,8 +126,8 @@ custom-id-saved: Custom ID saved
 dashboard: Dashboard
 days: days
 defined-as: Defined as
-defined-as-private: defined as private
-defined-as-public: defined as public
+defined-as-private: defined as normal
+defined-as-public: defined as default
 delete-account: Delete Account
 device:
   channel: Channel link

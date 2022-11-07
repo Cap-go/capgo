@@ -217,7 +217,7 @@ const addUser = async () => {
     newUser.value = ''
   }
 }
-const makePublic = async (val = true) => {
+const makeDefault = async (val = true) => {
   const alert = await alertController.create({
     header: t('account.delete_sure'),
     message: t('channel.confirm-public-desc'),
@@ -405,7 +405,7 @@ const inviteUser = async (userId: string) => {
               <IonToggle
                 color="secondary"
                 :checked="channel?.public"
-                @ion-change="makePublic($event.detail.checked)"
+                @ion-change="makeDefault($event.detail.checked)"
               />
             </IonButtons>
           </IonItem>

@@ -103,16 +103,17 @@ channel:
   beta-channel: canal beta
   cannot-delete-device: No se puede eliminar el dispositivo
   confirm-public-desc: >-
-    Hacer público este canal hará que envíe actualizaciones a todos tus
-    usuarios. 
+    Hacer que este canal sea el predeterminado hará que envíe actualizaciones a
+    todos sus usuarios.
 
-    Todos los demás canales públicos se volverán privados.
+
+    Otros canales predeterminados ya no serán predeterminados.
   copy: Copiar URL
   device: Dispositivo
   device-deleted: Dispositivo eliminado
   invit: Escriba el correo electrónico para invitar
   is_public: Canal predeterminado
-  make-now: Hacer público
+  make-now: Hacer por defecto
   make_it: Hazlo
   makeprivate: Tu canal es público, haz clic para hacerlo privado
   makepublic: Tu canal es privado, haz clic para hacerlo público
@@ -136,8 +137,8 @@ custom-id-saved: ID personalizado guardado
 dashboard: Tablero
 days: dias
 defined-as: Definido como
-defined-as-private: definido como privado
-defined-as-public: definido como público
+defined-as-private: definido como normal
+defined-as-public: definido como predeterminado
 delete-account: Borrar cuenta
 device:
   channel: enlace del canal
