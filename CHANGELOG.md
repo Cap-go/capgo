@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.44.18](https://github.com/Cap-go/capgo/compare/1.44.17...1.44.18) (2022-11-07)
+
+
+### Bug Fixes
+
+* trigger version no jwt needed ([8ed352a](https://github.com/Cap-go/capgo/commit/8ed352a371bf201f892a09f89fb1c19dfeb6c48c))
+
 ### [1.44.17](https://github.com/Cap-go/capgo/compare/1.44.16...1.44.17) (2022-11-07)
 
 
