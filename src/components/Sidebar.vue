@@ -118,7 +118,7 @@ watch(sidebarExpanded, () => {
 
             <!-- Documentation -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noreferrer" href="https://docs.capgo.app/">
+              <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://docs.capgo.app/">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <IonIcon :icon="bookOutline" class="w-6 text-2xl text-slate-400" />
@@ -130,7 +130,7 @@ watch(sidebarExpanded, () => {
 
             <!-- Discord -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noreferrer" href="https://discord.gg/VnYRvBfgA6">
+              <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://discord.gg/VnYRvBfgA6">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <IonIcon :icon="logoDiscord" class="w-6 text-2xl text-slate-400" />

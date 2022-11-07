@@ -312,6 +312,7 @@ const presentActionSheet = async () => {
           <li>
             <a
               class="flex items-center justify-between"
+              rel="noopener"
               href="https://discord.gg/VnYRvBfgA6"
               target="_blank"
             >

@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.162.0/http/server.ts'
+import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.0.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
@@ -23,7 +24,7 @@ interface AppInfos {
 
 serve(async (event: Request) => {
   // create random id
-  const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  const id = cryptoRandomString({ length: 10 })
   try {
     const body = (await event.json()) as AppInfos
     console.log(id, 'body', body)
