@@ -41,6 +41,12 @@ const newUserModalOpen = ref(false)
 const search = ref('')
 const devices = ref<definitions['channel_devices'][]>([])
 
+const openBundle = () => {
+  if (!channel.value)
+    return
+  console.log('openBundle', channel.value.version.id)
+  router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
+}
 const openApp = () => {
   if (!channel.value)
     return
@@ -122,6 +128,7 @@ const getChannel = async () => {
           name,
           public,
           version (
+            id,
             name,
             app_id,
             bucket_id,
@@ -397,6 +404,40 @@ const inviteUser = async (userId: string) => {
               {{ channel?.name }}
             </span>
           </IonListHeader>
+          <IonItemDivider>
+            <IonLabel>
+              {{ t('informations') }}
+            </IonLabel>
+          </IonItemDivider>
+          <IonItem class="cursor-pointer text-azure-500" @click="openBundle()">
+            <IonLabel class="my-6">
+              {{ t('package.versions') }}
+            </IonLabel>
+            <IonNote slot="end">
+              {{ channel?.version.name }}
+            </IonNote>
+          </IonItem>
+          <IonItem>
+            <IonLabel class="my-6">
+              {{ t('device.created_at') }}
+            </IonLabel>
+            <IonNote slot="end">
+              {{ formatDate(channel?.created_at) }}
+            </IonNote>
+          </IonItem>
+          <IonItem>
+            <IonLabel class="my-6">
+              {{ t('device.last_update') }}
+            </IonLabel>
+            <IonNote slot="end">
+              {{ formatDate(channel?.updated_at) }}
+            </IonNote>
+          </IonItem>
+          <IonItemDivider>
+            <IonLabel>
+              {{ t('settings') }}
+            </IonLabel>
+          </IonItemDivider>
           <IonItem>
             <IonLabel class="my-6 font-extrabold">
               {{ t('channel.is_public') }}
@@ -409,20 +450,6 @@ const inviteUser = async (userId: string) => {
               />
             </IonButtons>
           </IonItem>
-          <IonItemDivider>
-            <IonLabel>
-              {{ t('settings') }}
-            </IonLabel>
-          </IonItemDivider>
-          <!-- <IonItem>
-          <IonLabel>{{ t('channel.beta-channel') }}</IonLabel>
-          <IonToggle
-
-            color="secondary"
-            :checked="channel?.beta"
-            @ion-change="saveChannelChange('beta', $event.target.checked)"
-          />
-        </IonItem> -->
           <IonItem>
             <IonLabel>{{ t('disable-auto-downgra') }}</IonLabel>
             <IonToggle
