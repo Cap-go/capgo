@@ -16,21 +16,8 @@ const guard = async (next: any, to: string, from: string) => {
   if (auth && !main.auth) {
     main.auth = auth
     // console.log('set auth', auth)
-    if (!main.user && auth) {
+    if (!main.user) {
       try {
-        isTrial(auth?.id).then((res) => {
-          // console.log('isTrial', res)
-          main.trialDaysLeft = res
-        })
-        isPaying(auth?.id).then((res) => {
-          main.paying = res
-        })
-        isGoodPlan(auth?.id).then((res) => {
-          main.goodPlan = res
-        })
-        isCanceled(auth?.id).then((res) => {
-          main.canceled = res
-        })
         const { data, error } = await supabase
           .from<definitions['users']>('users')
           .select()
@@ -38,26 +25,41 @@ const guard = async (next: any, to: string, from: string) => {
           .single()
         if (!error && data)
           main.user = data
-        else return next('/onboarding/verify_email')
-        snag.publish({
-          channel: 'user-login',
-          event: 'User Login',
-          icon: '✅',
-          tags: {
-            'user-id': data.id,
-          },
-          notify: false,
-        }).catch()
-        setUser({
-          nickname: `${data.first_name} ${data.last_name}`,
-          email: data.email,
-          avatar: data.image_url,
-        })
+        else
+          return next('/onboarding/verify_email')
       }
       catch (error) {
         console.error('auth', error)
+        return next('/onboarding/verify_email')
       }
     }
+    isTrial(auth?.id).then((res) => {
+      // console.log('isTrial', res)
+      main.trialDaysLeft = res
+    })
+    isPaying(auth?.id).then((res) => {
+      main.paying = res
+    })
+    isGoodPlan(auth?.id).then((res) => {
+      main.goodPlan = res
+    })
+    isCanceled(auth?.id).then((res) => {
+      main.canceled = res
+    })
+    snag.publish({
+      channel: 'user-login',
+      event: 'User Login',
+      icon: '✅',
+      tags: {
+        'user-id': auth.id,
+      },
+      notify: false,
+    }).catch()
+    setUser({
+      nickname: `${main.user.first_name} ${main.user.last_name}`,
+      email: main.user.email,
+      avatar: main.user.image_url,
+    })
     setUserId(auth.id)
 
     if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
