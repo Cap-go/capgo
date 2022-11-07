@@ -1,7 +1,5 @@
 // list all apps in supabase and create version unknown for each
-// import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
-// import type { definitions } from '~/types/supabase'
 
 const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 const supabaseAnonKey = '***'
