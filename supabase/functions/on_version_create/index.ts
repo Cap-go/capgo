@@ -21,6 +21,14 @@ serve(async (event: Request) => {
     const body = (await event.json()) as { record: definitions['app_versions'] }
     const record = body.record
 
+    await supabaseAdmin
+      .from<definitions['apps']>('apps')
+      .update({
+        last_version: record.name,
+      }, { returning: 'minimal' })
+      .eq('app_id', record.app_id)
+      .eq('user_id', record.user_id)
+
     if (!record.bucket_id) {
       console.log('No bucket_id')
       const { error: dbError } = await supabaseAdmin
