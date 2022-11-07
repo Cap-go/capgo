@@ -1,25 +1,23 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import type {
-  SegmentChangeEventDetail,
-} from '@ionic/vue'
+import type { SegmentChangeEventDetail } from '@ionic/vue'
 import {
-  IonLabel, IonSegment, IonSegmentButton, toastController,
+  IonLabel,
+  IonSegment, IonSegmentButton, toastController,
 } from '@ionic/vue'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { CapacitorCrispWeb } from '~/services/crisp-web'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import type { StatsV2 } from '~/services/plans'
 import type { definitions } from '~/types/supabase'
 import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
+import { openChat, sendMessage } from '~/services/crips'
 
-const crisp = new CapacitorCrispWeb()
 const openSupport = () => {
-  crisp.sendMessage({ value: 'I need a custom plan' })
-  crisp.openMessenger()
+  sendMessage('I need a custom plan')
+  openChat()
 }
 
 const { t } = useI18n()
@@ -137,18 +135,18 @@ watchEffect(async () => {
 
 <template>
   <div v-if="!isLoading" class="bg-white dark:bg-gray-800">
-    <div class="max-w-7xl mx-auto pt-6 px-4 sm:px-6 lg:px-8">
+    <div class="px-4 pt-6 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="sm:flex sm:flex-col sm:align-center">
         <h1 class="text-5xl font-extrabold text-gray-900 dark:text-white sm:text-center">
           {{ t('plan.pricing-plans') }}
         </h1>
-        <p class="mt-5 text-xl text-gray-700 dark:text-white  sm:text-center">
+        <p class="mt-5 text-xl text-gray-700 dark:text-white sm:text-center">
           {{ t('plan.desc') }}<br>
-          {{ t('your-are-a') }} <span class="underline font-bold">{{ currentPlan?.name }}</span> {{ t('plan-member') }}<br>
-          {{ t('the') }} <span class="underline font-bold">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
+          {{ t('your-are-a') }} <span class="font-bold underline">{{ currentPlan?.name }}</span> {{ t('plan-member') }}<br>
+          {{ t('the') }} <span class="font-bold underline">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
 
-        <IonSegment :value="segmentVal" class="sm:w-max-80 mx-auto mt-6 sm:mt-8 dark:text-gray-300 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
+        <IonSegment :value="segmentVal" class="mx-auto mt-6 sm:w-max-80 sm:mt-8 dark:text-gray-300 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
           <IonSegmentButton class="h-10" value="m">
             <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
           </IonSegmentButton>
@@ -158,9 +156,9 @@ watchEffect(async () => {
         </IonSegment>
       </div>
       <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
-        <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+        <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div class="p-6">
-            <h2 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+            <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
               {{ p.name }}
             </h2>
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">
@@ -170,17 +168,17 @@ watchEffect(async () => {
               <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ isYearly ? 'yr' : 'mo' }}</span>
             </p>
-            <button v-if="p.stripe_id !== 'free'" class="mt-8 block w-full bg-gray-800 dark:bg-white border border-gray-800 rounded-md py-2 text-sm font-semibold text-white dark:text-black text-center hover:bg-gray-900 dark:hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:dark:bg-gray-400" :disabled="currentPlan?.name === p.name" @click="openChangePlan(p.stripe_id)">
+            <button v-if="p.stripe_id !== 'free'" class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white bg-gray-800 border border-gray-800 rounded-md dark:bg-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:dark:bg-gray-400" :disabled="currentPlan?.name === p.name" @click="openChangePlan(p.stripe_id)">
               {{ t('plan.buy') }} {{ p.name }}
             </button>
           </div>
-          <div class="pt-6 pb-8 px-6">
-            <h3 class="text-xs font-medium text-gray-900 dark:text-white tracking-wide uppercase">
+          <div class="px-6 pt-6 pb-8">
+            <h3 class="text-xs font-medium tracking-wide text-gray-900 uppercase dark:text-white">
               {{ t('plan.whats-included') }}
             </h3>
             <ul role="list" class="mt-6 space-y-4">
               <li v-for="(f, index) in planFeatures(p)" :key="index" class="flex space-x-3">
-                <svg class="flex-shrink-0 h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <svg class="flex-shrink-0 w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
                 <span class="text-sm text-gray-500 dark:text-gray-100">{{ f }}</span>
@@ -314,24 +312,7 @@ watchEffect(async () => {
                     <a
                       href="#"
                       title="Get quote now"
-                      class="
-                                    rounded-xl
-                                    p-6
-                                    inline-flex
-                                    items-center
-                                    justify-center
-                                    mt-5
-                                    text-base
-                                    font-bold
-                                    text-gray-900
-                                    transition-all
-                                    duration-200
-                                    bg-white
-                                    border border-transparent
-                                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white
-                                    font-pj
-                                    hover:bg-opacity-90
-                                "
+                      class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-900 transition-all duration-200 bg-white border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white font-pj hover:bg-opacity-90"
                       role="button"
                       @click="openSupport()"
                     >

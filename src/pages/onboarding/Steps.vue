@@ -9,14 +9,13 @@ import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
-import { CapacitorCrispWeb } from '~/services/crisp-web'
+import { pushEvent } from '~/services/crips'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done'])
 
-const crisp = new CapacitorCrispWeb()
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
@@ -69,9 +68,9 @@ const setLog = () => {
       },
       notify: false,
     }).catch()
-    crisp.pushEvent({ name: `user:step-${step.value}`, color: 'blue' })
+    pushEvent({ name: `user:step-${step.value}`, color: 'blue' })
     if (step.value === 4)
-      crisp.pushEvent({ name: 'user:onboarding-done', color: 'green' })
+      pushEvent({ name: 'user:onboarding-done', color: 'green' })
     // TODO add emailing on onboarding done to send blog article versioning
   }
 }
@@ -151,7 +150,7 @@ watchEffect(async () => {
         <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
           {{ t('add-your-first-app-t') }}
         </p>
-        <p class="mx-auto mt-2 text-md font-normal text-muted-blue-300 font-pj">
+        <p class="mx-auto mt-2 font-normal text-md text-muted-blue-300 font-pj">
           {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
         </p>
       </div>
@@ -164,7 +163,7 @@ watchEffect(async () => {
 
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="bg-gray-200 w-1 h-10 mx-auto" />
+          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" />
 
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
@@ -178,7 +177,7 @@ watchEffect(async () => {
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
-                <code v-if="s.command" class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(s.command)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
+                <code v-if="s.command" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
                 <br v-if="s.command">
                 <span class="text-sm">{{ s.subtitle }}</span>
               </p>
