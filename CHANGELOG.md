@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.44.16](https://github.com/Cap-go/capgo/compare/1.44.15...1.44.16) (2022-11-07)
+
+
+### Bug Fixes
+
+* change public to default wording ([f6cee70](https://github.com/Cap-go/capgo/commit/f6cee705956555b9addfc49e5860f8c3ecee6eff))
+* naming public to default ([b35314f](https://github.com/Cap-go/capgo/commit/b35314fa42c480eae0b7030b51c80753e6dd0f17))
+
 ### [1.44.15](https://github.com/Cap-go/capgo/compare/1.44.14...1.44.15) (2022-11-07)
 
 
