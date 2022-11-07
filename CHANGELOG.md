@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.44.14](https://github.com/Cap-go/capgo/compare/1.44.13...1.44.14) (2022-11-07)
+
+
+### Bug Fixes
+
+* add more badge ([7402de9](https://github.com/Cap-go/capgo/commit/7402de91958467e2f2e727a5011e955f11521cc9))
+
+### [1.44.13](https://github.com/Cap-go/capgo/compare/1.44.12...1.44.13) (2022-11-07)
+
+
+### Bug Fixes
+
+* double init css + double crisp init ([16b7c69](https://github.com/Cap-go/capgo/commit/16b7c698aa2c0a22a9cf642e55658916b2595659))
+
 ### [1.44.12](https://github.com/Cap-go/capgo/compare/1.44.11...1.44.12) (2022-11-07)
 
 ### [1.44.11](https://github.com/Cap-go/capgo/compare/1.44.10...1.44.11) (2022-11-07)
