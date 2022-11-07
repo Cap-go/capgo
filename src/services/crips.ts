@@ -45,9 +45,9 @@ export const openChat = (): void => {
 export const reset = (): void => {
   CapacitorCrisp.reset()
 }
-export const initCrisp = (): void => {
+export const initCrisp = async (): Promise<void> => {
   try {
-    CapacitorCrisp.configure({
+    await CapacitorCrisp.configure({
       websiteID: import.meta.env.crisp as string,
     })
   }

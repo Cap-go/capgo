@@ -76,7 +76,6 @@ specifiers:
   eslint: 8.26.0
   eslint-plugin-cypress: ^2.12.1
   firebase: 9.12.1
-  flatpickr: ^4.6.13
   generate-password-browser: ^1.1.0
   https-localhost: 4.7.1
   json2csv: ^5.0.7
@@ -106,7 +105,6 @@ specifiers:
   vue: 3.2.41
   vue-chartjs: ^4.1.2
   vue-demi: 0.13.11
-  vue-flatpickr-component: ^9.0.7
   vue-i18n: 9.2.2
   vue-router: 4.1.6
   vue-tsc: 0.40.13
@@ -164,7 +162,6 @@ dependencies:
   copy-text-to-clipboard: 3.0.1
   dayjs: 1.11.6
   firebase: 9.12.1
-  flatpickr: 4.6.13
   generate-password-browser: 1.1.0
   json2csv: 5.0.7
   logsnag: 0.1.4
@@ -178,7 +175,6 @@ dependencies:
   vue: 3.2.41
   vue-chartjs: 4.1.2_chart.js@3.9.1+vue@3.2.41
   vue-demi: 0.13.11_vue@3.2.41
-  vue-flatpickr-component: 9.0.7_vue@3.2.41
   vue-i18n: 9.2.2_vue@3.2.41
   vue-router: 4.1.6_vue@3.2.41
 
@@ -10324,10 +10320,6 @@ packages:
       rimraf: 3.0.2
     dev: true
 
-  /flatpickr/4.6.13:
-    resolution: {integrity: sha512-97PMG/aywoYpB4IvbvUJi0RQi8vearvU0oov1WW3k0WZPBMrTQVqekSX5CjSG/M4Q3i6A/0FKXC7RyAoAUUSPw==}
-    dev: false
-
   /flatted/3.2.2:
     resolution: {integrity: sha512-JaTY/wtrcSyvXJl4IMFHPKyFur1sE9AUqc0QnhOaJ0CxHtAoIV8pYDzeEfAaNEtGkOfq4gr3LBFmdXW5mOQFnA==}
     dev: true
@@ -18182,16 +18174,6 @@ packages:
     transitivePeerDependencies:
       - supports-color
     dev: true
-
-  /vue-flatpickr-component/9.0.7_vue@3.2.41:
-    resolution: {integrity: sha512-ihJ9KHOJFsKH1QFZktvHXJreaZQcHpmgRYWIAEGDL+yqmbEeVqSU7ad+1OlCbiHIKH/viiXGDrg8FEMx7SiaxQ==}
-    engines: {node: '>=10.13.0'}
-    peerDependencies:
-      vue: ^3.0.0
-    dependencies:
-      flatpickr: 4.6.13
-      vue: 3.2.41
-    dev: false
 
   /vue-hot-reload-api/2.3.4:
     resolution: {integrity: sha512-BXq3jwIagosjgNVae6tkHzzIk6a8MHFtzAdwhnV5VlvPTFxDCvIttgSiHWjdGoTJvXtmRu5HacExfdarRcFhog==}

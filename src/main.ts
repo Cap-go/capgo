@@ -13,12 +13,12 @@ import App from './App.vue'
 import './styles/ionic.css'
 import './styles/markdown.css'
 import './styles/style.css'
-/* Additional styles */
-import './styles/additional-styles/utility-patterns.css'
-import './styles/additional-styles/range-slider.css'
-import './styles/additional-styles/toggle-switch.css'
-import './styles/additional-styles/flatpickr.css'
-import './styles/additional-styles/theme.css'
+// /* Additional styles */
+// import './styles/additional-styles/utility-patterns.css'
+// import './styles/additional-styles/range-slider.css'
+// import './styles/additional-styles/toggle-switch.css'
+// import './styles/additional-styles/flatpickr.css'
+// import './styles/additional-styles/theme.css'
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/vue/css/core.css'

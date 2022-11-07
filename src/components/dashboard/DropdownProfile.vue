@@ -52,27 +52,27 @@ onUnmounted(() => {
   <div class="relative inline-flex">
     <button
       ref="trigger"
-      class="inline-flex justify-center items-center group"
+      class="inline-flex items-center justify-center group"
       aria-haspopup="true"
       :aria-expanded="dropdownOpen"
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
       <img v-if="main.user?.image_url" class="w-8 h-8 rounded-full" :src="main.user?.image_url" width="32" height="32" alt="User">
-      <div v-else class="w-8 h-8 rounded-full flex justify-center items-center border-white border">
+      <div v-else class="flex items-center justify-center w-8 h-8 border border-white rounded-full">
         <p>{{ acronym }}</p>
       </div>
       <div class="flex items-center truncate">
-        <span class="truncate ml-2 text-sm font-medium group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
-        <svg class="w-3 h-3 shrink-0 ml-1 fill-current text-slate-400" viewBox="0 0 12 12">
+        <span class="ml-2 text-sm font-medium truncate group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
+        <svg class="w-3 h-3 ml-1 fill-current shrink-0 text-slate-400" viewBox="0 0 12 12">
           <path d="M5.9 11.4L.5 6l1.4-1.4 4 4 4-4L11.3 6z" />
         </svg>
       </div>
     </button>
     <transition
-      enter-active-class="transition ease-out duration-200 transform"
-      enter-from-class="opacity-0 -translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-out duration-200"
+      enter-active-class="transition duration-200 ease-out transform"
+      enter-from-class="-translate-y-2 opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition duration-200 ease-out"
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
@@ -81,7 +81,7 @@ onUnmounted(() => {
           <div class="font-medium text-slate-800">
             {{ `${main.user?.first_name} ${main.user?.last_name}` }}
           </div>
-          <div class="text-xs text-slate-900 font-bold">
+          <div class="text-xs font-bold text-slate-900">
             {{ planCurrent }} plan
           </div>
         </div>
@@ -92,19 +92,19 @@ onUnmounted(() => {
           @focusout="dropdownOpen = false"
         >
           <li>
-            <router-link class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" to="/dashboard/settings/account" @click="dropdownOpen = false">
+            <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/dashboard/settings/account" @click="dropdownOpen = false">
               {{ t('settings') }}
             </router-link>
           </li>
           <hr>
           <li>
-            <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="openChat">
+            <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="openChat">
               {{ t('account.support') }}
             </button>
           </li>
           <hr>
           <li>
-            <button class="font-medium text-sm text-blue-500 hover:text-blue-600 flex items-center py-1 px-3" @click="main.logout().then(() => router.replace('/login'))">
+            <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="main.logout().then(() => router.replace('/login'))">
               {{ t('sign-out') }}
             </button>
           </li>

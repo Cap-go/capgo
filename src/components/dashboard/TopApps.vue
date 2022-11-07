@@ -20,7 +20,7 @@ const { t } = useI18n()
     <div class="p-3">
       <!-- Table -->
       <div class="overflow-x-auto">
-        <table class="w-full table-auto">
+        <table class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="text-xs uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
             <tr>

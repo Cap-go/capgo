@@ -229,6 +229,7 @@ const presentActionSheet = async () => {
         <img
           v-else
           class="object-cover w-40 h-40 mx-auto mt-8 rounded-5xl"
+          alt="User"
           :src="main.user?.image_url"
           @click="presentActionSheet"
         >

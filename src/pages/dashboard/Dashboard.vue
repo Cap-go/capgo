@@ -73,7 +73,7 @@ watchEffect(async () => {
         </div>
       </main>
     </div>
-    <IonFab v-if="!stepsOpen && isMobile" slot="fixed" vertical="bottom" horizontal="end">
+    <IonFab v-if="!stepsOpen && !isMobile" slot="fixed" vertical="bottom" horizontal="end">
       <IonFabButton color="secondary" @click="stepsOpen = true">
         <IonIcon :icon="addOutline" />
       </IonFabButton>
