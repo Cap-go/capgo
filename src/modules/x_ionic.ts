@@ -30,23 +30,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 export const install: UserModule = ({ app, router }) => {
   app.use(IonicVue)
   const main = useMainStore()
-  // const regexpToken = /#access_token=(.+?)&/
   if (isPlatform('capacitor')) {
-    // let downloadStarted = false
-    // setTimeout(async () => {
-    //   if (!downloadStarted)
-    //     SplashScreen.hide()
-    // }, 1000)
-    // CapacitorUpdater.addListener('download', async () => {
-    //   downloadStarted = true
-    // })
-    // CapacitorUpdater.addListener('updateAvailable', async (res) => {
-    //   if (downloadStarted) {
-    //     CapacitorUpdater.set({
-    //       id: res.bundle.id,
-    //     })
-    //   }
-    // })
     CapacitorUpdater.notifyAppReady()
     App.addListener('appUrlOpen', async (event: URLOpenListenerEvent) => {
       const loading = await loadingController.create({
@@ -54,7 +38,6 @@ export const install: UserModule = ({ app, router }) => {
       })
       await loading.present()
       let { url } = event
-      // console.log('url', url)
       if (url.startsWith(supabaseUrl)) {
         const urlParams = Object.fromEntries(new URLSearchParams(url.split('?')[1]) as any) as HttpParams
         const options: HttpOptions = {
@@ -75,7 +58,6 @@ export const install: UserModule = ({ app, router }) => {
           return toast.present()
         }
       }
-      // console.log('url', url)
       if (!url.startsWith(appUrl)) {
         await loading.dismiss()
         return
