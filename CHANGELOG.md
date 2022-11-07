@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.44.9](https://github.com/Cap-go/capgo/compare/1.44.8...1.44.9) (2022-11-07)
+
+
+### Bug Fixes
+
+* auth codesmell complexity ([9178299](https://github.com/Cap-go/capgo/commit/9178299a34b7c4f0c28af3dfaadd18867e64bcbe))
+* remove comment code ([76b4c9b](https://github.com/Cap-go/capgo/commit/76b4c9b671c61f705e66d58d97543bc80a5f13cf))
+
 ### [1.44.8](https://github.com/Cap-go/capgo/compare/1.44.7...1.44.8) (2022-11-07)
 
 
