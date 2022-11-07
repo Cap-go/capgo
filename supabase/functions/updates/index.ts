@@ -142,10 +142,10 @@ serve(async (event: Request) => {
       .eq('app_id', app_id)
       .single()
     if (dbError || !channelData) {
-      console.log(id, 'Cannot get channel', app_id, `no public channel ${JSON.stringify(dbError)}`)
+      console.log(id, 'Cannot get channel', app_id, `no default channel ${JSON.stringify(dbError)}`)
       return sendRes({
         message: 'Cannot get channel',
-        err: `no public channel ${JSON.stringify(dbError)}`,
+        err: `no default channel ${JSON.stringify(dbError)}`,
       }, 200)
     }
     let channel = channelData
