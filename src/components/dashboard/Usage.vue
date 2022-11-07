@@ -68,15 +68,16 @@ const getAppStats = async () => {
   }
 }
 
-const getUsages = async () => {
-  // get aapp_stats
+const getTotalStats = async () => {
   const date_id = new Date().toISOString().slice(0, 7)
   const { data: totalStats, error: errorOldStats } = await supabase
     .rpc<StatsV2>('get_total_stats', { userid: main.user?.id, dateid: date_id })
     .single()
-  const { data, error } = await getAppStats()
   if (totalStats && !errorOldStats)
     stats.value = totalStats
+}
+const getUsages = async () => {
+  const { data, error } = await getAppStats()
   if (data && !error) {
     datas.value.mau = new Array(daysInCurrentMonth() + 1).fill(0)
     datas.value.storage = new Array(daysInCurrentMonth() + 1).fill(0)
@@ -99,6 +100,7 @@ const loadData = async () => {
     plans.value.push(...pls)
   })
   await getUsages()
+  await getTotalStats()
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
   if (main.auth?.id)
     await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
@@ -111,18 +113,18 @@ loadData()
 <template>
   <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :tilte="t('MAU')" unit="Users" />
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
+    <div class="w-full px-3 mx-auto my-3 border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
   </div>
   <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
+    <div class="w-full px-3 mx-auto my-3 border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
   </div>
   <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
+    <div class="w-full px-3 mx-auto my-3 border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
   </div>
   <MobileStats v-if="!isLoading && appId" />
   <div v-else-if="appId" class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="animate-spin rounded-full w-full px-3 mx-auto my-3 aspect-square border-b-2 border-cornflower-600" />
+    <div class="w-full px-3 mx-auto my-3 border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
   </div>
 </template>

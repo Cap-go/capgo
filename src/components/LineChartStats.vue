@@ -50,7 +50,6 @@ const generateAnnotations = computed(() => {
   let annotations: any = {}
   const min = Math.min(...accumulateData.value as number[])
   const max = Math.max(...accumulateData.value as number[])
-  // const annotations: any = {}
   Object.entries(props.limits as { [key: string]: number }).forEach(([key, val], i) => {
     if (val && val > min && val < (max * 1.2)) {
       const color1 = (i + 1) * 100

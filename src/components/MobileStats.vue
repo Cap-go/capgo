@@ -24,12 +24,6 @@ const versions = ref<(definitions['app_versions_meta'] & Version)[]>([])
 const dataDevValues = ref([] as number[])
 const dataDevLabels = ref([] as string[])
 
-// const MAU = computed(() => {
-//   return versions.value.reduce((p, c) => {
-//     return p + (c.devices || 0)
-//   }, 0)
-// })
-
 const buildGraph = () => {
   const vals = versions.value.reduce((past, d) => {
     if (d.devices)
@@ -121,7 +115,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="chat-items flex justify-center">
+  <div v-if="isLoading" class="flex justify-center chat-items">
     <Spinner />
   </div>
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">

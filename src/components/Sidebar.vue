@@ -99,23 +99,6 @@ watch(sidebarExpanded, () => {
               </router-link>
             </li>
 
-            <!-- Settings -->
-            <!-- <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <router-link class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('settings')) && 'hover:text-slate-200'" to="/dashboard/settings/account">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24">
-                      <path class="fill-current text-slate-600" :class="currentRoute.fullPath.includes('settings') && 'text-blue-500'" d="M19.714 14.7l-7.007 7.007-1.414-1.414 7.007-7.007c-.195-.4-.298-.84-.3-1.286a3 3 0 113 3 2.969 2.969 0 01-1.286-.3z" />
-                      <path class="fill-current text-slate-400" :class="currentRoute.fullPath.includes('settings') && 'text-blue-300'" d="M10.714 18.3c.4-.195.84-.298 1.286-.3a3 3 0 11-3 3c.002-.446.105-.885.3-1.286l-6.007-6.007 1.414-1.414 6.007 6.007z" />
-                      <path class="fill-current text-slate-600" :class="currentRoute.fullPath.includes('settings') && 'text-blue-500'" d="M5.7 10.714c.195.4.298.84.3 1.286a3 3 0 11-3-3c.446.002.885.105 1.286.3l7.007-7.007 1.414 1.414L5.7 10.714z" />
-                      <path class="fill-current text-slate-400" :class="currentRoute.fullPath.includes('settings') && 'text-blue-300'" d="M19.707 9.292a3.012 3.012 0 00-1.415 1.415L13.286 5.7c-.4.195-.84.298-1.286.3a3 3 0 113-3 2.969 2.969 0 01-.3 1.286l5.007 5.006z" />
-                    </svg>
-                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100">Settings</span>
-                  </div>
-                </div>
-              </router-link>
-            </li> -->
-
             <!-- Documentation -->
             <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
               <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://docs.capgo.app/">
