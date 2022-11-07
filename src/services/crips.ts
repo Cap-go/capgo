@@ -1,6 +1,15 @@
+import { isPlatform } from '@ionic/vue'
+import type { eventColor } from './crisp-web'
 import { CapacitorCrispWeb } from './crisp-web'
 
 const CapacitorCrisp = new CapacitorCrispWeb()
+if (!isPlatform('capacitor'))
+  CapacitorCrisp.isIframe = false
+CapacitorCrisp.init()
+
+export const pushEvent = (data: { name: string; color: eventColor }): void => {
+  CapacitorCrisp.pushEvent(data)
+}
 
 export const setUserId = (uuid: string): void => {
   CapacitorCrisp.setString({ key: 'user-uuid', value: uuid })
