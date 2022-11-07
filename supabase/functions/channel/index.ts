@@ -55,7 +55,7 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
     const { error: dbError } = await supabaseAdmin
       .from<definitions['channels']>('channels')
       .delete()
-      .eq('app_id', body.app_id || body.app_id)
+      .eq('app_id', body.app_id)
       .eq('name', body.channel)
     if (dbError) {
       console.log('Cannot delete channel')
