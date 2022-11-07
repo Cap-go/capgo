@@ -2,6 +2,16 @@
   <img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/>
 </p>
 
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+
 <br>
 
 <p align='center'>
