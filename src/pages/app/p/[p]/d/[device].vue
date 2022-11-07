@@ -462,7 +462,6 @@ watchEffect(async () => {
   <IonPage>
     <TitleHead :title="t('device.title')" color="warning" />
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="t('device.title')" big color="warning" condense /> -->
       <IonList>
         <IonListHeader>
           <span class="text-vista-blue-500">

@@ -378,7 +378,6 @@ const inviteUser = async (userId: string) => {
   <IonPage>
     <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="t('channel.title')" big color="warning" /> -->
       <IonHeader collapse="condense">
         <IonToolbar mode="ios">
           <IonTitle color="warning" size="large">
@@ -474,7 +473,7 @@ const inviteUser = async (userId: string) => {
               {{ t('channel.invit') }}
             </IonLabel>
             <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
-            <div slot="end" class="h-full flex items-center justify-center">
+            <div slot="end" class="flex items-center justify-center h-full">
               <IonButton color="secondary" @click="addUser()">
                 {{ t('channel.add') }}
               </IonButton>
@@ -482,8 +481,8 @@ const inviteUser = async (userId: string) => {
           </IonItem>
           <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
             <IonLabel>
-              <div class="col-span-6 flex flex-col">
-                <div class="flex justify-between items-center">
+              <div class="flex flex-col col-span-6">
+                <div class="flex items-center justify-between">
                   <h2 class="text-sm text-azure-500">
                     {{ usr.user_id.first_name }}  {{ usr.user_id.last_name }}
                   </h2>

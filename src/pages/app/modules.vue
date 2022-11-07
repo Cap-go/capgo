@@ -37,7 +37,6 @@ Object.keys(dependencies).forEach((dep) => {
   <IonPage>
     <TitleHead :title="t('module.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="t('module.heading')" no-back big color="warning" /> -->
       <div class="p-6">
         <ul class="grid grid-rows-4 mb-6 gap-y-5">
           <li>
