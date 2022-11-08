@@ -56,14 +56,13 @@ export const parseStripeEvent = (body: string, signature: string) => {
   return jsonPayload
 }
 
-export const extractDataEvent = (event: any): definitions['stripe_info'] => {
-  const data: definitions['stripe_info'] = {
+export const extractDataEvent = (event: any): Partial<definitions['stripe_info']> => {
+  const data: Partial<definitions['stripe_info']> = {
     product_id: 'free',
     price_id: '',
     subscription_id: undefined,
     customer_id: '',
     updated_at: new Date().toISOString(),
-    trial_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     status: undefined,
   }
