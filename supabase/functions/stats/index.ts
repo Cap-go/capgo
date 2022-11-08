@@ -48,11 +48,6 @@ serve(async (event: Request) => {
     if (data && data.length && !error) {
       stat.version = data[0].id
       device.version = data[0].id
-      all.push(updateVersionStats({
-        app_id: body.app_id,
-        version_id: data[0].id,
-        devices: 1,
-      }))
       const { data: deviceData, error: deviceError } = await supabaseAdmin
         .from<definitions['devices']>(deviceDb)
         .select()
@@ -66,6 +61,11 @@ serve(async (event: Request) => {
           devices: -1,
         }))
       }
+      all.push(updateVersionStats({
+        app_id: body.app_id,
+        version_id: data[0].id,
+        devices: 1,
+      }))
     }
     else {
       console.log('switch to onprem', body.app_id)
