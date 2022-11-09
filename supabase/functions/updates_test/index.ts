@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.162.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.0.0/mod.ts'
+import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
