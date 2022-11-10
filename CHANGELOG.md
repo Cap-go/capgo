@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.45.1](https://github.com/Cap-go/capgo/compare/1.45.0...1.45.1) (2022-11-10)
+
+
+### Bug Fixes
+
+* design usage + remove welcome after app added ([1dc516e](https://github.com/Cap-go/capgo/commit/1dc516e305316a37a9959ee5910138c03d04e5b4))
+
 ## [1.45.0](https://github.com/Cap-go/capgo/compare/1.44.26...1.45.0) (2022-11-10)
 
 
