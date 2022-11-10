@@ -64,6 +64,7 @@ export const extractDataEvent = (event: any): Partial<definitions['stripe_info']
     customer_id: '',
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
+    is_good_plan: true,
     status: undefined,
   }
 

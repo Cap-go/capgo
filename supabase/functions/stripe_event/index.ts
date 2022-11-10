@@ -46,7 +46,7 @@ serve(async (event: Request) => {
       price_id: stripeData.price_id,
       product_id: stripeData.product_id,
     })
-    if (stripeData.status !== 'canceled' && stripeData.price_id) {
+    if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id) {
       const { data: plan } = await supabaseAdmin
         .from<definitions['plans']>('plans')
         .select()
@@ -71,36 +71,35 @@ serve(async (event: Request) => {
         await addEventPerson(user.email, {}, 'user:upgrade', 'green')
         await logsnag.publish({
           channel: 'usage',
-          event: 'User subscribe',
+          event: stripeData.status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
           icon: '💰',
           tags: {
             'user-id': user.id,
           },
-          notify: true,
+          notify: stripeData.status === 'succeeded',
         }).catch()
       }
       else { await updatePerson(user.email, undefined, ['Not_found']) }
     }
-    else if (stripeData.status === 'canceled') {
-      if (customer && customer.subscription_id === stripeData.subscription_id) {
-        const { error: dbError2 } = await supabaseAdmin
-          .from<definitions['stripe_info']>('stripe_info')
-          .update(stripeData)
-          .eq('customer_id', stripeData.customer_id)
-        if (dbError2)
-          return sendRes(dbError, 500)
-        await updatePerson(user.email, undefined, ['Canceled'])
-        await addEventPerson(user.email, {}, 'user:cancel', 'red')
-        await logsnag.publish({
-          channel: 'usage',
-          event: 'User cancel',
-          icon: '⚠️',
-          tags: {
-            'user-id': user.id,
-          },
-          notify: true,
-        }).catch()
-      }
+    else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
+      stripeData.is_good_plan = false
+      const { error: dbError2 } = await supabaseAdmin
+        .from<definitions['stripe_info']>('stripe_info')
+        .update(stripeData)
+        .eq('customer_id', stripeData.customer_id)
+      if (dbError2)
+        return sendRes(dbError, 500)
+      await updatePerson(user.email, undefined, ['Canceled'])
+      await addEventPerson(user.email, {}, 'user:cancel', 'red')
+      await logsnag.publish({
+        channel: 'usage',
+        event: 'User cancel',
+        icon: '⚠️',
+        tags: {
+          'user-id': user.id,
+        },
+        notify: true,
+      }).catch()
     }
     else {
       await updatePerson(user.email, undefined, ['Free'])
