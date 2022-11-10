@@ -92,7 +92,7 @@ export const post = async (event: Request, apikey: definitions['apikeys']): Prom
     }
     channel.version = data.id
   }
-  if (body.public !== undefined)
+  if (Object.prototype.hasOwnProperty.call(body, 'public'))
     channel.public = body.public
 
   try {

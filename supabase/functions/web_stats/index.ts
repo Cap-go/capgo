@@ -6,6 +6,13 @@ import { insights } from '../_utils/_logsnag.ts'
 
 interface UserStats {
   users: number
+  plans: {
+    Free: number
+    Solo: number
+    Maker: number
+    Team: number
+    'Pay as you go': number
+  }
   trial: number
   need_upgrade: number
   not_paying: number
@@ -16,6 +23,10 @@ interface GlobalStats {
   updates: PromiseLike<number>
   stars: Promise<number>
   users: PromiseLike<UserStats>
+}
+
+interface StripePlan {
+  product_id: definitions['plans']
 }
 
 const getGithubStars = async (): Promise<number> => {
@@ -42,13 +53,28 @@ const getStats = (): GlobalStats => {
           console.log('get users', res.error)
           return {
             users: 0,
+            plans: {
+              'Free': 0,
+              'Solo': 0,
+              'Maker': 0,
+              'Team': 0,
+              'Pay as you go': 0,
+            },
             trial: 0,
             need_upgrade: 0,
+            not_paying: 0,
             paying: 0,
           } as UserStats
         }
         const data: UserStats = {
           users: res.data.length,
+          plans: {
+            'Free': 0,
+            'Solo': 0,
+            'Maker': 0,
+            'Team': 0,
+            'Pay as you go': 0,
+          },
           trial: 0,
           need_upgrade: 0,
           not_paying: 0,
@@ -56,6 +82,27 @@ const getStats = (): GlobalStats => {
         }
         const all = []
         for (const user of res.data) {
+          all.push(supabaseAdmin
+            .from<definitions['stripe_info'] & StripePlan>('stripe_info')
+            .select(`
+              customer_id,
+              status,
+              product_id (
+                name
+              )
+            `)
+            .eq('customer_id', user.customer_id)
+            .single()
+            .then((res) => {
+              if (res.error)
+                console.error('stripe_info error', res.error)
+              if (!res.body)
+                console.error('stripe_info no body', user.customer_id)
+              const name = res.body?.product_id.name as keyof typeof data.plans
+              console.log('stripe_info name', name, res.body?.status, res.body)
+              if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
+                data.plans[name] += res.body?.status === 'succeeded' || name === 'Free' ? 1 : 0
+            }))
           all.push(supabaseAdmin
             .rpc<boolean>('is_trial', { userid: user.id })
             .single().then((res) => {
@@ -76,32 +123,6 @@ const getStats = (): GlobalStats => {
         await Promise.all(all)
         data.need_upgrade -= data.not_paying
         data.not_paying -= data.trial
-        await insights([
-          {
-            title: 'User Count',
-            value: data.users,
-            icon: '👨',
-          },
-          {
-            title: 'User need upgrade',
-            value: data.need_upgrade,
-            icon: '🤒',
-          },
-          {
-            title: 'User trial',
-            value: data.trial,
-            icon: '👶',
-          },
-          {
-            title: 'User paying',
-            value: data.paying,
-            icon: '💰',
-          },
-          {
-            title: 'User not paying',
-            value: data.not_paying,
-            icon: '🥲',
-          }])
         return data
       }),
     stars: getGithubStars(),
@@ -121,6 +142,58 @@ serve(async (event: Request) => {
   try {
     const res = getStats()
     const [apps, updates, stars, users] = await Promise.all([res.apps, res.updates, res.stars, res.users])
+    await insights([
+      {
+        title: 'User Count',
+        value: users.users,
+        icon: '👨',
+      },
+      {
+        title: 'User need upgrade',
+        value: users.need_upgrade,
+        icon: '🤒',
+      },
+      {
+        title: 'User trial',
+        value: users.trial,
+        icon: '👶',
+      },
+      {
+        title: 'User paying',
+        value: users.paying,
+        icon: '💰',
+      },
+      {
+        title: 'User not paying',
+        value: users.not_paying,
+        icon: '🥲',
+      },
+      {
+        title: 'Free plan',
+        value: users.plans.Free,
+        icon: '🆓',
+      },
+      {
+        title: 'Solo Plan',
+        value: users.plans.Solo,
+        icon: '🎸',
+      },
+      {
+        title: 'Maker Plan',
+        value: users.plans.Maker,
+        icon: '🤝',
+      },
+      {
+        title: 'Team plan',
+        value: users.plans.Team,
+        icon: '👏',
+      },
+      {
+        title: 'Pay as you go plan',
+        value: users.plans['Pay as you go'],
+        icon: '📈',
+      },
+    ])
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
