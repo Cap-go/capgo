@@ -17,7 +17,7 @@ interface ChannelUserApp {
 </script>
 
 <template>
-  <div id="my_apps" class="bg-white border rounded-sm shadow-lg col-span-full xl:col-span-16 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+  <div id="my_shared_apps" class="bg-white border rounded-sm shadow-lg col-span-full xl:col-span-16 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <header class="px-5 py-4 border-b border-slate-100">
       <h2 class="font-semibold text-slate-800 dark:text-white">
         {{ t('shared-apps') }}

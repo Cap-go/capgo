@@ -54,6 +54,6 @@ const lastDayEvolution = computed(() => {
     <!-- Chart built with Chart.js 3 -->
 
     <!-- Change the height attribute to adjust the chart height -->
-    <LineChartStats class="w-full px-3 mx-auto my-3 aspect-square" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
+    <LineChartStats class="w-full px-3 mx-auto aspect-square" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
   </div>
 </template>

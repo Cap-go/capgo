@@ -59,7 +59,7 @@ watchEffect(async () => {
       <main>
         <div class="w-full px-4 py-8 mx-auto mb-8 sm:px-6 lg:px-8 max-w-9xl">
           <!-- Welcome banner -->
-          <WelcomeBanner />
+          <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
 
           <!-- Cards -->
           <div class="grid grid-cols-12 gap-6">
@@ -68,7 +68,7 @@ watchEffect(async () => {
             <!-- Table (Top Channels) -->
             <TopApps :apps="props.apps" @reload="emit('reloadApp')" />
 
-            <SharedApps :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
+            <SharedApps v-if="props.sharedApps.length" :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
           </div>
         </div>
       </main>
