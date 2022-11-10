@@ -144,6 +144,16 @@ serve(async (event: Request) => {
     const [apps, updates, stars, users] = await Promise.all([res.apps, res.updates, res.stars, res.users])
     await insights([
       {
+        title: 'Apps',
+        value: apps,
+        icon: '📱',
+      },
+      {
+        title: 'Updates',
+        value: updates,
+        icon: '📲',
+      },
+      {
         title: 'User Count',
         value: users.users,
         icon: '👨',
