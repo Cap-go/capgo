@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.44.26](https://github.com/Cap-go/capgo/compare/1.44.25...1.44.26) (2022-11-10)
+
+
+### Bug Fixes
+
+* sripe event make good plan direct ([12e6007](https://github.com/Cap-go/capgo/commit/12e6007b0e2f34c2e12283353bbb5dfcefa2dcbc))
+* stats and use secure check hasOwnProperty ([fa181dd](https://github.com/Cap-go/capgo/commit/fa181dd6c972a6aba5ac0f5030c17d420317ec88))
+
 ### [1.44.25](https://github.com/Cap-go/capgo/compare/1.44.24...1.44.25) (2022-11-10)
 
 ### [1.44.24](https://github.com/Cap-go/capgo/compare/1.44.23...1.44.24) (2022-11-09)
