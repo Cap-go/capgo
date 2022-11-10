@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.45.0](https://github.com/Cap-go/capgo/compare/1.44.26...1.45.0) (2022-11-10)
+
+
+### Features
+
+* add insights app and updates ([5a42570](https://github.com/Cap-go/capgo/commit/5a425705bc2043f6a004a71aa87949e17f38d08d))
+
 ### [1.44.26](https://github.com/Cap-go/capgo/compare/1.44.25...1.44.26) (2022-11-10)
 
 
