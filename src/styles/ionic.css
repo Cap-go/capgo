@@ -272,17 +272,17 @@ html {
   font-family: 'AirbnbCerealLight';
   font-style: normal;
   font-weight: normal;
-  src: url('../../fonts/AirbnbCerealLight.woff');
+  src: url('/fonts/AirbnbCerealLight.woff');
 }
 @font-face {
   font-family: 'AirbnbCerealMedium';
   font-style: normal;
   font-weight: normal;
-  src: url('../../fonts/AirbnbCerealMedium.woff');
+  src: url('/fonts/AirbnbCerealMedium.woff');
 }
 @font-face {
   font-family: 'AirbnbCerealBold';
   font-style: normal;
   font-weight: normal;
-  src: url('../../fonts/AirbnbCerealBold.woff');
+  src: url('/fonts/AirbnbCerealBold.woff');
 }

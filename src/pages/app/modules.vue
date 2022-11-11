@@ -35,7 +35,7 @@ Object.keys(dependencies).forEach((dep) => {
 
 <template>
   <IonPage>
-    <TitleHead :title="t('module.heading')" no-back color="warning" />
+    <TitleHead :title="t('module.heading')" default-back="/app/home" color="warning" />
     <IonContent :fullscreen="true">
       <div class="p-6">
         <ul class="grid grid-rows-4 mb-6 gap-y-5">
@@ -46,13 +46,13 @@ Object.keys(dependencies).forEach((dep) => {
               rel="noopener"
               target="_blank"
             >
-              <span class="font-bold">Discover module in Awesome capacitor</span>
+              <span class="font-bold">{{ t('discover-module-in-a') }}</span>
               <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
             </a>
           </li>
           <IonItemDivider>
             <IonLabel>
-              available in the sandbox
+              {{ t('available-in-the-san') }}
             </IonLabel>
           </IonItemDivider>
           <li v-for="(module, index) in modules" :key="index">
@@ -70,8 +70,3 @@ Object.keys(dependencies).forEach((dep) => {
     </IonContent>
   </IonPage>
 </template>
-
-<route lang="yaml">
-meta:
-  option: tabs
-</route>

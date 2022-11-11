@@ -124,6 +124,10 @@
 		"classpath": "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin"
 	},
 	{
+		"pkg": "@capgo/native-market",
+		"classpath": "com.getcapacitor.community.nativemarket.NativeMarket"
+	},
+	{
 		"pkg": "capacitor-native-biometric",
 		"classpath": "com.epicshaggy.biometric.NativeBiometric"
 	},

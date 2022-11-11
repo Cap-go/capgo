@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { isPlatform } from '@ionic/vue'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
 import { openChat } from '~/services/crips'
@@ -16,6 +17,7 @@ const { t } = useI18n()
 
 const router = useRouter()
 const main = useMainStore()
+const isMobile = isPlatform('capacitor')
 const planCurrent = ref('')
 const acronym = computed(() => {
   if (main.user?.first_name && main.user.last_name)
@@ -94,6 +96,16 @@ onUnmounted(() => {
           <li>
             <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/dashboard/settings/account" @click="dropdownOpen = false">
               {{ t('settings') }}
+            </router-link>
+          </li>
+          <li v-if="isMobile">
+            <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/app/modules" @click="dropdownOpen = false">
+              {{ t('module.heading') }}
+            </router-link>
+          </li>
+          <li v-if="isMobile">
+            <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/app/modules_test" @click="dropdownOpen = false">
+              {{ t('module.heading') }} {{ t('tests') }}
             </router-link>
           </li>
           <hr>

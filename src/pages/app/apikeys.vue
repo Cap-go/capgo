@@ -111,8 +111,3 @@ watchEffect(async () => {
     </IonContent>
   </IonPage>
 </template>
-
-<route lang="yaml">
-meta:
-  option: tabs
-</route>

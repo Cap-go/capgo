@@ -626,6 +626,7 @@ export interface paths {
           os_version?: parameters["rowFilter.devices_onprem.os_version"];
           id?: parameters["rowFilter.devices_onprem.id"];
           version_build?: parameters["rowFilter.devices_onprem.version_build"];
+          custom_id?: parameters["rowFilter.devices_onprem.custom_id"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -686,6 +687,7 @@ export interface paths {
           os_version?: parameters["rowFilter.devices_onprem.os_version"];
           id?: parameters["rowFilter.devices_onprem.id"];
           version_build?: parameters["rowFilter.devices_onprem.version_build"];
+          custom_id?: parameters["rowFilter.devices_onprem.custom_id"];
         };
         header: {
           /** Preference */
@@ -710,6 +712,7 @@ export interface paths {
           os_version?: parameters["rowFilter.devices_onprem.os_version"];
           id?: parameters["rowFilter.devices_onprem.id"];
           version_build?: parameters["rowFilter.devices_onprem.version_build"];
+          custom_id?: parameters["rowFilter.devices_onprem.custom_id"];
         };
         body: {
           /** devices_onprem */
@@ -3328,6 +3331,11 @@ export interface definitions {
      * @default builtin
      */
     version_build?: string;
+    /**
+     * Format: text
+     * @default
+     */
+    custom_id?: string;
   };
   stats_onprem: {
     /**
@@ -3745,7 +3753,10 @@ export interface definitions {
     plugin_version: string;
     /** Format: character varying */
     os_version?: string;
-    /** Format: character varying */
+    /**
+     * Format: character varying
+     * @default
+     */
     date_id?: string;
     /**
      * Format: text
@@ -3754,7 +3765,7 @@ export interface definitions {
     version_build?: string;
     /**
      * Format: text
-     * @default ::text
+     * @default
      */
     custom_id: string;
   };
@@ -4057,6 +4068,8 @@ export interface parameters {
   "rowFilter.devices_onprem.id": string;
   /** Format: text */
   "rowFilter.devices_onprem.version_build": string;
+  /** Format: text */
+  "rowFilter.devices_onprem.custom_id": string;
   /** @description stats_onprem */
   "body.stats_onprem": definitions["stats_onprem"];
   /** Format: bigint */

@@ -87,13 +87,16 @@ include ':capgo-capacitor-flash'
 project(':capgo-capacitor-flash').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-flash@1.2.11_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-flash/android')
 
 include ':capgo-capacitor-mute'
-project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.7_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute/android')
+project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.9_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute/android')
 
 include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.6_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-screen-recorder/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.6.3_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.10.1_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-updater/android')
+
+include ':capgo-native-market'
+project(':capgo-native-market').projectDir = new File('../node_modules/.pnpm/@capgo+native-market@1.0.11/node_modules/@capgo/native-market/android')
 
 include ':capacitor-native-biometric'
 project(':capacitor-native-biometric').projectDir = new File('../node_modules/.pnpm/capacitor-native-biometric@4.1.3/node_modules/capacitor-native-biometric/android')
