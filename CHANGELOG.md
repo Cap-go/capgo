@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.45.2](https://github.com/Cap-go/capgo/compare/1.45.1...1.45.2) (2022-11-11)
+
+
+### Bug Fixes
+
+* add module test page ([c6dbbad](https://github.com/Cap-go/capgo/commit/c6dbbadc899db4dcec00604e6dd5dd33209f546a))
+
 ### [1.45.1](https://github.com/Cap-go/capgo/compare/1.45.0...1.45.1) (2022-11-10)
 
 
