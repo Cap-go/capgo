@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.46.0](https://github.com/Cap-go/capgo/compare/1.45.4...1.46.0) (2022-11-15)
+
+
+### Features
+
+* add projection of data and fix chart 0 value ([6d298e5](https://github.com/Cap-go/capgo/commit/6d298e5f8a28cfc95f471fc261704b527a12db10))
+
 ### [1.45.4](https://github.com/Cap-go/capgo/compare/1.45.3...1.45.4) (2022-11-15)
 
 
