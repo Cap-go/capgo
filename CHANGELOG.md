@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.45.4](https://github.com/Cap-go/capgo/compare/1.45.3...1.45.4) (2022-11-15)
+
+
+### Bug Fixes
+
+* paying check + check ip only on version who have less than 4 hours ([0d935ef](https://github.com/Cap-go/capgo/commit/0d935ef063c9e6daaf5b95b3b3cab1364480cd74))
+
 ### [1.45.3](https://github.com/Cap-go/capgo/compare/1.45.2...1.45.3) (2022-11-15)
 
 ### [1.45.2](https://github.com/Cap-go/capgo/compare/1.45.1...1.45.2) (2022-11-11)
