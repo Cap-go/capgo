@@ -83,6 +83,11 @@ modules.value.push(...[
     method: 'getLatest',
     option: {},
   },
+  {
+    name: 'CapacitorUpdater',
+    method: 'getChannel',
+    option: {},
+  },
 ])
 // CapacitorUpdater.
 const runMethod = async (m: Module) => {

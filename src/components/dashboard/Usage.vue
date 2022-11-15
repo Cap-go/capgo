@@ -8,11 +8,12 @@ import type { StatsV2 } from '~/services/plans'
 import type { definitions } from '~/types/supabase'
 import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
+import { getDaysInCurrentMonth } from '~/services/date'
 
 const props = defineProps({
   appId: { type: String, default: '' },
 })
-const daysInCurrentMonth = () => new Date().getDate()
+
 const plans = ref<definitions['plans'][]>([])
 const { t } = useI18n()
 
@@ -51,7 +52,7 @@ const allLimits = computed(() => {
 const getAppStats = async () => {
   const date_id = new Date().toISOString().slice(0, 7)
   if (props.appId) {
-    console.log('appID', props.appId)
+    // console.log('appID', props.appId)
     return supabase
       .from<definitions['app_stats']>('app_stats')
       .select()
@@ -79,15 +80,24 @@ const getTotalStats = async () => {
 const getUsages = async () => {
   const { data, error } = await getAppStats()
   if (data && !error) {
-    datas.value.mau = new Array(daysInCurrentMonth() + 1).fill(0)
-    datas.value.storage = new Array(daysInCurrentMonth() + 1).fill(0)
-    datas.value.bandwidth = new Array(daysInCurrentMonth() + 1).fill(0)
+    datas.value.mau = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
+    datas.value.storage = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
+    datas.value.bandwidth = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
     data.forEach((item: definitions['app_stats']) => {
       if (item.date_id.length > 7) {
-        const dayNumber = Number(item.date_id.slice(8))
-        datas.value.mau[dayNumber] += item.devices || 0
-        datas.value.storage[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
-        datas.value.bandwidth[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
+        const dayNumber = Number(item.date_id.slice(8)) - 1
+        if (datas.value.mau[dayNumber])
+          datas.value.mau[dayNumber] += item.devices || 0
+        else
+          datas.value.mau[dayNumber] = item.devices || 0
+        if (datas.value.storage[dayNumber])
+          datas.value.storage[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
+        else
+          datas.value.storage[dayNumber] = item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
+        if (datas.value.bandwidth[dayNumber])
+          datas.value.bandwidth[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
+        else
+          datas.value.bandwidth[dayNumber] = item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
       }
     })
   }
