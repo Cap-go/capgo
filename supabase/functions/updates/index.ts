@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.164.0/http/server.ts'
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
+import { checkPlan, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 
 interface Channel {
@@ -149,8 +149,7 @@ serve(async (event: Request) => {
       }, 200)
     }
     let channel = channelData
-    const trial = await isTrial(channel.created_by)
-    const paying = await isGoodPlan(channel.created_by)
+    const rightPlan = await checkPlan(channel.created_by)
     let version: definitions['app_versions'] = channel.version
     await updateOrCreateDevice({
       app_id,
@@ -164,7 +163,7 @@ serve(async (event: Request) => {
       updated_at: new Date().toISOString(),
     })
     // console.log('updateOrCreateDevice done')
-    if (!paying && !trial) {
+    if (!rightPlan) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
       await sendStats('needUpgrade', platform, device_id, app_id, version_build, version.id)
       return sendRes({

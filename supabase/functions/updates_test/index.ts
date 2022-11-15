@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.164.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { isGoodPlan, isTrial, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
+import { checkPlan, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { invalidIp } from '../_utils/invalids_ip.ts'
 
@@ -27,11 +27,6 @@ serve(async (event: Request) => {
   // create random id
   const id = cryptoRandomString({ length: 10 })
   console.log('event', event)
-  const xForwardedFor = event.headers.get('x-forwarded-for') || ''
-  if (await invalidIp(xForwardedFor.split(',')[0])) {
-    console.error('invalid ip', xForwardedFor)
-    return sendRes({ message: 'invalid ip' }, 400)
-  }
 
   try {
     const body = (await event.json()) as AppInfos
@@ -90,6 +85,7 @@ serve(async (event: Request) => {
           version (
             id,
             name,
+            created_at,
             checksum,
             user_id,
             bucket_id,
@@ -118,6 +114,7 @@ serve(async (event: Request) => {
             version (
               id,
               name,
+              created_at,
               checksum,
               user_id,
               bucket_id,
@@ -140,6 +137,7 @@ serve(async (event: Request) => {
           version (
             id,
             name,
+            created_at,
             checksum,
             user_id,
             bucket_id,
@@ -157,9 +155,16 @@ serve(async (event: Request) => {
       }, 200)
     }
     let channel = channelData
-    const trial = await isTrial(channel.created_by)
-    const paying = await isGoodPlan(channel.created_by)
+    const rightPlan = await checkPlan(channel.created_by)
     let version: definitions['app_versions'] = channel.version
+    const xForwardedFor = event.headers.get('x-forwarded-for') || ''
+    // check if version is created_at more than 4 hours
+    const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
+
+    if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
+      console.error('invalid ip', xForwardedFor)
+      return sendRes({ message: 'invalid ip' }, 400)
+    }
     await updateOrCreateDevice({
       app_id,
       device_id,
@@ -172,7 +177,7 @@ serve(async (event: Request) => {
       updated_at: new Date().toISOString(),
     })
     // console.log('updateOrCreateDevice done')
-    if (!paying && !trial) {
+    if (!rightPlan) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
       await sendStats('needUpgrade', platform, device_id, app_id, version_build, version.id)
       return sendRes({
