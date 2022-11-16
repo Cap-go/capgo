@@ -108,6 +108,10 @@
 		"classpath": "io.capawesome.capacitorjs.plugins.screenorientation.ScreenOrientationPlugin"
 	},
 	{
+		"pkg": "@capgo/capacitor-crisp",
+		"classpath": "ee.forgr.plugin.crisp.CapacitorCrispPlugin"
+	},
+	{
 		"pkg": "@capgo/capacitor-flash",
 		"classpath": "ee.forgr.plugin.capacitor_flash.CapacitorFlashPlugin"
 	},
@@ -116,12 +120,20 @@
 		"classpath": "ee.forgr.plugin.mute.MutePlugin"
 	},
 	{
+		"pkg": "@capgo/capacitor-purchases",
+		"classpath": "ee.forgr.plugin.capacitor_purchases.CapacitorPurchasesPlugin"
+	},
+	{
 		"pkg": "@capgo/capacitor-screen-recorder",
 		"classpath": "ee.forgr.plugin.screenrecorder.ScreenRecorderPlugin"
 	},
 	{
 		"pkg": "@capgo/capacitor-updater",
 		"classpath": "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin"
+	},
+	{
+		"pkg": "@capgo/native-audio",
+		"classpath": "ee.forgr.audio.NativeAudio"
 	},
 	{
 		"pkg": "@capgo/native-market",

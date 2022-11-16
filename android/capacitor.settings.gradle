@@ -83,17 +83,26 @@ project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modu
 include ':capawesome-capacitor-screen-orientation'
 project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/.pnpm/@capawesome+capacitor-screen-orientation@2.0.1_@capacitor+core@4.4.0/node_modules/@capawesome/capacitor-screen-orientation/android')
 
+include ':capgo-capacitor-crisp'
+project(':capgo-capacitor-crisp').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-crisp@1.1.7_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-crisp/android')
+
 include ':capgo-capacitor-flash'
 project(':capgo-capacitor-flash').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-flash@1.2.11_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-flash/android')
 
 include ':capgo-capacitor-mute'
 project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.9_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-mute/android')
 
+include ':capgo-capacitor-purchases'
+project(':capgo-capacitor-purchases').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-purchases@1.3.18_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-purchases/android')
+
 include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-screen-recorder@1.2.6_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-screen-recorder/android')
 
 include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.10.1_@capacitor+core@4.4.0/node_modules/@capgo/capacitor-updater/android')
+
+include ':capgo-native-audio'
+project(':capgo-native-audio').projectDir = new File('../node_modules/.pnpm/@capgo+native-audio@4.1.0_@capacitor+core@4.4.0/node_modules/@capgo/native-audio/android')
 
 include ':capgo-native-market'
 project(':capgo-native-market').projectDir = new File('../node_modules/.pnpm/@capgo+native-market@1.0.11/node_modules/@capgo/native-market/android')
