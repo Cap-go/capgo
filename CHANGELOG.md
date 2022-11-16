@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.46.3](https://github.com/Cap-go/capgo/compare/1.46.2...1.46.3) (2022-11-16)
+
+
+### Bug Fixes
+
+* translate projection key ([eae8f77](https://github.com/Cap-go/capgo/commit/eae8f773db9c0cc7238321d477638d45486b2dcb))
+
 ### [1.46.2](https://github.com/Cap-go/capgo/compare/1.46.1...1.46.2) (2022-11-16)
 
 
