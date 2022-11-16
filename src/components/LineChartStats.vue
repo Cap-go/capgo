@@ -2,7 +2,6 @@
 import type { ChartData } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
-import { useI18n } from 'vue-i18n'
 import { isDark } from '~/composables'
 import { getDaysInCurrentMonth } from '~/services/date'
 
@@ -12,7 +11,6 @@ const props = defineProps({
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
 })
-const { t } = useI18n()
 const accumulateData = computed(() => {
   // console.log('accumulateData', props.data)
   return (props.data as number[]).reduce((acc: number[], val: number) => {
@@ -98,7 +96,7 @@ const chartData = ref<ChartData<'line'>>({
     pointBorderWidth: 0,
   },
   {
-    label: t('projection'),
+    label: 'none',
     data: projectionData.value,
     borderColor: props.colors[400],
     borderDash: [2, 10],
@@ -126,6 +124,13 @@ const chartOptions = {
   plugins: {
     annotation: {
       annotations: generateAnnotations.value,
+    },
+    legend: {
+      labels: {
+        filter: (item: any) => {
+          return item.text !== 'none'
+        },
+      },
     },
   },
 }
