@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.46.4](https://github.com/Cap-go/capgo/compare/1.46.3...1.46.4) (2022-11-16)
+
+
+### Bug Fixes
+
+* remove legend for projection ([ff7df0a](https://github.com/Cap-go/capgo/commit/ff7df0a14509c03e8a9a1b9dfba46825abae2e06))
+
 ### [1.46.3](https://github.com/Cap-go/capgo/compare/1.46.2...1.46.3) (2022-11-16)
 
 
