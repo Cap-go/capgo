@@ -163,6 +163,7 @@ serve(async (event: Request) => {
 
     if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
       console.error('invalid ip', xForwardedFor)
+      await sendStats('invalidIP', platform, device_id, app_id, version_build, version.id)
       return sendRes({ message: 'invalid ip' }, 400)
     }
     await updateOrCreateDevice({

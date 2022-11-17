@@ -4,6 +4,7 @@ import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { checkPlanValid, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
+import { invalidIp } from '../_utils/invalids_ip.ts'
 
 interface Channel {
   version: definitions['app_versions']
@@ -153,6 +154,15 @@ serve(async (event: Request) => {
     let channel = channelData
     const planValid = await checkPlanValid(channel.created_by)
     let version: definitions['app_versions'] = channel.version
+    const xForwardedFor = event.headers.get('x-forwarded-for') || ''
+    // check if version is created_at more than 4 hours
+    const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
+
+    if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
+      console.error('invalid ip', xForwardedFor)
+      await sendStats('invalidIP', platform, device_id, app_id, version_build, version.id)
+      return sendRes({ message: 'invalid ip' }, 400)
+    }
     await updateOrCreateDevice({
       app_id,
       device_id,
