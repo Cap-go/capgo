@@ -185,7 +185,7 @@ export const isTrial = async (userId: string): Promise<number> => {
   return data || 0
 }
 
-export const checkPlan = async (userId: string) => {
+export const checkPlanValid = async (userId: string) => {
   const validPlan = await isGoodPlan(userId)
   const paying = await isPaying(userId)
   const trialDays = await isTrial(userId)

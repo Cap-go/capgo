@@ -77,7 +77,7 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
   if (error)
     throw error
 
-  return data || 0
+  return data || false
 }
 export const isCanceled = async (userId: string): Promise<boolean> => {
   const { data, error } = await useSupabase()
