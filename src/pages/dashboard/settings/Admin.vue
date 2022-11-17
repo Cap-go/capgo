@@ -67,7 +67,9 @@ const reset = () => {
     return
   }
   const data = JSON.parse(textData)
-  data.currentSession.user.id = oldId.value
+  console.log('reset', data)
+  data.currentSession.user.id = localStorage.getItem('supabase.old_id')
+  console.log('reset2', data)
   localStorage.setItem('supabase.auth.token', JSON.stringify(data))
   localStorage.removeItem('supabase.old_id')
   // reload page
