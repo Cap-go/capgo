@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.48.0](https://github.com/Cap-go/capgo/compare/1.47.4...1.48.0) (2022-11-17)
+
+
+### Features
+
+* add invalidIP for device from google ([0e4658a](https://github.com/Cap-go/capgo/commit/0e4658a3415b5cf84e039d1bf282addedc04a23a))
+
 ### [1.47.4](https://github.com/Cap-go/capgo/compare/1.47.3...1.47.4) (2022-11-17)
 
 
