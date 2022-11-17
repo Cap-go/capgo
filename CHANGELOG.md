@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.47.2](https://github.com/Cap-go/capgo/compare/1.47.1...1.47.2) (2022-11-17)
+
+
+### Bug Fixes
+
+* channel message modal issue ([8fdf0f8](https://github.com/Cap-go/capgo/commit/8fdf0f84a8759ab115d9b0a4099de32a346f8f99))
+
 ### [1.47.1](https://github.com/Cap-go/capgo/compare/1.47.0...1.47.1) (2022-11-17)
 
 
