@@ -149,7 +149,7 @@ serve(async (event: Request) => {
       }, 200)
     }
     let channel = channelData
-    const rightPlan = await checkPlanValid(channel.created_by)
+    const planValid = await checkPlanValid(channel.created_by)
     let version: definitions['app_versions'] = channel.version
     await updateOrCreateDevice({
       app_id,
@@ -163,7 +163,7 @@ serve(async (event: Request) => {
       updated_at: new Date().toISOString(),
     })
     // console.log('updateOrCreateDevice done')
-    if (!rightPlan) {
+    if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
       await sendStats('needUpgrade', platform, device_id, app_id, version_build, version.id)
       return sendRes({
