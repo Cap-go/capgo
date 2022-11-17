@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.47.0](https://github.com/Cap-go/capgo/compare/1.46.6...1.47.0) (2022-11-17)
+
+
+### Features
+
+* add new data send by plugin in interface ([fc5caa3](https://github.com/Cap-go/capgo/commit/fc5caa34d6ebc44fcd7109c18e9ddcfa8a20e889))
+
 ### [1.46.6](https://github.com/Cap-go/capgo/compare/1.46.5...1.46.6) (2022-11-17)
 
 
