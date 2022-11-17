@@ -189,7 +189,7 @@ export const checkPlanValid = async (userId: string) => {
   const validPlan = await isGoodPlan(userId)
   const paying = await isPaying(userId)
   const trialDays = await isTrial(userId)
-  return ((!paying || !validPlan) && trialDays < 0)
+  return (paying && validPlan) || (!paying && trialDays < 0)
 }
 
 export const sendStats = async (action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) => {
