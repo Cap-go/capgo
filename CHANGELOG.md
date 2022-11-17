@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.47.3](https://github.com/Cap-go/capgo/compare/1.47.2...1.47.3) (2022-11-17)
+
+
+### Bug Fixes
+
+* remove useless package who was having vulnerability ([1d897c6](https://github.com/Cap-go/capgo/commit/1d897c6c9380d4ecf3d103536fbd7b77940c140e))
+
 ### [1.47.2](https://github.com/Cap-go/capgo/compare/1.47.1...1.47.2) (2022-11-17)
 
 
