@@ -195,6 +195,10 @@ login:
   or: o
   password: Parola d'ordine
   withemail: Con indirizzo email
+make-normal: Rendi normale
+making-this-channel-: >-
+  Per rendere questo canale "normale" dovrai configurare un altro canale
+  predefinito o lasciare che il dispositivo si assegni automaticamente.
 module:
   heading: Moduli
 monthly-active-users: Utenti attivi mensili

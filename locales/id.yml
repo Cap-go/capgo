@@ -196,6 +196,10 @@ login:
   or: atau
   password: Kata sandi
   withemail: Dengan alamat email
+make-normal: Jadikan normal
+making-this-channel-: >-
+  Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
+  sebagai default atau membiarkan perangkat menetapkan sendiri.
 module:
   heading: Modul
 monthly-active-users: Pengguna aktif bulanan

@@ -200,6 +200,10 @@ login:
   or: o
   password: Contraseña
   withemail: con dirección de correo electrónico
+make-normal: normalizar
+making-this-channel-: >-
+  Para hacer que este canal sea "normal", deberá configurar otro canal
+  predeterminado o dejar que el dispositivo se auto asigne.
 module:
   heading: Módulos
 monthly-active-users: Usuarios activos mensuales

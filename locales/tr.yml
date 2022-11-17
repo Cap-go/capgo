@@ -5,4 +5,8 @@ channel:
 
 
     Diğer varsayılan kanallar artık varsayılan olmayacaktır.
+make-normal: normal yap
+making-this-channel-: >-
+  Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
+  veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
 projection: Projeksiyonlar

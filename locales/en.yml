@@ -189,6 +189,10 @@ login:
   or: or
   password: Password
   withemail: With email adress
+make-normal: Make normal
+making-this-channel-: >-
+  Making this channel "normal" will need you to configure an other channel
+  default or let device self assign.
 module:
   heading: Modules
 monthly-active-users: Monthly active users

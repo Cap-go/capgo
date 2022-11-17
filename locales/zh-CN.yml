@@ -188,6 +188,8 @@ login:
   or: 要么
   password: 密码
   withemail: 有电子邮件地址
+make-normal: 使正常
+making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 module:
   heading: 模块
 monthly-active-users: 月活跃用户

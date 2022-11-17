@@ -194,6 +194,10 @@ login:
   or: lub
   password: Hasło
   withemail: Z adresem e-mail
+make-normal: Zrób normalne
+making-this-channel-: >-
+  Ustawienie tego kanału jako „normalnego” będzie wymagało skonfigurowania
+  innego domyślnego kanału lub umożliwienia samoprzypisania przez urządzenie.
 module:
   heading: Moduły
 monthly-active-users: Aktywni użytkownicy miesięcznie

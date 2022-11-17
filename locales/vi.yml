@@ -194,6 +194,10 @@ login:
   or: hoặc
   password: Mật khẩu
   withemail: Với địa chỉ email
+make-normal: làm cho bình thường
+making-this-channel-: >-
+  Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
+  một kênh khác hoặc để thiết bị tự chỉ định.
 module:
   heading: Mô-đun
 monthly-active-users: Người dùng hoạt động hàng tháng

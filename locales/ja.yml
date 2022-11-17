@@ -188,6 +188,8 @@ login:
   or: また
   password: パスワード
   withemail: メールアドレス付き
+make-normal: 通常にする
+making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 module:
   heading: モジュール
 monthly-active-users: 月間アクティブ ユーザー数

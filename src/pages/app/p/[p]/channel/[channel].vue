@@ -227,14 +227,14 @@ const addUser = async () => {
 const makeDefault = async (val = true) => {
   const alert = await alertController.create({
     header: t('account.delete_sure'),
-    message: t('channel.confirm-public-desc'),
+    message: val ? t('channel.confirm-public-desc') : t('making-this-channel-'),
     buttons: [
       {
         text: t('button.cancel'),
         role: 'cancel',
       },
       {
-        text: t('channel.make-now'),
+        text: val ? t('channel.make-now') : t('make-normal'),
         id: 'confirm-button',
         handler: async () => {
           if (!channel.value || !id.value)

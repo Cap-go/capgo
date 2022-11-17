@@ -188,6 +188,8 @@ login:
   or: 또는
   password: 비밀번호
   withemail: 이메일 주소로
+make-normal: 정상으로 만들기
+making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 module:
   heading: 모듈
 monthly-active-users: 월간 활성 사용자

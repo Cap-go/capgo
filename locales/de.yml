@@ -200,6 +200,10 @@ login:
   or: oder
   password: Passwort
   withemail: Mit E-Mail-Adresse
+make-normal: Normal machen
+making-this-channel-: >-
+  Wenn Sie diesen Kanal „normal“ machen, müssen Sie einen anderen Standardkanal
+  konfigurieren oder das Gerät selbst zuweisen lassen.
 module:
   heading: Module
 monthly-active-users: Monatlich aktive Benutzer
