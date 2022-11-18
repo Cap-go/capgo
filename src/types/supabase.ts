@@ -627,6 +627,8 @@ export interface paths {
           id?: parameters["rowFilter.devices_onprem.id"];
           version_build?: parameters["rowFilter.devices_onprem.version_build"];
           custom_id?: parameters["rowFilter.devices_onprem.custom_id"];
+          is_prod?: parameters["rowFilter.devices_onprem.is_prod"];
+          is_emulator?: parameters["rowFilter.devices_onprem.is_emulator"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -688,6 +690,8 @@ export interface paths {
           id?: parameters["rowFilter.devices_onprem.id"];
           version_build?: parameters["rowFilter.devices_onprem.version_build"];
           custom_id?: parameters["rowFilter.devices_onprem.custom_id"];
+          is_prod?: parameters["rowFilter.devices_onprem.is_prod"];
+          is_emulator?: parameters["rowFilter.devices_onprem.is_emulator"];
         };
         header: {
           /** Preference */
@@ -713,6 +717,8 @@ export interface paths {
           id?: parameters["rowFilter.devices_onprem.id"];
           version_build?: parameters["rowFilter.devices_onprem.version_build"];
           custom_id?: parameters["rowFilter.devices_onprem.custom_id"];
+          is_prod?: parameters["rowFilter.devices_onprem.is_prod"];
+          is_emulator?: parameters["rowFilter.devices_onprem.is_emulator"];
         };
         body: {
           /** devices_onprem */
@@ -1830,6 +1836,8 @@ export interface paths {
           date_id?: parameters["rowFilter.devices.date_id"];
           version_build?: parameters["rowFilter.devices.version_build"];
           custom_id?: parameters["rowFilter.devices.custom_id"];
+          is_prod?: parameters["rowFilter.devices.is_prod"];
+          is_emulator?: parameters["rowFilter.devices.is_emulator"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1891,6 +1899,8 @@ export interface paths {
           date_id?: parameters["rowFilter.devices.date_id"];
           version_build?: parameters["rowFilter.devices.version_build"];
           custom_id?: parameters["rowFilter.devices.custom_id"];
+          is_prod?: parameters["rowFilter.devices.is_prod"];
+          is_emulator?: parameters["rowFilter.devices.is_emulator"];
         };
         header: {
           /** Preference */
@@ -1916,6 +1926,8 @@ export interface paths {
           date_id?: parameters["rowFilter.devices.date_id"];
           version_build?: parameters["rowFilter.devices.version_build"];
           custom_id?: parameters["rowFilter.devices.custom_id"];
+          is_prod?: parameters["rowFilter.devices.is_prod"];
+          is_emulator?: parameters["rowFilter.devices.is_emulator"];
         };
         body: {
           /** devices */
@@ -3336,6 +3348,16 @@ export interface definitions {
      * @default
      */
     custom_id?: string;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    is_prod?: boolean;
+    /**
+     * Format: boolean
+     * @default false
+     */
+    is_emulator?: boolean;
   };
   stats_onprem: {
     /**
@@ -3768,6 +3790,16 @@ export interface definitions {
      * @default
      */
     custom_id: string;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    is_prod?: boolean;
+    /**
+     * Format: boolean
+     * @default false
+     */
+    is_emulator?: boolean;
   };
   app_versions_meta: {
     /**
@@ -4070,6 +4102,10 @@ export interface parameters {
   "rowFilter.devices_onprem.version_build": string;
   /** Format: text */
   "rowFilter.devices_onprem.custom_id": string;
+  /** Format: boolean */
+  "rowFilter.devices_onprem.is_prod": string;
+  /** Format: boolean */
+  "rowFilter.devices_onprem.is_emulator": string;
   /** @description stats_onprem */
   "body.stats_onprem": definitions["stats_onprem"];
   /** Format: bigint */
@@ -4278,6 +4314,10 @@ export interface parameters {
   "rowFilter.devices.version_build": string;
   /** Format: text */
   "rowFilter.devices.custom_id": string;
+  /** Format: boolean */
+  "rowFilter.devices.is_prod": string;
+  /** Format: boolean */
+  "rowFilter.devices.is_emulator": string;
   /** @description app_versions_meta */
   "body.app_versions_meta": definitions["app_versions_meta"];
   /** Format: timestamp with time zone */

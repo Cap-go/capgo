@@ -41,6 +41,8 @@ serve(async (event: Request) => {
       custom_id = '',
       app_id,
       device_id,
+      is_emulator,
+      is_prod,
       version_os,
     } = body
     // if version_build is not semver, then make it semver
@@ -170,6 +172,8 @@ serve(async (event: Request) => {
       plugin_version,
       version: version.id,
       os_version: version_os,
+      ...(is_emulator !== undefined ? { is_emulator } : {}),
+      ...(is_prod !== undefined ? { is_prod } : {}),
       ...(custom_id ? { custom_id } : {}),
       version_build,
       updated_at: new Date().toISOString(),

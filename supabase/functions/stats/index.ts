@@ -6,7 +6,6 @@ import type { definitions } from '../_utils/types_supabase.ts'
 interface AppStats {
   platform: string
   action: string
-  custom_id?: string
   device_id: string
   version_name?: string
   plugin_version?: string
@@ -14,6 +13,9 @@ interface AppStats {
   version: number
   version_build: string
   app_id: string
+  custom_id?: string
+  is_prod?: boolean
+  is_emulator?: boolean
 }
 
 serve(async (event: Request) => {
@@ -29,6 +31,8 @@ serve(async (event: Request) => {
       app_id: body.app_id,
       plugin_version: body.plugin_version || '2.3.3',
       os_version: body.version_os,
+      ...(body.is_emulator !== undefined ? { is_emulator: body.is_emulator } : {}),
+      ...(body.is_prod !== undefined ? { is_prod: body.is_prod } : {}),
       ...(body.custom_id ? { custom_id: body.custom_id } : {}),
     }
 
