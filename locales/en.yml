@@ -163,6 +163,7 @@ forgot:
   email: Email
   heading: Forgot password
   success: Password updated successfully
+from-device: from device
 good: Good
 id: id
 in-your-main-file: In your main file

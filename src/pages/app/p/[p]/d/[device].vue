@@ -276,7 +276,7 @@ const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
-      message: `${t('alert.delete-message')} ${name}?`,
+      message: `${t('alert.delete-message')} ${name} ${t('from-device')} ?`,
       buttons: [
         {
           text: t('button.cancel'),
