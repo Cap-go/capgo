@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.50.0](https://github.com/Cap-go/capgo/compare/1.49.0...1.50.0) (2022-11-18)
+
+
+### Features
+
+* add option for allow dev and emulator ([ab3e45f](https://github.com/Cap-go/capgo/commit/ab3e45f082aae8752428e36180e57296e341c902))
+
 ## [1.49.0](https://github.com/Cap-go/capgo/compare/1.48.1...1.49.0) (2022-11-18)
 
 
