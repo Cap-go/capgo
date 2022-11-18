@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.49.0](https://github.com/Cap-go/capgo/compare/1.48.1...1.49.0) (2022-11-18)
+
+
+### Features
+
+* add is_emulator is_prod saving ([7359e4d](https://github.com/Cap-go/capgo/commit/7359e4d9cb3b5db5df2c62d1ce51950a59c421ab))
+
 ### [1.48.1](https://github.com/Cap-go/capgo/compare/1.48.0...1.48.1) (2022-11-17)
 
 
