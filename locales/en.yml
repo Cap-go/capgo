@@ -52,7 +52,9 @@ afternoon: afternoon
 alert:
   confirm-delete: Confirm Delete
   delete-message: This action is not reversible. Are you sure you want to delete this
+allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
+allow-emulator: Allow Emulators
 api-key: API key
 api-keys: API Keys
 apikeys:
@@ -173,6 +175,8 @@ intro:
   hi: Hi, {name}!
   whats-your-name: What's your name?
 invalid-auth: invalid auth
+is-emulator: Is Emulator
+is-production-app: Is Production app
 last-upload: Last upload
 last-version: Last version
 limit-reached: Limit reached

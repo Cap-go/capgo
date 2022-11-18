@@ -56,7 +56,9 @@ alert:
   delete-message: |-
     Hành động này là không thể đảo ngược. 
     Bạn có chắc chắn muốn xóa cái này không
+allow-develoment-bui: Cho phép xây dựng phát triển
 allow-device-to-self: Cho phép các thiết bị tự liên kết
+allow-emulator: Cho phép giả lập
 api-key: Mã API
 api-keys: Khóa API
 apikeys:
@@ -178,6 +180,8 @@ intro:
   hi: Hi, {name}!
   whats-your-name: Tên bạn là gì?
 invalid-auth: xác thực không hợp lệ
+is-emulator: là giả lập
+is-production-app: Là ứng dụng sản xuất
 last-upload: Lần tải lên cuối cùng
 last-version: Phiên bản cuối cùng
 limit-reached: Đạt tới giới hạn

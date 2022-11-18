@@ -56,7 +56,9 @@ alert:
   delete-message: |-
     Questa azione non è reversibile. 
     Sei sicuro di voler cancellare questo
+allow-develoment-bui: Consenti build di sviluppo
 allow-device-to-self: Consenti ai dispositivi di associarsi automaticamente
+allow-emulator: Consenti emulatori
 api-key: Chiave API
 api-keys: Chiavi API
 apikeys:
@@ -179,6 +181,8 @@ intro:
   hi: Ciao, {name}!
   whats-your-name: Come ti chiami?
 invalid-auth: autenticazione non valida
+is-emulator: È emulatore
+is-production-app: È l'app di produzione
 last-upload: Ultimo caricamento
 last-version: Ultima versione
 limit-reached: Limite raggiunto

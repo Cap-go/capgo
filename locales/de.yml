@@ -60,7 +60,9 @@ alert:
   delete-message: |-
     Diese Aktion ist nicht umkehrbar. 
     Möchten Sie diese wirklich löschen?
+allow-develoment-bui: Entwicklungsbuild zulassen
 allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
+allow-emulator: Emulatoren zulassen
 api-key: API-Schlüssel
 api-keys: API-Schlüssel
 apikeys:
@@ -184,6 +186,8 @@ intro:
   hi: Hi, {name}!
   whats-your-name: Wie heißt du?
 invalid-auth: ungültige Auth
+is-emulator: Ist Emulator
+is-production-app: Ist die Produktions-App
 last-upload: Letzter Upload
 last-version: Letzte Version
 limit-reached: Limit erreicht

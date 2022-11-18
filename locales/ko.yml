@@ -54,7 +54,9 @@ alert:
   delete-message: |-
     이 작업은 되돌릴 수 없습니다. 
     삭제하시겠습니까?
+allow-develoment-bui: 개발 빌드 허용
 allow-device-to-self: 장치가 자체 연결하도록 허용
+allow-emulator: 에뮬레이터 허용
 api-key: API 키
 api-keys: API 키
 apikeys:
@@ -172,6 +174,8 @@ intro:
   hi: 안녕, {name}!
   whats-your-name: 이름이 뭐예요?
 invalid-auth: 잘못된 인증
+is-emulator: 에뮬레이터임
+is-production-app: 프로덕션 앱
 last-upload: 마지막 업로드
 last-version: 마지막 버전
 limit-reached: 한도 도달

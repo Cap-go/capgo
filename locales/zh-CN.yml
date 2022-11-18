@@ -54,7 +54,9 @@ alert:
   delete-message: |-
     这个动作是不可逆的。
     你确定要删除这个吗
+allow-develoment-bui: 允许开发构建
 allow-device-to-self: 允许设备自我关联
+allow-emulator: 允许模拟器
 api-key: API 密钥
 api-keys: API 密钥
 apikeys:
@@ -172,6 +174,8 @@ intro:
   hi: 你好，{name}
   whats-your-name: 输入你的名字
 invalid-auth: 无效的身份验证
+is-emulator: 是模拟器
+is-production-app: 是生产应用
 last-upload: 上次上传
 last-version: 最新版本
 limit-reached: 达到上限

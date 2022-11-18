@@ -54,7 +54,9 @@ alert:
   delete-message: |-
     このアクションは元に戻せません。
     これを削除してもよろしいですか
+allow-develoment-bui: 開発ビルドを許可
 allow-device-to-self: デバイスの自己関連付けを許可する
+allow-emulator: エミュレータを許可
 api-key: API キー
 api-keys: API キー
 apikeys:
@@ -172,6 +174,8 @@ intro:
   hi: こんにちは、{name}!
   whats-your-name: 君の名は。
 invalid-auth: 無効な認証
+is-emulator: エミュレータです
+is-production-app: 本番アプリです
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
 limit-reached: 制限に達しました

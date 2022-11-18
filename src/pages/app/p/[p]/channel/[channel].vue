@@ -135,6 +135,8 @@ const getChannel = async () => {
             created_at
           ),
           created_at,
+          allow_emulator,
+          allow_dev,
           allow_device_self_set,
           disableAutoUpdateUnderNative,
           disableAutoUpdateToMajor,
@@ -467,11 +469,19 @@ const inviteUser = async (userId: string) => {
             />
           </IonItem>
           <IonItem>
-            <IonLabel>{{ t('allow-device-to-self') }} ( min 4.7.0)</IonLabel>
+            <IonLabel>{{ t('allow-develoment-bui') }} ( min 4.7.0)</IonLabel>
             <IonToggle
               color="secondary"
-              :checked="channel?.allow_device_self_set"
-              @ion-change="saveChannelChange('allow_device_self_set', $event.target.checked)"
+              :checked="channel?.allow_dev"
+              @ion-change="saveChannelChange('allow_dev', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItem>
+            <IonLabel>{{ t('allow-emulator') }} ( min 4.7.0)</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.allow_emulator"
+              @ion-change="saveChannelChange('allow_emulator', $event.target.checked)"
             />
           </IonItem>
           <IonItem>
@@ -488,6 +498,14 @@ const inviteUser = async (userId: string) => {
               color="secondary"
               :checked="channel?.android"
               @ion-change="saveChannelChange('android', $event.target.checked)"
+            />
+          </IonItem>
+          <IonItem>
+            <IonLabel>{{ t('allow-device-to-self') }} ( min 4.7.0)</IonLabel>
+            <IonToggle
+              color="secondary"
+              :checked="channel?.allow_device_self_set"
+              @ion-change="saveChannelChange('allow_device_self_set', $event.target.checked)"
             />
           </IonItem>
           <IonItemDivider>

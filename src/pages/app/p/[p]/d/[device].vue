@@ -11,6 +11,7 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { gt } from 'semver'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
@@ -222,6 +223,8 @@ const getDevice = async () => {
             bucket_id,
             created_at
           ),
+          is_prod,
+          is_emulator,
           version_build,
           created_at,
           plugin_version,
@@ -238,6 +241,10 @@ const getDevice = async () => {
   catch (error) {
     console.error(error)
   }
+}
+
+const minVersion = (val: string, min = '4.6.99') => {
+  return gt(val, min)
 }
 
 const loadData = async () => {
@@ -531,6 +538,26 @@ watchEffect(async () => {
           </IonLabel>
           <IonNote slot="end">
             {{ device.os_version || 'unknow' }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device && minVersion(device.plugin_version)">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('is-emulator') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ device.is_emulator }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device && minVersion(device.plugin_version)">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('is-production-app') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ device.is_prod }}
           </IonNote>
         </IonItem>
         <IonItem v-if="device">

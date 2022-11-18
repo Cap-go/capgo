@@ -30,6 +30,8 @@ export interface paths {
           ios?: parameters["rowFilter.channels.ios"];
           android?: parameters["rowFilter.channels.android"];
           allow_device_self_set?: parameters["rowFilter.channels.allow_device_self_set"];
+          allow_emulator?: parameters["rowFilter.channels.allow_emulator"];
+          allow_dev?: parameters["rowFilter.channels.allow_dev"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -94,6 +96,8 @@ export interface paths {
           ios?: parameters["rowFilter.channels.ios"];
           android?: parameters["rowFilter.channels.android"];
           allow_device_self_set?: parameters["rowFilter.channels.allow_device_self_set"];
+          allow_emulator?: parameters["rowFilter.channels.allow_emulator"];
+          allow_dev?: parameters["rowFilter.channels.allow_dev"];
         };
         header: {
           /** Preference */
@@ -122,6 +126,8 @@ export interface paths {
           ios?: parameters["rowFilter.channels.ios"];
           android?: parameters["rowFilter.channels.android"];
           allow_device_self_set?: parameters["rowFilter.channels.allow_device_self_set"];
+          allow_emulator?: parameters["rowFilter.channels.allow_emulator"];
+          allow_dev?: parameters["rowFilter.channels.allow_dev"];
         };
         body: {
           /** channels */
@@ -3123,6 +3129,16 @@ export interface definitions {
      * @default false
      */
     allow_device_self_set: boolean;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    allow_emulator: boolean;
+    /**
+     * Format: boolean
+     * @default true
+     */
+    allow_dev: boolean;
   };
   deleted_account: {
     /**
@@ -3978,6 +3994,10 @@ export interface parameters {
   "rowFilter.channels.android": string;
   /** Format: boolean */
   "rowFilter.channels.allow_device_self_set": string;
+  /** Format: boolean */
+  "rowFilter.channels.allow_emulator": string;
+  /** Format: boolean */
+  "rowFilter.channels.allow_dev": string;
   /** @description deleted_account */
   "body.deleted_account": definitions["deleted_account"];
   /** Format: timestamp with time zone */

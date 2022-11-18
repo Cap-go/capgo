@@ -58,7 +58,9 @@ alert:
   delete-message: |-
     Это действие необратимо. 
     Вы уверены, что хотите удалить это
+allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
+allow-emulator: Разрешить эмуляторы
 api-key: ключ API
 api-keys: Ключи API
 apikeys:
@@ -180,6 +182,8 @@ intro:
   hi: Привет, {name}!
   whats-your-name: Как тебя зовут?
 invalid-auth: недействительная авторизация
+is-emulator: Эмулятор
+is-production-app: Является производственным приложением
 last-upload: Последняя загрузка
 last-version: Последняя версия
 limit-reached: Достигнут предел

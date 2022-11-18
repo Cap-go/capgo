@@ -1,3 +1,5 @@
+allow-develoment-bui: Geliştirme derlemesine izin ver
+allow-emulator: Öykünücülere İzin Ver
 channel:
   confirm-public-desc: >-
     Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler
@@ -5,6 +7,8 @@ channel:
 
 
     Diğer varsayılan kanallar artık varsayılan olmayacaktır.
+is-emulator: Emülatör mü
+is-production-app: Üretim uygulaması mı
 make-normal: normal yap
 making-this-channel-: >-
   Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı

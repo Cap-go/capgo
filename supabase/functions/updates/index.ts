@@ -34,16 +34,16 @@ serve(async (event: Request) => {
     let {
       version_name,
       version_build,
-      plugin_version,
     } = body
     const {
       platform,
-      custom_id = '',
       app_id,
       device_id,
-      is_emulator,
-      is_prod,
       version_os,
+      plugin_version = '2.3.3',
+      custom_id,
+      is_emulator = false,
+      is_prod = true,
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
@@ -52,13 +52,14 @@ serve(async (event: Request) => {
     else
       return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-    plugin_version = plugin_version || '2.3.3'
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       console.log('Cannot get all vars', platform,
         app_id,
         device_id,
         custom_id,
         version_build,
+        is_emulator,
+        is_prod,
         version_name)
       return sendRes({ message: 'missing appid' }, 400)
     }
@@ -68,6 +69,8 @@ serve(async (event: Request) => {
       device_id,
       custom_id,
       version_build,
+      is_emulator,
+      is_prod,
       plugin_version,
       version_name)
 
@@ -181,7 +184,7 @@ serve(async (event: Request) => {
     // console.log('updateOrCreateDevice done')
     if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
-      await sendStats('needUpgrade', platform, device_id, app_id, version_build, version.id)
+      await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
         err: 'not good plan',
@@ -224,21 +227,21 @@ serve(async (event: Request) => {
 
     // console.log('check disableAutoUpdateToMajor', device_id)
     if (!devicesOverride && !channel.ios && platform === 'ios') {
-      console.log(id, 'Cannot upgrade ios it\t disabled', device_id)
+      console.log(id, 'Cannot update, ios is disabled', device_id)
       await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         major: true,
-        message: 'Cannot upgrade ios it\t disabled',
+        message: 'Cannot update, ios it\'s disabled',
         version: version.name,
         old: version_name,
       }, 200)
     }
     if (!devicesOverride && !channel.android && platform === 'android') {
-      console.log(id, 'Cannot upgrade android it\t disabled', device_id)
+      console.log(id, 'Cannot update, android is disabled', device_id)
       await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         major: true,
-        message: 'Cannot upgrade android it\t disabled',
+        message: 'Cannot update, android is disabled',
         version: version.name,
         old: version_name,
       }, 200)
@@ -254,12 +257,33 @@ serve(async (event: Request) => {
       }, 200)
     }
 
-    console.log(id, 'check disableAutoUpdateUnderNative', device_id)
+    // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
     if (!devicesOverride && channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
-      await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, version.id)
       console.log(id, 'Cannot revert under native version', device_id)
+      await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         message: 'Cannot revert under native version',
+        version: version.name,
+        old: version_name,
+      }, 200)
+    }
+
+    if (!devicesOverride && !channel.allow_dev && !is_prod) {
+      console.log(id, 'Cannot update dev build is disabled', device_id)
+      await sendStats('disableDevBuild', platform, device_id, app_id, version_build, version.id)
+      return sendRes({
+        major: true,
+        message: 'Cannot update, dev build is disabled',
+        version: version.name,
+        old: version_name,
+      }, 200)
+    }
+    if (!devicesOverride && !channel.allow_emulator && is_emulator) {
+      console.log(id, 'Cannot update emulator is disabled', device_id)
+      await sendStats('disableEmulator', platform, device_id, app_id, version_build, version.id)
+      return sendRes({
+        major: true,
+        message: 'Cannot update, emulator is disabled',
         version: version.name,
         old: version_name,
       }, 200)

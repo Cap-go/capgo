@@ -58,7 +58,9 @@ alert:
   delete-message: |-
     Tindakan ini tidak dapat dibalik. 
     Apa kamu yakin ingin menghapus ini
+allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
+allow-emulator: Izinkan Emulator
 api-key: Kunci API
 api-keys: Kunci API
 apikeys:
@@ -180,6 +182,8 @@ intro:
   hi: Halo, {name}!
   whats-your-name: Siapa nama anda?
 invalid-auth: autentik tidak valid
+is-emulator: Apakah Emulator
+is-production-app: Apakah aplikasi Produksi
 last-upload: Unggahan terakhir
 last-version: Versi terakhir
 limit-reached: Batas tercapai
