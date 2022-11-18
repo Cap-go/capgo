@@ -51,9 +51,8 @@ add-your-first-app-t: 最初のアプリをアカウントに追加して、ア�
 afternoon: 午後
 alert:
   confirm-delete: 削除の確認
-  delete-message: |-
-    このアクションは元に戻せません。
-    これを削除してもよろしいですか
+  delete-message: これを削除してもよろしいですか
+  not-reverse-message: このアクションは元に戻せません
 allow-develoment-bui: 開発ビルドを許可
 allow-device-to-self: デバイスの自己関連付けを許可する
 allow-emulator: エミュレータを許可

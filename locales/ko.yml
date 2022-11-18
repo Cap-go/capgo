@@ -51,9 +51,8 @@ add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 �
 afternoon: 오후
 alert:
   confirm-delete: 삭제 확인
-  delete-message: |-
-    이 작업은 되돌릴 수 없습니다. 
-    삭제하시겠습니까?
+  delete-message: 삭제하시겠습니까?
+  not-reverse-message: 이 작업은 되돌릴 수 없습니다.
 allow-develoment-bui: 개발 빌드 허용
 allow-device-to-self: 장치가 자체 연결하도록 허용
 allow-emulator: 에뮬레이터 허용

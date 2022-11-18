@@ -51,7 +51,8 @@ add-your-first-app-t: Add your first app to your account and let's push updates 
 afternoon: afternoon
 alert:
   confirm-delete: Confirm Delete
-  delete-message: This action is not reversible. Are you sure you want to delete this
+  not-reverse-message: This action is not reversible
+  delete-message:  Are you sure you want to delete this
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators

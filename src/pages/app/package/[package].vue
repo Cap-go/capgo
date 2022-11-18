@@ -172,7 +172,7 @@ const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
-      message: `${t('alert.delete-message')} ${name}?`,
+      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
       buttons: [
         {
           text: t('button.cancel'),
@@ -340,11 +340,11 @@ watchEffect(async () => {
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
       </IonRefresher>
-      <div v-if="isLoading" class="chat-items flex justify-center">
+      <div v-if="isLoading" class="flex justify-center chat-items">
         <Spinner />
       </div>
       <div v-else>
-        <div class="grid grid-cols-16 gap-6 md:mx-10">
+        <div class="grid gap-6 grid-cols-16 md:mx-10">
           <Usage :app-id="id" />
         </div>
         <IonList ref="listRef">
@@ -411,7 +411,7 @@ watchEffect(async () => {
               </IonItemOptions>
             </IonItemSliding>
           </template>
-          <div v-if="isLoadingSub" class="chat-items flex justify-center">
+          <div v-if="isLoadingSub" class="flex justify-center chat-items">
             <Spinner />
           </div>
           <IonInfiniteScroll

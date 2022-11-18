@@ -53,9 +53,8 @@ add-your-first-app-t: Aggiungi la tua prima app al tuo account e spingiamo gli a
 afternoon: pomeriggio
 alert:
   confirm-delete: Conferma cancellazione
-  delete-message: |-
-    Questa azione non è reversibile. 
-    Sei sicuro di voler cancellare questo
+  delete-message: Sei sicuro di voler cancellare questo
+  not-reverse-message: Questa azione non è reversibile
 allow-develoment-bui: Consenti build di sviluppo
 allow-device-to-self: Consenti ai dispositivi di associarsi automaticamente
 allow-emulator: Consenti emulatori

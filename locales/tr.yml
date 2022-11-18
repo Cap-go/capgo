@@ -1,3 +1,6 @@
+alert:
+  delete-message: Bunu silmek istediğinizden emin misiniz
+  not-reverse-message: Bu eylem geri alınamaz
 allow-develoment-bui: Geliştirme derlemesine izin ver
 allow-emulator: Öykünücülere İzin Ver
 channel:

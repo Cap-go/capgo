@@ -51,9 +51,8 @@ add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让�
 afternoon: 下午
 alert:
   confirm-delete: 确认删除
-  delete-message: |-
-    这个动作是不可逆的。
-    你确定要删除这个吗
+  delete-message: 你确定要删除这个吗
+  not-reverse-message: 此操作不可逆
 allow-develoment-bui: 允许开发构建
 allow-device-to-self: 允许设备自我关联
 allow-emulator: 允许模拟器

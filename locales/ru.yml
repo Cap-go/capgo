@@ -55,9 +55,8 @@ add-your-first-app-t: >-
 afternoon: после полудня
 alert:
   confirm-delete: Подтвердите удаление
-  delete-message: |-
-    Это действие необратимо. 
-    Вы уверены, что хотите удалить это
+  delete-message: Вы уверены, что хотите удалить это
+  not-reverse-message: Это действие необратимо
 allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
 allow-emulator: Разрешить эмуляторы

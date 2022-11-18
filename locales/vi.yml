@@ -53,9 +53,8 @@ add-your-first-app-t: Thêm ứng dụng đầu tiên vào tài khoản của b�
 afternoon: buổi chiều
 alert:
   confirm-delete: Xác nhận Xóa
-  delete-message: |-
-    Hành động này là không thể đảo ngược. 
-    Bạn có chắc chắn muốn xóa cái này không
+  delete-message: Bạn có chắc chắn muốn xóa cái này
+  not-reverse-message: Hành động này là không thể đảo ngược
 allow-develoment-bui: Cho phép xây dựng phát triển
 allow-device-to-self: Cho phép các thiết bị tự liên kết
 allow-emulator: Cho phép giả lập

@@ -55,9 +55,8 @@ add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan mari doro
 afternoon: sore
 alert:
   confirm-delete: Konfirmasi Hapus
-  delete-message: |-
-    Tindakan ini tidak dapat dibalik. 
-    Apa kamu yakin ingin menghapus ini
+  delete-message: Apa kamu yakin ingin menghapus ini
+  not-reverse-message: Tindakan ini tidak dapat dibatalkan
 allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 allow-emulator: Izinkan Emulator

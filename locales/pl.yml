@@ -53,9 +53,8 @@ add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i przes
 afternoon: wieczór
 alert:
   confirm-delete: Potwierdź usunięcie
-  delete-message: |-
-    To działanie nie jest odwracalne. 
-    Czy na pewno chcesz to usunąć?
+  delete-message: Czy na pewno chcesz to usunąć
+  not-reverse-message: Ta czynność nie jest odwracalna
 allow-develoment-bui: Zezwalaj na kompilację deweloperską
 allow-device-to-self: Zezwalaj urządzeniom na samodzielne kojarzenie
 allow-emulator: Zezwalaj na emulatory

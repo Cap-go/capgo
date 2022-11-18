@@ -55,9 +55,8 @@ add-your-first-app-t: "Ajoutez votre première application à votre compte et po
 afternoon: après midi
 alert:
   confirm-delete: Confirmation de la suppression
-  delete-message: |-
-    Cette action n'est pas réversible. 
-    Êtes-vous sûr de vouloir supprimer ce
+  delete-message: Êtes-vous sûr de vouloir supprimer ce
+  not-reverse-message: Cette action n'est pas réversible
 allow-develoment-bui: Autoriser la compilation de développement
 allow-device-to-self: Autoriser les appareils à s'auto-associer
 allow-emulator: Autoriser les émulateurs
