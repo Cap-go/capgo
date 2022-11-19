@@ -1,0 +1,4 @@
+This app is a companion app for dev using Capacitorjs framework.
+It works as Expo Go app, for React Native.
+It allows you to test JS build in the app, like a sandbox.
+It improve the dev workflow.
