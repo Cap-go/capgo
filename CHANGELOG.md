@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.51.0](https://github.com/Cap-go/capgo/compare/1.50.3...1.51.0) (2022-11-19)
+
+
+### Features
+
+* use fastlane deliver ([1449f7c](https://github.com/Cap-go/capgo/commit/1449f7c56736d27e833910aaf30780495b41da5d))
+
 ### [1.50.3](https://github.com/Cap-go/capgo/compare/1.50.2...1.50.3) (2022-11-19)
 
 ### [1.50.2](https://github.com/Cap-go/capgo/compare/1.50.1...1.50.2) (2022-11-18)
