@@ -49,7 +49,7 @@ specifiers:
   '@iconify-json/ls': 1.1.2
   '@intlify/vite-plugin-vue-i18n': 6.0.3
   '@ionic/vue': 6.3.6
-  '@ionic/vue-router': 6.3.6
+  '@ionic/vue-router': 6.3.7
   '@supabase/supabase-js': 1.35.7
   '@tailwindcss/forms': ^0.5.3
   '@types/fs-extra': ^9.0.13
@@ -153,7 +153,7 @@ dependencies:
   '@capgo/native-audio': 4.1.0_@capacitor+core@4.4.0
   '@capgo/native-market': 1.0.11
   '@ionic/vue': 6.3.6
-  '@ionic/vue-router': 6.3.6
+  '@ionic/vue-router': 6.3.7
   '@supabase/supabase-js': 1.35.7
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.3
   '@vuelidate/core': 2.0.0_vue@3.2.44
@@ -2580,8 +2580,8 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/message-compiler': 9.3.0-beta.7
-      '@intlify/shared': 9.3.0-beta.7
+      '@intlify/message-compiler': 9.3.0-beta.10
+      '@intlify/shared': 9.3.0-beta.10
       jsonc-eslint-parser: 1.4.1
       source-map: 0.6.1
       vue-i18n: 9.2.2_vue@3.2.44
@@ -2610,11 +2610,11 @@ packages:
       '@intlify/shared': 9.2.2
       source-map: 0.6.1
 
-  /@intlify/message-compiler/9.3.0-beta.7:
-    resolution: {integrity: sha512-70r2UNp6DyKtIM4FgYCwdSuBK7xqCx2rVSXLMFiDRQi8pwooBklmOuzA0j7Q8ffbwKlFUJEEr2xPHZz2TJ6NAw==}
+  /@intlify/message-compiler/9.3.0-beta.10:
+    resolution: {integrity: sha512-RoOC6yceOykLRhN0NlbkNOBUx1el6iphx3W8NfOx3jHVNtfT1FYokx14/5sU3F1F0uxeG4sp6q+ppKvaF8o+ww==}
     engines: {node: '>= 14'}
     dependencies:
-      '@intlify/shared': 9.3.0-beta.7
+      '@intlify/shared': 9.3.0-beta.10
       source-map: 0.6.1
     dev: true
 
@@ -2622,8 +2622,8 @@ packages:
     resolution: {integrity: sha512-wRwTpsslgZS5HNyM7uDQYZtxnbI12aGiBZURX3BTR9RFIKKRWpllTsgzHWvj3HKm3Y2Sh5LPC1r0PDCKEhVn9Q==}
     engines: {node: '>= 14'}
 
-  /@intlify/shared/9.3.0-beta.7:
-    resolution: {integrity: sha512-weWqKXyv94rdPXbSFYvA4yIwLYDhzgIWfgrVQ6UYARobPFE3BN+woWmjlGmASTyXMzZtTsq21b0LCN9SHN8pxQ==}
+  /@intlify/shared/9.3.0-beta.10:
+    resolution: {integrity: sha512-h93uAanbAt/XgjDHclrVB7xix6r7Uz11wx0iGNOCdHP7aA2LCJjUT3uNbekJjjbo+Fl5jzTSJZdm2SexzoqhRA==}
     engines: {node: '>= 14'}
     dev: true
 
@@ -2643,7 +2643,7 @@ packages:
         optional: true
     dependencies:
       '@intlify/bundle-utils': 3.2.1_vue-i18n@9.2.2
-      '@intlify/shared': 9.3.0-beta.7
+      '@intlify/shared': 9.3.0-beta.10
       '@rollup/pluginutils': 4.2.1
       debug: 4.3.4
       fast-glob: 3.2.11
@@ -2761,8 +2761,8 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/vue-router/6.3.6:
-    resolution: {integrity: sha512-AwG83KHGRp7u+bW8rPsvwq+uOMJkqqEdxKpPp4OOFa5vPCdS9qSTrbnX1hQiskIjhYNbS4MSkxH/5FATcPCY3Q==}
+  /@ionic/vue-router/6.3.7:
+    resolution: {integrity: sha512-iXiH2cvPpcuKSC4qNlalrsrnZZK3rML8jaRysihp8wyv20e8BCl4t7gk3z5nhNDDT9EJl86HPpHcWlREEdjWzw==}
     dependencies:
       '@ionic/vue': 6.3.6
     dev: false
