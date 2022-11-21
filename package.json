@@ -112,7 +112,7 @@
     "@types/uuid": "8.3.4",
     "@vitejs/plugin-vue": "3.2.0",
     "@vue/cli-service": "5.0.8",
-    "@vue/compiler-sfc": "3.2.44",
+    "@vue/compiler-sfc": "3.2.45",
     "@vue/server-renderer": "3.2.44",
     "autoprefixer": "^10.4.13",
     "critters": "0.0.16",
