@@ -121,7 +121,7 @@
     "eslint": "8.27.0",
     "eslint-plugin-cypress": "^2.12.1",
     "https-localhost": "4.7.1",
-    "netlify-cli": "12.1.1",
+    "netlify-cli": "12.2.4",
     "pnpm": "7.15.0",
     "postcss": "^8.4.19",
     "sass": "1.56.1",
