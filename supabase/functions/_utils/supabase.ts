@@ -69,6 +69,7 @@ export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: st
     .eq('app_id', increment.app_id)
     .eq('date_id', date_id)
     .single()
+  console.log('updateOrAppStats', increment)
   if (dataAppStats) {
     const { error } = await supabaseAdmin
       .rpc('increment_stats', increment)

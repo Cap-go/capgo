@@ -14,12 +14,14 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
     const body = (await event.json()) as { record: definitions['app_versions'] }
+    console.log('body', body)
     const record = body.record
 
-    if (record.bucket_id)
+    if (!record.bucket_id) {
+      console.log('no bucket_id')
       return sendRes()
+    }
 
     const { data, error: dbError } = await supabaseAdmin
       .from<definitions['app_versions_meta']>('app_versions_meta')
