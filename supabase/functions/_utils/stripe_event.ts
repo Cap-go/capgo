@@ -74,7 +74,7 @@ export const extractDataEvent = (event: any): Partial<definitions['stripe_info']
       const subscription = event.data.object as any
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
-      data.status = subscription.cancel_at ? 'canceled' : 'succeeded'
+      data.status = subscription.cancel_at ? 'canceled' : 'updated'
       data.subscription_id = subscription.id
       data.customer_id = String(subscription.customer)
     }
