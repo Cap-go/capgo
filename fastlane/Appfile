@@ -3,5 +3,16 @@ apple_id(ENV["FASTLANE_APPLE_ID"])
 itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"])
 team_id(ENV["DEVELOPER_PORTAL_TEAM_ID"])
 
-json_key_file(ENV["ANDROID_JSON_KEY_FILE"])
+if ENV["ANDROID_JSON_KEY_FILE"]
+    puts 'Use ANDROID_JSON_KEY_FILE'
+    json_key_file(ENV["ANDROID_JSON_KEY_FILE"])
+elsif ENV["PLAY_CONFIG_JSON"]
+    puts 'Use PLAY_CONFIG_JSON'
+    # decode keystore base64 to string
+    keystore_base64 = ENV["PLAY_CONFIG_JSON"]
+    keystore_string = Base64.decode64(keystore_base64)
+    # puts 'keystore_string' + keystore_string
+
+    json_key_data_raw(keystore_string)
+end
 package_name(ENV['DEVELOPER_PACKAGE_NAME'])

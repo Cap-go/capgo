@@ -1,3 +1,5 @@
+require 'json'
+
 default_platform(:ios)
 
 DEVELOPER_APP_IDENTIFIER = ENV["DEVELOPER_APP_IDENTIFIER"]
@@ -81,10 +83,52 @@ platform :ios do
 
     delete_temp_keychain(TEMP_KEYCHAIN_USER)
   end
+
+  lane :submit_review do
+    version = ''
+    Dir.chdir("..") do
+      file = File.read("package.json")
+      data = JSON.parse(file)
+      version = data["version"]
+    end
+    deliver(
+      app_version: version,
+      submit_for_review: true,
+      automatic_release: true,
+      force: true, # Skip HTMl report verification
+      skip_metadata: false,
+      skip_screenshots: false,
+      skip_binary_upload: true
+    )
+  end
 end
 
 platform :android do
     desc "Deploy a beta version to the Google Play"
+    private_lane :verify_changelog_exists do |version_code: |
+      changelog_path = "android/metadata/en-US/changelogs/#{version_code}.txt"
+      UI.user_error!("Missing changelog file at #{changelog_path}") unless File.exist?(changelog_path)
+      UI.message("Changelog exists for version code #{version_code}")
+    end
+  
+    private_lane :verify_upload_to_staging do |version_name: |
+      UI.message "Skipping staging verification step"
+      # require 'open-uri'
+      # staging_version = nil
+      # begin
+      #   versions = JSON.parse(open(URI.join(STAGING_API_URL, "/--/api/v2/versions")).read)
+      #   latest_major_version = versions['sdkVersions'].keys.map(&:to_i).sort().reverse().first()
+      #   latest_version = versions['sdkVersions']["#{latest_major_version}.0.0"]
+      #   staging_version = latest_version['androidClientVersion']
+      # rescue StandardError => e
+      #   UI.user_error!("Unable to validate androidClientVersion for latest SDK version on versions endpoint: #{e.inspect}. If this issue persists, remove the verify_upload_to_staging step from Fastfile and manually verify that the Android client has been deployed and tested on staging.")
+      # end
+  
+      # unless staging_version == version_name
+      #   UI.user_error!("APK version #{version_name} is not yet uploaded to staging. Please download from the client_android CI job, test and upload manually.")
+      # end
+      # UI.message "APK version #{version_name} has been uploaded to staging"
+    end
     lane :beta do
         gradle(
           task: "clean bundleRelease",
@@ -104,5 +148,21 @@ platform :android do
           skip_upload_images: true,
           skip_upload_screenshots: true,
         )
+    end
+    lane :prod_release do
+      build_gradle = File.read("../android/app/build.gradle")
+
+      verify_changelog_exists(version_code: build_gradle.match(/versionCode (\d+)/)[1])
+      verify_upload_to_staging(version_name: build_gradle.match(/versionName '([\d\.]+)'/)[1])
+  
+      supply(
+        track_promote_to: 'beta',
+        skip_upload_apk: true,
+        skip_upload_aab: true,
+        skip_upload_metadata: false,
+        skip_upload_changelogs: false,
+        skip_upload_images: false,
+        skip_upload_screenshots: false
+      )
     end
 end
