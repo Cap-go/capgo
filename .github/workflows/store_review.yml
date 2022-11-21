@@ -2,8 +2,6 @@ name: Build source code and send to Capgo
 
 on:
   workflow_dispatch:
-    tags:
-      - '*'
       
 jobs:
   release_android:
