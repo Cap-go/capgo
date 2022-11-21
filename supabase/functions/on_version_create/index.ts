@@ -10,8 +10,6 @@ import { sendRes } from '../_utils/utils.ts'
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret)
-    return sendRes({ status: 'Cannot find authorization secret' }, 400)
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
     console.log('Fail Authorization')
     return sendRes({ message: 'Fail Authorization' }, 400)
