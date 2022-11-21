@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.53.0](https://github.com/Cap-go/capgo/compare/1.52.4...1.53.0) (2022-11-21)
+
+
+### Features
+
+* add dependabot ([b1dfc5c](https://github.com/Cap-go/capgo/commit/b1dfc5ceec6fc8188570d8d64313fac7c954363c))
+
 ### [1.52.4](https://github.com/Cap-go/capgo/compare/1.52.3...1.52.4) (2022-11-21)
 
 
