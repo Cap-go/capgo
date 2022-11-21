@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.52.0](https://github.com/Cap-go/capgo/compare/1.51.0...1.52.0) (2022-11-21)
+
+
+### Features
+
+* add workflow to release on native store ([6a1e6f4](https://github.com/Cap-go/capgo/commit/6a1e6f4de38d98ece78166075abc030395a10049))
+
 ## [1.51.0](https://github.com/Cap-go/capgo/compare/1.50.3...1.51.0) (2022-11-19)
 
 
