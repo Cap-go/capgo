@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.53.6](https://github.com/Cap-go/capgo/compare/1.53.5...1.53.6) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue to v6.3.7 ([76dfdc4](https://github.com/Cap-go/capgo/commit/76dfdc40e61e8e87631a21ea87f99959370b8fcb))
+
 ### [1.53.5](https://github.com/Cap-go/capgo/compare/1.53.4...1.53.5) (2022-11-22)
 
 
