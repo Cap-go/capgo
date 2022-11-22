@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "1.53.2",
+  "version": "1.53.3",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
