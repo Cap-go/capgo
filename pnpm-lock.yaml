@@ -43,7 +43,7 @@ specifiers:
   '@capgo/capacitor-updater': 4.10.1
   '@capgo/native-audio': ^4.1.0
   '@capgo/native-market': ^1.0.11
-  '@iconify-json/carbon': 1.1.10
+  '@iconify-json/carbon': 1.1.11
   '@iconify-json/heroicons': ^1.1.6
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
@@ -188,7 +188,7 @@ devDependencies:
   '@antfu/eslint-config': 0.31.0_zksrc6ykdxhogxjbhb5axiabwi
   '@capacitor/cli': 4.4.0
   '@capacitor/core': 4.4.0
-  '@iconify-json/carbon': 1.1.10
+  '@iconify-json/carbon': 1.1.11
   '@iconify-json/heroicons': 1.1.6
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
@@ -2531,8 +2531,8 @@ packages:
     resolution: {integrity: sha512-H9XAx3hc0BQHY6l+IFSWHDySypcXsvsuLhgYLUGywmJ5pswRVQJUHpOsobnLYp2ZUaUlKiKDrgWWhosOwAEM8Q==}
     engines: {node: '>=6.9.0'}
 
-  /@iconify-json/carbon/1.1.10:
-    resolution: {integrity: sha512-k3/28wk+2CklUPdKBXWhPHQxquvLGiPYk1s6UWdQYR3YtneHRMuCp+0zc9yNjHYBzoSylMIECO0UPH+SdccguA==}
+  /@iconify-json/carbon/1.1.11:
+    resolution: {integrity: sha512-IHkHSNmTM6q6b8DuKSzd+AEMYPZywSxcb+37kZU7ywtcwsGen3aVEvWFykopIWjjwj3xdZ/5UdwJRqhZDQMlNg==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
