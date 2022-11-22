@@ -88,7 +88,7 @@ specifiers:
   nprogress: 1.0.0-1
   pinia: 2.0.25
   plausible-tracker: ^0.3.8
-  pnpm: 7.15.0
+  pnpm: 7.17.0
   postcss: ^8.4.19
   prism-theme-vars: ^0.2.4
   sass: 1.56.1
@@ -210,7 +210,7 @@ devDependencies:
   eslint-plugin-cypress: 2.12.1_eslint@8.27.0
   https-localhost: 4.7.1
   netlify-cli: 12.1.1_@types+node@18.11.9
-  pnpm: 7.15.0
+  pnpm: 7.17.0
   postcss: 8.4.19
   sass: 1.56.1
   standard-version: 9.5.0
@@ -14132,8 +14132,8 @@ packages:
     engines: {node: '>=4'}
     dev: true
 
-  /pnpm/7.15.0:
-    resolution: {integrity: sha512-GGQ5+MCwD0bpq+65uitpgO1+ZusZ1keO5ebG/CH6ciu1ohnZj5Y3X374Ow/CBApa+Jw2/NUifVRz2fW4JChftA==}
+  /pnpm/7.17.0:
+    resolution: {integrity: sha512-0oy+VI/6r248MzFrr3jBTQ5qxC1wM+wP3YoGcoohPEMk+5LfQBYHsazdu8QDtuigr2jjaDi0hfg/c8k89jxiEA==}
     engines: {node: '>=14.6'}
     hasBin: true
     dev: true
