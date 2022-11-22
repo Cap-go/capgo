@@ -1,7 +1,7 @@
 import type { definitions } from '~/types/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
-import { isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
+import { checkPlanValid, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
@@ -39,6 +39,9 @@ const guard = async (next: any, to: string, from: string) => {
     })
     isPaying(auth?.id).then((res) => {
       main.paying = res
+    })
+    checkPlanValid(auth?.id).then((res) => {
+      main.canUseMore = res
     })
     isGoodPlan(auth?.id).then((res) => {
       main.goodPlan = res

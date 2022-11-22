@@ -108,6 +108,12 @@ export const getPlans = async (): Promise<definitions['plans'][]> => {
   return plans || []
 }
 
+export const checkPlanValid = async (userId: string) => {
+  const validPlan = await isGoodPlan(userId)
+  const paying = await isPaying(userId)
+  const trialDays = await isTrial(userId)
+  return (paying && validPlan) || (!paying && trialDays > 0)
+}
 export const getCurrentPlanName = async (userId: string): Promise<string> => {
   const { data, error } = await useSupabase()
     .rpc<string>('get_current_plan_name', { userid: userId })

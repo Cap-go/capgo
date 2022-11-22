@@ -11,6 +11,7 @@ const props = defineProps({
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
 })
+// console.log('title', props.title, props.data)
 const accumulateData = computed(() => {
   // console.log('accumulateData', props.data)
   return (props.data as number[]).reduce((acc: number[], val: number) => {

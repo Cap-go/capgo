@@ -183,7 +183,7 @@ const addUser = async () => {
   // console.log('newUser', newUser.value)
   if (!channel.value || !auth)
     return
-  if (!main.canUseMore && (main.trialDaysLeft || 0) <= 0) {
+  if (!main.canUseMore) {
     // show alert for upgrade plan and return
     const alert = await alertController.create({
       header: t('limit-reached'),
