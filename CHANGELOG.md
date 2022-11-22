@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.53.5](https://github.com/Cap-go/capgo/compare/1.53.4...1.53.5) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capacitor/assets to v2.0.4 ([7db333c](https://github.com/Cap-go/capgo/commit/7db333c52ba96c4f3361fdfa255a8cc2bf44bcc2))
+* **deps:** update dependency @ionic/vue-router to v6.3.7 ([79423e2](https://github.com/Cap-go/capgo/commit/79423e287691b3fcc55ab90f7d932463b212bdf0))
+* **deps:** update dependency androidx.core:core-splashscreen to v1.0.0 ([7c39174](https://github.com/Cap-go/capgo/commit/7c391747b0f7534dd001233f4c977cd4c0084bcc))
+* **deps:** update dependency androidx.test.ext:junit to v1.1.4 ([855a620](https://github.com/Cap-go/capgo/commit/855a620c7c90c8f81f751a8152c8898ddc00ec5d))
+
 ### [1.53.4](https://github.com/Cap-go/capgo/compare/1.53.3...1.53.4) (2022-11-22)
 
 ### [1.53.3](https://github.com/Cap-go/capgo/compare/1.53.2...1.53.3) (2022-11-22)
