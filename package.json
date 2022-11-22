@@ -64,7 +64,7 @@
     "@capgo/capacitor-updater": "4.10.1",
     "@capgo/native-audio": "^4.1.0",
     "@capgo/native-market": "^1.0.11",
-    "@ionic/vue": "6.3.6",
+    "@ionic/vue": "6.3.7",
     "@ionic/vue-router": "6.3.7",
     "@supabase/supabase-js": "1.35.7",
     "@tailwindcss/forms": "^0.5.3",
