@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.54.0](https://github.com/Cap-go/capgo/compare/1.53.9...1.54.0) (2022-11-22)
+
+
+### Features
+
+* use new notif system to send notif every week ([b5670cb](https://github.com/Cap-go/capgo/commit/b5670cb7af747b38b59505b64d0f63fa1c99d497))
+
 ### [1.53.9](https://github.com/Cap-go/capgo/compare/1.53.8...1.53.9) (2022-11-22)
 
 
