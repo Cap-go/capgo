@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.53.7](https://github.com/Cap-go/capgo/compare/1.53.6...1.53.7) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.android.volley:volley to v1.2.1 ([132724d](https://github.com/Cap-go/capgo/commit/132724d857e3c5220220e58f2de0f4596fa1d443))
+* **deps:** update dependency com.google.gms:google-services to v4.3.14 ([b755da4](https://github.com/Cap-go/capgo/commit/b755da43a9b1372a564c1c6050acab08164433ba))
+
 ### [1.53.6](https://github.com/Cap-go/capgo/compare/1.53.5...1.53.6) (2022-11-22)
 
 
