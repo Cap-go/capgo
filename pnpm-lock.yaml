@@ -48,7 +48,7 @@ specifiers:
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
   '@intlify/vite-plugin-vue-i18n': 6.0.3
-  '@ionic/vue': 6.3.6
+  '@ionic/vue': 6.3.7
   '@ionic/vue-router': 6.3.7
   '@supabase/supabase-js': 1.35.7
   '@tailwindcss/forms': ^0.5.3
@@ -152,7 +152,7 @@ dependencies:
   '@capgo/capacitor-updater': 4.10.1_@capacitor+core@4.4.0
   '@capgo/native-audio': 4.1.0_@capacitor+core@4.4.0
   '@capgo/native-market': 1.0.11
-  '@ionic/vue': 6.3.6
+  '@ionic/vue': 6.3.7
   '@ionic/vue-router': 6.3.7
   '@supabase/supabase-js': 1.35.7
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.3
@@ -2764,14 +2764,14 @@ packages:
   /@ionic/vue-router/6.3.7:
     resolution: {integrity: sha512-iXiH2cvPpcuKSC4qNlalrsrnZZK3rML8jaRysihp8wyv20e8BCl4t7gk3z5nhNDDT9EJl86HPpHcWlREEdjWzw==}
     dependencies:
-      '@ionic/vue': 6.3.6
+      '@ionic/vue': 6.3.7
     dev: false
 
-  /@ionic/vue/6.3.6:
-    resolution: {integrity: sha512-0u5vWo++jDHqW92PbRFrIAQjBakJmjAhe2P1R/DqWv0zoMeZcwCNh9DKqKqrl9xIStnu6gjLSnT/lywrksiDuA==}
+  /@ionic/vue/6.3.7:
+    resolution: {integrity: sha512-mMqCpvD7ezuJKKwiHiLzFh9myD7ThFP2g5WpGpqCfbMeWPC9Bp/oTM+SMNeQ6cE10wNsx7Op8axaT2euJeAj8g==}
     dependencies:
       '@ionic/core': 6.3.6
-      ionicons: 6.0.3
+      ionicons: 6.0.4
     dev: false
 
   /@jest/types/25.5.0:
@@ -3934,12 +3934,6 @@ packages:
   /@soda/get-current-script/1.0.2:
     resolution: {integrity: sha512-T7VNNlYVM1SgQ+VsMYhnDkcGmWhQdL0bDyGm5TlQ3GBXnJscEClUUOKduWTmm2zCnvNLC1hc3JpuXjs/nFOc5w==}
     dev: true
-
-  /@stencil/core/2.16.1:
-    resolution: {integrity: sha512-s/UJp9qxExL3DyQPT70kiuWeb3AdjbUZM+5lEIXn30I2DLcLYPOPXfsoWJODieQywq+3vPiLZeIdkoqjf6jcSw==}
-    engines: {node: '>=12.10.0', npm: '>=6.0.0'}
-    hasBin: true
-    dev: false
 
   /@stencil/core/2.18.0:
     resolution: {integrity: sha512-NLEY8Jq59smyiivBAxHKipsp9YkkW/K/Vm90zAyXQqukb12i2SFucWHJ1Ik7ropVlhmMVvigyxXgRfQ9quIqtg==}
@@ -11059,12 +11053,6 @@ packages:
       from2: 2.3.0
       p-is-promise: 1.1.0
     dev: true
-
-  /ionicons/6.0.3:
-    resolution: {integrity: sha512-kVOWER991EMqLiVShrCSWKMHkgHZP7XfVdyN6YPMuoO33W7pc5CPNVNfR8OMe/I8rYEbaunyBs6dXNYpR6gGZw==}
-    dependencies:
-      '@stencil/core': 2.16.1
-    dev: false
 
   /ionicons/6.0.4:
     resolution: {integrity: sha512-uDNOkBo0OVYV+kIhb51g9mb7r3Z0b+78GPZQBsjXuaetNmrB/mNTqN/uFtO+vxL/rQySKjzk8qeKJI5NWL9Ueg==}
