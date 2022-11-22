@@ -19,7 +19,7 @@ serve(async (event: Request) => {
     const body = (await event.json()) as { record: definitions['app_versions'] }
     const record = body.record
 
-    await supabaseAdmin
+    await supabaseAdmin()
       .from<definitions['apps']>('apps')
       .update({
         last_version: record.name,
@@ -29,7 +29,7 @@ serve(async (event: Request) => {
 
     if (!record.bucket_id) {
       console.log('No bucket_id')
-      const { error: dbError } = await supabaseAdmin
+      const { error: dbError } = await supabaseAdmin()
         .from<definitions['app_versions_meta']>('app_versions_meta')
         .insert({
           id: record.id,
@@ -43,7 +43,7 @@ serve(async (event: Request) => {
       return sendRes()
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin()
       .storage
       .from(`apps/${record.user_id}/${record.app_id}/versions`)
       .download(record.bucket_id)
@@ -57,7 +57,7 @@ serve(async (event: Request) => {
     // cr32 hash the file
     const checksum = crc32(new Uint8Array(u))
     // create app version meta
-    const { error: dbError } = await supabaseAdmin
+    const { error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions_meta']>('app_versions_meta')
       .insert({
         id: record.id,

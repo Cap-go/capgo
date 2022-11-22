@@ -69,7 +69,7 @@ serve(async (event: Request) => {
       plugin_version,
       version_name)
 
-    const { data: channelData, error: dbError } = await supabaseAdmin
+    const { data: channelData, error: dbError } = await supabaseAdmin()
       .from<definitions['channels'] & Channel>('channels')
       .select(`
           id,
@@ -95,7 +95,7 @@ serve(async (event: Request) => {
       .eq('app_id', app_id)
       .eq('public', true)
       .single()
-    const { data: channelOverride } = await supabaseAdmin
+    const { data: channelOverride } = await supabaseAdmin()
       .from<definitions['channel_devices'] & ChannelDev>('channel_devices')
       .select(`
           device_id,
@@ -127,7 +127,7 @@ serve(async (event: Request) => {
       .eq('device_id', device_id)
       .eq('app_id', app_id)
       .single()
-    const { data: devicesOverride } = await supabaseAdmin
+    const { data: devicesOverride } = await supabaseAdmin()
       .from<definitions['devices_override'] & Channel>('devices_override')
       .select(`
           device_id,
@@ -204,7 +204,7 @@ serve(async (event: Request) => {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await supabaseAdmin
+      const res = await supabaseAdmin()
         .storage
         .from(`apps/${version.user_id}/${app_id}/versions`)
         .createSignedUrl(version.bucket_id, 60)

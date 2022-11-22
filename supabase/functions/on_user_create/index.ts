@@ -19,7 +19,7 @@ serve(async (event: Request) => {
     console.log('body')
     const body = (await event.json()) as { record: definitions['users'] }
     const record = body.record
-    await supabaseAdmin
+    await supabaseAdmin()
       .from<definitions['apikeys']>('apikeys')
       .insert([
         {
@@ -42,7 +42,7 @@ serve(async (event: Request) => {
     if (record.customer_id)
       return sendRes()
     const customer = await createCustomer(record.email)
-    const { error: dbStripeError } = await supabaseAdmin
+    const { error: dbStripeError } = await supabaseAdmin()
       .from<definitions['stripe_info']>('stripe_info')
       .insert({
         customer_id: customer.id,
@@ -54,7 +54,7 @@ serve(async (event: Request) => {
     })
     await addEventPerson(record.email, {}, 'user:register', 'green')
     console.log('stripe_info done')
-    const { error: dbError } = await supabaseAdmin
+    const { error: dbError } = await supabaseAdmin()
       .from<definitions['users']>('users')
       .update({
         customer_id: customer.id,

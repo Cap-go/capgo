@@ -25,7 +25,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
   }
   // if device_id get one device
   if (body.device_id) {
-    const { data: dataDevice, error: dbError } = await supabaseAdmin
+    const { data: dataDevice, error: dbError } = await supabaseAdmin()
       .from<definitions['devices'] & DeviceVersion>('devices')
       .select(`
           created_at,
@@ -52,7 +52,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
   }
   else {
     // get all devices
-    const { data: dataDevices, error: dbError } = await supabaseAdmin
+    const { data: dataDevices, error: dbError } = await supabaseAdmin()
       .from<definitions['devices']>('devices')
       .select()
       .eq('app_id', body.app_id)
@@ -73,7 +73,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   // find device
-  const { data: dataDevice, error: dbError } = await supabaseAdmin
+  const { data: dataDevice, error: dbError } = await supabaseAdmin()
     .from<definitions['devices']>('devices')
     .select()
     .eq('app_id', body.app_id)
@@ -88,7 +88,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
 
   // if version_id set device_override to it
   if (body.version_id) {
-    const { data: dataVersion, error: dbError } = await supabaseAdmin
+    const { data: dataVersion, error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.app_id)
@@ -98,7 +98,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       console.log('Cannot find version', dbError)
       return sendRes({ status: 'Cannot find version', error: dbError }, 400)
     }
-    const { data: dataDev, error: dbErrorDev } = await supabaseAdmin
+    const { data: dataDev, error: dbErrorDev } = await supabaseAdmin()
       .from<definitions['devices_override']>('devices_override')
       .upsert({
         device_id: body.device_id,
@@ -114,7 +114,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin
+    const { data: dataChannel, error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
       .select()
       .eq('app_id', body.app_id)
@@ -124,7 +124,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       console.log('Cannot find channel', dbError)
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
     }
-    const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin
+    const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin()
       .from<definitions['channel_devices']>('channel_devices')
       .upsert({
         device_id: body.device_id,
@@ -148,7 +148,7 @@ export const deleteDev = async (event: Request, apikey: definitions['apikeys']):
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await supabaseAdmin()
       .from<definitions['devices_override']>('devices_override')
       .delete()
       .eq('app_id', body.app_id)
@@ -157,7 +157,7 @@ export const deleteDev = async (event: Request, apikey: definitions['apikeys']):
       console.error('Cannot delete override')
       return sendRes({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
     }
-    const { error: errorChannel } = await supabaseAdmin
+    const { error: errorChannel } = await supabaseAdmin()
       .from<definitions['channel_devices']>('channel_devices')
       .delete()
       .eq('app_id', body.app_id)

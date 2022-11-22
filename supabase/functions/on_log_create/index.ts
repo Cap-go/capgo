@@ -38,7 +38,7 @@ serve(async (event: Request) => {
     }
     else if (record.action === 'get') {
       increment.mlu_real = 1
-      const { data: dataVersionsMeta } = await supabaseAdmin
+      const { data: dataVersionsMeta } = await supabaseAdmin()
         .from<definitions['app_versions_meta']>('app_versions_meta')
         .select()
         .eq('id', record.version)
@@ -50,7 +50,7 @@ serve(async (event: Request) => {
       changed = true
     }
     // get device and check if update_at is today
-    const { data: dataDevice } = await supabaseAdmin
+    const { data: dataDevice } = await supabaseAdmin()
       .from<definitions['devices']>('devices')
       .select()
       .eq('device_id', record.device_id)
@@ -60,7 +60,7 @@ serve(async (event: Request) => {
       if (dataDevice.date_id !== month_id) {
         increment.devices = 1
         changed = true
-        await supabaseAdmin
+        await supabaseAdmin()
           .from<definitions['devices']>('devices')
           .update({
             date_id: month_id,
@@ -70,7 +70,7 @@ serve(async (event: Request) => {
     }
     if (changed) {
       // get app_versions_meta
-      const { data: dataApp } = await supabaseAdmin
+      const { data: dataApp } = await supabaseAdmin()
         .from<definitions['apps']>('apps')
         .select()
         .eq('app_id', record.app_id)

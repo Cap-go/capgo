@@ -29,7 +29,7 @@ serve(async (event: Request) => {
       shared: 1,
       versions: 0,
     }
-    const { data: dataApp } = await supabaseAdmin
+    const { data: dataApp } = await supabaseAdmin()
       .from<definitions['apps']>('apps')
       .select()
       .eq('app_id', record.app_id)

@@ -20,7 +20,7 @@ serve(async (event: Request) => {
       return sendRes('no customer found', 500)
 
     // find email from user with customer_id
-    const { error: dbError, data: user } = await supabaseAdmin
+    const { error: dbError, data: user } = await supabaseAdmin()
       .from<definitions['users']>('users')
       .select(`email,
       id`)
@@ -31,7 +31,7 @@ serve(async (event: Request) => {
     if (!user)
       return sendRes('no user found', 500)
 
-    const { data: customer } = await supabaseAdmin
+    const { data: customer } = await supabaseAdmin()
       .from<definitions['stripe_info']>('stripe_info')
       .select()
       .eq('customer_id', stripeData.customer_id)
@@ -47,13 +47,13 @@ serve(async (event: Request) => {
       product_id: stripeData.product_id,
     })
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id) {
-      const { data: plan } = await supabaseAdmin
+      const { data: plan } = await supabaseAdmin()
         .from<definitions['plans']>('plans')
         .select()
         .eq('stripe_id', stripeData.product_id)
         .single()
       if (plan) {
-        const { error: dbError2 } = await supabaseAdmin
+        const { error: dbError2 } = await supabaseAdmin()
           .from<definitions['stripe_info']>('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
@@ -83,7 +83,7 @@ serve(async (event: Request) => {
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       stripeData.is_good_plan = false
-      const { error: dbError2 } = await supabaseAdmin
+      const { error: dbError2 } = await supabaseAdmin()
         .from<definitions['stripe_info']>('stripe_info')
         .update(stripeData)
         .eq('customer_id', stripeData.customer_id)

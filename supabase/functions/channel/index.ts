@@ -22,7 +22,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
   }
   // get one channel or all channels
   if (body.channel) {
-    const { data: dataChannel, error: dbError } = await supabaseAdmin
+    const { data: dataChannel, error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
       .select()
       .eq('app_id', body.app_id)
@@ -34,7 +34,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     return sendRes(dataChannel[0])
   }
   else {
-    const { data: dataChannels, error: dbError } = await supabaseAdmin
+    const { data: dataChannels, error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
       .select()
       .eq('app_id', body.app_id)
@@ -52,7 +52,7 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
-    const { error: dbError } = await supabaseAdmin
+    const { error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
       .delete()
       .eq('app_id', body.app_id)
@@ -78,7 +78,7 @@ export const post = async (event: Request, apikey: definitions['apikeys']): Prom
     name: body.channel,
   }
   if (body.version) {
-    const { data, error: vError } = await supabaseAdmin
+    const { data, error: vError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.app_id)

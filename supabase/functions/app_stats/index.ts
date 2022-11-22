@@ -70,7 +70,7 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    const { data: apps } = await supabaseAdmin
+    const { data: apps } = await supabaseAdmin()
       .from<definitions['apps']>('apps')
       .select()
     if (!apps || !apps.length)

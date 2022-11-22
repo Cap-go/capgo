@@ -1497,6 +1497,111 @@ export interface paths {
       };
     };
   };
+  "/notifications": {
+    get: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.notifications.id"];
+          created_at?: parameters["rowFilter.notifications.created_at"];
+          updated_at?: parameters["rowFilter.notifications.updated_at"];
+          user_id?: parameters["rowFilter.notifications.user_id"];
+          last_send_at?: parameters["rowFilter.notifications.last_send_at"];
+          total_send?: parameters["rowFilter.notifications.total_send"];
+          cron?: parameters["rowFilter.notifications.cron"];
+          /** Filtering Columns */
+          select?: parameters["select"];
+          /** Ordering */
+          order?: parameters["order"];
+          /** Limiting and Pagination */
+          offset?: parameters["offset"];
+          /** Limiting and Pagination */
+          limit?: parameters["limit"];
+        };
+        header: {
+          /** Limiting and Pagination */
+          Range?: parameters["range"];
+          /** Limiting and Pagination */
+          "Range-Unit"?: parameters["rangeUnit"];
+          /** Preference */
+          Prefer?: parameters["preferCount"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["notifications"][];
+        };
+        /** Partial Content */
+        206: unknown;
+      };
+    };
+    post: {
+      parameters: {
+        body: {
+          /** notifications */
+          notifications?: definitions["notifications"];
+        };
+        query: {
+          /** Filtering Columns */
+          select?: parameters["select"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** Created */
+        201: unknown;
+      };
+    };
+    delete: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.notifications.id"];
+          created_at?: parameters["rowFilter.notifications.created_at"];
+          updated_at?: parameters["rowFilter.notifications.updated_at"];
+          user_id?: parameters["rowFilter.notifications.user_id"];
+          last_send_at?: parameters["rowFilter.notifications.last_send_at"];
+          total_send?: parameters["rowFilter.notifications.total_send"];
+          cron?: parameters["rowFilter.notifications.cron"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+    patch: {
+      parameters: {
+        query: {
+          id?: parameters["rowFilter.notifications.id"];
+          created_at?: parameters["rowFilter.notifications.created_at"];
+          updated_at?: parameters["rowFilter.notifications.updated_at"];
+          user_id?: parameters["rowFilter.notifications.user_id"];
+          last_send_at?: parameters["rowFilter.notifications.last_send_at"];
+          total_send?: parameters["rowFilter.notifications.total_send"];
+          cron?: parameters["rowFilter.notifications.cron"];
+        };
+        body: {
+          /** notifications */
+          notifications?: definitions["notifications"];
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferReturn"];
+        };
+      };
+      responses: {
+        /** No Content */
+        204: never;
+      };
+    };
+  };
   "/channel_users": {
     get: {
       parameters: {
@@ -3627,6 +3732,42 @@ export interface definitions {
      */
     customer_id?: string;
   };
+  notifications: {
+    /**
+     * Format: character varying
+     * @description Note:
+     * This is a Primary Key.<pk/>
+     */
+    id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    created_at?: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    updated_at?: string;
+    /**
+     * Format: uuid
+     * @description Note:
+     * This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+     */
+    user_id: string;
+    /**
+     * Format: timestamp with time zone
+     * @default now()
+     */
+    last_send_at: string;
+    /** Format: bigint */
+    total_send: number;
+    /**
+     * Format: text
+     * @default * * * * *
+     */
+    cron: string;
+  };
   channel_users: {
     /**
      * Format: bigint
@@ -4252,6 +4393,22 @@ export interface parameters {
   "rowFilter.users.legalAccepted": string;
   /** Format: character varying */
   "rowFilter.users.customer_id": string;
+  /** @description notifications */
+  "body.notifications": definitions["notifications"];
+  /** Format: character varying */
+  "rowFilter.notifications.id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.notifications.created_at": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.notifications.updated_at": string;
+  /** Format: uuid */
+  "rowFilter.notifications.user_id": string;
+  /** Format: timestamp with time zone */
+  "rowFilter.notifications.last_send_at": string;
+  /** Format: bigint */
+  "rowFilter.notifications.total_send": string;
+  /** Format: text */
+  "rowFilter.notifications.cron": string;
   /** @description channel_users */
   "body.channel_users": definitions["channel_users"];
   /** Format: bigint */

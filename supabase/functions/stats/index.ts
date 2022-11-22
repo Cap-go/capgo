@@ -44,7 +44,7 @@ serve(async (event: Request) => {
       version_build: body.version_build,
     }
     const all = []
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.app_id)
@@ -52,7 +52,7 @@ serve(async (event: Request) => {
     if (data && data.length && !error) {
       stat.version = data[0].id
       device.version = data[0].id
-      const { data: deviceData, error: deviceError } = await supabaseAdmin
+      const { data: deviceData, error: deviceError } = await supabaseAdmin()
         .from<definitions['devices']>(deviceDb)
         .select()
         .eq('app_id', body.app_id)

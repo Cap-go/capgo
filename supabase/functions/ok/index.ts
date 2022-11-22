@@ -7,7 +7,7 @@ serve(async (event: Request) => {
   const url = new URL(event.url)
   console.log('url', url, url.searchParams.get('service'))
   if (url.searchParams.get('service') === 'database') {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin()
       .from<definitions['apps']>('apps')
       .select()
       .eq('app_id', 'unknow.unknow')

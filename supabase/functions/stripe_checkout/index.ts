@@ -23,7 +23,7 @@ serve(async (event: Request) => {
     const body = (await event.json()) as PortalData
     console.log('body', body)
     console.log('auth')
-    const { user: auth, error } = await supabaseAdmin.auth.api.getUser(
+    const { user: auth, error } = await supabaseAdmin().auth.api.getUser(
       authorization?.split('Bearer ')[1],
     )
     console.log('auth done', auth?.id)
@@ -32,7 +32,7 @@ serve(async (event: Request) => {
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
-    const { data: user, error: dbError } = await supabaseAdmin
+    const { data: user, error: dbError } = await supabaseAdmin()
       .from<definitions['users']>('users')
       .select()
       .eq('id', auth.id)

@@ -29,12 +29,12 @@ serve(async (event: Request) => {
     await updatePerson(record.email, person)
     if (!record.customer_id) {
       const customer = await createCustomer(record.email)
-      await supabaseAdmin
+      await supabaseAdmin()
         .from<definitions['stripe_info']>('stripe_info')
         .insert({
           customer_id: customer.id,
         })
-      await supabaseAdmin
+      await supabaseAdmin()
         .from<definitions['users']>('users')
         .update({
           customer_id: customer.id,

@@ -20,13 +20,13 @@ const post = async (event: Request): Promise<Response> => {
     return sendRes({ status: 'Cannot find device_id or appi_id' }, 400)
   }
   // find device
-  const { data: dataDevice, error: dbError } = await supabaseAdmin
+  const { data: dataDevice, error: dbError } = await supabaseAdmin()
     .from<definitions['devices']>('devices')
     .select()
     .eq('app_id', body.app_id)
     .eq('device_id', body.device_id)
     .single()
-  const { data: dataChannelOverride } = await supabaseAdmin
+  const { data: dataChannelOverride } = await supabaseAdmin()
     .from<definitions['channel_devices'] & DeviceChannel>('channel_devices')
     .select(`
       channel_id (
@@ -46,7 +46,7 @@ const post = async (event: Request): Promise<Response> => {
   // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin
+    const { data: dataChannel, error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
       .select()
       .eq('app_id', body.app_id)
@@ -57,7 +57,7 @@ const post = async (event: Request): Promise<Response> => {
       console.log('Cannot find channel', dbError)
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
     }
-    const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin
+    const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin()
       .from<definitions['channel_devices']>('channel_devices')
       .upsert({
         device_id: body.device_id,
@@ -79,13 +79,13 @@ const put = async (event: Request): Promise<Response> => {
     console.log('Cannot find device or appi_id')
     return sendRes({ status: 'Cannot find device' }, 400)
   }
-  const { data: dataChannel, error: errorChannel } = await supabaseAdmin
+  const { data: dataChannel, error: errorChannel } = await supabaseAdmin()
     .from<definitions['channels'] & DeviceChannel>('channels')
     .select()
     .eq('app_id', body.app_id)
     .eq('public', true)
     .single()
-  const { data: dataChannelOverride, error } = await supabaseAdmin
+  const { data: dataChannelOverride, error } = await supabaseAdmin()
     .from<definitions['channel_devices'] & DeviceChannel>('channel_devices')
     .select(`
       channel_id (

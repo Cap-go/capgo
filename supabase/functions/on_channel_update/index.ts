@@ -19,7 +19,7 @@ serve(async (event: Request) => {
 
     if (record.public) {
       // find all other channels with same app_i with public true and update them to false
-      await supabaseAdmin
+      await supabaseAdmin()
         .from< definitions['channels']>('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)

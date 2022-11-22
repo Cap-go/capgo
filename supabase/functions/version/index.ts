@@ -19,7 +19,7 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   try {
-    const { error: dbError } = await supabaseAdmin
+    const { error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .update({
         deleted: true,
@@ -52,7 +52,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
 
-    const { data: dataVersions, error: dbError } = await supabaseAdmin
+    const { data: dataVersions, error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.appid || body.app_id)

@@ -22,7 +22,7 @@ serve(async (event: Request) => {
     // deno-lint-ignore no-empty
     }
     catch {}
-    const { user: auth, error } = await supabaseAdmin.auth.api.getUser(
+    const { user: auth, error } = await supabaseAdmin().auth.api.getUser(
       authorization?.split('Bearer ')[1],
     )
 
@@ -30,7 +30,7 @@ serve(async (event: Request) => {
     if (error || !auth)
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
-    const { data: user, error: dbError } = await supabaseAdmin
+    const { data: user, error: dbError } = await supabaseAdmin()
       .from<definitions['users']>('users')
       .select()
       .eq('id', auth.id)

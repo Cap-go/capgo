@@ -37,17 +37,17 @@ const getGithubStars = async (): Promise<number> => {
 
 const getStats = (): GlobalStats => {
   return {
-    apps: supabaseAdmin.rpc<number>('count_all_apps', {}).single().then((res) => {
+    apps: supabaseAdmin().rpc<number>('count_all_apps', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_apps', res.error)
       return res.data || 0
     }),
-    updates: supabaseAdmin.rpc<number>('count_all_updates', {}).single().then((res) => {
+    updates: supabaseAdmin().rpc<number>('count_all_updates', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_updates', res.error)
       return res.data || 0
     }),
-    users: supabaseAdmin.from<definitions['users']>('users')
+    users: supabaseAdmin().from<definitions['users']>('users')
       .select().then(async (res) => {
         if (res.error || !res.data) {
           console.log('get users', res.error)
@@ -82,7 +82,7 @@ const getStats = (): GlobalStats => {
         }
         const all = []
         for (const user of res.data) {
-          all.push(supabaseAdmin
+          all.push(supabaseAdmin()
             .from<definitions['stripe_info'] & StripePlan>('stripe_info')
             .select(`
               customer_id,
@@ -103,17 +103,17 @@ const getStats = (): GlobalStats => {
               if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
                 data.plans[name] += res.body?.status === 'succeeded' || name === 'Free' ? 1 : 0
             }))
-          all.push(supabaseAdmin
+          all.push(supabaseAdmin()
             .rpc<boolean>('is_trial', { userid: user.id })
             .single().then((res) => {
               data.trial += res.data ? 1 : 0
             }))
-          all.push(supabaseAdmin
+          all.push(supabaseAdmin()
             .rpc<boolean>('is_good_plan_v2', { userid: user.id })
             .single().then((res) => {
               data.need_upgrade += res.data ? 0 : 1
             }))
-          all.push(supabaseAdmin
+          all.push(supabaseAdmin()
             .rpc<boolean>('is_paying', { userid: user.id })
             .single().then((res) => {
               data.paying += res.data ? 1 : 0
@@ -215,7 +215,7 @@ serve(async (event: Request) => {
       ...users,
     }
     // console.log('newData', newData)
-    await supabaseAdmin
+    await supabaseAdmin()
       .from<definitions['global_stats']>('global_stats')
       .upsert(newData)
     return sendRes()
