@@ -48,7 +48,7 @@ specifiers:
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.2
   '@intlify/vite-plugin-vue-i18n': 6.0.3
-  '@ionic/vue': 6.3.7
+  '@ionic/vue': 6.3.8
   '@ionic/vue-router': 6.3.7
   '@supabase/supabase-js': 1.35.7
   '@tailwindcss/forms': ^0.5.3
@@ -152,7 +152,7 @@ dependencies:
   '@capgo/capacitor-updater': 4.10.1_@capacitor+core@4.4.0
   '@capgo/native-audio': 4.1.0_@capacitor+core@4.4.0
   '@capgo/native-market': 1.0.11
-  '@ionic/vue': 6.3.7
+  '@ionic/vue': 6.3.8
   '@ionic/vue-router': 6.3.7
   '@supabase/supabase-js': 1.35.7
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.3
@@ -2683,8 +2683,8 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/core/6.3.6:
-    resolution: {integrity: sha512-QbLp9XNRfFHUVpSEEcFJYEyxek6Vi82EDIdJj0JvUPqMFdzF93dfzRoEIOos52jWxTG4LwGHLHlWem/3stF5Rg==}
+  /@ionic/core/6.3.8:
+    resolution: {integrity: sha512-mpawxkbjx/lBaWMYexvEHzKP9+03gKKe/CXHGnBh7z9WHpDuR+H9jdojjiHkakoN79TcdM3G+BYMZ0tVGeeJhw==}
     dependencies:
       '@stencil/core': 2.18.0
       ionicons: 6.0.4
@@ -2776,13 +2776,13 @@ packages:
   /@ionic/vue-router/6.3.7:
     resolution: {integrity: sha512-iXiH2cvPpcuKSC4qNlalrsrnZZK3rML8jaRysihp8wyv20e8BCl4t7gk3z5nhNDDT9EJl86HPpHcWlREEdjWzw==}
     dependencies:
-      '@ionic/vue': 6.3.7
+      '@ionic/vue': 6.3.8
     dev: false
 
-  /@ionic/vue/6.3.7:
-    resolution: {integrity: sha512-mMqCpvD7ezuJKKwiHiLzFh9myD7ThFP2g5WpGpqCfbMeWPC9Bp/oTM+SMNeQ6cE10wNsx7Op8axaT2euJeAj8g==}
+  /@ionic/vue/6.3.8:
+    resolution: {integrity: sha512-l3vxlrwNroSpb0US/Yqoie67f4jAGb/jhN7J4kdb19/9EjEH4z5lPTEH/XgiYQ1dYokPlT2zZeP6SImgwozGoA==}
     dependencies:
-      '@ionic/core': 6.3.6
+      '@ionic/core': 6.3.8
       ionicons: 6.0.4
     dev: false
 
