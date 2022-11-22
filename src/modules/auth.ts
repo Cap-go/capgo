@@ -84,7 +84,9 @@ const guard = async (next: any, to: string, from: string) => {
 // // vueuse/head https://github.com/vueuse/head
 export const install: UserModule = ({ router }) => {
   router.beforeEach(async (to, from, next) => {
-    if (to.meta.middleware) { await guard(next, to.path, from.path) }
+    if (to.meta.middleware) {
+      await guard(next, to.path, from.path)
+    }
     else {
       hideLoader()
       next()

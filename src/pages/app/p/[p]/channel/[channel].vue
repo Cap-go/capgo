@@ -220,7 +220,9 @@ const addUser = async () => {
       user_id: exist,
       created_by: auth.id,
     })
-  if (error) { console.error(error) }
+  if (error) {
+    console.error(error)
+  }
   else {
     await getUsers()
     newUser.value = ''
@@ -374,7 +376,9 @@ const inviteUser = async (userId: string) => {
       app_id: channel.value?.version.app_id,
       user_id: userId,
     })
-  if (error) { console.error(error) }
+  if (error) {
+    console.error(error)
+  }
   else {
     newUser.value = ''
     newUserModalOpen.value = false

@@ -108,7 +108,9 @@ watch(
       // reGenerate annotations
       isLoading.value = false
     }
-    else if (prevMyPlan && !myPlan) { isLoading.value = true }
+    else if (prevMyPlan && !myPlan) {
+      isLoading.value = true
+    }
   })
 
 watchEffect(async () => {

@@ -25,7 +25,9 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 
 const rules = computed(() => {
-  if (step.value === 1) { return { email: { required, email } } }
+  if (step.value === 1) {
+    return { email: { required, email } }
+  }
   else {
     return {
       password: { required, minLength: minLength(6) },
@@ -55,7 +57,9 @@ const submit = async () => {
     // console.log('redirect', redirectTo)
     const { error } = await supabase.auth.api
       .resetPasswordForEmail(form.email, { redirectTo })
-    setTimeout(() => { isLoading.value = false }, 5000)
+    setTimeout(() => {
+      isLoading.value = false
+    }, 5000)
     if (error)
       showToastMessage(error.message)
     else showToastMessage(t('forgot.check_email'))
@@ -66,8 +70,12 @@ const submit = async () => {
     const access_token = urlParams.get('access_token') || ''
     const { error } = await supabase.auth.api
       .updateUser(access_token, { password: form.password })
-    setTimeout(() => { isLoading.value = false }, 5000)
-    if (error) { showToastMessage(error.message) }
+    setTimeout(() => {
+      isLoading.value = false
+    }, 5000)
+    if (error) {
+      showToastMessage(error.message)
+    }
     else {
       showToastMessage(t('forgot.success'))
       await supabase.auth.signOut()
