@@ -18,41 +18,41 @@ const getApp = (userId: string, appId: string) => {
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
   // console.log('req', req)
   return {
-    mlu: supabaseAdmin
+    mlu: supabaseAdmin()
       .from<definitions['stats']>('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'get'),
-    mlu_real: supabaseAdmin
+    mlu_real: supabaseAdmin()
       .from<definitions['stats']>('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'set'),
-    devices: supabaseAdmin
+    devices: supabaseAdmin()
       .from<definitions['devices']>('devices')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
-    bandwidth: supabaseAdmin
+    bandwidth: supabaseAdmin()
       .from<definitions['app_stats']>('app_stats')
       .select()
       .eq('app_id', appId)
       .in('date_id', allDayOfMonth()),
-    versions: supabaseAdmin
+    versions: supabaseAdmin()
       .from<definitions['app_versions_meta']>('app_versions_meta')
       .select()
       .eq('app_id', appId)
       .eq('user_id', userId),
-    shared: supabaseAdmin
+    shared: supabaseAdmin()
       .from<definitions['channel_users']>('channel_users')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
-    channels: supabaseAdmin
+    channels: supabaseAdmin()
       .from<definitions['channels']>('channels')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
@@ -120,7 +120,7 @@ serve(async (event: Request) => {
             bandwidth: bandwidthTotal,
           }
           // console.log('newData', newData)
-          return supabaseAdmin
+          return supabaseAdmin()
             .from<definitions['app_stats']>('app_stats')
             .upsert(newData)
         }))
