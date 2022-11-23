@@ -2,21 +2,7 @@ import { serve } from 'https://deno.land/std@0.165.0/http/server.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
-
-interface AppStats {
-  platform: string
-  action: string
-  device_id: string
-  version_name?: string
-  plugin_version?: string
-  version_os?: string
-  version: number
-  version_build: string
-  app_id: string
-  custom_id?: string
-  is_prod?: boolean
-  is_emulator?: boolean
-}
+import type { AppStats } from '../_utils/types.ts'
 
 serve(async (event: Request) => {
   try {
@@ -49,9 +35,10 @@ serve(async (event: Request) => {
       .select()
       .eq('app_id', body.app_id)
       .eq('name', body.version_name || 'unknown')
-    if (data && data.length && !error) {
-      stat.version = data[0].id
-      device.version = data[0].id
+      .single()
+    if (data && !error) {
+      stat.version = data.id
+      device.version = data.id
       const { data: deviceData, error: deviceError } = await supabaseAdmin()
         .from<definitions['devices']>(deviceDb)
         .select()
@@ -67,7 +54,7 @@ serve(async (event: Request) => {
       }
       all.push(updateVersionStats({
         app_id: body.app_id,
-        version_id: data[0].id,
+        version_id: data.id,
         devices: 1,
       }))
     }

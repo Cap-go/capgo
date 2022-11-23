@@ -1,11 +1,10 @@
 import { serve } from 'https://deno.land/std@0.165.0/http/server.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { sendStats, supabaseAdmin } from '../_utils/supabase.ts'
+import type { AppInfos } from '../_utils/types.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
-interface DeviceLink {
-  app_id: string
-  device_id: string
+interface DeviceLink extends AppInfos {
   channel?: string
 }
 
@@ -70,6 +69,16 @@ const post = async (event: Request): Promise<Response> => {
       return sendRes({ status: 'Cannot do channel override', error: dbErrorDev }, 400)
     }
   }
+  const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
+    .from<definitions['app_versions']>('app_versions')
+    .select()
+    .eq('app_id', body.app_id)
+    .eq('name', body.version_name || 'unknown')
+    .single()
+  if (dataVersion && !errorVersion)
+    await sendStats('setChannel', body.platform, body.device_id, body.app_id, body.version_build, dataVersion.id)
+  else
+    console.log('Cannot find app version', errorVersion)
   return sendRes()
 }
 
@@ -114,6 +123,16 @@ const put = async (event: Request): Promise<Response> => {
     }, 400)
   }
   else if (dataChannel) {
+    const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
+      .from<definitions['app_versions']>('app_versions')
+      .select()
+      .eq('app_id', body.app_id)
+      .eq('name', body.version_name || 'unknown')
+      .single()
+    if (dataVersion && !errorVersion)
+      await sendStats('getChannel', body.platform, body.device_id, body.app_id, body.version_build, dataVersion.id)
+    else
+      console.log('Cannot find app version', errorVersion)
     return sendRes({
       channel: dataChannel.name,
       status: 'default',
