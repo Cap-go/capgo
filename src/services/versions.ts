@@ -43,7 +43,7 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
       await CapacitorUpdater.next({ id: current.bundle.id })
       // // iso date in one hour with dayjs
       const expires = dayjs().add(1, 'hour').toISOString()
-      await CapacitorUpdater.setDelay({ kind: 'date', value: expires })
+      await CapacitorUpdater.setMultiDelay({ delayConditions: [{ kind: 'date', value: expires }] })
       await CapacitorUpdater.set(newBundle)
     }
     catch (error) {
