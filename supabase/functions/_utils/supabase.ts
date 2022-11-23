@@ -156,6 +156,16 @@ export const updateOrCreateDevice = async (update: Partial<definitions['devices'
   }
 }
 
+export const getCurrentPlanName = async (userId: string): Promise<string> => {
+  const { data, error } = await supabaseAdmin()
+    .rpc<string>('get_current_plan_name', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || 'Free'
+}
+
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
     .rpc<boolean>('is_good_plan_v2', { userid: userId })

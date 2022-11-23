@@ -45,7 +45,7 @@ serve(async (event: Request) => {
         product_id: 'free',
       })
     }
-    await checkPlan(record)
+    await checkPlan(record.id)
     return sendRes()
   }
   catch (e) {

@@ -5,6 +5,7 @@ import { sendRes } from '../_utils/utils.ts'
 import { checkPlanValid, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
 import { invalidIp } from '../_utils/invalids_ip.ts'
+import { checkPlan } from '../_utils/plans.ts'
 
 interface Channel {
   version: definitions['app_versions']
@@ -158,6 +159,7 @@ serve(async (event: Request) => {
     }
     let channel = channelData
     const planValid = await checkPlanValid(channel.created_by)
+    await checkPlan(channel.created_by)
     let version: definitions['app_versions'] = channel.version
     const xForwardedFor = event.headers.get('x-forwarded-for') || ''
     // check if version is created_at more than 4 hours
