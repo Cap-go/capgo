@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.55.0](https://github.com/Cap-go/capgo/compare/1.54.9...1.55.0) (2022-11-23)
+
+
+### Features
+
+* add stats for check channel ([76cf9e1](https://github.com/Cap-go/capgo/commit/76cf9e12bd6d110a6208e794c38162280b7da1f0))
+
 ### [1.54.9](https://github.com/Cap-go/capgo/compare/1.54.8...1.54.9) (2022-11-23)
 
 
