@@ -63,7 +63,7 @@ specifiers:
   '@vue/server-renderer': 3.2.45
   '@vuelidate/core': 2.0.0
   '@vuelidate/validators': 2.0.0
-  '@vueuse/core': 9.5.0
+  '@vueuse/core': 9.6.0
   autoprefixer: ^10.4.13
   base64-arraybuffer: 1.0.2
   capacitor-native-biometric: 4.1.3
@@ -158,7 +158,7 @@ dependencies:
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.3
   '@vuelidate/core': 2.0.0_vue@3.2.45
   '@vuelidate/validators': 2.0.0_vue@3.2.45
-  '@vueuse/core': 9.5.0_vue@3.2.45
+  '@vueuse/core': 9.6.0_vue@3.2.45
   base64-arraybuffer: 1.0.2
   capacitor-native-biometric: 4.1.3
   capacitor-rate-app: 3.0.0_@capacitor+core@4.4.0
@@ -5062,24 +5062,24 @@ packages:
       vue-demi: 0.13.11_vue@3.2.45
     dev: false
 
-  /@vueuse/core/9.5.0_vue@3.2.45:
-    resolution: {integrity: sha512-6GsWBsJHEb3sYw15mbLrcbslAVY45pkzjJYTKYKCXv88z7srAF0VEW0q+oXKsl58tCbqooplInahXFg8Yo1m4w==}
+  /@vueuse/core/9.6.0_vue@3.2.45:
+    resolution: {integrity: sha512-qGUcjKQXHgN+jqXEgpeZGoxdCbIDCdVPz3QiF1uyecVGbMuM63o96I1GjYx5zskKgRI0FKSNsVWM7rwrRMTf6A==}
     dependencies:
       '@types/web-bluetooth': 0.0.16
-      '@vueuse/metadata': 9.5.0
-      '@vueuse/shared': 9.5.0_vue@3.2.45
+      '@vueuse/metadata': 9.6.0
+      '@vueuse/shared': 9.6.0_vue@3.2.45
       vue-demi: 0.13.11_vue@3.2.45
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
     dev: false
 
-  /@vueuse/metadata/9.5.0:
-    resolution: {integrity: sha512-4M1AyPZmIv41pym+K5+4wup3bKuYebbH8w8BROY1hmT7rIwcyS4tEL+UsGz0Hiu1FCOxcoBrwtAizc0YmBJjyQ==}
+  /@vueuse/metadata/9.6.0:
+    resolution: {integrity: sha512-sIC8R+kWkIdpi5X2z2Gk8TRYzmczDwHRhEFfCu2P+XW2JdPoXrziqsGpDDsN7ykBx4ilwieS7JUIweVGhvZ93w==}
     dev: false
 
-  /@vueuse/shared/9.5.0_vue@3.2.45:
-    resolution: {integrity: sha512-HnnCWU1Vg9CVWRCcI8ohDKDRB2Sc4bTgT1XAIaoLSfVHHn+TKbrox6pd3klCSw4UDxkhDfOk8cAdcK+Z5KleCA==}
+  /@vueuse/shared/9.6.0_vue@3.2.45:
+    resolution: {integrity: sha512-/eDchxYYhkHnFyrb00t90UfjCx94kRHxc7J1GtBCqCG4HyPMX+krV9XJgVtWIsAMaxKVU4fC8NSUviG1JkwhUQ==}
     dependencies:
       vue-demi: 0.13.11_vue@3.2.45
     transitivePeerDependencies:
