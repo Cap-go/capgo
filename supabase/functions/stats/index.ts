@@ -78,10 +78,10 @@ serve(async (event: Request) => {
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
     }
-    all.push(supabaseAdmin
+    all.push(supabaseAdmin()
       .from(deviceDb)
       .upsert(device))
-    all.push(supabaseAdmin
+    all.push(supabaseAdmin()
       .from(statsDb)
       .insert(stat))
     await Promise.all(all)

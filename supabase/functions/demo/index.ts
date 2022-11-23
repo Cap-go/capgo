@@ -16,7 +16,7 @@ serve(async (event: Request) => {
     console.error('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin, ['all', 'write'])
+  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
   if (!apikey) {
     console.error('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)

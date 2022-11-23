@@ -23,7 +23,7 @@ serve(async (event: Request) => {
       return sendRes({ status: 'error', message: 'no apps' })
     const all = []
     for (const user of users) {
-      all.push(supabaseAdmin
+      all.push(supabaseAdmin()
         .from<definitions['users']>('users')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', user.id))
