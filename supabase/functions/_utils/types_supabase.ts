@@ -2285,6 +2285,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
+          encrypted?: parameters["rowFilter.app_versions.encrypted"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -2345,6 +2346,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
+          encrypted?: parameters["rowFilter.app_versions.encrypted"];
         };
         header: {
           /** Preference */
@@ -2369,6 +2371,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
+          encrypted?: parameters["rowFilter.app_versions.encrypted"];
         };
         body: {
           /** app_versions */
@@ -2691,6 +2694,26 @@ export interface paths {
       };
     };
   };
+  "/rpc/get_current_plan_max": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/find_fit_plan": {
     post: {
       parameters: {
@@ -2984,6 +3007,26 @@ export interface paths {
             userid: string;
             /** Format: bigint */
             versionid: number;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
+  "/rpc/get_max_plan": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
           };
         };
         header: {
@@ -3763,7 +3806,7 @@ export interface definitions {
     /** Format: bigint */
     total_send: number;
     /**
-     * Format: text
+     * Format: character varying
      * @default * * * * *
      */
     cron: string;
@@ -4069,6 +4112,11 @@ export interface definitions {
     external_url?: string;
     /** Format: character varying */
     checksum?: string;
+    /**
+     * Format: boolean
+     * @default false
+     */
+    encrypted: boolean;
   };
 }
 
@@ -4407,7 +4455,7 @@ export interface parameters {
   "rowFilter.notifications.last_send_at": string;
   /** Format: bigint */
   "rowFilter.notifications.total_send": string;
-  /** Format: text */
+  /** Format: character varying */
   "rowFilter.notifications.cron": string;
   /** @description channel_users */
   "body.channel_users": definitions["channel_users"];
@@ -4553,6 +4601,8 @@ export interface parameters {
   "rowFilter.app_versions.external_url": string;
   /** Format: character varying */
   "rowFilter.app_versions.checksum": string;
+  /** Format: boolean */
+  "rowFilter.app_versions.encrypted": string;
 }
 
 export interface operations {}
