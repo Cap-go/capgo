@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
-
+configurations {
+    all {
+        exclude group: 'androidx.lifecycle', module: 'lifecycle-runtime-ktx'
+        exclude group: 'androidx.lifecycle', module: 'lifecycle-viewmodel-ktx'
+    }
+}
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
