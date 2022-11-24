@@ -38,9 +38,9 @@ specifiers:
   '@capgo/capacitor-crisp': ^1.1.13
   '@capgo/capacitor-flash': ^1.2.19
   '@capgo/capacitor-mute': ^1.1.19
-  '@capgo/capacitor-purchases': ^1.3.29
-  '@capgo/capacitor-screen-recorder': ^1.2.14
-  '@capgo/capacitor-updater': 4.11.12
+  '@capgo/capacitor-purchases': ^1.3.33
+  '@capgo/capacitor-screen-recorder': ^1.2.18
+  '@capgo/capacitor-updater': 4.12.2
   '@capgo/native-audio': ^4.2.7
   '@capgo/native-market': ^1.1.6
   '@iconify-json/carbon': 1.1.11
@@ -146,9 +146,9 @@ dependencies:
   '@capgo/capacitor-crisp': 1.1.13_@capacitor+core@4.5.0
   '@capgo/capacitor-flash': 1.2.19_@capacitor+core@4.5.0
   '@capgo/capacitor-mute': 1.1.19_@capacitor+core@4.5.0
-  '@capgo/capacitor-purchases': 1.3.29_@capacitor+core@4.5.0
-  '@capgo/capacitor-screen-recorder': 1.2.14_@capacitor+core@4.5.0
-  '@capgo/capacitor-updater': 4.11.12_@capacitor+core@4.5.0
+  '@capgo/capacitor-purchases': 1.3.33_@capacitor+core@4.5.0
+  '@capgo/capacitor-screen-recorder': 1.2.18_@capacitor+core@4.5.0
+  '@capgo/capacitor-updater': 4.12.2_@capacitor+core@4.5.0
   '@capgo/native-audio': 4.2.7_@capacitor+core@4.5.0
   '@capgo/native-market': 1.1.6
   '@ionic/vue': 6.3.8
@@ -212,7 +212,7 @@ devDependencies:
   pnpm: 7.17.0
   postcss: 8.4.19
   sass: 1.56.1
-  tailwindcss: 3.2.4_postcss@8.4.19
+  tailwindcss: 3.2.4
   typescript: 4.9.3
   unplugin-icons: 0.14.14_@vue+compiler-sfc@3.2.45
   vite: 3.2.4_ajklay5k626t46b6fyghkbup3i
@@ -1929,24 +1929,24 @@ packages:
       '@capacitor/core': 4.5.0
     dev: false
 
-  /@capgo/capacitor-purchases/1.3.29_@capacitor+core@4.5.0:
-    resolution: {integrity: sha512-jfImErQ/whpjzNYCJObCtyUZwG+UN7W/p2VX33OUxJvJa+y/bNNxo3QJX+NyU4527xv5qsZMQEV13TxuQ9GC4w==}
+  /@capgo/capacitor-purchases/1.3.33_@capacitor+core@4.5.0:
+    resolution: {integrity: sha512-9fxzLmSrmJ6X/03T+52gPKV1IhGGJlSfUg6xxHhpgyn52auqT2YP8qMTHWP7BG8JbixkpAPEVgmG4Ve7C6Qkzw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
       '@capacitor/core': 4.5.0
     dev: false
 
-  /@capgo/capacitor-screen-recorder/1.2.14_@capacitor+core@4.5.0:
-    resolution: {integrity: sha512-dgdoxIsEli07j11qgLMEQqisG+2MB7tQCABtYGZ7oGN56FuxIAnn1rjOjUoplr7qkpUc562h0QnQaY5+Mt0UNQ==}
+  /@capgo/capacitor-screen-recorder/1.2.18_@capacitor+core@4.5.0:
+    resolution: {integrity: sha512-mNol2r2dkUsAGKcs7sOuNopRLIbgCA6LVVryLjf0z4fyXjJjQwc5LzUIheMooPLrfOPP2/+xVgi3JbP3OM2CWw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
       '@capacitor/core': 4.5.0
     dev: false
 
-  /@capgo/capacitor-updater/4.11.12_@capacitor+core@4.5.0:
-    resolution: {integrity: sha512-Pg0OHhsQWUsjlNYr3x5Fcr4zF04Y2z9hRZlhkd1oCzPNDRQpXUBS15dOBMouLoUXYFQ6Mc56LT2ez+eIblAcBQ==}
+  /@capgo/capacitor-updater/4.12.2_@capacitor+core@4.5.0:
+    resolution: {integrity: sha512-l/nLLx36aL0u/jk1uweKEFqTvBr3GRE+Z0jUAuqUNVa7dAM8XvAI7dOqsd+D19WT+GazGyGaHF+SArRnrZ1JLw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
@@ -4057,7 +4057,7 @@ packages:
       tailwindcss: '>=3.0.0 || >= 3.0.0-alpha.1'
     dependencies:
       mini-svg-data-uri: 1.4.4
-      tailwindcss: 3.2.4_postcss@8.4.19
+      tailwindcss: 3.2.4
     dev: false
 
   /@trapezedev/gradle-parse/5.0.10:
@@ -7264,8 +7264,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
     dependencies:
-      JSONStream: 1.3.5
       is-text-path: 1.0.1
+      JSONStream: 1.3.5
       lodash: 4.17.21
       meow: 8.1.2
       split2: 3.2.2
@@ -16202,12 +16202,10 @@ packages:
       - supports-color
     dev: true
 
-  /tailwindcss/3.2.4_postcss@8.4.19:
+  /tailwindcss/3.2.4:
     resolution: {integrity: sha512-AhwtHCKMtR71JgeYDaswmZXhPcW9iuI9Sp2LvZPo9upDZ7231ZJ7eA9RaURbhpXGVlrjX4cFNlB4ieTetEb7hQ==}
     engines: {node: '>=12.13.0'}
     hasBin: true
-    peerDependencies:
-      postcss: ^8.0.9
     dependencies:
       arg: 5.0.2
       chokidar: 3.5.3
