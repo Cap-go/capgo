@@ -84,7 +84,7 @@
     "logsnag": "^0.1.6",
     "mime": "^3.0.0",
     "nprogress": "1.0.0-1",
-    "pinia": "2.0.25",
+    "pinia": "2.0.26",
     "plausible-tracker": "^0.3.8",
     "prism-theme-vars": "^0.2.4",
     "semver": "^7.3.8",

@@ -86,7 +86,7 @@ specifiers:
   mime: ^3.0.0
   netlify-cli: 12.2.6
   nprogress: 1.0.0-1
-  pinia: 2.0.25
+  pinia: 2.0.26
   plausible-tracker: ^0.3.8
   pnpm: 7.17.0
   postcss: ^8.4.19
@@ -172,7 +172,7 @@ dependencies:
   logsnag: 0.1.6
   mime: 3.0.0
   nprogress: 1.0.0-1
-  pinia: 2.0.25_mgnvym7yiazkylwwogi5r767ue
+  pinia: 2.0.26_mgnvym7yiazkylwwogi5r767ue
   plausible-tracker: 0.3.8
   prism-theme-vars: 0.2.4
   semver: 7.3.8
@@ -13961,8 +13961,8 @@ packages:
     engines: {node: '>=6'}
     dev: true
 
-  /pinia/2.0.25_mgnvym7yiazkylwwogi5r767ue:
-    resolution: {integrity: sha512-3reAkjJ6bW2D5hZKRMS0c9rUbHVlsVyZd037xO0PJr2AuF/09RRSBnFLlJgmHF4Jx6dEoW/jZBOHTushY7IMlw==}
+  /pinia/2.0.26_mgnvym7yiazkylwwogi5r767ue:
+    resolution: {integrity: sha512-tSxZNUcMGxQOvKZRjPKXxd2+/2NZhRF/CoYVE/+K6uE/Z3v1Oi4fcQFpxu5nMB1dCchjXUZ+lz0tBxV5ntwmQQ==}
     peerDependencies:
       '@vue/composition-api': ^1.4.0
       typescript: '>=4.4.4'
