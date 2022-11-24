@@ -17,8 +17,8 @@ serve(async (event: Request) => {
       app_id: body.app_id,
       plugin_version: body.plugin_version || '2.3.3',
       os_version: body.version_os,
-      ...(body.is_emulator !== undefined ? { is_emulator: body.is_emulator } : {}),
-      ...(body.is_prod !== undefined ? { is_prod: body.is_prod } : {}),
+      is_emulator: body.is_emulator === undefined ? false : body.is_emulator,
+      is_prod: body.is_prod === undefined ? true : body.is_prod,
       ...(body.custom_id ? { custom_id: body.custom_id } : {}),
     }
 
@@ -39,26 +39,28 @@ serve(async (event: Request) => {
     if (data && !error) {
       stat.version = data.id
       device.version = data.id
-      const { data: deviceData, error: deviceError } = await supabaseAdmin()
-        .from<definitions['devices']>(deviceDb)
-        .select()
-        .eq('app_id', body.app_id)
-        .eq('device_id', body.device_id)
-        .single()
-      if (deviceData && !deviceError) {
+      if (!device.is_emulator && device.is_prod) {
+        const { data: deviceData, error: deviceError } = await supabaseAdmin()
+          .from<definitions['devices']>(deviceDb)
+          .select()
+          .eq('app_id', body.app_id)
+          .eq('device_id', body.device_id)
+          .single()
+        if (deviceData && !deviceError) {
+          all.push(updateVersionStats({
+            app_id: body.app_id,
+            version_id: deviceData.version,
+            devices: -1,
+          }))
+        }
         all.push(updateVersionStats({
           app_id: body.app_id,
-          version_id: deviceData.version,
-          devices: -1,
+          version_id: data.id,
+          devices: 1,
         }))
       }
-      all.push(updateVersionStats({
-        app_id: body.app_id,
-        version_id: data.id,
-        devices: 1,
-      }))
     }
-    else {
+    else if (!device.is_emulator && device.is_prod) {
       console.log('switch to onprem', body.app_id)
       device.version = body.version_name || 'unknown' as any
       stat.version = body.version || 0
