@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "1.55.6",
+  "version": "1.55.8",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
@@ -60,7 +60,7 @@
     "@capgo/capacitor-mute": "^1.1.19",
     "@capgo/capacitor-purchases": "^1.3.33",
     "@capgo/capacitor-screen-recorder": "^1.2.18",
-    "@capgo/capacitor-updater": "4.12.2",
+    "@capgo/capacitor-updater": "4.12.3",
     "@capgo/native-audio": "^4.2.7",
     "@capgo/native-market": "^1.1.6",
     "@ionic/vue": "6.3.8",
@@ -120,7 +120,7 @@
     "eslint": "8.28.0",
     "eslint-plugin-cypress": "^2.12.1",
     "https-localhost": "4.7.1",
-    "netlify-cli": "12.2.6",
+    "netlify-cli": "12.2.7",
     "pnpm": "7.17.0",
     "postcss": "^8.4.19",
     "sass": "1.56.1",
