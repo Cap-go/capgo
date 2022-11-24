@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.5](https://github.com/Cap-go/capgo/compare/1.55.4...1.55.5) (2022-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.appcompat:appcompat to v1.5.1 ([2791a24](https://github.com/Cap-go/capgo/commit/2791a24eb419f12c6e4492124b765fa56908ca69))
+* **deps:** update dependency androidx.test.espresso:espresso-core to v3.5.0 ([7e2fb1a](https://github.com/Cap-go/capgo/commit/7e2fb1a0ff0b696fbf12ff0776c7d4ecb53afdf8))
+* **deps:** update dependency com.android.tools.build:gradle to v7.3.1 ([1c70091](https://github.com/Cap-go/capgo/commit/1c70091b9f6317e6aac1c1581d6393c275c59c27))
+
 ### [1.55.4](https://github.com/Cap-go/capgo/compare/1.55.3...1.55.4) (2022-11-24)
 
 ### [1.55.3](https://github.com/Cap-go/capgo/compare/1.55.2...1.55.3) (2022-11-24)
