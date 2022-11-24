@@ -115,7 +115,7 @@ jobs:
         with:
           lane: android beta
       - name: Upload release bundle
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: android-release
           path: ./android/app/build/outputs/bundle/release/app-release.aab
@@ -165,7 +165,7 @@ jobs:
           with:
             lane: closed_beta
         - name: Upload release bundle
-          uses: actions/upload-artifact@v2
+          uses: actions/upload-artifact@v3
           with:
             name: ios-release
             path: ./App.ipa
