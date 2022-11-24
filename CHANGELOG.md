@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.15](https://github.com/Cap-go/capgo/compare/1.55.14...1.55.15) (2022-11-24)
+
+
+### Bug Fixes
+
+* prevent emulator count in stats ([1d10f6d](https://github.com/Cap-go/capgo/commit/1d10f6d7e061286c763ab3f2a3f01439ebbbe2ff))
+
 ### [1.55.14](https://github.com/Cap-go/capgo/compare/1.55.13...1.55.14) (2022-11-24)
 
 
