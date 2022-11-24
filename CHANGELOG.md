@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.6](https://github.com/Cap-go/capgo/compare/1.55.5...1.55.6) (2022-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pinia to v2.0.26 ([5b118a8](https://github.com/Cap-go/capgo/commit/5b118a89fb56d9224a86148272cd510058ad3d74))
+
 ### [1.55.5](https://github.com/Cap-go/capgo/compare/1.55.4...1.55.5) (2022-11-24)
 
 
