@@ -36,6 +36,8 @@ const getApp = (userId: string, appId: string) => {
       .from<definitions['devices']>('devices')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
+      .eq('is_emulator', false)
+      .eq('is_prod', true)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
     bandwidth: supabaseAdmin()

@@ -2285,7 +2285,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
-          encrypted?: parameters["rowFilter.app_versions.encrypted"];
+          session_key?: parameters["rowFilter.app_versions.session_key"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -2346,7 +2346,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
-          encrypted?: parameters["rowFilter.app_versions.encrypted"];
+          session_key?: parameters["rowFilter.app_versions.session_key"];
         };
         header: {
           /** Preference */
@@ -2371,7 +2371,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
-          encrypted?: parameters["rowFilter.app_versions.encrypted"];
+          session_key?: parameters["rowFilter.app_versions.session_key"];
         };
         body: {
           /** app_versions */
@@ -4112,11 +4112,8 @@ export interface definitions {
     external_url?: string;
     /** Format: character varying */
     checksum?: string;
-    /**
-     * Format: boolean
-     * @default false
-     */
-    encrypted: boolean;
+    /** Format: character varying */
+    session_key?: string;
   };
 }
 
@@ -4601,8 +4598,8 @@ export interface parameters {
   "rowFilter.app_versions.external_url": string;
   /** Format: character varying */
   "rowFilter.app_versions.checksum": string;
-  /** Format: boolean */
-  "rowFilter.app_versions.encrypted": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.session_key": string;
 }
 
 export interface operations {}

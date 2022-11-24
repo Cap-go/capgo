@@ -31,6 +31,9 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
           created_at,
           updated_at,
           device_id,
+          custom_id,
+          is_prod,
+          is_emulator,
           version (
             name,
             id
@@ -140,7 +143,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   return sendRes()
 }
 
-export const deleteDev = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const deleteOverride = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = (await event.json()) as DeviceLink
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
@@ -193,7 +196,7 @@ serve(async (event: Request) => {
   else if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
     return get(event, apikey)
   else if (api_mode_string === 'DELETE' || (!api_mode_string && event.method === 'DELETE'))
-    return deleteDev(event, apikey)
+    return deleteOverride(event, apikey)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
