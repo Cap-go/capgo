@@ -1,4 +1,4 @@
-name: Build source code and send to Capgo
+name: Send app to review
 
 on:
   workflow_dispatch:
