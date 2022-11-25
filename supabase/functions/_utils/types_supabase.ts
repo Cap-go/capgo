@@ -1826,6 +1826,7 @@ export interface paths {
           date_id?: parameters["rowFilter.app_stats.date_id"];
           version_size?: parameters["rowFilter.app_stats.version_size"];
           bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
+          devices_real?: parameters["rowFilter.app_stats.devices_real"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1889,6 +1890,7 @@ export interface paths {
           date_id?: parameters["rowFilter.app_stats.date_id"];
           version_size?: parameters["rowFilter.app_stats.version_size"];
           bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
+          devices_real?: parameters["rowFilter.app_stats.devices_real"];
         };
         header: {
           /** Preference */
@@ -1916,6 +1918,7 @@ export interface paths {
           date_id?: parameters["rowFilter.app_stats.date_id"];
           version_size?: parameters["rowFilter.app_stats.version_size"];
           bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
+          devices_real?: parameters["rowFilter.app_stats.devices_real"];
         };
         body: {
           /** app_stats */
@@ -2285,7 +2288,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
-          encrypted?: parameters["rowFilter.app_versions.encrypted"];
+          session_key?: parameters["rowFilter.app_versions.session_key"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -2346,7 +2349,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
-          encrypted?: parameters["rowFilter.app_versions.encrypted"];
+          session_key?: parameters["rowFilter.app_versions.session_key"];
         };
         header: {
           /** Preference */
@@ -2371,7 +2374,7 @@ export interface paths {
           deleted?: parameters["rowFilter.app_versions.deleted"];
           external_url?: parameters["rowFilter.app_versions.external_url"];
           checksum?: parameters["rowFilter.app_versions.checksum"];
-          encrypted?: parameters["rowFilter.app_versions.encrypted"];
+          session_key?: parameters["rowFilter.app_versions.session_key"];
         };
         body: {
           /** app_versions */
@@ -3930,9 +3933,11 @@ export interface definitions {
      */
     date_id: string;
     /** Format: bigint */
-    version_size?: number;
+    version_size: number;
     /** Format: bigint */
-    bandwidth?: number;
+    bandwidth: number;
+    /** Format: bigint */
+    devices_real: number;
   };
   devices: {
     /**
@@ -4112,11 +4117,8 @@ export interface definitions {
     external_url?: string;
     /** Format: character varying */
     checksum?: string;
-    /**
-     * Format: boolean
-     * @default false
-     */
-    encrypted: boolean;
+    /** Format: character varying */
+    session_key?: string;
   };
 }
 
@@ -4515,6 +4517,8 @@ export interface parameters {
   "rowFilter.app_stats.version_size": string;
   /** Format: bigint */
   "rowFilter.app_stats.bandwidth": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.devices_real": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */
@@ -4601,8 +4605,8 @@ export interface parameters {
   "rowFilter.app_versions.external_url": string;
   /** Format: character varying */
   "rowFilter.app_versions.checksum": string;
-  /** Format: boolean */
-  "rowFilter.app_versions.encrypted": string;
+  /** Format: character varying */
+  "rowFilter.app_versions.session_key": string;
 }
 
 export interface operations {}

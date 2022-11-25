@@ -1826,6 +1826,7 @@ export interface paths {
           date_id?: parameters["rowFilter.app_stats.date_id"];
           version_size?: parameters["rowFilter.app_stats.version_size"];
           bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
+          devices_real?: parameters["rowFilter.app_stats.devices_real"];
           /** Filtering Columns */
           select?: parameters["select"];
           /** Ordering */
@@ -1889,6 +1890,7 @@ export interface paths {
           date_id?: parameters["rowFilter.app_stats.date_id"];
           version_size?: parameters["rowFilter.app_stats.version_size"];
           bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
+          devices_real?: parameters["rowFilter.app_stats.devices_real"];
         };
         header: {
           /** Preference */
@@ -1916,6 +1918,7 @@ export interface paths {
           date_id?: parameters["rowFilter.app_stats.date_id"];
           version_size?: parameters["rowFilter.app_stats.version_size"];
           bandwidth?: parameters["rowFilter.app_stats.bandwidth"];
+          devices_real?: parameters["rowFilter.app_stats.devices_real"];
         };
         body: {
           /** app_stats */
@@ -3930,9 +3933,11 @@ export interface definitions {
      */
     date_id: string;
     /** Format: bigint */
-    version_size?: number;
+    version_size: number;
     /** Format: bigint */
-    bandwidth?: number;
+    bandwidth: number;
+    /** Format: bigint */
+    devices_real: number;
   };
   devices: {
     /**
@@ -4512,6 +4517,8 @@ export interface parameters {
   "rowFilter.app_stats.version_size": string;
   /** Format: bigint */
   "rowFilter.app_stats.bandwidth": string;
+  /** Format: bigint */
+  "rowFilter.app_stats.devices_real": string;
   /** @description devices */
   "body.devices": definitions["devices"];
   /** Format: timestamp with time zone */
