@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.17](https://github.com/Cap-go/capgo/compare/1.55.16...1.55.17) (2022-11-25)
+
+
+### Bug Fixes
+
+* stripe cancelation ([1b2ef00](https://github.com/Cap-go/capgo/commit/1b2ef00c4193dd0dee49e6eb90d192a8cf25a37f))
+
 ### [1.55.16](https://github.com/Cap-go/capgo/compare/1.55.15...1.55.16) (2022-11-24)
 
 
