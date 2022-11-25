@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.19](https://github.com/Cap-go/capgo/compare/1.55.18...1.55.19) (2022-11-25)
+
+
+### Bug Fixes
+
+* api + add paging ([fe545b8](https://github.com/Cap-go/capgo/commit/fe545b8e9d2d641e8c79e684070519648f8a22dc))
+
 ### [1.55.18](https://github.com/Cap-go/capgo/compare/1.55.17...1.55.18) (2022-11-25)
 
 
