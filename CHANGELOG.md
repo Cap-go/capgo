@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.20](https://github.com/Cap-go/capgo/compare/1.55.19...1.55.20) (2022-11-25)
+
+
+### Bug Fixes
+
+* channel select ([4c61d7f](https://github.com/Cap-go/capgo/commit/4c61d7f824cef758341e5eefbac38d0f93995ed0))
+
 ### [1.55.19](https://github.com/Cap-go/capgo/compare/1.55.18...1.55.19) (2022-11-25)
 
 
