@@ -9,9 +9,11 @@ interface ChannelSet {
   version?: string
   public?: boolean
 }
+const fetchLimit = 50
 interface GetDevice {
   app_id: string
   channel?: string
+  page?: number
 }
 
 export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
@@ -24,7 +26,23 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
   if (body.channel) {
     const { data: dataChannel, error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
-      .select()
+      .select(`
+        id,
+        created_at,
+        name,
+        app_id,
+        created_by,
+        updated_at,
+        public,
+        disableAutoUpdateUnderNative,
+        disableAutoUpdateToMajor,
+        is_emulator,
+        is_prod,
+        version (
+          name,
+          id
+        )
+      `)
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
     if (dbError || !dataChannel || !dataChannel.length) {
@@ -34,10 +52,31 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     return sendRes(dataChannel[0])
   }
   else {
+    const fetchOffset = body.page === undefined ? 0 : body.page
+    const from = fetchOffset * fetchLimit
+    const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataChannels, error: dbError } = await supabaseAdmin()
       .from<definitions['channels']>('channels')
-      .select()
+      .select(`
+        id,
+        created_at,
+        name,
+        app_id,
+        created_by,
+        updated_at,
+        public,
+        disableAutoUpdateUnderNative,
+        disableAutoUpdateToMajor,
+        is_emulator,
+        is_prod,
+        version (
+          name,
+          id
+        )
+    `)
       .eq('app_id', body.app_id)
+      .range(from, to)
+      .order('created_at', { ascending: true })
     if (dbError || !dataChannels || !dataChannels.length)
       return sendRes([])
     return sendRes(dataChannels)

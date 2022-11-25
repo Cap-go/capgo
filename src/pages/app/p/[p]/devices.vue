@@ -133,7 +133,7 @@ const searchDevices = async () => {
       `)
     .eq('app_id', id.value)
     .gt('updated_at', subDays(new Date(), 30).toUTCString())
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
     .or(`device_id.like.%${search.value}%,custom_id.like.%${search.value}%`)
   filtered.value = dataVersions || []
   isLoadingSub.value = false
