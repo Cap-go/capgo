@@ -67,8 +67,8 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
         public,
         disableAutoUpdateUnderNative,
         disableAutoUpdateToMajor,
-        is_emulator,
-        is_prod,
+        allow_emulator,
+        allow_dev,
         version (
           name,
           id
