@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.18](https://github.com/Cap-go/capgo/compare/1.55.17...1.55.18) (2022-11-25)
+
+
+### Bug Fixes
+
+* remove appid ([9ee36fe](https://github.com/Cap-go/capgo/commit/9ee36fec998c6eaae367e4bd0002c9bb2e6ea479))
+
 ### [1.55.17](https://github.com/Cap-go/capgo/compare/1.55.16...1.55.17) (2022-11-25)
 
 
