@@ -4,7 +4,7 @@ import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
 
 interface dataDemo {
-  appid: string
+  app_id: string
   name: string
   icon: string
   iconType: string

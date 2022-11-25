@@ -4,17 +4,16 @@ import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
 
 interface GetLatest {
-  appid?: string
   app_id?: string
 }
 
 export const deleteVersion = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as GetLatest
-  if (!(body.appid || body.app_id)) {
+  if (!body.app_id) {
     console.log('No app_id provided')
     return sendRes({ status: 'Missing app_id' }, 400)
   }
-  if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
+  if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
     console.error('You can\'t access this app', body.app_id)
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
@@ -24,7 +23,7 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
       .update({
         deleted: true,
       })
-      .eq('app_id', body.appid || body.app_id)
+      .eq('app_id', body.app_id)
     if (dbError) {
       console.log('Cannot delete version')
       return sendRes({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
@@ -40,22 +39,22 @@ export const deleteVersion = async (event: Request, apikey: definitions['apikeys
 export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   try {
     const body = (await event.json()) as GetLatest
-    if (!(body.appid || body.app_id)) {
+    if (!body.app_id) {
       console.log('No app_id provided')
       return sendRes({ status: 'Missing app_id' }, 400)
     }
-    if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id))) {
+    if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
       console.error('You can\'t access this app', body.app_id)
       return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
-    if (!(await checkAppOwner(apikey.user_id, body.appid || body.app_id)))
+    if (!(await checkAppOwner(apikey.user_id, body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
 
     const { data: dataVersions, error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
-      .eq('app_id', body.appid || body.app_id)
+      .eq('app_id', body.app_id)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
     if (dbError || !dataVersions || !dataVersions.length) {

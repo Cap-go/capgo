@@ -62,7 +62,7 @@ serve(async (event: Request) => {
         is_emulator,
         is_prod,
         version_name)
-      return sendRes({ message: 'missing appid' }, 400)
+      return sendRes({ message: 'missing app_id' }, 400)
     }
 
     console.log(id, 'Headers', platform,
