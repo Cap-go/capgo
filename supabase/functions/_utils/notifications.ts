@@ -6,7 +6,7 @@ import type { definitions } from './types_supabase.ts'
 
 const sendNow = async (eventName: string, email: string, userId: string, color: string) => {
   console.log('send notif', eventName, email)
-  await addEventPerson(email, {}, 'user:register', color)
+  await addEventPerson(email, {}, eventName, color)
   await supabaseAdmin()
     .from<definitions['notifications']>('notifications')
     .insert({
@@ -38,7 +38,11 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
     .eq('id', userId)
     .single()
 
-  if (!user || !user.enableNotifications) {
+  if (!user) {
+    console.log('user not found', userId)
+    return Promise.resolve()
+  }
+  if (!user.enableNotifications) {
     console.log('user disables notif', userId)
     return Promise.resolve()
   }
