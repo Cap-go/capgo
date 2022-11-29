@@ -9,6 +9,7 @@ export interface AppStatsIncrement {
   mlu: number
   mlu_real: number
   devices: number
+  // devices_real: number
   version_size: number
   channels: number
   shared: number
@@ -79,6 +80,7 @@ export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: st
   else {
     const newDay: definitions['app_stats'] = {
       ...increment,
+      devices_real: 0,
       user_id,
     }
     const { error } = await supabaseAdmin()

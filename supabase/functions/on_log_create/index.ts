@@ -6,6 +6,18 @@ import { sendRes } from '../_utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
+
+const ignoredEvents = [
+  'needPlanUpgrade',
+  'invalidIP',
+  'noNew',
+  'disablePlatformIos',
+  'disablePlatformAndroid',
+  'disableAutoUpdateToMajor',
+  'disableAutoUpdateUnderNative',
+  'disableDevBuild',
+  'disableEmulator',
+]
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
@@ -27,6 +39,7 @@ serve(async (event: Request) => {
       mlu: 0,
       mlu_real: 0,
       devices: 0,
+      // devices_real: 0,
       version_size: 0,
       channels: 0,
       shared: 0,
@@ -55,7 +68,7 @@ serve(async (event: Request) => {
       .select()
       .eq('device_id', record.device_id)
       .single()
-    if (dataDevice) {
+    if (dataDevice && !ignoredEvents.includes(record.action)) {
       // compare date with today
       if (dataDevice.date_id !== month_id) {
         increment.devices = 1

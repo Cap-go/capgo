@@ -16,6 +16,7 @@ const getApp = (userId: string, appId: string) => {
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const month_id = new Date().toISOString().slice(0, 7)
   // console.log('req', req)
   return {
     mlu: supabaseAdmin()
@@ -38,6 +39,14 @@ const getApp = (userId: string, appId: string) => {
       .eq('app_id', appId)
       .eq('is_emulator', false)
       .eq('is_prod', true)
+      .eq('date_id', month_id)
+      .lte('updated_at', lastDay.toISOString())
+      .gte('updated_at', firstDay.toISOString()),
+    devicesTT: supabaseAdmin()
+      .from<definitions['devices']>('devices')
+      .select('*', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .eq('date_id', month_id)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
     bandwidth: supabaseAdmin()
@@ -83,8 +92,8 @@ serve(async (event: Request) => {
       if (!app.id)
         continue
       const res = getApp(app.user_id, app.app_id)
-      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.bandwidth])
-        .then(([app, mlu, mlu_real, versions, shared, channels, devices, bandwidth]) => {
+      all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.devicesTT, res.bandwidth])
+        .then(([app, mlu, mlu_real, versions, shared, channels, devices, devicesTT, bandwidth]) => {
           if (!app.app_id)
             return
           // console.log('app', app.app_id, devices, versions, shared, channels)
@@ -101,6 +110,7 @@ serve(async (event: Request) => {
               mlu: 0,
               mlu_real: 0,
               devices: 0,
+              // devices_real: 0,
               version_size: versionSize,
               channels: 0,
               shared: 0,
@@ -114,8 +124,9 @@ serve(async (event: Request) => {
             user_id: app.user_id,
             channels: channels.count || 0,
             mlu: mlu.count || 0,
-            devices: devices.count || 0,
             mlu_real: mlu_real.count || 0,
+            devices: devices.count || 0,
+            devices_real: devicesTT.count || 0,
             versions: versions.data?.length || 0,
             version_size: versionSize,
             shared: shared.count || 0,
