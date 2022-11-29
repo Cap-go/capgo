@@ -76,6 +76,7 @@ serve(async (event: Request) => {
       mlu: 0,
       mlu_real: 0,
       devices: 0,
+      // devices_real: 0,
       version_size: size,
       channels: 0,
       shared: 0,
