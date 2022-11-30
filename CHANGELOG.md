@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.28](https://github.com/Cap-go/capgo/compare/1.55.27...1.55.28) (2022-11-30)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/capacitor-updater to v4.12.9 ([f7dd35d](https://github.com/Cap-go/capgo/commit/f7dd35da5172a4d1aab0e6e76357e74df22bac5e))
+
 ### [1.55.27](https://github.com/Cap-go/capgo/compare/1.55.26...1.55.27) (2022-11-30)
 
 
