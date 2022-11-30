@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "1.55.26",
+  "version": "1.55.28",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
@@ -60,7 +60,7 @@
     "@capgo/capacitor-mute": "^1.1.19",
     "@capgo/capacitor-purchases": "^1.3.36",
     "@capgo/capacitor-screen-recorder": "^1.2.22",
-    "@capgo/capacitor-updater": "4.12.8",
+    "@capgo/capacitor-updater": "4.12.9",
     "@capgo/native-audio": "^5.0.0",
     "@capgo/native-market": "^1.1.6",
     "@ionic/vue": "6.3.8",
@@ -108,7 +108,7 @@
     "@types/mime": "^3.0.1",
     "@types/node": "18.11.9",
     "@types/nprogress": "^0.2.0",
-    "@types/uuid": "8.3.4",
+    "@types/uuid": "9.0.0",
     "@vitejs/plugin-vue": "3.2.0",
     "@vue/cli-service": "5.0.8",
     "@vue/compiler-sfc": "3.2.45",
