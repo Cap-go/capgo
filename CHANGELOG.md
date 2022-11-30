@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.27](https://github.com/Cap-go/capgo/compare/1.55.26...1.55.27) (2022-11-30)
+
+
+### Bug Fixes
+
+* disable crips, logsnag, plausible when impersonate ([968b5e6](https://github.com/Cap-go/capgo/commit/968b5e6086dd4a41c3214c129dd599e47c4c8da6))
+* notif error message ([ecbcded](https://github.com/Cap-go/capgo/commit/ecbcdedfdf2c98c6a27ed4673442d59294e23da9))
+
 ### [1.55.26](https://github.com/Cap-go/capgo/compare/1.55.25...1.55.26) (2022-11-30)
 
 
