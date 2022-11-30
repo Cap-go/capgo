@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.26](https://github.com/Cap-go/capgo/compare/1.55.25...1.55.26) (2022-11-30)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/native-audio to v5 ([1120804](https://github.com/Cap-go/capgo/commit/1120804b73155ca9c07cd45c76b4ce2741d86bc3))
+* **deps:** update dependency pinia to v2.0.27 ([e66904a](https://github.com/Cap-go/capgo/commit/e66904a754496969e1a88fc9d7bfda0907d4051b))
+
 ### [1.55.25](https://github.com/Cap-go/capgo/compare/1.55.24...1.55.25) (2022-11-30)
 
 ### [1.55.24](https://github.com/Cap-go/capgo/compare/1.55.23...1.55.24) (2022-11-29)
