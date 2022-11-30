@@ -73,6 +73,7 @@ apikeys:
   title: Chiavi API
   updater: condensatore di aggiornamento
 app-id-example: Esempio di ID app
+available-in-the-san: Disponibile nell'app sandbox
 bigger-app-size: Dimensioni dell'app più grandi
 build-your-code-and-: Costruisci il tuo codice
 bulk-upload: Caricamento collettivo
@@ -129,6 +130,7 @@ checksum: somma di controllo
 commands: comandi
 copied-to-clipboard: Copiato negli appunti
 copy-your: Copia il tuo
+create-a-free-accoun: Crea un account gratis
 custom-domain: Dominio personalizzato
 custom-id: ID personalizzato
 custom-id-saved: ID personalizzato salvato
@@ -161,13 +163,16 @@ devices:
 devices-using-this-b: Dispositivi che utilizzano questo pacchetto
 disable-auto-downgra: Disabilita il downgrade automatico in nativo
 disable-auto-upgrade: Disabilita l'aggiornamento automatico sopra major
+discover-module-in-a: Scopri il modulo in Awesome-condensatore
 discover-your-dashbo: Scopri la tua dashboard!
 documentation: Documentazione
+dont-have-an-account: Non hai un account?
 forgot:
   check_email: Controlla la tua email per ottenere il link per reimpostare la tua password
   email: E-mail
   heading: Ha dimenticato la password
   success: Password aggiornata correttamente
+from-device: dal dispositivo
 good: Bene
 id: id
 in-your-main-file: Nel tuo file principale
@@ -186,6 +191,7 @@ last-upload: Ultimo caricamento
 last-version: Ultima versione
 limit-reached: Limite raggiunto
 loading-more-data: Caricamento più dati...
+log-in: Accesso
 log-to-the-capgo-cli: Accedi alla CLI di Capgo
 login:
   andpass: E password
@@ -198,6 +204,7 @@ login:
   or: o
   password: Parola d'ordine
   withemail: Con indirizzo email
+login-to-your-accoun: Accedi al tuo account
 make-normal: Rendi normale
 making-this-channel-: >-
   Per rendere questo canale "normale" dovrai configurare un altro canale
@@ -335,6 +342,7 @@ stats:
   versions: Versioni
 submit: Invia
 terms-of-use: Termini di utilizzo
+tests: test
 thank-you-for-choosi: Grazie per aver scelto Capgo!
 the: Il
 this-page-will-self-: Questa pagina si aggiornerà automaticamente
@@ -354,6 +362,7 @@ usage:
     minuti
   title: Utilizzo
 version-builtin: Versione incorporata
+welcome-to: Benvenuto a
 welcome-to-your-capg: Benvenuto nella dashboard di Capgo
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
 you-reached-the-limi: Limite raggiunto

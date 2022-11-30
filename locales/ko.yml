@@ -68,6 +68,7 @@ apikeys:
   title: API 키
   updater: 커패시터 업데이터
 app-id-example: 앱 ID 예시
+available-in-the-san: 샌드박스 앱에서 사용 가능
 bigger-app-size: 더 큰 앱 크기
 build-your-code-and-: 코드 작성
 bulk-upload: 일괄 업로드
@@ -122,6 +123,7 @@ checksum: 체크섬
 commands: 명령
 copied-to-clipboard: 클립보드에 복사됨
 copy-your: 복사
+create-a-free-accoun: 무료 계정을 만들다
 custom-domain: 사용자 정의 도메인
 custom-id: 맞춤 ID
 custom-id-saved: 맞춤 ID가 저장되었습니다.
@@ -154,13 +156,16 @@ devices:
 devices-using-this-b: 이 번들을 사용하는 기기
 disable-auto-downgra: 기본에서 자동 다운그레이드 비활성화
 disable-auto-upgrade: 메이저 위의 자동 업그레이드 비활성화
+discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
+dont-have-an-account: 계정이 없습니까?
 forgot:
   check_email: 이메일을 확인하여 비밀번호 재설정 링크를 받으세요
   email: 이메일
   heading: 비밀번호를 잊으 셨나요
   success: 비밀번호가 성공적으로 업데이트되었습니다.
+from-device: 장치에서
 good: 좋은
 id: ID
 in-your-main-file: 기본 파일에서
@@ -179,6 +184,7 @@ last-upload: 마지막 업로드
 last-version: 마지막 버전
 limit-reached: 한도 도달
 loading-more-data: 추가 데이터 로드 중...
+log-in: 로그인
 log-to-the-capgo-cli: Capgo CLI에 로그인
 login:
   andpass: 그리고 비밀번호
@@ -191,6 +197,7 @@ login:
   or: 또는
   password: 비밀번호
   withemail: 이메일 주소로
+login-to-your-accoun: 계정에 로그인
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 module:
@@ -324,6 +331,7 @@ stats:
   versions: 버전
 submit: 제출하다
 terms-of-use: 이용약관
+tests: 테스트
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
@@ -341,6 +349,7 @@ usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법
 version-builtin: 버전 내장
+welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-reached-the-limi: 한도 도달

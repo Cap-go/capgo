@@ -72,6 +72,7 @@ apikeys:
   title: Klucze API
   updater: aktualizacja kondensatorów
 app-id-example: Przykład identyfikatora aplikacji
+available-in-the-san: Dostępne w aplikacji piaskownicy
 bigger-app-size: Większy rozmiar aplikacji
 build-your-code-and-: Zbuduj swój kod
 bulk-upload: Przesyłanie zbiorcze
@@ -128,6 +129,7 @@ checksum: Suma kontrolna
 commands: polecenia
 copied-to-clipboard: Skopiowane do schowka
 copy-your: Skopiuj swój
+create-a-free-accoun: Utwórz darmowe konto
 custom-domain: Domena niestandardowa
 custom-id: Identyfikator niestandardowy
 custom-id-saved: Zapisano niestandardowy identyfikator
@@ -160,13 +162,16 @@ devices:
 devices-using-this-b: Urządzenia korzystające z tego pakietu
 disable-auto-downgra: Wyłącz automatyczną zmianę wersji na wersję natywną
 disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej głównej
+discover-module-in-a: Odkryj moduł w Awesome-capacitor
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: Dokumentacja
+dont-have-an-account: Nie masz konta?
 forgot:
   check_email: Sprawdź pocztę, aby uzyskać link do zresetowania hasła
   email: E-mail
   heading: Zapomniałeś hasła
   success: Hasło zostało zmienione
+from-device: z urządzenia
 good: Dobrze
 id: ID
 in-your-main-file: W twoim głównym pliku
@@ -185,6 +190,7 @@ last-upload: Ostatnie przesłanie
 last-version: Ostatnia wersja
 limit-reached: Limit osiągnięty
 loading-more-data: Ładuję więcej danych...
+log-in: Zaloguj sie
 log-to-the-capgo-cli: Zaloguj się do Capgo CLI
 login:
   andpass: I hasło
@@ -197,6 +203,7 @@ login:
   or: lub
   password: Hasło
   withemail: Z adresem e-mail
+login-to-your-accoun: Zaloguj się na swoje konto
 make-normal: Zrób normalne
 making-this-channel-: >-
   Ustawienie tego kanału jako „normalnego” będzie wymagało skonfigurowania
@@ -332,6 +339,7 @@ stats:
   versions: Wersje
 submit: Składać
 terms-of-use: Warunki korzystania
+tests: testy
 thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 the: The
 this-page-will-self-: Ta strona odświeży się automatycznie
@@ -351,6 +359,7 @@ usage:
     minut
   title: Stosowanie
 version-builtin: Wbudowana wersja
+welcome-to: Witamy w
 welcome-to-your-capg: Witamy w Twoim panelu Capgo
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-reached-the-limi: Limit osiągnięty

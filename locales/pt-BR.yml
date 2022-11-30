@@ -72,6 +72,7 @@ apikeys:
   title: Chaves de API
   updater: atualizador de capacitor
 app-id-example: Exemplo de ID do aplicativo
+available-in-the-san: Disponível no aplicativo sandbox
 bigger-app-size: Maior tamanho de aplicativo
 build-your-code-and-: Construa seu código
 bulk-upload: Upload em massa
@@ -128,6 +129,7 @@ checksum: Soma de verificação
 commands: comandos
 copied-to-clipboard: Copiado para a área de transferência
 copy-your: Copie seu
+create-a-free-accoun: Criar uma conta gratuita
 custom-domain: Domínio personalizado
 custom-id: ID personalizado
 custom-id-saved: ID personalizado salvo
@@ -160,13 +162,16 @@ devices:
 devices-using-this-b: Dispositivos que usam este pacote
 disable-auto-downgra: Desative o downgrade automático em nativo
 disable-auto-upgrade: Desativar atualização automática acima do principal
+discover-module-in-a: Descubra o módulo no capacitor Awesome
 discover-your-dashbo: Descubra o seu painel!
 documentation: Documentação
+dont-have-an-account: Não tem uma conta?
 forgot:
   check_email: Verifique seu e-mail para obter o link para redefinir sua senha
   email: E-mail
   heading: Esqueceu a senha
   success: Senha atualizada com sucesso
+from-device: do dispositivo
 good: Bom
 id: Eu iria
 in-your-main-file: No seu arquivo principal
@@ -185,6 +190,7 @@ last-upload: Último upload
 last-version: Última versão
 limit-reached: Limite alcançado
 loading-more-data: Carregando mais dados...
+log-in: Conecte-se
 log-to-the-capgo-cli: Faça login na CLI do Capgo
 login:
   andpass: E senha
@@ -197,6 +203,7 @@ login:
   or: ou
   password: Senha
   withemail: Com endereço de e-mail
+login-to-your-accoun: Faça login na sua conta
 make-normal: tornar normal
 making-this-channel-: >-
   Tornar este canal "normal" exigirá que você configure um outro padrão de canal
@@ -334,6 +341,7 @@ stats:
   versions: Versões
 submit: Enviar
 terms-of-use: Termos de uso
+tests: testes
 thank-you-for-choosi: Obrigado por escolher a Capgo!
 the: o
 this-page-will-self-: Esta página será atualizada automaticamente
@@ -351,6 +359,7 @@ usage:
   success: Seu plano foi configurado esta página será atualizada, em alguns minutos
   title: Uso
 version-builtin: Versão integrada
+welcome-to: Bem-vindo ao
 welcome-to-your-capg: Bem-vindo ao seu painel Capgo
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.
 you-reached-the-limi: Limite alcançado

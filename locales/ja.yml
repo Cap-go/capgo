@@ -68,6 +68,7 @@ apikeys:
   title: APIキー
   updater: コンデンサアップデータ
 app-id-example: アプリ ID の例
+available-in-the-san: サンドボックス アプリで利用可能
 bigger-app-size: アプリのサイズが大きい
 build-your-code-and-: コードをビルドする
 bulk-upload: 一括アップロード
@@ -122,6 +123,7 @@ checksum: チェックサム
 commands: コマンド
 copied-to-clipboard: クリップボードにコピーしました
 copy-your: あなたのコピー
+create-a-free-accoun: 無料アカウントを作成
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 custom-id-saved: カスタム ID を保存しました
@@ -154,13 +156,16 @@ devices:
 devices-using-this-b: このバンドルを使用するデバイス
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
 disable-auto-upgrade: メジャーを超える自動アップグレードを無効にする
+discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
 documentation: ドキュメンテーション
+dont-have-an-account: アカウントを持っていませんか？
 forgot:
   check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
   email: Eメール
   heading: パスワードをお忘れですか
   success: パスワードが正常に更新されました
+from-device: デバイスから
 good: 良い
 id: ID
 in-your-main-file: メインファイルで
@@ -179,6 +184,7 @@ last-upload: 最後のアップロード
 last-version: 最後のバージョン
 limit-reached: 制限に達しました
 loading-more-data: より多くのデータを読み込んでいます...
+log-in: ログイン
 log-to-the-capgo-cli: Capgo CLI にログインします。
 login:
   andpass: そしてパスワード
@@ -191,6 +197,7 @@ login:
   or: また
   password: パスワード
   withemail: メールアドレス付き
+login-to-your-accoun: あなたのアカウントにログイン
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 module:
@@ -324,6 +331,7 @@ stats:
   versions: バージョン
 submit: 送信
 terms-of-use: 利用規約
+tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 the: の
 this-page-will-self-: このページは自動的に更新されます
@@ -341,6 +349,7 @@ usage:
   success: プランが設定されましたこのページは数分で更新されます
   title: 使用法
 version-builtin: バージョン組み込み
+welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
 you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました

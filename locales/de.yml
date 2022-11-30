@@ -1,2 +1,381 @@
+Bandwidth: Bandbreite
+MAU: Monatlich aktive Benutzer
+Storage: Lagerung
+account:
+  backButton: Der Rücken
+  billing: Abrechnung
+  changePassword: Passwort ändern
+  delete-account: Mein Konto löschen
+  delete_sure: Bist du dir sicher ?
+  discord: Zwietracht
+  error: Fehler
+  heading: Konto
+  keys: API-Schlüssel
+  legal: Nutzungsbedingungen
+  logout: Ausloggen
+  personalInformation: Persönliche Informationen
+  preferences: Benachrichtigungen
+  privacy: Datenschutz-Bestimmungen
+  support: Die Unterstützung
+  usage: Verwendungszweck
+account-settings: Account Einstellungen
+accountPassword:
+  confirmPassword: Passwort bestätigen
+  errorMsg: Fehler aufgetreten, bitte versuchen Sie es erneut
+  heading: Ändere mein Passwort
+  password: Neues Passwort
+  success: Passwort erfolgreich geändert
+  validate: Bestätigen
+accountProfile:
+  country: Land
+  email: Email
+  first-name: Vorname
+  heading: Persönliche Informationen
+  last-name: Nachname
+  update: Aktualisieren
+activation:
+  desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
+  doi: Optionale Zustimmung
+  doi-desc: Ich akzeptiere E-Mail-Newsletter und zukünftige Marketingangebote
+  heading: Aktivierung
+  headline: Meine Einstellungen
+  legal: Nutzungsbedingungen
+  legal-desc: >-
+    Ich akzeptiere die Datenschutzrichtlinien und Nutzungsbedingungen der
+    Capgo-App
+  notification: Benachrichtigungen
+  notification-desc: >-
+    Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
+    verfügbar sind
+  validate: Bestätigen
+add-another-app: Fügen Sie eine weitere App hinzu
+add-this-code-to-you: Fügen Sie diesen Code Ihrem Projekt hinzu
+add-your-app-to-your: Fügen Sie Ihre App zu Ihrem Konto hinzu
+add-your-first-app-t: >-
+  Fügen Sie Ihrem Konto Ihre erste App hinzu und lassen Sie uns Updates
+  veröffentlichen!
+afternoon: Nachmittag
 alert:
+  confirm-delete: Löschen bestätigen
   delete-message: Möchten Sie diese wirklich löschen?
+  not-reverse-message: Diese Aktion ist nicht umkehrbar
+allow-develoment-bui: Entwicklungsbuild zulassen
+allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
+allow-emulator: Emulatoren zulassen
+api-key: API-Schlüssel
+api-keys: API-Schlüssel
+apikeys:
+  all: Schlüssel
+  checkbelow: Überprüfen Sie unter dem Link, um weitere Informationen zu erhalten
+  cli: capgo-CLI
+  explain: >-
+    Alle diese API-Schlüssel sind für die Verwendung mit dem Capgo CLI-Tool oder
+    dem Capacitor-Updater-Plugin vorgesehen
+  keyCopied: Schlüssel in Ihre Zwischenablage kopiert
+  links: Verknüpfungen
+  title: API-Schlüssel
+  updater: Kondensator-Updater
+app-id-example: App-ID-Beispiel
+available-in-the-san: Verfügbar in der Sandbox-App
+bigger-app-size: Größere App-Größe
+build-your-code-and-: Erstellen Sie Ihren Code
+bulk-upload: Bulk-Upload
+bundle-number: Bündelnummer
+button:
+  about: Um
+  back: Der Rücken
+  browse: Durchsuche
+  camera: Kamera
+  cancel: Absagen
+  delete: Löschen
+  go: GEHEN
+  home: Heim
+  remove: Entfernen
+  tabs: Registerkarten
+  toggle_dark: Dunkelmodus umschalten
+  toggle_langs: Sprachen ändern
+by-clicking-on-them: indem Sie darauf klicken.
+cannot-delete-app: App kann nicht gelöscht werden
+cannot-delete-app-version: App-Version kann nicht gelöscht werden
+cannot-delete-channel: Kanal kann nicht gelöscht werden
+cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
+change: Veränderung
+channel:
+  add: Hinzufügen
+  beta-channel: Beta-Kanal
+  cannot-delete-device: Gerät kann nicht gelöscht werden
+  confirm-public-desc: >-
+    Wenn Sie diesen Kanal als Standard festlegen, werden Updates an alle Ihre
+    Benutzer gesendet.
+
+
+    Andere Standardkanäle sind nicht mehr Standard.
+  copy: URL kopieren
+  device: Gerät
+  device-deleted: Gerät gelöscht
+  invit: Geben Sie die einzuladende E-Mail-Adresse ein
+  is_public: Kanalvorgabe
+  make-now: Machen Standard
+  make_it: Mach es
+  makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen
+  makepublic: Dein Kanal ist privat, klicke hier, um ihn öffentlich zu machen
+  open: Offen
+  private_desc: Privatgelände
+  public: Kondensator-Updater-Link
+  public_desc: Öffentlichkeit
+  title: Kanal
+  user: Benutzer
+  user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
+  users: Mit Benutzern geteilt
+  v3: V3-Einstellungen
+channel-deleted: Kanal gelöscht
+checksum: Prüfsumme
+commands: Befehle
+copied-to-clipboard: In die Zwischenablage kopiert
+copy-your: Kopieren Sie Ihre
+create-a-free-accoun: Erstelle einen kostenlosen Account
+custom-domain: Benutzerdefinierten Domain
+custom-id: Benutzerdefinierte ID
+custom-id-saved: Benutzerdefinierte ID gespeichert
+dashboard: Armaturenbrett
+days: Tage
+defined-as: Definiert als
+defined-as-private: als normal definiert
+defined-as-public: als Standard definiert
+delete-account: Konto löschen
+device:
+  channel: Kanallink
+  created_at: Hergestellt in
+  force_version: Force-Version
+  info: Informationen
+  last_update: Letztes Update
+  link_channel: Kanal mit Gerät verknüpft
+  link_fail: Kann nicht verlinken, es ist ein Fehler passiert
+  link_version: mit dem Gerät verknüpfte Version
+  no_channel: Kein Kanal, zum Hinzufügen klicken
+  no_override: Keine Überschreibung, zum Hinzufügen klicken
+  os_version: OS Version
+  platform: Plattform
+  plugin_version: Plugin-Version
+  title: Gerät
+  unlink_channel: Verknüpfung des Kanals mit dem Gerät aufheben
+  unlink_version: Version Verknüpfung zum Gerät aufheben
+  version: Ausführung
+devices:
+  title: Geräte
+devices-using-this-b: Geräte, die dieses Paket verwenden
+disable-auto-downgra: Deaktivieren Sie das automatische Downgrade unter native
+disable-auto-upgrade: Deaktivieren Sie das automatische Upgrade über Major
+discover-module-in-a: Entdecken Sie das Modul in Awesome-capacitor
+discover-your-dashbo: Entdecken Sie Ihr Dashboard!
+documentation: Dokumentation
+dont-have-an-account: Sie haben kein Konto?
+forgot:
+  check_email: >-
+    Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
+    erhalten
+  email: Email
+  heading: Passwort vergessen
+  success: Passwort erfolgreich aktualisiert
+from-device: vom Gerät
+good: Gut
+id: Ich würde
+in-your-main-file: In Ihrer Hauptdatei
+informations: Informationen
+into-your-app-folder: In Ihren App-Ordner.
+intro:
+  aka: Auch bekannt als
+  desc: Meinungsstarke Vite-Starter-Vorlage
+  dynamic-route: Demo der dynamischen Route
+  hi: Hallo, {Name}!
+  whats-your-name: Wie heißen Sie?
+invalid-auth: ungültige Auth
+is-emulator: Ist Emulator
+is-production-app: Ist die Produktions-App
+last-upload: Letzter Upload
+last-version: Letzte Version
+limit-reached: Limit erreicht
+loading-more-data: Weitere Daten werden geladen...
+log-in: Einloggen
+log-to-the-capgo-cli: Melden Sie sich bei der Capgo-CLI an
+login:
+  andpass: Und Passwort
+  connexion: Anmeldung
+  create-new: Neuen Account erstellen
+  email: Email
+  forgot: Vergessen
+  hello: Hallo
+  login-in: Einloggen in
+  or: oder
+  password: Passwort
+  withemail: Mit E-Mail-Adresse
+login-to-your-accoun: Melde dich in deinem Konto an
+make-normal: Normal machen
+making-this-channel-: >-
+  Wenn Sie diesen Kanal „normal“ machen, müssen Sie einen anderen Standardkanal
+  konfigurieren oder das Gerät selbst zuweisen lassen.
+module:
+  heading: Module
+monthly-active-users: Monatlich aktive Benutzer
+more-version-storage: Mehr Versionsspeicher
+morning: Morgen
+my-account: Mein Konto
+my-notifications: Meine Benachrichtigungen
+name: Name
+need-more-contact-us: |-
+  Brauche mehr ? 
+  Kontaktieren Sie uns für einen maßgeschneiderten Plan
+not-found: Nicht gefunden
+notificationSettings:
+  heading: Benachrichtigungseinstellungen
+  validate: Bestätigen
+notifications: Benachrichtigungen
+onboarding:
+  loading: Wird geladen
+one-day-left: Ein Tag übrig
+open-sidebar: Seitenleiste öffnen
+package:
+  cannot-delete-version: Paket kann nicht gelöscht werden
+  channels: Kanäle
+  device_list: Geräteliste
+  devices: Siehe Gerätestatistik
+  devices-list: Geräte verknüpft
+  download: Bündel herunterladen
+  externally: extern gespeichert
+  link_channel: Link zum Kanal
+  link_version: Link zum Bündel
+  mobiles-stats: Mobile Statistiken
+  name: App
+  not_available: Paket nicht gefunden
+  set: Bündel auf Kanal setzen
+  stats: Statistiken
+  test: Bündel starten
+  title: die Info
+  version:
+    is-used-in-device: >-
+      in einer Geräteüberschreibung verwendet wird, heben Sie zuerst die
+      Verknüpfung auf
+  version-deleted: Bündel gelöscht
+  versions: Bündeln
+pages: Seiten
+password:
+  heading: Passwort erstellen
+  new: Neues Passwort
+  validate: Bestätigen
+pckage:
+  version:
+    is-used-in-channel: in einem Kanal verwendet wird, heben Sie zuerst die Verknüpfung auf
+personal-information: Persönliche Informationen
+plan:
+  abtest: A / B-Tests
+  application: Anwendung
+  applications: Anwendungen
+  bandwidth: GB Bandbreite
+  buy: Besorgen
+  channel: Kanal
+  channels: Kanäle
+  desc: >-
+    Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan
+    hinzu, um live zu gehen. 
+
+    Kontopläne schalten zusätzliche Funktionen frei.
+  free:
+    desc: Am besten für MVP und Tests
+  maker:
+    desc: Am besten für Kleinunternehmer
+  mau: Monatlich aktive Benutzer
+  monthly-billing: Monatliche Abrechnung
+  payasyougo:
+    desc: Am besten für Scaling-Unternehmen
+  pricing-plans: Preispläne
+  progressive_deploy: Progressive Bereitstellung
+  shared_channel: Geteilter Kanal
+  shared_channels: Geteilte Kanäle
+  solo:
+    desc: Am besten für unabhängige Entwickler
+  storage: GB Speicher
+  team:
+    desc: Am besten für Großunternehmer
+  update: Aktualisieren
+  updates: Aktualisierung
+  version: Ausführung
+  versions: Versionen
+  whats-included: Was ist inbegriffen
+  yearly-billing: Jährliche Abrechnung
+plan-inactive: Planen Sie inaktiv
+plan-is-the-best-pla: Plan ist der beste Plan für Ihre Bedürfnisse.
+plan-member: Planmitglied.
+plans: Pläne
+please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
+please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
+pro-tip-you-can-copy: 'Pro-Tipp: Sie können die'
+projection: Projektionen
+projects:
+  list: Deine
+  sharedlist: Mit mir geteilt
+  title: Projekte
+refresh-this-page: Aktualisieren Sie diese Seite
+register:
+  already-account: Sie haben schon ein Konto?
+  check-email: Bitte überprüfen Sie Ihre E-Mail und bestätigen Sie
+  confirm-email: Bestätige deine E-Mail
+  confirm-password: Passwort bestätigen
+  desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
+  email: Email
+  first-name: Vorname
+  heading: Anmeldung
+  last-name: Nachname
+  lowerCaseError: Sollte Kleinbuchstaben enthalten
+  next: Registrieren
+  password: Passwort
+  password-hint: >-
+    Geben Sie eine Kombination aus mindestens 6 Zahlen, Buchstaben und
+    Satzzeichen ein.
+  specialError: Sollte Sonderzeichen enthalten
+  upperCaseError: Sollte Großbuchstaben enthalten
+see-usage: Siehe Verwendung
+settings: Einstellungen
+shared-apps: Geteilte Apps
+sign-out: Austragen
+size: Größe
+something-went-wrong-try-again-later: |-
+  Etwas ist schief gelaufen! 
+  Versuchen Sie es später noch einmal.
+special-api-access: Spezieller API-Zugriff
+start-using-capgo: Beginnen Sie mit Capgo!
+stats:
+  devices: Geräte
+  downloads: Downloads
+  subtitle: Im vergangenen Monat
+  title: Statistiken
+  versions: Versionen
+submit: Einreichen
+terms-of-use: Nutzungsbedingungen
+tests: Prüfungen
+thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
+the: Das
+this-page-will-self-: Diese Seite wird sich selbst aktualisieren
+title: Titel
+top-apps: Meine Applikationen
+trial-left: Tage übrig
+trial-plan-expired: Probezeit abgelaufen
+trial-plan-expires-in: Der Prozess endet in
+unlimited-updates: Unbegrenzte Updates
+updated-at: Aktualisiert am
+upgrade: Aktualisierung
+upgrade-now: Jetzt upgraden
+url: URL
+usage:
+  success: >-
+    Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten
+    aktualisiert
+  title: Verwendungszweck
+version-builtin: Version eingebaut
+welcome-to: Willkommen zu
+welcome-to-your-capg: Willkommen auf Ihrem Capgo-Dashboard
+you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.
+you-reached-the-limi: Limit erreicht
+your-api-key: 'Ihr API-Schlüssel:'
+your-are-a: Dein Gebiet
+your-current-plan-is: Ihr aktueller Plan ist
+your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist

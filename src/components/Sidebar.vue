@@ -57,8 +57,8 @@ watch(sidebarExpanded, () => {
         </button>
         <!-- Logo -->
         <router-link class="flex flex-row items-center space-x-2" to="/app/home">
-          <img src="../../assets/icon-foreground.png" alt="foreground logo" class="h-[32px] w-[32px]">
-          <span class="text-xl font-medium truncate transition duration-150 lg:hidden lg:sidebar-expanded:block 2xl:block text-slate-200 hover:text-white">Capgo</span>
+          <img src="/capgo.webp" alt="logo" class="h-[32px] w-[32px]">
+          <span class="text-xl font-medium font-prompt truncate transition duration-150 lg:hidden lg:sidebar-expanded:block 2xl:block text-slate-200 hover:text-white">Capgo</span>
         </router-link>
       </div>
 

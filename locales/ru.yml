@@ -74,6 +74,7 @@ apikeys:
   title: ключи API
   updater: конденсатор-обновитель
 app-id-example: Пример идентификатора приложения
+available-in-the-san: Доступно в приложении песочницы
 bigger-app-size: Большой размер приложения
 build-your-code-and-: Создайте свой код
 bulk-upload: Массовая загрузка
@@ -130,6 +131,7 @@ checksum: Контрольная сумма
 commands: команды
 copied-to-clipboard: Скопировано в буфер обмена
 copy-your: Скопируйте свой
+create-a-free-accoun: Создать бесплатный аккаунт
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
 custom-id-saved: Пользовательский идентификатор сохранен
@@ -162,13 +164,16 @@ devices:
 devices-using-this-b: Устройства, использующие этот пакет
 disable-auto-downgra: Отключить автоматическое понижение версии под нативным
 disable-auto-upgrade: Отключить автоматическое обновление выше основного
+discover-module-in-a: Откройте для себя модуль в Awesome-capacitor
 discover-your-dashbo: Откройте для себя панель инструментов!
 documentation: Документация
+dont-have-an-account: У вас нет аккаунта?
 forgot:
   check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
   email: Эл. адрес
   heading: Забыл пароль
   success: Пароль успешно обновлен
+from-device: с устройства
 good: Хороший
 id: я бы
 in-your-main-file: В вашем основном файле
@@ -187,6 +192,7 @@ last-upload: Последняя загрузка
 last-version: Последняя версия
 limit-reached: Достигнут предел
 loading-more-data: Загрузка дополнительных данных...
+log-in: Авторизоваться
 log-to-the-capgo-cli: Войдите в интерфейс командной строки Capgo
 login:
   andpass: И пароль
@@ -199,6 +205,7 @@ login:
   or: или
   password: Пароль
   withemail: С адресом электронной почты
+login-to-your-accoun: Вход в свой аккаунт
 make-normal: Сделать нормальным
 making-this-channel-: >-
   Чтобы сделать этот канал «обычным», вам потребуется настроить другой канал по
@@ -334,6 +341,7 @@ stats:
   versions: Версии
 submit: Представлять на рассмотрение
 terms-of-use: Условия эксплуатации
+tests: тесты
 thank-you-for-choosi: Спасибо, что выбрали Капго!
 the: ''
 this-page-will-self-: Эта страница будет автоматически обновляться
@@ -353,6 +361,7 @@ usage:
     минут.
   title: использование
 version-builtin: Встроенная версия
+welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.
 you-reached-the-limi: Достигнуто ограничение

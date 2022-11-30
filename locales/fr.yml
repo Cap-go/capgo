@@ -74,6 +74,7 @@ apikeys:
   title: Clés API
   updater: condensateur de mise à jour
 app-id-example: Exemple d'ID d'application
+available-in-the-san: Disponible dans l'application bac à sable
 bigger-app-size: Taille d'application plus grande
 build-your-code-and-: Construisez votre code
 bulk-upload: Transfert groupé
@@ -130,6 +131,7 @@ checksum: Somme de contrôle
 commands: commandes
 copied-to-clipboard: Copié dans le presse-papier
 copy-your: Copiez votre
+create-a-free-accoun: Créer un compte gratuit
 custom-domain: Domaine personnalisé
 custom-id: Identifiant personnalisé
 custom-id-saved: Identifiant personnalisé enregistré
@@ -162,8 +164,10 @@ devices:
 devices-using-this-b: Appareils utilisant ce bundle
 disable-auto-downgra: Désactiver la rétrogradation automatique sous natif
 disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus du majeur
+discover-module-in-a: Découvrir le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: Documentation
+dont-have-an-account: "Vous n'avez pas de compte\_?"
 forgot:
   check_email: >-
     Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
@@ -171,6 +175,7 @@ forgot:
   email: E-mail
   heading: Mot de passe oublié
   success: Mot de passe mis à jour avec succès
+from-device: depuis l'appareil
 good: Bien
 id: identifiant
 in-your-main-file: Dans votre fichier principal
@@ -189,6 +194,7 @@ last-upload: Dernier téléchargement
 last-version: Dernière version
 limit-reached: Limite atteinte
 loading-more-data: Chargement de plus de données...
+log-in: Connexion
 log-to-the-capgo-cli: Connectez-vous à la CLI Capgo
 login:
   andpass: Et mot de passe
@@ -201,6 +207,7 @@ login:
   or: ou
   password: Mot de passe
   withemail: Avec adresse e-mail
+login-to-your-accoun: Connectez-vous à votre compte
 make-normal: Rendre normal
 making-this-channel-: >-
   Pour rendre ce canal "normal", vous devrez configurer un autre canal par
@@ -338,6 +345,7 @@ stats:
   versions: Versions
 submit: Soumettre
 terms-of-use: Conditions d'utilisation
+tests: essais
 thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: La
 this-page-will-self-: Cette page s'actualisera automatiquement
@@ -357,6 +365,7 @@ usage:
     minutes
   title: Usage
 version-builtin: Version intégrée
+welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-reached-the-limi: Limite atteinte

@@ -74,6 +74,7 @@ apikeys:
   title: kunci API
   updater: kapasitor-pembaru
 app-id-example: Contoh ID Aplikasi
+available-in-the-san: Tersedia di aplikasi kotak pasir
 bigger-app-size: Ukuran aplikasi lebih besar
 build-your-code-and-: Buat kode Anda
 bulk-upload: Unggah massal
@@ -130,6 +131,7 @@ checksum: Ceksum
 commands: perintah
 copied-to-clipboard: Disalin ke papan klip
 copy-your: Salin Anda
+create-a-free-accoun: Buat Akun gratis
 custom-domain: Domain khusus
 custom-id: ID Khusus
 custom-id-saved: ID khusus disimpan
@@ -162,13 +164,16 @@ devices:
 devices-using-this-b: Perangkat yang menggunakan bundel ini
 disable-auto-downgra: Nonaktifkan penurunan versi otomatis di bawah asli
 disable-auto-upgrade: Nonaktifkan peningkatan otomatis di atas mayor
+discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
+dont-have-an-account: Belum punya akun?
 forgot:
   check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
   email: Surel
   heading: Tidak ingat kata sandi
   success: Kata sandi berhasil diperbarui
+from-device: dari perangkat
 good: Bagus
 id: Indo
 in-your-main-file: Di file utama Anda
@@ -187,6 +192,7 @@ last-upload: Unggahan terakhir
 last-version: Versi terakhir
 limit-reached: Batas tercapai
 loading-more-data: Memuat lebih banyak data...
+log-in: Gabung
 log-to-the-capgo-cli: Masuk ke Capgo CLI
 login:
   andpass: Dan kata sandi
@@ -199,6 +205,7 @@ login:
   or: atau
   password: Kata sandi
   withemail: Dengan alamat email
+login-to-your-accoun: masuk ke akun Anda
 make-normal: Jadikan normal
 making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
@@ -334,6 +341,7 @@ stats:
   versions: Versi
 submit: Kirim
 terms-of-use: Syarat Penggunaan
+tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri sendiri
@@ -353,6 +361,7 @@ usage:
     menit
   title: Penggunaan
 version-builtin: Versi bawaan
+welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai

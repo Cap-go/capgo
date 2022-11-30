@@ -72,6 +72,7 @@ apikeys:
   title: Khóa API
   updater: trình cập nhật tụ điện
 app-id-example: Ví dụ về ID ứng dụng
+available-in-the-san: Có sẵn trong ứng dụng sandbox
 bigger-app-size: Kích thước ứng dụng lớn hơn
 build-your-code-and-: Xây dựng mã của bạn
 bulk-upload: Tải lên hàng loạt
@@ -128,6 +129,7 @@ checksum: Checksum
 commands: lệnh
 copied-to-clipboard: Sao chép vào clipboard
 copy-your: Sao chép của bạn
+create-a-free-accoun: Tạo một tài khoản miễn phí
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
 custom-id-saved: ID tùy chỉnh đã được lưu
@@ -160,13 +162,16 @@ devices:
 devices-using-this-b: Các thiết bị sử dụng gói này
 disable-auto-downgra: Tắt tự động hạ cấp dưới gốc
 disable-auto-upgrade: Tắt nâng cấp tự động trên chính
+discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá trang tổng quan của bạn!
 documentation: Tài liệu
+dont-have-an-account: Bạn chưa có tài khoản?
 forgot:
   check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
   email: E-mail
   heading: Quên mật khẩu
   success: Đã cập nhật mật khẩu thành công
+from-device: từ thiết bị
 good: Tốt
 id: Tôi
 in-your-main-file: Trong tệp chính của bạn
@@ -185,6 +190,7 @@ last-upload: Lần tải lên cuối cùng
 last-version: Phiên bản cuối cùng
 limit-reached: Đạt tới giới hạn
 loading-more-data: Đang tải thêm dữ liệu ...
+log-in: Đăng nhập
 log-to-the-capgo-cli: Đăng nhập vào Capgo CLI
 login:
   andpass: Và mật khẩu
@@ -197,6 +203,7 @@ login:
   or: hoặc
   password: Mật khẩu
   withemail: Với địa chỉ email
+login-to-your-accoun: đăng nhập vào tài khoản của bạn
 make-normal: làm cho bình thường
 making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
@@ -334,6 +341,7 @@ stats:
   versions: Phiên bản
 submit: Nộp
 terms-of-use: Điều khoản sử dụng
+tests: kiểm tra
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
@@ -351,6 +359,7 @@ usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
 version-builtin: Nội trang phiên bản
+welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của bạn ở đây.
 you-reached-the-limi: Đạt tới giới hạn

@@ -68,6 +68,7 @@ apikeys:
   title: API 密钥
   updater: 电容更新器
 app-id-example: 应用 ID 示例
+available-in-the-san: 在沙盒应用程序中可用
 bigger-app-size: 更大的应用程序大小
 build-your-code-and-: 构建你的代码
 bulk-upload: 批量上传
@@ -122,6 +123,7 @@ checksum: 校验和
 commands: 命令
 copied-to-clipboard: 已复制到剪贴板
 copy-your: 复制你的
+create-a-free-accoun: 创建一个免费帐户
 custom-domain: 自定义域
 custom-id: 自定义 ID
 custom-id-saved: 自定义 ID 已保存
@@ -154,13 +156,16 @@ devices:
 devices-using-this-b: 使用此捆绑包的设备
 disable-auto-downgra: 在 native 下禁用自动降级
 disable-auto-upgrade: 禁用主要以上的自动升级
+discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
+dont-have-an-account: 没有帐户？
 forgot:
   check_email: 检查您的电子邮件以获取重置密码的链接
   email: 电子邮件
   heading: 忘记密码
   success: 密码更新成功
+from-device: 从设备
 good: 好的
 id: ID
 in-your-main-file: 在你的主文件中
@@ -179,6 +184,7 @@ last-upload: 上次上传
 last-version: 最新版本
 limit-reached: 达到上限
 loading-more-data: 正在加载更多数据...
+log-in: 登录
 log-to-the-capgo-cli: 登录 Capgo CLI
 login:
   andpass: 和密码
@@ -191,6 +197,7 @@ login:
   or: 要么
   password: 密码
   withemail: 有电子邮件地址
+login-to-your-accoun: 登录到您的帐户
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 module:
@@ -324,6 +331,7 @@ stats:
   versions: 版本
 submit: 提交
 terms-of-use: 使用条款
+tests: 测试
 thank-you-for-choosi: 感谢您选择 Capgo！
 the: 这
 this-page-will-self-: 此页面将自动刷新
@@ -341,6 +349,7 @@ usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
 version-builtin: 内置版本
+welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到上限

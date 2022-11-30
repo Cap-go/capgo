@@ -51,8 +51,8 @@ add-your-first-app-t: Add your first app to your account and let's push updates 
 afternoon: afternoon
 alert:
   confirm-delete: Confirm Delete
+  delete-message: Are you sure you want to delete this
   not-reverse-message: This action is not reversible
-  delete-message:  Are you sure you want to delete this
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
@@ -124,6 +124,7 @@ checksum: Checksum
 commands: commands
 copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
+create-a-free-accoun: Create a free account
 custom-domain: Custom domain
 custom-id: Custom ID
 custom-id-saved: Custom ID saved
@@ -159,6 +160,7 @@ disable-auto-upgrade: Disable auto upgrade above major
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
+dont-have-an-account: Don’t have an account?
 forgot:
   check_email: Check your email to get the link to reset your password
   email: Email
@@ -183,6 +185,7 @@ last-upload: Last upload
 last-version: Last version
 limit-reached: Limit reached
 loading-more-data: Loading more data...
+log-in: Log in
 log-to-the-capgo-cli: Log to the Capgo CLI
 login:
   andpass: And password
@@ -195,6 +198,7 @@ login:
   or: or
   password: Password
   withemail: With email adress
+login-to-your-accoun: Login to your account
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
@@ -344,6 +348,7 @@ usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
 version-builtin: Version builtin
+welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
