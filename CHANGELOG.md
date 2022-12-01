@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.31](https://github.com/Cap-go/capgo/compare/1.55.30...1.55.31) (2022-12-01)
+
+
+### Bug Fixes
+
+* login add translation ([06dd5b0](https://github.com/Cap-go/capgo/commit/06dd5b03b9cc29204bcec4f4a660817c4a016c75))
+
 ### [1.55.30](https://github.com/Cap-go/capgo/compare/1.55.29...1.55.30) (2022-11-30)
 
 
