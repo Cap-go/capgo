@@ -174,7 +174,7 @@ export class CapacitorCrispWeb {
   private setAutoHide() {
     this.push(
       // ['safe', true],
-      (this.isIframe ? ['do', 'chat:open'] : []),
+      (this.isIframe ? ['do', 'chat:open'] : ['do', 'chat:hide']),
       [
         'on',
         'chat:closed',
