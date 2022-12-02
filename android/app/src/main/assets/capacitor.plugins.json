@@ -8,10 +8,6 @@
 		"classpath": "com.getcapacitor.community.keepawake.KeepAwakePlugin"
 	},
 	{
-		"pkg": "@capacitor-community/native-audio",
-		"classpath": "com.getcapacitor.community.audio.NativeAudio"
-	},
-	{
 		"pkg": "@capacitor/action-sheet",
 		"classpath": "com.capacitorjs.plugins.actionsheet.ActionSheetPlugin"
 	},

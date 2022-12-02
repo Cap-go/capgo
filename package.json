@@ -59,7 +59,7 @@
     "@capgo/capacitor-mute": "^1.1.25",
     "@capgo/capacitor-purchases": "^1.3.36",
     "@capgo/capacitor-screen-recorder": "^1.2.22",
-    "@capgo/capacitor-updater": "4.12.9",
+    "@capgo/capacitor-updater": "4.13.2",
     "@capgo/native-audio": "^5.0.1",
     "@capgo/native-market": "^1.1.6",
     "@ionic/vue": "6.3.8",
