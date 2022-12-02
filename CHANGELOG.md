@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.37](https://github.com/Cap-go/capgo/compare/1.55.36...1.55.37) (2022-12-02)
+
+
+### Bug Fixes
+
+* dashboard issue ([bfe1407](https://github.com/Cap-go/capgo/commit/bfe140715811bd12f0c0ab3711cf60d3aec5e5b6))
+
 ### [1.55.36](https://github.com/Cap-go/capgo/compare/1.55.35...1.55.36) (2022-12-02)
 
 
