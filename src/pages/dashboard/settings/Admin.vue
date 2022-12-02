@@ -81,27 +81,27 @@ const reset = () => {
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+  <div class="flex h-screen overflow-hidden bg-white safe-zone dark:bg-gray-900/90">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
 
     <!-- Content area -->
-    <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    <div class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
       <!-- Site header -->
       <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
       <main>
-        <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+        <div class="w-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
           <!-- Page header -->
           <div class="mb-8">
             <!-- Title -->
-            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
+            <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
               Admin
             </h1>
           </div>
 
           <!-- Content -->
-          <div class="bg-white dark:bg-gray-800 shadow-lg rounded-sm mb-8">
+          <div class="mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800">
             <div class="flex flex-col md:flex-row md:-mr-px">
               <SettingsSidebar />
               <div>
@@ -111,20 +111,20 @@ const reset = () => {
                   >
                     <!-- Panel body -->
                     <div class="p-6 space-y-6">
-                      <h2 class="text-2xl text-slate-800 dark:text-white font-bold mb-5">
+                      <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
                         Admin
                       </h2>
                       <!-- Personal Info -->
                       <section>
-                        <h3 class="text-xl leading-snug text-slate-800 dark:text-white font-bold mb-1">
+                        <h3 class="mb-1 text-xl font-bold leading-snug text-slate-800 dark:text-white">
                           Use the UUID of user you want to spoof
                         </h3>
 
-                        <div class="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
+                        <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
                           <div class="sm:w-1/2">
-                            <label class="block text-sm font-medium mb-1 dark:text-white" for="name">UUID</label>
+                            <label class="block mb-1 text-sm font-medium dark:text-white" for="name">UUID</label>
                             <input
-                              v-model="form.uuid" class="form-input w-full dark:bg-gray-700 dark:text-white"
+                              v-model="form.uuid" class="w-full form-input dark:bg-gray-700 dark:text-white"
                               :disabled="isLoading"
                               autofocus
                               required
@@ -132,7 +132,7 @@ const reset = () => {
                               type="text"
                             >
                             <div v-for="(error, index) of v$.uuid.$errors" :key="index">
-                              <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                              <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                                 UUID: {{ error.$message }}
                               </p>
                             </div>
@@ -145,7 +145,7 @@ const reset = () => {
                       <div class="flex flex-col px-6 py-5 border-t border-slate-200">
                         <div class="flex self-end">
                           <button
-                            class="btn p-2 rounded bg-blue-500 hover:bg-blue-600 text-white ml-3"
+                            class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
                             :disabled="isLoading"
                             type="submit"
                             color="secondary"
@@ -158,7 +158,7 @@ const reset = () => {
                           </button>
                           <button
                             v-if="oldId"
-                            class="btn p-2 rounded bg-red-500 hover:bg-red-600 text-white ml-3"
+                            class="p-2 ml-3 text-white bg-red-500 rounded btn hover:bg-red-600"
                             :disabled="isLoading"
                             color="secondary"
                             shape="round"

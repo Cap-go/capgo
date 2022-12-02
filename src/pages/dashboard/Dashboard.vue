@@ -24,7 +24,7 @@ const props = defineProps<{
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
-const isMobile = isPlatform('capacitor')
+const isMobile = !isPlatform('capacitor')
 const isLoading = ref(false)
 const route = useRoute()
 const main = useMainStore()
@@ -73,7 +73,7 @@ watchEffect(async () => {
         </div>
       </main>
     </div>
-    <IonFab v-if="!stepsOpen && !isMobile" slot="fixed" vertical="bottom" horizontal="end">
+    <IonFab v-if="!stepsOpen && !isMobile" slot="fixed" vertical="bottom" horizontal="end" class="safe-zone">
       <IonFabButton color="secondary" @click="stepsOpen = true">
         <IonIcon :icon="addOutline" />
       </IonFabButton>

@@ -41,7 +41,7 @@ watch(sidebarExpanded, () => {
       :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between pr-3 mb-10 sm:px-2">
+      <div class="flex justify-between pr-3 mb-10 safe-zone sm:px-2">
         <!-- Close button -->
         <button
           ref="trigger"
@@ -58,7 +58,7 @@ watch(sidebarExpanded, () => {
         <!-- Logo -->
         <router-link class="flex flex-row items-center space-x-2" to="/app/home">
           <img src="/capgo.webp" alt="logo" class="h-[32px] w-[32px]">
-          <span class="text-xl font-medium font-prompt truncate transition duration-150 lg:hidden lg:sidebar-expanded:block 2xl:block text-slate-200 hover:text-white">Capgo</span>
+          <span class="text-xl font-medium truncate transition duration-150 font-prompt lg:hidden lg:sidebar-expanded:block 2xl:block text-slate-200 hover:text-white">Capgo</span>
         </router-link>
       </div>
 

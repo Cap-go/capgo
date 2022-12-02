@@ -12,6 +12,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { Mute } from '@capgo/capacitor-mute'
 import TitleHead from '~/components/TitleHead.vue'
 
 const { t } = useI18n()
@@ -26,6 +27,7 @@ const modules = ref([] as Module[])
 const mods = {
   NativeMarket,
   CapacitorUpdater,
+  Mute,
 }
 modules.value.push(...[
   // {
@@ -80,12 +82,12 @@ modules.value.push(...[
   },
   {
     name: 'CapacitorUpdater',
-    method: 'getLatest',
+    method: 'getChannel',
     option: {},
   },
   {
-    name: 'CapacitorUpdater',
-    method: 'getChannel',
+    name: 'Mute',
+    method: 'isMuted',
     option: {},
   },
 ])

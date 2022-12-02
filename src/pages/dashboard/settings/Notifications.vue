@@ -11,27 +11,27 @@ const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+  <div class="flex h-screen overflow-hidden bg-white safe-zone dark:bg-gray-900/90">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
 
     <!-- Content area -->
-    <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    <div class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
       <!-- Site header -->
       <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
       <main>
-        <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+        <div class="w-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
           <!-- Page header -->
           <div class="mb-8">
             <!-- Title -->
-            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
+            <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
               {{ t('account-settings') }} ✨
             </h1>
           </div>
 
           <!-- Content -->
-          <div class="bg-white dark:bg-gray-800 shadow-lg rounded-sm mb-8">
+          <div class="mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800">
             <div class="flex flex-col md:flex-row md:-mr-px">
               <SettingsSidebar />
               <NotificationsPanel />

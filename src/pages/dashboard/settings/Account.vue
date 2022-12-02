@@ -11,7 +11,7 @@ const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+  <div class="safe-zone flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
 
