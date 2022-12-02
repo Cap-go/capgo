@@ -93,6 +93,7 @@ serve(async (event: Request) => {
             id,
             name,
             checksum,
+            session_key,
             user_id,
             bucket_id,
             external_url
@@ -122,6 +123,7 @@ serve(async (event: Request) => {
               id,
               name,
               checksum,
+              session_key,
               user_id,
               bucket_id,
               external_url
@@ -144,6 +146,7 @@ serve(async (event: Request) => {
             id,
             name,
             checksum,
+            session_key,
             user_id,
             bucket_id,
             external_url
@@ -298,7 +301,8 @@ serve(async (event: Request) => {
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,
-      ...(version.checksum ? { checksum: version.checksum } : {}),
+      session_key: version.session_key,
+      checksum: version.checksum,
       url: signedURL,
     })
   }
