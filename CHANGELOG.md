@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.33](https://github.com/Cap-go/capgo/compare/1.55.32...1.55.33) (2022-12-02)
+
+
+### Bug Fixes
+
+* packages ([f95655a](https://github.com/Cap-go/capgo/commit/f95655a0df2abe4f9dc2375f4af57e078417eca0))
+* safe zone ios ([fc97408](https://github.com/Cap-go/capgo/commit/fc97408b40a0b495d7bd56137d6ddeac39a1b9a4))
+
 ### [1.55.32](https://github.com/Cap-go/capgo/compare/1.55.31...1.55.32) (2022-12-01)
 
 ### [1.55.31](https://github.com/Cap-go/capgo/compare/1.55.30...1.55.31) (2022-12-01)
