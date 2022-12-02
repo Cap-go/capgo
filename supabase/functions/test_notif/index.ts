@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.166.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { sendRes } from '../_utils/utils.ts'
 
