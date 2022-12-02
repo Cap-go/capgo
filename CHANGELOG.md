@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.39](https://github.com/Cap-go/capgo/compare/1.55.38...1.55.39) (2022-12-02)
+
+
+### Bug Fixes
+
+* remove useless files ([4805298](https://github.com/Cap-go/capgo/commit/4805298068a44148bbda565075b450e41127b376))
+* udate latest plugin ([4e1aee1](https://github.com/Cap-go/capgo/commit/4e1aee100e418074edb6ca73afbacda5b0933ab8))
+
 ### [1.55.38](https://github.com/Cap-go/capgo/compare/1.55.37...1.55.38) (2022-12-02)
 
 ### [1.55.37](https://github.com/Cap-go/capgo/compare/1.55.36...1.55.37) (2022-12-02)
