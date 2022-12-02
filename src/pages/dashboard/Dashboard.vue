@@ -24,7 +24,7 @@ const props = defineProps<{
   sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
-const isMobile = !isPlatform('capacitor')
+const isMobile = isPlatform('capacitor')
 const isLoading = ref(false)
 const route = useRoute()
 const main = useMainStore()
