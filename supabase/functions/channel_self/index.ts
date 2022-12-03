@@ -41,7 +41,7 @@ const post = async (event: Request): Promise<Response> => {
     return sendRes({ status: 'Cannot find device', error: dbError }, 400)
   }
   if (!body.channel || (dataChannelOverride && !dataChannelOverride?.channel_id.allow_device_self_set))
-    return sendRes({ status: 'Nothing to update' }, 400)
+    return sendRes({ status: 'Cannot change device override current channel don\t allow it' }, 400)
   // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
