@@ -10,14 +10,13 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { addOutline } from 'ionicons/icons'
+import copy from 'copy-text-to-clipboard'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
-import copy from 'copy-text-to-clipboard'
-
 
 const { t } = useI18n()
 const route = useRoute()
