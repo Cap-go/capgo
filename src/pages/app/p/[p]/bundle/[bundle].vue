@@ -16,6 +16,8 @@ import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
+import copy from 'copy-text-to-clipboard'
+
 
 const { t } = useI18n()
 const route = useRoute()
@@ -31,6 +33,15 @@ const version_meta = ref<definitions['app_versions_meta']>()
 const search = ref('')
 const devices = ref<definitions['devices'][]>([])
 
+const copyToast = async (text: string) => {
+  copy(text)
+  const toast = await toastController
+    .create({
+      message: t('copied-to-clipboard'),
+      duration: 2000,
+    })
+  await toast.present()
+}
 const getDevices = async () => {
   if (!version.value)
     return
@@ -188,6 +199,12 @@ watchEffect(async () => {
   }
 })
 
+const hideString = (str: string) => {
+  const first = str.slice(0, 5)
+  const last = str.slice(-5)
+  return `${first}...${last}`
+}
+
 const devicesFilter = computed(() => {
   const value = search.value
   if (value) {
@@ -274,6 +291,16 @@ const devicesFilter = computed(() => {
             </IonLabel>
             <IonNote slot="end">
               {{ version_meta?.devices }}
+            </IonNote>
+          </IonItem>
+          <IonItem v-if="version?.session_key">
+            <IonLabel>
+              <h2 class="text-sm text-azure-500">
+                {{ t('session_key') }}
+              </h2>
+            </IonLabel>
+            <IonNote slot="end" @click="copyToast(version?.session_key || '')">
+              {{ hideString(version.session_key) }}
             </IonNote>
           </IonItem>
           <IonItem v-if="version?.external_url">
