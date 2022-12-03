@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.42](https://github.com/Cap-go/capgo/compare/1.55.41...1.55.42) (2022-12-03)
+
+
+### Bug Fixes
+
+* channel error ([43399b0](https://github.com/Cap-go/capgo/commit/43399b0b885c670c7f049c21cd288e843409daa5))
+
 ### [1.55.41](https://github.com/Cap-go/capgo/compare/1.55.40...1.55.41) (2022-12-03)
 
 
