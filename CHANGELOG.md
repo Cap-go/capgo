@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.41](https://github.com/Cap-go/capgo/compare/1.55.40...1.55.41) (2022-12-03)
+
+
+### Bug Fixes
+
+* normalise api with netlify ([c15a44f](https://github.com/Cap-go/capgo/commit/c15a44f2983a374e358e98821e4ea8593b71eef2))
+
 ### [1.55.40](https://github.com/Cap-go/capgo/compare/1.55.39...1.55.40) (2022-12-03)
 
 
