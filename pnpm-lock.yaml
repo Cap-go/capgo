@@ -36,7 +36,7 @@ specifiers:
   '@capawesome/capacitor-screen-orientation': ^2.0.1
   '@capgo/capacitor-crisp': ^1.1.13
   '@capgo/capacitor-flash': ^1.2.19
-  '@capgo/capacitor-mute': ^1.1.25
+  '@capgo/capacitor-mute': ^1.1.27
   '@capgo/capacitor-purchases': ^1.3.36
   '@capgo/capacitor-screen-recorder': ^1.2.22
   '@capgo/capacitor-updater': 4.13.2
@@ -143,7 +143,7 @@ dependencies:
   '@capawesome/capacitor-screen-orientation': 2.0.1_@capacitor+core@4.4.0
   '@capgo/capacitor-crisp': 1.1.13_@capacitor+core@4.4.0
   '@capgo/capacitor-flash': 1.2.19_@capacitor+core@4.4.0
-  '@capgo/capacitor-mute': 1.1.25_@capacitor+core@4.4.0
+  '@capgo/capacitor-mute': 1.1.27_@capacitor+core@4.4.0
   '@capgo/capacitor-purchases': 1.3.36_@capacitor+core@4.4.0
   '@capgo/capacitor-screen-recorder': 1.2.22_@capacitor+core@4.4.0
   '@capgo/capacitor-updater': 4.13.2_@capacitor+core@4.4.0
@@ -1917,8 +1917,8 @@ packages:
       '@capacitor/core': 4.4.0
     dev: false
 
-  /@capgo/capacitor-mute/1.1.25_@capacitor+core@4.4.0:
-    resolution: {integrity: sha512-F4s+x4xQlZZrm9HY5rADhyFBLJei4swUkOiG5fpEGNESQA58J9hIXXbjf1B7iv9HXfwY0Sz8hiBTaBfABeP+XA==}
+  /@capgo/capacitor-mute/1.1.27_@capacitor+core@4.4.0:
+    resolution: {integrity: sha512-a6cpvB1GllkPM0FUWIDQU9S+LhPNrMFkRtd1xZM7cXdg5CuRX3NDQ919flG5LvftD0hhQx/whbRgTc5FL6XhYg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
