@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.44](https://github.com/Cap-go/capgo/compare/1.55.43...1.55.44) (2022-12-03)
+
+
+### Bug Fixes
+
+* automerge config ([e8cca89](https://github.com/Cap-go/capgo/commit/e8cca89ff939f7a915a5ee3bdaa8a3e5fb5768b2))
+* return on error ([a4b3171](https://github.com/Cap-go/capgo/commit/a4b31719e22471c5a5813bb267af09c0d0b0ec5a))
+
 ### [1.55.43](https://github.com/Cap-go/capgo/compare/1.55.42...1.55.43) (2022-12-03)
 
 
