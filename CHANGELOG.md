@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.1](https://github.com/Cap-go/capgo/compare/1.58.0...1.58.1) (2022-12-03)
+
+
+### Bug Fixes
+
+* make bundle consistent with other endpoints ([1b819be](https://github.com/Cap-go/capgo/commit/1b819be8e59358ad47ca0e0890b0eedaf6e491e1))
+
 ## [1.58.0](https://github.com/Cap-go/capgo/compare/1.57.1...1.58.0) (2022-12-03)
 
 
