@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
@@ -7,34 +8,54 @@ import type { AppStats } from '../_utils/types.ts'
 serve(async (event: Request) => {
   try {
     const body = (await event.json()) as AppStats
+    console.log('body', body)
+    let {
+      version_name,
+      version_build,
+    } = body
+    const {
+      platform,
+      app_id,
+      version_os,
+      version,
+      device_id,
+      action,
+      plugin_version = '2.3.3',
+      custom_id,
+      is_emulator = false,
+      is_prod = true,
+    } = body
     let statsDb = 'stats'
     let deviceDb = 'devices'
 
-    console.log('body', body)
+    const coerce = semver.coerce(version_build)
+    if (coerce)
+      version_build = coerce.version
+    version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     const device: Partial<definitions['devices'] | definitions['devices_onprem']> = {
-      platform: body.platform as definitions['stats']['platform'],
-      device_id: body.device_id,
-      app_id: body.app_id,
-      plugin_version: body.plugin_version || '2.3.3',
-      os_version: body.version_os,
-      is_emulator: body.is_emulator === undefined ? false : body.is_emulator,
-      is_prod: body.is_prod === undefined ? true : body.is_prod,
-      ...(body.custom_id ? { custom_id: body.custom_id } : {}),
+      platform: platform as definitions['stats']['platform'],
+      device_id,
+      app_id,
+      plugin_version,
+      os_version: version_os,
+      is_emulator: is_emulator === undefined ? false : is_emulator,
+      is_prod: is_prod === undefined ? true : is_prod,
+      ...(custom_id ? { custom_id } : {}),
     }
 
     const stat: Partial<definitions['stats']> = {
-      platform: body.platform as definitions['stats']['platform'],
-      device_id: body.device_id,
-      action: body.action,
-      app_id: body.app_id,
-      version_build: body.version_build,
+      platform: platform as definitions['stats']['platform'],
+      device_id: device_id,
+      action: action,
+      app_id: app_id,
+      version_build: version_build,
     }
     const all = []
     const { data, error } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
-      .eq('app_id', body.app_id)
-      .eq('name', body.version_name || 'unknown')
+      .eq('app_id', app_id)
+      .eq('name', version_name || 'unknown')
       .single()
     if (data && !error) {
       stat.version = data.id
@@ -43,27 +64,27 @@ serve(async (event: Request) => {
         const { data: deviceData, error: deviceError } = await supabaseAdmin()
           .from<definitions['devices']>(deviceDb)
           .select()
-          .eq('app_id', body.app_id)
-          .eq('device_id', body.device_id)
+          .eq('app_id', app_id)
+          .eq('device_id', device_id)
           .single()
         if (deviceData && !deviceError) {
           all.push(updateVersionStats({
-            app_id: body.app_id,
+            app_id: app_id,
             version_id: deviceData.version,
             devices: -1,
           }))
         }
         all.push(updateVersionStats({
-          app_id: body.app_id,
+          app_id: app_id,
           version_id: data.id,
           devices: 1,
         }))
       }
     }
     else if (!device.is_emulator && device.is_prod) {
-      console.log('switch to onprem', body.app_id)
-      device.version = body.version_name || 'unknown' as any
-      stat.version = body.version || 0
+      console.log('switch to onprem', app_id)
+      device.version = version_name || 'unknown' as any
+      stat.version = version || 0
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
     }
