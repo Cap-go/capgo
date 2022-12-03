@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.56.0](https://github.com/Cap-go/capgo/compare/1.55.44...1.56.0) (2022-12-03)
+
+
+### Features
+
+* add ivSessionKey display in bundle ([f65cd0e](https://github.com/Cap-go/capgo/commit/f65cd0e2ed8e167c3bc9cef74fc6a9d6107140ca))
+
 ### [1.55.44](https://github.com/Cap-go/capgo/compare/1.55.43...1.55.44) (2022-12-03)
 
 
