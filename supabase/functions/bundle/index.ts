@@ -67,7 +67,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       return sendRes({ status: 'Cannot get bundle', error: dbError }, 400)
     }
 
-    return sendRes({ versions: dataBundles, bundles: dataBundles })
+    return sendRes(dataBundles)
   }
   catch (e) {
     console.log('Cannot get bundle', JSON.stringify(e))
