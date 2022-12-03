@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
-import { checkKey, sendRes } from '../_utils/utils.ts'
+import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
 
 interface DeviceLink {
   app_id: string
@@ -9,7 +9,6 @@ interface DeviceLink {
   version_id?: string
   channel?: string
 }
-const fetchLimit = 50
 interface GetDevice {
   app_id: string
   device_id?: string

@@ -5,6 +5,8 @@ import type { JwtUser } from './types.ts'
 export const jwtDecoder = (jwt: string): JwtUser =>
   JSON.parse(atob(jwt.split('.')[1]))
 
+export const fetchLimit = 50
+
 const basicHeaders = {
   'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
   'Content-Type': 'application/json',

@@ -1,10 +1,11 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import type { definitions } from '../_utils/types_supabase.ts'
-import { checkKey, sendRes } from '../_utils/utils.ts'
+import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
 
 interface GetLatest {
   app_id?: string
+  page?: number
 }
 
 export const deleteVersion = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
@@ -51,11 +52,15 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     if (!(await checkAppOwner(apikey.user_id, body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
 
+    const fetchOffset = body.page === undefined ? 0 : body.page
+    const from = fetchOffset * fetchLimit
+    const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataVersions, error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.app_id)
       .eq('deleted', false)
+      .range(from, to)
       .order('created_at', { ascending: false })
     if (dbError || !dataVersions || !dataVersions.length) {
       console.log('Cannot get version')
