@@ -51,7 +51,10 @@ serve(async (event: Request) => {
     if (coerce)
       version_build = coerce.version
     else
-      return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
+      return sendRes({ 
+        message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
+        error: 'semver_error',
+      }, 400)
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       console.log('Cannot get all vars', platform,
@@ -62,7 +65,10 @@ serve(async (event: Request) => {
         is_emulator,
         is_prod,
         version_name)
-      return sendRes({ message: 'missing app_id' }, 400)
+      return sendRes({ 
+        message: 'Cannot find device_id or appi_id',
+        error: 'missing_info',
+      }, 400)
     }
 
     console.log(id, 'Headers', platform,
@@ -239,6 +245,7 @@ serve(async (event: Request) => {
       return sendRes({
         major: true,
         message: 'Cannot update, ios it\'s disabled',
+        error: 'disabled_platform_ios',
         version: version.name,
         old: version_name,
       }, 200)
@@ -249,6 +256,7 @@ serve(async (event: Request) => {
       return sendRes({
         major: true,
         message: 'Cannot update, android is disabled',
+        error: 'disabled_platform_android',
         version: version.name,
         old: version_name,
       }, 200)
@@ -259,6 +267,7 @@ serve(async (event: Request) => {
       return sendRes({
         major: true,
         message: 'Cannot upgrade major version',
+        error: 'disable_auto_update_to_major',
         version: version.name,
         old: version_name,
       }, 200)
@@ -270,6 +279,7 @@ serve(async (event: Request) => {
       await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, version.id)
       return sendRes({
         message: 'Cannot revert under native version',
+        error: 'disable_auto_update_under_native',
         version: version.name,
         old: version_name,
       }, 200)
@@ -281,6 +291,7 @@ serve(async (event: Request) => {
       return sendRes({
         major: true,
         message: 'Cannot update, dev build is disabled',
+        error: 'disable_dev_build',
         version: version.name,
         old: version_name,
       }, 200)
@@ -291,6 +302,7 @@ serve(async (event: Request) => {
       return sendRes({
         major: true,
         message: 'Cannot update, emulator is disabled',
+        error: 'disable_emulator',
         version: version.name,
         old: version_name,
       }, 200)
@@ -309,8 +321,8 @@ serve(async (event: Request) => {
   catch (e) {
     console.log(id, 'Error', e)
     return sendRes({
-      status: 'Error unknow',
-      error: JSON.stringify(e),
+      message: `Error unknow ${JSON.stringify(e)}`,
+      error: 'unknow_error',
     }, 500)
   }
 })

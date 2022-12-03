@@ -34,12 +34,18 @@ const post = async (event: Request): Promise<Response> => {
   if (coerce)
     version_build = coerce.version
   else
-    return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
+    return sendRes({ 
+      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
+      error: 'semver_error',
+    }, 400)
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
   if (!device_id || !app_id) {
     console.log('Cannot find device_id or appi_id')
-    return sendRes({ status: 'Cannot find device_id or appi_id' }, 400)
+    return sendRes({ 
+      message: 'Cannot find device_id or appi_id',
+      error: 'missing_info',
+    }, 400)
   }
   // find device
   const { data: dataDevice} = await supabaseAdmin()
@@ -71,10 +77,9 @@ const post = async (event: Request): Promise<Response> => {
       if (!version) {
         return sendRes({
           message: `Version ${version_name} doesn't exist`,
+          error: 'version_error',
         }, 400)
       }
-      // console.error('Cannot find device', body, dbError)
-      // return sendRes({ status: 'Cannot find device', error: dbError, payload: body }, 400)
       await updateOrCreateDevice({
         app_id,
         device_id,
@@ -90,8 +95,12 @@ const post = async (event: Request): Promise<Response> => {
       })
     }
   }
-  if (!channel || (dataChannelOverride && !dataChannelOverride?.channel_id.allow_device_self_set))
-    return sendRes({ status: 'Cannot change device override current channel don\t allow it' }, 400)
+  if (!channel || (dataChannelOverride && !dataChannelOverride?.channel_id.allow_device_self_set)) {
+    return sendRes({
+      message: 'Cannot change device override current channel don\t allow it',
+      error: 'cannot_override',
+    }, 400)
+  }
   // if channel set channel_override to it
   if (channel) {
     // get channel by name
@@ -104,7 +113,7 @@ const post = async (event: Request): Promise<Response> => {
       .single()
     if (dbError || !dataChannel) {
       console.log('Cannot find channel', dbError)
-      return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
+      return sendRes({ message: `Cannot find channel ${dbError}`, error: 'channel_not_found' }, 400)
     }
     const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin()
       .from<definitions['channel_devices']>('channel_devices')
@@ -116,7 +125,7 @@ const post = async (event: Request): Promise<Response> => {
       })
     if (dbErrorDev || !dataChannelDev) {
       console.log('Cannot do channel override', dbErrorDev)
-      return sendRes({ status: 'Cannot do channel override', error: dbErrorDev }, 400)
+      return sendRes({ message: `Cannot do channel override ${dbErrorDev}`, error: 'override_not_allowed' }, 400)
     }
   }
   const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
@@ -151,7 +160,7 @@ const put = async (event: Request): Promise<Response> => {
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!device_id || !app_id) {
     console.log('Cannot find device or appi_id')
-    return sendRes({ status: 'Cannot find device' }, 400)
+    return sendRes({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
   const { data: dataChannel, error: errorChannel } = await supabaseAdmin()
     .from<definitions['channels'] & DeviceChannel>('channels')
@@ -214,5 +223,5 @@ serve((event: Request) => {
   else if (api_mode_string === 'PUT' || (!api_mode_string && event.method === 'PUT'))
     return put(event)
   console.log('Method not allowed')
-  return sendRes({ status: 'Method now allowed' }, 400)
+  return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
 })
