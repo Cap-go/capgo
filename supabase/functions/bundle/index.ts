@@ -8,7 +8,7 @@ interface GetLatest {
   page?: number
 }
 
-export const deleteVersion = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const deleteBundle = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
   const body = await event.json() as GetLatest
   if (!body.app_id) {
     console.log('No app_id provided')
@@ -55,23 +55,23 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     const fetchOffset = body.page === undefined ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const { data: dataVersions, error: dbError } = await supabaseAdmin()
+    const { data: dataBundles, error: dbError } = await supabaseAdmin()
       .from<definitions['app_versions']>('app_versions')
       .select()
       .eq('app_id', body.app_id)
       .eq('deleted', false)
       .range(from, to)
       .order('created_at', { ascending: false })
-    if (dbError || !dataVersions || !dataVersions.length) {
-      console.log('Cannot get version')
-      return sendRes({ status: 'Cannot get version', error: dbError }, 400)
+    if (dbError || !dataBundles || !dataBundles.length) {
+      console.log('Cannot get bundle')
+      return sendRes({ status: 'Cannot get bundle', error: dbError }, 400)
     }
 
-    return sendRes({ versions: dataVersions })
+    return sendRes({ versions: dataBundles, bundles: dataBundles })
   }
   catch (e) {
-    console.log('Cannot get version', JSON.stringify(e))
-    return sendRes({ status: 'Cannot get version', error: JSON.stringify(e) }, 500)
+    console.log('Cannot get bundle', JSON.stringify(e))
+    return sendRes({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 }
 
@@ -91,7 +91,7 @@ serve(async (event: Request) => {
   if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
     return get(event, apikey)
   else if (api_mode_string === 'DELETE' || (!api_mode_string && event.method === 'DELETE'))
-    return deleteVersion(event, apikey)
+    return deleteBundle(event, apikey)
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
