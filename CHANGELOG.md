@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.58.0](https://github.com/Cap-go/capgo/compare/1.57.1...1.58.0) (2022-12-03)
+
+
+### Features
+
+* transfer endpoint from version to bundle ([57c19c7](https://github.com/Cap-go/capgo/commit/57c19c732b6a5b4dd98dc7439119f71664088ced))
+
 ### [1.57.1](https://github.com/Cap-go/capgo/compare/1.57.0...1.57.1) (2022-12-03)
 
 
