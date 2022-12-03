@@ -99,7 +99,7 @@ const getStats = (): GlobalStats => {
               if (!res.body)
                 console.error('stripe_info no body', user.customer_id)
               const name = res.body?.product_id.name as keyof typeof data.plans
-              console.log('stripe_info name', name, res.body?.status, res.body)
+              console.log('stripe_info name', name, res.body?.status, res.data)
               if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
                 data.plans[name] += res.body?.status === 'succeeded' || name === 'Free' ? 1 : 0
             }))
@@ -203,21 +203,24 @@ serve(async (event: Request) => {
         value: users.plans['Pay as you go'],
         icon: '📈',
       },
-    ])
+    ]).catch()
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
+    const details = {...users}
+    details.plans = undefined as any
     const newData: definitions['global_stats'] = {
       date_id,
       apps,
       updates,
       stars,
-      ...users,
+      ...details,
     }
     // console.log('newData', newData)
-    await supabaseAdmin()
+    const { error } = await supabaseAdmin()
       .from<definitions['global_stats']>('global_stats')
       .upsert(newData)
+    console.log('error', error)
     return sendRes()
   }
   catch (e) {
