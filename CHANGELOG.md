@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.8](https://github.com/Cap-go/capgo/compare/1.58.7...1.58.8) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue-router to v6.3.9 ([853acb5](https://github.com/Cap-go/capgo/commit/853acb53c0837c73c3999328bba1e6d3cbb93a14))
+
 ### [1.58.7](https://github.com/Cap-go/capgo/compare/1.58.6...1.58.7) (2022-12-03)
 
 
