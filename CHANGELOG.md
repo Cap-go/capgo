@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.55.43](https://github.com/Cap-go/capgo/compare/1.55.42...1.55.43) (2022-12-03)
+
+
+### Bug Fixes
+
+* mute module issue ([eacd754](https://github.com/Cap-go/capgo/commit/eacd754688b481ce968ba6823157371e0041ffbe))
+
 ### [1.55.42](https://github.com/Cap-go/capgo/compare/1.55.41...1.55.42) (2022-12-03)
 
 
