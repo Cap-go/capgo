@@ -324,6 +324,7 @@ register:
   specialError: Phải chứa các ký tự đặc biệt
   upperCaseError: Nên chứa các chữ cái in hoa
 see-usage: Xem mức sử dụng
+session_key: IvSessionKey
 settings: Cài đặt
 shared-apps: Ứng dụng được chia sẻ
 sign-out: Đăng xuất

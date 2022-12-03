@@ -314,6 +314,7 @@ register:
   specialError: 应包含特殊字符
   upperCaseError: 应包含大写字母
 see-usage: 查看用法
+session_key: Iv会话密钥
 settings: 设置
 shared-apps: 共享应用程序
 sign-out: 登出

@@ -326,6 +326,7 @@ register:
   specialError: Özel karakterler içermelidir
   upperCaseError: Büyük harfler içermelidir
 see-usage: Kullanıma bakın
+session_key: IvSessionKey
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
 sign-out: Oturumu Kapat

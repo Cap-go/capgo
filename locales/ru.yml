@@ -324,6 +324,7 @@ register:
   specialError: Должен содержать специальные символы
   upperCaseError: Должен содержать заглавные буквы
 see-usage: См. использование
+session_key: IvSessionKey
 settings: Настройки
 shared-apps: Общие приложения
 sign-out: Выход

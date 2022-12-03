@@ -322,6 +322,7 @@ register:
   specialError: Powinien zawierać znaki specjalne
   upperCaseError: Powinien zawierać wielkie litery
 see-usage: Zobacz użycie
+session_key: IvSessionKey
 settings: Ustawienia
 shared-apps: Udostępnione aplikacje
 sign-out: Wyloguj się

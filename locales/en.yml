@@ -315,6 +315,7 @@ register:
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
 see-usage: See usage
+session_key: IvSessionKey
 settings: Settings
 shared-apps: Shared Apps
 sign-out: Sign Out

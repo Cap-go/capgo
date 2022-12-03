@@ -334,6 +334,7 @@ register:
   specialError: Sollte Sonderzeichen enthalten
   upperCaseError: Sollte Großbuchstaben enthalten
 see-usage: Siehe Verwendung
+session_key: IvSessionKey
 settings: Einstellungen
 shared-apps: Geteilte Apps
 sign-out: Austragen

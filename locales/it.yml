@@ -325,6 +325,7 @@ register:
   specialError: Dovrebbe contenere caratteri speciali
   upperCaseError: Dovrebbe contenere lettere maiuscole
 see-usage: Vedi utilizzo
+session_key: IvSessionKey
 settings: Impostazioni
 shared-apps: App condivise
 sign-out: Disconnessione

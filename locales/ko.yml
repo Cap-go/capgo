@@ -314,6 +314,7 @@ register:
   specialError: 특수 문자를 포함해야 합니다.
   upperCaseError: 대문자를 포함해야 합니다.
 see-usage: 사용법 보기
+session_key: IvSessionKey
 settings: 설정
 shared-apps: 공유 앱
 sign-out: 로그아웃
