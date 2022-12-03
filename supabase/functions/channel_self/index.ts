@@ -159,9 +159,11 @@ const put = async (event: Request): Promise<Response> => {
     .eq('app_id', app_id)
     .eq('public', true)
     .single()
-  const { data: dataChannelOverride, error } = await supabaseAdmin()
+  const { data: dataChannelOverride } = await supabaseAdmin()
     .from<definitions['channel_devices'] & DeviceChannel>('channel_devices')
     .select(`
+      app_id,
+      device_id,
       channel_id (
         allow_device_self_set,
         name
@@ -170,12 +172,7 @@ const put = async (event: Request): Promise<Response> => {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
-  if (error) {
-    return sendRes({
-      error,
-    }, 400)
-  }
-  else if (dataChannelOverride && dataChannelOverride.channel_id) {
+  if (dataChannelOverride && dataChannelOverride.channel_id) {
     return sendRes({
       channel: dataChannelOverride.channel_id.name,
       status: 'override',
@@ -184,7 +181,8 @@ const put = async (event: Request): Promise<Response> => {
   }
   if (errorChannel) {
     return sendRes({
-      error,
+      message: 'Cannot find channel',
+      error: errorChannel,
     }, 400)
   }
   else if (dataChannel) {
