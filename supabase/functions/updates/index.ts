@@ -314,6 +314,7 @@ serve(async (event: Request) => {
     return sendRes({
       version: version.name,
       session_key: version.session_key,
+      ...(version.session_key ? { session_key: version.session_key } : {}),
       checksum: version.checksum,
       url: signedURL,
     })
