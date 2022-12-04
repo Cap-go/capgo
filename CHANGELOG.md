@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.10](https://github.com/Cap-go/capgo/compare/1.58.9...1.58.10) (2022-12-04)
+
+
+### Bug Fixes
+
+* **deps:** update capacitor monorepo to 4.6 ([0dc94a1](https://github.com/Cap-go/capgo/commit/0dc94a183bbb69d320ebe125142a69476dee1069))
+
+### [1.58.9](https://github.com/Cap-go/capgo/compare/1.58.8...1.58.9) (2022-12-04)
+
+### [1.58.8](https://github.com/Cap-go/capgo/compare/1.58.7...1.58.8) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue-router to v6.3.9 ([853acb5](https://github.com/Cap-go/capgo/commit/853acb53c0837c73c3999328bba1e6d3cbb93a14))
+
+### [1.58.7](https://github.com/Cap-go/capgo/compare/1.58.6...1.58.7) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue to v6.3.9 ([65aab32](https://github.com/Cap-go/capgo/commit/65aab32965115df22bcce6a5ab8a4c210e8c47b2))
+
+### [1.58.6](https://github.com/Cap-go/capgo/compare/1.58.5...1.58.6) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/capacitor-updater to v4.13.4 ([91e2531](https://github.com/Cap-go/capgo/commit/91e2531bb8ac4f7f9126f0c018e611c3aab25075))
+
+### [1.58.5](https://github.com/Cap-go/capgo/compare/1.58.4...1.58.5) (2022-12-03)
+
+### [1.58.4](https://github.com/Cap-go/capgo/compare/1.58.3...1.58.4) (2022-12-03)
+
+### [1.58.3](https://github.com/Cap-go/capgo/compare/1.58.2...1.58.3) (2022-12-03)
+
+
+### Bug Fixes
+
+* web_stats ([85af415](https://github.com/Cap-go/capgo/commit/85af41512c3de40be4a14693f7e7f343665db9b5))
+
 ### [1.58.2](https://github.com/Cap-go/capgo/compare/1.58.1...1.58.2) (2022-12-03)
 
 
