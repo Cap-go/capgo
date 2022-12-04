@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.10](https://github.com/Cap-go/capgo/compare/1.58.9...1.58.10) (2022-12-04)
+
+
+### Bug Fixes
+
+* **deps:** update capacitor monorepo to 4.6 ([0dc94a1](https://github.com/Cap-go/capgo/commit/0dc94a183bbb69d320ebe125142a69476dee1069))
+
 ### [1.58.9](https://github.com/Cap-go/capgo/compare/1.58.8...1.58.9) (2022-12-04)
 
 ### [1.58.8](https://github.com/Cap-go/capgo/compare/1.58.7...1.58.8) (2022-12-03)
