@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.11](https://github.com/Cap-go/capgo/compare/1.58.10...1.58.11) (2022-12-04)
+
+
+### Bug Fixes
+
+* try xcode cloud again ([1c84ef4](https://github.com/Cap-go/capgo/commit/1c84ef434bb7e8dbe9f4d0046b07901de36c73a3))
+
 ### [1.58.10](https://github.com/Cap-go/capgo/compare/1.58.9...1.58.10) (2022-12-04)
 
 
