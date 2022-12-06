@@ -198,11 +198,14 @@ export const isTrial = async (userId: string): Promise<number> => {
   return data || 0
 }
 
-export const checkPlanValid = async (userId: string) => {
-  const validPlan = await isGoodPlan(userId)
-  const paying = await isPaying(userId)
-  const trialDays = await isTrial(userId)
-  return (paying && validPlan) || (!paying && trialDays > 0)
+export const isAllowedAction = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin()
+      .rpc<boolean>('is_allowed_action', { userid: userId })
+      .single()
+  if (error) {
+      throw error
+  }
+  return data
 }
 
 export const sendStats = async (action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) => {
