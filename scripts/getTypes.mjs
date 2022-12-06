@@ -4,7 +4,7 @@ import { supa_anon, supa_url } from './utils.mjs'
 
 const exec = util.promisify(execCb)
 const url = `${supa_url}/rest/v1/\?apikey\=${supa_anon}`
-const command = `npx openapi-typescript@5 ${url} --output src/types/supabase.ts`
+const command = `npx --yes openapi-typescript@5 ${url} --output src/types/supabase.ts`
 
 const main = async () => {
   try {

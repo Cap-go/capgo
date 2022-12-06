@@ -32,12 +32,12 @@ const snag = useLogSnag()
 const steps = ref([
   {
     title: t('log-to-the-capgo-cli'),
-    command: 'npx @capgo/cli@latest login [APIKEY]',
+    command: 'npx --yes @capgo/cli@latest login [APIKEY]',
     subtitle: '',
   },
   {
     title: t('add-your-app-to-your'),
-    command: 'npx @capgo/cli@latest add',
+    command: 'npx --yes @capgo/cli@latest add',
     subtitle: `${t('into-your-app-folder')}`,
   },
   {
@@ -48,7 +48,7 @@ CapacitorUpdater.notifyAppReady()`,
   },
   {
     title: t('build-your-code-and-'),
-    command: 'npx @capgo/cli@latest upload',
+    command: 'npx --yes @capgo/cli@latest upload',
     subtitle: '',
   },
   {
@@ -94,7 +94,7 @@ const getKey = async (retry = true): Promise<void> => {
     .select()
     .eq('user_id', auth?.id).eq('mode', 'all')
   if (data)
-    steps.value[0].command = `npx @capgo/cli@latest login ${data[0].key}`
+    steps.value[0].command = `npx --yes @capgo/cli@latest login ${data[0].key}`
 
   else if (retry && auth?.id)
     return getKey(false)
