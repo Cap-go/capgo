@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.17](https://github.com/Cap-go/capgo/compare/1.58.16...1.58.17) (2022-12-06)
+
+
+### Bug Fixes
+
+* channel use single ([be9b7c7](https://github.com/Cap-go/capgo/commit/be9b7c7b18cfbe59f7c44e30793d7db7389edc0f))
+* npx command ([1f4198c](https://github.com/Cap-go/capgo/commit/1f4198cc294e6f6d1e690539feaf2302632b1130))
+
 ### [1.58.16](https://github.com/Cap-go/capgo/compare/1.58.15...1.58.16) (2022-12-06)
 
 
