@@ -44,11 +44,12 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
       `)
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
-    if (dbError || !dataChannel || !dataChannel.length) {
+      .single()
+    if (dbError || !dataChannel) {
       console.log('Cannot find channel')
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
     }
-    return sendRes(dataChannel[0])
+    return sendRes(dataChannel)
   }
   else {
     const fetchOffset = body.page === undefined ? 0 : body.page
