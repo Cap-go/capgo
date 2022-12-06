@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.15](https://github.com/Cap-go/capgo/compare/1.58.14...1.58.15) (2022-12-06)
+
+
+### Bug Fixes
+
+* switch to DB isAllowedAction ([4f1960e](https://github.com/Cap-go/capgo/commit/4f1960e454d6935144bfcf7b6532751a95a12d81))
+
 ### [1.58.14](https://github.com/Cap-go/capgo/compare/1.58.13...1.58.14) (2022-12-05)
 
 ### [1.58.13](https://github.com/Cap-go/capgo/compare/1.58.12...1.58.13) (2022-12-05)
