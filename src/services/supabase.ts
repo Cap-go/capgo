@@ -110,11 +110,11 @@ export const getPlans = async (): Promise<definitions['plans'][]> => {
 
 export const isAllowedAction = async (userId: string): Promise<boolean> => {
   const { data, error } = await useSupabase()
-      .rpc<boolean>('is_allowed_action', { userid: userId })
-      .single()
-  if (error) {
-      throw error
-  }
+    .rpc<boolean>('is_allowed_action_user', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
   return data
 }
 

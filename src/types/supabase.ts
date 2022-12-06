@@ -3146,6 +3146,26 @@ export interface paths {
       };
     };
   };
+  "/rpc/is_allowed_action_user": {
+    post: {
+      parameters: {
+        body: {
+          args: {
+            /** Format: uuid */
+            userid: string;
+          };
+        };
+        header: {
+          /** Preference */
+          Prefer?: parameters["preferParams"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: unknown;
+      };
+    };
+  };
   "/rpc/count_all_updates": {
     post: {
       parameters: {
@@ -3168,8 +3188,8 @@ export interface paths {
       parameters: {
         body: {
           args: {
-            /** Format: text */
-            apikey: string;
+            /** Format: uuid */
+            userid: string;
           };
         };
         header: {
