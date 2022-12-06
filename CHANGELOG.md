@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.18](https://github.com/Cap-go/capgo/compare/1.58.17...1.58.18) (2022-12-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency chart.js to v4 ([6f6266b](https://github.com/Cap-go/capgo/commit/6f6266b7399f8f29e269738d487feee41359a218))
+
 ### [1.58.17](https://github.com/Cap-go/capgo/compare/1.58.16...1.58.17) (2022-12-06)
 
 
