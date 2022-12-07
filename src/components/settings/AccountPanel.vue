@@ -25,18 +25,18 @@ const errorMessage = ref('')
 const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
     .from('images')
-    .upload(`${main.auth?.id}/${fileName}`, decode(data), {
+    .upload(`${main.user?.id}/${fileName}`, decode(data), {
       contentType,
     })
 
   const { data: res } = supabase.storage
     .from('images')
-    .getPublicUrl(`${main.auth?.id}/${fileName}`)
+    .getPublicUrl(`${main.user?.id}/${fileName}`)
 
   const { data: usr, error: dbError } = await supabase
     .from('users')
     .update({ image_url: res.publicUrl })
-    .eq('id', main.auth?.id)
+    .eq('id', main.user?.id)
     .select()
     .single()
   isLoading.value = false
@@ -211,13 +211,13 @@ const v$ = useVuelidate(rules, form)
 const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect || !main.auth?.id || !form.email) {
+  if (!isFormCorrect || !main.user?.id || !form.email) {
     isLoading.value = false
     return
   }
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
-    id: main.auth?.id,
+    id: main.user?.id,
     first_name: form.first_name,
     last_name: form.last_name,
     email: form.email,
@@ -249,7 +249,7 @@ watchEffect(async () => {
         country,
         email
       `)
-      .eq('id', main.auth?.id)
+      .eq('id', main.user?.id)
       .single()
     if (usr) {
       console.log('usr', usr)

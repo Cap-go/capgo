@@ -6,6 +6,7 @@ import type { StatsV2 } from './plans'
 import type { Database } from '~/types/supabase.types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+const supbaseId = supabaseUrl.split('//')[1].split('.')[0]
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 export const useSupabase = () => {
@@ -36,6 +37,36 @@ export const useSupabase = () => {
     // },
   }
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+}
+
+export const isSpoofed = () => !!localStorage.getItem('supabase.spoof_id')
+export const saveSpoof = (id: string) => localStorage.setItem('supabase.spoof_id', id)
+
+export const spoofUser = () => {
+  const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
+  if (!textData)
+    return false
+
+  const data = JSON.parse(textData)
+  data.user.id = localStorage.getItem('supabase.spoof_id')
+  localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
+  return data.user.id
+}
+
+export const unspoofUser = () => {
+  const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
+  if (!textData || !isSpoofed())
+    return false
+
+  const data = JSON.parse(textData)
+  const oldId = localStorage.getItem('supabase.spoof_id')
+  if (!oldId)
+    return false
+
+  data.user.id = oldId
+  localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
+  localStorage.removeItem('supabase.spoof_id')
+  return true
 }
 
 export const existUser = async (email: string): Promise<string> => {

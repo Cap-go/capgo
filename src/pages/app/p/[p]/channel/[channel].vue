@@ -49,7 +49,7 @@ const openBundle = () => {
 const openApp = () => {
   if (!channel.value)
     return
-  openVersion(channel.value.version, main.auth?.id || '')
+  openVersion(channel.value.version, main.user?.id || '')
 }
 const getUsers = async () => {
   if (!channel.value)
@@ -207,7 +207,7 @@ const addUser = async () => {
       channel_id: id.value,
       app_id: channel.value.version.app_id,
       user_id: exist,
-      created_by: main.auth.id,
+      created_by: main.user?.id,
     })
   if (error) {
     console.error(error)
@@ -363,7 +363,7 @@ const inviteUser = async (userId: string) => {
     .from('channel_users')
     .insert({
       channel_id: id.value,
-      created_by: main.auth?.id,
+      created_by: main.user?.id,
       app_id: channel.value?.version.app_id,
       user_id: userId,
     })

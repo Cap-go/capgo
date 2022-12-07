@@ -1,3 +1,4 @@
+import { isSpoofed, spoofUser } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
@@ -8,11 +9,14 @@ import { hideLoader } from '~/services/loader'
 const guard = async (next: any, to: string, from: string) => {
   const supabase = useSupabase()
   const { data: auth } = await supabase.auth.getUser()
+
   const snag = useLogSnag()
 
   const main = useMainStore()
 
   if (auth.user && !main.auth) {
+    if (isSpoofed())
+      auth.user.id = spoofUser()
     main.auth = auth.user
     // console.log('set auth', auth)
     if (!main.user) {

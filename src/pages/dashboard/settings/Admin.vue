@@ -9,6 +9,7 @@ import { useRoute } from 'vue-router'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
+import { saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
 
 const route = useRoute()
 const form = reactive({
@@ -25,16 +26,11 @@ console.log('setLogAs', oldId.value)
 const v$ = useVuelidate(rules, form)
 const setLogAs = (id: string) => {
   console.log('setLogAs', id)
-  const textData = localStorage.getItem('supabase.auth.token')
-  if (!textData) {
+  saveSpoof(id)
+  if (!spoofUser()) {
     isLoading.value = false
     return
   }
-  const data = JSON.parse(textData)
-  if (!oldId.value)
-    localStorage.setItem('supabase.old_id', data.currentSession.user.id)
-  data.currentSession.user.id = id
-  localStorage.setItem('supabase.auth.token', JSON.stringify(data))
   // reload page
   setTimeout(() => {
     isLoading.value = false
@@ -61,18 +57,10 @@ if (route.path.includes('/admin')) {
 }
 const reset = () => {
   isLoading.value = true
-  const textData = localStorage.getItem('supabase.auth.token')
-  if (!textData) {
+  if (!unspoofUser()) {
     isLoading.value = false
     return
   }
-  const data = JSON.parse(textData)
-  console.log('reset', data)
-  data.currentSession.user.id = localStorage.getItem('supabase.old_id')
-  console.log('reset2', data)
-  localStorage.setItem('supabase.auth.token', JSON.stringify(data))
-  localStorage.removeItem('supabase.old_id')
-  // reload page
   setTimeout(() => {
     isLoading.value = false
     window.location.reload()

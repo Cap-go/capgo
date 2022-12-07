@@ -29,8 +29,8 @@ const acronym = computed(() => {
   return '??'
 })
 
-if (main.auth?.id)
-  getCurrentPlanName(main.auth?.id).then(res => planCurrent.value = res)
+if (main.user?.id)
+  getCurrentPlanName(main.user?.id).then(res => planCurrent.value = res)
 
 const dropdownOpen = ref(false)
 

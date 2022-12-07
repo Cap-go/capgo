@@ -92,8 +92,8 @@ const loadData = async () => {
   })
   await getUsages()
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
-  if (main.auth?.id)
-    await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
+  if (main.user?.id)
+    await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
   isLoading.value = false
 }
 

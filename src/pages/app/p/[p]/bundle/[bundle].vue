@@ -140,7 +140,7 @@ const openPannel = async () => {
           actionSheet.dismiss()
           if (!version.value)
             return
-          openVersion(version.value, main.auth?.id || '')
+          openVersion(version.value, main.user?.id || '')
         },
       },
       {

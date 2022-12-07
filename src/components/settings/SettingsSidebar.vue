@@ -11,8 +11,8 @@ const { t } = useI18n()
 const version = import.meta.env.VITE_APP_VERSION
 const isMobile = ref(isPlatform('capacitor'))
 const isUserAdmin = ref(false)
-if (main.auth?.id) {
-  isAdmin(main.auth?.id).then((res) => {
+if (main.user?.id) {
+  isAdmin(main.user?.id).then((res) => {
     isUserAdmin.value = !!res || !!localStorage.getItem('supabase.old_id')
   })
 }
