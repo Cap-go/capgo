@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.19](https://github.com/Cap-go/capgo/compare/1.58.18...1.58.19) (2022-12-07)
+
+
+### Bug Fixes
+
+* dayjs issue ([913b551](https://github.com/Cap-go/capgo/commit/913b551bc5b8f849217c50b21bef2a8f5fa239d7))
+
 ### [1.58.18](https://github.com/Cap-go/capgo/compare/1.58.17...1.58.18) (2022-12-06)
 
 
