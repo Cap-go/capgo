@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.59.0](https://github.com/Cap-go/capgo/compare/1.58.21...1.59.0) (2022-12-07)
+
+
+### Features
+
+* update to supabase 2 ([511b20a](https://github.com/Cap-go/capgo/commit/511b20a4229bcb375d6276de108fa8e10ec9417d))
+
+
+### Bug Fixes
+
+* **deps:** update dependency @supabase/supabase-js to v2 ([3e03382](https://github.com/Cap-go/capgo/commit/3e03382f50d5e3a7e0debe2c71a5f5dda0079f99))
+* supabase ([0046b89](https://github.com/Cap-go/capgo/commit/0046b8951b122eaa1f09714a8099ee029ddd0e86))
+
 ### [1.58.21](https://github.com/Cap-go/capgo/compare/1.58.20...1.58.21) (2022-12-07)
 
 
