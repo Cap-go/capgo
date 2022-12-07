@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.20](https://github.com/Cap-go/capgo/compare/1.58.19...1.58.20) (2022-12-07)
+
+
+### Bug Fixes
+
+* banner design ([20447a5](https://github.com/Cap-go/capgo/commit/20447a51a16086452ca6c021d9dfa4e4bc1e9cdb))
+
 ### [1.58.19](https://github.com/Cap-go/capgo/compare/1.58.18...1.58.19) (2022-12-07)
 
 
