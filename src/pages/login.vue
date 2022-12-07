@@ -51,7 +51,7 @@ const submit = async () => {
   v$.value.$touch()
   if (!v$.value.$invalid) {
     isLoading.value = true
-    const { error } = await supabase.auth.signIn({
+    const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
     })
@@ -91,8 +91,10 @@ const fixIOS = () => {
 const checkLogin = async () => {
   main.auth = null
   isLoading.value = true
-  const user = supabase.auth.user()
-  let session = supabase.auth.session()!
+  const resUser = await supabase.auth.getUser()
+  const user = resUser?.data.user
+  const resSession = await supabase.auth.getSession()!
+  let session = resSession?.data.session
   if (user) {
     await nextLogin()
   }
@@ -124,7 +126,7 @@ onMounted(checkLogin)
           <div class="max-w-2xl mx-auto text-center">
             <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
             <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
-              {{ t('welcome-to') }} <p class="font-prompt inline">
+              {{ t('welcome-to') }} <p class="inline font-prompt">
                 Capgo
               </p> !
             </h1>

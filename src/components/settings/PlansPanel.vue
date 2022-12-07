@@ -10,10 +10,10 @@ import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import type { StatsV2 } from '~/services/plans'
-import type { definitions } from '~/types/supabase'
-import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getMaxstats, getPlans } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
+import type { Database } from '~/types/supabase.types'
 
 const openSupport = () => {
   sendMessage('I need a custom plan')
@@ -21,7 +21,7 @@ const openSupport = () => {
 }
 
 const { t } = useI18n()
-const plans = ref<definitions['plans'][]>([])
+const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const displayPlans = computed(() => {
   return plans.value.filter(plan => plan.stripe_id !== 'free')
 })
@@ -33,14 +33,13 @@ const stats = ref({
 const planSuggest = ref('')
 const planCurrrent = ref('')
 const snag = useLogSnag()
-const supabase = useSupabase()
 const isLoading = ref(false)
 const segmentVal = ref<'m' | 'y'>('m')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
 
-const planFeatures = (plan: definitions['plans']) => [
+const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
   `${plan.mau.toLocaleString()} ${t('plan.mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan.storage')}`,
   `${plan.bandwidth.toLocaleString()} ${t('plan.bandwidth')}`,
@@ -74,18 +73,16 @@ const showToastMessage = async (message: string) => {
   await toast.present()
 }
 
-const getPrice = (plan: definitions['plans'], t: 'm' | 'y'): number => {
+const getPrice = (plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number => {
   return plan[t === 'm' ? 'price_m' : 'price_y']
 }
 
 const getUsages = async () => {
   // get aapp_stats
+  if (!main.user?.id)
+    return
   const date_id = new Date().toISOString().slice(0, 7)
-  const { data: oldStats, error: errorOldStats } = await supabase
-    .rpc<StatsV2>('get_total_stats', { userid: main.user?.id, dateid: date_id })
-    .single()
-  if (oldStats && !errorOldStats)
-    stats.value = oldStats
+  stats.value = await getMaxstats(main.user?.id, date_id)
 }
 const loadData = async () => {
   isLoading.value = true

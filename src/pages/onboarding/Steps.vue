@@ -6,7 +6,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { arrowBack, copyOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/crips'
@@ -23,7 +22,6 @@ const appId = ref<string>()
 const realtimeListener = ref(false)
 const mySubscription = ref()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
 const router = useRouter()
 const main = useMainStore()
 const { t } = useI18n()
@@ -92,11 +90,11 @@ const getKey = async (retry = true): Promise<void> => {
   const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', auth?.id).eq('mode', 'all')
+    .eq('user_id', main.user?.id).eq('mode', 'all')
   if (data)
     steps.value[0].command = `npx --yes @capgo/cli@latest login ${data[0].key}`
 
-  else if (retry && auth?.id)
+  else if (retry && main.user?.id)
     return getKey(false)
 
   isLoading.value = false
@@ -106,7 +104,7 @@ watchEffect(async () => {
     // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from(`apps:user_id=eq.${main.auth?.id}`)
+      .from(`apps:user_id=eq.${main.user?.id}`)
       .on('INSERT', (payload) => {
         // console.log('Change received step 1!', payload)
         setLog()

@@ -5,8 +5,8 @@ import { useRoute } from 'vue-router'
 import { Doughnut } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import type { Database } from '~/types/supabase.types'
 
 interface Version {
   id: {
@@ -20,7 +20,7 @@ const supabase = useSupabase()
 const id = ref('')
 const isLoading = ref(true)
 const downloads = ref(0)
-const versions = ref<(definitions['app_versions_meta'] & Version)[]>([])
+const versions = ref<(Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]>([])
 const dataDevValues = ref([] as number[])
 const dataDevLabels = ref([] as string[])
 
@@ -37,7 +37,7 @@ const buildGraph = () => {
 const loadData = async () => {
   try {
     const { data: dataVersions } = await supabase
-      .from<definitions['app_versions_meta'] & Version>('app_versions_meta')
+      .from('app_versions_meta')
       .select(`
         id (
             name
@@ -48,7 +48,7 @@ const loadData = async () => {
       `)
       .eq('app_id', id.value)
       .order('created_at', { ascending: false })
-    versions.value = dataVersions || versions.value
+    versions.value = (dataVersions || versions.value) as (Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]
     buildGraph()
   }
   catch (error) {

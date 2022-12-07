@@ -6,17 +6,18 @@ import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
 // import { addOutline } from 'ionicons/icons'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Sidebar from '~/components/Sidebar.vue'
 import Navbar from '~/components/Navbar.vue'
+import type { Database } from '~/types/supabase.types'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
+const main = useMainStore()
 const isLoading = ref(false)
 const sidebarOpen = ref(false)
 const supabase = useSupabase()
-const auth = supabase.auth.user()
-const apps = ref<definitions['apikeys'][]>()
-const copyKey = async (app: definitions['apikeys']) => {
+const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
   const toast = await toastController
     .create({
@@ -30,11 +31,11 @@ const geKeys = async (retry = true): Promise<void> => {
   const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', auth?.id)
+    .eq('user_id', main.user?.id)
   if (data && data.length)
     apps.value = data
 
-  else if (retry && auth?.id)
+  else if (retry && main.user?.id)
     return geKeys(false)
 
   isLoading.value = false

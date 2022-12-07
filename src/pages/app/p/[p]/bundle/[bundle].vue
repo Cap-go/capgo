@@ -13,24 +13,25 @@ import { addOutline } from 'ionicons/icons'
 import copy from 'copy-text-to-clipboard'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
+import { useMainStore } from '~/stores/main'
+import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const route = useRoute()
 const listRef = ref()
+const main = useMainStore()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
-const version = ref<definitions['app_versions']>()
-const channels = ref<(definitions['channels'])[]>([])
-const version_meta = ref<definitions['app_versions_meta']>()
+const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const search = ref('')
-const devices = ref<definitions['devices'][]>([])
+const devices = ref<Database['public']['Tables']['devices']['Row'][]>([])
 
 const copyToast = async (text: string) => {
   copy(text)
@@ -82,7 +83,7 @@ const showSize = computed(() => {
   else
     return t('package.not_available')
 })
-const setChannel = async (channel: definitions['channels']) => {
+const setChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
   if (!version.value)
     return
   return supabase
@@ -129,6 +130,8 @@ const ASChannelChooser = async () => {
   await actionSheet.present()
 }
 const openPannel = async () => {
+  if (!version.value || !main.auth)
+    return
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -137,7 +140,7 @@ const openPannel = async () => {
           actionSheet.dismiss()
           if (!version.value)
             return
-          openVersion(version.value, auth?.id || '')
+          openVersion(version.value, main.auth?.id || '')
         },
       },
       {
@@ -252,7 +255,7 @@ const devicesFilter = computed(() => {
               {{ version?.id }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version?.created_at">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('device.created_at') }}
@@ -262,7 +265,7 @@ const devicesFilter = computed(() => {
               {{ formatDate(version?.created_at) }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version?.updated_at">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('updated-at') }}
@@ -339,7 +342,7 @@ const devicesFilter = computed(() => {
                 </h2>
               </IonLabel>
               <IonNote slot="end">
-                {{ formatDate(d.created_at) }}
+                {{ formatDate(d.created_at || '') }}
               </IonNote>
             </IonItem>
           </template>

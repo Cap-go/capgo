@@ -5,7 +5,6 @@ import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
 
 const supabase = useSupabase()
@@ -19,7 +18,8 @@ const user = ref<User | null>(null)
 
 const updateDb = async () => {
   // console.log('update db')
-  let session = supabase.auth.session()!
+  const resSession = await supabase.auth.getSession()!
+  let session = resSession.data.session
   if (!session) {
     const logSession = await autoAuth(route)
     if (!logSession)
@@ -43,7 +43,7 @@ const updateDb = async () => {
         id: user.value?.id,
         first_name: user.value?.user_metadata.first_name,
         last_name: user.value?.user_metadata.last_name,
-        email: user.value?.email,
+        email: user.value?.email || '',
         image_url: '',
       },
     )

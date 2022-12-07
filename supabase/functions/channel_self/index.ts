@@ -1,16 +1,12 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
-}
-
-interface DeviceChannel {
-  channel_id: definitions['channels']
 }
 
 const post = async (event: Request): Promise<Response> => {
@@ -31,36 +27,41 @@ const post = async (event: Request): Promise<Response> => {
     is_prod = true,
   } = body
   const coerce = semver.coerce(version_build)
-  if (coerce)
+  if (coerce) {
     version_build = coerce.version
-  else
-    return sendRes({ 
+  }
+  else {
+    return sendRes({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
+  }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
   if (!device_id || !app_id) {
     console.log('Cannot find device_id or appi_id')
-    return sendRes({ 
+    return sendRes({
       message: 'Cannot find device_id or appi_id',
       error: 'missing_info',
     }, 400)
   }
   // find device
-  const { data: dataDevice} = await supabaseAdmin()
+  const { data: dataDevice } = await supabaseAdmin()
     .from('devices')
     .select()
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
   const { data: dataChannelOverride } = await supabaseAdmin()
-    .from<definitions['channel_devices'] & DeviceChannel>('channel_devices')
+    .from('channel_devices')
     .select(`
+      app_id,
+      device_id,
       channel_id (
+        id,
         allow_device_self_set,
         name
-      ),
+      )
     `)
     .eq('app_id', app_id)
     .eq('device_id', device_id)
@@ -73,7 +74,7 @@ const post = async (event: Request): Promise<Response> => {
         .eq('app_id', app_id)
         .eq('name', version_name || 'unknown')
         .single()
-  
+
       if (!version) {
         return sendRes({
           message: `Version ${version_name} doesn't exist`,
@@ -90,12 +91,12 @@ const post = async (event: Request): Promise<Response> => {
         ...(is_prod !== undefined ? { is_prod } : {}),
         version_build,
         os_version: version_os,
-        platform: platform as definitions['devices']['platform'],
+        platform: platform as Database['public']['Enums']['platform_os'],
         updated_at: new Date().toISOString(),
       })
     }
   }
-  if (!channel || (dataChannelOverride && !dataChannelOverride?.channel_id.allow_device_self_set)) {
+  if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
@@ -118,9 +119,9 @@ const post = async (event: Request): Promise<Response> => {
     const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin()
       .from('channel_devices')
       .upsert({
-        device_id: device_id,
+        device_id,
         channel_id: dataChannel.id,
-        app_id: app_id,
+        app_id,
         created_by: dataChannel.created_by,
       })
     if (dbErrorDev || !dataChannelDev) {
@@ -163,29 +164,32 @@ const put = async (event: Request): Promise<Response> => {
     return sendRes({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
   const { data: dataChannel, error: errorChannel } = await supabaseAdmin()
-    .from<definitions['channels'] & DeviceChannel>('channels')
+    .from('channels')
     .select()
     .eq('app_id', app_id)
     .eq('public', true)
     .single()
   const { data: dataChannelOverride } = await supabaseAdmin()
-    .from<definitions['channel_devices'] & DeviceChannel>('channel_devices')
+    .from('channel_devices')
     .select(`
       app_id,
       device_id,
       channel_id (
+        id,
         allow_device_self_set,
         name
-      ),
+      )
     `)
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
   if (dataChannelOverride && dataChannelOverride.channel_id) {
+    const channelId = dataChannelOverride.channel_id as Database['public']['Tables']['channels']['Row']
+
     return sendRes({
-      channel: dataChannelOverride.channel_id.name,
+      channel: channelId.name,
       status: 'override',
-      allowSet: dataChannelOverride.channel_id.allow_device_self_set,
+      allowSet: channelId.allow_device_self_set,
     })
   }
   if (errorChannel) {

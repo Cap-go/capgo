@@ -2,7 +2,6 @@ import { logsnag } from '../_utils/_logsnag.ts'
 import { addEventPerson } from './crisp.ts'
 import { sendNotif } from './notifications.ts'
 import { getCurrentPlanName, isGoodPlan, isTrial, supabaseAdmin } from './supabase.ts'
-import type { definitions } from './types_supabase.ts'
 
 export interface StatsV2 {
   mau: number
@@ -31,7 +30,7 @@ export const findBestPlan = async (stats: StatsV2): Promise<string> => {
   const storage = Math.round((stats.storage || 0) / 1024 / 1024 / 1024)
   const bandwidth = Math.round((stats.bandwidth || 0) / 1024 / 1024 / 1024)
   const { data, error } = await supabaseAdmin()
-    .rpc<string>('find_best_plan_v2', {
+    .rpc('find_best_plan_v2', {
       mau: stats.mau || 0,
       storage,
       bandwidth,
@@ -45,12 +44,13 @@ export const findBestPlan = async (stats: StatsV2): Promise<string> => {
 
 export const getMaxstats = async (userId: string, dateId: string): Promise<StatsV2> => {
   const { data, error } = await supabaseAdmin()
-    .rpc<StatsV2>('get_total_stats', { userid: userId, dateid: dateId })
+    .rpc('get_total_stats', { userid: userId, dateid: dateId })
     .single()
+
   if (error)
     throw error
 
-  return data || {
+  return data[0] || {
     mau: 0,
     storage: 0,
     bandwidth: 0,

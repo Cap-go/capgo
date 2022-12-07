@@ -83,7 +83,7 @@ const getStats = (): GlobalStats => {
         const all = []
         for (const user of res.data) {
           all.push(supabaseAdmin()
-            .from<definitions['stripe_info'] & StripePlan>('stripe_info')
+            .from('stripe_info')
             .select(`
               customer_id,
               status,

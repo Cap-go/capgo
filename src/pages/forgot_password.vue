@@ -55,8 +55,7 @@ const submit = async () => {
   if (step.value === 1) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
     // console.log('redirect', redirectTo)
-    const { error } = await supabase.auth.api
-      .resetPasswordForEmail(form.email, { redirectTo })
+    const { error } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo })
     setTimeout(() => {
       isLoading.value = false
     }, 5000)
@@ -68,8 +67,9 @@ const submit = async () => {
     const queryString = route.hash.replace('#', '')
     const urlParams = new URLSearchParams(queryString)
     const access_token = urlParams.get('access_token') || ''
-    const { error } = await supabase.auth.api
-      .updateUser(access_token, { password: form.password })
+    // login with access_token
+    // supabase.auth.setSession({ access_token })
+    const { error } = await supabase.auth.updateUser({ password: form.password })
     setTimeout(() => {
       isLoading.value = false
     }, 5000)

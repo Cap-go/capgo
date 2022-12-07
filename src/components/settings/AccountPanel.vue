@@ -13,7 +13,7 @@ import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -21,29 +21,29 @@ const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
 const errorMessage = ref('')
-const auth = supabase.auth.user()
 
 const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
     .from('images')
-    .upload(`${auth?.id}/${fileName}`, decode(data), {
+    .upload(`${main.auth?.id}/${fileName}`, decode(data), {
       contentType,
     })
 
-  const { publicURL, error: urlError } = supabase.storage
+  const { data: res } = supabase.storage
     .from('images')
-    .getPublicUrl(`${auth?.id}/${fileName}`)
+    .getPublicUrl(`${main.auth?.id}/${fileName}`)
 
   const { data: usr, error: dbError } = await supabase
     .from('users')
-    .update({ image_url: publicURL })
-    .eq('id', auth?.id)
+    .update({ image_url: res.publicUrl })
+    .eq('id', main.auth?.id)
+    .select()
     .single()
   isLoading.value = false
 
-  if (error || urlError || dbError || !publicURL || !usr) {
+  if (error || dbError || !res.publicUrl || !usr) {
     errorMessage.value = t('something-went-wrong-try-again-later')
-    console.error('upload error', error, urlError, dbError)
+    console.error('upload error', error, dbError)
     return
   }
   main.user = usr
@@ -123,10 +123,12 @@ const deleteAccount = async () => {
       {
         text: t('button.remove'),
         handler: async () => {
+          if (!main.auth || main.auth?.email === undefined)
+            return
           const { error } = await supabase
             .from('deleted_account')
             .insert({
-              email: main.auth?.email,
+              email: main.auth.email,
             })
           if (error) {
             console.error(error)
@@ -194,13 +196,14 @@ const route = useRoute()
 const form = reactive({
   first_name: '',
   last_name: '',
-  email: auth?.email,
+  email: main.auth?.email,
   country: '',
 })
 
 const rules = computed(() => ({
   first_name: { required },
   last_name: { required },
+  email: { required },
 }))
 
 const v$ = useVuelidate(rules, form)
@@ -208,11 +211,13 @@ const v$ = useVuelidate(rules, form)
 const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect)
+  if (!isFormCorrect || !main.auth?.id || !form.email) {
     isLoading.value = false
+    return
+  }
 
-  const updateData: Partial<definitions['users']> = {
-    id: auth?.id,
+  const updateData: Database['public']['Tables']['users']['Insert'] = {
+    id: main.auth?.id,
     first_name: form.first_name,
     last_name: form.last_name,
     email: form.email,
@@ -222,6 +227,7 @@ const submit = async () => {
   const { data: usr, error: dbError } = await supabase
     .from('users')
     .upsert(updateData)
+    .select()
     .single()
 
   if (dbError || !usr) {
@@ -243,7 +249,7 @@ watchEffect(async () => {
         country,
         email
       `)
-      .eq('id', auth?.id)
+      .eq('id', main.auth?.id)
       .single()
     if (usr) {
       console.log('usr', usr)
@@ -263,7 +269,7 @@ watchEffect(async () => {
     >
       <!-- Panel body -->
       <div class="p-6 space-y-6">
-        <h2 class="text-2xl text-slate-800 dark:text-white font-bold mb-5">
+        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
           {{ t('my-account') }}
         </h2>
         <!-- Picture -->
@@ -271,32 +277,32 @@ watchEffect(async () => {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="main.user?.image_url" class="w-20 h-20 object-cover rounded-full" :src="main.user?.image_url"
+                v-if="main.user?.image_url" class="object-cover w-20 h-20 rounded-full" :src="main.user?.image_url"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="w-20 h-20 rounded-full flex justify-center items-center border-white border text-4xl">
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-white rounded-full">
                 <p>{{ acronym }}</p>
               </div>
             </div>
-            <button class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded" @click="presentActionSheet">
+            <button class="p-2 text-white bg-blue-500 rounded hover:bg-blue-600" @click="presentActionSheet">
               {{ t('change') }}
             </button>
           </div>
         </section>
         <!-- Personal Info -->
         <section>
-          <h3 class="text-xl leading-snug text-slate-800 dark:text-white font-bold mb-1">
+          <h3 class="mb-1 text-xl font-bold leading-snug text-slate-800 dark:text-white">
             {{ t('personal-information') }}
           </h3>
           <div class="text-sm dark:text-gray-100">
             {{ t('you-can-change-your-') }}
           </div>
 
-          <div class="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1 dark:text-white" for="name">First Name</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">First Name</label>
               <input
-                v-model="form.first_name" class="form-input w-full dark:bg-gray-700 dark:text-white"
+                v-model="form.first_name" class="w-full form-input dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 autofocus
                 required
@@ -304,32 +310,32 @@ watchEffect(async () => {
                 type="text"
               >
               <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                   {{ t('accountProfile.first-name') }}: {{ error.$message }}
                 </p>
               </div>
             </div>
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1 dark:text-white" for="business-id">Last Name</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="business-id">Last Name</label>
               <input
-                v-model="form.last_name" class="form-input w-full dark:bg-gray-700 dark:text-white"
+                v-model="form.last_name" class="w-full form-input dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 required
                 :placeholder="t('accountProfile.last-name')"
                 type="text"
               >
               <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                   {{ t('accountProfile.last-name') }}: {{ error.$message }}
                 </p>
               </div>
             </div>
           </div>
-          <div class="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1 dark:text-white" for="location">Email</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">Email</label>
               <input
-                v-model="form.email" class="form-input w-full dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
+                v-model="form.email" class="w-full form-input dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
                 required
                 disabled
                 inputmode="email"
@@ -338,10 +344,10 @@ watchEffect(async () => {
               >
             </div>
             <div class="sm:w-1/2">
-              <label class="block text-sm font-medium mb-1 dark:text-white" for="location">Country</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">Country</label>
               <input
                 v-model="form.country"
-                class="form-input w-full dark:bg-gray-700 dark:text-white"
+                class="w-full form-input dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 required
                 :placeholder="t('accountProfile.country')"
@@ -355,11 +361,11 @@ watchEffect(async () => {
       <footer>
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button class="btn p-2 rounded bg-red-400 border-red-200 hover:bg-red-600 text-white" @click="deleteAccount()">
+            <button class="p-2 text-white bg-red-400 border-red-200 rounded btn hover:bg-red-600" @click="deleteAccount()">
               {{ t('delete-account') }}
             </button>
             <button
-              class="btn p-2 rounded bg-blue-500 hover:bg-blue-600 text-white ml-3"
+              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
               :disabled="isLoading"
               type="submit"
               color="secondary"

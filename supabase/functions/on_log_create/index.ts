@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
@@ -26,7 +26,7 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    const body = (await event.json()) as { record: definitions['stats'] }
+    const body = (await event.json()) as { record: Database['public']['Tables']['stats']['Row'] }
     const record = body.record
     console.log('record', record)
     const today_id = new Date().toISOString().slice(0, 10)

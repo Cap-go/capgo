@@ -4,24 +4,24 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import type { StatsV2 } from '~/services/plans'
-import type { definitions } from '~/types/supabase'
-import { findBestPlan, getCurrentPlanName, getPlans, useSupabase } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getMaxstats, getPlans, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
+import type { Database } from '~/types/supabase.types'
 
 const props = defineProps({
   appId: { type: String, default: '' },
 })
 
-const plans = ref<definitions['plans'][]>([])
+const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
 
 const stats = ref({
   mau: 0,
   storage: 0,
   bandwidth: 0,
-} as StatsV2)
+} as Database['public']['Functions']['get_total_stats']['Returns'][0])
+
 const planSuggest = ref('')
 const planCurrrent = ref('')
 const datas = ref({
@@ -70,12 +70,11 @@ const getAppStats = async () => {
 }
 
 const getTotalStats = async () => {
+  // get aapp_stats
+  if (!main.user?.id)
+    return
   const date_id = new Date().toISOString().slice(0, 7)
-  const { data: totalStats, error: errorOldStats } = await supabase
-    .rpc<StatsV2>('get_total_stats', { userid: main.user?.id, dateid: date_id })
-    .single()
-  if (totalStats && !errorOldStats)
-    stats.value = totalStats
+  stats.value = await getMaxstats(main.user?.id, date_id)
 }
 const getUsages = async () => {
   const { data, error } = await getAppStats()
@@ -83,7 +82,7 @@ const getUsages = async () => {
     datas.value.mau = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
     datas.value.storage = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
     datas.value.bandwidth = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
-    data.forEach((item: definitions['app_stats']) => {
+    data.forEach((item: Database['public']['Tables']['app_stats']['Row']) => {
       if (item.date_id.length > 7) {
         const dayNumber = Number(item.date_id.slice(8)) - 1
         if (datas.value.mau[dayNumber])

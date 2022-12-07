@@ -3,16 +3,10 @@ import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { invalidIp } from '../_utils/invalids_ip.ts'
 import { checkPlan } from '../_utils/plans.ts'
+import type { Database } from './../_utils/supabase.types.ts'
 
-interface Channel {
-  version: definitions['app_versions']
-}
-interface ChannelDev {
-  channel_id: definitions['channels'] & Channel
-}
 interface AppInfos {
   version_name: string
   version_build: string
@@ -84,7 +78,7 @@ serve(async (event: Request) => {
       version_name)
 
     const { data: channelData, error: dbError } = await supabaseAdmin()
-      .from<definitions['channels'] & Channel>('channels')
+      .from('channels')
       .select(`
           id,
           created_at,
@@ -111,7 +105,7 @@ serve(async (event: Request) => {
       .eq('public', true)
       .single()
     const { data: channelOverride } = await supabaseAdmin()
-      .from<definitions['channel_devices'] & ChannelDev>('channel_devices')
+      .from('channel_devices')
       .select(`
           device_id,
           app_id,
@@ -144,7 +138,7 @@ serve(async (event: Request) => {
       .eq('app_id', app_id)
       .single()
     const { data: devicesOverride } = await supabaseAdmin()
-      .from<definitions['devices_override'] & Channel>('devices_override')
+      .from('devices_override')
       .select(`
           device_id,
           app_id,
@@ -173,7 +167,7 @@ serve(async (event: Request) => {
     let channel = channelData
     const planValid = await isAllowedAction(channel.created_by)
     await checkPlan(channel.created_by)
-    let version: definitions['app_versions'] = channel.version
+    let version = channel.version as Database['public']['Tables']['app_versions']['Row']
     const xForwardedFor = event.headers.get('x-forwarded-for') || ''
     // check if version is created_at more than 4 hours
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
@@ -186,7 +180,7 @@ serve(async (event: Request) => {
     await updateOrCreateDevice({
       app_id,
       device_id,
-      platform: platform as definitions['devices']['platform'],
+      platform: platform as Database['public']['Enums']['platform_os'],
       plugin_version,
       version: version.id,
       os_version: version_os,
@@ -205,14 +199,18 @@ serve(async (event: Request) => {
         err: 'not good plan',
       }, 200)
     }
-    if (channelOverride) {
-      console.log(id, 'Set channel override', app_id, channelOverride.channel_id.version.name)
-      version = channelOverride.channel_id.version
-      channel = channelOverride.channel_id
+    if (channelOverride && channelOverride.channel_id) {
+      const channelId = channelOverride.channel_id as Database['public']['Tables']['channels']['Row'] & {
+        version: Database['public']['Tables']['app_versions']['Row']
+      }
+      console.log(id, 'Set channel override', app_id, channelId.version.name)
+      version = channelId.version
+      channel = channelId
     }
-    if (devicesOverride) {
-      console.log(id, 'Set device override', app_id, devicesOverride.version.name)
-      version = devicesOverride.version
+    if (devicesOverride && devicesOverride.version) {
+      const deviceVersion = devicesOverride.version as Database['public']['Tables']['app_versions']['Row']
+      console.log(id, 'Set device override', app_id, deviceVersion.name)
+      version = deviceVersion
     }
 
     if (!version.bucket_id && !version.external_url) {
@@ -223,12 +221,12 @@ serve(async (event: Request) => {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await supabaseAdmin()
+      const { data } = await supabaseAdmin()
         .storage
         .from(`apps/${version.user_id}/${app_id}/versions`)
         .createSignedUrl(version.bucket_id, 60)
-      if (res && res.signedURL)
-        signedURL = res.signedURL
+      if (data && data.signedUrl)
+        signedURL = data.signedUrl
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)

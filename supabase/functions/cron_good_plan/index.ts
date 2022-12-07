@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 serve(async (event: Request) => {

@@ -1,14 +1,14 @@
 import type { User } from '@supabase/supabase-js'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 import { reset } from '~/services/crips'
+import type { Database } from '~/types/supabase.types'
 
 export const useMainStore = defineStore('main', () => {
-  const auth = ref<User | null>()
+  const auth = ref<User | undefined>()
   const path = ref('')
-  const user = ref<definitions['users']>()
+  const user = ref<Database['public']['Tables']['users']['Row']>()
   const trialDaysLeft = ref<number>(0)
   const paying = ref<boolean>(false)
   const canceled = ref<boolean>(false)

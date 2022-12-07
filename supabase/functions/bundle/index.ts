@@ -1,14 +1,15 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
 interface GetLatest {
   app_id?: string
   page?: number
 }
 
-export const deleteBundle = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const deleteBundle = async (event: Request,
+  apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = await event.json() as GetLatest
   if (!body.app_id) {
     console.log('No app_id provided')
@@ -37,7 +38,8 @@ export const deleteBundle = async (event: Request, apikey: definitions['apikeys'
   return sendRes()
 }
 
-export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const get = async (event: Request,
+  apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   try {
     const body = (await event.json()) as GetLatest
     if (!body.app_id) {
@@ -83,7 +85,8 @@ serve(async (event: Request) => {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string,
+    supabaseAdmin(), ['all', 'write'])
   if (!apikey) {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)

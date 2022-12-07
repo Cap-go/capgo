@@ -2,7 +2,6 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
 import { logsnag } from '../_utils/_logsnag.ts'
@@ -42,8 +41,8 @@ serve(async (event: Request) => {
     await addDataPerson(user.email, {
       id: user.id,
       customer_id: stripeData.customer_id,
-      status: stripeData.status,
-      price_id: stripeData.price_id,
+      status: stripeData.status as string,
+      price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
     })
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id) {

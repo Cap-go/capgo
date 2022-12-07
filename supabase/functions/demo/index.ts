@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { checkKey, sendRes } from '../_utils/utils.ts'
 
 interface dataDemo {
@@ -16,7 +16,7 @@ serve(async (event: Request) => {
     console.error('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
   if (!apikey) {
     console.error('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)

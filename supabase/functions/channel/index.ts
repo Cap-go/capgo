@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
 
 interface ChannelSet {
@@ -15,7 +15,7 @@ interface GetDevice {
   page?: number
 }
 
-export const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const get = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
     console.error('You can\'t access this app', body.app_id)
@@ -83,7 +83,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
   }
 }
 
-export const deleteChannel = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const deleteChannel = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as ChannelSet
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
@@ -108,13 +108,14 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
   return sendRes()
 }
 
-export const post = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const post = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as ChannelSet
 
-  const channel: Partial<definitions['channels']> = {
+  const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
     app_id: body.app_id,
     name: body.channel,
+    version: -1,
   }
   if (body.version) {
     const { data, error: vError } = await supabaseAdmin()
@@ -156,7 +157,7 @@ serve(async (event: Request) => {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
   if (!apikey) {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)

@@ -2,8 +2,8 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import type { AppStats } from '../_utils/types.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
 serve(async (event: Request) => {
   try {
@@ -32,23 +32,25 @@ serve(async (event: Request) => {
     if (coerce)
       version_build = coerce.version
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-    const device: Partial<definitions['devices'] | definitions['devices_onprem']> = {
-      platform: platform as definitions['stats']['platform'],
+    const device: Database['public']['Tables']['devices']['Insert'] | Database['public']['Tables']['devices_onprem']['Insert'] = {
+      platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       app_id,
       plugin_version,
       os_version: version_os,
+      version: version_name || 'unknown' as any,
       is_emulator: is_emulator === undefined ? false : is_emulator,
       is_prod: is_prod === undefined ? true : is_prod,
       ...(custom_id ? { custom_id } : {}),
     }
 
-    const stat: Partial<definitions['stats']> = {
-      platform: platform as definitions['stats']['platform'],
+    const stat: Database['public']['Tables']['stats']['Insert'] = {
+      platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       action,
       app_id,
       version_build,
+      version: version || 0,
     }
     const all = []
     const { data, error } = await supabaseAdmin()
@@ -83,8 +85,6 @@ serve(async (event: Request) => {
     }
     else if (!device.is_emulator && device.is_prod) {
       console.log('switch to onprem', app_id)
-      device.version = version_name || 'unknown' as any
-      stat.version = version || 0
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
     }

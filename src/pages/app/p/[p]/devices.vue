@@ -15,9 +15,9 @@ import { subDays } from 'date-fns'
 import dayjs from 'dayjs'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
+import type { Database } from '~/types/supabase.types'
 
 interface Device {
   version: {
@@ -39,8 +39,8 @@ const id = ref('')
 const search = ref('')
 const isLoading = ref(true)
 const isLoadingSub = ref(false)
-const devices = ref<(definitions['devices'] & Device)[]>([])
-const filtered = ref<(definitions['devices'] & Device)[]>([])
+const devices = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
+const filtered = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
 
 const deviceFiltered = computed(() => {
   if (search.value)
@@ -53,7 +53,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
     // create a date object for the last day of the previous month with dayjs
     const lastDay = dayjs().subtract(1, 'month')
     const { data: dataDev } = await supabase
-      .from<definitions['devices'] & Device>('devices')
+      .from('devices')
       .select(`
         device_id,
         platform,
@@ -70,7 +70,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataDev)
       return
-    devices.value.push(...dataDev)
+    devices.value.push(...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[])
     if (dataDev.length === fetchLimit)
       fetchOffset += fetchLimit
     else
@@ -97,7 +97,7 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-const openDevice = async (device: definitions['devices']) => {
+const openDevice = async (device: Database['public']['Tables']['devices']['Row']) => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/d/${device.device_id}`)
 }
 
@@ -119,7 +119,7 @@ watchEffect(async () => {
 const searchDevices = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
-    .from<definitions['devices'] & Device>('devices')
+    .from('devices')
     .select(`
         device_id,
         platform,
@@ -135,7 +135,7 @@ const searchDevices = async () => {
     .gt('updated_at', subDays(new Date(), 30).toUTCString())
     .order('updated_at', { ascending: false })
     .or(`device_id.like.%${search.value}%,custom_id.like.%${search.value}%`)
-  filtered.value = dataVersions || []
+  filtered.value = (dataVersions || []) as (Database['public']['Tables']['devices']['Row'] & Device)[]
   isLoadingSub.value = false
 }
 const onSearch = (val: string) => {
@@ -174,7 +174,7 @@ const onSearch = (val: string) => {
                 </div>
               </IonLabel>
               <IonNote slot="end">
-                {{ formatDate(d.updated_at) }}
+                {{ formatDate(d.updated_at || '') }}
               </IonNote>
             </IonItem>
           </template>

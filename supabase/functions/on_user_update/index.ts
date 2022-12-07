@@ -2,10 +2,10 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import { updatePerson } from '../_utils/crisp.ts'
 import type { Person } from '../_utils/crisp.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { createCustomer } from '../_utils/stripe.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
@@ -18,7 +18,7 @@ serve(async (event: Request) => {
   }
   try {
     console.log('body')
-    const body = (await event.json()) as { record: definitions['users'] }
+    const body = (await event.json()) as { record: Database['public']['Tables']['users']['Row'] }
     const record = body.record
     console.log('updatePerson crisp')
     const person: Person = {

@@ -18,10 +18,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
 import Usage from '~/components/dashboard/Usage.vue'
+import type { Database } from '~/types/supabase.types'
 
 interface InfiniteScrollCustomEvent extends CustomEvent {
   target: HTMLIonInfiniteScrollElement
@@ -35,15 +35,14 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
-// const auth = supabase.auth.user()
 const id = ref('')
 const search = ref('')
 const isLoading = ref(false)
 const isLoadingSub = ref(false)
-const app = ref<definitions['apps']>()
-const channels = ref<(definitions['channels'] & Channel)[]>([])
-const versions = ref<(definitions['app_versions'] & definitions['app_versions_meta'])[]>([])
-const filtered = ref<(definitions['app_versions'] & definitions['app_versions_meta'])[]>([])
+const app = ref<Database['public']['Tables']['apps']['Row']>()
+const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
+const versions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
+const filtered = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
 
 const versionFilter = computed(() => {
   if (search.value)
@@ -58,7 +57,7 @@ const loadAppInfo = async () => {
       .eq('app_id', id.value)
       .single()
     const { data: dataChannel } = await supabase
-      .from<definitions['channels'] & Channel>('channels')
+      .from('channels')
       .select(`
           id,
           name,
@@ -73,7 +72,7 @@ const loadAppInfo = async () => {
       .eq('app_id', id.value)
       .order('updated_at', { ascending: false })
     app.value = dataApp || app.value
-    channels.value = dataChannel || channels.value
+    channels.value = (dataChannel || channels.value) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
   }
   catch (error) {
     console.error(error)
@@ -85,7 +84,7 @@ const bytesToMb = (bytes: number) => {
   return `${res.toFixed(2)} MB`
 }
 
-const showSize = (version: (definitions['app_versions'] & definitions['app_versions_meta'])) => {
+const showSize = (version: (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])) => {
   if (version.size)
     return bytesToMb(version.size)
   else if (version.external_url)
@@ -114,7 +113,7 @@ const searchVersion = async () => {
     .in('id', dataVersions.map(({ id }) => id))
   const newVersions = dataVersions.map(({ id, ...rest }) => {
     const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-    return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
+    return { ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
   })
   filtered.value = newVersions
   isLoadingSub.value = false
@@ -137,7 +136,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
     // merge dataVersions and dataVersionsMeta
     const newVersions = dataVersions.map(({ id, ...rest }) => {
       const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-      return { ...rest, ...version } as (definitions['app_versions'] & definitions['app_versions_meta'])
+      return { ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
     })
     versions.value.push(...newVersions)
 
@@ -188,7 +187,7 @@ const didCancel = async (name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteChannel = async (channel: definitions['channels']) => {
+const deleteChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
   // console.log('deleteChannel', channel)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -228,7 +227,7 @@ const deleteChannel = async (channel: definitions['channels']) => {
   }
 }
 
-const deleteVersion = async (version: definitions['app_versions']) => {
+const deleteVersion = async (version: Database['public']['Tables']['app_versions']['Row']) => {
   // console.log('deleteVersion', version)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -300,10 +299,10 @@ const deleteVersion = async (version: definitions['app_versions']) => {
   }
 }
 
-const openChannel = (channel: definitions['channels']) => {
+const openChannel = (channel: Database['public']['Tables']['channels']['Row']) => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
 }
-const openVersion = (version: definitions['app_versions']) => {
+const openVersion = (version: Database['public']['Tables']['app_versions']['Row']) => {
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/bundle/${version.id}`)
 }
 const openDevices = () => {
@@ -335,7 +334,7 @@ watchEffect(async () => {
 
 <template>
   <IonPage>
-    <TitleHead :title="app?.name" default-back="/app" color="warning" />
+    <TitleHead :title="app?.name || ''" default-back="/app" color="warning" />
     <IonContent :fullscreen="true">
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />
@@ -401,7 +400,7 @@ watchEffect(async () => {
                   </h2>
                 </IonLabel>
                 <IonNote slot="end">
-                  {{ formatDate(v.created_at) }}
+                  {{ formatDate(v.created_at || '') }}
                 </IonNote>
               </IonItem>
               <IonItemOptions side="end">

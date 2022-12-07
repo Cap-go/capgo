@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
 import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { sendRes } from '../_utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
@@ -16,14 +16,14 @@ serve(async (event: Request) => {
   }
   try {
     console.log('body')
-    const body = (await event.json()) as { record: definitions['app_versions'] }
+    const body = (await event.json()) as { record: Database['public']['Tables']['app_versions']['Row'] }
     const record = body.record
 
     await supabaseAdmin()
       .from('apps')
       .update({
         last_version: record.name,
-      }, { returning: 'minimal' })
+      })
       .eq('app_id', record.app_id)
       .eq('user_id', record.user_id)
 

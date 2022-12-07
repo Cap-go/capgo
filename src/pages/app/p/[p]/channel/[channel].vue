@@ -10,19 +10,19 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import Spinner from '~/components/Spinner.vue'
-import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
+import { existUser, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
 import { useMainStore } from '~/stores/main'
+import type { Database } from '~/types/supabase.types'
 
 interface ChannelUsers {
-  user_id: definitions['users']
+  user_id: Database['public']['Tables']['users']['Row']
 }
 interface Channel {
-  version: definitions['app_versions']
+  version: Database['public']['Tables']['app_versions']['Row']
 }
 const router = useRouter()
 const { t } = useI18n()
@@ -30,16 +30,15 @@ const route = useRoute()
 const main = useMainStore()
 const listRef = ref()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
-const channel = ref<definitions['channels'] & Channel>()
-const users = ref<(definitions['channel_users'] & ChannelUsers)[]>()
+const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
+const users = ref<(Database['public']['Tables']['channel_users']['Row'] & ChannelUsers)[]>()
 const newUser = ref<string>()
 const newUserModalOpen = ref(false)
 const search = ref('')
-const devices = ref<definitions['channel_devices'][]>([])
+const devices = ref<Database['public']['Tables']['channel_devices']['Row'][]>([])
 
 const openBundle = () => {
   if (!channel.value)
@@ -50,14 +49,14 @@ const openBundle = () => {
 const openApp = () => {
   if (!channel.value)
     return
-  openVersion(channel.value.version, auth?.id || '')
+  openVersion(channel.value.version, main.auth?.id || '')
 }
 const getUsers = async () => {
   if (!channel.value)
     return
   try {
     const { data, error } = await supabase
-      .from<definitions['channel_users'] & ChannelUsers>('channel_users')
+      .from('channel_users')
       .select(`
           id,
           channel_id,
@@ -75,7 +74,7 @@ const getUsers = async () => {
       console.error('no channel users', error)
       return
     }
-    users.value = data
+    users.value = data as (Database['public']['Tables']['channel_users']['Row'] & ChannelUsers)[]
   }
   catch (error) {
     console.error(error)
@@ -107,7 +106,7 @@ const saveChannelChange = async (key: string, val: boolean) => {
       [key]: val,
     }
     const { error } = await supabase
-      .from<definitions['channels'] & Channel>('channels')
+      .from('channels')
       .update(update)
       .eq('id', id.value)
     if (error)
@@ -122,7 +121,7 @@ const getChannel = async () => {
     return
   try {
     const { data, error } = await supabase
-      .from<definitions['channels'] & Channel>('channels')
+      .from('channels')
       .select(`
           id,
           name,
@@ -150,7 +149,7 @@ const getChannel = async () => {
       console.error('no channel', error)
       return
     }
-    channel.value = data
+    channel.value = data as Database['public']['Tables']['channels']['Row'] & Channel
   }
   catch (error) {
     console.error(error)
@@ -169,19 +168,9 @@ watchEffect(async () => {
   }
 })
 
-const existUser = async (email: string): Promise<string> => {
-  const { data, error } = await supabase
-    .rpc<string>('exist_user', { e_mail: email })
-    .single()
-  if (error)
-    throw error
-
-  return data
-}
-
 const addUser = async () => {
   // console.log('newUser', newUser.value)
-  if (!channel.value || !auth)
+  if (!channel.value || !main.auth || !id.value)
     return
   if (!main.canUseMore) {
     // show alert for upgrade plan and return
@@ -218,7 +207,7 @@ const addUser = async () => {
       channel_id: id.value,
       app_id: channel.value.version.app_id,
       user_id: exist,
-      created_by: auth.id,
+      created_by: main.auth.id,
     })
   if (error) {
     console.error(error)
@@ -284,7 +273,7 @@ const didCancel = async (name: string) => {
   await alert.present()
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
-const deleteUser = async (usr: definitions['users']) => {
+const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => {
   if (!channel.value || await didCancel(t('channel.user')))
     return
   const { error } = await supabase
@@ -298,7 +287,7 @@ const deleteUser = async (usr: definitions['users']) => {
     await getUsers()
 }
 
-const presentActionSheet = async (usr: definitions['users']) => {
+const presentActionSheet = async (usr: Database['public']['Tables']['users']['Row']) => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -328,7 +317,7 @@ const devicesFilter = computed(() => {
   }
   return devices.value
 })
-const deleteDevice = async (device: definitions['channel_devices']) => {
+const deleteDevice = async (device: Database['public']['Tables']['channel_devices']['Row']) => {
   // console.log('deleteDevice', device)
   if (listRef.value)
     listRef.value.$el.closeSlidingItems()
@@ -368,11 +357,13 @@ const deleteDevice = async (device: definitions['channel_devices']) => {
   }
 }
 const inviteUser = async (userId: string) => {
+  if (!channel.value || !id.value)
+    return
   const { error } = await supabase
     .from('channel_users')
     .insert({
       channel_id: id.value,
-      created_by: auth?.id,
+      created_by: main.auth?.id,
       app_id: channel.value?.version.app_id,
       user_id: userId,
     })
@@ -558,7 +549,7 @@ const inviteUser = async (userId: string) => {
                   </h2>
                 </IonLabel>
                 <IonNote slot="end">
-                  {{ formatDate(d.created_at) }}
+                  {{ formatDate(d.created_at || '') }}
                 </IonNote>
               </IonItem>
               <IonItemOptions side="end">

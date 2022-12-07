@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import { createCustomer } from '../_utils/stripe.ts'
 
 const supabaseUrl = 'https://***.supabase.co'
@@ -7,9 +7,11 @@ const supabaseAnonKey = '***'
 const useSupabase = () => {
   const options = {
     // const options: SupabaseClientOptions = {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
   }
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }

@@ -5,17 +5,18 @@ import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 import Spinner from '~/components/Spinner.vue'
+import type { Database } from '~/types/supabase.types'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const isLoading = ref(false)
 const route = useRoute()
+const main = useMainStore()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
-const apps = ref<definitions['apikeys'][]>()
-const copyKey = async (app: definitions['apikeys']) => {
+const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
   const toast = await toastController
     .create({
@@ -32,11 +33,11 @@ const geKeys = async (retry = true): Promise<void> => {
   const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', auth?.id)
+    .eq('user_id', main.user?.id)
   if (data && data.length)
     apps.value = data
 
-  else if (retry && auth?.id)
+  else if (retry && main.user?.id)
     return geKeys(false)
 
   isLoading.value = false
@@ -51,8 +52,8 @@ watchEffect(async () => {
   <IonPage>
     <TitleHead :title="t('apikeys.title')" default-back="/app/account" />
     <IonContent :fullscreen="true">
-      <div class="mx-auto w-full lg:w-1/2">
-        <div class="py-16 px-6">
+      <div class="w-full mx-auto lg:w-1/2">
+        <div class="px-6 py-16">
           <p class="m-3">
             {{ t('apikeys.explain') }}
           </p>
@@ -89,14 +90,14 @@ watchEffect(async () => {
             </div>
             <IonItem v-for="(app, index) in apps" v-else :key="index" @click="copyKey(app)">
               <IonLabel class="cursor-pointer">
-                <div class="col-span-6 flex flex-col ">
-                  <div class="flex justify-between items-center">
+                <div class="flex flex-col col-span-6 ">
+                  <div class="flex items-center justify-between">
                     <h2 class="text-sm text-azure-500">
                       {{ app.key }}
                     </h2>
                   </div>
-                  <div class="flex justify-between items-center">
-                    <h3 class="text-true-gray-800 py-1 font-bold">
+                  <div class="flex items-center justify-between">
+                    <h3 class="py-1 font-bold text-true-gray-800">
                       {{
                         app.mode
                       }}

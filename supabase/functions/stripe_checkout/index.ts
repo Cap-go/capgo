@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { createCheckout } from '../_utils/stripe.ts'
 
@@ -23,19 +22,18 @@ serve(async (event: Request) => {
     const body = (await event.json()) as PortalData
     console.log('body', body)
     console.log('auth')
-    const { user: auth, error } = await supabaseAdmin().auth.api.getUser(
+    const { data: auth, error } = await supabaseAdmin().auth.getUser(
       authorization?.split('Bearer ')[1],
     )
-    console.log('auth done', auth?.id)
-
     // console.log('auth', auth)
-    if (error || !auth)
+    if (error || !auth || !auth.user)
       return sendRes({ status: 'not authorize' }, 400)
+    console.log('auth done', auth.user?.id)
     // get user from users
     const { data: user, error: dbError } = await supabaseAdmin()
       .from('users')
       .select()
-      .eq('id', auth.id)
+      .eq('id', auth.user.id)
       .single()
     if (dbError || !user)
       return sendRes({ status: 'not authorize' }, 400)

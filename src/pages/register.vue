@@ -60,24 +60,24 @@ const submit = async () => {
     isLoading.value = false
     return
   }
-  const { user, error } = await supabase.auth.signUp(
+  const { data: user, error } = await supabase.auth.signUp(
     {
       email: form.email,
       password: form.password,
-    },
-    {
-      data: {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        phone: form.phone,
-        activation: {
-          formFilled: true,
-          enableNotifications: false,
-          legal: false,
-          optForNewsletters: false,
+      options: {
+        data: {
+          first_name: form.first_name,
+          last_name: form.last_name,
+          phone: form.phone,
+          activation: {
+            formFilled: true,
+            enableNotifications: false,
+            legal: false,
+            optForNewsletters: false,
+          },
         },
+        emailRedirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/verify_email`,
       },
-      redirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/verify_email`,
     },
     // supabase auth config
     // http://localhost:3334/onboarding/verify_email,http://localhost:3334/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2

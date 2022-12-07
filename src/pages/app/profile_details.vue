@@ -14,7 +14,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 import { useMainStore } from '~/stores/main'
-import type { definitions } from '~/types/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const router = useRouter()
 const route = useRoute()
@@ -22,11 +22,10 @@ const main = useMainStore()
 const { t } = useI18n()
 const supabase = useSupabase()
 
-const auth = supabase.auth.user()
 const form = reactive({
   first_name: '',
   last_name: '',
-  email: auth?.email,
+  email: main.user?.email,
   country: '',
 })
 
@@ -46,17 +45,18 @@ const submit = async () => {
   if (!isFormCorrect)
     isLoading.value = false
 
-  const updateData: Partial<definitions['users']> = {
-    id: auth?.id,
+  const updateData: Database['public']['Tables']['users']['Insert'] = {
+    id: main.user?.id || '',
     first_name: form.first_name,
     last_name: form.last_name,
-    email: form.email,
+    email: form.email || '',
     country: form.country,
   }
 
   const { data: usr, error: dbError } = await supabase
     .from('users')
     .upsert(updateData)
+    .select()
     .single()
 
   if (dbError || !usr) {
@@ -79,7 +79,7 @@ watchEffect(async () => {
         country,
         email
       `)
-      .eq('id', auth?.id)
+      .eq('id', main.user?.id)
       .single()
     if (usr) {
       console.log('usr', usr)
@@ -96,15 +96,15 @@ watchEffect(async () => {
   <IonPage>
     <TitleHead :title="t('account.personalInformation')" />
     <IonContent :fullscreen="true" class="w-full">
-      <div class="grid mx-auto w-full lg:w-1/2 p-8">
+      <div class="grid w-full p-8 mx-auto lg:w-1/2">
         <form
-          class="mt-12 w-full"
+          class="w-full mt-12"
           @submit.prevent="submit"
         >
-          <p v-if="errorMessage" class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+          <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
             {{ errorMessage }}
           </p>
-          <div class="w-full grid item-center">
+          <div class="grid w-full item-center">
             <div class="py-1">
               <IonInput
                 v-model="form.first_name"
@@ -117,7 +117,7 @@ watchEffect(async () => {
               />
 
               <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                   {{ t('accountProfile.first-name') }}: {{ error.$message }}
                 </p>
               </div>
@@ -132,7 +132,7 @@ watchEffect(async () => {
                 type="text"
               />
               <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="text-pumpkin-orange-900 text-xs italic mt-2 mb-4">
+                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
                   {{ t('accountProfile.last-name') }}: {{ error.$message }}
                 </p>
               </div>
@@ -143,7 +143,7 @@ watchEffect(async () => {
                 required
                 disabled
                 inputmode="email"
-                class="text-left border-b-2 z-0 ion-padding-start"
+                class="z-0 text-left border-b-2 ion-padding-start"
                 :placeholder="t('accountProfile.email')"
                 type="email"
               />
@@ -153,7 +153,7 @@ watchEffect(async () => {
                 v-model="form.country"
                 :disabled="isLoading"
                 required
-                class="text-left border-b-2 z-0 ion-padding-start"
+                class="z-0 text-left border-b-2 ion-padding-start"
                 :placeholder="t('accountProfile.country')"
                 type="text"
               />
@@ -164,7 +164,7 @@ watchEffect(async () => {
               type="submit"
               color="secondary"
               shape="round"
-              class="ion-margin-top w-45 mx-auto font-semibold mt-8"
+              class="mx-auto mt-8 font-semibold ion-margin-top w-45"
             >
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('accountProfile.update') }}

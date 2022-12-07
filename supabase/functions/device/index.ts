@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
 
 interface DeviceLink {
@@ -14,11 +14,8 @@ interface GetDevice {
   device_id?: string
   page?: number
 }
-interface DeviceVersion {
-  version: definitions['app_versions']
-}
 
-const get = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+const get = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = await event.json() as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
     console.error('You can\'t access this app', body.app_id)
@@ -27,7 +24,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
   // if device_id get one device
   if (body.device_id) {
     const { data: dataDevice, error: dbError } = await supabaseAdmin()
-      .from<definitions['devices'] & DeviceVersion>('devices')
+      .from('devices')
       .select(`
           created_at,
           updated_at,
@@ -91,7 +88,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
   }
 }
 
-const post = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+const post = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = await event.json() as DeviceLink
   if (!body.device_id || !body.app_id) {
     console.log('Cannot find device or appi_id')
@@ -169,7 +166,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   return sendRes()
 }
 
-export const deleteOverride = async (event: Request, apikey: definitions['apikeys']): Promise<Response> => {
+export const deleteOverride = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as DeviceLink
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
@@ -211,7 +208,7 @@ serve(async (event: Request) => {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  const apikey: definitions['apikeys'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
   if (!apikey) {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)

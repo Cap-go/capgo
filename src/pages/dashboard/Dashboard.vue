@@ -10,18 +10,18 @@ import Steps from '../onboarding/Steps.vue'
 import { useMainStore } from '~/stores/main'
 import Usage from '~/components/dashboard/Usage.vue'
 import TopApps from '~/components/dashboard/TopApps.vue'
-import type { definitions } from '~/types/supabase'
 import SharedApps from '~/components/dashboard/SharedApps.vue'
+import type { Database } from '~/types/supabase.types'
 
 interface ChannelUserApp {
-  app_id: definitions['apps']
-  channel_id: definitions['channels'] & {
-    version: definitions['app_versions']
+  app_id: Database['public']['Tables']['apps']['Row']
+  channel_id: Database['public']['Tables']['channels']['Row'] & {
+    version: Database['public']['Tables']['app_versions']['Row']
   }
 }
 const props = defineProps<{
-  apps: definitions['apps'][]
-  sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
+  apps: Database['public']['Tables']['apps']['Row'][]
+  sharedApps: (Database['public']['Tables']['channel_users']['Row'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
 const isMobile = isPlatform('capacitor')
