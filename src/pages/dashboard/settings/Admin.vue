@@ -16,12 +16,11 @@ const form = reactive({
   uuid: '',
 })
 const isLoading = ref(false)
-const oldId = ref(!!localStorage.getItem('supabase.old_id'))
+const oldId = ref('')
 const sidebarOpen = ref(false)
 const rules = computed(() => ({
   uuid: { required },
 }))
-console.log('setLogAs', oldId.value)
 
 const v$ = useVuelidate(rules, form)
 const setLogAs = (id: string) => {

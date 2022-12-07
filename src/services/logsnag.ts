@@ -1,7 +1,8 @@
 import { LogSnag } from 'logsnag'
+import { isSpoofed } from './supabase'
 
 export const useLogSnag = (): LogSnag => {
-  if (localStorage.getItem('supabase.old_id')) {
+  if (isSpoofed()) {
     return {
       getProject: () => '',
       publish: () => Promise.resolve(false),
