@@ -53,7 +53,7 @@ const versionFilter = computed(() => {
 const loadAppInfo = async () => {
   try {
     const { data: dataApp } = await supabase
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .select()
       .eq('app_id', id.value)
       .single()
@@ -97,7 +97,7 @@ const showSize = (version: (definitions['app_versions'] & definitions['app_versi
 const searchVersion = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
-    .from<definitions['app_versions']>('app_versions')
+    .from('app_versions')
     .select()
     .eq('app_id', id.value)
     .eq('deleted', false)
@@ -109,7 +109,7 @@ const searchVersion = async () => {
     return
   }
   const { data: dataVersionsMeta } = await supabase
-    .from<definitions['app_versions_meta']>('app_versions_meta')
+    .from('app_versions_meta')
     .select()
     .in('id', dataVersions.map(({ id }) => id))
   const newVersions = dataVersions.map(({ id, ...rest }) => {
@@ -122,7 +122,7 @@ const searchVersion = async () => {
 const loadData = async (event?: InfiniteScrollCustomEvent) => {
   try {
     const { data: dataVersions } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', id.value)
       .eq('deleted', false)
@@ -131,7 +131,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
     if (!dataVersions)
       return
     const { data: dataVersionsMeta } = await supabase
-      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .from('app_versions_meta')
       .select()
       .in('id', dataVersions.map(({ id }) => id))
     // merge dataVersions and dataVersionsMeta
@@ -196,7 +196,7 @@ const deleteChannel = async (channel: definitions['channels']) => {
     return
   try {
     const { error: delChanError } = await supabase
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .delete()
       .eq('app_id', channel.app_id)
       .eq('id', channel.id)
@@ -236,7 +236,7 @@ const deleteVersion = async (version: definitions['app_versions']) => {
     return
   try {
     const { data: channelFound, error: errorChannel } = await supabase
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .select()
       .eq('app_id', version.app_id)
       .eq('version', version.id)
@@ -250,7 +250,7 @@ const deleteVersion = async (version: definitions['app_versions']) => {
       return
     }
     const { data: deviceFound, error: errorDevice } = await supabase
-      .from<definitions['devices_override']>('devices_override')
+      .from('devices_override')
       .select()
       .eq('app_id', version.app_id)
       .eq('version', version.id)
@@ -268,7 +268,7 @@ const deleteVersion = async (version: definitions['app_versions']) => {
       .from('apps')
       .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
     const { error: delAppError } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .update({ deleted: true })
       .eq('app_id', version.app_id)
       .eq('id', version.id)

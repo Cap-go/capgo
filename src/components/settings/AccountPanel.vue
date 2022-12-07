@@ -124,7 +124,7 @@ const deleteAccount = async () => {
         text: t('button.remove'),
         handler: async () => {
           const { error } = await supabase
-            .from<definitions['deleted_account']>('deleted_account')
+            .from('deleted_account')
             .insert({
               email: main.auth?.email,
             })
@@ -220,7 +220,7 @@ const submit = async () => {
   }
 
   const { data: usr, error: dbError } = await supabase
-    .from<definitions['users']>('users')
+    .from('users')
     .upsert(updateData)
     .single()
 
@@ -235,7 +235,7 @@ const submit = async () => {
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/account') {
     const { data: usr } = await supabase
-      .from<definitions['users']>('users')
+      .from('users')
       .select(`
         id,
         first_name,

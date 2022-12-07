@@ -26,7 +26,7 @@ interface ChannelUserApp {
 }
 const getMyApps = async () => {
   const { data } = await supabase
-    .from<definitions['apps']>('apps')
+    .from('apps')
     .select()
     .eq('user_id', auth?.id).order('name', { ascending: true })
   if (data && data.length)

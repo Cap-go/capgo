@@ -132,7 +132,7 @@ const deleteAccount = async () => {
         text: t('button.remove'),
         handler: async () => {
           const { error } = await supabase
-            .from<definitions['deleted_account']>('deleted_account')
+            .from('deleted_account')
             .insert({
               email: main.auth?.email,
             })

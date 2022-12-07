@@ -49,7 +49,7 @@ const post = async (event: Request): Promise<Response> => {
   }
   // find device
   const { data: dataDevice} = await supabaseAdmin()
-    .from<definitions['devices']>('devices')
+    .from('devices')
     .select()
     .eq('app_id', app_id)
     .eq('device_id', device_id)
@@ -68,7 +68,7 @@ const post = async (event: Request): Promise<Response> => {
   if (!dataDevice) {
     if (!dataDevice) {
       const { data: version } = await supabaseAdmin()
-        .from<definitions['app_versions']>('app_versions')
+        .from('app_versions')
         .select()
         .eq('app_id', app_id)
         .eq('name', version_name || 'unknown')
@@ -105,7 +105,7 @@ const post = async (event: Request): Promise<Response> => {
   if (channel) {
     // get channel by name
     const { data: dataChannel, error: dbError } = await supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .select()
       .eq('app_id', app_id)
       .eq('name', channel)
@@ -116,7 +116,7 @@ const post = async (event: Request): Promise<Response> => {
       return sendRes({ message: `Cannot find channel ${dbError}`, error: 'channel_not_found' }, 400)
     }
     const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin()
-      .from<definitions['channel_devices']>('channel_devices')
+      .from('channel_devices')
       .upsert({
         device_id: device_id,
         channel_id: dataChannel.id,
@@ -129,7 +129,7 @@ const post = async (event: Request): Promise<Response> => {
     }
   }
   const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
-    .from<definitions['app_versions']>('app_versions')
+    .from('app_versions')
     .select()
     .eq('app_id', app_id)
     .eq('name', version_name || 'unknown')
@@ -196,7 +196,7 @@ const put = async (event: Request): Promise<Response> => {
   }
   else if (dataChannel) {
     const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', app_id)
       .eq('name', version_name || 'unknown')

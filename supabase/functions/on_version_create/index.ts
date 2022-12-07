@@ -20,7 +20,7 @@ serve(async (event: Request) => {
     const record = body.record
 
     await supabaseAdmin()
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .update({
         last_version: record.name,
       }, { returning: 'minimal' })
@@ -30,7 +30,7 @@ serve(async (event: Request) => {
     if (!record.bucket_id) {
       console.log('No bucket_id')
       const { error: dbError } = await supabaseAdmin()
-        .from<definitions['app_versions_meta']>('app_versions_meta')
+        .from('app_versions_meta')
         .insert({
           id: record.id,
           app_id: record.app_id,
@@ -58,7 +58,7 @@ serve(async (event: Request) => {
     const checksum = crc32(new Uint8Array(u))
     // create app version meta
     const { error: dbError } = await supabaseAdmin()
-      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .from('app_versions_meta')
       .insert({
         id: record.id,
         app_id: record.app_id,

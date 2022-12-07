@@ -24,7 +24,7 @@ serve(async (event: Request) => {
     }
 
     const { data, error: dbError } = await supabaseAdmin()
-      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .from('app_versions_meta')
       .select()
       .eq('id', record.id)
       .single()

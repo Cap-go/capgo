@@ -63,7 +63,7 @@ const logFiltered = computed(() => {
 const getVersion = async () => {
   try {
     const { data, error } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('deleted', false)
@@ -264,7 +264,7 @@ const loadData = async () => {
 
 const upsertDevVersion = async (device: string, v: definitions['app_versions']) => {
   return supabase
-    .from<definitions['devices_override']>('devices_override')
+    .from('devices_override')
     .upsert({
       device_id: device,
       version: v.id,
@@ -294,7 +294,7 @@ const didCancel = async (name: string) => {
 const saveCustomId = async () => {
   console.log('device.value?.custom_id', device.value?.custom_id)
   await supabase
-    .from<definitions['devices']>('devices')
+    .from('devices')
     .update({
       custom_id: device.value?.custom_id,
     }, { returning: 'minimal' })
@@ -310,7 +310,7 @@ const delDevVersion = async (device: string) => {
   if (await didCancel(t('channel.device')))
     return
   return supabase
-    .from<definitions['devices_override']>('devices_override')
+    .from('devices_override')
     .delete()
     .eq('device_id', device)
     .eq('app_id', packageId.value)
@@ -377,7 +377,7 @@ const updateOverride = async () => {
 }
 const upsertDevChannel = async (device: string, channel: definitions['channels']) => {
   return supabase
-    .from<definitions['channel_devices']>('channel_devices')
+    .from('channel_devices')
     .upsert({
       device_id: device,
       channel_id: channel.id,
@@ -389,7 +389,7 @@ const delDevChannel = async (device: string) => {
   if (await didCancel(t('channel.title')))
     return
   return supabase
-    .from<definitions['channel_devices']>('channel_devices')
+    .from('channel_devices')
     .delete()
     .eq('device_id', device)
     .eq('app_id', packageId.value)

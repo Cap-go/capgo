@@ -21,7 +21,7 @@ serve(async (event: Request) => {
 
     // find email from user with customer_id
     const { error: dbError, data: user } = await supabaseAdmin()
-      .from<definitions['users']>('users')
+      .from('users')
       .select(`email,
       id`)
       .eq('customer_id', stripeData.customer_id)
@@ -32,7 +32,7 @@ serve(async (event: Request) => {
       return sendRes('no user found', 500)
 
     const { data: customer } = await supabaseAdmin()
-      .from<definitions['stripe_info']>('stripe_info')
+      .from('stripe_info')
       .select()
       .eq('customer_id', stripeData.customer_id)
       .single()
@@ -50,13 +50,13 @@ serve(async (event: Request) => {
       const status = stripeData.status
       stripeData.status = 'succeeded'
       const { data: plan } = await supabaseAdmin()
-        .from<definitions['plans']>('plans')
+        .from('plans')
         .select()
         .eq('stripe_id', stripeData.product_id)
         .single()
       if (plan) {
         const { error: dbError2 } = await supabaseAdmin()
-          .from<definitions['stripe_info']>('stripe_info')
+          .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
         if (customer && customer.product_id !== 'free' && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
@@ -101,7 +101,7 @@ serve(async (event: Request) => {
       else {
         stripeData.is_good_plan = false
         const { error: dbError2 } = await supabaseAdmin()
-          .from<definitions['stripe_info']>('stripe_info')
+          .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
         if (dbError2)

@@ -8,7 +8,7 @@ serve(async (event: Request) => {
   console.log('url', url, url.searchParams.get('service'))
   if (url.searchParams.get('service') === 'database') {
     const { data, error } = await supabaseAdmin()
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .select()
       .eq('app_id', 'unknow.unknow')
       .single()

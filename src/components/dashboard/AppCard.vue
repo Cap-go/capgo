@@ -47,7 +47,7 @@ const deleteApp = async (app: definitions['apps']) => {
     return
   try {
     const { data, error: vError } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
@@ -70,7 +70,7 @@ const deleteApp = async (app: definitions['apps']) => {
     }
 
     const { error: dbAppError } = await supabase
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .delete()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
@@ -107,7 +107,7 @@ const loadData = async () => {
     try {
       const date_id = new Date().toISOString().slice(0, 7)
       const { data, error } = await supabase
-        .from<definitions['app_stats']>('app_stats')
+        .from('app_stats')
         .select()
         .eq('app_id', props.app.app_id)
         .eq('date_id', date_id)

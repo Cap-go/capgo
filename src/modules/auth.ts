@@ -19,7 +19,7 @@ const guard = async (next: any, to: string, from: string) => {
     if (!main.user) {
       try {
         const { data, error } = await supabase
-          .from<definitions['users']>('users')
+          .from('users')
           .select()
           .eq('id', auth?.id)
           .single()

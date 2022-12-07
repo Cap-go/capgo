@@ -1,5 +1,5 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
-import type { definitions } from './types_supabase.ts'
+import type { Database } from './supabase.types.ts'
 import type { JwtUser } from './types.ts'
 
 export const jwtDecoder = (jwt: string): JwtUser =>
@@ -18,12 +18,13 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-export const checkKey = async (authorization: string | undefined, supabase: SupabaseClient, allowed: definitions['apikeys']['mode'][]): Promise<definitions['apikeys'] | null> => {
+export const checkKey = async (authorization: string | undefined,
+  supabase: SupabaseClient, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> => {
   if (!authorization)
     return null
   try {
     const { data, error } = await supabase
-      .from<definitions['apikeys']>('apikeys')
+      .from('apikeys')
       .select()
       .eq('key', authorization)
       .in('mode', allowed)

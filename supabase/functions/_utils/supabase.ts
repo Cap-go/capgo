@@ -1,5 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
-import type { definitions } from './types_supabase.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import type { Database } from './supabase.types.ts'
 // Import Supabase client
 
 export interface AppStatsIncrement {
@@ -20,7 +20,7 @@ export interface VersionStatsIncrement {
   version_id: number
   devices: number
 }
-export const supabaseClient = () => createClient(
+export const supabaseClient = () => createClient<Database>(
   // Supabase API URL - env var exported by default.
   Deno.env.get('SUPABASE_URL') ?? '',
   // Supabase API ANON KEY - env var exported by default.
@@ -28,15 +28,15 @@ export const supabaseClient = () => createClient(
 )
 
 // WARNING: The service role key has admin priviliges and should only be used in secure server environments!
-export const supabaseAdmin = () => createClient(
+export const supabaseAdmin = () => createClient<Database>(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
 
-export const updateOrCreateVersion = async (update: Partial<definitions['app_versions']>) => {
+export const updateOrCreateVersion = async (update: Database['public']['Tables']['app_versions']['Insert']) => {
   console.log('updateOrCreateVersion', update)
   const { data, error } = await supabaseAdmin()
-    .from<definitions['app_versions']>('app_versions')
+    .from('app_versions')
     .select()
     .eq('app_id', update.app_id)
     .eq('name', update.name)
@@ -44,14 +44,14 @@ export const updateOrCreateVersion = async (update: Partial<definitions['app_ver
     console.log('update Version')
     update.deleted = false
     return supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .update(update)
       .eq('app_id', update.app_id)
       .eq('name', update.name)
   }
   else {
     return supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .insert(update)
   }
 }
@@ -65,7 +65,7 @@ export const updateVersionStats = async (increment: VersionStatsIncrement) => {
 
 export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: string, user_id: string) => {
   const { data: dataAppStats } = await supabaseAdmin()
-    .from<definitions['app_stats']>('app_stats')
+    .from('app_stats')
     .select()
     .eq('app_id', increment.app_id)
     .eq('date_id', date_id)
@@ -78,34 +78,34 @@ export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: st
       console.error('increment_stats', error)
   }
   else {
-    const newDay: definitions['app_stats'] = {
+    const newDay: Database['public']['Tables']['app_stats']['Insert'] = {
       ...increment,
       devices_real: 0,
       user_id,
     }
     const { error } = await supabaseAdmin()
-      .from<definitions['app_stats']>('app_stats')
+      .from('app_stats')
       .insert(newDay)
     if (error)
       console.error('Cannot create app_stats', error)
   }
 }
 
-export const updateOrCreateChannel = async (update: Partial<definitions['channels']>) => {
+export const updateOrCreateChannel = async (update: Database['public']['Tables']['channels']['Insert']) => {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
   const { data, error } = await supabaseAdmin()
-    .from<definitions['channels']>('channels')
+    .from('channels')
     .select()
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)
   if (data && data.length && !error) {
     return supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .update(update)
       .eq('app_id', update.app_id)
       .eq('name', update.name)
@@ -113,7 +113,7 @@ export const updateOrCreateChannel = async (update: Partial<definitions['channel
   }
   else {
     return supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .insert(update)
   }
 }
@@ -123,7 +123,7 @@ export const checkAppOwner = async (userId: string | undefined, appId: string | 
     return false
   try {
     const { data, error } = await supabaseAdmin()
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .select()
       .eq('user_id', userId)
       .eq('app_id', appId)
@@ -137,21 +137,21 @@ export const checkAppOwner = async (userId: string | undefined, appId: string | 
   }
 }
 
-export const updateOrCreateDevice = async (update: Partial<definitions['devices']>) => {
+export const updateOrCreateDevice = async (update: Database['public']['Tables']['devices']['Insert']) => {
   console.log('updateOrCreateDevice', update)
   const { data, error } = await supabaseAdmin()
-    .from<definitions['devices']>('devices')
+    .from('devices')
     .select()
     .eq('app_id', update.app_id)
     .eq('device_id', update.device_id)
   if (!data || !data.length || error) {
     return supabaseAdmin()
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .insert(update)
   }
   else {
     return supabaseAdmin()
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .update(update)
       .eq('app_id', update.app_id)
       .eq('device_id', update.device_id)
@@ -160,7 +160,7 @@ export const updateOrCreateDevice = async (update: Partial<definitions['devices'
 
 export const getCurrentPlanName = async (userId: string): Promise<string> => {
   const { data, error } = await supabaseAdmin()
-    .rpc<string>('get_current_plan_name', { userid: userId })
+    .rpc('get_current_plan_name', { userid: userId })
     .single()
   if (error)
     throw error
@@ -170,7 +170,7 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
-    .rpc<boolean>('is_good_plan_v2', { userid: userId })
+    .rpc('is_good_plan_v2', { userid: userId })
     .single()
   if (error)
     throw error
@@ -180,7 +180,7 @@ export const isGoodPlan = async (userId: string): Promise<boolean> => {
 
 export const isPaying = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
-    .rpc<boolean>('is_paying', { userid: userId })
+    .rpc('is_paying', { userid: userId })
     .single()
   if (error)
     throw error
@@ -190,7 +190,7 @@ export const isPaying = async (userId: string): Promise<boolean> => {
 
 export const isTrial = async (userId: string): Promise<number> => {
   const { data, error } = await supabaseAdmin()
-    .rpc<number>('is_trial', { userid: userId })
+    .rpc('is_trial', { userid: userId })
     .single()
   if (error)
     throw error
@@ -200,7 +200,7 @@ export const isTrial = async (userId: string): Promise<number> => {
 
 export const isAllowedAction = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
-    .rpc<boolean>('is_allowed_action_user', { userid: userId })
+    .rpc('is_allowed_action_user', { userid: userId })
     .single()
   if (error)
     throw error
@@ -209,8 +209,8 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
 }
 
 export const sendStats = async (action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) => {
-  const stat: Partial<definitions['stats']> = {
-    platform: platform as definitions['stats']['platform'],
+  const stat: Database['public']['Tables']['stats']['Insert'] = {
+    platform: platform as Database['public']['Enums']['platform_os'],
     device_id,
     action,
     app_id,
@@ -219,7 +219,7 @@ export const sendStats = async (action: string, platform: string, device_id: str
   }
   try {
     const { error } = await supabaseAdmin()
-      .from<definitions['stats']>('stats')
+      .from('stats')
       .insert(stat)
     if (error)
       console.log('Cannot insert stat', app_id, version_build, error)

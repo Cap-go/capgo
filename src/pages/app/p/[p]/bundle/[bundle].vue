@@ -46,7 +46,7 @@ const getDevices = async () => {
     return
   try {
     const { data: dataDevices } = await supabase
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .select()
       .eq('version', id.value)
       .eq('app_id', version.value.app_id)
@@ -63,7 +63,7 @@ const getChannels = async () => {
   if (!version.value)
     return
   const { data: dataChannel } = await supabase
-    .from<definitions['channels']>('channels')
+    .from('channels')
     .select()
     .eq('app_id', version.value.app_id)
     .order('updated_at', { ascending: false })
@@ -86,7 +86,7 @@ const setChannel = async (channel: definitions['channels']) => {
   if (!version.value)
     return
   return supabase
-    .from<definitions['channels']>('channels')
+    .from('channels')
     .update({
       version: version.value.id,
     })
@@ -164,13 +164,13 @@ const getVersion = async () => {
     return
   try {
     const { data, error } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('id', id.value)
       .single()
     const { data: dataVersionsMeta, error: dataVersionsError } = await supabase
-      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .from('app_versions_meta')
       .select()
       .eq('id', id.value)
       .single()

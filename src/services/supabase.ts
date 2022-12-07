@@ -101,7 +101,7 @@ export const isPaying = async (userId: string): Promise<boolean> => {
 
 export const getPlans = async (): Promise<definitions['plans'][]> => {
   const { data: plans } = await useSupabase()
-    .from<definitions['plans']>('plans')
+    .from('plans')
     .select()
     .order('price_m')
     // .neq('stripe_id', 'free')

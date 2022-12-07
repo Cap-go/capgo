@@ -60,7 +60,7 @@ export const getMaxstats = async (userId: string, dateId: string): Promise<Stats
 export const checkPlan = async (userId: string): Promise<void> => {
   try {
     const { data: user, error: userError } = await supabaseAdmin()
-      .from<definitions['users']>('users')
+      .from('users')
       .select()
       .eq('id', userId)
       .single()
@@ -68,7 +68,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
       throw userError
     if (await isTrial(userId)) {
       await supabaseAdmin()
-        .from<definitions['stripe_info']>('stripe_info')
+        .from('stripe_info')
         .update({ is_good_plan: true })
         .eq('customer_id', user.customer_id)
         .then()
@@ -119,7 +119,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
       }
     }
     return supabaseAdmin()
-      .from<definitions['stripe_info']>('stripe_info')
+      .from('stripe_info')
       .update({ is_good_plan: !!is_good_plan })
       .eq('customer_id', user.customer_id)
       .then()

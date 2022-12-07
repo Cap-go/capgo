@@ -55,7 +55,7 @@ const submit = async () => {
   }
 
   const { data: usr, error: dbError } = await supabase
-    .from<definitions['users']>('users')
+    .from('users')
     .upsert(updateData)
     .single()
 
@@ -71,7 +71,7 @@ const submit = async () => {
 watchEffect(async () => {
   if (route.path === '/app/profile_details') {
     const { data: usr } = await supabase
-      .from<definitions['users']>('users')
+      .from('users')
       .select(`
         id,
         first_name,

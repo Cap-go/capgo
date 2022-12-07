@@ -59,7 +59,7 @@ const loadData = async () => {
 const getLastDownload = async () => {
   const date_id = new Date().toISOString().slice(0, 7)
   const { data } = await supabase
-    .from<definitions['app_stats']>('app_stats')
+    .from('app_stats')
     .select()
     .eq('app_id', id.value)
     .eq('date_id', date_id)

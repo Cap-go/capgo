@@ -31,7 +31,7 @@ serve(async (event: Request) => {
       versions: 0,
     }
     const { data: dataApp } = await supabaseAdmin()
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .select()
       .eq('app_id', record.app_id)
       .single()

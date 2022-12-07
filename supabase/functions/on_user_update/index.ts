@@ -30,12 +30,12 @@ serve(async (event: Request) => {
     if (!record.customer_id) {
       const customer = await createCustomer(record.email)
       await supabaseAdmin()
-        .from<definitions['stripe_info']>('stripe_info')
+        .from('stripe_info')
         .insert({
           customer_id: customer.id,
         })
       await supabaseAdmin()
-        .from<definitions['users']>('users')
+        .from('users')
         .update({
           customer_id: customer.id,
         })

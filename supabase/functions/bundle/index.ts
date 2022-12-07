@@ -20,7 +20,7 @@ export const deleteBundle = async (event: Request, apikey: definitions['apikeys'
   }
   try {
     const { error: dbError } = await supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .update({
         deleted: true,
       })
@@ -56,7 +56,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataBundles, error: dbError } = await supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', body.app_id)
       .eq('deleted', false)

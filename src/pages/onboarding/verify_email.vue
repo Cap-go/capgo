@@ -37,7 +37,7 @@ const updateDb = async () => {
     return
 
   const { error } = await supabase
-    .from<definitions['users']>('users')
+    .from('users')
     .insert(
       {
         id: user.value?.id,

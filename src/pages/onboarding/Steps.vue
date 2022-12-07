@@ -90,7 +90,7 @@ const copyToast = async (text: string) => {
 const getKey = async (retry = true): Promise<void> => {
   isLoading.value = true
   const { data } = await supabase
-    .from<definitions['apikeys']>('apikeys')
+    .from('apikeys')
     .select()
     .eq('user_id', auth?.id).eq('mode', 'all')
   if (data)
@@ -106,7 +106,7 @@ watchEffect(async () => {
     // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from<definitions['apps']>(`apps:user_id=eq.${main.auth?.id}`)
+      .from(`apps:user_id=eq.${main.auth?.id}`)
       .on('INSERT', (payload) => {
         // console.log('Change received step 1!', payload)
         setLog()
@@ -121,7 +121,7 @@ watchEffect(async () => {
     // console.log('watch app change step 4')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from<definitions['app_versions']>(`app_versions:app_id=eq.${appId.value}`)
+      .from(`app_versions:app_id=eq.${appId.value}`)
       .on('INSERT', (payload) => {
         // console.log('Change received step 4!', payload)
         setLog()

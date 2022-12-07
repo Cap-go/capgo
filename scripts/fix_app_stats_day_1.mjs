@@ -46,7 +46,7 @@ const fix_apps = async () => {
 
   const { data } = await supabase
     .from('apps')
-    // .from<definitions['apps']>('apps')
+    // .from('apps')
     .select()
 
   if (!data || !data.length) {

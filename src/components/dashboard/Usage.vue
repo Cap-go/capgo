@@ -54,7 +54,7 @@ const getAppStats = async () => {
   if (props.appId) {
     // console.log('appID', props.appId)
     return supabase
-      .from<definitions['app_stats']>('app_stats')
+      .from('app_stats')
       .select()
       .eq('user_id', main.user?.id)
       .eq('app_id', props.appId)
@@ -62,7 +62,7 @@ const getAppStats = async () => {
   }
   else {
     return supabase
-      .from<definitions['app_stats']>('app_stats')
+      .from('app_stats')
       .select()
       .eq('user_id', main.user?.id)
       .like('date_id', `${date_id}%`)

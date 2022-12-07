@@ -1,5 +1,5 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
-import type { definitions } from './types_supabase.ts'
+import type { Database } from './supabase.types.ts'
 
 const DEFAULT_TOLERANCE = 300
 const EXPECTED_SCHEME = 'v1'
@@ -56,8 +56,8 @@ export const parseStripeEvent = (body: string, signature: string) => {
   return jsonPayload
 }
 
-export const extractDataEvent = (event: any): Partial<definitions['stripe_info']> => {
-  const data: Partial<definitions['stripe_info']> = {
+export const extractDataEvent = (event: any): Database['public']['Tables']['stripe_info']['Insert'] => {
+  const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',
     subscription_id: undefined,

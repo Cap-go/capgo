@@ -24,7 +24,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
   // get one channel or all channels
   if (body.channel) {
     const { data: dataChannel, error: dbError } = await supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .select(`
         id,
         created_at,
@@ -55,7 +55,7 @@ export const get = async (event: Request, apikey: definitions['apikeys']): Promi
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataChannels, error: dbError } = await supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .select(`
         id,
         created_at,
@@ -91,7 +91,7 @@ export const deleteChannel = async (event: Request, apikey: definitions['apikeys
   }
   try {
     const { error: dbError } = await supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .delete()
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
@@ -117,7 +117,7 @@ export const post = async (event: Request, apikey: definitions['apikeys']): Prom
   }
   if (body.version) {
     const { data, error: vError } = await supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', body.app_id)
       .eq('name', body.version)

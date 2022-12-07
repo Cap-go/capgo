@@ -16,7 +16,7 @@ serve(async (event: Request) => {
   }
   try {
     const { data: users } = await supabaseAdmin()
-      .from<definitions['users']>('users')
+      .from('users')
       .select()
 
     if (!users || !users.length)
@@ -24,7 +24,7 @@ serve(async (event: Request) => {
     const all = []
     for (const user of users) {
       all.push(supabaseAdmin()
-        .from<definitions['users']>('users')
+        .from('users')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', user.id))
     }

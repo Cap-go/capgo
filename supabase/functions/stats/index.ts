@@ -45,14 +45,14 @@ serve(async (event: Request) => {
 
     const stat: Partial<definitions['stats']> = {
       platform: platform as definitions['stats']['platform'],
-      device_id: device_id,
-      action: action,
-      app_id: app_id,
-      version_build: version_build,
+      device_id,
+      action,
+      app_id,
+      version_build,
     }
     const all = []
     const { data, error } = await supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', app_id)
       .eq('name', version_name || 'unknown')
@@ -62,20 +62,20 @@ serve(async (event: Request) => {
       device.version = data.id
       if (!device.is_emulator && device.is_prod) {
         const { data: deviceData, error: deviceError } = await supabaseAdmin()
-          .from<definitions['devices']>(deviceDb)
+          .from(deviceDb)
           .select()
           .eq('app_id', app_id)
           .eq('device_id', device_id)
           .single()
         if (deviceData && !deviceError) {
           all.push(updateVersionStats({
-            app_id: app_id,
+            app_id,
             version_id: deviceData.version,
             devices: -1,
           }))
         }
         all.push(updateVersionStats({
-          app_id: app_id,
+          app_id,
           version_id: data.id,
           devices: 1,
         }))

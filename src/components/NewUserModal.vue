@@ -71,7 +71,7 @@ const submit = async () => {
       redirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/set_password`,
     })
     const { error: userTableError } = await supabase
-      .from<definitions['users']>('users')
+      .from('users')
       .insert(
         {
           id: user?.id,

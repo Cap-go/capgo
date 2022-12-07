@@ -86,7 +86,7 @@ const getDevices = async () => {
     return
   try {
     const { data: dataDevices } = await supabase
-      .from<definitions['channel_devices']>('channel_devices')
+      .from('channel_devices')
       .select()
       .eq('channel_id', id.value)
       .eq('app_id', channel.value.version.app_id)
@@ -213,7 +213,7 @@ const addUser = async () => {
   }
 
   const { error } = await supabase
-    .from<definitions['channel_users']>('channel_users')
+    .from('channel_users')
     .insert({
       channel_id: id.value,
       app_id: channel.value.version.app_id,
@@ -244,7 +244,7 @@ const makeDefault = async (val = true) => {
           if (!channel.value || !id.value)
             return
           const { error } = await supabase
-            .from<definitions['channels']>('channels')
+            .from('channels')
             .update({ public: val })
             .eq('id', id.value)
           if (error) {
@@ -288,7 +288,7 @@ const deleteUser = async (usr: definitions['users']) => {
   if (!channel.value || await didCancel(t('channel.user')))
     return
   const { error } = await supabase
-    .from<definitions['channel_users']>('channel_users')
+    .from('channel_users')
     .delete()
     .eq('app_id', channel.value.version.app_id)
     .eq('user_id', usr.id)
@@ -336,7 +336,7 @@ const deleteDevice = async (device: definitions['channel_devices']) => {
     return
   try {
     const { error: delDevError } = await supabase
-      .from<definitions['channel_devices']>('channel_devices')
+      .from('channel_devices')
       .delete()
       .eq('app_id', device.app_id)
       .eq('device_id', device.device_id)
@@ -369,7 +369,7 @@ const deleteDevice = async (device: definitions['channel_devices']) => {
 }
 const inviteUser = async (userId: string) => {
   const { error } = await supabase
-    .from<definitions['channel_users']>('channel_users')
+    .from('channel_users')
     .insert({
       channel_id: id.value,
       created_by: auth?.id,

@@ -31,7 +31,7 @@ serve(async (event: Request) => {
       return sendRes({ status: 'not authorize' }, 400)
     // get user from users
     const { data: user, error: dbError } = await supabaseAdmin()
-      .from<definitions['users']>('users')
+      .from('users')
       .select()
       .eq('id', auth.id)
       .single()

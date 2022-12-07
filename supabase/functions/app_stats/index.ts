@@ -1,8 +1,8 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { AppStatsIncrement } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
 const allDayOfMonth = () => {
   const lastDay = new Date(new Date().getFullYear(), 10, 0).getDate()
@@ -20,21 +20,21 @@ const getApp = (userId: string, appId: string) => {
   // console.log('req', req)
   return {
     mlu: supabaseAdmin()
-      .from<definitions['stats']>('stats')
+      .from('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'get'),
     mlu_real: supabaseAdmin()
-      .from<definitions['stats']>('stats')
+      .from('stats')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .lte('created_at', lastDay.toISOString())
       .gte('created_at', firstDay.toISOString())
       .eq('action', 'set'),
     devices: supabaseAdmin()
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .eq('is_emulator', false)
@@ -43,28 +43,28 @@ const getApp = (userId: string, appId: string) => {
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
     devicesTT: supabaseAdmin()
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .select('*', { count: 'exact', head: true })
       .eq('app_id', appId)
       .eq('date_id', month_id)
       .lte('updated_at', lastDay.toISOString())
       .gte('updated_at', firstDay.toISOString()),
     bandwidth: supabaseAdmin()
-      .from<definitions['app_stats']>('app_stats')
+      .from('app_stats')
       .select()
       .eq('app_id', appId)
       .in('date_id', allDayOfMonth()),
     versions: supabaseAdmin()
-      .from<definitions['app_versions_meta']>('app_versions_meta')
+      .from('app_versions_meta')
       .select()
       .eq('app_id', appId)
       .eq('user_id', userId),
     shared: supabaseAdmin()
-      .from<definitions['channel_users']>('channel_users')
+      .from('channel_users')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
     channels: supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', appId),
   }
@@ -82,7 +82,7 @@ serve(async (event: Request) => {
   }
   try {
     const { data: apps } = await supabaseAdmin()
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .select()
     if (!apps || !apps.length)
       return sendRes({ status: 'error', message: 'no apps' })
@@ -118,7 +118,7 @@ serve(async (event: Request) => {
             }
             all.push(updateOrAppStats(increment, today_id, app.user_id))
           }
-          const newData: definitions['app_stats'] = {
+          const newData: Database['public']['Tables']['app_stats']['Insert'] = {
             app_id: app.app_id,
             date_id: month_id,
             user_id: app.user_id,
@@ -134,7 +134,7 @@ serve(async (event: Request) => {
           }
           // console.log('newData', newData)
           return supabaseAdmin()
-            .from<definitions['app_stats']>('app_stats')
+            .from('app_stats')
             .upsert(newData)
         }))
     }

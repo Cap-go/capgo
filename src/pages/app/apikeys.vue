@@ -30,7 +30,7 @@ const openLink = (link: string) => {
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true
   const { data } = await supabase
-    .from<definitions['apikeys']>('apikeys')
+    .from('apikeys')
     .select()
     .eq('user_id', auth?.id)
   if (data && data.length)

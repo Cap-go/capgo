@@ -47,7 +47,7 @@ const getStats = (): GlobalStats => {
         console.log('count_all_updates', res.error)
       return res.data || 0
     }),
-    users: supabaseAdmin().from<definitions['users']>('users')
+    users: supabaseAdmin().from('users')
       .select().then(async (res) => {
         if (res.error || !res.data) {
           console.log('get users', res.error)
@@ -207,7 +207,7 @@ serve(async (event: Request) => {
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
-    const details = {...users}
+    const details = { ...users }
     details.plans = undefined as any
     const newData: definitions['global_stats'] = {
       date_id,
@@ -218,7 +218,7 @@ serve(async (event: Request) => {
     }
     // console.log('newData', newData)
     const { error } = await supabaseAdmin()
-      .from<definitions['global_stats']>('global_stats')
+      .from('global_stats')
       .upsert(newData)
     console.log('error', error)
     return sendRes()

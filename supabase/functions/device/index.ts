@@ -62,7 +62,7 @@ const get = async (event: Request, apikey: definitions['apikeys']): Promise<Resp
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataDevices, error: dbError } = await supabaseAdmin()
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .select(`
           created_at,
           updated_at,
@@ -103,7 +103,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   }
   // find device
   const { data: dataDevice, error: dbError } = await supabaseAdmin()
-    .from<definitions['devices']>('devices')
+    .from('devices')
     .select()
     .eq('app_id', body.app_id)
     .eq('device_id', body.device_id)
@@ -118,7 +118,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   // if version_id set device_override to it
   if (body.version_id) {
     const { data: dataVersion, error: dbError } = await supabaseAdmin()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', body.app_id)
       .eq('name', body.version_id)
@@ -128,7 +128,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       return sendRes({ status: 'Cannot find version', error: dbError }, 400)
     }
     const { data: dataDev, error: dbErrorDev } = await supabaseAdmin()
-      .from<definitions['devices_override']>('devices_override')
+      .from('devices_override')
       .upsert({
         device_id: body.device_id,
         version: dataVersion.id,
@@ -144,7 +144,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
   if (body.channel) {
     // get channel by name
     const { data: dataChannel, error: dbError } = await supabaseAdmin()
-      .from<definitions['channels']>('channels')
+      .from('channels')
       .select()
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
@@ -154,7 +154,7 @@ const post = async (event: Request, apikey: definitions['apikeys']): Promise<Res
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
     }
     const { data: dataChannelDev, error: dbErrorDev } = await supabaseAdmin()
-      .from<definitions['channel_devices']>('channel_devices')
+      .from('channel_devices')
       .upsert({
         device_id: body.device_id,
         channel_id: dataChannel.id,
@@ -178,7 +178,7 @@ export const deleteOverride = async (event: Request, apikey: definitions['apikey
   }
   try {
     const { error } = await supabaseAdmin()
-      .from<definitions['devices_override']>('devices_override')
+      .from('devices_override')
       .delete()
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id)
@@ -187,7 +187,7 @@ export const deleteOverride = async (event: Request, apikey: definitions['apikey
       return sendRes({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
     }
     const { error: errorChannel } = await supabaseAdmin()
-      .from<definitions['channel_devices']>('channel_devices')
+      .from('channel_devices')
       .delete()
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id)

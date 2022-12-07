@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
 import { createCustomer } from '../_utils/stripe.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 
 const supabaseUrl = 'https://***.supabase.co'
 const supabaseAnonKey = '***'
@@ -17,7 +16,7 @@ const useSupabase = () => {
 // get all users from supabase
 const initCustomers = async () => {
   const { data: users } = await useSupabase()
-    .from<definitions['users']>('users')
+    .from('users')
     .select()
   if (!users) {
     console.log('No users found')
@@ -27,7 +26,7 @@ const initCustomers = async () => {
   for (const user of users) {
     const customer = await createCustomer(user.email)
     const { error: dbStripeError } = await useSupabase()
-      .from<definitions['stripe_info']>('stripe_info')
+      .from('stripe_info')
       .insert({
         customer_id: customer.id,
       })
@@ -36,7 +35,7 @@ const initCustomers = async () => {
       return
     }
     const { error: dbError } = await useSupabase()
-      .from<definitions['users']>('users')
+      .from('users')
       .update({
         customer_id: customer.id,
       })

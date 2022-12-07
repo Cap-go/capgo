@@ -2,13 +2,12 @@ import { parseCronExpression } from 'https://cdn.skypack.dev/cron-schedule@3.0.6
 import dayjs from 'https://cdn.skypack.dev/dayjs'
 import { addEventPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
-import type { definitions } from './types_supabase.ts'
 
 const sendNow = async (eventName: string, email: string, userId: string, color: string) => {
   console.log('send notif', eventName, email)
   await addEventPerson(email, {}, eventName, color)
   await supabaseAdmin()
-    .from<definitions['notifications']>('notifications')
+    .from('notifications')
     .insert({
       id: eventName,
       user_id: userId,
@@ -33,7 +32,7 @@ const isSendable = (last: string, cron: string) => {
 
 export const sendNotif = async (eventName: string, userId: string, cron: string, color: string) => {
   const { data: user } = await supabaseAdmin()
-    .from<definitions['users']>('users')
+    .from('users')
     .select()
     .eq('id', userId)
     .single()
@@ -48,7 +47,7 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
   }
   // check if notif has already been send in notifications table
   const { data: notif } = await supabaseAdmin()
-    .from<definitions['notifications']>('notifications')
+    .from('notifications')
     .select()
     .eq('user_id', userId)
     .eq('id', eventName)
