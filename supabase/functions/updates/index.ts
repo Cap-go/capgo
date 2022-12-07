@@ -48,13 +48,15 @@ serve(async (event: Request) => {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
-    if (coerce)
+    if (coerce) {
       version_build = coerce.version
-    else
-      return sendRes({ 
+    }
+    else {
+      return sendRes({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
       }, 400)
+    }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       console.log('Cannot get all vars', platform,
@@ -65,7 +67,7 @@ serve(async (event: Request) => {
         is_emulator,
         is_prod,
         version_name)
-      return sendRes({ 
+      return sendRes({
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
       }, 400)

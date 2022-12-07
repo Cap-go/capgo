@@ -1,5 +1,5 @@
 import { parseCronExpression } from 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts'
-import dayjs from 'https://cdn.skypack.dev/dayjs'
+import dayjs from 'https://cdn.skypack.dev/dayjs@1.11.6?dts'
 import { addEventPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { definitions } from './types_supabase.ts'
