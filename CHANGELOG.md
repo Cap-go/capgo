@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.58.21](https://github.com/Cap-go/capgo/compare/1.58.20...1.58.21) (2022-12-07)
+
+
+### Bug Fixes
+
+* updateOr functions ([e04a2cb](https://github.com/Cap-go/capgo/commit/e04a2cb213dee4ed9e1ed645e952b5324c1aba0f))
+
+### [1.58.20](https://github.com/Cap-go/capgo/compare/1.58.19...1.58.20) (2022-12-07)
+
+
+### Bug Fixes
+
+* banner design ([20447a5](https://github.com/Cap-go/capgo/commit/20447a51a16086452ca6c021d9dfa4e4bc1e9cdb))
+
+### [1.58.19](https://github.com/Cap-go/capgo/compare/1.58.18...1.58.19) (2022-12-07)
+
+
+### Bug Fixes
+
+* dayjs issue ([913b551](https://github.com/Cap-go/capgo/commit/913b551bc5b8f849217c50b21bef2a8f5fa239d7))
+
+### [1.58.18](https://github.com/Cap-go/capgo/compare/1.58.17...1.58.18) (2022-12-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency chart.js to v4 ([6f6266b](https://github.com/Cap-go/capgo/commit/6f6266b7399f8f29e269738d487feee41359a218))
+
+### [1.58.17](https://github.com/Cap-go/capgo/compare/1.58.16...1.58.17) (2022-12-06)
+
+
+### Bug Fixes
+
+* channel use single ([be9b7c7](https://github.com/Cap-go/capgo/commit/be9b7c7b18cfbe59f7c44e30793d7db7389edc0f))
+* npx command ([1f4198c](https://github.com/Cap-go/capgo/commit/1f4198cc294e6f6d1e690539feaf2302632b1130))
+
 ### [1.58.16](https://github.com/Cap-go/capgo/compare/1.58.15...1.58.16) (2022-12-06)
 
 
