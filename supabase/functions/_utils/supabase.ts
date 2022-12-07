@@ -35,12 +35,13 @@ export const supabaseAdmin = () => createClient(
 
 export const updateOrCreateVersion = async (update: Partial<definitions['app_versions']>) => {
   console.log('updateOrCreateVersion', update)
-  const { data, error } = await supabaseAdmin()
+  const { data } = await supabaseAdmin()
     .from<definitions['app_versions']>('app_versions')
     .select()
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-  if (data && data.length && !error) {
+    .single()
+  if (data) {
     console.log('update Version')
     update.deleted = false
     return supabaseAdmin()
@@ -69,7 +70,6 @@ export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: st
     .select()
     .eq('app_id', increment.app_id)
     .eq('date_id', date_id)
-    .single()
   console.log('updateOrAppStats', increment)
   if (dataAppStats) {
     const { error } = await supabaseAdmin()
@@ -139,12 +139,13 @@ export const checkAppOwner = async (userId: string | undefined, appId: string | 
 
 export const updateOrCreateDevice = async (update: Partial<definitions['devices']>) => {
   console.log('updateOrCreateDevice', update)
-  const { data, error } = await supabaseAdmin()
+  const { data } = await supabaseAdmin()
     .from<definitions['devices']>('devices')
     .select()
     .eq('app_id', update.app_id)
     .eq('device_id', update.device_id)
-  if (!data || !data.length || error) {
+    .single()
+  if (!data) {
     return supabaseAdmin()
       .from<definitions['devices']>('devices')
       .insert(update)
