@@ -78,9 +78,9 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    console.log('body')
     const body = (await event.json()) as { record: Database['public']['Tables']['app_stats']['Row'] }
     const app = body.record
+    console.log('body', app)
     // explore all apps
     const month_id = new Date().toISOString().slice(0, 7)
 
