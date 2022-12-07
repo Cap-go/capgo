@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://***.supabase.co'
 const supabaseAnonKey = '***'
-
 export const useSupabase = () => {
   const options = {
     // const options: SupabaseClientOptions = {
@@ -22,6 +21,7 @@ const fix_apps = async () => {
   const { data } = await supabase
     .from('app_versions')
     .select()
+    .eq('app_id', 'com.x_b_e.client')
     .eq('deleted', true)
 
   if (!data || !data.length) {
@@ -29,16 +29,20 @@ const fix_apps = async () => {
     return
   }
 
+  const all = []
   for (const version of data) {
-    console.log('versions', version.app_id)
-    await supabase
-      .from('app_version_meta')
+    all.push(supabase
+      .from('app_versions_meta')
       // .from('app_versions')
       .update({ size: 0 })
       .eq('app_id', version.app_id)
-      .eq('version_id', version.id)
-      .single()
+      .eq('id', version.id).then((res) => {
+        console.log('versions', version.app_id, version.id)
+        if (res?.error?.message)
+          console.log('res', res)
+      }))
   }
+  await Promise.all(all)
 }
 
 fix_apps()
