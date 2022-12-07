@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.59.2](https://github.com/Cap-go/capgo/compare/1.59.1...1.59.2) (2022-12-07)
+
+
+### Bug Fixes
+
+* spoof system supabase 2 ([affb574](https://github.com/Cap-go/capgo/commit/affb5747e50dd357bb9be35388820fe104bc99e1))
+
 ### [1.59.1](https://github.com/Cap-go/capgo/compare/1.59.0...1.59.1) (2022-12-07)
 
 
