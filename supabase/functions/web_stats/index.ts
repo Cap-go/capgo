@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { insights } from '../_utils/_logsnag.ts'
 
@@ -25,10 +25,6 @@ interface GlobalStats {
   users: PromiseLike<UserStats>
 }
 
-interface StripePlan {
-  product_id: definitions['plans']
-}
-
 const getGithubStars = async (): Promise<number> => {
   const res = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater')
   const json = await res.json()
@@ -37,12 +33,12 @@ const getGithubStars = async (): Promise<number> => {
 
 const getStats = (): GlobalStats => {
   return {
-    apps: supabaseAdmin().rpc<number>('count_all_apps', {}).single().then((res) => {
+    apps: supabaseAdmin().rpc('count_all_apps', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_apps', res.error)
       return res.data || 0
     }),
-    updates: supabaseAdmin().rpc<number>('count_all_updates', {}).single().then((res) => {
+    updates: supabaseAdmin().rpc('count_all_updates', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_updates', res.error)
       return res.data || 0
@@ -88,6 +84,7 @@ const getStats = (): GlobalStats => {
               customer_id,
               status,
               product_id (
+                id,
                 name
               )
             `)
@@ -96,25 +93,26 @@ const getStats = (): GlobalStats => {
             .then((res) => {
               if (res.error)
                 console.error('stripe_info error', res.error)
-              if (!res.body)
+              if (!res.data)
                 console.error('stripe_info no body', user.customer_id)
-              const name = res.body?.product_id.name as keyof typeof data.plans
-              console.log('stripe_info name', name, res.body?.status, res.data)
+              const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
+              const name = product.name as keyof typeof data.plans
+              console.log('stripe_info name', name, res.data?.status, res.data)
               if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
-                data.plans[name] += res.body?.status === 'succeeded' || name === 'Free' ? 1 : 0
+                data.plans[name] += res.data?.status === 'succeeded' || name === 'Free' ? 1 : 0
             }))
           all.push(supabaseAdmin()
-            .rpc<boolean>('is_trial', { userid: user.id })
+            .rpc('is_trial', { userid: user.id })
             .single().then((res) => {
               data.trial += res.data ? 1 : 0
             }))
           all.push(supabaseAdmin()
-            .rpc<boolean>('is_good_plan_v2', { userid: user.id })
+            .rpc('is_good_plan_v2', { userid: user.id })
             .single().then((res) => {
               data.need_upgrade += res.data ? 0 : 1
             }))
           all.push(supabaseAdmin()
-            .rpc<boolean>('is_paying', { userid: user.id })
+            .rpc('is_paying', { userid: user.id })
             .single().then((res) => {
               data.paying += res.data ? 1 : 0
               data.not_paying += res.data ? 0 : 1
@@ -209,7 +207,7 @@ serve(async (event: Request) => {
     const date_id = new Date().toISOString().slice(0, 10)
     const details = { ...users }
     details.plans = undefined as any
-    const newData: definitions['global_stats'] = {
+    const newData: Database['public']['Tables']['global_stats']['Insert'] = {
       date_id,
       apps,
       updates,
