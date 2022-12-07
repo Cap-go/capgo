@@ -1,8 +1,7 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
-import type { AppStatsIncrement } from '../_utils/supabase.ts'
+import type { AppStatsIncrement, UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-
 import { sendRes } from '../_utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
@@ -15,10 +14,23 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    const body = (await event.json()) as { record: Database['public']['Tables']['app_versions']['Row'] }
-    console.log('body', body)
+    const table: keyof Database['public']['Tables'] = 'app_versions'
+    const body = (await event.json()) as UpdatePayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'UPDATE') {
+      console.log('Not UPDATE')
+      return sendRes({ message: 'Not UPDATE' }, 200)
+    }
     const record = body.record
+    console.log('record', record)
 
+    if (!record.app_id || !record.user_id) {
+      console.log('no app_id or user_id')
+      return sendRes()
+    }
     if (!record.bucket_id) {
       console.log('no bucket_id')
       return sendRes()

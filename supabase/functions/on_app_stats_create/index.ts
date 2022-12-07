@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.165.0/http/server.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
-import type { AppStatsIncrement } from '../_utils/supabase.ts'
+import type { AppStatsIncrement, InsertPayload } from '../_utils/supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import type { Database } from './../_utils/supabase.types.ts'
 
@@ -78,13 +78,22 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    const body = (await event.json()) as { record: Database['public']['Tables']['app_stats']['Row'] }
-    const app = body.record
-    console.log('body', app)
+    const table: keyof Database['public']['Tables'] = 'app_stats'
+    const body = (await event.json()) as InsertPayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'INSERT') {
+      console.log('Not INSERT')
+      return sendRes({ message: 'Not INSERT' }, 200)
+    }
+    const record = body.record
+    console.log('record', record)
     // explore all apps
     const month_id = new Date().toISOString().slice(0, 7)
 
-    if (app.date_id === month_id) {
+    if (record.date_id === month_id) {
       console.log('Already updated')
       return sendRes({ message: 'Already updated' }, 200)
     }
@@ -92,7 +101,7 @@ serve(async (event: Request) => {
     const { data: monthData } = await supabaseAdmin()
       .from('app_stats')
       .select('id')
-      .eq('app_id', app.app_id)
+      .eq('app_id', record.app_id)
       .eq('date_id', month_id)
       .single()
     if (monthData) {
@@ -101,8 +110,8 @@ serve(async (event: Request) => {
     }
 
     const all = []
-    const res = getApp(app.user_id, app.app_id)
-    all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.devicesTT, res.bandwidth])
+    const res = getApp(record.user_id, record.app_id)
+    all.push(Promise.all([record, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.devicesTT, res.bandwidth])
       .then(([app, mlu, mlu_real, versions, shared, channels, devices, devicesTT, bandwidth]) => {
         // console.log('app', app.app_id, devices, versions, shared, channels)
         // check if today is first day of the month

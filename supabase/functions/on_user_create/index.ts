@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { addDataPerson, addEventPerson, postPerson } from '../_utils/crisp.ts'
 import { createCustomer } from '../_utils/stripe.ts'
+import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -16,9 +17,18 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
-    const body = (await event.json()) as { record: Database['public']['Tables']['users']['Row'] }
+    const table: keyof Database['public']['Tables'] = 'users'
+    const body = (await event.json()) as InsertPayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'INSERT') {
+      console.log('Not INSERT')
+      return sendRes({ message: 'Not INSERT' }, 200)
+    }
     const record = body.record
+    console.log('record', record)
     await supabaseAdmin()
       .from('apikeys')
       .insert([

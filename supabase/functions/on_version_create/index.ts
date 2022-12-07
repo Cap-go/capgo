@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
-import type { AppStatsIncrement } from '../_utils/supabase.ts'
+import type { AppStatsIncrement, InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -15,9 +15,18 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
-    const body = (await event.json()) as { record: Database['public']['Tables']['app_versions']['Row'] }
+    const table: keyof Database['public']['Tables'] = 'app_versions'
+    const body = (await event.json()) as InsertPayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'INSERT') {
+      console.log('Not INSERT')
+      return sendRes({ message: 'Not INSERT' }, 200)
+    }
     const record = body.record
+    console.log('record', record)
 
     await supabaseAdmin()
       .from('apps')

@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.165.0/http/server.ts'
+import type { UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import type { Database } from './../_utils/supabase.types.ts'
@@ -77,26 +78,40 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
   }
   try {
-    const body = (await event.json()) as { record: Database['public']['Tables']['app_stats']['Row'] }
-    const app = body.record
-    console.log('body', app)
+    const table: keyof Database['public']['Tables'] = 'app_stats'
+    const body = (await event.json()) as UpdatePayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'UPDATE') {
+      console.log('Not UPDATE')
+      return sendRes({ message: 'Not UPDATE' }, 200)
+    }
+    const record = body.record
+    console.log('record', record)
     const month_id = new Date().toISOString().slice(0, 7)
 
-    if (app.date_id === month_id)
+    if (record.date_id === month_id)
       return sendRes({ message: 'Already updated' }, 200)
 
     const all = []
-    const res = getApp(app.user_id, app.app_id)
-    all.push(Promise.all([app, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.devicesTT, res.bandwidth])
+    if (!record.user_id || !record.app_id) {
+      console.log('No user_id or app_id')
+      return sendRes({ message: 'No user_id or app_id' }, 200)
+    }
+
+    const res = getApp(record.user_id, record.app_id)
+    all.push(Promise.all([record, res.mlu, res.mlu_real, res.versions, res.shared, res.channels, res.devices, res.devicesTT, res.bandwidth])
       .then(([app, mlu, mlu_real, versions, shared, channels, devices, devicesTT, bandwidth]) => {
         // console.log('app', app.app_id, devices, versions, shared, channels)
         // check if today is first day of the month
         const versionSize = versions.data?.reduce((acc, cur) => acc + (cur.size || 0), 0) || 0
         const bandwidthTotal = bandwidth.data?.reduce((acc, cur) => acc + (cur.bandwidth || 0), 0) || 0
         const newData: Database['public']['Tables']['app_stats']['Insert'] = {
-          app_id: app.app_id,
+          app_id: app.app_id || '',
           date_id: month_id,
-          user_id: app.user_id,
+          user_id: app.user_id || '',
           channels: channels.count || 0,
           mlu: mlu.count || 0,
           mlu_real: mlu_real.count || 0,

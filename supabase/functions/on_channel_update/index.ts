@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import type { UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendRes } from '../_utils/utils.ts'
@@ -13,9 +14,18 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
-    const body = (await event.json()) as { record: Database['public']['Tables']['channels']['Row'] }
+    const table: keyof Database['public']['Tables'] = 'channels'
+    const body = (await event.json()) as UpdatePayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'UPDATE') {
+      console.log('Not UPDATE')
+      return sendRes({ message: 'Not UPDATE' }, 200)
+    }
     const record = body.record
+    console.log('record', record)
 
     if (record.public) {
       // find all other channels with same app_i with public true and update them to false

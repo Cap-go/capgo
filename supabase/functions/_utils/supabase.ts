@@ -2,6 +2,27 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import type { Database } from './supabase.types.ts'
 // Import Supabase client
 
+export interface InsertPayload<T extends keyof Database['public']['Tables']> {
+  type: 'INSERT'
+  table: string
+  schema: string
+  record: Database['public']['Tables'][T]['Insert']
+  old_record: null
+}
+export interface UpdatePayload<T extends keyof Database['public']['Tables']> {
+  type: 'UPDATE'
+  table: string
+  schema: string
+  record: Database['public']['Tables'][T]['Update']
+  old_record: Database['public']['Tables'][T]['Row']
+}
+export interface DeletePayload<T extends keyof Database['public']['Tables']> {
+  type: 'DELETE'
+  table: string
+  schema: string
+  record: null
+  old_record: Database['public']['Tables'][T]['Row']
+}
 export interface AppStatsIncrement {
   app_id: string
   date_id: string

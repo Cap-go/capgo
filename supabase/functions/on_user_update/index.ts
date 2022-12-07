@@ -4,6 +4,7 @@ import { updatePerson } from '../_utils/crisp.ts'
 import type { Person } from '../_utils/crisp.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { createCustomer } from '../_utils/stripe.ts'
+import type { UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
@@ -17,9 +18,27 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
   }
   try {
-    console.log('body')
-    const body = (await event.json()) as { record: Database['public']['Tables']['users']['Row'] }
+    const table: keyof Database['public']['Tables'] = 'users'
+    const body = (await event.json()) as UpdatePayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'UPDATE') {
+      console.log('Not UPDATE')
+      return sendRes({ message: 'Not UPDATE' }, 200)
+    }
     const record = body.record
+    console.log('record', record)
+    if (!record.email) {
+      console.log('No email')
+      return sendRes()
+    }
+    if (!record.id) {
+      console.log('No id')
+      return sendRes()
+    }
+
     console.log('updatePerson crisp')
     const person: Person = {
       nickname: `${record.first_name} ${record.last_name}`,
