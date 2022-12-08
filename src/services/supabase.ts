@@ -53,6 +53,7 @@ export const spoofUser = () => {
   return data.user.id
 }
 export const deleteSupabaseToken = () => localStorage.removeItem(`sb-${supbaseId}-auth-token`)
+export const getSupabaseToken = () => localStorage.getItem(`sb-${supbaseId}-auth-token`)
 export const unspoofUser = () => {
   const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
   if (!textData || !isSpoofed())

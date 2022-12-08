@@ -24,7 +24,7 @@ const openBlank = (link: string) => {
 export const openPortal = async () => {
 //   console.log('openPortal')
   const supabase = useSupabase()
-  const session = supabase.auth.session()
+  const session = await supabase.auth.getSession()
   if (!session)
     return
   const loading = await loadingController.create({
@@ -32,7 +32,9 @@ export const openPortal = async () => {
   })
   try {
     await loading.present()
-    const resp = await supabase.functions.invoke('stripe_portal', {})
+    const resp = await supabase.functions.invoke('stripe_portal', {
+      body: JSON.stringify({ callbackUrl: window.location.href }),
+    })
     console.error('stripe_portal', resp)
     await loading.dismiss()
     if (!resp.error && resp.data && resp.data.url) {
@@ -63,7 +65,7 @@ export const openPortal = async () => {
 export const openCheckout = async (priceId: string, successUrl: string, cancelUrl: string) => {
 //   console.log('openCheckout')
   const supabase = useSupabase()
-  const session = supabase.auth.session()
+  const session = await supabase.auth.getSession()
   if (!session)
     return
   const loading = await loadingController.create({
