@@ -52,7 +52,7 @@ export const spoofUser = () => {
   localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
   return data.user.id
 }
-
+export const deleteSupabaseToken = () => localStorage.removeItem(`sb-${supbaseId}-auth-token`)
 export const unspoofUser = () => {
   const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
   if (!textData || !isSpoofed())
