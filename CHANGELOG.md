@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.60.7](https://github.com/Cap-go/capgo/compare/1.60.6...1.60.7) (2022-12-08)
+
+
+### Bug Fixes
+
+* add missing function ([6e860e5](https://github.com/Cap-go/capgo/commit/6e860e5c3c527049a26cf46209e5a6ba39079ca1))
+* remove spoof when logout ([b2613a6](https://github.com/Cap-go/capgo/commit/b2613a66161f382db31fc0ceb941fe8e7c03d8fd))
+
 ### [1.60.6](https://github.com/Cap-go/capgo/compare/1.60.5...1.60.6) (2022-12-08)
 
 
