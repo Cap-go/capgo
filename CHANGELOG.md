@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.60.9](https://github.com/Cap-go/capgo/compare/1.60.8...1.60.9) (2022-12-08)
+
+
+### Bug Fixes
+
+* deno versions ([26f8ec9](https://github.com/Cap-go/capgo/commit/26f8ec937bfb8461323b2999a79a8e35aa446f13))
+* forgot password page ([ffed6d1](https://github.com/Cap-go/capgo/commit/ffed6d109bef3a78ad81558563dd55f4ce219efb))
+* i18n register and forgot ([ee99627](https://github.com/Cap-go/capgo/commit/ee9962757a8ee0a03744c24fddbc24c35799e71b))
+* unspoof user ([16447ac](https://github.com/Cap-go/capgo/commit/16447ac52e2d209e91a649e1350ea40055a73135))
+
 ### [1.60.8](https://github.com/Cap-go/capgo/compare/1.60.7...1.60.8) (2022-12-08)
 
 
