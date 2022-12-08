@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.1](https://github.com/Cap-go/capgo/compare/1.61.0...1.61.1) (2022-12-08)
+
+
+### Bug Fixes
+
+* billing portal ([e0996cf](https://github.com/Cap-go/capgo/commit/e0996cf09b447ad7d28f0c21222d420d214dc870))
+
 ## [1.61.0](https://github.com/Cap-go/capgo/compare/1.60.9...1.61.0) (2022-12-08)
 
 
