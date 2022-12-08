@@ -26,11 +26,11 @@ export const useMainStore = defineStore('main', () => {
         if (event === 'SIGNED_OUT') {
           auth.value = undefined
           user.value = undefined
-          unspoofUser()
           reset()
           resolve()
         }
       })
+      unspoofUser()
       // deleteSupabaseToken()
       setTimeout(() => {
         supabase.auth.signOut()
