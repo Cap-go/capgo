@@ -114,7 +114,7 @@ const post = async (event: Request): Promise<Response> => {
       .single()
     if (dbError || !dataChannel) {
       console.log('Cannot find channel', dbError)
-      return sendRes({ message: `Cannot find channel ${dbError}`, error: 'channel_not_found' }, 400)
+      return sendRes({ message: `Cannot find channel ${JSON.stringify(dbError)}`, error: 'channel_not_found' }, 400)
     }
     const { error: dbErrorDev } = await supabaseAdmin()
       .from('channel_devices')
@@ -126,7 +126,7 @@ const post = async (event: Request): Promise<Response> => {
       })
     if (dbErrorDev) {
       console.log('Cannot do channel override', dataChannel, dbErrorDev)
-      return sendRes({ message: `Cannot do channel override ${dbErrorDev}`, error: 'override_not_allowed' }, 400)
+      return sendRes({ message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`, error: 'override_not_allowed' }, 400)
     }
   }
   const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
@@ -194,7 +194,7 @@ const put = async (event: Request): Promise<Response> => {
   }
   if (errorChannel) {
     return sendRes({
-      message: `Cannot find channel ${errorChannel}`,
+      message: `Cannot find channel ${JSON.stringify(errorChannel)}`,
       error: 'channel_not_found',
     }, 400)
   }
