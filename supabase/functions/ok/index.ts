@@ -4,17 +4,18 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 
 serve(async (event: Request) => {
   const url = new URL(event.url)
-  console.log('url', url, url.searchParams.get('service'))
-  if (url.searchParams.get('service') === 'database') {
+  const service = url.searchParams.get('service')
+  console.log('service', service)
+  if (service === 'database') {
     const { data, error } = await supabaseAdmin()
       .from('apps')
       .select()
       .eq('app_id', 'unknow.unknow')
       .single()
     if (data && !error)
-      return sendRes({ status: 'ok', service: 'database' })
-    console.log('db not answering as expected', error)
-    return sendRes({ error: 'db not answering as expected' }, 500)
+      return sendRes({ status: 'ok', service })
+    console.error('db not answering as expected', error)
+    return sendRes({ error: 'db not answering as expected', service }, 500)
   }
   return sendRes()
 })
