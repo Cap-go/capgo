@@ -9,14 +9,14 @@ import { useRoute } from 'vue-router'
 import Sidebar from '../../../components/Sidebar.vue'
 import Navbar from '../../../components/Navbar.vue'
 import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
-import { saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
+import { isSpoofed, saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
 
 const route = useRoute()
 const form = reactive({
   uuid: '',
 })
 const isLoading = ref(false)
-const oldId = ref('')
+const oldId = ref(isSpoofed())
 const sidebarOpen = ref(false)
 const rules = computed(() => ({
   uuid: { required },
