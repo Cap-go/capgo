@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.60.6](https://github.com/Cap-go/capgo/compare/1.60.5...1.60.6) (2022-12-08)
+
+
+### Bug Fixes
+
+* isSpoofed for reset button ([e947ea5](https://github.com/Cap-go/capgo/commit/e947ea5933d1a064b80cc3c866b11d348f2e22e9))
+
 ### [1.60.5](https://github.com/Cap-go/capgo/compare/1.60.4...1.60.5) (2022-12-08)
 
 
