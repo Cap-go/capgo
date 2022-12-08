@@ -216,7 +216,7 @@ const put = async (event: Request): Promise<Response> => {
   }
   return sendRes({
     message: 'Cannot find channel',
-    error: 'no_channel',
+    error: 'channel_not_found',
   }, 400)
 }
 
