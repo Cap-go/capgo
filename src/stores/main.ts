@@ -1,6 +1,10 @@
 import type { User } from '@supabase/supabase-js'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
+import {
+  // deleteSupabaseToken,
+  unspoofUser,
+} from './../services/supabase'
 import { useSupabase } from '~/services/supabase'
 import { reset } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
@@ -22,11 +26,12 @@ export const useMainStore = defineStore('main', () => {
         if (event === 'SIGNED_OUT') {
           auth.value = undefined
           user.value = undefined
+          unspoofUser()
           reset()
           resolve()
         }
       })
-      localStorage.removeItem('supabase.auth.token')
+      // deleteSupabaseToken()
       setTimeout(() => {
         supabase.auth.signOut()
       }, 300)
