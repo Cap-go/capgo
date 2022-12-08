@@ -73,6 +73,7 @@ apikeys:
   updater: trình cập nhật tụ điện
 app-id-example: Ví dụ về ID ứng dụng
 available-in-the-san: Có sẵn trong ứng dụng sandbox
+back-to-login-page: Quay lại trang đăng nhập
 bigger-app-size: Kích thước ứng dụng lớn hơn
 build-your-code-and-: Xây dựng mã của bạn
 bulk-upload: Tải lên hàng loạt
@@ -166,6 +167,11 @@ discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá trang tổng quan của bạn!
 documentation: Tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
+email-address: Địa chỉ email
+enter-your-email-add: >-
+  Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
+  mật khẩu của bạn.
+enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 forgot:
   check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
   email: E-mail
@@ -323,6 +329,8 @@ register:
   password-hint: Nhập kết hợp của ít nhất 6 số, chữ cái và dấu chấm câu.
   specialError: Phải chứa các ký tự đặc biệt
   upperCaseError: Nên chứa các chữ cái in hoa
+reset-password: Đặt lại mật khẩu
+reset-your-password: Đặt lại mật khẩu của bạn
 see-usage: Xem mức sử dụng
 session_key: IvSessionKey
 settings: Cài đặt

@@ -99,7 +99,7 @@ const submit = async () => {
           <div class="max-w-2xl mx-auto text-center">
             <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
 
-            <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
+            <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
               {{ t("register.heading") }}
             </h1>
           </div>

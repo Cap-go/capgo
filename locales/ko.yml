@@ -69,6 +69,7 @@ apikeys:
   updater: 커패시터 업데이터
 app-id-example: 앱 ID 예시
 available-in-the-san: 샌드박스 앱에서 사용 가능
+back-to-login-page: 로그인 페이지로 돌아가기
 bigger-app-size: 더 큰 앱 크기
 build-your-code-and-: 코드 작성
 bulk-upload: 일괄 업로드
@@ -160,6 +161,9 @@ discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
+email-address: 이메일 주소
+enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
+enter-your-new-passw: 새 비밀번호를 입력하고 확인
 forgot:
   check_email: 이메일을 확인하여 비밀번호 재설정 링크를 받으세요
   email: 이메일
@@ -313,6 +317,8 @@ register:
   password-hint: 6개 이상의 숫자, 문자, 구두점 조합을 입력하세요.
   specialError: 특수 문자를 포함해야 합니다.
   upperCaseError: 대문자를 포함해야 합니다.
+reset-password: 암호를 재설정
+reset-your-password: 비밀번호를 재설정
 see-usage: 사용법 보기
 session_key: IvSessionKey
 settings: 설정

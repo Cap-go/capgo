@@ -75,6 +75,7 @@ apikeys:
   updater: конденсатор-обновитель
 app-id-example: Пример идентификатора приложения
 available-in-the-san: Доступно в приложении песочницы
+back-to-login-page: Назад на страницу входа
 bigger-app-size: Большой размер приложения
 build-your-code-and-: Создайте свой код
 bulk-upload: Массовая загрузка
@@ -168,6 +169,9 @@ discover-module-in-a: Откройте для себя модуль в Awesome-c
 discover-your-dashbo: Откройте для себя панель инструментов!
 documentation: Документация
 dont-have-an-account: У вас нет аккаунта?
+email-address: Адрес электронной почты
+enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
+enter-your-new-passw: Введите новый пароль и подтвердите
 forgot:
   check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
   email: Эл. адрес
@@ -323,6 +327,8 @@ register:
   password-hint: Введите комбинацию не менее 6 цифр, букв и знаков препинания.
   specialError: Должен содержать специальные символы
   upperCaseError: Должен содержать заглавные буквы
+reset-password: Сброс пароля
+reset-your-password: Сбросить пароль
 see-usage: См. использование
 session_key: IvSessionKey
 settings: Настройки

@@ -75,6 +75,7 @@ apikeys:
   updater: kapasitor-pembaru
 app-id-example: Contoh ID Aplikasi
 available-in-the-san: Tersedia di aplikasi kotak pasir
+back-to-login-page: Kembali ke halaman login
 bigger-app-size: Ukuran aplikasi lebih besar
 build-your-code-and-: Buat kode Anda
 bulk-upload: Unggah massal
@@ -168,6 +169,11 @@ discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
 dont-have-an-account: Belum punya akun?
+email-address: Alamat email
+enter-your-email-add: >-
+  Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
+  ulang kata sandi Anda.
+enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 forgot:
   check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
   email: Surel
@@ -323,6 +329,8 @@ register:
   password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
   specialError: Harus mengandung karakter khusus
   upperCaseError: Harus mengandung huruf besar
+reset-password: Atur Ulang Kata Sandi
+reset-your-password: Mereset password Anda
 see-usage: Lihat penggunaan
 session_key: IvSessionKey
 settings: Pengaturan

@@ -117,13 +117,13 @@ watchEffect(() => {
             <div class="max-w-2xl mx-auto text-center">
               <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
               <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
-                Reset your password
+                {{ t('reset-your-password') }}
               </h1>
               <p v-if="step === 1" class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
-                Enter your email address and we'll send you a link to reset your password.
+                {{ t('enter-your-email-add') }}
               </p>
               <p v-else>
-                Enter your new password.
+                {{ t('enter-your-new-passw') }}
               </p>
             </div>
 
@@ -136,7 +136,7 @@ watchEffect(() => {
                         {{ errorMessage }}
                       </p>
                       <div v-if="step === 1">
-                        <label for="" class="text-base font-medium text-gray-900"> Email address </label>
+                        <label for="" class="text-base font-medium text-gray-900"> {{ t('email-address') }} </label>
                         <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                           <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -231,7 +231,7 @@ watchEffect(() => {
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                           </svg>
                           <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-700 focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
-                            Reset Password
+                            {{ t('reset-password') }}
                           </button>
                         </button>
                       </div>
@@ -241,7 +241,7 @@ watchEffect(() => {
               </div>
               <div class="flex flex-row justify-center w-full mt-5">
                 <router-link to="/login" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
-                  Back to login page
+                  {{ t('back-to-login-page') }}
                 </router-link>
               </div>
             </div>

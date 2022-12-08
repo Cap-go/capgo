@@ -73,6 +73,7 @@ apikeys:
   updater: aktualizacja kondensatorów
 app-id-example: Przykład identyfikatora aplikacji
 available-in-the-san: Dostępne w aplikacji piaskownicy
+back-to-login-page: Powrót do strony logowania
 bigger-app-size: Większy rozmiar aplikacji
 build-your-code-and-: Zbuduj swój kod
 bulk-upload: Przesyłanie zbiorcze
@@ -166,6 +167,9 @@ discover-module-in-a: Odkryj moduł w Awesome-capacitor
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: Dokumentacja
 dont-have-an-account: Nie masz konta?
+email-address: Adres e-mail
+enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
+enter-your-new-passw: Wprowadź swoje nowe hasło i potwierdź
 forgot:
   check_email: Sprawdź pocztę, aby uzyskać link do zresetowania hasła
   email: E-mail
@@ -321,6 +325,8 @@ register:
   password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
   specialError: Powinien zawierać znaki specjalne
   upperCaseError: Powinien zawierać wielkie litery
+reset-password: Zresetuj hasło
+reset-your-password: Zresetuj swoje hasło
 see-usage: Zobacz użycie
 session_key: IvSessionKey
 settings: Ustawienia

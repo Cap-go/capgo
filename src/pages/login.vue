@@ -6,12 +6,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
-import { useMainStore } from '~/stores/main'
 import { hideLoader } from '~/services/loader'
 
 const route = useRoute()
 const supabase = useSupabase()
-const main = useMainStore()
 const isLoading = ref(false)
 const router = useRouter()
 const { t } = useI18n()
@@ -89,7 +87,6 @@ const fixIOS = () => {
 }
 
 const checkLogin = async () => {
-  main.auth = null
   isLoading.value = true
   const resUser = await supabase.auth.getUser()
   const user = resUser?.data.user

@@ -71,6 +71,7 @@ apikeys:
   updater: capacitor-updater
 app-id-example: App ID example
 available-in-the-san: Available in the sandbox app
+back-to-login-page: Back to login page
 bigger-app-size: Bigger app size
 build-your-code-and-: Build your code & Upload your version
 bulk-upload: Bulk upload
@@ -161,6 +162,9 @@ discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
 dont-have-an-account: Don’t have an account?
+email-address: Email address
+enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
+enter-your-new-passw: Enter your new password and confirm
 forgot:
   check_email: Check your email to get the link to reset your password
   email: Email
@@ -314,6 +318,8 @@ register:
   password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
+reset-password: Reset Password
+reset-your-password: Reset your password
 see-usage: See usage
 session_key: IvSessionKey
 settings: Settings

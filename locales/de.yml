@@ -77,6 +77,7 @@ apikeys:
   updater: Kondensator-Updater
 app-id-example: App-ID-Beispiel
 available-in-the-san: Verfügbar in der Sandbox-App
+back-to-login-page: Zurück zur Anmeldeseite
 bigger-app-size: Größere App-Größe
 build-your-code-and-: Erstellen Sie Ihren Code
 bulk-upload: Bulk-Upload
@@ -170,6 +171,11 @@ discover-module-in-a: Entdecken Sie das Modul in Awesome-capacitor
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
+email-address: E-Mail-Addresse
+enter-your-email-add: >-
+  Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum
+  Zurücksetzen Ihres Passworts.
+enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 forgot:
   check_email: >-
     Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
@@ -333,6 +339,8 @@ register:
     Satzzeichen ein.
   specialError: Sollte Sonderzeichen enthalten
   upperCaseError: Sollte Großbuchstaben enthalten
+reset-password: Passwort zurücksetzen
+reset-your-password: Setze dein Passwort zurück
 see-usage: Siehe Verwendung
 session_key: IvSessionKey
 settings: Einstellungen

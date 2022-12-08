@@ -69,6 +69,7 @@ apikeys:
   updater: コンデンサアップデータ
 app-id-example: アプリ ID の例
 available-in-the-san: サンドボックス アプリで利用可能
+back-to-login-page: ログインページに戻る
 bigger-app-size: アプリのサイズが大きい
 build-your-code-and-: コードをビルドする
 bulk-upload: 一括アップロード
@@ -160,6 +161,9 @@ discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
 documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
+email-address: 電子メールアドレス
+enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
+enter-your-new-passw: 新しいパスワードを入力して確認します
 forgot:
   check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
   email: Eメール
@@ -313,6 +317,8 @@ register:
   password-hint: 少なくとも6つの数字、文字、句読点の組み合わせを入力してください。
   specialError: 特殊文字を含める必要があります
   upperCaseError: 大文字を含める必要があります
+reset-password: パスワードを再設定する
+reset-your-password: あなたのパスワードをリセット
 see-usage: 使用法を見る
 session_key: IvSessionKey
 settings: 設定

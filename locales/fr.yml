@@ -75,6 +75,7 @@ apikeys:
   updater: condensateur de mise à jour
 app-id-example: Exemple d'ID d'application
 available-in-the-san: Disponible dans l'application bac à sable
+back-to-login-page: Retour à la page de connexion
 bigger-app-size: Taille d'application plus grande
 build-your-code-and-: Construisez votre code
 bulk-upload: Transfert groupé
@@ -168,6 +169,11 @@ discover-module-in-a: Découvrir le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: Documentation
 dont-have-an-account: "Vous n'avez pas de compte\_?"
+email-address: Adresse e-mail
+enter-your-email-add: >-
+  Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
+  votre mot de passe.
+enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 forgot:
   check_email: >-
     Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
@@ -329,6 +335,8 @@ register:
     ponctuation.
   specialError: Doit contenir des caractères spéciaux
   upperCaseError: Doit contenir des lettres majuscules
+reset-password: réinitialiser le mot de passe
+reset-your-password: réinitialisez votre mot de passe
 see-usage: Voir l'utilisation
 session_key: IvSessionKey
 settings: Réglages

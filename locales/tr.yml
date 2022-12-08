@@ -71,6 +71,7 @@ apikeys:
   updater: kondansatör güncelleyici
 app-id-example: Uygulama kimliği örneği
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
+back-to-login-page: Giriş sayfasına geri dön
 bigger-app-size: Daha büyük uygulama boyutu
 build-your-code-and-: Kodunuzu oluşturun
 bulk-upload: toplu yükleme
@@ -164,6 +165,11 @@ discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
 documentation: Belgeler
 dont-have-an-account: Hesabınız yok mu?
+email-address: E-posta adresi
+enter-your-email-add: >-
+  E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
+  gönderelim.
+enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 forgot:
   check_email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
   email: E-posta
@@ -325,6 +331,8 @@ register:
     girin.
   specialError: Özel karakterler içermelidir
   upperCaseError: Büyük harfler içermelidir
+reset-password: Şifreyi yenile
+reset-your-password: şifrenizi sıfırlayın
 see-usage: Kullanıma bakın
 session_key: IvSessionKey
 settings: Ayarlar

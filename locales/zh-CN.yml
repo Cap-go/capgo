@@ -69,6 +69,7 @@ apikeys:
   updater: 电容更新器
 app-id-example: 应用 ID 示例
 available-in-the-san: 在沙盒应用程序中可用
+back-to-login-page: 返回登录页面
 bigger-app-size: 更大的应用程序大小
 build-your-code-and-: 构建你的代码
 bulk-upload: 批量上传
@@ -160,6 +161,9 @@ discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
 dont-have-an-account: 没有帐户？
+email-address: 电子邮件地址
+enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
+enter-your-new-passw: 输入您的新密码并确认
 forgot:
   check_email: 检查您的电子邮件以获取重置密码的链接
   email: 电子邮件
@@ -313,6 +317,8 @@ register:
   password-hint: 输入至少 6 个数字、字母和标点符号的组合。
   specialError: 应包含特殊字符
   upperCaseError: 应包含大写字母
+reset-password: 重设密码
+reset-your-password: 重置你的密码
 see-usage: 查看用法
 session_key: Iv会话密钥
 settings: 设置

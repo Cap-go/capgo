@@ -73,6 +73,7 @@ apikeys:
   updater: atualizador de capacitor
 app-id-example: Exemplo de ID do aplicativo
 available-in-the-san: Disponível no aplicativo sandbox
+back-to-login-page: Voltar para a página de login
 bigger-app-size: Maior tamanho de aplicativo
 build-your-code-and-: Construa seu código
 bulk-upload: Upload em massa
@@ -166,6 +167,9 @@ discover-module-in-a: Descubra o módulo no capacitor Awesome
 discover-your-dashbo: Descubra o seu painel!
 documentation: Documentação
 dont-have-an-account: Não tem uma conta?
+email-address: Endereço de email
+enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha.
+enter-your-new-passw: Digite sua nova senha e confirme
 forgot:
   check_email: Verifique seu e-mail para obter o link para redefinir sua senha
   email: E-mail
@@ -323,6 +327,8 @@ register:
   password-hint: Insira uma combinação de pelo menos 6 números, letras e pontuações.
   specialError: Deve conter caracteres especiais
   upperCaseError: Deve conter letras maiúsculas
+reset-password: Redefinir senha
+reset-your-password: Redefina sua senha
 see-usage: Ver uso
 session_key: IvSessionKey
 settings: Definições

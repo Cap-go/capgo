@@ -74,6 +74,7 @@ apikeys:
   updater: condensatore di aggiornamento
 app-id-example: Esempio di ID app
 available-in-the-san: Disponibile nell'app sandbox
+back-to-login-page: Torna alla pagina di accesso
 bigger-app-size: Dimensioni dell'app più grandi
 build-your-code-and-: Costruisci il tuo codice
 bulk-upload: Caricamento collettivo
@@ -167,6 +168,11 @@ discover-module-in-a: Scopri il modulo in Awesome-condensatore
 discover-your-dashbo: Scopri la tua dashboard!
 documentation: Documentazione
 dont-have-an-account: Non hai un account?
+email-address: Indirizzo e-mail
+enter-your-email-add: >-
+  Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la
+  password.
+enter-your-new-passw: Inserisci la tua nuova password e conferma
 forgot:
   check_email: Controlla la tua email per ottenere il link per reimpostare la tua password
   email: E-mail
@@ -324,6 +330,8 @@ register:
     punteggiatura.
   specialError: Dovrebbe contenere caratteri speciali
   upperCaseError: Dovrebbe contenere lettere maiuscole
+reset-password: Resetta la password
+reset-your-password: reimposta la tua password
 see-usage: Vedi utilizzo
 session_key: IvSessionKey
 settings: Impostazioni
