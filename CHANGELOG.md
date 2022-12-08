@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.60.8](https://github.com/Cap-go/capgo/compare/1.60.7...1.60.8) (2022-12-08)
+
+
+### Bug Fixes
+
+* display accronym ([166c4d5](https://github.com/Cap-go/capgo/commit/166c4d5c9cd5df62371ab7118def787817876ee3))
+
 ### [1.60.7](https://github.com/Cap-go/capgo/compare/1.60.6...1.60.7) (2022-12-08)
 
 
