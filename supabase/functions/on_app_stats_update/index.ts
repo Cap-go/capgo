@@ -89,7 +89,7 @@ serve(async (event: Request) => {
       return sendRes({ message: 'Not UPDATE' }, 200)
     }
     const record = body.record
-    console.log('record', record)
+    console.log('record', record, event.headers)
     const month_id = new Date().toISOString().slice(0, 7)
 
     if (record.date_id === month_id)
