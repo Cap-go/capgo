@@ -21,11 +21,11 @@ const isMobile = isPlatform('capacitor')
 const planCurrent = ref('')
 const acronym = computed(() => {
   if (main.user?.first_name && main.user.last_name)
-    return main.user?.first_name + main.user?.last_name
+    return main.user?.first_name[0] + main.user?.last_name[0]
   else if (main.user?.first_name)
-    return main.user?.first_name
+    return main.user?.first_name[0]
   else if (main.user?.last_name)
-    return main.user?.last_name
+    return main.user?.last_name[0]
   return '??'
 })
 
