@@ -229,7 +229,7 @@ serve((event: Request) => {
   }
   catch (error) {
     console.log('Error', error)
-    return sendRes({ message: `Error ${error}`, error: 'general_error' }, 400)
+    return sendRes({ message: `Error ${JSON.stringify(error)}`, error: 'general_error' }, 400)
   }
 
   console.log('Method not allowed')
