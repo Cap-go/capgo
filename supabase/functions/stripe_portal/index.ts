@@ -15,8 +15,7 @@ serve(async (event: Request) => {
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)
   try {
-    let body: PortalData = { callbackUrl: `${Deno.env.get('WEBAPP_URL')}/app/usage` }
-    body = (await event.json()) as PortalData
+    const body: PortalData = (await event.json()) as PortalData
     const { data: auth, error } = await supabaseAdmin().auth.getUser(
       authorization?.split('Bearer ')[1],
     )

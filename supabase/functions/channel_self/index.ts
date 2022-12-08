@@ -194,8 +194,8 @@ const put = async (event: Request): Promise<Response> => {
   }
   if (errorChannel) {
     return sendRes({
-      message: 'Cannot find channel',
-      error: errorChannel,
+      message: `Cannot find channel ${errorChannel}`,
+      error: 'channel_not_found',
     }, 400)
   }
   else if (dataChannel) {
@@ -215,17 +215,23 @@ const put = async (event: Request): Promise<Response> => {
     })
   }
   return sendRes({
-    error: 'no channel',
+    message: 'Cannot find channel',
+    error: 'no_channel',
   }, 400)
 }
 
 serve((event: Request) => {
-  const api_mode_string = event.headers.get('api_mode')
+  try {
+    if (event.method === 'POST')
+      return post(event)
+    else if (event.method === 'PUT')
+      return put(event)
+  }
+  catch (error) {
+    console.log('Error', error)
+    return sendRes({ message: `Error ${error}`, error: 'general_error' }, 400)
+  }
 
-  if (api_mode_string === 'POST' || (!api_mode_string && event.method === 'POST'))
-    return post(event)
-  else if (api_mode_string === 'PUT' || (!api_mode_string && event.method === 'PUT'))
-    return put(event)
   console.log('Method not allowed')
   return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
 })

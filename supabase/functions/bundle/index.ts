@@ -79,22 +79,27 @@ export const get = async (event: Request,
 
 serve(async (event: Request) => {
   const apikey_string = event.headers.get('authorization')
-  const api_mode_string = event.headers.get('api_mode')
 
   if (!apikey_string) {
     console.log('Missing apikey')
     return sendRes({ status: 'Missing apikey' }, 400)
   }
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string,
-    supabaseAdmin(), ['all', 'write'])
-  if (!apikey) {
-    console.log('Missing apikey')
-    return sendRes({ status: 'Missing apikey' }, 400)
+  try {
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string,
+      supabaseAdmin(), ['all', 'write'])
+    if (!apikey) {
+      console.log('Missing apikey')
+      return sendRes({ status: 'Missing apikey' }, 400)
+    }
+    if (event.method === 'GET')
+      return get(event, apikey)
+    else if (event.method === 'DELETE')
+      return deleteBundle(event, apikey)
   }
-  if (api_mode_string === 'GET' || (!api_mode_string && event.method === 'GET'))
-    return get(event, apikey)
-  else if (api_mode_string === 'DELETE' || (!api_mode_string && event.method === 'DELETE'))
-    return deleteBundle(event, apikey)
+  catch (e) {
+    console.log('Error', JSON.stringify(e))
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+  }
   console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })
