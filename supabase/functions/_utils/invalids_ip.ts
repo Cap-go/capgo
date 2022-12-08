@@ -1,4 +1,4 @@
-import ipapi from 'https://deno.land/x/ipapi/mod.js'
+import ipapi from 'https://deno.land/x/ipapi@v1.0/mod.js'
 
 export const invalidIps = async (ips: string[]) => {
   // check all ip an return true if one is from google

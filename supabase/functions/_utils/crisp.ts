@@ -1,4 +1,4 @@
-import axiod from 'https://deno.land/x/axiod/mod.ts'
+import axiod from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 
 const getAuth = () => {
   // get crisp token
