@@ -19,25 +19,30 @@ const fix_apps = async () => {
   const supabase = useSupabase()
 
   const { data } = await supabase
-    .from('app_versions')
+    .from('apps')
     .select()
     // .eq('app_id', 'com.x_b_e.client')
-    .eq('deleted', true)
+    // .eq('deleted', true)
 
-  if (!data || !data.length) {
-    console.error('No apps_versions found')
-    return
-  }
-
+  // if (!data || !data.length) {
+  //   console.error('No apps_versions found')
+  //   return
+  // }
+  const d = new Date()
+  d.setDate(d.getDate() - 5)
+  const today_id = d.toISOString().slice(0, 10)
+  console.log('today_id', today_id)
   const all = []
-  for (const version of data) {
+  for (const app of data) {
     all.push(supabase
-      .from('app_versions_meta')
-      // .from('app_versions')
-      .update({ size: 0 })
-      .eq('app_id', version.app_id)
-      .eq('id', version.id).then((res) => {
-        console.log('versions', version.app_id, version.id)
+      .from('app_stats')
+    // .from('app_versions')
+      .update({ devices_real: 1 })
+      .eq('app_id', app.app_id)
+      .eq('date_id', today_id)
+    // .eq('id', version.id)
+      .then((res) => {
+        console.log('app', app.app_id)
         if (res?.error?.message)
           console.log('res', res)
       }))
