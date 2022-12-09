@@ -133,10 +133,9 @@ serve(async (event: Request) => {
     console.log('Cannot find authorization secret')
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
   }
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization', authorizationSecret, API_SECRET)
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
-  }
+
   try {
     const res = getStats()
     const [apps, updates, stars, users] = await Promise.all([res.apps, res.updates, res.stars, res.users])
@@ -215,14 +214,12 @@ serve(async (event: Request) => {
       ...details,
     }
     // console.log('newData', newData)
-    const { error } = await supabaseAdmin()
+    await supabaseAdmin()
       .from('global_stats')
       .upsert(newData)
-    console.log('error', error)
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

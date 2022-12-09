@@ -13,10 +13,9 @@ import type { Database } from '../_utils/supabase.types.ts'
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization')
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization' }, 400)
-  }
+
   try {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = (await event.json()) as UpdatePayload<typeof table>
@@ -68,7 +67,6 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

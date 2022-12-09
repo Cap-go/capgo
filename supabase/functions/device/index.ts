@@ -17,10 +17,9 @@ interface GetDevice {
 
 const get = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = await event.json() as GetDevice
-  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app', body.app_id)
+  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-  }
+
   // if device_id get one device
   if (body.device_id) {
     const { data: dataDevice, error: dbError } = await supabaseAdmin()
@@ -47,10 +46,9 @@ const get = async (event: Request, apikey: Database['public']['Tables']['apikeys
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id)
       .single()
-    if (dbError || !dataDevice) {
-      console.log('Cannot find device')
+    if (dbError || !dataDevice)
       return sendRes({ status: 'Cannot find device', error: dbError }, 400)
-    }
+
     return sendRes(dataDevice)
   }
   else {
@@ -90,14 +88,12 @@ const get = async (event: Request, apikey: Database['public']['Tables']['apikeys
 
 const post = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = await event.json() as DeviceLink
-  if (!body.device_id || !body.app_id) {
-    console.log('Cannot find device or appi_id')
+  if (!body.device_id || !body.app_id)
     return sendRes({ status: 'Cannot find device' }, 400)
-  }
-  if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app', body.app_id)
+
+  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-  }
+
   // find device
   const { data: dataDevice, error: dbError } = await supabaseAdmin()
     .from('devices')
@@ -120,10 +116,9 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
       .eq('app_id', body.app_id)
       .eq('name', body.version_id)
       .single()
-    if (dbError || !dataVersion) {
-      console.log('Cannot find version', dbError)
+    if (dbError || !dataVersion)
       return sendRes({ status: 'Cannot find version', error: dbError }, 400)
-    }
+
     const { error: dbErrorDev } = await supabaseAdmin()
       .from('devices_override')
       .upsert({
@@ -132,10 +127,8 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
         app_id: body.app_id,
         created_by: apikey.user_id,
       })
-    if (dbErrorDev) {
-      console.log('Cannot save device override', dbErrorDev)
+    if (dbErrorDev)
       return sendRes({ status: 'Cannot save device override', error: dbErrorDev }, 400)
-    }
   }
   // if channel set channel_override to it
   if (body.channel) {
@@ -146,10 +139,9 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
       .single()
-    if (dbError || !dataChannel) {
-      console.log('Cannot find channel', dbError)
+    if (dbError || !dataChannel)
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
-    }
+
     const { error: dbErrorDev } = await supabaseAdmin()
       .from('channel_devices')
       .upsert({
@@ -158,10 +150,8 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
         app_id: body.app_id,
         created_by: apikey.user_id,
       })
-    if (dbErrorDev) {
-      console.log('Cannot find channel override', dbErrorDev)
+    if (dbErrorDev)
       return sendRes({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
-    }
   }
   return sendRes()
 }
@@ -169,29 +159,25 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
 export const deleteOverride = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as DeviceLink
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app', body.app_id)
+  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-  }
+
   try {
     const { error } = await supabaseAdmin()
       .from('devices_override')
       .delete()
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id)
-    if (error) {
-      console.error('Cannot delete override')
+    if (error)
       return sendRes({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
-    }
+
     const { error: errorChannel } = await supabaseAdmin()
       .from('channel_devices')
       .delete()
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id)
-    if (errorChannel) {
-      console.error('Cannot delete override')
+    if (errorChannel)
       return sendRes({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
-    }
   }
   catch (e) {
     console.log('Cannot delete override', e)
@@ -203,16 +189,13 @@ export const deleteOverride = async (event: Request, apikey: Database['public'][
 serve(async (event: Request) => {
   const apikey_string = event.headers.get('authorization')
 
-  if (!apikey_string) {
-    console.log('Missing apikey')
+  if (!apikey_string)
     return sendRes({ status: 'Missing apikey' }, 400)
-  }
+
   try {
     const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
-    if (!apikey) {
-      console.log('Missing apikey')
+    if (!apikey)
       return sendRes({ status: 'Missing apikey' }, 400)
-    }
 
     if (event.method === 'POST')
       return post(event, apikey)
@@ -222,9 +205,7 @@ serve(async (event: Request) => {
       return deleteOverride(event, apikey)
   }
   catch (e) {
-    console.log('Error', JSON.stringify(e))
     return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
-  console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })

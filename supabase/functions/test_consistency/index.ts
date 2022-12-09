@@ -9,38 +9,33 @@ serve(async () => {
   try {
     const supabaseUpdate = await postUpdate(baseSupabase)
     const netlifyUpdate = await postUpdate(baseNetlify)
-    if (supabaseUpdate !== netlifyUpdate) {
-      console.log('supabaseUpdate !== netlifyUpdate', supabaseUpdate, netlifyUpdate)
+    if (supabaseUpdate !== netlifyUpdate)
       sendRes({ error: 'supabaseUpdate !== netlifyUpdate' }, 500)
-    }
+
     // check if they setChannel
     const supabaseSetChannel = await setChannel(baseSupabase)
     const netlifySetChannel = await setChannel(baseNetlify)
-    if (supabaseSetChannel !== netlifySetChannel) {
-      console.log('supabaseSetChannel !== netlifySetChannel', supabaseSetChannel, netlifySetChannel)
+    if (supabaseSetChannel !== netlifySetChannel)
       sendRes({ error: 'supabaseSetChannel !== netlifySetChannel' }, 500)
-    }
+
     // check if they putChannel
     const supabasePutChannel = await putChannel(baseSupabase)
     const netlifyPutChannel = await putChannel(baseNetlify)
-    if (supabasePutChannel !== netlifyPutChannel) {
-      console.log('supabasePutChannel !== netlifyPutChannel', supabasePutChannel, netlifyPutChannel)
+    if (supabasePutChannel !== netlifyPutChannel)
       sendRes({ error: 'supabasePutChannel !== netlifyPutChannel' }, 500)
-    }
+
     // check if they send device list
     const supabaseDevices = await getDevices(baseSupabase)
     const netlifyDevices = await getDevices(baseNetlify)
-    if (supabaseDevices !== netlifyDevices) {
-      console.log('supabaseDevices !== netlifyDevices', supabaseDevices, netlifyDevices)
+    if (supabaseDevices !== netlifyDevices)
       sendRes({ error: 'supabaseDevices !== netlifyDevices' }, 500)
-    }
+
     // check if they send channel list
     const supabaseChannels = await getChannels(baseSupabase)
     const netlifyChannels = await getChannels(baseNetlify)
-    if (supabaseChannels !== netlifyChannels) {
-      console.log('supabaseChannels !== netlifyChannels', supabaseChannels, netlifyChannels)
+    if (supabaseChannels !== netlifyChannels)
       sendRes({ error: 'supabaseChannels !== netlifyChannels' }, 500)
-    }
+
     return sendRes()
   }
   catch (error) {

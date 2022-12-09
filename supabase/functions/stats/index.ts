@@ -98,7 +98,6 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

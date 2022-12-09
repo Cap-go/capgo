@@ -40,13 +40,18 @@ export const checkKey = async (authorization: string | undefined,
   }
 }
 
-export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => (new Response(
-  JSON.stringify(data),
-  {
-    status: statusCode,
-    headers: { ...basicHeaders, ...corsHeaders },
-  },
-))
+export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+  if (statusCode >= 1)
+    console.error('sendRes error', JSON.stringify(data, null, 2))
+
+  return new Response(
+    JSON.stringify(data),
+    {
+      status: statusCode,
+      headers: { ...basicHeaders, ...corsHeaders },
+    },
+  )
+}
 
 export const sendOptionsRes = () => (new Response(
   'ok',

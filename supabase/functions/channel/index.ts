@@ -17,10 +17,9 @@ interface GetDevice {
 
 export const get = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as GetDevice
-  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app', body.app_id)
+  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-  }
+
   // get one channel or all channels
   if (body.channel) {
     const { data: dataChannel, error: dbError } = await supabaseAdmin()
@@ -45,10 +44,9 @@ export const get = async (event: Request, apikey: Database['public']['Tables']['
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
       .single()
-    if (dbError || !dataChannel) {
-      console.log('Cannot find channel')
+    if (dbError || !dataChannel)
       return sendRes({ status: 'Cannot find channel', error: dbError }, 400)
-    }
+
     return sendRes(dataChannel)
   }
   else {
@@ -86,23 +84,19 @@ export const get = async (event: Request, apikey: Database['public']['Tables']['
 export const deleteChannel = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   const body = (await event.json()) as ChannelSet
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id))) {
-    console.error('You can\'t access this app', body.app_id)
+  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-  }
+
   try {
     const { error: dbError } = await supabaseAdmin()
       .from('channels')
       .delete()
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
-    if (dbError) {
-      console.log('Cannot delete channel')
+    if (dbError)
       return sendRes({ status: 'Cannot delete channel', error: JSON.stringify(dbError) }, 400)
-    }
   }
   catch (e) {
-    console.log('Cannot delete channel', e)
     return sendRes({ status: 'Cannot delete channels', error: e }, 500)
   }
   return sendRes()
@@ -126,10 +120,9 @@ export const post = async (event: Request, apikey: Database['public']['Tables'][
       .eq('user_id', apikey.user_id)
       .eq('deleted', false)
       .single()
-    if (vError || !data) {
-      console.log(`Cannot find version ${body.version}`)
+    if (vError || !data)
       return sendRes({ status: `Cannot find version ${body.version}`, error: JSON.stringify(vError) }, 400)
-    }
+
     channel.version = data.id
   }
   if (Object.prototype.hasOwnProperty.call(body, 'public'))
@@ -137,13 +130,10 @@ export const post = async (event: Request, apikey: Database['public']['Tables'][
 
   try {
     const { error: dbError } = await updateOrCreateChannel(channel)
-    if (dbError) {
-      console.log('Cannot create channel')
+    if (dbError)
       return sendRes({ status: 'Cannot create channel', error: JSON.stringify(dbError) }, 400)
-    }
   }
   catch (e) {
-    console.log('Cannot create channel', e)
     return sendRes({ status: 'Cannot set channels', error: e }, 500)
   }
   return sendRes()
@@ -152,16 +142,13 @@ export const post = async (event: Request, apikey: Database['public']['Tables'][
 serve(async (event: Request) => {
   const apikey_string = event.headers.get('authorization')
 
-  if (!apikey_string) {
-    console.log('Missing apikey')
+  if (!apikey_string)
     return sendRes({ status: 'Missing apikey' }, 400)
-  }
+
   try {
     const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
-    if (!apikey) {
-      console.log('Missing apikey')
+    if (!apikey)
       return sendRes({ status: 'Missing apikey' }, 400)
-    }
 
     if (event.method === 'POST')
       return post(event, apikey)
@@ -171,10 +158,8 @@ serve(async (event: Request) => {
       return deleteChannel(event, apikey)
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({ status: 'Error', error: e }, 500)
   }
 
-  console.log('Method not allowed')
   return sendRes({ status: 'Method now allowed' }, 400)
 })

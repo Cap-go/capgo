@@ -69,14 +69,12 @@ const getApp = (userId: string, appId: string) => {
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret) {
-    console.log('Cannot find authorization secret')
+  if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
-  }
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization', authorizationSecret, API_SECRET)
+
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
-  }
+
   try {
     const table: keyof Database['public']['Tables'] = 'app_stats'
     const body = (await event.json()) as UpdatePayload<typeof table>
@@ -130,7 +128,6 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

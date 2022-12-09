@@ -53,14 +53,6 @@ serve(async (event: Request) => {
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      console.log('Cannot get all vars', platform,
-        app_id,
-        device_id,
-        custom_id,
-        version_build,
-        is_emulator,
-        is_prod,
-        version_name)
       return sendRes({
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
@@ -320,7 +312,6 @@ serve(async (event: Request) => {
     })
   }
   catch (e) {
-    console.log(id, 'Error', e)
     return sendRes({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',

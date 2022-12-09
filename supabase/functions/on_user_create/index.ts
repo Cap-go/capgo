@@ -12,10 +12,9 @@ import { logsnag } from '../_utils/_logsnag.ts'
 serve(async (event: Request) => {
   const API_SECRET = Deno.env.get('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization')
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization' }, 400)
-  }
+
   try {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = (await event.json()) as InsertPayload<typeof table>
@@ -71,10 +70,9 @@ serve(async (event: Request) => {
       })
       .eq('email', record.email)
     console.log('users done')
-    if (dbError || dbStripeError) {
-      console.log(dbError)
+    if (dbError || dbStripeError)
       return sendRes({ message: dbError }, 400)
-    }
+
     await logsnag.publish({
       channel: 'user-register',
       event: 'User Joined',

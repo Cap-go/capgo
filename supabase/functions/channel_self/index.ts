@@ -39,7 +39,6 @@ const post = async (event: Request): Promise<Response> => {
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
   if (!device_id || !app_id) {
-    console.log('Cannot find device_id or appi_id')
     return sendRes({
       message: 'Cannot find device_id or appi_id',
       error: 'missing_info',
@@ -112,10 +111,9 @@ const post = async (event: Request): Promise<Response> => {
       .eq('name', channel)
       .eq('allow_device_self_set', true)
       .single()
-    if (dbError || !dataChannel) {
-      console.log('Cannot find channel', dbError)
+    if (dbError || !dataChannel)
       return sendRes({ message: `Cannot find channel ${JSON.stringify(dbError)}`, error: 'channel_not_found' }, 400)
-    }
+
     const { error: dbErrorDev } = await supabaseAdmin()
       .from('channel_devices')
       .upsert({
@@ -124,10 +122,8 @@ const post = async (event: Request): Promise<Response> => {
         app_id,
         created_by: dataChannel.created_by,
       })
-    if (dbErrorDev) {
-      console.log('Cannot do channel override', dataChannel, dbErrorDev)
+    if (dbErrorDev)
       return sendRes({ message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`, error: 'override_not_allowed' }, 400)
-    }
   }
   const { data: dataVersion, error: errorVersion } = await supabaseAdmin()
     .from('app_versions')
@@ -138,7 +134,7 @@ const post = async (event: Request): Promise<Response> => {
   if (dataVersion && !errorVersion)
     await sendStats('setChannel', platform, device_id, app_id, version_build, dataVersion.id)
   else
-    console.log('Cannot find app version', errorVersion)
+    return sendRes({ message: `Cannot find app version ${errorVersion}`, error: 'app_version_not_found' }, 400)
   return sendRes()
 }
 
@@ -159,10 +155,9 @@ const put = async (event: Request): Promise<Response> => {
   else
     return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-  if (!device_id || !app_id) {
-    console.log('Cannot find device or appi_id')
+  if (!device_id || !app_id)
     return sendRes({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
-  }
+
   const { data: dataChannel, error: errorChannel } = await supabaseAdmin()
     .from('channels')
     .select()
@@ -228,10 +223,7 @@ serve((event: Request) => {
       return put(event)
   }
   catch (error) {
-    console.log('Error', error)
     return sendRes({ message: `Error ${JSON.stringify(error)}`, error: 'general_error' }, 400)
   }
-
-  console.log('Method not allowed')
   return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
 })
