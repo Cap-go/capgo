@@ -8,25 +8,23 @@ const supaId = 'xvwzpoazmxkqosrdewyv'
 const supaHost = `${supaId}.functions.supabase.co`
 const transform = {
   default: async (request) => {
-    const url = new URL(request.url)
-    const end = url.pathname.split('/').pop()
-    url.hostname = supaHost
-    url.pathname = `/${end}`
-    let body = null
-    const headers = { ...Object.fromEntries(request.headers.entries()), api_mode: request.method }
-    if (headers.api_mode === 'GET')
-      body = JSON.stringify(Object.fromEntries(url.searchParams))
-    return newReq(url, {
+    const urlNew = new URL(request.url)
+    const end = urlNew.pathname.split('/').pop()
+    urlNew.hostname = supaHost
+    urlNew.pathname = `/${end}`
+    const headers = {
+      ...Object.fromEntries(request.headers.entries()),
+      host: urlNew.host,
+    }
+    return newReq(urlNew, {
       ...request,
       headers,
-      body: body || request.body,
-      method: 'POST',
     })
   },
   auto_update: async (request) => {
-    const url = new URL(request.url)
-    url.pathname = '/api/updates'
-    return transform.default(newReq(url, {
+    const urlNew = new URL(request.url)
+    urlNew.pathname = '/api/updates'
+    return transform.default(newReq(urlNew, {
       ...request,
       method: 'POST',
       body: JSON.stringify({

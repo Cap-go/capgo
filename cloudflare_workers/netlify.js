@@ -10,7 +10,6 @@ const transform = {
     const headers = {
       ...Object.fromEntries(request.headers.entries()),
       host: urlNew.host,
-      api_mode: request.method,
     }
     return fetch(urlNew.toString(), {
       ...request,
