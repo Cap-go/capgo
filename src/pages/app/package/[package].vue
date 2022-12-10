@@ -62,6 +62,7 @@ const loadAppInfo = async () => {
           id,
           name,
           app_id,
+          public,
           version (
             name,
             created_at
@@ -364,7 +365,7 @@ watchEffect(async () => {
           </IonItemDivider>
           <template v-for="ch in channels" :key="ch.name">
             <IonItemSliding>
-              <IonItem class="cursor-pointer" @click="openChannel(ch)">
+              <IonItem button :detail="true" :color="ch.public ? 'primary' : ''" @click="openChannel(ch)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
                     {{ ch.name }}
@@ -372,7 +373,7 @@ watchEffect(async () => {
                 </IonLabel>
                 <IonNote slot="end">
                   <p>{{ ch.version.name }}</p>
-                  {{ formatDate(ch.created_at) }}
+                  {{ formatDate(ch.updated_at) }}
                 </IonNote>
               </IonItem>
               <IonItemOptions side="end">
@@ -393,7 +394,7 @@ watchEffect(async () => {
           </IonItem>
           <template v-for="v in versionFilter" :key="v.name">
             <IonItemSliding>
-              <IonItem class="cursor-pointer" @click="openVersion(v)">
+              <IonItem button :detail="true" @click="openVersion(v)">
                 <IonLabel>
                   <h2 class="text-sm text-azure-500">
                     {{ v.name }} ( {{ showSize(v) }} )
