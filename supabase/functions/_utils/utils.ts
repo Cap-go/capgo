@@ -41,7 +41,7 @@ export const checkKey = async (authorization: string | undefined,
 }
 
 export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
-  if (statusCode >= 1)
+  if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
 
   return new Response(
