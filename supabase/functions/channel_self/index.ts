@@ -134,7 +134,7 @@ const post = async (event: Request): Promise<Response> => {
   if (dataVersion && !errorVersion)
     await sendStats('setChannel', platform, device_id, app_id, version_build, dataVersion.id)
   else
-    return sendRes({ message: `Cannot find app version ${errorVersion}`, error: 'app_version_not_found' }, 400)
+    return sendRes({ message: `Cannot find app version ${JSON.stringify(errorVersion)}`, error: 'app_version_not_found' }, 400)
   return sendRes()
 }
 

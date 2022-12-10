@@ -39,6 +39,6 @@ serve(async () => {
     return sendRes()
   }
   catch (error) {
-    return sendRes({ error }, 500)
+    return sendRes({ error: JSON.stringify(error) }, 500)
   }
 })

@@ -181,7 +181,7 @@ export const deleteOverride = async (event: Request, apikey: Database['public'][
   }
   catch (e) {
     console.log('Cannot delete override', e)
-    return sendRes({ status: 'Cannot delete override', error: e }, 500)
+    return sendRes({ status: 'Cannot delete override', error: JSON.stringify(e) }, 500)
   }
   return sendRes()
 }

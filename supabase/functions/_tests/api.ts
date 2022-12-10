@@ -4,17 +4,23 @@ export const baseSupabase = 'https://supabase.capgo.app/'
 export const baseNetlify = 'https://netlify.capgo.app/'
 
 const defaultAppId = 'ee.test.test'
+const defaultVersion = '1.58.17'
+const defaultVersionId = 142
+const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
+const defaultZipId = '776bf561-94ef-422f-851f-502c85ff6cEE'
+const defaultUserId = 'f83fd102-c21d-4984-b6a1-33c2cf018fd7'
+
 export const defaultUpdateRes = {
   version: '1.58.17',
   session_key: null,
   checksum: 'ebf52a10',
-  url: 'https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/sign/apps/f83fd102-c21d-4984-b6a1-33c2cf108fd7/ee.forgr.capacitor_go/versions/776bf561-94ef-422f-851f-502c85ff6cbd?token=',
+  url: `https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/sign/apps/${defaultUserId}/${defaultAppId}/versions/${defaultZipId}?token=`,
 }
 export const postUpdate = async (baseUrl: string) => {
   const url = `${baseUrl}/updates`
   const response = await axiod.post(url, {
     platform: 'ios',
-    device_id: 'F7D455A1-337C-4AF2-9494-BA938E83EB22',
+    device_id: defaultDeviceID,
     app_id: defaultAppId,
     version_build: '1.25.1',
     version_code: '12501999',
@@ -30,7 +36,7 @@ export const setChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
   const response = await axiod.post(url, {
     platform: 'ios',
-    device_id: 'F7D455A1-337C-4AF2-9494-BA938E83EB22',
+    device_id: defaultDeviceID,
     app_id: defaultAppId,
     version_build: '1.25.1',
     version_code: '12501999',
@@ -46,7 +52,7 @@ export const putChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
   const response = await axiod.put(url, {
     platform: 'ios',
-    device_id: 'F7D455A1-337C-4AF2-9494-BA938E83EB22',
+    device_id: defaultDeviceID,
     app_id: defaultAppId,
     version_build: '1.25.1',
     version_code: '12501999',

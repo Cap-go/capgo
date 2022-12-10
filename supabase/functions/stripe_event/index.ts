@@ -26,7 +26,7 @@ serve(async (event: Request) => {
       .eq('customer_id', stripeData.customer_id)
       .single()
     if (dbError)
-      return sendRes(dbError, 500)
+      return sendRes({ error: JSON.stringify(dbError) }, 500)
     if (!user)
       return sendRes('no user found', 500)
 
@@ -62,7 +62,7 @@ serve(async (event: Request) => {
           await removeOldSubscription(customer.subscription_id)
 
         if (dbError2)
-          return sendRes(dbError, 500)
+          return sendRes({ error: JSON.stringify(dbError) }, 500)
 
         const isMonthly = plan.price_m_id === stripeData.price_id
         await updatePerson(user.email, undefined, [plan.name, isMonthly ? 'Monthly' : 'Yearly'])
@@ -104,7 +104,7 @@ serve(async (event: Request) => {
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
         if (dbError2)
-          return sendRes(dbError, 500)
+          return sendRes({ error: JSON.stringify(dbError) }, 500)
       }
     }
     else {

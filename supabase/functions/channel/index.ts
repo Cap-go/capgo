@@ -97,7 +97,7 @@ export const deleteChannel = async (event: Request, apikey: Database['public']['
       return sendRes({ status: 'Cannot delete channel', error: JSON.stringify(dbError) }, 400)
   }
   catch (e) {
-    return sendRes({ status: 'Cannot delete channels', error: e }, 500)
+    return sendRes({ status: 'Cannot delete channels', error: JSON.stringify(e) }, 500)
   }
   return sendRes()
 }
@@ -134,7 +134,7 @@ export const post = async (event: Request, apikey: Database['public']['Tables'][
       return sendRes({ status: 'Cannot create channel', error: JSON.stringify(dbError) }, 400)
   }
   catch (e) {
-    return sendRes({ status: 'Cannot set channels', error: e }, 500)
+    return sendRes({ status: 'Cannot set channels', error: JSON.stringify(e) }, 500)
   }
   return sendRes()
 }
@@ -158,7 +158,7 @@ serve(async (event: Request) => {
       return deleteChannel(event, apikey)
   }
   catch (e) {
-    return sendRes({ status: 'Error', error: e }, 500)
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 
   return sendRes({ status: 'Method now allowed' }, 400)

@@ -28,7 +28,7 @@ export const deleteBundle = async (event: Request,
       return sendRes({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
   }
   catch (e) {
-    return sendRes({ status: 'Cannot delete version', error: e }, 500)
+    return sendRes({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
   return sendRes()
 }
