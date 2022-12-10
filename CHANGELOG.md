@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.10](https://github.com/Cap-go/capgo/compare/1.61.9...1.61.10) (2022-12-10)
+
+
+### Bug Fixes
+
+* cloudflare scripts ([632aaf2](https://github.com/Cap-go/capgo/commit/632aaf23cc9a076bbdc15e93ad879d3b44be74b1))
+
 ### [1.61.9](https://github.com/Cap-go/capgo/compare/1.61.8...1.61.9) (2022-12-10)
 
 
