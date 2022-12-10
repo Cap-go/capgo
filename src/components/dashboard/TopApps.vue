@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import AppCard from './AppCard.vue'
-import type { definitions } from '~/types/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
-  apps: (definitions['apps'])[]
+  apps: (Database['public']['Tables']['apps']['Row'])[]
 }>()
 const emit = defineEmits(['reload'])
 const { t } = useI18n()

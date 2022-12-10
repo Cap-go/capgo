@@ -4,12 +4,12 @@ import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import IconTrash from '~icons/heroicons/trash'
-import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
-  app: definitions['apps']
+  app: Database['public']['Tables']['apps']['Row']
   channel: string
 }>()
 const emit = defineEmits(['reload'])
@@ -41,7 +41,7 @@ const didCancel = async (name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteApp = async (app: definitions['apps']) => {
+const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
   // console.log('deleteApp', app)
   if (await didCancel(t('package.name')))
     return
@@ -53,7 +53,7 @@ const deleteApp = async (app: definitions['apps']) => {
       .eq('user_id', app.user_id)
 
     if (data && data.length) {
-      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
+      const filesToRemove = (data as Database['public']['Tables']['app_versions']['Row'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
       const { error: delError } = await supabase
         .storage
         .from('apps')
@@ -162,7 +162,7 @@ watchEffect(async () => {
     </td>
     <td class="p-2">
       <div class="text-center">
-        {{ formatDate(props.app.updated_at) }}
+        {{ formatDate(props.app.updated_at || "") }}
       </div>
     </td>
     <td class="p-2">

@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import AppCard from './AppCard.vue'
-import type { definitions } from '~/types/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
-  sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
+  sharedApps: (Database['public']['Tables']['channel_users']['Row'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reload'])
 const { t } = useI18n()
 interface ChannelUserApp {
-  app_id: definitions['apps']
-  channel_id: definitions['channels'] & {
-    version: definitions['app_versions']
+  app_id: Database['public']['Tables']['apps']['Row']
+  channel_id: Database['public']['Tables']['channels']['Row'] & {
+    version: Database['public']['Tables']['app_versions']['Row']
   }
 }
 </script>

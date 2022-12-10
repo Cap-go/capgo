@@ -2,9 +2,9 @@ import { isPlatform, loadingController, toastController } from '@ionic/vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import dayjs from 'dayjs'
 import { useSupabase } from './supabase'
-import type { definitions } from '~/types/supabase'
+import type { Database } from '~/types/supabase.types'
 
-export const openVersion = async (app: definitions['app_versions'], userId: string) => {
+export const openVersion = async (app: Database['public']['Tables']['app_versions']['Row'], userId: string) => {
   const supabase = useSupabase()
 
   const loading = await loadingController
@@ -20,8 +20,7 @@ export const openVersion = async (app: definitions['app_versions'], userId: stri
       .storage
       .from(`apps/${userId}/${app.app_id}/versions`)
       .createSignedUrl(app.bucket_id, 60)
-
-    signedURL = res.data?.signedURL
+    signedURL = res.data?.signedUrl
   }
   else {
     signedURL = app.external_url
