@@ -53,13 +53,13 @@ serve(async (event: Request) => {
       version: version || 0,
     }
     const all = []
-    const { data, error } = await supabaseAdmin()
+    const { data } = await supabaseAdmin()
       .from('app_versions')
       .select()
       .eq('app_id', app_id)
       .eq('name', version_name || 'unknown')
       .single()
-    if (data && !error) {
+    if (data) {
       stat.version = data.id
       device.version = data.id
       if (!device.is_emulator && device.is_prod) {
@@ -83,7 +83,7 @@ serve(async (event: Request) => {
         }))
       }
     }
-    else if (!device.is_emulator && device.is_prod) {
+    else {
       console.log('switch to onprem', app_id)
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
