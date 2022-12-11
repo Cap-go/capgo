@@ -176,9 +176,9 @@ serve(async (event: Request) => {
       plugin_version,
       version: version.id,
       os_version: version_os,
-      ...(is_emulator !== undefined ? { is_emulator } : {}),
-      ...(is_prod !== undefined ? { is_prod } : {}),
-      ...(custom_id ? { custom_id } : {}),
+      ...(is_emulator != null ? { is_emulator } : {}),
+      ...(is_prod != null ? { is_prod } : {}),
+      ...(custom_id != null ? { custom_id } : {}),
       version_build,
       updated_at: new Date().toISOString(),
     })
@@ -306,7 +306,7 @@ serve(async (event: Request) => {
     return sendRes({
       version: version.name,
       session_key: version.session_key,
-      ...(version.session_key ? { session_key: version.session_key } : {}),
+      ...(version.session_key == null ? { session_key: version.session_key } : {}),
       checksum: version.checksum,
       url: signedURL,
     })

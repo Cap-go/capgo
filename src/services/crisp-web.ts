@@ -253,10 +253,10 @@ export class CapacitorCrispWeb {
     avatar?: string
   }): Promise<void> {
     const arr = [
-      ...(data.nickname ? [['set', 'user:nickname', data.nickname]] : []),
-      ...(data.phone ? [['set', 'user:phone', data.phone]] : []),
-      ...(data.email ? [['set', 'user:email', data.email]] : []),
-      ...(data.avatar ? [['set', 'user:avatar', data.avatar]] : []),
+      ...(data.nickname != null ? [['set', 'user:nickname', data.nickname]] : []),
+      ...(data.phone != null ? [['set', 'user:phone', data.phone]] : []),
+      ...(data.email != null ? [['set', 'user:email', data.email]] : []),
+      ...(data.avatar != null ? [['set', 'user:avatar', data.avatar]] : []),
     ]
     this.push(...arr)
   }

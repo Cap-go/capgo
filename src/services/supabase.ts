@@ -201,5 +201,5 @@ export const findBestPlan = async (stats: StatsV2): Promise<string> => {
   if (error)
     throw error
 
-  return data || 'Team'
+  return data
 }
