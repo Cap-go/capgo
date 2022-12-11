@@ -71,14 +71,15 @@ serve(async (event: Request) => {
       changed = true
     }
     // get device and check if update_at is today
-    const { data: dataDevice } = await supabaseAdmin()
-      .from('devices')
-      .select()
-      .eq('device_id', record.device_id)
-      .single()
-    if (dataDevice && !ignoredEvents.includes(record.action)) {
+    if (!ignoredEvents.includes(record.action)) {
+      const { data: dataDevice } = await supabaseAdmin()
+        .from('devices')
+        .select()
+        .eq('device_id', record.device_id)
+        .neq('date_id', month_id)
+        .single()
+      if (dataDevice && !ignoredEvents.includes(record.action)) {
       // compare date with today
-      if (dataDevice.date_id !== month_id) {
         increment.devices = 1
         changed = true
         await supabaseAdmin()
