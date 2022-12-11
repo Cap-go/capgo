@@ -79,9 +79,9 @@ const getTotalStats = async () => {
 const getUsages = async () => {
   const { data, error } = await getAppStats()
   if (data && !error) {
-    datas.value.mau = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
-    datas.value.storage = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
-    datas.value.bandwidth = new Array(getDaysInCurrentMonth() + 1).fill(undefined)
+    datas.value.mau = new Array(getDaysInCurrentMonth()).fill(undefined)
+    datas.value.storage = new Array(getDaysInCurrentMonth()).fill(undefined)
+    datas.value.bandwidth = new Array(getDaysInCurrentMonth()).fill(undefined)
     data.forEach((item: Database['public']['Tables']['app_stats']['Row']) => {
       if (item.date_id.length > 7) {
         const dayNumber = Number(item.date_id.slice(8)) - 1
