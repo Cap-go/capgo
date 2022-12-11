@@ -82,13 +82,15 @@ export const updateVersionStats = async (increment: VersionStatsIncrement) => {
     console.error('increment_stats', error)
 }
 
-export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats']['Args'], date_id: string, user_id: string) => {
+export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats']['Args'],
+  date_id: string, user_id: string) => {
   const { data: dataAppStats } = await supabaseAdmin()
     .from('app_stats')
     .select()
     .eq('app_id', increment.app_id)
     .eq('date_id', date_id)
-  console.log('updateOrAppStats', increment)
+    .single()
+  console.log('updateOrAppStats', increment, !!dataAppStats)
   if (dataAppStats) {
     const { error } = await supabaseAdmin()
       .rpc('increment_stats', increment)
@@ -115,13 +117,14 @@ export const updateOrCreateChannel = async (update: Database['public']['Tables']
     console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
-  const { data, error } = await supabaseAdmin()
+  const { data } = await supabaseAdmin()
     .from('channels')
     .select()
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)
-  if (data && data.length && !error) {
+    .single()
+  if (data) {
     return supabaseAdmin()
       .from('channels')
       .update(update)
@@ -156,24 +159,24 @@ export const checkAppOwner = async (userId: string | undefined, appId: string | 
 }
 
 export const updateOrCreateDevice = async (update: Database['public']['Tables']['devices']['Insert']) => {
-  console.log('updateOrCreateDevice', update)
   const { data } = await supabaseAdmin()
     .from('devices')
     .select()
     .eq('app_id', update.app_id)
     .eq('device_id', update.device_id)
     .single()
-  if (!data) {
-    return supabaseAdmin()
-      .from('devices')
-      .insert(update)
-  }
-  else {
+  console.log('updateOrCreateDevice', update, !!data)
+  if (data) {
     return supabaseAdmin()
       .from('devices')
       .update(update)
       .eq('app_id', update.app_id)
       .eq('device_id', update.device_id)
+  }
+  else {
+    return supabaseAdmin()
+      .from('devices')
+      .insert(update)
   }
 }
 

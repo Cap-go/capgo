@@ -39,8 +39,8 @@ serve(async (event: Request) => {
       plugin_version,
       os_version: version_os,
       version: version_name || 'unknown' as any,
-      is_emulator: is_emulator === undefined ? false : is_emulator,
-      is_prod: is_prod === undefined ? true : is_prod,
+      is_emulator: is_emulator == null ? false : is_emulator,
+      is_prod: is_prod == null ? true : is_prod,
       ...(custom_id != null ? { custom_id } : {}),
     }
 

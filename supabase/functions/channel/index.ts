@@ -50,7 +50,7 @@ export const get = async (event: Request, apikey: Database['public']['Tables']['
     return sendRes(dataChannel)
   }
   else {
-    const fetchOffset = body.page === undefined ? 0 : body.page
+    const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataChannels, error: dbError } = await supabaseAdmin()

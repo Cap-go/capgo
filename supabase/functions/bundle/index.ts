@@ -46,7 +46,7 @@ export const get = async (event: Request,
     if (!(await checkAppOwner(apikey.user_id, body.app_id)))
       return sendRes({ status: 'You can\'t check this app' }, 400)
 
-    const fetchOffset = body.page === undefined ? 0 : body.page
+    const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataBundles, error: dbError } = await supabaseAdmin()

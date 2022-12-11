@@ -123,7 +123,7 @@ const deleteAccount = async () => {
       {
         text: t('button.remove'),
         handler: async () => {
-          if (!main.auth || main.auth?.email === undefined)
+          if (!main.auth || main.auth?.email == null)
             return
           const { error } = await supabase
             .from('deleted_account')

@@ -101,7 +101,7 @@ const getChannels = async () => {
   }
 }
 const onSearchLog = async (val: string | undefined) => {
-  if (val === undefined) {
+  if (val == null) {
     search.value = ''
     return
   }
