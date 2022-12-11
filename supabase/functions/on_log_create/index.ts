@@ -77,6 +77,8 @@ serve(async (event: Request) => {
         .select()
         .eq('device_id', record.device_id)
         .neq('date_id', month_id)
+        .eq('is_emulator', false)
+        .eq('is_prod', true)
         .single()
       if (dataDevice && !ignoredEvents.includes(record.action)) {
       // compare date with today
