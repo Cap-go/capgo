@@ -41,10 +41,6 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
     console.log('user not found', userId)
     return Promise.resolve()
   }
-  if (!user.enableNotifications) {
-    console.log('user disables notif', userId)
-    return Promise.resolve()
-  }
   // check if notif has already been send in notifications table
   const { data: notif } = await supabaseAdmin()
     .from('notifications')

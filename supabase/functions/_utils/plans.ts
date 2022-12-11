@@ -105,7 +105,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
           }).catch()
         }
         else if (planToInt(best_plan) > planToInt(current_plan)) {
-          await sendNotif(`user:upgrade_to_${bestPlanKey}`, userId, '* * * * *', 'red')
+          await sendNotif(`user:upgrade_to_${bestPlanKey}`, userId, '0 0 * * 1', 'red')
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
           console.log(`user:upgrade_to_${bestPlanKey}`, userId)
           await logsnag.publish({
