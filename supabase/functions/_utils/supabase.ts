@@ -82,7 +82,7 @@ export const updateVersionStats = async (increment: VersionStatsIncrement) => {
     console.error('increment_stats', error)
 }
 
-export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats']['Args'],
+export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats_v2']['Args'],
   date_id: string, user_id: string) => {
   const { data: dataAppStats } = await supabaseAdmin()
     .from('app_stats')
@@ -93,9 +93,9 @@ export const updateOrAppStats = async (increment: Database['public']['Functions'
   console.log('updateOrAppStats', increment, !!dataAppStats)
   if (dataAppStats) {
     const { error } = await supabaseAdmin()
-      .rpc('increment_stats', increment)
+      .rpc('increment_stats_v2', increment)
     if (error)
-      console.error('increment_stats', error)
+      console.error('increment_stats_v2', error)
   }
   else {
     const newDay: Database['public']['Tables']['app_stats']['Insert'] = {

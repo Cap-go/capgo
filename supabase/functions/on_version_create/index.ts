@@ -77,14 +77,14 @@ serve(async (event: Request) => {
     if (dbError)
       console.error('Cannot create app version meta', dbError)
     const today_id = new Date().toISOString().slice(0, 10)
-    const increment: Database['public']['Functions']['increment_stats']['Args'] = {
+    const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
       app_id: record.app_id,
       date_id: today_id,
       bandwidth: 0,
       mlu: 0,
       mlu_real: 0,
       devices: 0,
-      // devices_real: 0,
+      devices_real: 0,
       version_size: size,
       channels: 0,
       shared: 0,

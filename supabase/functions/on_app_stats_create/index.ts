@@ -46,7 +46,7 @@ serve(async (event: Request) => {
     }
     const newData = await createAppStat(record.user_id, record.app_id, month_id)
     if (new Date().getDate() === 1) {
-      const increment: Database['public']['Functions']['increment_stats']['Args'] = {
+      const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
         ...newData,
         date_id: today_id,
         bandwidth: 0,

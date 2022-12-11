@@ -913,6 +913,22 @@ export interface Database {
         }
         Returns: undefined
       }
+      increment_stats_v2: {
+        Args: {
+          app_id: string
+          date_id: string
+          bandwidth: number
+          version_size: number
+          channels: number
+          shared: number
+          mlu: number
+          mlu_real: number
+          versions: number
+          devices: number
+          devices_real: number
+        }
+        Returns: undefined
+      }
       increment_version_stats: {
         Args: { app_id: string; version_id: number; devices: number }
         Returns: undefined
@@ -921,15 +937,10 @@ export interface Database {
         Args: { userid: string }
         Returns: boolean
       }
-      is_allowed_action:
-        | {
-            Args: { apikey: string }
-            Returns: boolean
-          }
-        | {
-            Args: { userid: string }
-            Returns: boolean
-          }
+      is_allowed_action: {
+        Args: { apikey: string }
+        Returns: boolean
+      }
       is_allowed_action_user: {
         Args: { userid: string }
         Returns: boolean
