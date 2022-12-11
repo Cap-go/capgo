@@ -94,6 +94,18 @@ const showSize = (version: (Database['public']['Tables']['app_versions']['Row'] 
     return t('package.not_available')
 }
 
+const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['app_versions']['Row'][]) => {
+  const { data: dataVersionsMeta } = await supabase
+    .from('app_versions_meta')
+    .select()
+    .in('id', dataVersions.map(({ id }) => id))
+  const newVersions = dataVersions.map(({ id, ...rest }) => {
+    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
+    return { id, ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
+  })
+  return newVersions
+}
+
 const searchVersion = async () => {
   isLoadingSub.value = true
   const { data: dataVersions } = await supabase
@@ -108,15 +120,7 @@ const searchVersion = async () => {
     isLoadingSub.value = false
     return
   }
-  const { data: dataVersionsMeta } = await supabase
-    .from('app_versions_meta')
-    .select()
-    .in('id', dataVersions.map(({ id }) => id))
-  const newVersions = dataVersions.map(({ id, ...rest }) => {
-    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-    return { ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
-  })
-  filtered.value = newVersions
+  filtered.value = await enhenceVersionElems(dataVersions)
   isLoadingSub.value = false
 }
 const loadData = async (event?: InfiniteScrollCustomEvent) => {
@@ -130,16 +134,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataVersions)
       return
-    const { data: dataVersionsMeta } = await supabase
-      .from('app_versions_meta')
-      .select()
-      .in('id', dataVersions.map(({ id }) => id))
-    // merge dataVersions and dataVersionsMeta
-    const newVersions = dataVersions.map(({ id, ...rest }) => {
-      const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-      return { ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
-    })
-    versions.value.push(...newVersions)
+    versions.value.push(...(await enhenceVersionElems(dataVersions)))
 
     if (dataVersions.length === fetchLimit)
       fetchOffset += fetchLimit
@@ -304,6 +299,7 @@ const openChannel = (channel: Database['public']['Tables']['channels']['Row']) =
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
 }
 const openVersion = (version: Database['public']['Tables']['app_versions']['Row']) => {
+  console.log('openVersion', version)
   router.push(`/app/p/${id.value.replace(/\./g, '--')}/bundle/${version.id}`)
 }
 const openDevices = () => {

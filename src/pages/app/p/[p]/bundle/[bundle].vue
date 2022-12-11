@@ -8,7 +8,7 @@ import {
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { addOutline } from 'ionicons/icons'
 import copy from 'copy-text-to-clipboard'
 import Spinner from '~/components/Spinner.vue'
@@ -21,6 +21,7 @@ import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const listRef = ref()
 const main = useMainStore()
 const supabase = useSupabase()
@@ -166,22 +167,25 @@ const getVersion = async () => {
   if (!id.value)
     return
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('id', id.value)
       .single()
-    const { data: dataVersionsMeta, error: dataVersionsError } = await supabase
+    const { data: dataVersionsMeta } = await supabase
       .from('app_versions_meta')
       .select()
       .eq('id', id.value)
       .single()
-    if (error || dataVersionsError) {
-      console.error('no version', error, dataVersionsError)
+    if (!data) {
+      console.error('no version found')
+      router.back()
       return
     }
-    version_meta.value = dataVersionsMeta
+    if (dataVersionsMeta)
+      version_meta.value = dataVersionsMeta
+
     version.value = data
   }
   catch (error) {
@@ -275,24 +279,24 @@ const devicesFilter = computed(() => {
               {{ formatDate(version?.updated_at) }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version?.checksum">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('checksum') }}
               </h2>
             </IonLabel>
             <IonNote slot="end">
-              {{ version?.checksum }}
+              {{ version.checksum }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version_meta?.devices">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('devices.title') }}
               </h2>
             </IonLabel>
             <IonNote slot="end">
-              {{ version_meta?.devices }}
+              {{ version_meta.devices }}
             </IonNote>
           </IonItem>
           <IonItem v-if="version?.session_key">
