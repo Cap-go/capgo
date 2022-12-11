@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
-import type { AppStatsIncrement } from '../_utils/supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
@@ -101,7 +100,7 @@ serve(async (event: Request) => {
           const bandwidthTotal = bandwidth.data?.reduce((acc, cur) => acc + (cur.bandwidth || 0), 0) || 0
           if (new Date().getDate() === 1) {
             const today_id = new Date().toISOString().slice(0, 10)
-            const increment: AppStatsIncrement = {
+            const increment: Database['public']['Functions']['increment_stats']['Args'] = {
               app_id: app.app_id,
               date_id: today_id,
               bandwidth: 0,

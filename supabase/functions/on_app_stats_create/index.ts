@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import type { InsertPayload } from '../_utils/supabase.ts'
 import { createAppStat, supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
-import type { AppStatsIncrement, InsertPayload } from '../_utils/supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import type { Database } from './../_utils/supabase.types.ts'
 
@@ -46,7 +46,7 @@ serve(async (event: Request) => {
     }
     const newData = await createAppStat(record.user_id, record.app_id, month_id)
     if (new Date().getDate() === 1) {
-      const increment: AppStatsIncrement = {
+      const increment: Database['public']['Functions']['increment_stats']['Args'] = {
         ...newData,
         date_id: today_id,
         bandwidth: 0,

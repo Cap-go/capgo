@@ -23,19 +23,6 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   record: null
   old_record: Database['public']['Tables'][T]['Row']
 }
-export interface AppStatsIncrement {
-  app_id: string
-  date_id: string
-  bandwidth: number
-  mlu: number
-  mlu_real: number
-  devices: number
-  // devices_real: number
-  version_size: number
-  channels: number
-  shared: number
-  versions: number
-}
 export interface VersionStatsIncrement {
   app_id: string
   version_id: number
@@ -95,7 +82,7 @@ export const updateVersionStats = async (increment: VersionStatsIncrement) => {
     console.error('increment_stats', error)
 }
 
-export const updateOrAppStats = async (increment: AppStatsIncrement, date_id: string, user_id: string) => {
+export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats']['Args'], date_id: string, user_id: string) => {
   const { data: dataAppStats } = await supabaseAdmin()
     .from('app_stats')
     .select()
