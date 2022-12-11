@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.27](https://github.com/Cap-go/capgo/compare/1.61.26...1.61.27) (2022-12-11)
+
+
+### Bug Fixes
+
+* chart data length ([23be4b1](https://github.com/Cap-go/capgo/commit/23be4b1923a6646db25c5e29d8c092f24747a2c2))
+
 ### [1.61.26](https://github.com/Cap-go/capgo/compare/1.61.25...1.61.26) (2022-12-11)
 
 
