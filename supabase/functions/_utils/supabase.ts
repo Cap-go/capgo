@@ -54,6 +54,16 @@ export const supabaseAdmin = () => createClient<Database>(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
 
+const allObject = async <T extends string, R>(all: { [key in T]: PromiseLike<R> }) => {
+  const allAwaited: { [key in T]: number } = await Object
+    .entries(all)
+    .reduce(async (acc, [key, value]) => ({
+      ...await acc,
+      [key]: await value,
+    }), Promise.resolve({} as { [key in T]: number }))
+  return allAwaited
+}
+
 export const updateOrCreateVersion = async (update: Database['public']['Tables']['app_versions']['Insert']) => {
   console.log('updateOrCreateVersion', update)
   const { data } = await supabaseAdmin()
@@ -269,4 +279,91 @@ export const sendStats = async (action: string, platform: string, device_id: str
   catch (err) {
     console.log('Cannot insert stats', app_id, err)
   }
+}
+
+export const allDayOfMonth = () => {
+  const lastDay = new Date(new Date().getFullYear(), 10, 0).getDate()
+  const days = []
+  for (let d = 1; d <= lastDay; d++)
+    days.push(d)
+
+  return days
+}
+
+export const createAppStat = async (userId: string, appId: string, date_id: string) => {
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  // console.log('req', req)
+  const mlu = supabaseAdmin()
+    .from('stats')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .lte('created_at', lastDay.toISOString())
+    .gte('created_at', firstDay.toISOString())
+    .eq('action', 'get')
+    .then(res => res.count || 0)
+  const mlu_real = supabaseAdmin()
+    .from('stats')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .lte('created_at', lastDay.toISOString())
+    .gte('created_at', firstDay.toISOString())
+    .eq('action', 'set')
+    .then(res => res.count || 0)
+  const devices = supabaseAdmin()
+    .from('devices')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .eq('is_emulator', false)
+    .eq('is_prod', true)
+    .lte('updated_at', lastDay.toISOString())
+    .gte('updated_at', firstDay.toISOString())
+    .then(res => res.count || 0)
+  const devices_real = supabaseAdmin()
+    .from('devices')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .lte('updated_at', lastDay.toISOString())
+    .gte('updated_at', firstDay.toISOString())
+    .then(res => res.count || 0)
+  const bandwidth = supabaseAdmin()
+    .from('app_stats')
+    .select()
+    .eq('app_id', appId)
+    .in('date_id', allDayOfMonth())
+    .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.bandwidth || 0), 0))
+  const version_size = supabaseAdmin()
+    .from('app_versions_meta')
+    .select()
+    .eq('app_id', appId)
+    .eq('user_id', userId)
+    .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.size || 0), 0))
+  const versions = supabaseAdmin()
+    .from('app_versions')
+    .select('id', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .eq('user_id', userId)
+    .eq('deleted', false)
+    .then(res => res.count || 0)
+  const shared = supabaseAdmin()
+    .from('channel_users')
+    .select('id', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .then(res => res.count || 0)
+  const channels = supabaseAdmin()
+    .from('channels')
+    .select('id', { count: 'exact', head: true })
+    .eq('app_id', appId)
+    .then(res => res.count || 0)
+  const all = { mlu, mlu_real, devices, devices_real, bandwidth, version_size, versions, shared, channels }
+  type Keys = keyof typeof all
+  const allAwaited = await allObject<Keys, number>(all)
+  const newData = {
+    app_id: appId,
+    user_id: userId,
+    date_id,
+    ...allAwaited,
+  }
+  return newData
 }
