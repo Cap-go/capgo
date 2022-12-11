@@ -1,7 +1,7 @@
 import { logsnag } from '../_utils/_logsnag.ts'
 import { addEventPerson } from './crisp.ts'
 import { sendNotif } from './notifications.ts'
-import { getCurrentPlanName, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin } from './supabase.ts'
+import { getCurrentPlanName, isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin } from './supabase.ts'
 
 export interface StatsV2 {
   mau: number
@@ -77,7 +77,8 @@ export const checkPlan = async (userId: string): Promise<void> => {
     const is_good_plan = await isGoodPlan(userId)
     const is_onboarded = await isOnboarded(userId)
     const is_onboarding_needed = await isOnboardingNeeded(userId)
-    if (!is_good_plan && is_onboarded) {
+    const is_free_usage = await isFreeUsage(userId)
+    if (!is_good_plan && is_onboarded && !is_free_usage) {
       console.log('is_good_plan_v2', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
       const dateid = new Date().toISOString().slice(0, 7)
@@ -134,7 +135,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
     }
     return supabaseAdmin()
       .from('stripe_info')
-      .update({ is_good_plan: !!is_good_plan })
+      .update({ is_good_plan: is_good_plan || is_free_usage })
       .eq('customer_id', user.customer_id)
       .then()
   }

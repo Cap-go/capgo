@@ -822,29 +822,9 @@ export interface Database {
         Args: { e_mail: string }
         Returns: string
       }
-      find_best_plan: {
-        Args: {
-          apps_n: number
-          channels_n: number
-          updates_n: number
-          versions_n: number
-          shared_n: number
-        }
-        Returns: string
-      }
       find_best_plan_v2: {
         Args: { mau: number; storage: number; bandwidth: number }
         Returns: string
-      }
-      find_fit_plan: {
-        Args: {
-          apps_n: number
-          channels_n: number
-          updates_n: number
-          versions_n: number
-          shared_n: number
-        }
-        Returns: { name: string }[]
       }
       find_fit_plan_v2: {
         Args: { mau: number; storage: number; bandwidth: number }
@@ -982,7 +962,7 @@ export interface Database {
         Args: { userid: string }
         Returns: boolean
       }
-      is_good_plan: {
+      is_free_usage: {
         Args: { userid: string }
         Returns: boolean
       }

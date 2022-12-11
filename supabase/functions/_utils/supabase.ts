@@ -220,6 +220,16 @@ export const isOnboarded = async (userId: string): Promise<boolean> => {
   return data || false
 }
 
+export const isFreeUsage = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin()
+    .rpc('is_free_usage', { userid: userId })
+    .single()
+  if (error)
+    throw error
+
+  return data || false
+}
+
 export const isOnboardingNeeded = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
     .rpc('is_onboarding_needed', { userid: userId })
