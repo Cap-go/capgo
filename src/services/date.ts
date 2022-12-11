@@ -13,3 +13,9 @@ export const getDaysInCurrentMonth = () => {
     0,
   ).getDate()
 }
+
+export const getCurrentDayMonth = () => {
+  const date = new Date()
+
+  return date.getDate()
+}

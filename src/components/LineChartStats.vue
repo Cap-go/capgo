@@ -3,7 +3,7 @@ import type { ChartData } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
 import { isDark } from '~/composables'
-import { getDaysInCurrentMonth } from '~/services/date'
+import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -11,12 +11,20 @@ const props = defineProps({
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
 })
+
 // console.log('title', props.title, props.data)
 const accumulateData = computed(() => {
   // console.log('accumulateData', props.data)
-  return (props.data as number[]).reduce((acc: number[], val: number) => {
+  const monthDay = getCurrentDayMonth()
+  // console.log('accumulateData', monthDay, props.data.length)
+  return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
-    const newVal = val !== undefined ? last + val : undefined
+    let newVal
+    if (val !== undefined)
+      newVal = last + val
+    else if (i < monthDay)
+      newVal = last
+    // console.log('accumulateData', i, monthDay, val, last, newVal)
     // console.log('accumulateData', i, val, last, newVal)
     return [...acc, newVal] as number[]
   }, [])
