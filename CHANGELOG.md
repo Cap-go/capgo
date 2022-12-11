@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.31](https://github.com/Cap-go/capgo/compare/1.61.30...1.61.31) (2022-12-11)
+
+
+### Bug Fixes
+
+* on_log_create no device count on emulators or dev ([2286b6a](https://github.com/Cap-go/capgo/commit/2286b6a3abf399ee03c2a9ce27b9614f6ec94aa5))
+
 ### [1.61.30](https://github.com/Cap-go/capgo/compare/1.61.29...1.61.30) (2022-12-11)
 
 
