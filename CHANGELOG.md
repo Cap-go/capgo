@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.16](https://github.com/Cap-go/capgo/compare/1.61.15...1.61.16) (2022-12-11)
+
+
+### Bug Fixes
+
+* add new email user need onboarding ([9c20c40](https://github.com/Cap-go/capgo/commit/9c20c40f50d42984a5ab452d3c74ca8bf8cfdd41))
+
 ### [1.61.15](https://github.com/Cap-go/capgo/compare/1.61.14...1.61.15) (2022-12-11)
 
 
