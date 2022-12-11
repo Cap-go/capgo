@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.21](https://github.com/Cap-go/capgo/compare/1.61.20...1.61.21) (2022-12-11)
+
+
+### Bug Fixes
+
+* is good plan calc ([3b79e81](https://github.com/Cap-go/capgo/commit/3b79e817a488abc0194bc02cabc6ffd6d0a9fd45))
+
 ### [1.61.20](https://github.com/Cap-go/capgo/compare/1.61.19...1.61.20) (2022-12-11)
 
 
