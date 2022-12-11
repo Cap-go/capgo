@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.61.28](https://github.com/Cap-go/capgo/compare/1.61.27...1.61.28) (2022-12-11)
+
+
+### Bug Fixes
+
+* stats remove useless error obj ([44b73dc](https://github.com/Cap-go/capgo/commit/44b73dcdce2aa9ea5ec49564462eec91661aaad6))
+* use increment v2 ([904bb8b](https://github.com/Cap-go/capgo/commit/904bb8bd62974089118d69a7f76d6ddc21c6ba8e))
+
 ### [1.61.27](https://github.com/Cap-go/capgo/compare/1.61.26...1.61.27) (2022-12-11)
 
 
