@@ -28,3 +28,5 @@ report.xml
 fastlane/metadata/review_information/demo_password.txt
 fastlane/metadata/review_information/demo_user.txt
 fastlane/metadata/review_information/phone_number.txt
+.capgo_key
+.capgo_key.pub
