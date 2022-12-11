@@ -1,7 +1,7 @@
 import { logsnag } from '../_utils/_logsnag.ts'
 import { addEventPerson } from './crisp.ts'
 import { sendNotif } from './notifications.ts'
-import { getCurrentPlanName, isGoodPlan, isTrial, supabaseAdmin } from './supabase.ts'
+import { getCurrentPlanName, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin } from './supabase.ts'
 
 export interface StatsV2 {
   mau: number
@@ -75,7 +75,9 @@ export const checkPlan = async (userId: string): Promise<void> => {
       return Promise.resolve()
     }
     const is_good_plan = await isGoodPlan(userId)
-    if (!is_good_plan) {
+    const is_onboarded = await isOnboarded(userId)
+    const is_onboarding_needed = await isOnboardingNeeded(userId)
+    if (!is_good_plan && is_onboarded) {
       console.log('is_good_plan_v2', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
       const dateid = new Date().toISOString().slice(0, 7)
@@ -117,6 +119,18 @@ export const checkPlan = async (userId: string): Promise<void> => {
           }).catch()
         }
       }
+    }
+    else if (!is_onboarded && is_onboarding_needed) {
+      await addEventPerson(user.email, {}, 'user:need_onboarding', 'orange')
+      await logsnag.publish({
+        channel: 'usage',
+        event: 'User need onboarding',
+        icon: '🥲',
+        tags: {
+          'user-id': userId,
+        },
+        notify: false,
+      }).catch()
     }
     return supabaseAdmin()
       .from('stripe_info')

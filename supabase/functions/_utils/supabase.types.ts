@@ -1001,6 +1001,14 @@ export interface Database {
         Args: { email_check: string }
         Returns: boolean
       }
+      is_onboarded: {
+        Args: { userid: string }
+        Returns: boolean
+      }
+      is_onboarding_needed: {
+        Args: { userid: string }
+        Returns: boolean
+      }
       is_paying: {
         Args: { userid: string }
         Returns: boolean
