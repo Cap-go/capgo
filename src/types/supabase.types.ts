@@ -516,7 +516,6 @@ export interface Database {
           user_id: string
           last_send_at: string
           total_send: number
-          cron: string
         }
         Insert: {
           id: string
@@ -525,7 +524,6 @@ export interface Database {
           user_id: string
           last_send_at?: string
           total_send?: number
-          cron?: string
         }
         Update: {
           id?: string
@@ -534,7 +532,6 @@ export interface Database {
           user_id?: string
           last_send_at?: string
           total_send?: number
-          cron?: string
         }
       }
       pay_as_you_go: {
