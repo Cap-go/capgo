@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.62.0](https://github.com/Cap-go/capgo/compare/1.61.35...1.62.0) (2022-12-12)
+
+
+### Features
+
+* add percentUsage ([9e3ebfb](https://github.com/Cap-go/capgo/commit/9e3ebfbec3979d15a6e9c31bce2f69d875f21bad))
+
 ### [1.61.35](https://github.com/Cap-go/capgo/compare/1.61.34...1.61.35) (2022-12-12)
 
 ### [1.61.34](https://github.com/Cap-go/capgo/compare/1.61.33...1.61.34) (2022-12-12)
