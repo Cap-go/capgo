@@ -83,7 +83,7 @@ specifiers:
   json2csv: ^5.0.7
   logsnag: ^0.1.6
   mime: ^3.0.0
-  netlify-cli: 12.2.8
+  netlify-cli: 12.2.9
   nprogress: 1.0.0-1
   pinia: 2.0.27
   plausible-tracker: ^0.3.8
@@ -206,7 +206,7 @@ devDependencies:
   eslint: 8.29.0
   eslint-plugin-cypress: 2.12.1_eslint@8.29.0
   https-localhost: 4.7.1
-  netlify-cli: 12.2.8_@types+node@18.11.13
+  netlify-cli: 12.2.9_@types+node@18.11.13
   pnpm: 7.17.1
   postcss: 8.4.19
   sass: 1.56.1
@@ -3079,6 +3079,31 @@ packages:
 
   /@netlify/edge-bundler/5.0.0:
     resolution: {integrity: sha512-6kTOzuBhdYO5/puBU87hbl5b15DMCUHynVbJMRb2AAnxB0/ggWbQpOVogQSeLF7pOO+4r5TmRGS/U30xC2CA2A==}
+    engines: {node: ^14.16.0 || >=16.0.0}
+    dependencies:
+      '@import-maps/resolve': 1.0.1
+      ajv: 8.11.2
+      ajv-errors: 3.0.0_ajv@8.11.2
+      better-ajv-errors: 1.2.0_ajv@8.11.2
+      common-path-prefix: 3.0.0
+      del: 7.0.0
+      env-paths: 3.0.0
+      execa: 6.1.0
+      find-up: 6.3.0
+      get-port: 6.1.2
+      glob-to-regexp: 0.4.1
+      node-fetch: 3.3.0
+      node-stream-zip: 1.15.0
+      p-retry: 5.1.1
+      p-wait-for: 4.1.0
+      path-key: 4.0.0
+      semver: 7.3.8
+      tmp-promise: 3.0.3
+      uuid: 9.0.0
+    dev: true
+
+  /@netlify/edge-bundler/5.4.0:
+    resolution: {integrity: sha512-hCqr8/hiaW+7O5mf801tCO2uJpo8GQjEQ/u47qb49Xth9iSOlAxkhKc+phYR5DulRNO2Tf8EzuOsls81SrbRMQ==}
     engines: {node: ^14.16.0 || >=16.0.0}
     dependencies:
       '@import-maps/resolve': 1.0.1
@@ -12891,15 +12916,15 @@ packages:
     resolution: {integrity: sha512-9iN1ka/9zmX1ZvLV9ewJYEk9h7RyRRtqdK0woXcqohu8EWIerfPUjYJPg0ULy0UqP7cslmdGc8xKDJcojlKiaw==}
     dev: true
 
-  /netlify-cli/12.2.8_@types+node@18.11.13:
-    resolution: {integrity: sha512-OmZoqPazXLv6cofp01cvTKPq0DB13X1XgCL520pOLcpg6a/QwUqpe/4nM43sU+KPV3l9OHlPjS0hHrwA0ka28w==}
+  /netlify-cli/12.2.9_@types+node@18.11.13:
+    resolution: {integrity: sha512-Y9WjkLql2gTdNHK2Bo7omqI1Er5inxTYFIi0+1vSvWzypmH/PjsNGXpYu2L0AfYoSbVNUFtIjjo7r7mnB6qFvA==}
     engines: {node: ^14.16.0 || >=16.0.0}
     hasBin: true
     requiresBuild: true
     dependencies:
       '@netlify/build': 28.4.5_@types+node@18.11.13
       '@netlify/config': 20.0.2
-      '@netlify/edge-bundler': 5.0.0
+      '@netlify/edge-bundler': 5.4.0
       '@netlify/framework-info': 9.5.2
       '@netlify/local-functions-proxy': 1.1.1
       '@netlify/zip-it-and-ship-it': 8.1.0
