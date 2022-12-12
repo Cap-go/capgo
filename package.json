@@ -105,7 +105,7 @@
     "@intlify/vite-plugin-vue-i18n": "6.0.3",
     "@types/fs-extra": "^9.0.13",
     "@types/mime": "^3.0.1",
-    "@types/node": "18.11.10",
+    "@types/node": "18.11.13",
     "@types/nprogress": "^0.2.0",
     "@types/uuid": "9.0.0",
     "@vitejs/plugin-vue": "3.2.0",
