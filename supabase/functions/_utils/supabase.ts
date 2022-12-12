@@ -190,6 +190,16 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
   return data || 'Free'
 }
 
+export const getPlanUsagePercent = async (userId: string, dateid: string): Promise<number> => {
+  const { data, error } = await supabaseAdmin()
+    .rpc('get_plan_usage_percent', { userid: userId, dateid })
+    .single()
+  if (error)
+    throw error
+
+  return data || 0
+}
+
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
     .rpc('is_good_plan_v2', { userid: userId })

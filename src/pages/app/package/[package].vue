@@ -22,6 +22,7 @@ import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
+import { bytesToMbText } from '~/services/conversion'
 
 interface InfiniteScrollCustomEvent extends CustomEvent {
   target: HTMLIonInfiniteScrollElement
@@ -80,14 +81,9 @@ const loadAppInfo = async () => {
   }
 }
 
-const bytesToMb = (bytes: number) => {
-  const res = bytes / 1024 / 1024
-  return `${res.toFixed(2)} MB`
-}
-
 const showSize = (version: (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])) => {
   if (version.size)
-    return bytesToMb(version.size)
+    return bytesToMbText(version.size)
   else if (version.external_url)
     return t('package.externally')
   else

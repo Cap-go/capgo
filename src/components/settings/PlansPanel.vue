@@ -10,7 +10,7 @@ import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import type { StatsV2 } from '~/services/plans'
-import { findBestPlan, getCurrentPlanName, getMaxstats, getPlans } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
@@ -82,7 +82,7 @@ const getUsages = async () => {
   if (!main.user?.id)
     return
   const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getMaxstats(main.user?.id, date_id)
+  stats.value = await getTotalStats(main.user?.id, date_id)
 }
 const loadData = async () => {
   isLoading.value = true

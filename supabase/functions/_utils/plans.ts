@@ -1,7 +1,11 @@
 import { logsnag } from '../_utils/_logsnag.ts'
+import { bytesToGb } from './conversion.ts'
 import { addEventPerson } from './crisp.ts'
 import { sendNotif } from './notifications.ts'
-import { getCurrentPlanName, isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin } from './supabase.ts'
+import {
+  getCurrentPlanName, getPlanUsagePercent,
+  isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin,
+} from './supabase.ts'
 
 export interface StatsV2 {
   mau: number
@@ -27,8 +31,8 @@ const planToInt = (plan: string) => {
 }
 
 export const findBestPlan = async (stats: StatsV2): Promise<string> => {
-  const storage = Math.round((stats.storage || 0) / 1024 / 1024 / 1024)
-  const bandwidth = Math.round((stats.bandwidth || 0) / 1024 / 1024 / 1024)
+  const storage = bytesToGb(stats.storage)
+  const bandwidth = bytesToGb(stats.bandwidth)
   const { data, error } = await supabaseAdmin()
     .rpc('find_best_plan_v2', {
       mau: stats.mau || 0,
@@ -42,7 +46,7 @@ export const findBestPlan = async (stats: StatsV2): Promise<string> => {
   return data || 'Team'
 }
 
-export const getMaxstats = async (userId: string, dateId: string): Promise<StatsV2> => {
+export const getTotalStats = async (userId: string, dateId: string): Promise<StatsV2> => {
   const { data, error } = await supabaseAdmin()
     .rpc('get_total_stats', { userid: userId, dateid: dateId })
     .single()
@@ -74,18 +78,19 @@ export const checkPlan = async (userId: string): Promise<void> => {
         .then()
       return Promise.resolve()
     }
+    const dateid = new Date().toISOString().slice(0, 7)
     const is_good_plan = await isGoodPlan(userId)
     const is_onboarded = await isOnboarded(userId)
     const is_onboarding_needed = await isOnboardingNeeded(userId)
     const is_free_usage = await isFreeUsage(userId)
+    const percentUsage = await getPlanUsagePercent(userId, dateid)
     if (!is_good_plan && is_onboarded && !is_free_usage) {
       console.log('is_good_plan_v2', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
-      const dateid = new Date().toISOString().slice(0, 7)
-      const get_max_stats = await getMaxstats(userId, dateid)
+      const get_total_stats = await getTotalStats(userId, dateid)
       const current_plan = await getCurrentPlanName(userId)
-      if (get_max_stats) {
-        const best_plan = await findBestPlan(get_max_stats)
+      if (get_total_stats) {
+        const best_plan = await findBestPlan(get_total_stats)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
         // TODO create a rpc method to calculate % of plan usage.
         // TODO send email for 50%, 70%, 90% of current plan usage.
@@ -135,7 +140,10 @@ export const checkPlan = async (userId: string): Promise<void> => {
     }
     return supabaseAdmin()
       .from('stripe_info')
-      .update({ is_good_plan: is_good_plan || is_free_usage })
+      .update({
+        is_good_plan: is_good_plan || is_free_usage,
+        plan_usage: percentUsage,
+      })
       .eq('customer_id', user.customer_id)
       .then()
   }

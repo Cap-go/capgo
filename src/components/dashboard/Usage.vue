@@ -4,10 +4,11 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getMaxstats, getPlans, useSupabase } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
+import { bytesToGb } from '~/services/conversion'
 
 const props = defineProps({
   appId: { type: String, default: '' },
@@ -69,12 +70,12 @@ const getAppStats = async () => {
   }
 }
 
-const getTotalStats = async () => {
+const getAllStats = async () => {
   // get aapp_stats
   if (!main.user?.id)
     return
   const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getMaxstats(main.user?.id, date_id)
+  stats.value = await getTotalStats(main.user?.id, date_id)
 }
 const getUsages = async () => {
   const { data, error } = await getAppStats()
@@ -90,13 +91,13 @@ const getUsages = async () => {
         else
           datas.value.mau[dayNumber] = item.devices || 0
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
+          datas.value.storage[dayNumber] += item.version_size ? bytesToGb(item.version_size) : 0
         else
-          datas.value.storage[dayNumber] = item.version_size ? item.version_size / 1024 / 1024 / 1024 : 0
+          datas.value.storage[dayNumber] = item.version_size ? bytesToGb(item.version_size) : 0
         if (datas.value.bandwidth[dayNumber])
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
+          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
         else
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? item.bandwidth / 1024 / 1024 / 1024 : 0
+          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
     })
   }
@@ -109,7 +110,7 @@ const loadData = async () => {
     plans.value.push(...pls)
   })
   await getUsages()
-  await getTotalStats()
+  await getAllStats()
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
   if (main.user?.id)
     await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)

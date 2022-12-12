@@ -18,6 +18,7 @@ import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
+import { bytesToMbText } from '~/services/conversion'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -71,14 +72,10 @@ const getChannels = async () => {
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
 }
-const bytesToMb = (bytes: number) => {
-  const res = bytes / 1024 / 1024
-  return `${res.toFixed(2)} MB`
-}
 
 const showSize = computed(() => {
   if (version_meta.value?.size)
-    return bytesToMb(version_meta.value.size)
+    return bytesToMbText(version_meta.value.size)
   else if (version.value?.external_url)
     return t('package.externally')
   else

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { StatsV2 } from './plans'
+import { bytesToGb } from './conversion'
 import type { Database } from '~/types/supabase.types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
@@ -162,13 +163,13 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
   return data
 }
 
-export const getMaxstats = async (userId: string, dateId: string): Promise<StatsV2> => {
+export const getTotalStats = async (userId: string, dateId: string): Promise<StatsV2> => {
   const { data, error } = await useSupabase()
     .rpc('get_total_stats', { userid: userId, dateid: dateId })
     .single()
   if (error)
     throw error
-  // console.log('getMaxstats', data, error)
+  // console.log('getTotalStats', data, error)
 
   return data[0] || {
     mau: 0,
@@ -189,8 +190,8 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
 
 export const findBestPlan = async (stats: StatsV2): Promise<string> => {
   // console.log('findBestPlan', stats)
-  const storage = Math.round((stats.storage || 0) / 1024 / 1024 / 1024)
-  const bandwidth = Math.round((stats.bandwidth || 0) / 1024 / 1024 / 1024)
+  const storage = bytesToGb(stats.storage)
+  const bandwidth = bytesToGb(stats.bandwidth)
   const { data, error } = await useSupabase()
     .rpc('find_best_plan_v2', {
       mau: stats.mau || 0,

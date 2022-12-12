@@ -721,6 +721,7 @@ export interface Database {
           trial_at: string
           price_id: string | null
           is_good_plan: boolean | null
+          plan_usage: number | null
         }
         Insert: {
           created_at?: string
@@ -732,6 +733,7 @@ export interface Database {
           trial_at?: string
           price_id?: string | null
           is_good_plan?: boolean | null
+          plan_usage?: number | null
         }
         Update: {
           created_at?: string
@@ -743,6 +745,7 @@ export interface Database {
           trial_at?: string
           price_id?: string | null
           is_good_plan?: boolean | null
+          plan_usage?: number | null
         }
       }
       users: {
@@ -838,6 +841,10 @@ export interface Database {
         Args: { userid: string }
         Returns: string
       }
+      get_devices_version: {
+        Args: { app_id: string; version_id: number }
+        Returns: number
+      }
       get_dl_by_month: {
         Args: { userid: string; pastmonth: number }
         Returns: { app_id: string; maxdownload: number }[]
@@ -878,6 +885,10 @@ export interface Database {
         Args: { userid: string }
         Returns: number
       }
+      get_plan_usage_percent: {
+        Args: { userid: string; dateid: string }
+        Returns: number
+      }
       get_stats: {
         Args: { userid: string; dateid: string }
         Returns: {
@@ -893,6 +904,10 @@ export interface Database {
       get_total_stats: {
         Args: { userid: string; dateid: string }
         Returns: { mau: number; storage: number; bandwidth: number }[]
+      }
+      get_total_stats_v2: {
+        Args: { userid: string; dateid: string }
+        Returns: unknown
       }
       get_user_id: {
         Args: { apikey: string }
