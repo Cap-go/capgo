@@ -291,12 +291,12 @@ export const sendStats = async (action: string, platform: string, device_id: str
   }
 }
 
-export const allDayOfMonth = () => {
-  const lastDay = new Date(new Date().getFullYear(), 10, 0).getDate()
+const allDateIdOfMonth = () => {
+  const lastDay = new Date(new Date().getFullYear(), 10, 0)
   const days = []
-  for (let d = 1; d <= lastDay; d++)
-    days.push(d)
-
+  for (let d = 1; d <= lastDay.getDate(); d++)
+    days.push(`${lastDay.getFullYear()}-${lastDay.getMonth() + 1}-${d < 10 ? `0${d}` : d}`)
+  console.log('days', days)
   return days
 }
 
@@ -307,7 +307,7 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
   // console.log('req', req)
   const mlu = supabaseAdmin()
     .from('stats')
-    .select('*', { count: 'exact', head: true })
+    .select('app_id', { count: 'exact', head: true })
     .eq('app_id', appId)
     .lte('created_at', lastDay.toISOString())
     .gte('created_at', firstDay.toISOString())
@@ -315,7 +315,7 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
     .then(res => res.count || 0)
   const mlu_real = supabaseAdmin()
     .from('stats')
-    .select('*', { count: 'exact', head: true })
+    .select('app_id', { count: 'exact', head: true })
     .eq('app_id', appId)
     .lte('created_at', lastDay.toISOString())
     .gte('created_at', firstDay.toISOString())
@@ -323,7 +323,7 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
     .then(res => res.count || 0)
   const devices = supabaseAdmin()
     .from('devices')
-    .select('*', { count: 'exact', head: true })
+    .select('device_id', { count: 'exact', head: true })
     .eq('app_id', appId)
     .eq('is_emulator', false)
     .eq('is_prod', true)
@@ -332,20 +332,20 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
     .then(res => res.count || 0)
   const devices_real = supabaseAdmin()
     .from('devices')
-    .select('*', { count: 'exact', head: true })
+    .select('device_id', { count: 'exact', head: true })
     .eq('app_id', appId)
     .lte('updated_at', lastDay.toISOString())
     .gte('updated_at', firstDay.toISOString())
     .then(res => res.count || 0)
   const bandwidth = supabaseAdmin()
     .from('app_stats')
-    .select()
+    .select('bandwidth')
     .eq('app_id', appId)
-    .in('date_id', allDayOfMonth())
+    .in('date_id', allDateIdOfMonth())
     .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.bandwidth || 0), 0))
   const version_size = supabaseAdmin()
     .from('app_versions_meta')
-    .select()
+    .select('size')
     .eq('app_id', appId)
     .eq('user_id', userId)
     .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.size || 0), 0))
