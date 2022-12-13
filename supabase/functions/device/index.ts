@@ -101,10 +101,9 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
     .eq('app_id', body.app_id)
     .eq('device_id', body.device_id)
     .single()
-  if (dbError || !dataDevice) {
-    console.log('Cannot find device', body, dbError)
+  if (dbError || !dataDevice)
     return sendRes({ status: 'Cannot find device', error: dbError, payload: body }, 400)
-  }
+
   if (!body.channel && body.version_id)
     return sendRes({ status: 'Nothing to update' }, 400)
 
@@ -180,7 +179,6 @@ export const deleteOverride = async (event: Request, apikey: Database['public'][
       return sendRes({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
   }
   catch (e) {
-    console.log('Cannot delete override', e)
     return sendRes({ status: 'Cannot delete override', error: JSON.stringify(e) }, 500)
   }
   return sendRes()
