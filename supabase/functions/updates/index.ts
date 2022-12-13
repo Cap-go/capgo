@@ -5,23 +5,12 @@ import { sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import { invalidIp } from '../_utils/invalids_ip.ts'
 import { checkPlan } from '../_utils/plans.ts'
+import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from './../_utils/supabase.types.ts'
-
-interface AppInfos {
-  version_name: string
-  version_build: string
-  version_os: string
-  custom_id?: string
-  is_prod?: boolean
-  is_emulator?: boolean
-  plugin_version: string
-  platform: string
-  app_id: string
-  device_id: string
-}
 
 serve(async (event: Request) => {
   // create random id
+
   const id = cryptoRandomString({ length: 10 })
   try {
     const body = (await event.json()) as AppInfos

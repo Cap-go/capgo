@@ -2,8 +2,6 @@ import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import type { StatsV2 } from './plans'
-import { bytesToGb } from './conversion'
 import type { Database } from '~/types/supabase.types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
@@ -163,9 +161,18 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
   return data
 }
 
-export const getTotalStats = async (userId: string, dateId: string): Promise<StatsV2> => {
+export const getPlanUsagePercent = async (userId: string, dateid: string): Promise<number> => {
   const { data, error } = await useSupabase()
-    .rpc('get_total_stats', { userid: userId, dateid: dateId })
+    .rpc('get_plan_usage_percent', { userid: userId, dateid })
+    .single()
+  if (error)
+    throw error
+  return data || 0
+}
+
+export const getTotalStats = async (userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> => {
+  const { data, error } = await useSupabase()
+    .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
     .single()
   if (error)
     throw error
@@ -173,8 +180,8 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Sta
 
   return data[0] || {
     mau: 0,
-    storage: 0,
     bandwidth: 0,
+    storage: 0,
   }
 }
 
@@ -188,15 +195,15 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
   return data || 'Free'
 }
 
-export const findBestPlan = async (stats: StatsV2): Promise<string> => {
+export const findBestPlan = async (stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> => {
   // console.log('findBestPlan', stats)
-  const storage = bytesToGb(stats.storage)
-  const bandwidth = bytesToGb(stats.bandwidth)
+  // const storage = bytesToGb(stats.storage)
+  // const bandwidth = bytesToGb(stats.bandwidth)
   const { data, error } = await useSupabase()
-    .rpc('find_best_plan_v2', {
+    .rpc('find_best_plan_v3', {
       mau: stats.mau || 0,
-      storage,
-      bandwidth,
+      bandwidth: stats.bandwidth,
+      storage: stats.storage,
     })
     .single()
   if (error)

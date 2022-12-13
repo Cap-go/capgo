@@ -9,8 +9,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import type { StatsV2 } from '~/services/plans'
-import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
@@ -29,9 +28,10 @@ const stats = ref({
   mau: 0,
   storage: 0,
   bandwidth: 0,
-} as StatsV2)
+} as Database['public']['Functions']['get_total_stats_v2']['Returns'][0])
 const planSuggest = ref('')
 const planCurrrent = ref('')
+const planPercent = ref(0)
 const snag = useLogSnag()
 const isLoading = ref(false)
 const segmentVal = ref<'m' | 'y'>('m')
@@ -84,6 +84,7 @@ const getUsages = async () => {
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
+
 const loadData = async () => {
   isLoading.value = true
   await getPlans().then((pls) => {
@@ -92,8 +93,12 @@ const loadData = async () => {
   })
   await getUsages()
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
-  if (main.user?.id)
+
+  if (main.user?.id) {
+    const date_id = new Date().toISOString().slice(0, 7)
     await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
+    await getPlanUsagePercent(main.user?.id, date_id).then(res => planPercent.value = res)
+  }
   isLoading.value = false
 }
 
@@ -141,7 +146,7 @@ watchEffect(async () => {
         </h1>
         <p class="mt-5 text-xl text-gray-700 dark:text-white sm:text-center">
           {{ t('plan.desc') }}<br>
-          {{ t('your-are-a') }} <span class="font-bold underline">{{ currentPlan?.name }}</span> {{ t('plan-member') }}<br>
+          {{ t('your-are-a') }} <span class="font-bold underline">{{ currentPlan?.name }}</span> {{ t('plan-member') }} You use {{ planPercent }}% of this plan.<br>
           {{ t('the') }} <span class="font-bold underline">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
 

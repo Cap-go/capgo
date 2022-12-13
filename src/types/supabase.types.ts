@@ -801,6 +801,26 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: { mau: number; bandwidth: number; storage: number }[]
       }
+      convert_bytes_to_gb: {
+        Args: { byt: number }
+        Returns: number
+      }
+      convert_bytes_to_mb: {
+        Args: { byt: number }
+        Returns: number
+      }
+      convert_gb_to_bytes: {
+        Args: { gb: number }
+        Returns: number
+      }
+      convert_mb_to_bytes: {
+        Args: { gb: number }
+        Returns: number
+      }
+      convert_number_to_percent: {
+        Args: { val: number; max_val: number }
+        Returns: number
+      }
       count_all_apps: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -829,9 +849,17 @@ export interface Database {
         Args: { mau: number; storage: number; bandwidth: number }
         Returns: string
       }
+      find_best_plan_v3: {
+        Args: { mau: number; bandwidth: number; storage: number }
+        Returns: string
+      }
       find_fit_plan_v2: {
         Args: { mau: number; storage: number; bandwidth: number }
         Returns: { name: string }[]
+      }
+      find_fit_plan_v3: {
+        Args: { mau: number; bandwidth: number; storage: number }
+        Returns: string
       }
       get_current_plan_max: {
         Args: { userid: string }
@@ -870,17 +898,6 @@ export interface Database {
         Args: { userid: string }
         Returns: number
       }
-      get_max_stats: {
-        Args: { userid: string; dateid: string }
-        Returns: {
-          max_channel: number
-          max_shared: number
-          max_update: number
-          max_version: number
-          max_app: number
-          max_device: number
-        }[]
-      }
       get_max_version: {
         Args: { userid: string }
         Returns: number
@@ -907,7 +924,7 @@ export interface Database {
       }
       get_total_stats_v2: {
         Args: { userid: string; dateid: string }
-        Returns: unknown
+        Returns: { mau: number; bandwidth: number; storage: number }[]
       }
       get_user_id: {
         Args: { apikey: string }
@@ -993,6 +1010,10 @@ export interface Database {
         Returns: boolean
       }
       is_good_plan_v2: {
+        Args: { userid: string }
+        Returns: boolean
+      }
+      is_good_plan_v3: {
         Args: { userid: string }
         Returns: boolean
       }

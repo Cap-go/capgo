@@ -1,17 +1,11 @@
 import { logsnag } from '../_utils/_logsnag.ts'
-import { bytesToGb } from './conversion.ts'
 import { addEventPerson } from './crisp.ts'
 import { sendNotif } from './notifications.ts'
 import {
   getCurrentPlanName, getPlanUsagePercent,
   isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin,
 } from './supabase.ts'
-
-export interface StatsV2 {
-  mau: number
-  storage: number
-  bandwidth: number
-}
+import type { Database } from './supabase.types.ts'
 
 const planToInt = (plan: string) => {
   switch (plan) {
@@ -30,14 +24,12 @@ const planToInt = (plan: string) => {
   }
 }
 
-export const findBestPlan = async (stats: StatsV2): Promise<string> => {
-  const storage = bytesToGb(stats.storage)
-  const bandwidth = bytesToGb(stats.bandwidth)
+export const findBestPlan = async (stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> => {
   const { data, error } = await supabaseAdmin()
-    .rpc('find_best_plan_v2', {
+    .rpc('find_best_plan_v3', {
       mau: stats.mau || 0,
-      storage,
-      bandwidth,
+      bandwidth: stats.bandwidth,
+      storage: stats.storage,
     })
     .single()
   if (error)
@@ -46,9 +38,9 @@ export const findBestPlan = async (stats: StatsV2): Promise<string> => {
   return data || 'Team'
 }
 
-export const getTotalStats = async (userId: string, dateId: string): Promise<StatsV2> => {
+export const getTotalStats = async (userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> => {
   const { data, error } = await supabaseAdmin()
-    .rpc('get_total_stats', { userid: userId, dateid: dateId })
+    .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
     .single()
 
   if (error)

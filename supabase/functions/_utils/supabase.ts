@@ -292,11 +292,14 @@ export const sendStats = async (action: string, platform: string, device_id: str
 }
 
 const allDateIdOfMonth = () => {
-  const lastDay = new Date(new Date().getFullYear(), 10, 0)
+  const date_id = new Date().toISOString().slice(0, 7)
+  const lastDay = new Date(new Date().getFullYear(), new Date().getMonth(), 0)
   const days = []
-  for (let d = 1; d <= lastDay.getDate(); d++)
-    days.push(`${lastDay.getFullYear()}-${lastDay.getMonth() + 1}-${d < 10 ? `0${d}` : d}`)
-  console.log('days', days)
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const day = new Date(new Date().getFullYear(), new Date().getMonth(), d).getDate()
+    days.push(`${date_id}-${day}`)
+  }
+  // console.log('days', days)
   return days
 }
 
