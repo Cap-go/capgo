@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.64.0](https://github.com/Cap-go/capgo/compare/1.63.2...1.64.0) (2022-12-13)
+
+
+### Features
+
+* add test function ([9ead99f](https://github.com/Cap-go/capgo/commit/9ead99f1018aad655ac7a0298d6d241c6094de03))
+
 ### [1.63.2](https://github.com/Cap-go/capgo/compare/1.63.1...1.63.2) (2022-12-13)
 
 
