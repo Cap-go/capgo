@@ -5,6 +5,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 
 interface GetLatest {
   app_id?: string
+  version?: string
   page?: number
 }
 
@@ -13,19 +14,34 @@ export const deleteBundle = async (event: Request,
   const body = await event.json() as GetLatest
   if (!body.app_id)
     return sendRes({ status: 'Missing app_id' }, 400)
+  if (!body.version)
+    return sendRes({ status: 'Missing app_id' }, 400)
 
   if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
-    const { error: dbError } = await supabaseAdmin()
-      .from('app_versions')
-      .update({
-        deleted: true,
-      })
-      .eq('app_id', body.app_id)
-    if (dbError)
-      return sendRes({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
+    if (body.version) {
+      const { error: dbError } = await supabaseAdmin()
+        .from('app_versions')
+        .update({
+          deleted: true,
+        })
+        .eq('app_id', body.app_id)
+        .eq('name', body.version)
+      if (dbError)
+        return sendRes({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
+    }
+    else {
+      const { error: dbError } = await supabaseAdmin()
+        .from('app_versions')
+        .update({
+          deleted: true,
+        })
+        .eq('app_id', body.app_id)
+      if (dbError)
+        return sendRes({ status: 'Cannot delete all version', error: JSON.stringify(dbError) }, 400)
+    }
   }
   catch (e) {
     return sendRes({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
