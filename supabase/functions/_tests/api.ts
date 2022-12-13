@@ -5,10 +5,28 @@ export const baseNetlify = 'https://netlify.capgo.app/'
 
 const defaultAppId = 'ee.test.test'
 const defaultVersion = '1.58.17'
+const defaultVersionCode = '15817999'
 const defaultVersionId = 142
+const defaultChannelId = 142
+const defaultChannel = 'dev'
+const defaultOs = 'ios'
+const defaultVersionOs = '16.0.2'
+const defaultVersionName = 'builtin'
+const defaultpluginVersion = '4.3.4'
 const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
 const defaultZipId = '776bf561-94ef-422f-851f-502c85ff6cEE'
 const defaultUserId = 'f83fd102-c21d-4984-b6a1-33c2cf018fd7'
+
+export const defaultUpdatePayload = {
+  platform: defaultOs,
+  device_id: defaultDeviceID,
+  app_id: defaultAppId,
+  version_build: defaultVersion,
+  version_code: defaultVersionCode,
+  version_os: defaultVersionOs,
+  version_name: defaultVersionName,
+  plugin_version: defaultpluginVersion,
+}
 
 export const defaultUpdateRes = {
   version: '1.58.17',
@@ -18,48 +36,22 @@ export const defaultUpdateRes = {
 }
 export const postUpdate = async (baseUrl: string) => {
   const url = `${baseUrl}/updates`
-  const response = await axiod.post(url, {
-    platform: 'ios',
-    device_id: defaultDeviceID,
-    app_id: defaultAppId,
-    version_build: '1.25.1',
-    version_code: '12501999',
-    version_os: '16.0.2',
-    version_name: 'builtin',
-    plugin_version: '4.3.4',
-  })
+  const response = await axiod.post(url, defaultUpdatePayload)
   return response.data
 }
 
 export const defaultSetChannelRes = { status: 'ok' }
 export const setChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
-  const response = await axiod.post(url, {
-    platform: 'ios',
-    device_id: defaultDeviceID,
-    app_id: defaultAppId,
-    version_build: '1.25.1',
-    version_code: '12501999',
-    version_os: '16.0.2',
-    version_name: 'builtin',
-    plugin_version: '4.3.4',
-  })
+  const payload = { ...defaultUpdatePayload, channel: defaultChannel }
+  const response = await axiod.post(url, payload)
   return response.data
 }
 
 export const defaultPutChannelRes = { channel: 'production', status: 'default' }
 export const putChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
-  const response = await axiod.put(url, {
-    platform: 'ios',
-    device_id: defaultDeviceID,
-    app_id: defaultAppId,
-    version_build: '1.25.1',
-    version_code: '12501999',
-    version_os: '16.0.2',
-    version_name: 'builtin',
-    plugin_version: '4.3.4',
-  })
+  const response = await axiod.put(url, defaultUpdatePayload)
   return response.data
 }
 
@@ -71,11 +63,11 @@ export const defaultGetDevicesRes = [{
   is_prod: true,
   is_emulator: false,
   app_id: defaultAppId,
-  platform: 'ios',
-  plugin_version: '3.2.0',
-  os_version: null,
-  version_build: 'builtin',
-  version: { name: '0.8.1-alpha.4', id: 1538 },
+  platform: defaultOs,
+  plugin_version: defaultpluginVersion,
+  os_version: defaultVersionOs,
+  version_build: defaultVersionName,
+  version: { name: defaultVersion, id: defaultVersionId },
 }]
 export const getDevices = async (baseUrl: string) => {
   const url = `${baseUrl}/device`
@@ -91,18 +83,18 @@ export const getDevices = async (baseUrl: string) => {
 }
 
 export const defaultGetChannelRes = [{
-  id: 199,
   created_at: '2022-06-28T22:16:30.364812+00:00',
-  name: 'dev',
-  app_id: defaultAppId,
-  created_by: '3253946e-18d1-4019-8cd4-76d8dae566c1',
   updated_at: '2022-12-05T22:08:20.700084+00:00',
-  public: false,
+  id: defaultChannelId,
+  name: defaultChannel,
+  app_id: defaultAppId,
+  created_by: defaultUserId,
+  public: true,
   disableAutoUpdateUnderNative: false,
   disableAutoUpdateToMajor: false,
   allow_emulator: true,
   allow_dev: true,
-  version: { name: '0.23.1', id: 6342 },
+  version: { name: defaultVersion, id: defaultVersionId },
 }]
 export const getChannels = async (baseUrl: string) => {
   const url = `${baseUrl}/channel`
