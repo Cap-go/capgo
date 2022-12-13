@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.64.1](https://github.com/Cap-go/capgo/compare/1.64.0...1.64.1) (2022-12-13)
+
+
+### Bug Fixes
+
+* use real db value for prod tests ([a2da238](https://github.com/Cap-go/capgo/commit/a2da23898e3fe585a9f213962c4366a30e0b1c99))
+
 ## [1.64.0](https://github.com/Cap-go/capgo/compare/1.63.2...1.64.0) (2022-12-13)
 
 
