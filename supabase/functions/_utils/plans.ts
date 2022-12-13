@@ -33,7 +33,7 @@ export const findBestPlan = async (stats: Database['public']['Functions']['find_
     })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || 'Team'
 }
@@ -44,7 +44,7 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
     .single()
 
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data[0] || {
     mau: 0,

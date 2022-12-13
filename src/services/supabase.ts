@@ -74,7 +74,7 @@ export const existUser = async (email: string): Promise<string> => {
     .rpc('exist_user', { e_mail: email })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data
 }
@@ -100,7 +100,7 @@ export const isGoodPlan = async (userId: string): Promise<boolean> => {
     .rpc('is_good_plan_v2', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -109,7 +109,7 @@ export const isTrial = async (userId: string): Promise<number> => {
     .rpc('is_trial', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || 0
 }
@@ -118,7 +118,7 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
     .rpc('is_admin', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -127,7 +127,7 @@ export const isCanceled = async (userId: string): Promise<boolean> => {
     .rpc('is_canceled', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -137,7 +137,7 @@ export const isPaying = async (userId: string): Promise<boolean> => {
     .rpc('is_paying', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -156,7 +156,7 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
     .rpc('is_allowed_action_user', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data
 }
@@ -166,7 +166,7 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
     .rpc('get_plan_usage_percent', { userid: userId, dateid })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
   return data || 0
 }
 
@@ -175,7 +175,7 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
     .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
   // console.log('getTotalStats', data, error)
 
   return data[0] || {
@@ -190,7 +190,7 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
     .rpc('get_current_plan_name', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || 'Free'
 }
@@ -207,7 +207,7 @@ export const findBestPlan = async (stats: Database['public']['Functions']['find_
     })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data
 }

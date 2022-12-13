@@ -185,7 +185,7 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
     .rpc('get_current_plan_name', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || 'Free'
 }
@@ -195,7 +195,7 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
     .rpc('get_plan_usage_percent', { userid: userId, dateid })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || 0
 }
@@ -205,7 +205,7 @@ export const isGoodPlan = async (userId: string): Promise<boolean> => {
     .rpc('is_good_plan_v2', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -215,7 +215,7 @@ export const isOnboarded = async (userId: string): Promise<boolean> => {
     .rpc('is_onboarded', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -225,7 +225,7 @@ export const isFreeUsage = async (userId: string): Promise<boolean> => {
     .rpc('is_free_usage', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -235,7 +235,7 @@ export const isOnboardingNeeded = async (userId: string): Promise<boolean> => {
     .rpc('is_onboarding_needed', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -245,7 +245,7 @@ export const isPaying = async (userId: string): Promise<boolean> => {
     .rpc('is_paying', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || false
 }
@@ -255,7 +255,7 @@ export const isTrial = async (userId: string): Promise<number> => {
     .rpc('is_trial', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data || 0
 }
@@ -265,7 +265,7 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
     .rpc('is_allowed_action_user', { userid: userId })
     .single()
   if (error)
-    throw error
+    throw new Error(error.message)
 
   return data
 }
