@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.63.1](https://github.com/Cap-go/capgo/compare/1.63.0...1.63.1) (2022-12-13)
+
+
+### Bug Fixes
+
+* demove dup message ([fdddc35](https://github.com/Cap-go/capgo/commit/fdddc3541b47e4c95054757992c11b4ec93d2137))
+
 ## [1.63.0](https://github.com/Cap-go/capgo/compare/1.62.6...1.63.0) (2022-12-13)
 
 
