@@ -5,11 +5,10 @@ export const baseSupabase = 'https://supabase.capgo.app/'
 export const baseNetlify = 'https://netlify.capgo.app/'
 
 const defaultAppId = 'unknow.unknow'
-const defaultVersion = '1.58.17'
-const defaultVersionCode = '15817999'
-const defaultVersionId = 142
-const defaultBundleId = 142
-const defaultChannelId = 142
+const defaultVersion = '1.2.3'
+const defaultVersionCode = '10203999'
+const defaultVersionId = 2041
+const defaultChannelId = 591
 const defaultChannel = 'dev'
 const defaultAction = 'get'
 const defaultOs = 'ios'
@@ -19,10 +18,10 @@ const defaultpluginVersion = '4.3.4'
 const defaultChecksum = 'ebf52a10'
 const defaultSessionKey = null
 const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
-const defaultBucketId = '776bf561-94ef-422f-851f-502c85ff6cEE'
-const defaultUserId = 'f83fd102-c21d-4984-b6a1-33c2cf018fd7'
-const defaultCreatedAt = '2022-06-28T23:22:50.057507+00:00'
-const defaultUpdatedAt = '2022-11-03T10:11:59.241191+00:00'
+const defaultBucketId = 'test_bucket.zip'
+const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
+const defaultCreatedAt = '2022-12-13T23:22:50.057507+00:00'
+const defaultUpdatedAt = '2022-12-13T10:11:59.241191+00:00'
 
 const headers = {
   Authorization: Deno.env.get('TEST_APIKEY') || '',
@@ -172,7 +171,7 @@ export const setChannel = async (baseUrl: string) => {
 }
 
 export const defaultSetBundleRes = {
-  id: defaultBundleId,
+  id: defaultVersionId,
   app_id: defaultAppId,
   name: defaultVersion,
   user_id: defaultUserId,
