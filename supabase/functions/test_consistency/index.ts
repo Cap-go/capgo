@@ -1,41 +1,98 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
-import { baseNetlify, baseSupabase, getChannels, getDevices, postUpdate, putChannel, setChannel } from '../_tests/api.ts'
+import {
+  baseNetlify, baseSupabase, deleteBundle,
+  deleteDevice, getBundle, getChannel, getDevice,
+  getOk, postDevice, postStats, postUpdate, putChannel,
+  setChannel, setChannelSelf,
+} from '../_tests/api.ts'
 
 import { sendRes } from '../_utils/utils.ts'
 
-serve(async () => {
+serve(async (event: Request) => {
   // check if netlify and supbase send same
   // check if they send updates
   try {
-    const supabaseUpdate = await postUpdate(baseSupabase)
-    const netlifyUpdate = await postUpdate(baseNetlify)
-    if (supabaseUpdate !== netlifyUpdate)
-      sendRes({ error: 'supabaseUpdate !== netlifyUpdate' }, 500)
+    const url = new URL(event.url)
+    const service = url.searchParams.get('service')
 
-    // check if they setChannel
-    const supabaseSetChannel = await setChannel(baseSupabase)
-    const netlifySetChannel = await setChannel(baseNetlify)
-    if (supabaseSetChannel !== netlifySetChannel)
-      sendRes({ error: 'supabaseSetChannel !== netlifySetChannel' }, 500)
-
-    // check if they putChannel
-    const supabasePutChannel = await putChannel(baseSupabase)
-    const netlifyPutChannel = await putChannel(baseNetlify)
-    if (supabasePutChannel !== netlifyPutChannel)
-      sendRes({ error: 'supabasePutChannel !== netlifyPutChannel' }, 500)
-
-    // check if they send device list
-    const supabaseDevices = await getDevices(baseSupabase)
-    const netlifyDevices = await getDevices(baseNetlify)
-    if (supabaseDevices !== netlifyDevices)
-      sendRes({ error: 'supabaseDevices !== netlifyDevices' }, 500)
-
-    // check if they send channel list
-    const supabaseChannels = await getChannels(baseSupabase)
-    const netlifyChannels = await getChannels(baseNetlify)
-    if (supabaseChannels !== netlifyChannels)
-      sendRes({ error: 'supabaseChannels !== netlifyChannels' }, 500)
-
+    if (service === 'ok') {
+      const supabaseRes = await getOk(baseSupabase)
+      const netlifyRes = await getOk(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'database') {
+      const supabaseRes = await getOk(baseSupabase)
+      const netlifyRes = await getOk(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'update') {
+      const supabaseRes = await postUpdate(baseSupabase)
+      const netlifyRes = await postUpdate(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== supabaseRes', service }, 500)
+    }
+    else if (service === 'stats') {
+      const supabaseRes = await postStats(baseSupabase)
+      const netlifyRes = await postStats(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseSetChannelSelf  !== netlifySetChannelSelf' }, 500)
+    }
+    else if (service === 'channel_self_post') {
+      const supabaseRes = await setChannelSelf(baseSupabase)
+      const netlifyRes = await setChannelSelf(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes  !== supabaseRes', service }, 500)
+    }
+    else if (service === 'channel_self_get') {
+      const supabaseRes = await putChannel(baseSupabase)
+      const netlifyRes = await putChannel(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'channel_get') {
+      const supabaseRes = await getChannel(baseSupabase)
+      const netlifyRes = await getChannel(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'channel_post') {
+      const supabaseRes = await setChannel(baseSupabase)
+      const netlifyRes = await setChannel(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'netlifyRes !== supabaseRes', service }, 500)
+    }
+    else if (service === 'device_get') {
+      const supabaseRes = await getDevice(baseSupabase)
+      const netlifyRes = await getDevice(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'device_post') {
+      const supabaseRes = await postDevice(baseSupabase)
+      const netlifyRes = await postDevice(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'device_delete') {
+      const supabaseRes = await deleteDevice(baseSupabase)
+      const netlifyRes = await deleteDevice(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'bundle_get') {
+      const supabaseRes = await getBundle(baseSupabase)
+      const netlifyRes = await getBundle(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
+    else if (service === 'bundle_delete') {
+      const supabaseRes = await deleteBundle(baseSupabase)
+      const netlifyRes = await deleteBundle(baseNetlify)
+      if (supabaseRes !== netlifyRes)
+        sendRes({ error: 'supabaseRes !== netlifyRes', service }, 500)
+    }
     return sendRes()
   }
   catch (error) {
