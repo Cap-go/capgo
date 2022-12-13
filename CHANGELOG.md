@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.63.0](https://github.com/Cap-go/capgo/compare/1.62.6...1.63.0) (2022-12-13)
+
+
+### Features
+
+* allow more option from channel api ([b62610f](https://github.com/Cap-go/capgo/commit/b62610f0694a6b01ff8ff7710f974998e5879502))
+
+
+### Bug Fixes
+
+* remove dup console log ([ee9c5ff](https://github.com/Cap-go/capgo/commit/ee9c5ffcbe5cb8ab3bb6f6eaf95fc401f0aadab0))
+
 ### [1.62.6](https://github.com/Cap-go/capgo/compare/1.62.5...1.62.6) (2022-12-13)
 
 
