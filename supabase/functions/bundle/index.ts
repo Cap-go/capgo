@@ -52,7 +52,8 @@ export const deleteBundle = async (event: Request,
 export const get = async (event: Request,
   apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   try {
-    const body = (await event.json()) as GetLatest
+    const url = new URL(event.url)
+    const body = Object.fromEntries(url.searchParams.entries() as any) as GetLatest
     if (!body.app_id)
       return sendRes({ status: 'Missing app_id' }, 400)
 

@@ -23,7 +23,8 @@ interface GetDevice {
 }
 
 export const get = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
-  const body = (await event.json()) as GetDevice
+  const url = new URL(event.url)
+  const body = Object.fromEntries(url.searchParams.entries() as any) as GetDevice
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
