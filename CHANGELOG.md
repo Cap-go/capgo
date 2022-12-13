@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.62.2](https://github.com/Cap-go/capgo/compare/1.62.1...1.62.2) (2022-12-12)
+
+
+### Bug Fixes
+
+* card size ([0fe2b15](https://github.com/Cap-go/capgo/commit/0fe2b15e7971d9e4338a0f0eb77e679b00de3702))
+
 ### [1.62.1](https://github.com/Cap-go/capgo/compare/1.62.0...1.62.1) (2022-12-12)
 
 
