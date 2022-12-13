@@ -154,7 +154,6 @@ serve(async (event: Request) => {
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
     if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
-      console.error('invalid ip', xForwardedFor)
       await sendStats('invalidIP', platform, device_id, app_id, version_build, version.id)
       return sendRes({ message: 'invalid ip' }, 400)
     }
