@@ -8,6 +8,13 @@ interface ChannelSet {
   channel: string
   version?: string
   public?: boolean
+  disableAutoUpdateUnderNative?: boolean
+  disableAutoUpdateToMajor?: boolean
+  ios?: boolean
+  android?: boolean
+  allow_device_self_set?: boolean
+  allow_emulator?: boolean
+  allow_dev?: boolean
 }
 interface GetDevice {
   app_id: string
@@ -109,6 +116,14 @@ export const post = async (event: Request, apikey: Database['public']['Tables'][
     created_by: apikey.user_id,
     app_id: body.app_id,
     name: body.channel,
+    ...(body.public == null ? {} : { public: body.public }),
+    ...(body.disableAutoUpdateUnderNative == null ? {} : { disableAutoUpdateUnderNative: body.disableAutoUpdateUnderNative }),
+    ...(body.disableAutoUpdateToMajor == null ? {} : { disableAutoUpdateToMajor: body.disableAutoUpdateToMajor }),
+    ...(body.allow_device_self_set == null ? {} : { allow_device_self_set: body.allow_device_self_set }),
+    ...(body.allow_emulator == null ? {} : { allow_emulator: body.allow_emulator }),
+    ...(body.allow_dev == null ? {} : { allow_dev: body.allow_dev }),
+    ...(body.ios == null ? {} : { ios: body.ios }),
+    ...(body.android == null ? {} : { android: body.android }),
     version: -1,
   }
   if (body.version) {
@@ -125,9 +140,6 @@ export const post = async (event: Request, apikey: Database['public']['Tables'][
 
     channel.version = data.id
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'public'))
-    channel.public = body.public
-
   try {
     const { error: dbError } = await updateOrCreateChannel(channel)
     if (dbError)
