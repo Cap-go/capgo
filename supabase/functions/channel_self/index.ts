@@ -11,6 +11,7 @@ interface DeviceLink extends AppInfos {
 
 const post = async (event: Request): Promise<Response> => {
   const body = await event.json() as DeviceLink
+  console.log('body', body)
   let {
     version_name,
     version_build,
@@ -140,6 +141,7 @@ const post = async (event: Request): Promise<Response> => {
 
 const put = async (event: Request): Promise<Response> => {
   const body = await event.json() as DeviceLink
+  console.log('body', body)
   let {
     version_name,
     version_build,
