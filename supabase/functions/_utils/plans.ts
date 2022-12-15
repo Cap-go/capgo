@@ -32,8 +32,10 @@ export const findBestPlan = async (stats: Database['public']['Functions']['find_
       storage: stats.storage,
     })
     .single()
-  if (error)
+  if (error) {
+    console.error('error.message', error.message)
     throw new Error(error.message)
+  }
 
   return data || 'Team'
 }
@@ -43,8 +45,10 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
     .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
     .single()
 
-  if (error)
+  if (error) {
+    console.error('error.message', error.message)
     throw new Error(error.message)
+  }
 
   return data[0] || {
     mau: 0,

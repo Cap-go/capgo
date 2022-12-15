@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { isGoodPlan, isOnboarded, isPaying, isTrial, supabaseAdmin } from '../_utils/supabase.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { insights } from '../_utils/_logsnag.ts'
 
@@ -15,6 +15,7 @@ interface UserStats {
   }
   trial: number
   need_upgrade: number
+  onboarded: number
   not_paying: number
   paying: number
 }
@@ -31,6 +32,22 @@ const getGithubStars = async (): Promise<number> => {
   return json.stargazers_count
 }
 
+const defaultStats: UserStats = {
+  users: 0,
+  plans: {
+    'Free': 0,
+    'Solo': 0,
+    'Maker': 0,
+    'Team': 0,
+    'Pay as you go': 0,
+  },
+  trial: 0,
+  onboarded: 0,
+  need_upgrade: 0,
+  not_paying: 0,
+  paying: 0,
+}
+
 const getStats = (): GlobalStats => {
   return {
     apps: supabaseAdmin().rpc('count_all_apps', {}).single().then((res) => {
@@ -43,39 +60,16 @@ const getStats = (): GlobalStats => {
         console.log('count_all_updates', res.error)
       return res.data || 0
     }),
-    users: supabaseAdmin().from('users')
-      .select().then(async (res) => {
+    users: supabaseAdmin()
+      .from('users')
+      .select()
+      .then(async (res) => {
         if (res.error || !res.data) {
           console.log('get users', res.error)
-          return {
-            users: 0,
-            plans: {
-              'Free': 0,
-              'Solo': 0,
-              'Maker': 0,
-              'Team': 0,
-              'Pay as you go': 0,
-            },
-            trial: 0,
-            need_upgrade: 0,
-            not_paying: 0,
-            paying: 0,
-          } as UserStats
+          return defaultStats
         }
-        const data: UserStats = {
-          users: res.data.length,
-          plans: {
-            'Free': 0,
-            'Solo': 0,
-            'Maker': 0,
-            'Team': 0,
-            'Pay as you go': 0,
-          },
-          trial: 0,
-          need_upgrade: 0,
-          not_paying: 0,
-          paying: 0,
-        }
+        const data: UserStats = defaultStats
+        data.users = res.data.length
         const all = []
         for (const user of res.data) {
           all.push(supabaseAdmin()
@@ -97,30 +91,35 @@ const getStats = (): GlobalStats => {
                 console.error('stripe_info no body', user.customer_id)
               const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
               const name = product.name as keyof typeof data.plans
-              console.log('stripe_info name', name, res.data?.status, res.data)
+              // console.log('stripe_info name', name, res.data?.status, res.data)
               if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
                 data.plans[name] += res.data?.status === 'succeeded' || name === 'Free' ? 1 : 0
             }))
-          all.push(supabaseAdmin()
-            .rpc('is_trial', { userid: user.id })
-            .single().then((res) => {
-              data.trial += res.data ? 1 : 0
+          all.push(isTrial(user.id)
+            .then((res) => {
+              data.trial += res ? 1 : 0
             }))
-          all.push(supabaseAdmin()
-            .rpc('is_good_plan_v2', { userid: user.id })
-            .single().then((res) => {
-              data.need_upgrade += res.data ? 0 : 1
+          all.push(isOnboarded(user.id)
+            .then((res) => {
+              data.onboarded += res ? 1 : 0
             }))
-          all.push(supabaseAdmin()
-            .rpc('is_paying', { userid: user.id })
-            .single().then((res) => {
-              data.paying += res.data ? 1 : 0
-              data.not_paying += res.data ? 0 : 1
+          all.push(isPaying(user.id)
+            .then((res) => {
+              data.paying += res ? 1 : 0
+              data.not_paying += res ? 0 : 1
+              if (res) {
+                all.push(isGoodPlan(user.id)
+                  .then((res) => {
+                    data.need_upgrade += res ? 0 : 1
+                  }))
+              }
             }))
         }
+        console.log('all', all.length)
         await Promise.all(all)
-        data.need_upgrade -= data.not_paying
+        console.log('all done')
         data.not_paying -= data.trial
+        data.plans.Free -= data.trial
         return data
       }),
     stars: getGithubStars(),
@@ -158,6 +157,11 @@ serve(async (event: Request) => {
         title: 'User need upgrade',
         value: users.need_upgrade,
         icon: '🤒',
+      },
+      {
+        title: 'User onboarded',
+        value: users.onboarded,
+        icon: '✅',
       },
       {
         title: 'User trial',
