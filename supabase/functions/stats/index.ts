@@ -57,30 +57,33 @@ serve(async (event: Request) => {
       .from('app_versions')
       .select('id')
       .eq('app_id', app_id)
-      .or(`name.eq.${version_name},custom_id.eq.builtin`)
+      .or(`name.eq.${version_name},name.eq.builtin`)
+      .limit(1)
       .single()
     if (data) {
       stat.version = data.id
       device.version = data.id
-      if (!device.is_emulator && device.is_prod) {
-        const { data: deviceData, error: deviceError } = await supabaseAdmin()
+      if (action === 'set' && !device.is_emulator && device.is_prod) {
+        const { data: deviceData } = await supabaseAdmin()
           .from(deviceDb)
           .select()
           .eq('app_id', app_id)
           .eq('device_id', device_id)
           .single()
-        if (deviceData && !deviceError) {
+        if (deviceData && deviceData.version !== data.id) {
           all.push(updateVersionStats({
             app_id,
             version_id: deviceData.version,
             devices: -1,
           }))
         }
-        all.push(updateVersionStats({
-          app_id,
-          version_id: data.id,
-          devices: 1,
-        }))
+        if (!deviceData || deviceData.version !== data.id) {
+          all.push(updateVersionStats({
+            app_id,
+            version_id: data.id,
+            devices: 1,
+          }))
+        }
       }
     }
     else {

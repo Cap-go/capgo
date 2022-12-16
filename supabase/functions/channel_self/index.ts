@@ -49,7 +49,8 @@ const post = async (event: Request): Promise<Response> => {
     .from('app_versions')
     .select('id')
     .eq('app_id', app_id)
-    .or(`name.eq.${version_name},custom_id.eq.builtin`)
+    .or(`name.eq.${version_name},name.eq.builtin`)
+    .limit(1)
     .single()
 
   if (!version) {
@@ -160,7 +161,8 @@ const put = async (event: Request): Promise<Response> => {
     .from('app_versions')
     .select('id')
     .eq('app_id', app_id)
-    .or(`name.eq.${version_name},custom_id.eq.builtin`)
+    .or(`name.eq.${version_name},name.eq.builtin`)
+    .limit(1)
     .single()
 
   if (!version) {
