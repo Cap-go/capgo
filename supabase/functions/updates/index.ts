@@ -58,6 +58,12 @@ serve(async (event: Request) => {
       plugin_version,
       version_name)
 
+    const { data: versionData } = await supabaseAdmin()
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', app_id)
+      .or(`name.eq.${version_name},custom_id.eq.builtin`)
+      .single()
     const { data: channelData, error: dbError } = await supabaseAdmin()
       .from('channels')
       .select(`
@@ -149,12 +155,14 @@ serve(async (event: Request) => {
     const planValid = await isAllowedAction(channel.created_by)
     await checkPlan(channel.created_by)
     let version = channel.version as Database['public']['Tables']['app_versions']['Row']
+    const versionId = versionData ? versionData.id : version.id
+
     const xForwardedFor = event.headers.get('x-forwarded-for') || ''
     // check if version is created_at more than 4 hours
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
     if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
-      await sendStats('invalidIP', platform, device_id, app_id, version_build, version.id)
+      await sendStats('invalidIP', platform, device_id, app_id, version_build, versionId)
       return sendRes({ message: 'invalid ip' }, 400)
     }
     await updateOrCreateDevice({
@@ -162,7 +170,7 @@ serve(async (event: Request) => {
       device_id,
       platform: platform as Database['public']['Enums']['platform_os'],
       plugin_version,
-      version: version.id,
+      version: versionId,
       os_version: version_os,
       ...(is_emulator != null ? { is_emulator } : {}),
       ...(is_prod != null ? { is_prod } : {}),
@@ -173,7 +181,7 @@ serve(async (event: Request) => {
     // console.log('updateOrCreateDevice done')
     if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
-      await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, version.id)
+      await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
         err: 'not good plan',
@@ -212,7 +220,7 @@ serve(async (event: Request) => {
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
     if (version_name === version.name) {
       console.log(id, 'No new version available', device_id, version_name, version.name)
-      await sendStats('noNew', platform, device_id, app_id, version_build, version.id)
+      await sendStats('noNew', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'No new version available',
       }, 200)
@@ -221,7 +229,7 @@ serve(async (event: Request) => {
     // console.log('check disableAutoUpdateToMajor', device_id)
     if (!devicesOverride && !channel.ios && platform === 'ios') {
       console.log(id, 'Cannot update, ios is disabled', device_id)
-      await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, version.id)
+      await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         major: true,
         message: 'Cannot update, ios it\'s disabled',
@@ -232,7 +240,7 @@ serve(async (event: Request) => {
     }
     if (!devicesOverride && !channel.android && platform === 'android') {
       console.log(id, 'Cannot update, android is disabled', device_id)
-      await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, version.id)
+      await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         major: true,
         message: 'Cannot update, android is disabled',
@@ -243,7 +251,7 @@ serve(async (event: Request) => {
     }
     if (!devicesOverride && channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
       console.log(id, 'Cannot upgrade major version', device_id)
-      await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, version.id)
+      await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         major: true,
         message: 'Cannot upgrade major version',
@@ -256,7 +264,7 @@ serve(async (event: Request) => {
     // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
     if (!devicesOverride && channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
       console.log(id, 'Cannot revert under native version', device_id)
-      await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, version.id)
+      await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot revert under native version',
         error: 'disable_auto_update_under_native',
@@ -267,7 +275,7 @@ serve(async (event: Request) => {
 
     if (!devicesOverride && !channel.allow_dev && !is_prod) {
       console.log(id, 'Cannot update dev build is disabled', device_id)
-      await sendStats('disableDevBuild', platform, device_id, app_id, version_build, version.id)
+      await sendStats('disableDevBuild', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         major: true,
         message: 'Cannot update, dev build is disabled',
@@ -278,7 +286,7 @@ serve(async (event: Request) => {
     }
     if (!devicesOverride && !channel.allow_emulator && is_emulator) {
       console.log(id, 'Cannot update emulator is disabled', device_id)
-      await sendStats('disableEmulator', platform, device_id, app_id, version_build, version.id)
+      await sendStats('disableEmulator', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         major: true,
         message: 'Cannot update, emulator is disabled',

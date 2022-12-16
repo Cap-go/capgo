@@ -55,9 +55,9 @@ serve(async (event: Request) => {
     const all = []
     const { data } = await supabaseAdmin()
       .from('app_versions')
-      .select()
+      .select('id')
       .eq('app_id', app_id)
-      .eq('name', version_name || 'unknown')
+      .or(`name.eq.${version_name},custom_id.eq.builtin`)
       .single()
     if (data) {
       stat.version = data.id
