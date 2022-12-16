@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.64.8](https://github.com/Cap-go/capgo/compare/1.64.7...1.64.8) (2022-12-16)
+
+
+### Bug Fixes
+
+* use error when switch to on prem ([da00e87](https://github.com/Cap-go/capgo/commit/da00e87019e53ed4b6a97ee734837113c74fa759))
+
 ### [1.64.7](https://github.com/Cap-go/capgo/compare/1.64.6...1.64.7) (2022-12-16)
 
 
