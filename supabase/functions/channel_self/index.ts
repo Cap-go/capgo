@@ -50,6 +50,7 @@ const post = async (event: Request): Promise<Response> => {
     .select('id')
     .eq('app_id', app_id)
     .or(`name.eq.${version_name},name.eq.builtin`)
+    .order('id', { ascending: false })
     .limit(1)
     .single()
 
@@ -162,6 +163,7 @@ const put = async (event: Request): Promise<Response> => {
     .select('id')
     .eq('app_id', app_id)
     .or(`name.eq.${version_name},name.eq.builtin`)
+    .order('id', { ascending: false })
     .limit(1)
     .single()
 

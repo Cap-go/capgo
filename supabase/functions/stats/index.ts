@@ -58,6 +58,7 @@ serve(async (event: Request) => {
       .select('id')
       .eq('app_id', app_id)
       .or(`name.eq.${version_name},name.eq.builtin`)
+      .order('id', { ascending: false })
       .limit(1)
       .single()
     if (data) {
