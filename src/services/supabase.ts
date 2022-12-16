@@ -178,7 +178,7 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
     throw new Error(error.message)
   // console.log('getTotalStats', data, error)
 
-  return data[0] || {
+  return data as any as Database['public']['Functions']['get_total_stats_v2']['Returns'][0] || {
     mau: 0,
     bandwidth: 0,
     storage: 0,

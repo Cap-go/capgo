@@ -83,6 +83,7 @@ const getUsages = async () => {
     return
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
+  await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
 const loadData = async () => {
@@ -92,7 +93,6 @@ const loadData = async () => {
     plans.value.push(...pls)
   })
   await getUsages()
-  await findBestPlan(stats.value).then(res => planSuggest.value = res)
 
   if (main.user?.id) {
     const date_id = new Date().toISOString().slice(0, 7)
