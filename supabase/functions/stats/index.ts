@@ -88,7 +88,7 @@ serve(async (event: Request) => {
       }
     }
     else {
-      console.log('switch to onprem', app_id)
+      console.error('switch to onprem', app_id)
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
     }
