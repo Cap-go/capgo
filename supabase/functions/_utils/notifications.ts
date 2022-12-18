@@ -73,4 +73,4 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
 }
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
-// console.log(isSendable(last_send_at, '0 1 * * 0'))
+// console.log(isSendable(last_send_at, '0 0 1 * *'))

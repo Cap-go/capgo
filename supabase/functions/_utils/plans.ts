@@ -138,7 +138,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
       // check if user is at more than 90%, 50% or 70% of plan usage
       if (percentUsage >= 90) {
         // cron every month * * * * 1
-        await sendNotif('user:90_percent_of_plan', userId, '0 0 * * 1', 'red')
+        await sendNotif('user:90_percent_of_plan', userId, '0 0 1 * *', 'red')
         // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
         await logsnag.publish({
           channel: 'usage',
@@ -152,7 +152,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
       }
       else if (percentUsage >= 70) {
         // cron every month * * * * 1
-        await sendNotif('user:70_percent_of_plan', userId, '0 0 * * 1', 'orange')
+        await sendNotif('user:70_percent_of_plan', userId, '0 0 1 * *', 'orange')
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
         await logsnag.publish({
           channel: 'usage',
@@ -165,7 +165,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
         }).catch()
       }
       else if (percentUsage >= 50) {
-        await sendNotif('user:50_percent_of_plan', userId, '0 0 * * 1', 'orange')
+        await sendNotif('user:50_percent_of_plan', userId, '0 0 1 * *', 'orange')
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
         await logsnag.publish({
           channel: 'usage',
