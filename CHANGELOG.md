@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.66.0](https://github.com/Cap-go/capgo/compare/1.65.0...1.66.0) (2022-12-18)
+
+
+### Features
+
+* add % of plan emails ([d27118e](https://github.com/Cap-go/capgo/commit/d27118e24c00de2e8cdf2fa6b23e07f3bd7a2515))
+
 ## [1.65.0](https://github.com/Cap-go/capgo/compare/1.64.9...1.65.0) (2022-12-18)
 
 
