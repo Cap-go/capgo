@@ -81,7 +81,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
     const is_free_usage = await isFreeUsage(userId)
     const percentUsage = await getPlanUsagePercent(userId, dateid)
     if (!is_good_plan && is_onboarded && !is_free_usage) {
-      console.log('is_good_plan_v2', userId, is_good_plan)
+      console.log('is_good_plan_v3', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
       const get_total_stats = await getTotalStats(userId, dateid)
       const current_plan = await getCurrentPlanName(userId)

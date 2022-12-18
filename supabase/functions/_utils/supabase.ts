@@ -206,7 +206,7 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
-    .rpc('is_good_plan_v2', { userid: userId })
+    .rpc('is_good_plan_v3', { userid: userId })
     .single()
   if (error) {
     console.error('error.message', error.message)

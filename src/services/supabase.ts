@@ -97,7 +97,7 @@ export const autoAuth = async (route: RouteLocationNormalizedLoaded) => {
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v2', { userid: userId })
+    .rpc('is_good_plan_v3', { userid: userId })
     .single()
   if (error)
     throw new Error(error.message)
