@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.1](https://github.com/Cap-go/capgo/compare/1.66.0...1.66.1) (2022-12-18)
+
+
+### Bug Fixes
+
+* notif table record ([c948055](https://github.com/Cap-go/capgo/commit/c9480558c6f2e37677eec1aa16853a13f8842837))
+
 ## [1.66.0](https://github.com/Cap-go/capgo/compare/1.65.0...1.66.0) (2022-12-18)
 
 
