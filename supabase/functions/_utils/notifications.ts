@@ -5,7 +5,7 @@ import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 
 const sendNow = async (eventName: string,
-  email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row']) => {
+  email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) => {
   console.log('send notif', eventName, email)
   await addEventPerson(email, {}, eventName, color)
   if (past != null) {
