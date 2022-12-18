@@ -2,17 +2,31 @@ import { parseCronExpression } from 'https://cdn.skypack.dev/cron-schedule@3.0.6
 import dayjs from 'https://cdn.skypack.dev/dayjs@1.11.6?dts'
 import { addEventPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
+import type { Database } from './supabase.types.ts'
 
-const sendNow = async (eventName: string, email: string, userId: string, color: string) => {
+const sendNow = async (eventName: string,
+  email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row']) => {
   console.log('send notif', eventName, email)
   await addEventPerson(email, {}, eventName, color)
-  await supabaseAdmin()
-    .from('notifications')
-    .insert({
-      id: eventName,
-      user_id: userId,
-      last_send_at: dayjs().toISOString(),
-    })
+  if (past != null) {
+    await supabaseAdmin()
+      .from('notifications')
+      .update({
+        user_id: userId,
+        last_send_at: dayjs().toISOString(),
+        total_send: past.total_send + 1,
+      })
+      .eq('id', `eventName__${userId}`)
+  }
+  else {
+    await supabaseAdmin()
+      .from('notifications')
+      .insert({
+        id: `eventName__${userId}`,
+        user_id: userId,
+        last_send_at: dayjs().toISOString(),
+      })
+  }
 }
 
 const isSendable = (last: string, cron: string) => {
@@ -46,16 +60,16 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
     .from('notifications')
     .select()
     .eq('user_id', userId)
-    .eq('id', eventName)
+    .eq('id', `eventName__${userId}`)
     .single()
   if (!notif)
-    return sendNow(eventName, user.email, userId, color)
+    return sendNow(eventName, user.email, userId, color, null)
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
     console.log('notif already sent', eventName, userId)
     return Promise.resolve()
   }
-  return sendNow(eventName, user.email, userId, color)
+  return sendNow(eventName, user.email, userId, color, notif)
 }
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
