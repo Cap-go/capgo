@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.65.0](https://github.com/Cap-go/capgo/compare/1.64.9...1.65.0) (2022-12-18)
+
+
+### Features
+
+* switch to is_good_plan_v3 with new calculation methods ([0f0b062](https://github.com/Cap-go/capgo/commit/0f0b0629117157a69ac1ba41543522980745509f))
+
 ### [1.64.9](https://github.com/Cap-go/capgo/compare/1.64.8...1.64.9) (2022-12-16)
 
 
