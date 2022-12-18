@@ -16,13 +16,13 @@ const sendNow = async (eventName: string,
         last_send_at: dayjs().toISOString(),
         total_send: past.total_send + 1,
       })
-      .eq('id', `eventName__${userId}`)
+      .eq('id', `${eventName}__${userId}`)
   }
   else {
     await supabaseAdmin()
       .from('notifications')
       .insert({
-        id: `eventName__${userId}`,
+        id: `${eventName}__${userId}`,
         user_id: userId,
         last_send_at: dayjs().toISOString(),
       })
@@ -60,7 +60,7 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
     .from('notifications')
     .select()
     .eq('user_id', userId)
-    .eq('id', `eventName__${userId}`)
+    .eq('id', `${eventName}__${userId}`)
     .single()
   if (!notif)
     return sendNow(eventName, user.email, userId, color, null)
