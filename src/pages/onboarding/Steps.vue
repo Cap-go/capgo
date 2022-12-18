@@ -104,30 +104,48 @@ watchEffect(async () => {
     // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from(`apps:user_id=eq.${main.user?.id}`)
-      .on('INSERT', (payload) => {
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'apps',
+          filter: `user_id=eq.${main.user?.id}`,
+        },
+        (payload) => {
         // console.log('Change received step 1!', payload)
-        setLog()
-        step.value += 1
-        appId.value = payload.new.id || ''
-        realtimeListener.value = false
-        mySubscription.value.unsubscribe()
-      })
+          setLog()
+          step.value += 1
+          appId.value = payload.new.id || ''
+          realtimeListener.value = false
+          mySubscription.value.unsubscribe()
+        },
+      )
       .subscribe()
   }
   else if (step.value === 4 && !realtimeListener.value) {
     // console.log('watch app change step 4')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from(`app_versions:app_id=eq.${appId.value}`)
-      .on('INSERT', (payload) => {
-        // console.log('Change received step 4!', payload)
-        setLog()
-        step.value += 1
-        realtimeListener.value = false
-        mySubscription.value.unsubscribe()
-        emit('done')
-      })
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'app_versions',
+          filter: `app_id=eq.${appId.value}`,
+        },
+        (payload) => {
+        // console.log('Change received step 1!', payload)
+          setLog()
+          step.value += 1
+          realtimeListener.value = false
+          mySubscription.value.unsubscribe()
+          emit('done')
+        },
+      )
       .subscribe()
   }
 })
