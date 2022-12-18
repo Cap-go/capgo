@@ -134,6 +134,52 @@ export const checkPlan = async (userId: string): Promise<void> => {
         notify: false,
       }).catch()
     }
+    else if (is_good_plan && is_onboarded) {
+      // check if user is at more than 90%, 50% or 70% of plan usage
+      if (percentUsage >= 90) {
+        // cron every month * * * * 1
+        await sendNotif('user:90_percent_of_plan', userId, '0 0 * * 1', 'red')
+        // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
+        await logsnag.publish({
+          channel: 'usage',
+          event: 'User is at 90% of plan usage',
+          icon: '⚠️',
+          tags: {
+            'user-id': userId,
+          },
+          notify: false,
+        }).catch()
+      }
+      else if (percentUsage >= 70) {
+        // cron every month * * * * 1
+        await sendNotif('user:70_percent_of_plan', userId, '0 0 * * 1', 'orange')
+        // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
+        await logsnag.publish({
+          channel: 'usage',
+          event: 'User is at 70% of plan usage',
+          icon: '⚠️',
+          tags: {
+            'user-id': userId,
+          },
+          notify: false,
+        }).catch()
+      }
+      else if (percentUsage >= 50) {
+        await sendNotif('user:50_percent_of_plan', userId, '0 0 * * 1', 'orange')
+        // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
+        await logsnag.publish({
+          channel: 'usage',
+          event: 'User is at 50% of plan usage',
+          icon: '⚠️',
+          tags: {
+            'user-id': userId,
+          },
+          notify: false,
+        }).catch()
+      }
+
+      // and send email notification
+    }
     return supabaseAdmin()
       .from('stripe_info')
       .update({
