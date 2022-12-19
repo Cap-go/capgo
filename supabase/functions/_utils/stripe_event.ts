@@ -20,7 +20,7 @@ const parseHeader = (header: string, scheme: string): Details => {
     {
       timestamp: -1,
       signatures: [] as string[],
-    },
+    } as Details,
   )
 }
 const makeHMACContent = (payload: string, details: Details) => {

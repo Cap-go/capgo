@@ -20,6 +20,7 @@
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
+    "generate:node_serverless": "node ./scripts/convert_deno_to_node.mjs",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit"
   },

@@ -1,4 +1,4 @@
-import axiod from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 
 const getAuth = () => {
   // get stripe token
@@ -16,7 +16,7 @@ const getConfig = (form = false) => ({
 })
 
 export const createPortal = async (customerId: string, callbackUrl: string) => {
-  const response = await axiod.post('https://api.stripe.com/v1/billing_portal/sessions', new URLSearchParams({
+  const response = await axios.post('https://api.stripe.com/v1/billing_portal/sessions', new URLSearchParams({
     customer: customerId,
     return_url: callbackUrl,
   }), getConfig(true))
@@ -26,7 +26,7 @@ export const createPortal = async (customerId: string, callbackUrl: string) => {
 export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
   let priceId = null
   try {
-    const response = await axiod.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
+    const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
     const prices = response.data.data
     prices.forEach((price: any) => {
       if (price.recurring.interval === reccurence && price.active)
@@ -49,7 +49,7 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
   data.append('line_items[0][price]', priceId)
   data.append('line_items[0][quantity]', '1')
   try {
-    const response = await axiod.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(true))
+    const response = await axios.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(true))
     return response.data
   }
   catch (err2) {
@@ -61,7 +61,7 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
 export const createCustomer = async (email: string) => {
   const config = getConfig(true)
   console.log('config', config)
-  const response = await axiod.post('https://api.stripe.com/v1/customers', new URLSearchParams({
+  const response = await axios.post('https://api.stripe.com/v1/customers', new URLSearchParams({
     email,
   }), config)
   return response.data

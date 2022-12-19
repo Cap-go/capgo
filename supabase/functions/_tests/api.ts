@@ -1,4 +1,4 @@
-import axiod from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 
 export const baseSupabase = 'https://supabase.capgo.app/'
@@ -45,14 +45,14 @@ export const defaultUpdateRes = {
 }
 export const postUpdate = async (baseUrl: string) => {
   const url = `${baseUrl}/updates`
-  const response = await axiod.post<typeof defaultUpdateRes>(url, defaultUpdatePayload)
+  const response = await axios.post<typeof defaultUpdateRes>(url, defaultUpdatePayload)
   return response.data
 }
 
 export const defaultRes = { status: 'ok' }
 export const getOk = async (baseUrl: string) => {
   const url = `${baseUrl}/ok`
-  const response = await axiod.get<typeof defaultRes>(url)
+  const response = await axios.get<typeof defaultRes>(url)
   return response.data
 }
 
@@ -68,21 +68,21 @@ export const getDatabase = async () => {
 export const postStats = async (baseUrl: string) => {
   const url = `${baseUrl}/updates`
   const payload = { ...defaultUpdatePayload, action: defaultAction }
-  const response = await axiod.post<typeof defaultRes>(url, payload)
+  const response = await axios.post<typeof defaultRes>(url, payload)
   return response.data
 }
 
 export const setChannelSelf = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
   const payload = { ...defaultUpdatePayload, channel: defaultChannel }
-  const response = await axiod.post<typeof defaultRes>(url, payload)
+  const response = await axios.post<typeof defaultRes>(url, payload)
   return response.data
 }
 
 export const defaultPutChannelRes = { channel: 'production', status: 'default' }
 export const putChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
-  const response = await axiod.put<typeof defaultPutChannelRes>(url, defaultUpdatePayload)
+  const response = await axios.put<typeof defaultPutChannelRes>(url, defaultUpdatePayload)
   return response.data
 }
 
@@ -102,7 +102,7 @@ export const defaultGetDevicesRes = [{
 }]
 export const getDevice = async (baseUrl: string) => {
   const url = `${baseUrl}/device`
-  const response = await axiod.get<typeof defaultGetDevicesRes>(url, {
+  const response = await axios.get<typeof defaultGetDevicesRes>(url, {
     params: {
       app_id: defaultAppId,
     },
@@ -118,7 +118,7 @@ const defaultSetDevice = {
 }
 export const deleteDevice = async (baseUrl: string) => {
   const url = `${baseUrl}/device`
-  const response = await axiod.delete<typeof defaultRes>(url, {
+  const response = await axios.delete<typeof defaultRes>(url, {
     params: {
       app_id: defaultAppId,
     },
@@ -129,7 +129,7 @@ export const deleteDevice = async (baseUrl: string) => {
 
 export const postDevice = async (baseUrl: string) => {
   const url = `${baseUrl}/device`
-  const response = await axiod.post<typeof defaultRes>(url, defaultSetDevice, {
+  const response = await axios.post<typeof defaultRes>(url, defaultSetDevice, {
     headers,
   })
   return response.data
@@ -151,7 +151,7 @@ export const defaultGetChannelRes = [{
 }]
 export const getChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel`
-  const response = await axiod.get<typeof defaultGetChannelRes>(url, {
+  const response = await axios.get<typeof defaultGetChannelRes>(url, {
     params: {
       app_id: defaultAppId,
     },
@@ -161,7 +161,7 @@ export const getChannel = async (baseUrl: string) => {
 }
 export const setChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel`
-  const response = await axiod.post<typeof defaultRes>(url, {
+  const response = await axios.post<typeof defaultRes>(url, {
 
   },
   {
@@ -190,7 +190,7 @@ export const defaultGetBundleRes = [
 
 // export const setBundle = async (baseUrl: string) => {
 //   const url = `${baseUrl}/bundle`
-//   const response = await axiod.post<typeof defaultGetBundleRes>(url, defaultSetBundleRes, {
+//   const response = await axios.post<typeof defaultGetBundleRes>(url, defaultSetBundleRes, {
 //     params: {
 //       app_id: defaultAppId,
 //     },
@@ -201,7 +201,7 @@ export const defaultGetBundleRes = [
 
 export const getBundle = async (baseUrl: string) => {
   const url = `${baseUrl}/bundle`
-  const response = await axiod.get<typeof defaultGetBundleRes>(url, {
+  const response = await axios.get<typeof defaultGetBundleRes>(url, {
     params: {
       app_id: defaultAppId,
     },
@@ -212,7 +212,7 @@ export const getBundle = async (baseUrl: string) => {
 
 export const deleteBundle = async (baseUrl: string) => {
   const url = `${baseUrl}/bundle`
-  const response = await axiod.delete<typeof defaultRes>(url, {
+  const response = await axios.delete<typeof defaultRes>(url, {
     params: {
       app_id: defaultAppId,
     },

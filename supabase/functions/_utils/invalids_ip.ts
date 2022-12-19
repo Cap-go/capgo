@@ -1,4 +1,18 @@
-import ipapi from 'https://deno.land/x/ipapi@v1.0/mod.js'
+import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+
+const ipapi = async (ip: string, lang = 'en') => {
+  ip = ip || ''
+  lang = lang || 'en'
+
+  const langs = ['en', 'de', 'es', 'pt-BR', 'fr', 'ja', 'zh-CN', 'ru']
+
+  if (!langs.includes(lang))
+    throw new Error(`unknown language, supported ones are: ${langs.join(', ')}`)
+
+  const res = await axios(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
+
+  return res.data
+}
 
 export const invalidIps = async (ips: string[]) => {
   // check all ip an return true if one is from google
@@ -16,7 +30,3 @@ export const invalidIp = async (ip: string) => {
     return true
   return false
 }
-// const main = async () => {
-//   console.log('invalidIp', await invalidIp(['34.138.199.110', '34.75.111.56', '66.102.8.118']))
-// }
-// main()

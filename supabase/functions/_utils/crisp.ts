@@ -1,4 +1,4 @@
-import axiod from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 
 const getAuth = () => {
   // get crisp token
@@ -23,7 +23,7 @@ const baseUrl = () => {
 
 export const postPerson = async (email: string, firstName?: string, lastName?: string, avatar?: string) => {
   const url = `${baseUrl()}/people/profile`
-  const response = await axiod.post(url, {
+  const response = await axios.post(url, {
     email,
     person: {
       nickname: `${firstName} ${lastName}`,
@@ -45,7 +45,7 @@ export interface Person {
 
 export const updatePerson = async (email: string, person?: Person, segments: string[] = []) => {
   const url = `${baseUrl()}/people/profile/${email}`
-  const response = await axiod.patch(url, {
+  const response = await axios.patch(url, {
     email,
     person,
     segments,
@@ -55,13 +55,13 @@ export const updatePerson = async (email: string, person?: Person, segments: str
 
 export const addDataPerson = async (email: string, data: Person) => {
   const url = `${baseUrl()}/people/data/${email}`
-  const response = await axiod.patch(url, { data }, getConfig())
+  const response = await axios.patch(url, { data }, getConfig())
   return response.data
 }
 
 export const addEventPerson = async (email: string, data: any, text: string, color: string) => {
   const url = `${baseUrl()}/people/events/${email}`
-  const response = await axiod.post(url, {
+  const response = await axios.post(url, {
     text,
     data,
     color,
