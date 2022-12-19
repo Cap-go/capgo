@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.7](https://github.com/Cap-go/capgo/compare/1.66.6...1.66.7) (2022-12-19)
+
+### [1.66.6](https://github.com/Cap-go/capgo/compare/1.66.5...1.66.6) (2022-12-19)
+
+### [1.66.5](https://github.com/Cap-go/capgo/compare/1.66.4...1.66.5) (2022-12-18)
+
+
+### Bug Fixes
+
+* issue with on listen with v2 ([11a464e](https://github.com/Cap-go/capgo/commit/11a464e21b01d6014c918ba0d7094351770b3924))
+
 ### [1.66.4](https://github.com/Cap-go/capgo/compare/1.66.3...1.66.4) (2022-12-18)
 
 
