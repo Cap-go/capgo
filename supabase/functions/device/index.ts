@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
+import { checkKey, fetchLimit, methodJson, sendRes } from '../_utils/utils.ts'
 
 interface DeviceLink {
   app_id: string
@@ -15,9 +16,7 @@ interface GetDevice {
   page?: number
 }
 
-const get = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
-  const url = new URL(event.url)
-  const body = Object.fromEntries(url.searchParams.entries() as any) as GetDevice
+const get = async (body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -87,8 +86,7 @@ const get = async (event: Request, apikey: Database['public']['Tables']['apikeys
   }
 }
 
-const post = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
-  const body = await event.json() as DeviceLink
+const post = async (body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   if (!body.device_id || !body.app_id)
     return sendRes({ status: 'Cannot find device' }, 400)
 
@@ -156,9 +154,7 @@ const post = async (event: Request, apikey: Database['public']['Tables']['apikey
   return sendRes()
 }
 
-export const deleteOverride = async (event: Request, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
-  const body = (await event.json()) as DeviceLink
-
+export const deleteOverride = async (body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -185,8 +181,8 @@ export const deleteOverride = async (event: Request, apikey: Database['public'][
   return sendRes()
 }
 
-serve(async (event: Request) => {
-  const apikey_string = event.headers.get('authorization')
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  const apikey_string = headers.authorization
 
   if (!apikey_string)
     return sendRes({ status: 'Missing apikey' }, 400)
@@ -196,15 +192,28 @@ serve(async (event: Request) => {
     if (!apikey)
       return sendRes({ status: 'Missing apikey' }, 400)
 
-    if (event.method === 'POST')
-      return post(event, apikey)
-    else if (event.method === 'GET')
-      return get(event, apikey)
-    else if (event.method === 'DELETE')
-      return deleteOverride(event, apikey)
+    if (method === 'POST')
+      return post(body, apikey)
+    else if (method === 'GET')
+      return get(body, apikey)
+    else if (method === 'DELETE')
+      return deleteOverride(body, apikey)
   }
   catch (e) {
     return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
   return sendRes({ status: 'Method now allowed' }, 400)
+}
+
+serve(async (event: Request) => {
+  const url = new URL(event.url)
+  const headers = Object.fromEntries(event.headers.entries())
+  const method = event.method
+  try {
+    const body = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+  }
 })

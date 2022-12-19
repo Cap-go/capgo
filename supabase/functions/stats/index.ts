@@ -1,13 +1,12 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { methodJson, sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
-import type { AppStats } from '../_utils/types.ts'
+import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
-serve(async (event: Request) => {
+const main = async (url: URL, headers: BaseHeaders, method: string, body: AppStats) => {
   try {
-    const body = (await event.json()) as AppStats
     console.log('body', body)
     let {
       version_name,
@@ -106,5 +105,18 @@ serve(async (event: Request) => {
       status: 'Error unknow',
       error: JSON.stringify(e),
     }, 500)
+  }
+}
+
+serve(async (event: Request) => {
+  const url = new URL(event.url)
+  const headers = Object.fromEntries(event.headers.entries())
+  const method = event.method
+  try {
+    const body = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 })

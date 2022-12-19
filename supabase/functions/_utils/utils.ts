@@ -8,6 +8,8 @@ export const jwtDecoder = (jwt: string): JwtUser =>
 
 export const fetchLimit = 50
 
+export const methodJson = ['POST', 'PUT', 'PATCH']
+
 const basicHeaders = {
   'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
   'Content-Type': 'application/json',

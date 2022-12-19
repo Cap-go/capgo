@@ -1,19 +1,18 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { methodJson, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import { invalidIp } from '../_utils/invalids_ip.ts'
 import { checkPlan } from '../_utils/plans.ts'
-import type { AppInfos } from '../_utils/types.ts'
-import type { Database } from './../_utils/supabase.types.ts'
+import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
-serve(async (event: Request) => {
+const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
 
   const id = cryptoRandomString({ length: 10 })
   try {
-    const body = (await event.json()) as AppInfos
     console.log(id, 'body', body)
     let {
       version_name,
@@ -159,7 +158,7 @@ serve(async (event: Request) => {
     let version = channel.version as Database['public']['Tables']['app_versions']['Row']
     const versionId = versionData ? versionData.id : version.id
 
-    const xForwardedFor = event.headers.get('x-forwarded-for') || ''
+    const xForwardedFor = headers['x-forwarded-for'] || ''
     // check if version is created_at more than 4 hours
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
@@ -314,5 +313,18 @@ serve(async (event: Request) => {
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
     }, 500)
+  }
+}
+
+serve(async (event: Request) => {
+  const url = new URL(event.url)
+  const headers = Object.fromEntries(event.headers.entries())
+  const method = event.method
+  try {
+    const body = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 })
