@@ -1,7 +1,7 @@
+import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
-
 import type { Database } from './supabase.types.ts'
-import type { JwtUser } from './types.ts'
+import type { Details, JwtUser } from './types.ts'
 
 export const jwtDecoder = (jwt: string): JwtUser =>
   JSON.parse(atob(jwt.split('.')[1]))
@@ -68,3 +68,12 @@ export const getEnv = (key: string): string => {
   const val = Deno.env.get(key)
   return val || ''
 }
+
+const makeHMACContent = (payload: string, details: Details) => {
+  return `${details.timestamp}.${payload}`
+}
+
+export const createHmac = (data: string, details: Details) => {
+  return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
+}
+

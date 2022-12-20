@@ -5,7 +5,7 @@ import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
-import { logsnag } from '../_utils/_logsnag.ts'
+import { logsnag } from '../_utils/logsnag.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.

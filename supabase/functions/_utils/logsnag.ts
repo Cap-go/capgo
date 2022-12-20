@@ -1,5 +1,5 @@
 import { LogSnag } from 'https://cdn.logsnag.com/deno/0.1.5/index.ts'
-import { getEnv } from "./utils.ts";
+import { getEnv } from './utils.ts'
 
 const logsnag = getEnv('LOGSNAG_TOKEN')
   ? new LogSnag({

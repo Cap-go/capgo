@@ -15,8 +15,8 @@ const baseSupaTests = `${baseSupa}/${baseFunctions}/${baseTests}`
 const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates']
-const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans']
-const baseSupabaseHandler = `serve(async (event: Request) => {
+const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'notifications']
+const supabaseHandler = `serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
@@ -29,7 +29,7 @@ const baseSupabaseHandler = `serve(async (event: Request) => {
   }
 })`
 
-const baseNetlifyHandler = `export const handler: Handler = async (event) => {
+const netlifyHandler = `export const handler: Handler = async (event) => {
   try {
     const url: URL = new URL(event.rawUrl)
     const headers: BaseHeaders = { ...event.headers }
@@ -43,18 +43,17 @@ const baseNetlifyHandler = `export const handler: Handler = async (event) => {
 }
 `
 
-const baseSupabaseEnvFunction = `export const getEnv = (key: string): string => {
+const supabaseEnvFunction = `export const getEnv = (key: string): string => {
   const val = Deno.env.get(key)
   return val || ''
 }`
 
-const baseNetlifyEnvFunction = `export const getEnv = (key: string): string => {
+const netlifyEnvFunction = `export const getEnv = (key: string): string => {
   const val = process.env[key]
   return val || ''
-}
-`
+}`
 
-const baseSupabaseRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+const supabaseRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
 
@@ -67,7 +66,7 @@ const baseSupabaseRes = `export const sendRes = (data: any = { status: 'ok' }, s
   )
 }`
 
-const baseNetlifyRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+const netlifyRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
 
@@ -78,6 +77,17 @@ const baseNetlifyRes = `export const sendRes = (data: any = { status: 'ok' }, st
   }
 }`
 
+const hmacSupabase = `export const createHmac = (data: string, details: Details) => {
+  return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
+}`
+
+const hmacNetlify = `export const createHmac = (data: string, details: Details) => {
+  const hmac = crypto.createHmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET'))
+  hmac.write(makeHMACContent(data, details))
+  hmac.end()
+  return hmac.read().toString('hex')
+}`
+
 // escape url for regex
 const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const mutations = [
@@ -86,14 +96,15 @@ const mutations = [
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
-  { from: 'https://deno.land/x/hmac@v2.0.1/mod.ts', to: 'cron-schedule' },
   { from: 'https://deno.land/x/semver@v1.4.1/mod.ts', to: 'semver' },
+  { from: 'import { hmac } from \'https://deno.land/x/hmac@v2.0.1/mod.ts\'', to: 'import crypto from \'crypto\'' },
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
   { from: 'import { serve } from \'https://deno.land/std@0.167.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
-  { from: baseSupabaseHandler, to: baseNetlifyHandler },
-  { from: baseSupabaseEnvFunction, to: baseNetlifyEnvFunction },
-  { from: baseSupabaseRes, to: baseNetlifyRes },
+  { from: supabaseHandler, to: netlifyHandler },
+  { from: supabaseEnvFunction, to: netlifyEnvFunction },
+  { from: supabaseRes, to: netlifyRes },
+  { from: hmacSupabase, to: hmacNetlify },
   { from: '.ts\'', to: '\'' },
 ]
 // list deno functions folder and filter by allowed

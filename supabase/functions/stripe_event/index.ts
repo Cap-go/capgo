@@ -4,7 +4,7 @@ import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
-import { logsnag } from '../_utils/_logsnag.ts'
+import { logsnag } from '../_utils/logsnag.ts'
 
 serve(async (event: Request) => {
   if (!event.headers.get('stripe-signature') || !getEnv('STRIPE_WEBHOOK_SECRET') || !getEnv('STRIPE_SECRET_KEY'))
