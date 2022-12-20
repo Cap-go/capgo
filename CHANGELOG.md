@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.1](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.0...1.67.0-alpha.1) (2022-12-20)
+
+
+### Bug Fixes
+
+* for netlify build ([83e086b](https://github.com/Cap-go/capgo/commit/83e086b9264ea5a1c3afddd5c17f7ab4ded9fb0f))
+
 ## [1.67.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.66.7...1.67.0-alpha.0) (2022-12-20)
 
 
