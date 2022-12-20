@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.3](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.2...1.67.0-alpha.3) (2022-12-20)
+
+
+### Bug Fixes
+
+* for hmac ([58ea453](https://github.com/Cap-go/capgo/commit/58ea45350e407cafd3c2cfeae854cdc44b59e609))
+
 ## [1.67.0-alpha.2](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.1...1.67.0-alpha.2) (2022-12-20)
 
 
