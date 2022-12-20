@@ -350,7 +350,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16700603;
+				CURRENT_PROJECT_VERSION = 16700604;
 				DEVELOPMENT_TEAM = UVTJ336J2D;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Capgo;
@@ -376,7 +376,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16700603;
+				CURRENT_PROJECT_VERSION = 16700604;
 				DEVELOPMENT_TEAM = UVTJ336J2D;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Capgo;
