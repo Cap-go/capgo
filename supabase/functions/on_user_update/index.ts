@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import { updatePerson } from '../_utils/crisp.ts'
 import type { Person } from '../_utils/crisp.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { getEnv, sendRes } from '../_utils/utils.ts'
 import { createCustomer } from '../_utils/stripe.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
@@ -11,7 +11,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
 serve(async (event: Request) => {
-  const API_SECRET = Deno.env.get('API_SECRET')
+  const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization' }, 400)

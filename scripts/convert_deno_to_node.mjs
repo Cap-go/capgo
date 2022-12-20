@@ -17,31 +17,67 @@ const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates']
 const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans']
 const baseSupabaseHandler = `serve(async (event: Request) => {
-  const url = new URL(event.url)
-  const headers = Object.fromEntries(event.headers.entries())
-  const method = event.method
   try {
-    const body = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }
   catch (e) {
     return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
-})
-`
+})`
+
 const baseNetlifyHandler = `export const handler: Handler = async (event) => {
-  const url = new URL(event.rawUrl)
-  const headers = { ...event.headers }
-  const method = event.httpMethod
   try {
-    const body = methodJson.includes(method) ? await event.body : Object.fromEntries(url.searchParams.entries())
-    return main(url, headers as BaseHeaders, method, body)
+    const url: URL = new URL(event.rawUrl)
+    const headers: BaseHeaders = { ...event.headers }
+    const method: string = event.httpMethod
+    const body: any = methodJson.includes(method) ? await event.body : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
   }
   catch (e) {
     return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 }
 `
+
+const baseSupabaseEnvFunction = `export const getEnv = (key: string): string => {
+  const val = Deno.env.get(key)
+  return val || ''
+}`
+
+const baseNetlifyEnvFunction = `export const getEnv = (key: string): string => {
+  const val = process.env[key]
+  return val || ''
+}
+`
+
+const baseSupabaseRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+  if (statusCode >= 400)
+    console.error('sendRes error', JSON.stringify(data, null, 2))
+
+  return new Response(
+    JSON.stringify(data),
+    {
+      status: statusCode,
+      headers: { ...basicHeaders, ...corsHeaders },
+    },
+  )
+}`
+
+const baseNetlifyRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+  if (statusCode >= 400)
+    console.error('sendRes error', JSON.stringify(data, null, 2))
+
+  return {
+    statusCode,
+    headers: { ...basicHeaders, ...corsHeaders },
+    body: JSON.stringify(data),
+  }
+}`
+
 const mutations = [
   { from: 'https://cdn.logsnag.com/deno/.*/index.ts', to: 'logsnag' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.1.2', to: '@supabase/supabase-js' },
@@ -50,8 +86,12 @@ const mutations = [
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
   { from: 'https://deno.land/x/hmac@v2.0.1/mod.ts', to: 'cron-schedule' },
   { from: 'https://deno.land/x/semver@v1.4.1/mod.ts', to: 'semver' },
+  { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
   { from: 'import { serve } from \'https://deno.land/std@0.167.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
+  { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: baseSupabaseHandler, to: baseNetlifyHandler },
+  { from: baseSupabaseEnvFunction, to: baseNetlifyEnvFunction },
+  { from: baseSupabaseRes, to: baseNetlifyRes },
   { from: '.ts\'', to: '\'' },
 ]
 // list deno functions folder and filter by allowed

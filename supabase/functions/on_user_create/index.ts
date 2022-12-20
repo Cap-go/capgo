@@ -4,13 +4,13 @@ import { createCustomer } from '../_utils/stripe.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { getEnv, sendRes } from '../_utils/utils.ts'
 import { logsnag } from '../_utils/_logsnag.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
 serve(async (event: Request) => {
-  const API_SECRET = Deno.env.get('API_SECRET')
+  const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization' }, 400)

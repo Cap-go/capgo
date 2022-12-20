@@ -10,7 +10,6 @@ import type { Database } from '../_utils/supabase.types.ts'
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
-
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body)
@@ -317,11 +316,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 }
 
 serve(async (event: Request) => {
-  const url = new URL(event.url)
-  const headers = Object.fromEntries(event.headers.entries())
-  const method = event.method
   try {
-    const body = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }
   catch (e) {

@@ -63,3 +63,8 @@ export const sendOptionsRes = () => (new Response(
     },
   },
 ))
+
+export const getEnv = (key: string): string => {
+  const val = Deno.env.get(key)
+  return val || ''
+}

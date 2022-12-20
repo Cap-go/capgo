@@ -1,5 +1,6 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
 import type { Database } from './supabase.types.ts'
+import { getEnv } from "./utils.ts";
 
 const DEFAULT_TOLERANCE = 300
 const EXPECTED_SCHEME = 'v1'
@@ -42,7 +43,7 @@ export const parseStripeEvent = (body: string, signature: string) => {
   if (!details.signatures.length)
     throw new Error('No signatures found with expected scheme')
 
-  const expectedSignature = hmac('sha256', Deno.env.get('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(body, details), 'utf8', 'hex')
+  const expectedSignature = hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(body, details), 'utf8', 'hex')
   const signatureFound = !!details.signatures.filter(a => scmpCompare(a, expectedSignature as string)).length
 
   if (!signatureFound)

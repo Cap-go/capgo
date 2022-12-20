@@ -20,7 +20,7 @@
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
-    "generate:node_serverless": "node ./scripts/convert_deno_to_node.mjs",
+    "generate:node_serverless": "rm -rf netlify && node ./scripts/convert_deno_to_node.mjs",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit"
   },
@@ -78,6 +78,7 @@
     "chartjs-adapter-dayjs": "^1.0.0",
     "chartjs-plugin-annotation": "^2.1.0",
     "copy-text-to-clipboard": "^3.0.1",
+    "crypto-random-string": "^5.0.0",
     "dayjs": "1.11.6",
     "firebase": "9.14.0",
     "generate-password-browser": "^1.1.0",

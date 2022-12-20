@@ -109,11 +109,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
 }
 
 serve(async (event: Request) => {
-  const url = new URL(event.url)
-  const headers = Object.fromEntries(event.headers.entries())
-  const method = event.method
   try {
-    const body = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }
   catch (e) {

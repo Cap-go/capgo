@@ -74,6 +74,7 @@ specifiers:
   copy-text-to-clipboard: ^3.0.1
   critters: 0.0.16
   cross-env: ^7.0.3
+  crypto-random-string: ^5.0.0
   cypress: 11.2.0
   dayjs: 1.11.6
   eslint: 8.29.0
@@ -165,6 +166,7 @@ dependencies:
   chartjs-adapter-dayjs: 1.0.0_n5tccgukjl67bs6o7rkvlyi7my
   chartjs-plugin-annotation: 2.1.0_chart.js@4.0.1
   copy-text-to-clipboard: 3.0.1
+  crypto-random-string: 5.0.0
   dayjs: 1.11.6
   firebase: 9.14.0
   generate-password-browser: 1.1.0
@@ -7520,6 +7522,13 @@ packages:
     dependencies:
       type-fest: 1.4.0
     dev: true
+
+  /crypto-random-string/5.0.0:
+    resolution: {integrity: sha512-KWjTXWwxFd6a94m5CdRGW/t82Tr8DoBc9dNnPCAbFI1EBweN6v1tv8y4Y1m7ndkp/nkIBRxUxAzpaBnR2k3bcQ==}
+    engines: {node: '>=14.16'}
+    dependencies:
+      type-fest: 2.19.0
+    dev: false
 
   /css-declaration-sorter/6.3.1_postcss@8.4.19:
     resolution: {integrity: sha512-fBffmak0bPAnyqc/HO8C3n2sHrp9wcqQz6ES9koRF2/mLOVAx9zIQ3Y7R29sYCteTPqMCwns4WYQoCX91Xl3+w==}
@@ -16765,7 +16774,6 @@ packages:
   /type-fest/2.19.0:
     resolution: {integrity: sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==}
     engines: {node: '>=12.20'}
-    dev: true
 
   /type-is/1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
