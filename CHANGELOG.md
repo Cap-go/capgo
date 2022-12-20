@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.8](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.7...1.67.0-alpha.8) (2022-12-20)
+
+
+### Bug Fixes
+
+* issue when email already exist in crisp before they create account ([dc3cfa7](https://github.com/Cap-go/capgo/commit/dc3cfa7a5ee5c619f182bb9b39cc7d8c7f570f18))
+
 ## [1.67.0-alpha.7](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.6...1.67.0-alpha.7) (2022-12-20)
 
 
