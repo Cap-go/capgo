@@ -3,24 +3,54 @@ import type { ChartData } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
 import { isDark } from '~/composables'
+import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 
 const props = defineProps({
   title: { type: String, default: '' },
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
-  data: { type: Array, default: new Array(new Date().getDate()).fill(0) },
+  data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
 })
 
-const daysInCurrentMonth = () => new Date().getDate()
-
+// console.log('title', props.title, props.data)
 const accumulateData = computed(() => {
-  return (props.data as number[]).reduce((acc: number[], val: number) => {
+  // console.log('accumulateData', props.data)
+  const monthDay = getCurrentDayMonth()
+  // console.log('accumulateData', monthDay, props.data.length)
+  return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
-    return [...acc, last + val]
+    let newVal
+    if (val !== undefined)
+      newVal = last + val
+    else if (i < monthDay)
+      newVal = last
+    // console.log('accumulateData', i, monthDay, val, last, newVal)
+    // console.log('accumulateData', i, val, last, newVal)
+    return [...acc, newVal] as number[]
   }, [])
 })
+// find median difference of evolution between each element of the array
+const evolution = computed(() => {
+  const arr = props.data as number[]
+  const arrWithoutFirst = arr.slice(1)
+  const arrWithoutUndefined = arrWithoutFirst.filter((val: any) => val !== undefined)
+  const median = arrWithoutUndefined.reduce((a, b) => a + b, 0) / arrWithoutUndefined.length
+  return median
+})
+const projectionData = computed(() => {
+  const monthDay = getCurrentDayMonth()
+  const res = accumulateData.value.reduce((acc: number[], val: number, i: number) => {
+    const last = acc[acc.length - 1] || 0
+    const lastAcc = accumulateData.value[i - 1] || 0
+    const newVal = val || i < monthDay ? undefined : lastAcc + last + evolution.value
+    return [...acc, newVal] as number[]
+  }, [])
+  return res
+})
 const monthdays = () => {
-  const arr = [...Array(daysInCurrentMonth() + 1).keys()]
+  const keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
+  keys.shift()
+  const arr = [...keys]
   return arr
 }
 const createAnotation = (id: string, y: number, title: string, lineColor: string, bgColor: string) => {
@@ -34,7 +64,7 @@ const createAnotation = (id: string, y: number, title: string, lineColor: string
   }
   obj[`label_${id}`] = {
     type: 'label',
-    xValue: daysInCurrentMonth() / 2,
+    xValue: getDaysInCurrentMonth() / 2,
     yValue: y,
     backgroundColor: bgColor,
     // color: '#fff',
@@ -48,9 +78,8 @@ const createAnotation = (id: string, y: number, title: string, lineColor: string
 const generateAnnotations = computed(() => {
   // find biggest value in data
   let annotations: any = {}
-  const min = Math.min(...accumulateData.value as number[])
-  const max = Math.max(...accumulateData.value as number[])
-  // const annotations: any = {}
+  const min = Math.min(...accumulateData.value.filter((val: any) => val !== undefined) as number[])
+  const max = Math.max(...projectionData.value.filter((val: any) => val !== undefined) as number[])
   Object.entries(props.limits as { [key: string]: number }).forEach(([key, val], i) => {
     if (val && val > min && val < (max * 1.2)) {
       const color1 = (i + 1) * 100
@@ -61,6 +90,7 @@ const generateAnnotations = computed(() => {
       }
     }
   })
+  // console.log('generateAnnotations', annotations)
   return annotations
 })
 
@@ -71,7 +101,21 @@ const chartData = ref<ChartData<'line'>>({
     data: accumulateData.value,
     borderColor: props.colors[400],
     backgroundColor: props.colors[200],
-  }],
+    tension: 0.3,
+    pointRadius: 2,
+    pointBorderWidth: 0,
+  },
+  {
+    label: 'none',
+    data: projectionData.value,
+    borderColor: props.colors[400],
+    borderDash: [2, 10],
+    pointRadius: 0,
+    pointBackgroundColor: 'transparent',
+    tension: 0.3,
+    // backgroundColor: props.colors[200],
+  },
+  ],
 })
 const chartOptions = {
   scales: {
@@ -90,6 +134,13 @@ const chartOptions = {
   plugins: {
     annotation: {
       annotations: generateAnnotations.value,
+    },
+    legend: {
+      labels: {
+        filter: (item: any) => {
+          return item.text !== 'none'
+        },
+      },
     },
   },
 }

@@ -8,27 +8,28 @@ import { useRoute } from 'vue-router'
 import Dashboard from '../dashboard/Dashboard.vue'
 import Steps from '../onboarding/Steps.vue'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import type { Database } from '~/types/supabase.types'
+import { useMainStore } from '~/stores/main'
 
 const isLoading = ref(false)
 const route = useRoute()
+const main = useMainStore()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
-const apps = ref<definitions['apps'][]>([])
-const sharedApps = ref<(definitions['channel_users'] & ChannelUserApp)[]>([])
+const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
+const sharedApps = ref<(Database['public']['Tables']['channel_users']['Row'] & ChannelUserApp)[]>([])
 
 interface ChannelUserApp {
-  app_id: definitions['apps']
-  channel_id: definitions['channels'] & {
-    version: definitions['app_versions']
+  app_id: Database['public']['Tables']['apps']['Row']
+  channel_id: Database['public']['Tables']['channels']['Row'] & {
+    version: Database['public']['Tables']['app_versions']['Row']
   }
 }
 const getMyApps = async () => {
   const { data } = await supabase
-    .from<definitions['apps']>('apps')
+    .from('apps')
     .select()
-    .eq('user_id', auth?.id).order('name', { ascending: true })
+    .eq('user_id', main.user?.id).order('name', { ascending: true })
   if (data && data.length)
     apps.value = data
   else
@@ -41,7 +42,7 @@ const onboardingDone = async () => {
 
 const getSharedWithMe = async () => {
   const { data } = await supabase
-    .from<definitions['channel_users'] & ChannelUserApp>('channel_users')
+    .from('channel_users')
     .select(`
       id,
       app_id (
@@ -64,9 +65,9 @@ const getSharedWithMe = async () => {
       ),
       user_id
       `)
-    .eq('user_id', auth?.id)
+    .eq('user_id', main.user?.id)
   if (data && data.length)
-    sharedApps.value = data
+    sharedApps.value = data as (Database['public']['Tables']['channel_users']['Row'] & ChannelUserApp)[]
 }
 watchEffect(async () => {
   if (route.path === '/app/home') {

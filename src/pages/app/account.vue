@@ -19,7 +19,6 @@ import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { openPortal } from '~/services/stripe'
-import type { definitions } from '~/types/supabase'
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -27,31 +26,31 @@ const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
 const errorMessage = ref('')
-const auth = supabase.auth.user()
 const version = ref(import.meta.env.VITE_APP_VERSION)
 const isMobile = ref(isPlatform('capacitor'))
 
 const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
     .from('images')
-    .upload(`${auth?.id}/${fileName}`, decode(data), {
+    .upload(`${main.user?.id}/${fileName}`, decode(data), {
       contentType,
     })
 
-  const { publicURL, error: urlError } = supabase.storage
+  const { data: res } = await supabase.storage
     .from('images')
-    .getPublicUrl(`${auth?.id}/${fileName}`)
-
+    .getPublicUrl(`${main.user?.id}/${fileName}`)
+  const publicURL = res.publicUrl
   const { data: usr, error: dbError } = await supabase
     .from('users')
     .update({ image_url: publicURL })
-    .eq('id', auth?.id)
+    .eq('id', main.user?.id)
+    .select()
     .single()
   isLoading.value = false
 
-  if (error || urlError || dbError || !publicURL || !usr) {
+  if (error || dbError || !publicURL || !usr) {
     errorMessage.value = t('something-went-wrong-try-again-later')
-    console.error('upload error', error, urlError, dbError)
+    console.error('upload error', error, dbError)
     return
   }
   main.user = usr
@@ -131,10 +130,12 @@ const deleteAccount = async () => {
       {
         text: t('button.remove'),
         handler: async () => {
+          if (!main.user?.email)
+            return
           const { error } = await supabase
-            .from<definitions['deleted_account']>('deleted_account')
+            .from('deleted_account')
             .insert({
-              email: main.auth?.email,
+              email: main.user.email,
             })
           if (error) {
             console.error(error)
@@ -196,7 +197,6 @@ const presentActionSheet = async () => {
   <IonPage>
     <TitleHead :title="t('account.heading')" no-back color="warning" />
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="t('account.heading')" no-back big color="warning" /> -->
       <div class="px-6 py-16">
         <div
           v-if="!main.user?.image_url"
@@ -229,6 +229,7 @@ const presentActionSheet = async () => {
         <img
           v-else
           class="object-cover w-40 h-40 mx-auto mt-8 rounded-5xl"
+          alt="User"
           :src="main.user?.image_url"
           @click="presentActionSheet"
         >
@@ -311,6 +312,7 @@ const presentActionSheet = async () => {
           <li>
             <a
               class="flex items-center justify-between"
+              rel="noopener"
               href="https://discord.gg/VnYRvBfgA6"
               target="_blank"
             >
@@ -371,8 +373,3 @@ const presentActionSheet = async () => {
     </IonContent>
   </IonPage>
 </template>
-
-<route lang="yaml">
-meta:
-  option: tabs
-</route>

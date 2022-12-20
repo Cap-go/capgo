@@ -51,10 +51,11 @@ add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让�
 afternoon: 下午
 alert:
   confirm-delete: 确认删除
-  delete-message: |-
-    这个动作是不可逆的。
-    你确定要删除这个吗
+  delete-message: 你确定要删除这个吗
+  not-reverse-message: 此操作不可逆
+allow-develoment-bui: 允许开发构建
 allow-device-to-self: 允许设备自我关联
+allow-emulator: 允许模拟器
 api-key: API 密钥
 api-keys: API 密钥
 apikeys:
@@ -67,6 +68,8 @@ apikeys:
   title: API 密钥
   updater: 电容更新器
 app-id-example: 应用 ID 示例
+available-in-the-san: 在沙盒应用程序中可用
+back-to-login-page: 返回登录页面
 bigger-app-size: 更大的应用程序大小
 build-your-code-and-: 构建你的代码
 bulk-upload: 批量上传
@@ -88,20 +91,22 @@ by-clicking-on-them: 通过点击它们。
 cannot-delete-app: 无法删除应用
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-channel: 无法删除频道
+cannot-save-custom-i: 无法保存自定义 ID
 change: 改变
 channel:
   add: 添加
   beta-channel: 测试通道
   cannot-delete-device: 无法删除设备
   confirm-public-desc: |-
-    公开此频道将使其向您的所有用户发送更新。
-    所有其他公共频道将变为私人频道。
+    将此频道设为默认将使其向您的所有用户发送更新。
+
+    其他默认频道将不再默认。
   copy: 复制网址
   device: 设备
   device-deleted: 设备已删除
   invit: 输入电子邮件以邀请
-  is_public: 公开频道
-  make-now: 公开
+  is_public: 频道默认
+  make-now: 使默认
   make_it: 做了
   makeprivate: 您的频道是公开的，点击将其设为私密
   makepublic: 您的频道是私人频道，点击将其设为公开
@@ -119,12 +124,15 @@ checksum: 校验和
 commands: 命令
 copied-to-clipboard: 已复制到剪贴板
 copy-your: 复制你的
+create-a-free-accoun: 创建一个免费帐户
 custom-domain: 自定义域
+custom-id: 自定义 ID
+custom-id-saved: 自定义 ID 已保存
 dashboard: 仪表板
 days: 天
 defined-as: 定义为
-defined-as-private: 定义为私有
-defined-as-public: 定义为公开
+defined-as-private: 定义为正常
+defined-as-public: 定义为默认值
 delete-account: 删除帐户
 device:
   channel: 频道链接
@@ -149,13 +157,19 @@ devices:
 devices-using-this-b: 使用此捆绑包的设备
 disable-auto-downgra: 在 native 下禁用自动降级
 disable-auto-upgrade: 禁用主要以上的自动升级
+discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
+dont-have-an-account: 没有帐户？
+email-address: 电子邮件地址
+enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
+enter-your-new-passw: 输入您的新密码并确认
 forgot:
   check_email: 检查您的电子邮件以获取重置密码的链接
   email: 电子邮件
   heading: 忘记密码
   success: 密码更新成功
+from-device: 从设备
 good: 好的
 id: ID
 in-your-main-file: 在你的主文件中
@@ -168,10 +182,13 @@ intro:
   hi: 你好，{name}
   whats-your-name: 输入你的名字
 invalid-auth: 无效的身份验证
+is-emulator: 是模拟器
+is-production-app: 是生产应用
 last-upload: 上次上传
 last-version: 最新版本
 limit-reached: 达到上限
 loading-more-data: 正在加载更多数据...
+log-in: 登录
 log-to-the-capgo-cli: 登录 Capgo CLI
 login:
   andpass: 和密码
@@ -184,6 +201,9 @@ login:
   or: 要么
   password: 密码
   withemail: 有电子邮件地址
+login-to-your-accoun: 登录到您的帐户
+make-normal: 使正常
+making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 module:
   heading: 模块
 monthly-active-users: 月活跃用户
@@ -275,6 +295,7 @@ plans: 计划
 please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
 pro-tip-you-can-copy: 专业提示：您可以复制
+projection: 预测
 projects:
   list: 你的
   sharedlist: 与我分享
@@ -296,7 +317,10 @@ register:
   password-hint: 输入至少 6 个数字、字母和标点符号的组合。
   specialError: 应包含特殊字符
   upperCaseError: 应包含大写字母
+reset-password: 重设密码
+reset-your-password: 重置你的密码
 see-usage: 查看用法
+session_key: Iv会话密钥
 settings: 设置
 shared-apps: 共享应用程序
 sign-out: 登出
@@ -314,6 +338,7 @@ stats:
   versions: 版本
 submit: 提交
 terms-of-use: 使用条款
+tests: 测试
 thank-you-for-choosi: 感谢您选择 Capgo！
 the: 这
 this-page-will-self-: 此页面将自动刷新
@@ -331,6 +356,7 @@ usage:
   success: 您的计划已设置好此页面将在几分钟内更新
   title: 用法
 version-builtin: 内置版本
+welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到上限

@@ -6,23 +6,8 @@ import { App } from '@capacitor/app'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
-
-// /* Core CSS required for Ionic components to work properly */
-import '@ionic/vue/css/core.css'
-
-/* Basic CSS for apps built with Ionic */
-import '@ionic/vue/css/normalize.css'
-import '@ionic/vue/css/structure.css'
-import '@ionic/vue/css/typography.css'
-
-/* Optional CSS utils that can be commented out */
-import '@ionic/vue/css/padding.css'
-import '@ionic/vue/css/float-elements.css'
-import '@ionic/vue/css/text-alignment.css'
-import '@ionic/vue/css/text-transformation.css'
-import '@ionic/vue/css/flex-utils.css'
-import '@ionic/vue/css/display.css'
 import { hideLoader } from '~/services/loader'
+
 const appUrl = import.meta.env.VITE_APP_URL as string
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 
@@ -30,23 +15,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 export const install: UserModule = ({ app, router }) => {
   app.use(IonicVue)
   const main = useMainStore()
-  // const regexpToken = /#access_token=(.+?)&/
   if (isPlatform('capacitor')) {
-    // let downloadStarted = false
-    // setTimeout(async () => {
-    //   if (!downloadStarted)
-    //     SplashScreen.hide()
-    // }, 1000)
-    // CapacitorUpdater.addListener('download', async () => {
-    //   downloadStarted = true
-    // })
-    // CapacitorUpdater.addListener('updateAvailable', async (res) => {
-    //   if (downloadStarted) {
-    //     CapacitorUpdater.set({
-    //       id: res.bundle.id,
-    //     })
-    //   }
-    // })
     CapacitorUpdater.notifyAppReady()
     App.addListener('appUrlOpen', async (event: URLOpenListenerEvent) => {
       const loading = await loadingController.create({
@@ -54,7 +23,6 @@ export const install: UserModule = ({ app, router }) => {
       })
       await loading.present()
       let { url } = event
-      // console.log('url', url)
       if (url.startsWith(supabaseUrl)) {
         const urlParams = Object.fromEntries(new URLSearchParams(url.split('?')[1]) as any) as HttpParams
         const options: HttpOptions = {
@@ -75,7 +43,6 @@ export const install: UserModule = ({ app, router }) => {
           return toast.present()
         }
       }
-      // console.log('url', url)
       if (!url.startsWith(appUrl)) {
         await loading.dismiss()
         return

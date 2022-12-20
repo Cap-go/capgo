@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import AppCard from './AppCard.vue'
-import type { definitions } from '~/types/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
-  apps: (definitions['apps'])[]
+  apps: (Database['public']['Tables']['apps']['Row'])[]
 }>()
 const emit = defineEmits(['reload'])
 const { t } = useI18n()
@@ -20,7 +20,7 @@ const { t } = useI18n()
     <div class="p-3">
       <!-- Table -->
       <div class="overflow-x-auto">
-        <table class="w-full table-auto">
+        <table class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="text-xs uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
             <tr>

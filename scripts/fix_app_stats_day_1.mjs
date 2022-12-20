@@ -1,7 +1,5 @@
 // list all apps in supabase and create version unknown for each
-// import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
-// import type { definitions } from '~/types/supabase'
 
 const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 const supabaseAnonKey = '***'
@@ -48,7 +46,7 @@ const fix_apps = async () => {
 
   const { data } = await supabase
     .from('apps')
-    // .from<definitions['apps']>('apps')
+    // .from('apps')
     .select()
 
   if (!data || !data.length) {

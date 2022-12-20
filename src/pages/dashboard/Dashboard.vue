@@ -10,18 +10,18 @@ import Steps from '../onboarding/Steps.vue'
 import { useMainStore } from '~/stores/main'
 import Usage from '~/components/dashboard/Usage.vue'
 import TopApps from '~/components/dashboard/TopApps.vue'
-import type { definitions } from '~/types/supabase'
 import SharedApps from '~/components/dashboard/SharedApps.vue'
+import type { Database } from '~/types/supabase.types'
 
 interface ChannelUserApp {
-  app_id: definitions['apps']
-  channel_id: definitions['channels'] & {
-    version: definitions['app_versions']
+  app_id: Database['public']['Tables']['apps']['Row']
+  channel_id: Database['public']['Tables']['channels']['Row'] & {
+    version: Database['public']['Tables']['app_versions']['Row']
   }
 }
 const props = defineProps<{
-  apps: definitions['apps'][]
-  sharedApps: (definitions['channel_users'])[] & ChannelUserApp[]
+  apps: Database['public']['Tables']['apps']['Row'][]
+  sharedApps: (Database['public']['Tables']['channel_users']['Row'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
 const isMobile = isPlatform('capacitor')
@@ -59,7 +59,7 @@ watchEffect(async () => {
       <main>
         <div class="w-full px-4 py-8 mx-auto mb-8 sm:px-6 lg:px-8 max-w-9xl">
           <!-- Welcome banner -->
-          <WelcomeBanner />
+          <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
 
           <!-- Cards -->
           <div class="grid grid-cols-12 gap-6">
@@ -68,12 +68,12 @@ watchEffect(async () => {
             <!-- Table (Top Channels) -->
             <TopApps :apps="props.apps" @reload="emit('reloadApp')" />
 
-            <SharedApps :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
+            <SharedApps v-if="props.sharedApps.length" :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
           </div>
         </div>
       </main>
     </div>
-    <IonFab v-if="!stepsOpen && isMobile" slot="fixed" vertical="bottom" horizontal="end">
+    <IonFab v-if="!stepsOpen && !isMobile" slot="fixed" vertical="bottom" horizontal="end" class="safe-zone">
       <IonFabButton color="secondary" @click="stepsOpen = true">
         <IonIcon :icon="addOutline" />
       </IonFabButton>

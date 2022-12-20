@@ -5,8 +5,8 @@ import { useRoute } from 'vue-router'
 import { Doughnut } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Spinner from '~/components/Spinner.vue'
+import type { Database } from '~/types/supabase.types'
 
 interface Version {
   id: {
@@ -20,15 +20,9 @@ const supabase = useSupabase()
 const id = ref('')
 const isLoading = ref(true)
 const downloads = ref(0)
-const versions = ref<(definitions['app_versions_meta'] & Version)[]>([])
+const versions = ref<(Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]>([])
 const dataDevValues = ref([] as number[])
 const dataDevLabels = ref([] as string[])
-
-// const MAU = computed(() => {
-//   return versions.value.reduce((p, c) => {
-//     return p + (c.devices || 0)
-//   }, 0)
-// })
 
 const buildGraph = () => {
   const vals = versions.value.reduce((past, d) => {
@@ -43,7 +37,7 @@ const buildGraph = () => {
 const loadData = async () => {
   try {
     const { data: dataVersions } = await supabase
-      .from<definitions['app_versions_meta'] & Version>('app_versions_meta')
+      .from('app_versions_meta')
       .select(`
         id (
             name
@@ -54,7 +48,7 @@ const loadData = async () => {
       `)
       .eq('app_id', id.value)
       .order('created_at', { ascending: false })
-    versions.value = dataVersions || versions.value
+    versions.value = (dataVersions || versions.value) as (Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]
     buildGraph()
   }
   catch (error) {
@@ -65,7 +59,7 @@ const loadData = async () => {
 const getLastDownload = async () => {
   const date_id = new Date().toISOString().slice(0, 7)
   const { data } = await supabase
-    .from<definitions['app_stats']>('app_stats')
+    .from('app_stats')
     .select()
     .eq('app_id', id.value)
     .eq('date_id', date_id)
@@ -121,7 +115,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="chat-items flex justify-center">
+  <div v-if="isLoading" class="flex justify-center chat-items">
     <Spinner />
   </div>
   <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">

@@ -48,7 +48,7 @@ const submit = async () => {
   if (!isFormCorrect)
     isLoading.value = false
 
-  const { error: updateError } = await supabase.auth.update({ password: form.password })
+  const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
 
   isLoading.value = false
   if (updateError)
@@ -62,10 +62,10 @@ const submit = async () => {
   <IonPage>
     <TitleHead :title="t('accountPassword.heading')" />
     <IonContent :fullscreen="true">
-      <div class="py-16 px-6 mx-auto w-full lg:w-1/2">
+      <div class="w-full px-6 py-16 mx-auto lg:w-1/2">
         <form @submit.prevent="submit">
           <div v-if="errorMessage" class="text-center">
-            <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+            <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
               {{ errorMessage }}
             </p>
           </div>
@@ -76,7 +76,7 @@ const submit = async () => {
               <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
             </IonItem>
             <div v-for="(error, index) of v$.password.$errors" :key="index" class="text-center">
-              <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+              <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
                 {{ error.$message }}
               </p>
             </div>
@@ -86,7 +86,7 @@ const submit = async () => {
               <img v-else src="/eye-close.png" alt="password" @click="showPassword2 = !showPassword2">
             </IonItem>
             <div v-for="(error, index) of v$.confirmPassword.$errors" :key="index" class="text-center">
-              <p class="text-muted-blue-500 text-xs italic mt-2 mb-4">
+              <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
                 {{ error.$message }}
               </p>
             </div>
@@ -96,9 +96,9 @@ const submit = async () => {
             shape="round"
             expand="block"
             type="submit"
-            class="ion-margin-top font-light w-45 mx-auto mt-12"
+            class="mx-auto mt-12 font-light ion-margin-top w-45"
           >
-            <svg v-if="isLoading" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle
                 class="opacity-25"
                 cx="12"
@@ -123,8 +123,3 @@ const submit = async () => {
     </IonContent>
   </IonPage>
 </template>
-
-<route lang="yaml">
-meta:
-  option: tabs
-</route>

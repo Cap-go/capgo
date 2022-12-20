@@ -8,35 +8,48 @@ import {
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { addOutline } from 'ionicons/icons'
+import copy from 'copy-text-to-clipboard'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
+import { useMainStore } from '~/stores/main'
+import type { Database } from '~/types/supabase.types'
+import { bytesToMbText } from '~/services/conversion'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const listRef = ref()
+const main = useMainStore()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
-const version = ref<definitions['app_versions']>()
-const channels = ref<(definitions['channels'])[]>([])
-const version_meta = ref<definitions['app_versions_meta']>()
+const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const search = ref('')
-const devices = ref<definitions['devices'][]>([])
+const devices = ref<Database['public']['Tables']['devices']['Row'][]>([])
 
+const copyToast = async (text: string) => {
+  copy(text)
+  const toast = await toastController
+    .create({
+      message: t('copied-to-clipboard'),
+      duration: 2000,
+    })
+  await toast.present()
+}
 const getDevices = async () => {
   if (!version.value)
     return
   try {
     const { data: dataDevices } = await supabase
-      .from<definitions['devices']>('devices')
+      .from('devices')
       .select()
       .eq('version', id.value)
       .eq('app_id', version.value.app_id)
@@ -53,30 +66,26 @@ const getChannels = async () => {
   if (!version.value)
     return
   const { data: dataChannel } = await supabase
-    .from<definitions['channels']>('channels')
+    .from('channels')
     .select()
     .eq('app_id', version.value.app_id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
 }
-const bytesToMb = (bytes: number) => {
-  const res = bytes / 1024 / 1024
-  return `${res.toFixed(2)} MB`
-}
 
 const showSize = computed(() => {
   if (version_meta.value?.size)
-    return bytesToMb(version_meta.value.size)
+    return bytesToMbText(version_meta.value.size)
   else if (version.value?.external_url)
     return t('package.externally')
   else
     return t('package.not_available')
 })
-const setChannel = async (channel: definitions['channels']) => {
+const setChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
   if (!version.value)
     return
   return supabase
-    .from<definitions['channels']>('channels')
+    .from('channels')
     .update({
       version: version.value.id,
     })
@@ -119,6 +128,8 @@ const ASChannelChooser = async () => {
   await actionSheet.present()
 }
 const openPannel = async () => {
+  if (!version.value || !main.auth)
+    return
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
@@ -127,7 +138,7 @@ const openPannel = async () => {
           actionSheet.dismiss()
           if (!version.value)
             return
-          openVersion(version.value, auth?.id || '')
+          openVersion(version.value, main.user?.id || '')
         },
       },
       {
@@ -153,22 +164,25 @@ const getVersion = async () => {
   if (!id.value)
     return
   try {
-    const { data, error } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+    const { data } = await supabase
+      .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('id', id.value)
       .single()
-    const { data: dataVersionsMeta, error: dataVersionsError } = await supabase
-      .from<definitions['app_versions_meta']>('app_versions_meta')
+    const { data: dataVersionsMeta } = await supabase
+      .from('app_versions_meta')
       .select()
       .eq('id', id.value)
       .single()
-    if (error || dataVersionsError) {
-      console.error('no version', error, dataVersionsError)
+    if (!data) {
+      console.error('no version found')
+      router.back()
       return
     }
-    version_meta.value = dataVersionsMeta
+    if (dataVersionsMeta)
+      version_meta.value = dataVersionsMeta
+
     version.value = data
   }
   catch (error) {
@@ -187,6 +201,12 @@ watchEffect(async () => {
     loading.value = false
   }
 })
+
+const hideString = (str: string) => {
+  const first = str.slice(0, 5)
+  const last = str.slice(-5)
+  return `${first}...${last}`
+}
 
 const devicesFilter = computed(() => {
   const value = search.value
@@ -236,7 +256,7 @@ const devicesFilter = computed(() => {
               {{ version?.id }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version?.created_at">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('device.created_at') }}
@@ -246,7 +266,7 @@ const devicesFilter = computed(() => {
               {{ formatDate(version?.created_at) }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version?.updated_at">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('updated-at') }}
@@ -256,24 +276,34 @@ const devicesFilter = computed(() => {
               {{ formatDate(version?.updated_at) }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version?.checksum">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('checksum') }}
               </h2>
             </IonLabel>
             <IonNote slot="end">
-              {{ version?.checksum }}
+              {{ version.checksum }}
             </IonNote>
           </IonItem>
-          <IonItem>
+          <IonItem v-if="version_meta?.devices">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
                 {{ t('devices.title') }}
               </h2>
             </IonLabel>
             <IonNote slot="end">
-              {{ version_meta?.devices }}
+              {{ version_meta.devices }}
+            </IonNote>
+          </IonItem>
+          <IonItem v-if="version?.session_key">
+            <IonLabel>
+              <h2 class="text-sm text-azure-500">
+                {{ t('session_key') }}
+              </h2>
+            </IonLabel>
+            <IonNote slot="end" @click="copyToast(version?.session_key || '')">
+              {{ hideString(version.session_key) }}
             </IonNote>
           </IonItem>
           <IonItem v-if="version?.external_url">
@@ -313,7 +343,7 @@ const devicesFilter = computed(() => {
                 </h2>
               </IonLabel>
               <IonNote slot="end">
-                {{ formatDate(d.created_at) }}
+                {{ formatDate(d.created_at || '') }}
               </IonNote>
             </IonItem>
           </template>

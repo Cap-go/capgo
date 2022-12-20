@@ -51,10 +51,11 @@ add-your-first-app-t: 最初のアプリをアカウントに追加して、ア�
 afternoon: 午後
 alert:
   confirm-delete: 削除の確認
-  delete-message: |-
-    このアクションは元に戻せません。
-    これを削除してもよろしいですか
+  delete-message: これを削除してもよろしいですか
+  not-reverse-message: このアクションは元に戻せません
+allow-develoment-bui: 開発ビルドを許可
 allow-device-to-self: デバイスの自己関連付けを許可する
+allow-emulator: エミュレータを許可
 api-key: API キー
 api-keys: API キー
 apikeys:
@@ -67,6 +68,8 @@ apikeys:
   title: APIキー
   updater: コンデンサアップデータ
 app-id-example: アプリ ID の例
+available-in-the-san: サンドボックス アプリで利用可能
+back-to-login-page: ログインページに戻る
 bigger-app-size: アプリのサイズが大きい
 build-your-code-and-: コードをビルドする
 bulk-upload: 一括アップロード
@@ -88,20 +91,22 @@ by-clicking-on-them: それらをクリックして。
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-channel: チャネルを削除できません
+cannot-save-custom-i: カスタム ID を保存できません
 change: 変化する
 channel:
   add: 追加
   beta-channel: ベータチャンネル
   cannot-delete-device: デバイスを削除できません
   confirm-public-desc: |-
-    このチャネルを公開すると、すべてのユーザーに更新が送信されます。
-    他のすべての公開チャネルは非公開になります。
+    このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
+
+    他のデフォルト チャネルはデフォルトではなくなります。
   copy: URLをコピー
   device: 端末
   device-deleted: デバイスが削除されました
   invit: 招待するメールアドレスを入力
-  is_public: チャンネル公開
-  make-now: 公表します
+  is_public: チャネルのデフォルト
+  make-now: デフォルトにする
   make_it: 成功する
   makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします
   makepublic: チャンネルは非公開です。クリックして公開してください
@@ -119,12 +124,15 @@ checksum: チェックサム
 commands: コマンド
 copied-to-clipboard: クリップボードにコピーしました
 copy-your: あなたのコピー
+create-a-free-accoun: 無料アカウントを作成
 custom-domain: カスタム ドメイン
+custom-id: カスタム ID
+custom-id-saved: カスタム ID を保存しました
 dashboard: ダッシュボード
 days: 日々
 defined-as: として定義
-defined-as-private: プライベートと定義
-defined-as-public: パブリックと定義
+defined-as-private: 通常と定義
+defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
 device:
   channel: チャネルリンク
@@ -149,13 +157,19 @@ devices:
 devices-using-this-b: このバンドルを使用するデバイス
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
 disable-auto-upgrade: メジャーを超える自動アップグレードを無効にする
+discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
 documentation: ドキュメンテーション
+dont-have-an-account: アカウントを持っていませんか？
+email-address: 電子メールアドレス
+enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
+enter-your-new-passw: 新しいパスワードを入力して確認します
 forgot:
   check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
   email: Eメール
   heading: パスワードをお忘れですか
   success: パスワードが正常に更新されました
+from-device: デバイスから
 good: 良い
 id: ID
 in-your-main-file: メインファイルで
@@ -168,10 +182,13 @@ intro:
   hi: こんにちは、{name}!
   whats-your-name: 君の名は。
 invalid-auth: 無効な認証
+is-emulator: エミュレータです
+is-production-app: 本番アプリです
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
 limit-reached: 制限に達しました
 loading-more-data: より多くのデータを読み込んでいます...
+log-in: ログイン
 log-to-the-capgo-cli: Capgo CLI にログインします。
 login:
   andpass: そしてパスワード
@@ -184,6 +201,9 @@ login:
   or: また
   password: パスワード
   withemail: メールアドレス付き
+login-to-your-accoun: あなたのアカウントにログイン
+make-normal: 通常にする
+making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 module:
   heading: モジュール
 monthly-active-users: 月間アクティブ ユーザー数
@@ -275,6 +295,7 @@ plans: 予定
 please-choose-your-p: お好みを選択してください
 please-upgrade: プランをアップグレードして、ユーザーを追加してください
 pro-tip-you-can-copy: 'プロのヒント: をコピーできます'
+projection: 予測
 projects:
   list: あなたのもの
   sharedlist: 私と共有
@@ -296,7 +317,10 @@ register:
   password-hint: 少なくとも6つの数字、文字、句読点の組み合わせを入力してください。
   specialError: 特殊文字を含める必要があります
   upperCaseError: 大文字を含める必要があります
+reset-password: パスワードを再設定する
+reset-your-password: あなたのパスワードをリセット
 see-usage: 使用法を見る
+session_key: IvSessionKey
 settings: 設定
 shared-apps: 共有アプリ
 sign-out: サインアウト
@@ -314,6 +338,7 @@ stats:
   versions: バージョン
 submit: 送信
 terms-of-use: 利用規約
+tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 the: の
 this-page-will-self-: このページは自動的に更新されます
@@ -331,6 +356,7 @@ usage:
   success: プランが設定されましたこのページは数分で更新されます
   title: 使用法
 version-builtin: バージョン組み込み
+welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
 you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました

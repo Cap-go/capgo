@@ -1,5 +1,6 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
-import type { definitions } from './types_supabase.ts'
+import type { Database } from './supabase.types.ts'
+import { getEnv } from "./utils.ts";
 
 const DEFAULT_TOLERANCE = 300
 const EXPECTED_SCHEME = 'v1'
@@ -20,7 +21,7 @@ const parseHeader = (header: string, scheme: string): Details => {
     {
       timestamp: -1,
       signatures: [] as string[],
-    },
+    } as Details,
   )
 }
 const makeHMACContent = (payload: string, details: Details) => {
@@ -42,7 +43,7 @@ export const parseStripeEvent = (body: string, signature: string) => {
   if (!details.signatures.length)
     throw new Error('No signatures found with expected scheme')
 
-  const expectedSignature = hmac('sha256', Deno.env.get('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(body, details), 'utf8', 'hex')
+  const expectedSignature = hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(body, details), 'utf8', 'hex')
   const signatureFound = !!details.signatures.filter(a => scmpCompare(a, expectedSignature as string)).length
 
   if (!signatureFound)
@@ -56,15 +57,15 @@ export const parseStripeEvent = (body: string, signature: string) => {
   return jsonPayload
 }
 
-export const extractDataEvent = (event: any): definitions['stripe_info'] => {
-  const data: definitions['stripe_info'] = {
+export const extractDataEvent = (event: any): Database['public']['Tables']['stripe_info']['Insert'] => {
+  const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',
     subscription_id: undefined,
     customer_id: '',
     updated_at: new Date().toISOString(),
-    trial_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
+    is_good_plan: true,
     status: undefined,
   }
 
@@ -74,7 +75,7 @@ export const extractDataEvent = (event: any): definitions['stripe_info'] => {
       const subscription = event.data.object as any
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
-      data.status = subscription.cancel_at ? 'canceled' : 'succeeded'
+      data.status = subscription.cancel_at ? 'canceled' : 'updated'
       data.subscription_id = subscription.id
       data.customer_id = String(subscription.customer)
     }

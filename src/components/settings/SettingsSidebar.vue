@@ -3,7 +3,7 @@ import { isPlatform } from '@ionic/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { openPortal } from '~/services/stripe'
-import { isAdmin } from '~/services/supabase'
+import { isAdmin, isSpoofed } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
 const main = useMainStore()
@@ -11,9 +11,9 @@ const { t } = useI18n()
 const version = import.meta.env.VITE_APP_VERSION
 const isMobile = ref(isPlatform('capacitor'))
 const isUserAdmin = ref(false)
-if (main.auth?.id) {
-  isAdmin(main.auth?.id).then((res) => {
-    isUserAdmin.value = !!res || !!localStorage.getItem('supabase.old_id')
+if (main.user?.id) {
+  isAdmin(main.user?.id).then((res) => {
+    isUserAdmin.value = !!res || isSpoofed()
   })
 }
 </script>

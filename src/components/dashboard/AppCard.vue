@@ -4,12 +4,12 @@ import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import IconTrash from '~icons/heroicons/trash'
-import type { definitions } from '~/types/supabase'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
-  app: definitions['apps']
+  app: Database['public']['Tables']['apps']['Row']
   channel: string
 }>()
 const emit = defineEmits(['reload'])
@@ -25,7 +25,7 @@ const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
-      message: `${t('alert.delete-message')} ${name}?`,
+      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
       buttons: [
         {
           text: t('button.cancel'),
@@ -41,19 +41,19 @@ const didCancel = async (name: string) => {
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
 
-const deleteApp = async (app: definitions['apps']) => {
+const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
   // console.log('deleteApp', app)
   if (await didCancel(t('package.name')))
     return
   try {
     const { data, error: vError } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
 
     if (data && data.length) {
-      const filesToRemove = (data as definitions['app_versions'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
+      const filesToRemove = (data as Database['public']['Tables']['app_versions']['Row'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
       const { error: delError } = await supabase
         .storage
         .from('apps')
@@ -70,7 +70,7 @@ const deleteApp = async (app: definitions['apps']) => {
     }
 
     const { error: dbAppError } = await supabase
-      .from<definitions['apps']>('apps')
+      .from('apps')
       .delete()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
@@ -107,7 +107,7 @@ const loadData = async () => {
     try {
       const date_id = new Date().toISOString().slice(0, 7)
       const { data, error } = await supabase
-        .from<definitions['app_stats']>('app_stats')
+        .from('app_stats')
         .select()
         .eq('app_id', props.app.app_id)
         .eq('date_id', date_id)
@@ -149,7 +149,7 @@ watchEffect(async () => {
   <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
     <td class="p-2">
       <div class="flex flex-wrap items-center">
-        <img :src="app.icon_url" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
+        <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
         <div class="max-w-max">
           {{ props.app.name }}
         </div>
@@ -162,7 +162,7 @@ watchEffect(async () => {
     </td>
     <td class="p-2">
       <div class="text-center">
-        {{ formatDate(props.app.updated_at) }}
+        {{ formatDate(props.app.updated_at || "") }}
       </div>
     </td>
     <td class="p-2">

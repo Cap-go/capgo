@@ -51,8 +51,11 @@ add-your-first-app-t: Add your first app to your account and let's push updates 
 afternoon: afternoon
 alert:
   confirm-delete: Confirm Delete
-  delete-message: This action is not reversible. Are you sure you want to delete this
+  delete-message: Are you sure you want to delete this
+  not-reverse-message: This action is not reversible
+allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
+allow-emulator: Allow Emulators
 api-key: API key
 api-keys: API Keys
 apikeys:
@@ -67,6 +70,8 @@ apikeys:
   title: API keys
   updater: capacitor-updater
 app-id-example: App ID example
+available-in-the-san: Available in the sandbox app
+back-to-login-page: Back to login page
 bigger-app-size: Bigger app size
 build-your-code-and-: Build your code & Upload your version
 bulk-upload: Bulk upload
@@ -88,20 +93,21 @@ by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
+cannot-save-custom-i: Cannot save custom ID
 change: Change
 channel:
   add: Add
   beta-channel: Beta channel
   cannot-delete-device: Cannot delete device
   confirm-public-desc: |-
-    Making this channel public will make it send updates to all yours users. 
-    All other public channels will become private.
+    Making this channel default will make it send updates to all yours users. 
+    Others default channels will not be default anymore.
   copy: Copy URL
   device: Device
   device-deleted: Device deleted
   invit: Type email to invite
-  is_public: Channel public
-  make-now: Make public
+  is_public: Channel default
+  make-now: Make default
   make_it: Make it
   makeprivate: Your channel is public, click to make it private
   makepublic: Your channel is private, click to make it public
@@ -119,12 +125,15 @@ checksum: Checksum
 commands: commands
 copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
+create-a-free-accoun: Create a free account
 custom-domain: Custom domain
+custom-id: Custom ID
+custom-id-saved: Custom ID saved
 dashboard: Dashboard
 days: days
 defined-as: Defined as
-defined-as-private: defined as private
-defined-as-public: defined as public
+defined-as-private: defined as normal
+defined-as-public: defined as default
 delete-account: Delete Account
 device:
   channel: Channel link
@@ -149,13 +158,19 @@ devices:
 devices-using-this-b: Devices using this bundle
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
+discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
+dont-have-an-account: Don’t have an account?
+email-address: Email address
+enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
+enter-your-new-passw: Enter your new password and confirm
 forgot:
   check_email: Check your email to get the link to reset your password
   email: Email
   heading: Forgot password
   success: Password updated successfully
+from-device: from device
 good: Good
 id: id
 in-your-main-file: In your main file
@@ -168,10 +183,13 @@ intro:
   hi: Hi, {name}!
   whats-your-name: What's your name?
 invalid-auth: invalid auth
+is-emulator: Is Emulator
+is-production-app: Is Production app
 last-upload: Last upload
 last-version: Last version
 limit-reached: Limit reached
 loading-more-data: Loading more data...
+log-in: Log in
 log-to-the-capgo-cli: Log to the Capgo CLI
 login:
   andpass: And password
@@ -184,6 +202,11 @@ login:
   or: or
   password: Password
   withemail: With email adress
+login-to-your-accoun: Login to your account
+make-normal: Make normal
+making-this-channel-: >-
+  Making this channel "normal" will need you to configure an other channel
+  default or let device self assign.
 module:
   heading: Modules
 monthly-active-users: Monthly active users
@@ -273,6 +296,7 @@ plans: Plans
 please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
+projection: Projections
 projects:
   list: Yours
   sharedlist: Shared with me
@@ -294,7 +318,10 @@ register:
   password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
   specialError: Should contain special characters
   upperCaseError: Should contain uppercase letters
+reset-password: Reset Password
+reset-your-password: Reset your password
 see-usage: See usage
+session_key: IvSessionKey
 settings: Settings
 shared-apps: Shared Apps
 sign-out: Sign Out
@@ -310,6 +337,7 @@ stats:
   versions: Versions
 submit: Submit
 terms-of-use: Terms of Use
+tests: tests
 thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
@@ -327,6 +355,7 @@ usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
 version-builtin: Version builtin
+welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached

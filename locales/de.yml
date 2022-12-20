@@ -2,9 +2,9 @@ Bandwidth: Bandbreite
 MAU: Monatlich aktive Benutzer
 Storage: Lagerung
 account:
-  backButton: Zurück
+  backButton: Der Rücken
   billing: Abrechnung
-  changePassword: Kennwort ändern
+  changePassword: Passwort ändern
   delete-account: Mein Konto löschen
   delete_sure: Bist du dir sicher ?
   discord: Zwietracht
@@ -16,11 +16,11 @@ account:
   personalInformation: Persönliche Informationen
   preferences: Benachrichtigungen
   privacy: Datenschutz-Bestimmungen
-  support: Unterstützung
+  support: Die Unterstützung
   usage: Verwendungszweck
 account-settings: Account Einstellungen
 accountPassword:
-  confirmPassword: Kennwort bestätigen
+  confirmPassword: Passwort bestätigen
   errorMsg: Fehler aufgetreten, bitte versuchen Sie es erneut
   heading: Ändere mein Passwort
   password: Neues Passwort
@@ -57,10 +57,11 @@ add-your-first-app-t: >-
 afternoon: Nachmittag
 alert:
   confirm-delete: Löschen bestätigen
-  delete-message: |-
-    Diese Aktion ist nicht umkehrbar. 
-    Möchten Sie diese wirklich löschen?
+  delete-message: Möchten Sie diese wirklich löschen?
+  not-reverse-message: Diese Aktion ist nicht umkehrbar
+allow-develoment-bui: Entwicklungsbuild zulassen
 allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
+allow-emulator: Emulatoren zulassen
 api-key: API-Schlüssel
 api-keys: API-Schlüssel
 apikeys:
@@ -75,19 +76,21 @@ apikeys:
   title: API-Schlüssel
   updater: Kondensator-Updater
 app-id-example: App-ID-Beispiel
+available-in-the-san: Verfügbar in der Sandbox-App
+back-to-login-page: Zurück zur Anmeldeseite
 bigger-app-size: Größere App-Größe
 build-your-code-and-: Erstellen Sie Ihren Code
 bulk-upload: Bulk-Upload
 bundle-number: Bündelnummer
 button:
-  about: Über
-  back: Zurück
+  about: Um
+  back: Der Rücken
   browse: Durchsuche
   camera: Kamera
-  cancel: Abbrechen
+  cancel: Absagen
   delete: Löschen
-  go: Los
-  home: Startseite
+  go: GEHEN
+  home: Heim
   remove: Entfernen
   tabs: Registerkarten
   toggle_dark: Dunkelmodus umschalten
@@ -96,29 +99,31 @@ by-clicking-on-them: indem Sie darauf klicken.
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-version: App-Version kann nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
+cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
 change: Veränderung
 channel:
   add: Hinzufügen
   beta-channel: Beta-Kanal
   cannot-delete-device: Gerät kann nicht gelöscht werden
   confirm-public-desc: >-
-    Wenn Sie diesen Kanal öffentlich machen, werden Updates an alle Ihre
-    Benutzer gesendet. 
+    Wenn Sie diesen Kanal als Standard festlegen, werden Updates an alle Ihre
+    Benutzer gesendet.
 
-    Alle anderen öffentlichen Kanäle werden privat.
+
+    Andere Standardkanäle sind nicht mehr Standard.
   copy: URL kopieren
   device: Gerät
   device-deleted: Gerät gelöscht
   invit: Geben Sie die einzuladende E-Mail-Adresse ein
-  is_public: Kanal öffentlich
-  make-now: Veröffentlichen
+  is_public: Kanalvorgabe
+  make-now: Machen Standard
   make_it: Mach es
   makeprivate: Dein Kanal ist öffentlich, klicke um ihn privat zu machen
   makepublic: Dein Kanal ist privat, klicke hier, um ihn öffentlich zu machen
   open: Offen
   private_desc: Privatgelände
   public: Kondensator-Updater-Link
-  public_desc: Allgemein
+  public_desc: Öffentlichkeit
   title: Kanal
   user: Benutzer
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
@@ -129,12 +134,15 @@ checksum: Prüfsumme
 commands: Befehle
 copied-to-clipboard: In die Zwischenablage kopiert
 copy-your: Kopieren Sie Ihre
+create-a-free-accoun: Erstelle einen kostenlosen Account
 custom-domain: Benutzerdefinierten Domain
+custom-id: Benutzerdefinierte ID
+custom-id-saved: Benutzerdefinierte ID gespeichert
 dashboard: Armaturenbrett
 days: Tage
 defined-as: Definiert als
-defined-as-private: als privat definiert
-defined-as-public: als öffentlich definiert
+defined-as-private: als normal definiert
+defined-as-public: als Standard definiert
 delete-account: Konto löschen
 device:
   channel: Kanallink
@@ -159,8 +167,15 @@ devices:
 devices-using-this-b: Geräte, die dieses Paket verwenden
 disable-auto-downgra: Deaktivieren Sie das automatische Downgrade unter native
 disable-auto-upgrade: Deaktivieren Sie das automatische Upgrade über Major
+discover-module-in-a: Entdecken Sie das Modul in Awesome-capacitor
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
+dont-have-an-account: Sie haben kein Konto?
+email-address: E-Mail-Addresse
+enter-your-email-add: >-
+  Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum
+  Zurücksetzen Ihres Passworts.
+enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 forgot:
   check_email: >-
     Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
@@ -168,6 +183,7 @@ forgot:
   email: Email
   heading: Passwort vergessen
   success: Passwort erfolgreich aktualisiert
+from-device: vom Gerät
 good: Gut
 id: Ich würde
 in-your-main-file: In Ihrer Hauptdatei
@@ -175,27 +191,35 @@ informations: Informationen
 into-your-app-folder: In Ihren App-Ordner.
 intro:
   aka: Auch bekannt als
-  desc: Vite Startvorlage mit Vorlieben
-  dynamic-route: Demo einer dynamischen Route
-  hi: Hi, {name}!
-  whats-your-name: Wie heißt du?
+  desc: Meinungsstarke Vite-Starter-Vorlage
+  dynamic-route: Demo der dynamischen Route
+  hi: Hallo, {Name}!
+  whats-your-name: Wie heißen Sie?
 invalid-auth: ungültige Auth
+is-emulator: Ist Emulator
+is-production-app: Ist die Produktions-App
 last-upload: Letzter Upload
 last-version: Letzte Version
 limit-reached: Limit erreicht
 loading-more-data: Weitere Daten werden geladen...
+log-in: Einloggen
 log-to-the-capgo-cli: Melden Sie sich bei der Capgo-CLI an
 login:
   andpass: Und Passwort
   connexion: Anmeldung
   create-new: Neuen Account erstellen
   email: Email
-  forgot: vergessen
+  forgot: Vergessen
   hello: Hallo
   login-in: Einloggen in
   or: oder
   password: Passwort
   withemail: Mit E-Mail-Adresse
+login-to-your-accoun: Melde dich in deinem Konto an
+make-normal: Normal machen
+making-this-channel-: >-
+  Wenn Sie diesen Kanal „normal“ machen, müssen Sie einen anderen Standardkanal
+  konfigurieren oder das Gerät selbst zuweisen lassen.
 module:
   heading: Module
 monthly-active-users: Monatlich aktive Benutzer
@@ -209,7 +233,7 @@ need-more-contact-us: |-
   Kontaktieren Sie uns für einen maßgeschneiderten Plan
 not-found: Nicht gefunden
 notificationSettings:
-  heading: Konto
+  heading: Benachrichtigungseinstellungen
   validate: Bestätigen
 notifications: Benachrichtigungen
 onboarding:
@@ -217,32 +241,32 @@ onboarding:
 one-day-left: Ein Tag übrig
 open-sidebar: Seitenleiste öffnen
 package:
-  cannot-delete-version: Version kann nicht gelöscht werden
+  cannot-delete-version: Paket kann nicht gelöscht werden
   channels: Kanäle
   device_list: Geräteliste
-  devices: Siehe Geräte
+  devices: Siehe Gerätestatistik
   devices-list: Geräte verknüpft
-  download: Download-Version
+  download: Bündel herunterladen
   externally: extern gespeichert
   link_channel: Link zum Kanal
-  link_version: Version verlinken
+  link_version: Link zum Bündel
   mobiles-stats: Mobile Statistiken
   name: App
   not_available: Paket nicht gefunden
-  set: Version auf Kanal setzen
+  set: Bündel auf Kanal setzen
   stats: Statistiken
-  test: Version starten
+  test: Bündel starten
   title: die Info
   version:
     is-used-in-device: >-
       in einer Geräteüberschreibung verwendet wird, heben Sie zuerst die
       Verknüpfung auf
-  version-deleted: Fassung gelöscht
-  versions: Versionen
+  version-deleted: Bündel gelöscht
+  versions: Bündeln
 pages: Seiten
 password:
   heading: Passwort erstellen
-  new: Neues Kennwort
+  new: Neues Passwort
   validate: Bestätigen
 pckage:
   version:
@@ -291,6 +315,7 @@ plans: Pläne
 please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 pro-tip-you-can-copy: 'Pro-Tipp: Sie können die'
+projection: Projektionen
 projects:
   list: Deine
   sharedlist: Mit mir geteilt
@@ -299,22 +324,25 @@ refresh-this-page: Aktualisieren Sie diese Seite
 register:
   already-account: Sie haben schon ein Konto?
   check-email: Bitte überprüfen Sie Ihre E-Mail und bestätigen Sie
-  confirm-email: Bestätigungs-E-Mail
-  confirm-password: Kennwort bestätigen
+  confirm-email: Bestätige deine E-Mail
+  confirm-password: Passwort bestätigen
   desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
   email: Email
   first-name: Vorname
   heading: Anmeldung
   last-name: Nachname
   lowerCaseError: Sollte Kleinbuchstaben enthalten
-  next: Nächste
+  next: Registrieren
   password: Passwort
   password-hint: >-
     Geben Sie eine Kombination aus mindestens 6 Zahlen, Buchstaben und
     Satzzeichen ein.
   specialError: Sollte Sonderzeichen enthalten
   upperCaseError: Sollte Großbuchstaben enthalten
+reset-password: Passwort zurücksetzen
+reset-your-password: Setze dein Passwort zurück
 see-usage: Siehe Verwendung
+session_key: IvSessionKey
 settings: Einstellungen
 shared-apps: Geteilte Apps
 sign-out: Austragen
@@ -327,18 +355,19 @@ start-using-capgo: Beginnen Sie mit Capgo!
 stats:
   devices: Geräte
   downloads: Downloads
-  subtitle: Letzten Monat
+  subtitle: Im vergangenen Monat
   title: Statistiken
   versions: Versionen
 submit: Einreichen
 terms-of-use: Nutzungsbedingungen
+tests: Prüfungen
 thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
 the: Das
 this-page-will-self-: Diese Seite wird sich selbst aktualisieren
 title: Titel
 top-apps: Meine Applikationen
 trial-left: Tage übrig
-trial-plan-expired: Testplan abgelaufen
+trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
 unlimited-updates: Unbegrenzte Updates
 updated-at: Aktualisiert am
@@ -351,6 +380,7 @@ usage:
     aktualisiert
   title: Verwendungszweck
 version-builtin: Version eingebaut
+welcome-to: Willkommen zu
 welcome-to-your-capg: Willkommen auf Ihrem Capgo-Dashboard
 you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.
 you-reached-the-limi: Limit erreicht

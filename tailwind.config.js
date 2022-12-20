@@ -11,7 +11,7 @@ module.exports = {
   theme: {
     extend: {
       gridTemplateColumns: {
-        '16': 'repeat(16, minmax(0, 1fr))',
+        16: 'repeat(16, minmax(0, 1fr))',
       },
       boxShadow: {
         DEFAULT: '0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.02)',
@@ -23,7 +23,8 @@ module.exports = {
         blue: '2px solid rgba(0, 112, 244, 0.5)',
       },
       fontFamily: {
-        inter: ['Inter', 'sans-serif'],
+        inter: ['Inter', 'sans-serif', ...defaultTheme.fontFamily.sans],
+        prompt: ['Prompt', 'sans-serif', ...defaultTheme.fontFamily.sans],
         light: ['AirbnbCerealLight', 'sans-serif', ...defaultTheme.fontFamily.sans],
         medium: ['AirbnbCerealMedium', 'sans-serif', ...defaultTheme.fontFamily.sans],
         bold: ['AirbnbCerealBold', 'sans-serif', ...defaultTheme.fontFamily.sans],
@@ -113,6 +114,18 @@ module.exports = {
           700: '#008aeb',
           800: '#0080e1',
           900: '#0076d7',
+        },
+        'black-russian': {
+          50: '#f4f6fb',
+          100: '#e8ecf6',
+          200: '#cbd7ec',
+          300: '#9db4dc',
+          400: '#698cc7',
+          500: '#466eb1',
+          600: '#345595',
+          700: '#2b4479',
+          800: '#273c65',
+          900: '#111827',
         },
         'vista-blue': {
           50: '#baffd8',

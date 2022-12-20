@@ -2,11 +2,1522 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [1.39.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.39.0...1.39.1-alpha.0) (2022-11-03)
+### [1.66.7](https://github.com/Cap-go/capgo/compare/1.66.6...1.66.7) (2022-12-19)
 
-### [1.36.24-alpha.0](https://github.com/Cap-go/capgo/compare/1.36.24...1.36.24-alpha.0) (2022-10-27)
+### [1.66.6](https://github.com/Cap-go/capgo/compare/1.66.5...1.66.6) (2022-12-19)
 
-### [1.27.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.27.1...1.27.1-alpha.0) (2022-10-03)
+### [1.66.5](https://github.com/Cap-go/capgo/compare/1.66.4...1.66.5) (2022-12-18)
+
+
+### Bug Fixes
+
+* issue with on listen with v2 ([11a464e](https://github.com/Cap-go/capgo/commit/11a464e21b01d6014c918ba0d7094351770b3924))
+
+### [1.66.4](https://github.com/Cap-go/capgo/compare/1.66.3...1.66.4) (2022-12-18)
+
+
+### Bug Fixes
+
+* notif event name in table ([9c450fa](https://github.com/Cap-go/capgo/commit/9c450fa1c5ff1b1a631cab8d54239752c2049b8f))
+
+### [1.66.3](https://github.com/Cap-go/capgo/compare/1.66.2...1.66.3) (2022-12-18)
+
+
+### Bug Fixes
+
+* period for alerts ([3fb362a](https://github.com/Cap-go/capgo/commit/3fb362a50b59e31b0f3b4960f5333230cc214671))
+
+### [1.66.2](https://github.com/Cap-go/capgo/compare/1.66.1...1.66.2) (2022-12-18)
+
+
+### Bug Fixes
+
+* type issue ([0006a76](https://github.com/Cap-go/capgo/commit/0006a7647a4b0e283c301439bf1ce3aead81b808))
+
+### [1.66.1](https://github.com/Cap-go/capgo/compare/1.66.0...1.66.1) (2022-12-18)
+
+
+### Bug Fixes
+
+* notif table record ([c948055](https://github.com/Cap-go/capgo/commit/c9480558c6f2e37677eec1aa16853a13f8842837))
+
+## [1.66.0](https://github.com/Cap-go/capgo/compare/1.65.0...1.66.0) (2022-12-18)
+
+
+### Features
+
+* add % of plan emails ([d27118e](https://github.com/Cap-go/capgo/commit/d27118e24c00de2e8cdf2fa6b23e07f3bd7a2515))
+
+## [1.65.0](https://github.com/Cap-go/capgo/compare/1.64.9...1.65.0) (2022-12-18)
+
+
+### Features
+
+* switch to is_good_plan_v3 with new calculation methods ([0f0b062](https://github.com/Cap-go/capgo/commit/0f0b0629117157a69ac1ba41543522980745509f))
+
+### [1.64.9](https://github.com/Cap-go/capgo/compare/1.64.8...1.64.9) (2022-12-16)
+
+
+### Bug Fixes
+
+* best plan ([5558f23](https://github.com/Cap-go/capgo/commit/5558f2319ceba071c922426c81aa96bfbfbb6395))
+
+### [1.64.8](https://github.com/Cap-go/capgo/compare/1.64.7...1.64.8) (2022-12-16)
+
+
+### Bug Fixes
+
+* use error when switch to on prem ([da00e87](https://github.com/Cap-go/capgo/commit/da00e87019e53ed4b6a97ee734837113c74fa759))
+
+### [1.64.7](https://github.com/Cap-go/capgo/compare/1.64.6...1.64.7) (2022-12-16)
+
+
+### Bug Fixes
+
+* query for version id ([e7d5b2f](https://github.com/Cap-go/capgo/commit/e7d5b2f98748b8856045a2b5e75b5215d9b3f930))
+
+### [1.64.6](https://github.com/Cap-go/capgo/compare/1.64.5...1.64.6) (2022-12-16)
+
+
+### Bug Fixes
+
+* use better query to get one only ([452e3be](https://github.com/Cap-go/capgo/commit/452e3be60bd88d4ffbcca0fc9d6cc58b03d907ec))
+
+### [1.64.5](https://github.com/Cap-go/capgo/compare/1.64.4...1.64.5) (2022-12-16)
+
+
+### Bug Fixes
+
+* stats less make requests ([4ffccea](https://github.com/Cap-go/capgo/commit/4ffccea79430605de7b379d8ef0ddba225c39cde))
+
+### [1.64.4](https://github.com/Cap-go/capgo/compare/1.64.3...1.64.4) (2022-12-16)
+
+
+### Bug Fixes
+
+* better handle unknow versions ([549f37b](https://github.com/Cap-go/capgo/commit/549f37bacd8a16d8e6df7a528fce5d3cb2bbcf17))
+
+### [1.64.3](https://github.com/Cap-go/capgo/compare/1.64.2...1.64.3) (2022-12-15)
+
+
+### Bug Fixes
+
+* issue webstats ([d2b220a](https://github.com/Cap-go/capgo/commit/d2b220a632a59ce55ec00ef41b0568743706a6f2))
+
+### [1.64.2](https://github.com/Cap-go/capgo/compare/1.64.1...1.64.2) (2022-12-15)
+
+
+### Bug Fixes
+
+* add body log ([399cfe7](https://github.com/Cap-go/capgo/commit/399cfe71e4e0887ab48d105c7217ca4d9687a054))
+* delete old useless files ([6d3d00d](https://github.com/Cap-go/capgo/commit/6d3d00ddf685e0e80357ddd3d0b8155fb40054be))
+
+### [1.64.1](https://github.com/Cap-go/capgo/compare/1.64.0...1.64.1) (2022-12-13)
+
+
+### Bug Fixes
+
+* use real db value for prod tests ([a2da238](https://github.com/Cap-go/capgo/commit/a2da23898e3fe585a9f213962c4366a30e0b1c99))
+
+## [1.64.0](https://github.com/Cap-go/capgo/compare/1.63.2...1.64.0) (2022-12-13)
+
+
+### Features
+
+* add test function ([9ead99f](https://github.com/Cap-go/capgo/commit/9ead99f1018aad655ac7a0298d6d241c6094de03))
+
+### [1.63.2](https://github.com/Cap-go/capgo/compare/1.63.1...1.63.2) (2022-12-13)
+
+
+### Bug Fixes
+
+* api query params ([3234575](https://github.com/Cap-go/capgo/commit/3234575d2986c8e8baf66bf53ab64c3d4b358d50))
+
+### [1.63.1](https://github.com/Cap-go/capgo/compare/1.63.0...1.63.1) (2022-12-13)
+
+
+### Bug Fixes
+
+* demove dup message ([fdddc35](https://github.com/Cap-go/capgo/commit/fdddc3541b47e4c95054757992c11b4ec93d2137))
+
+## [1.63.0](https://github.com/Cap-go/capgo/compare/1.62.6...1.63.0) (2022-12-13)
+
+
+### Features
+
+* allow more option from channel api ([b62610f](https://github.com/Cap-go/capgo/commit/b62610f0694a6b01ff8ff7710f974998e5879502))
+
+
+### Bug Fixes
+
+* remove dup console log ([ee9c5ff](https://github.com/Cap-go/capgo/commit/ee9c5ffcbe5cb8ab3bb6f6eaf95fc401f0aadab0))
+
+### [1.62.6](https://github.com/Cap-go/capgo/compare/1.62.5...1.62.6) (2022-12-13)
+
+
+### Bug Fixes
+
+* bundle api ([ebf1281](https://github.com/Cap-go/capgo/commit/ebf1281b38cd9ed7128424df44cc0b202b94fe65))
+
+### [1.62.5](https://github.com/Cap-go/capgo/compare/1.62.4...1.62.5) (2022-12-13)
+
+
+### Bug Fixes
+
+* test payload ([035e5aa](https://github.com/Cap-go/capgo/commit/035e5aa1b080469832a66e8797fdb377f49f9eeb))
+
+### [1.62.4](https://github.com/Cap-go/capgo/compare/1.62.3...1.62.4) (2022-12-13)
+
+
+### Bug Fixes
+
+* throw error ([143a12e](https://github.com/Cap-go/capgo/commit/143a12e7a720722942a8ae5bc26e28551b8b18ac))
+
+### [1.62.3](https://github.com/Cap-go/capgo/compare/1.62.2...1.62.3) (2022-12-13)
+
+
+### Bug Fixes
+
+* stats issue and refactor types ([c00fdb8](https://github.com/Cap-go/capgo/commit/c00fdb8f90b29b1f4a6442d644aa2920bc6f7b63))
+
+### [1.62.2](https://github.com/Cap-go/capgo/compare/1.62.1...1.62.2) (2022-12-12)
+
+
+### Bug Fixes
+
+* card size ([0fe2b15](https://github.com/Cap-go/capgo/commit/0fe2b15e7971d9e4338a0f0eb77e679b00de3702))
+
+### [1.62.1](https://github.com/Cap-go/capgo/compare/1.62.0...1.62.1) (2022-12-12)
+
+
+### Bug Fixes
+
+* bandwidth count ([1855850](https://github.com/Cap-go/capgo/commit/1855850a9776d14459845262f62646517f8367ef))
+
+## [1.62.0](https://github.com/Cap-go/capgo/compare/1.61.35...1.62.0) (2022-12-12)
+
+
+### Features
+
+* add percentUsage ([9e3ebfb](https://github.com/Cap-go/capgo/commit/9e3ebfbec3979d15a6e9c31bce2f69d875f21bad))
+
+### [1.61.35](https://github.com/Cap-go/capgo/compare/1.61.34...1.61.35) (2022-12-12)
+
+### [1.61.34](https://github.com/Cap-go/capgo/compare/1.61.33...1.61.34) (2022-12-12)
+
+### [1.61.33](https://github.com/Cap-go/capgo/compare/1.61.32...1.61.33) (2022-12-11)
+
+
+### Bug Fixes
+
+* colors ([245c23c](https://github.com/Cap-go/capgo/commit/245c23c3abf0907db0af0d9ed68b4e173bad6c71))
+
+### [1.61.32](https://github.com/Cap-go/capgo/compare/1.61.31...1.61.32) (2022-12-11)
+
+
+### Bug Fixes
+
+* do increment or upsert ([9cd584c](https://github.com/Cap-go/capgo/commit/9cd584c44caa095c5cb5120e6336dd362a2e6cb9))
+
+### [1.61.31](https://github.com/Cap-go/capgo/compare/1.61.30...1.61.31) (2022-12-11)
+
+
+### Bug Fixes
+
+* on_log_create no device count on emulators or dev ([2286b6a](https://github.com/Cap-go/capgo/commit/2286b6a3abf399ee03c2a9ce27b9614f6ec94aa5))
+
+### [1.61.30](https://github.com/Cap-go/capgo/compare/1.61.29...1.61.30) (2022-12-11)
+
+
+### Bug Fixes
+
+* optimise on_log_create ([c44c283](https://github.com/Cap-go/capgo/commit/c44c283cc9b3b9ab61f49cc4e889a5f2795bafb2))
+
+### [1.61.29](https://github.com/Cap-go/capgo/compare/1.61.28...1.61.29) (2022-12-11)
+
+
+### Bug Fixes
+
+* reset real device ([c7f2741](https://github.com/Cap-go/capgo/commit/c7f2741787072b052443f617f75d1d73a87c1127))
+
+### [1.61.28](https://github.com/Cap-go/capgo/compare/1.61.27...1.61.28) (2022-12-11)
+
+
+### Bug Fixes
+
+* stats remove useless error obj ([44b73dc](https://github.com/Cap-go/capgo/commit/44b73dcdce2aa9ea5ec49564462eec91661aaad6))
+* use increment v2 ([904bb8b](https://github.com/Cap-go/capgo/commit/904bb8bd62974089118d69a7f76d6ddc21c6ba8e))
+
+### [1.61.27](https://github.com/Cap-go/capgo/compare/1.61.26...1.61.27) (2022-12-11)
+
+
+### Bug Fixes
+
+* chart data length ([23be4b1](https://github.com/Cap-go/capgo/commit/23be4b1923a6646db25c5e29d8c092f24747a2c2))
+
+### [1.61.26](https://github.com/Cap-go/capgo/compare/1.61.25...1.61.26) (2022-12-11)
+
+
+### Bug Fixes
+
+* graph artefact ([55d06d9](https://github.com/Cap-go/capgo/commit/55d06d997de5f32e5b6b0ac772548285c6ca9b35))
+
+### [1.61.25](https://github.com/Cap-go/capgo/compare/1.61.24...1.61.25) (2022-12-11)
+
+
+### Bug Fixes
+
+* graphs ([345c0c6](https://github.com/Cap-go/capgo/commit/345c0c6bc66a2547cb85c067edb14c99dab01369))
+
+### [1.61.24](https://github.com/Cap-go/capgo/compare/1.61.23...1.61.24) (2022-12-11)
+
+
+### Bug Fixes
+
+* don't use undefine check but null ([ccbe334](https://github.com/Cap-go/capgo/commit/ccbe33429905d419313db244615024b6731779c6))
+
+### [1.61.23](https://github.com/Cap-go/capgo/compare/1.61.22...1.61.23) (2022-12-11)
+
+
+### Bug Fixes
+
+* remove old typing ([691cc2b](https://github.com/Cap-go/capgo/commit/691cc2b524878e758466905bac807296c5dde824))
+
+### [1.61.22](https://github.com/Cap-go/capgo/compare/1.61.21...1.61.22) (2022-12-11)
+
+
+### Bug Fixes
+
+* equality checks ([542261d](https://github.com/Cap-go/capgo/commit/542261d9dac32cf02ccbb7688e0959e43c10c5be))
+
+### [1.61.21](https://github.com/Cap-go/capgo/compare/1.61.20...1.61.21) (2022-12-11)
+
+
+### Bug Fixes
+
+* is good plan calc ([3b79e81](https://github.com/Cap-go/capgo/commit/3b79e817a488abc0194bc02cabc6ffd6d0a9fd45))
+
+### [1.61.20](https://github.com/Cap-go/capgo/compare/1.61.19...1.61.20) (2022-12-11)
+
+
+### Bug Fixes
+
+* types ([a87ac89](https://github.com/Cap-go/capgo/commit/a87ac89abb1467969fa1a1b94c1fc07531b64730))
+
+### [1.61.19](https://github.com/Cap-go/capgo/compare/1.61.18...1.61.19) (2022-12-11)
+
+
+### Bug Fixes
+
+* mutualise code and make it less verbose ([e22b347](https://github.com/Cap-go/capgo/commit/e22b347673b56752507cd1867f6d09589d561055))
+
+### [1.61.18](https://github.com/Cap-go/capgo/compare/1.61.17...1.61.18) (2022-12-11)
+
+
+### Bug Fixes
+
+* bug for external sources ([2bd06a5](https://github.com/Cap-go/capgo/commit/2bd06a53508f99e18780232dd9dabb80d6515357))
+
+### [1.61.17](https://github.com/Cap-go/capgo/compare/1.61.16...1.61.17) (2022-12-11)
+
+
+### Bug Fixes
+
+* send upgrade emails ([22ca948](https://github.com/Cap-go/capgo/commit/22ca9481f848d292c7326b8a7b23f97c000876fe))
+
+### [1.61.16](https://github.com/Cap-go/capgo/compare/1.61.15...1.61.16) (2022-12-11)
+
+
+### Bug Fixes
+
+* add new email user need onboarding ([9c20c40](https://github.com/Cap-go/capgo/commit/9c20c40f50d42984a5ab452d3c74ca8bf8cfdd41))
+
+### [1.61.15](https://github.com/Cap-go/capgo/compare/1.61.14...1.61.15) (2022-12-11)
+
+
+### Bug Fixes
+
+* gitingore ([73f3897](https://github.com/Cap-go/capgo/commit/73f3897c321f9b6ea0da47af65b23508aace0214))
+
+### [1.61.14](https://github.com/Cap-go/capgo/compare/1.61.13...1.61.14) (2022-12-10)
+
+
+### Bug Fixes
+
+* lock issue ([48dbb8f](https://github.com/Cap-go/capgo/commit/48dbb8f285f1c3d08ba0c6eb38ba071996287dff))
+
+### [1.61.13](https://github.com/Cap-go/capgo/compare/1.61.12...1.61.13) (2022-12-10)
+
+### [1.61.12](https://github.com/Cap-go/capgo/compare/1.61.11...1.61.12) (2022-12-10)
+
+
+### Bug Fixes
+
+* channel list design ([7d71096](https://github.com/Cap-go/capgo/commit/7d71096a979ef8eaf5f9d7374725b49fca711fc6))
+* log API ([feaf56f](https://github.com/Cap-go/capgo/commit/feaf56f0a59e6081005bea0691f115c8e27035ab))
+
+### [1.61.11](https://github.com/Cap-go/capgo/compare/1.61.10...1.61.11) (2022-12-10)
+
+
+### Bug Fixes
+
+* remove old definition ([f018cbf](https://github.com/Cap-go/capgo/commit/f018cbf67f92b1ac23ff9c489eba899a84cdb87a))
+
+### [1.61.10](https://github.com/Cap-go/capgo/compare/1.61.9...1.61.10) (2022-12-10)
+
+
+### Bug Fixes
+
+* cloudflare scripts ([632aaf2](https://github.com/Cap-go/capgo/commit/632aaf23cc9a076bbdc15e93ad879d3b44be74b1))
+
+### [1.61.9](https://github.com/Cap-go/capgo/compare/1.61.8...1.61.9) (2022-12-10)
+
+
+### Bug Fixes
+
+* deps native ([9127c13](https://github.com/Cap-go/capgo/commit/9127c1370e9a9b94536a129752badd4b9adbe5e8))
+
+### [1.61.8](https://github.com/Cap-go/capgo/compare/1.61.7...1.61.8) (2022-12-10)
+
+
+### Bug Fixes
+
+* min code ([b40c535](https://github.com/Cap-go/capgo/commit/b40c535d5b417c30780dcfc8bb823c0c8d7a2956))
+
+### [1.61.7](https://github.com/Cap-go/capgo/compare/1.61.6...1.61.7) (2022-12-09)
+
+
+### Bug Fixes
+
+* function logs ([b42f932](https://github.com/Cap-go/capgo/commit/b42f9325981110c24231d8147d481ae676a1ee4a))
+
+### [1.61.6](https://github.com/Cap-go/capgo/compare/1.61.5...1.61.6) (2022-12-08)
+
+
+### Bug Fixes
+
+* error display ([83c2d0b](https://github.com/Cap-go/capgo/commit/83c2d0b362821e806ee00cbe65de93dc90e64f08))
+
+### [1.61.5](https://github.com/Cap-go/capgo/compare/1.61.4...1.61.5) (2022-12-08)
+
+
+### Bug Fixes
+
+* error display ([6e1b0bc](https://github.com/Cap-go/capgo/commit/6e1b0bc0fb3dc7a32f46f6df999f848761763420))
+
+### [1.61.4](https://github.com/Cap-go/capgo/compare/1.61.3...1.61.4) (2022-12-08)
+
+
+### Bug Fixes
+
+* error ([6afa698](https://github.com/Cap-go/capgo/commit/6afa698d7c7c6a7d147846639ceb06eb5d164103))
+* not catch errors ([673c45f](https://github.com/Cap-go/capgo/commit/673c45f6e0dc4dbc0b11220e47913755a43fa51a))
+
+### [1.61.3](https://github.com/Cap-go/capgo/compare/1.61.2...1.61.3) (2022-12-08)
+
+
+### Bug Fixes
+
+* not catch errors ([89eff7d](https://github.com/Cap-go/capgo/commit/89eff7d123fae85022e4d3434da0c6ff182d4844))
+
+### [1.61.2](https://github.com/Cap-go/capgo/compare/1.61.1...1.61.2) (2022-12-08)
+
+
+### Bug Fixes
+
+* api endpoints ([81f8f82](https://github.com/Cap-go/capgo/commit/81f8f825823509faccedc6189f46b3ccc036cb33))
+
+### [1.61.1](https://github.com/Cap-go/capgo/compare/1.61.0...1.61.1) (2022-12-08)
+
+
+### Bug Fixes
+
+* billing portal ([e0996cf](https://github.com/Cap-go/capgo/commit/e0996cf09b447ad7d28f0c21222d420d214dc870))
+
+## [1.61.0](https://github.com/Cap-go/capgo/compare/1.60.9...1.61.0) (2022-12-08)
+
+
+### Features
+
+* add test api system ([f17e9f9](https://github.com/Cap-go/capgo/commit/f17e9f9bcfa718d4ba1cc5cd1929451ae187bd1c))
+
+### [1.60.9](https://github.com/Cap-go/capgo/compare/1.60.8...1.60.9) (2022-12-08)
+
+
+### Bug Fixes
+
+* deno versions ([26f8ec9](https://github.com/Cap-go/capgo/commit/26f8ec937bfb8461323b2999a79a8e35aa446f13))
+* forgot password page ([ffed6d1](https://github.com/Cap-go/capgo/commit/ffed6d109bef3a78ad81558563dd55f4ce219efb))
+* i18n register and forgot ([ee99627](https://github.com/Cap-go/capgo/commit/ee9962757a8ee0a03744c24fddbc24c35799e71b))
+* unspoof user ([16447ac](https://github.com/Cap-go/capgo/commit/16447ac52e2d209e91a649e1350ea40055a73135))
+
+### [1.60.8](https://github.com/Cap-go/capgo/compare/1.60.7...1.60.8) (2022-12-08)
+
+
+### Bug Fixes
+
+* display accronym ([166c4d5](https://github.com/Cap-go/capgo/commit/166c4d5c9cd5df62371ab7118def787817876ee3))
+
+### [1.60.7](https://github.com/Cap-go/capgo/compare/1.60.6...1.60.7) (2022-12-08)
+
+
+### Bug Fixes
+
+* add missing function ([6e860e5](https://github.com/Cap-go/capgo/commit/6e860e5c3c527049a26cf46209e5a6ba39079ca1))
+* remove spoof when logout ([b2613a6](https://github.com/Cap-go/capgo/commit/b2613a66161f382db31fc0ceb941fe8e7c03d8fd))
+
+### [1.60.6](https://github.com/Cap-go/capgo/compare/1.60.5...1.60.6) (2022-12-08)
+
+
+### Bug Fixes
+
+* isSpoofed for reset button ([e947ea5](https://github.com/Cap-go/capgo/commit/e947ea5933d1a064b80cc3c866b11d348f2e22e9))
+
+### [1.60.5](https://github.com/Cap-go/capgo/compare/1.60.4...1.60.5) (2022-12-08)
+
+
+### Bug Fixes
+
+* logggin ([4cc3b3e](https://github.com/Cap-go/capgo/commit/4cc3b3e1e4afd899451d2f27b938760e73a9219e))
+
+### [1.60.4](https://github.com/Cap-go/capgo/compare/1.60.3...1.60.4) (2022-12-07)
+
+
+### Bug Fixes
+
+* script ([78b1fac](https://github.com/Cap-go/capgo/commit/78b1facfe1a7e8f0beca45bfc4d1fa43f8c13664))
+* use is spoofed ([a76e1b1](https://github.com/Cap-go/capgo/commit/a76e1b1305d6e20acc98593e081d73239a7902e8))
+
+### [1.60.3](https://github.com/Cap-go/capgo/compare/1.60.2...1.60.3) (2022-12-07)
+
+
+### Bug Fixes
+
+* size app ([e4c9630](https://github.com/Cap-go/capgo/commit/e4c96306987f369af34384fd983619a9e9745639))
+
+### [1.60.2](https://github.com/Cap-go/capgo/compare/1.60.1...1.60.2) (2022-12-07)
+
+
+### Bug Fixes
+
+* webhook typing use new cap of new typing ([c894b95](https://github.com/Cap-go/capgo/commit/c894b95dc561e6b0594c7dc69d6ce96d74b8a9f1))
+
+### [1.60.1](https://github.com/Cap-go/capgo/compare/1.60.0...1.60.1) (2022-12-07)
+
+
+### Bug Fixes
+
+* logs ([4984c3c](https://github.com/Cap-go/capgo/commit/4984c3ce50047e2fefd62b466af8b3212b3c67c5))
+
+## [1.60.0](https://github.com/Cap-go/capgo/compare/1.59.2...1.60.0) (2022-12-07)
+
+
+### Features
+
+* on app_stats create and update ([6512001](https://github.com/Cap-go/capgo/commit/65120016cdddf40bb1c652ac25c39a82318099f5))
+
+### [1.59.2](https://github.com/Cap-go/capgo/compare/1.59.1...1.59.2) (2022-12-07)
+
+
+### Bug Fixes
+
+* spoof system supabase 2 ([affb574](https://github.com/Cap-go/capgo/commit/affb5747e50dd357bb9be35388820fe104bc99e1))
+
+### [1.59.1](https://github.com/Cap-go/capgo/compare/1.59.0...1.59.1) (2022-12-07)
+
+
+### Bug Fixes
+
+* web stats ([aace66c](https://github.com/Cap-go/capgo/commit/aace66c0ee8d379a12037361e79468f546e4109c))
+
+## [1.59.0](https://github.com/Cap-go/capgo/compare/1.58.21...1.59.0) (2022-12-07)
+
+
+### Features
+
+* update to supabase 2 ([511b20a](https://github.com/Cap-go/capgo/commit/511b20a4229bcb375d6276de108fa8e10ec9417d))
+
+
+### Bug Fixes
+
+* **deps:** update dependency @supabase/supabase-js to v2 ([3e03382](https://github.com/Cap-go/capgo/commit/3e03382f50d5e3a7e0debe2c71a5f5dda0079f99))
+* supabase ([0046b89](https://github.com/Cap-go/capgo/commit/0046b8951b122eaa1f09714a8099ee029ddd0e86))
+
+### [1.58.21](https://github.com/Cap-go/capgo/compare/1.58.20...1.58.21) (2022-12-07)
+
+
+### Bug Fixes
+
+* updateOr functions ([e04a2cb](https://github.com/Cap-go/capgo/commit/e04a2cb213dee4ed9e1ed645e952b5324c1aba0f))
+
+### [1.58.20](https://github.com/Cap-go/capgo/compare/1.58.19...1.58.20) (2022-12-07)
+
+
+### Bug Fixes
+
+* banner design ([20447a5](https://github.com/Cap-go/capgo/commit/20447a51a16086452ca6c021d9dfa4e4bc1e9cdb))
+
+### [1.58.19](https://github.com/Cap-go/capgo/compare/1.58.18...1.58.19) (2022-12-07)
+
+
+### Bug Fixes
+
+* dayjs issue ([913b551](https://github.com/Cap-go/capgo/commit/913b551bc5b8f849217c50b21bef2a8f5fa239d7))
+
+### [1.58.18](https://github.com/Cap-go/capgo/compare/1.58.17...1.58.18) (2022-12-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency chart.js to v4 ([6f6266b](https://github.com/Cap-go/capgo/commit/6f6266b7399f8f29e269738d487feee41359a218))
+
+### [1.58.17](https://github.com/Cap-go/capgo/compare/1.58.16...1.58.17) (2022-12-06)
+
+
+### Bug Fixes
+
+* channel use single ([be9b7c7](https://github.com/Cap-go/capgo/commit/be9b7c7b18cfbe59f7c44e30793d7db7389edc0f))
+* npx command ([1f4198c](https://github.com/Cap-go/capgo/commit/1f4198cc294e6f6d1e690539feaf2302632b1130))
+
+### [1.58.16](https://github.com/Cap-go/capgo/compare/1.58.15...1.58.16) (2022-12-06)
+
+
+### Bug Fixes
+
+* is_allowed_action_user ([5a4d1ea](https://github.com/Cap-go/capgo/commit/5a4d1ea2ef98d1c5d2284af35102084891bcd180))
+
+### [1.58.15](https://github.com/Cap-go/capgo/compare/1.58.14...1.58.15) (2022-12-06)
+
+
+### Bug Fixes
+
+* switch to DB isAllowedAction ([4f1960e](https://github.com/Cap-go/capgo/commit/4f1960e454d6935144bfcf7b6532751a95a12d81))
+
+### [1.58.14](https://github.com/Cap-go/capgo/compare/1.58.13...1.58.14) (2022-12-05)
+
+### [1.58.13](https://github.com/Cap-go/capgo/compare/1.58.12...1.58.13) (2022-12-05)
+
+### [1.58.12](https://github.com/Cap-go/capgo/compare/1.58.11...1.58.12) (2022-12-04)
+
+### [1.58.11](https://github.com/Cap-go/capgo/compare/1.58.10...1.58.11) (2022-12-04)
+
+
+### Bug Fixes
+
+* try xcode cloud again ([1c84ef4](https://github.com/Cap-go/capgo/commit/1c84ef434bb7e8dbe9f4d0046b07901de36c73a3))
+
+### [1.58.10](https://github.com/Cap-go/capgo/compare/1.58.9...1.58.10) (2022-12-04)
+
+
+### Bug Fixes
+
+* **deps:** update capacitor monorepo to 4.6 ([0dc94a1](https://github.com/Cap-go/capgo/commit/0dc94a183bbb69d320ebe125142a69476dee1069))
+
+### [1.58.9](https://github.com/Cap-go/capgo/compare/1.58.8...1.58.9) (2022-12-04)
+
+### [1.58.8](https://github.com/Cap-go/capgo/compare/1.58.7...1.58.8) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue-router to v6.3.9 ([853acb5](https://github.com/Cap-go/capgo/commit/853acb53c0837c73c3999328bba1e6d3cbb93a14))
+
+### [1.58.7](https://github.com/Cap-go/capgo/compare/1.58.6...1.58.7) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue to v6.3.9 ([65aab32](https://github.com/Cap-go/capgo/commit/65aab32965115df22bcce6a5ab8a4c210e8c47b2))
+
+### [1.58.6](https://github.com/Cap-go/capgo/compare/1.58.5...1.58.6) (2022-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/capacitor-updater to v4.13.4 ([91e2531](https://github.com/Cap-go/capgo/commit/91e2531bb8ac4f7f9126f0c018e611c3aab25075))
+
+### [1.58.5](https://github.com/Cap-go/capgo/compare/1.58.4...1.58.5) (2022-12-03)
+
+### [1.58.4](https://github.com/Cap-go/capgo/compare/1.58.3...1.58.4) (2022-12-03)
+
+### [1.58.3](https://github.com/Cap-go/capgo/compare/1.58.2...1.58.3) (2022-12-03)
+
+
+### Bug Fixes
+
+* web_stats ([85af415](https://github.com/Cap-go/capgo/commit/85af41512c3de40be4a14693f7e7f343665db9b5))
+
+### [1.58.2](https://github.com/Cap-go/capgo/compare/1.58.1...1.58.2) (2022-12-03)
+
+
+### Bug Fixes
+
+* lint issue ([b7f7c03](https://github.com/Cap-go/capgo/commit/b7f7c03592c0db9d1ca8c1f4f0e746d9b672963d))
+
+### [1.58.1](https://github.com/Cap-go/capgo/compare/1.58.0...1.58.1) (2022-12-03)
+
+
+### Bug Fixes
+
+* make bundle consistent with other endpoints ([1b819be](https://github.com/Cap-go/capgo/commit/1b819be8e59358ad47ca0e0890b0eedaf6e491e1))
+
+## [1.58.0](https://github.com/Cap-go/capgo/compare/1.57.1...1.58.0) (2022-12-03)
+
+
+### Features
+
+* transfer endpoint from version to bundle ([57c19c7](https://github.com/Cap-go/capgo/commit/57c19c732b6a5b4dd98dc7439119f71664088ced))
+
+### [1.57.1](https://github.com/Cap-go/capgo/compare/1.57.0...1.57.1) (2022-12-03)
+
+
+### Bug Fixes
+
+* session_key ([43fefae](https://github.com/Cap-go/capgo/commit/43fefae8950e2cae833fe51d34b944235de2ec8c))
+
+## [1.57.0](https://github.com/Cap-go/capgo/compare/1.56.0...1.57.0) (2022-12-03)
+
+
+### Features
+
+* add page on version endpoint ([6e061d1](https://github.com/Cap-go/capgo/commit/6e061d1eb3c91f8c52c85815d749d8ff9425679e))
+
+
+### Bug Fixes
+
+* missing translation ([77e141f](https://github.com/Cap-go/capgo/commit/77e141fb40c9169b5ddbf5793c624904c177b0f2))
+
+## [1.56.0](https://github.com/Cap-go/capgo/compare/1.55.44...1.56.0) (2022-12-03)
+
+
+### Features
+
+* add ivSessionKey display in bundle ([f65cd0e](https://github.com/Cap-go/capgo/commit/f65cd0e2ed8e167c3bc9cef74fc6a9d6107140ca))
+
+### [1.55.44](https://github.com/Cap-go/capgo/compare/1.55.43...1.55.44) (2022-12-03)
+
+
+### Bug Fixes
+
+* automerge config ([e8cca89](https://github.com/Cap-go/capgo/commit/e8cca89ff939f7a915a5ee3bdaa8a3e5fb5768b2))
+* return on error ([a4b3171](https://github.com/Cap-go/capgo/commit/a4b31719e22471c5a5813bb267af09c0d0b0ec5a))
+
+### [1.55.43](https://github.com/Cap-go/capgo/compare/1.55.42...1.55.43) (2022-12-03)
+
+
+### Bug Fixes
+
+* mute module issue ([eacd754](https://github.com/Cap-go/capgo/commit/eacd754688b481ce968ba6823157371e0041ffbe))
+
+### [1.55.42](https://github.com/Cap-go/capgo/compare/1.55.41...1.55.42) (2022-12-03)
+
+
+### Bug Fixes
+
+* channel error ([43399b0](https://github.com/Cap-go/capgo/commit/43399b0b885c670c7f049c21cd288e843409daa5))
+
+### [1.55.41](https://github.com/Cap-go/capgo/compare/1.55.40...1.55.41) (2022-12-03)
+
+
+### Bug Fixes
+
+* normalise api with netlify ([c15a44f](https://github.com/Cap-go/capgo/commit/c15a44f2983a374e358e98821e4ea8593b71eef2))
+
+### [1.55.40](https://github.com/Cap-go/capgo/compare/1.55.39...1.55.40) (2022-12-03)
+
+
+### Bug Fixes
+
+* better error message ([a34836f](https://github.com/Cap-go/capgo/commit/a34836fe51925cf97025284b02aaa251587d8f98))
+
+### [1.55.39](https://github.com/Cap-go/capgo/compare/1.55.38...1.55.39) (2022-12-02)
+
+
+### Bug Fixes
+
+* remove useless files ([4805298](https://github.com/Cap-go/capgo/commit/4805298068a44148bbda565075b450e41127b376))
+* udate latest plugin ([4e1aee1](https://github.com/Cap-go/capgo/commit/4e1aee100e418074edb6ca73afbacda5b0933ab8))
+
+### [1.55.38](https://github.com/Cap-go/capgo/compare/1.55.37...1.55.38) (2022-12-02)
+
+### [1.55.37](https://github.com/Cap-go/capgo/compare/1.55.36...1.55.37) (2022-12-02)
+
+
+### Bug Fixes
+
+* dashboard issue ([bfe1407](https://github.com/Cap-go/capgo/commit/bfe140715811bd12f0c0ab3711cf60d3aec5e5b6))
+
+### [1.55.36](https://github.com/Cap-go/capgo/compare/1.55.35...1.55.36) (2022-12-02)
+
+
+### Bug Fixes
+
+* lint issue ([5c01d3e](https://github.com/Cap-go/capgo/commit/5c01d3e8c3ce31486ce15433a70acd228e5f81b1))
+
+### [1.55.35](https://github.com/Cap-go/capgo/compare/1.55.34...1.55.35) (2022-12-02)
+
+
+### Bug Fixes
+
+* send session_key ([b408bb5](https://github.com/Cap-go/capgo/commit/b408bb5b86c12e46755587070d8f397bc7859229))
+
+### [1.55.34](https://github.com/Cap-go/capgo/compare/1.55.33...1.55.34) (2022-12-02)
+
+
+### Bug Fixes
+
+* add new ignore ([86c8a8c](https://github.com/Cap-go/capgo/commit/86c8a8ca8ab67dfdc2254630f2993e923b79ad06))
+
+### [1.55.33](https://github.com/Cap-go/capgo/compare/1.55.32...1.55.33) (2022-12-02)
+
+
+### Bug Fixes
+
+* packages ([f95655a](https://github.com/Cap-go/capgo/commit/f95655a0df2abe4f9dc2375f4af57e078417eca0))
+* safe zone ios ([fc97408](https://github.com/Cap-go/capgo/commit/fc97408b40a0b495d7bd56137d6ddeac39a1b9a4))
+
+### [1.55.32](https://github.com/Cap-go/capgo/compare/1.55.31...1.55.32) (2022-12-01)
+
+### [1.55.31](https://github.com/Cap-go/capgo/compare/1.55.30...1.55.31) (2022-12-01)
+
+
+### Bug Fixes
+
+* login add translation ([06dd5b0](https://github.com/Cap-go/capgo/commit/06dd5b03b9cc29204bcec4f4a660817c4a016c75))
+
+### [1.55.30](https://github.com/Cap-go/capgo/compare/1.55.29...1.55.30) (2022-11-30)
+
+
+### Bug Fixes
+
+* import order ([dadfba1](https://github.com/Cap-go/capgo/commit/dadfba1139f4b2ddc9451f2016f9dad635d1fc68))
+
+### [1.55.29](https://github.com/Cap-go/capgo/compare/1.55.28...1.55.29) (2022-11-30)
+
+
+### Bug Fixes
+
+* logo and name design ([3c11552](https://github.com/Cap-go/capgo/commit/3c11552cb30e2499b5150494f5b06792e513cf05))
+
+### [1.55.28](https://github.com/Cap-go/capgo/compare/1.55.27...1.55.28) (2022-11-30)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/capacitor-updater to v4.12.9 ([f7dd35d](https://github.com/Cap-go/capgo/commit/f7dd35da5172a4d1aab0e6e76357e74df22bac5e))
+
+### [1.55.27](https://github.com/Cap-go/capgo/compare/1.55.26...1.55.27) (2022-11-30)
+
+
+### Bug Fixes
+
+* disable crips, logsnag, plausible when impersonate ([968b5e6](https://github.com/Cap-go/capgo/commit/968b5e6086dd4a41c3214c129dd599e47c4c8da6))
+* notif error message ([ecbcded](https://github.com/Cap-go/capgo/commit/ecbcdedfdf2c98c6a27ed4673442d59294e23da9))
+
+### [1.55.26](https://github.com/Cap-go/capgo/compare/1.55.25...1.55.26) (2022-11-30)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/native-audio to v5 ([1120804](https://github.com/Cap-go/capgo/commit/1120804b73155ca9c07cd45c76b4ce2741d86bc3))
+* **deps:** update dependency pinia to v2.0.27 ([e66904a](https://github.com/Cap-go/capgo/commit/e66904a754496969e1a88fc9d7bfda0907d4051b))
+
+### [1.55.25](https://github.com/Cap-go/capgo/compare/1.55.24...1.55.25) (2022-11-30)
+
+### [1.55.24](https://github.com/Cap-go/capgo/compare/1.55.23...1.55.24) (2022-11-29)
+
+### [1.55.23](https://github.com/Cap-go/capgo/compare/1.55.22...1.55.23) (2022-11-29)
+
+### [1.55.22](https://github.com/Cap-go/capgo/compare/1.55.21...1.55.22) (2022-11-29)
+
+
+### Bug Fixes
+
+* device counting remove some events ([69fba31](https://github.com/Cap-go/capgo/commit/69fba316171066c4040949507daea18a2394043c))
+
+### [1.55.21](https://github.com/Cap-go/capgo/compare/1.55.20...1.55.21) (2022-11-25)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/capacitor-updater to v4.12.8 ([541b05c](https://github.com/Cap-go/capgo/commit/541b05c863656e1711adc51f269d10602c73aad7))
+
+### [1.55.20](https://github.com/Cap-go/capgo/compare/1.55.19...1.55.20) (2022-11-25)
+
+
+### Bug Fixes
+
+* channel select ([4c61d7f](https://github.com/Cap-go/capgo/commit/4c61d7f824cef758341e5eefbac38d0f93995ed0))
+
+### [1.55.19](https://github.com/Cap-go/capgo/compare/1.55.18...1.55.19) (2022-11-25)
+
+
+### Bug Fixes
+
+* api + add paging ([fe545b8](https://github.com/Cap-go/capgo/commit/fe545b8e9d2d641e8c79e684070519648f8a22dc))
+
+### [1.55.18](https://github.com/Cap-go/capgo/compare/1.55.17...1.55.18) (2022-11-25)
+
+
+### Bug Fixes
+
+* remove appid ([9ee36fe](https://github.com/Cap-go/capgo/commit/9ee36fec998c6eaae367e4bd0002c9bb2e6ea479))
+
+### [1.55.17](https://github.com/Cap-go/capgo/compare/1.55.16...1.55.17) (2022-11-25)
+
+
+### Bug Fixes
+
+* stripe cancelation ([1b2ef00](https://github.com/Cap-go/capgo/commit/1b2ef00c4193dd0dee49e6eb90d192a8cf25a37f))
+
+### [1.55.16](https://github.com/Cap-go/capgo/compare/1.55.15...1.55.16) (2022-11-24)
+
+
+### Bug Fixes
+
+* workflow name ([6f87d62](https://github.com/Cap-go/capgo/commit/6f87d62fb0639dc52e4522b23deaa5a38dc5f0d9))
+
+### [1.55.15](https://github.com/Cap-go/capgo/compare/1.55.14...1.55.15) (2022-11-24)
+
+
+### Bug Fixes
+
+* prevent emulator count in stats ([1d10f6d](https://github.com/Cap-go/capgo/commit/1d10f6d7e061286c763ab3f2a3f01439ebbbe2ff))
+
+### [1.55.14](https://github.com/Cap-go/capgo/compare/1.55.13...1.55.14) (2022-11-24)
+
+
+### Bug Fixes
+
+* device stats ([060da3b](https://github.com/Cap-go/capgo/commit/060da3b9f3e1509598103b426556b7d5350698fe))
+
+### [1.55.13](https://github.com/Cap-go/capgo/compare/1.55.12...1.55.13) (2022-11-24)
+
+
+### Bug Fixes
+
+* channel method ([485897e](https://github.com/Cap-go/capgo/commit/485897e145f96c86f725c30ba2db534b0bb7b0f9))
+
+### [1.55.12](https://github.com/Cap-go/capgo/compare/1.55.11...1.55.12) (2022-11-24)
+
+
+### Bug Fixes
+
+* allow dev ([6f1990a](https://github.com/Cap-go/capgo/commit/6f1990a576d7a3084f0c4420050307131759ad59))
+
+### [1.55.11](https://github.com/Cap-go/capgo/compare/1.55.10...1.55.11) (2022-11-24)
+
+
+### Bug Fixes
+
+* android build ([a4174d0](https://github.com/Cap-go/capgo/commit/a4174d0e119c5bae47632d5f070d0d0d89ebff03))
+
+### [1.55.10](https://github.com/Cap-go/capgo/compare/1.55.9...1.55.10) (2022-11-24)
+
+
+### Bug Fixes
+
+* lock file ([a41d1a2](https://github.com/Cap-go/capgo/commit/a41d1a2d770980542c280185282c31a6ff441072))
+
+### [1.55.9](https://github.com/Cap-go/capgo/compare/1.55.8...1.55.9) (2022-11-24)
+
+
+### Bug Fixes
+
+* config updater ([1ea3dac](https://github.com/Cap-go/capgo/commit/1ea3dacebe235acd6b6f5ac8c249216d60506dbb))
+* packages ([6586afc](https://github.com/Cap-go/capgo/commit/6586afc789695fff54c3dfc87f54f92c920c4a87))
+
+### [1.55.8](https://github.com/Cap-go/capgo/compare/1.55.7...1.55.8) (2022-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capgo/capacitor-updater to v4.12.3 ([b8d93cf](https://github.com/Cap-go/capgo/commit/b8d93cfa5b03921834b87df831eac8d15edb02e2))
+
+### [1.55.7](https://github.com/Cap-go/capgo/compare/1.55.6...1.55.7) (2022-11-24)
+
+### [1.55.6](https://github.com/Cap-go/capgo/compare/1.55.5...1.55.6) (2022-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pinia to v2.0.26 ([5b118a8](https://github.com/Cap-go/capgo/commit/5b118a89fb56d9224a86148272cd510058ad3d74))
+
+### [1.55.5](https://github.com/Cap-go/capgo/compare/1.55.4...1.55.5) (2022-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.appcompat:appcompat to v1.5.1 ([2791a24](https://github.com/Cap-go/capgo/commit/2791a24eb419f12c6e4492124b765fa56908ca69))
+* **deps:** update dependency androidx.test.espresso:espresso-core to v3.5.0 ([7e2fb1a](https://github.com/Cap-go/capgo/commit/7e2fb1a0ff0b696fbf12ff0776c7d4ecb53afdf8))
+* **deps:** update dependency com.android.tools.build:gradle to v7.3.1 ([1c70091](https://github.com/Cap-go/capgo/commit/1c70091b9f6317e6aac1c1581d6393c275c59c27))
+
+### [1.55.4](https://github.com/Cap-go/capgo/compare/1.55.3...1.55.4) (2022-11-24)
+
+### [1.55.3](https://github.com/Cap-go/capgo/compare/1.55.2...1.55.3) (2022-11-24)
+
+### [1.55.2](https://github.com/Cap-go/capgo/compare/1.55.1...1.55.2) (2022-11-23)
+
+
+### Bug Fixes
+
+* config files ([012b3a7](https://github.com/Cap-go/capgo/commit/012b3a7360467878822599a86a6d0082fd745e9d))
+* functions checkPlan ([d3ff675](https://github.com/Cap-go/capgo/commit/d3ff675e15b3137f0a36781ea8c89bf33e823519))
+
+### [1.55.1](https://github.com/Cap-go/capgo/compare/1.55.0...1.55.1) (2022-11-23)
+
+
+### Bug Fixes
+
+* lockfile ([993bfad](https://github.com/Cap-go/capgo/commit/993bfad7dadae8989431856ef9f9ff13961697da))
+* update deps ([bc766dc](https://github.com/Cap-go/capgo/commit/bc766dc1c20d6ae394e4071f0f5c4de7fdcc8d16))
+
+## [1.55.0](https://github.com/Cap-go/capgo/compare/1.54.9...1.55.0) (2022-11-23)
+
+
+### Features
+
+* add stats for check channel ([76cf9e1](https://github.com/Cap-go/capgo/commit/76cf9e12bd6d110a6208e794c38162280b7da1f0))
+
+### [1.54.9](https://github.com/Cap-go/capgo/compare/1.54.8...1.54.9) (2022-11-23)
+
+
+### Bug Fixes
+
+* function call ([fea206f](https://github.com/Cap-go/capgo/commit/fea206fbae0f55e7af4461ea15e0ffffb5963c92))
+
+### [1.54.8](https://github.com/Cap-go/capgo/compare/1.54.7...1.54.8) (2022-11-23)
+
+
+### Bug Fixes
+
+* issue stats ([64c134d](https://github.com/Cap-go/capgo/commit/64c134d04dcf9963b26d749e827fc5024caad216))
+
+### [1.54.7](https://github.com/Cap-go/capgo/compare/1.54.6...1.54.7) (2022-11-23)
+
+
+### Bug Fixes
+
+* types ([0192a3d](https://github.com/Cap-go/capgo/commit/0192a3d0502a11850f6c9c6fc356e5297bed3674))
+
+### [1.54.6](https://github.com/Cap-go/capgo/compare/1.54.5...1.54.6) (2022-11-22)
+
+### [1.54.5](https://github.com/Cap-go/capgo/compare/1.54.4...1.54.5) (2022-11-22)
+
+### [1.54.4](https://github.com/Cap-go/capgo/compare/1.54.3...1.54.4) (2022-11-22)
+
+### [1.54.3](https://github.com/Cap-go/capgo/compare/1.54.2...1.54.3) (2022-11-22)
+
+
+### Bug Fixes
+
+* lint issues ([b6bf101](https://github.com/Cap-go/capgo/commit/b6bf10115d480701c9d205fae7fef338d0d695b1))
+
+### [1.54.2](https://github.com/Cap-go/capgo/compare/1.54.1...1.54.2) (2022-11-22)
+
+### [1.54.1](https://github.com/Cap-go/capgo/compare/1.54.0...1.54.1) (2022-11-22)
+
+
+### Bug Fixes
+
+* can use more ([c8b5fd9](https://github.com/Cap-go/capgo/commit/c8b5fd99e3f8f1d0529724df84abe2f5fa8f3f8e))
+
+## [1.54.0](https://github.com/Cap-go/capgo/compare/1.53.9...1.54.0) (2022-11-22)
+
+
+### Features
+
+* use new notif system to send notif every week ([b5670cb](https://github.com/Cap-go/capgo/commit/b5670cb7af747b38b59505b64d0f63fa1c99d497))
+
+### [1.53.9](https://github.com/Cap-go/capgo/compare/1.53.8...1.53.9) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pinia to v2.0.25 ([6d30cb9](https://github.com/Cap-go/capgo/commit/6d30cb9e0e115ea44751d36003962aa54d019709))
+
+### [1.53.8](https://github.com/Cap-go/capgo/compare/1.53.7...1.53.8) (2022-11-22)
+
+### [1.53.7](https://github.com/Cap-go/capgo/compare/1.53.6...1.53.7) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.android.volley:volley to v1.2.1 ([132724d](https://github.com/Cap-go/capgo/commit/132724d857e3c5220220e58f2de0f4596fa1d443))
+* **deps:** update dependency com.google.gms:google-services to v4.3.14 ([b755da4](https://github.com/Cap-go/capgo/commit/b755da43a9b1372a564c1c6050acab08164433ba))
+
+### [1.53.6](https://github.com/Cap-go/capgo/compare/1.53.5...1.53.6) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @ionic/vue to v6.3.7 ([76dfdc4](https://github.com/Cap-go/capgo/commit/76dfdc40e61e8e87631a21ea87f99959370b8fcb))
+
+### [1.53.5](https://github.com/Cap-go/capgo/compare/1.53.4...1.53.5) (2022-11-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @capacitor/assets to v2.0.4 ([7db333c](https://github.com/Cap-go/capgo/commit/7db333c52ba96c4f3361fdfa255a8cc2bf44bcc2))
+* **deps:** update dependency @ionic/vue-router to v6.3.7 ([79423e2](https://github.com/Cap-go/capgo/commit/79423e287691b3fcc55ab90f7d932463b212bdf0))
+* **deps:** update dependency androidx.core:core-splashscreen to v1.0.0 ([7c39174](https://github.com/Cap-go/capgo/commit/7c391747b0f7534dd001233f4c977cd4c0084bcc))
+* **deps:** update dependency androidx.test.ext:junit to v1.1.4 ([855a620](https://github.com/Cap-go/capgo/commit/855a620c7c90c8f81f751a8152c8898ddc00ec5d))
+
+### [1.53.4](https://github.com/Cap-go/capgo/compare/1.53.3...1.53.4) (2022-11-22)
+
+### [1.53.3](https://github.com/Cap-go/capgo/compare/1.53.2...1.53.3) (2022-11-22)
+
+
+### Bug Fixes
+
+* renovate config ([c0ebef7](https://github.com/Cap-go/capgo/commit/c0ebef77c3df49dc26ef21165ac495401972c48a))
+
+### [1.53.2](https://github.com/Cap-go/capgo/compare/1.53.1...1.53.2) (2022-11-21)
+
+
+### Bug Fixes
+
+* remove dependabot ([a47acb2](https://github.com/Cap-go/capgo/commit/a47acb2bac75b679529e628c40cc74c39bf53f17))
+
+### [1.53.1](https://github.com/Cap-go/capgo/compare/1.53.0...1.53.1) (2022-11-21)
+
+## [1.53.0](https://github.com/Cap-go/capgo/compare/1.52.4...1.53.0) (2022-11-21)
+
+
+### Features
+
+* add dependabot ([b1dfc5c](https://github.com/Cap-go/capgo/commit/b1dfc5ceec6fc8188570d8d64313fac7c954363c))
+
+### [1.52.4](https://github.com/Cap-go/capgo/compare/1.52.3...1.52.4) (2022-11-21)
+
+
+### Bug Fixes
+
+* version delete stats issue ([677272c](https://github.com/Cap-go/capgo/commit/677272cd948571d7ae245b8b6d48dc91047d65e3))
+
+### [1.52.3](https://github.com/Cap-go/capgo/compare/1.52.2...1.52.3) (2022-11-21)
+
+
+### Bug Fixes
+
+* naming convention functions ([f87db17](https://github.com/Cap-go/capgo/commit/f87db17936750f573458d0d6d35bbbc18fe8c005))
+
+### [1.52.2](https://github.com/Cap-go/capgo/compare/1.52.1...1.52.2) (2022-11-21)
+
+
+### Bug Fixes
+
+* stripe event method ([084407e](https://github.com/Cap-go/capgo/commit/084407e75e2511681fe80ab2b7850b52435357df))
+
+### [1.52.1](https://github.com/Cap-go/capgo/compare/1.52.0...1.52.1) (2022-11-21)
+
+
+### Bug Fixes
+
+* remove dup code ([839c792](https://github.com/Cap-go/capgo/commit/839c792bccd98a4d2e350a8eca1f5d637a135a66))
+
+## [1.52.0](https://github.com/Cap-go/capgo/compare/1.51.0...1.52.0) (2022-11-21)
+
+
+### Features
+
+* add workflow to release on native store ([6a1e6f4](https://github.com/Cap-go/capgo/commit/6a1e6f4de38d98ece78166075abc030395a10049))
+
+## [1.51.0](https://github.com/Cap-go/capgo/compare/1.50.3...1.51.0) (2022-11-19)
+
+
+### Features
+
+* use fastlane deliver ([1449f7c](https://github.com/Cap-go/capgo/commit/1449f7c56736d27e833910aaf30780495b41da5d))
+
+### [1.50.3](https://github.com/Cap-go/capgo/compare/1.50.2...1.50.3) (2022-11-19)
+
+### [1.50.2](https://github.com/Cap-go/capgo/compare/1.50.1...1.50.2) (2022-11-18)
+
+
+### Bug Fixes
+
+* delete message ([fce5165](https://github.com/Cap-go/capgo/commit/fce5165763f6a81490588f9fe9cbb17e34e4c34f))
+* modal message ([c09ccad](https://github.com/Cap-go/capgo/commit/c09ccad9bd6beeac14c3ce5a054689825c48489e))
+
+### [1.50.1](https://github.com/Cap-go/capgo/compare/1.50.0...1.50.1) (2022-11-18)
+
+
+### Bug Fixes
+
+* local build ([4cdea8c](https://github.com/Cap-go/capgo/commit/4cdea8ccfb150016eed994dd63f8e5022d397aa5))
+
+## [1.50.0](https://github.com/Cap-go/capgo/compare/1.49.0...1.50.0) (2022-11-18)
+
+
+### Features
+
+* add option for allow dev and emulator ([ab3e45f](https://github.com/Cap-go/capgo/commit/ab3e45f082aae8752428e36180e57296e341c902))
+
+## [1.49.0](https://github.com/Cap-go/capgo/compare/1.48.1...1.49.0) (2022-11-18)
+
+
+### Features
+
+* add is_emulator is_prod saving ([7359e4d](https://github.com/Cap-go/capgo/commit/7359e4d9cb3b5db5df2c62d1ce51950a59c421ab))
+
+### [1.48.1](https://github.com/Cap-go/capgo/compare/1.48.0...1.48.1) (2022-11-17)
+
+
+### Bug Fixes
+
+* reset after spoof ([fca59e5](https://github.com/Cap-go/capgo/commit/fca59e5157afb1ab87d14511c0e53cafbeee5b9a))
+
+## [1.48.0](https://github.com/Cap-go/capgo/compare/1.47.4...1.48.0) (2022-11-17)
+
+
+### Features
+
+* add invalidIP for device from google ([0e4658a](https://github.com/Cap-go/capgo/commit/0e4658a3415b5cf84e039d1bf282addedc04a23a))
+
+### [1.47.4](https://github.com/Cap-go/capgo/compare/1.47.3...1.47.4) (2022-11-17)
+
+
+### Bug Fixes
+
+* typo in condition ([c706aa8](https://github.com/Cap-go/capgo/commit/c706aa8fbcd2afa4a80490772458c1d361d8f72d))
+
+### [1.47.3](https://github.com/Cap-go/capgo/compare/1.47.2...1.47.3) (2022-11-17)
+
+
+### Bug Fixes
+
+* remove useless package who was having vulnerability ([1d897c6](https://github.com/Cap-go/capgo/commit/1d897c6c9380d4ecf3d103536fbd7b77940c140e))
+
+### [1.47.2](https://github.com/Cap-go/capgo/compare/1.47.1...1.47.2) (2022-11-17)
+
+
+### Bug Fixes
+
+* channel message modal issue ([8fdf0f8](https://github.com/Cap-go/capgo/commit/8fdf0f84a8759ab115d9b0a4099de32a346f8f99))
+
+### [1.47.1](https://github.com/Cap-go/capgo/compare/1.47.0...1.47.1) (2022-11-17)
+
+
+### Bug Fixes
+
+* checkPlanValid ([8bbfd2d](https://github.com/Cap-go/capgo/commit/8bbfd2dbab84af454652890c3845876f6e5b759f))
+
+## [1.47.0](https://github.com/Cap-go/capgo/compare/1.46.6...1.47.0) (2022-11-17)
+
+
+### Features
+
+* add new data send by plugin in interface ([fc5caa3](https://github.com/Cap-go/capgo/commit/fc5caa34d6ebc44fcd7109c18e9ddcfa8a20e889))
+
+### [1.46.6](https://github.com/Cap-go/capgo/compare/1.46.5...1.46.6) (2022-11-17)
+
+
+### Bug Fixes
+
+* better var naming ([7d145a6](https://github.com/Cap-go/capgo/commit/7d145a6de26368ae0c04bb329e512420e7d87209))
+
+### [1.46.5](https://github.com/Cap-go/capgo/compare/1.46.4...1.46.5) (2022-11-17)
+
+
+### Bug Fixes
+
+* naming ([b2c39ac](https://github.com/Cap-go/capgo/commit/b2c39ac149fb608d19c0f8a38fdbfbdfd5f4abc2))
+
+### [1.46.4](https://github.com/Cap-go/capgo/compare/1.46.3...1.46.4) (2022-11-16)
+
+
+### Bug Fixes
+
+* remove legend for projection ([ff7df0a](https://github.com/Cap-go/capgo/commit/ff7df0a14509c03e8a9a1b9dfba46825abae2e06))
+
+### [1.46.3](https://github.com/Cap-go/capgo/compare/1.46.2...1.46.3) (2022-11-16)
+
+
+### Bug Fixes
+
+* translate projection key ([eae8f77](https://github.com/Cap-go/capgo/commit/eae8f773db9c0cc7238321d477638d45486b2dcb))
+
+### [1.46.2](https://github.com/Cap-go/capgo/compare/1.46.1...1.46.2) (2022-11-16)
+
+
+### Bug Fixes
+
+* line design ([5ffa808](https://github.com/Cap-go/capgo/commit/5ffa80874516f56845009810e2d6e1e0b4827b09))
+
+### [1.46.1](https://github.com/Cap-go/capgo/compare/1.46.0...1.46.1) (2022-11-16)
+
+
+### Bug Fixes
+
+* sync new plugins ([ff2b575](https://github.com/Cap-go/capgo/commit/ff2b575a99feb786eb33722d94602eb247f72464))
+
+## [1.46.0](https://github.com/Cap-go/capgo/compare/1.45.4...1.46.0) (2022-11-15)
+
+
+### Features
+
+* add projection of data and fix chart 0 value ([6d298e5](https://github.com/Cap-go/capgo/commit/6d298e5f8a28cfc95f471fc261704b527a12db10))
+
+### [1.45.4](https://github.com/Cap-go/capgo/compare/1.45.3...1.45.4) (2022-11-15)
+
+
+### Bug Fixes
+
+* paying check + check ip only on version who have less than 4 hours ([0d935ef](https://github.com/Cap-go/capgo/commit/0d935ef063c9e6daaf5b95b3b3cab1364480cd74))
+
+### [1.45.3](https://github.com/Cap-go/capgo/compare/1.45.2...1.45.3) (2022-11-15)
+
+### [1.45.2](https://github.com/Cap-go/capgo/compare/1.45.1...1.45.2) (2022-11-11)
+
+
+### Bug Fixes
+
+* add module test page ([c6dbbad](https://github.com/Cap-go/capgo/commit/c6dbbadc899db4dcec00604e6dd5dd33209f546a))
+
+### [1.45.1](https://github.com/Cap-go/capgo/compare/1.45.0...1.45.1) (2022-11-10)
+
+
+### Bug Fixes
+
+* design usage + remove welcome after app added ([1dc516e](https://github.com/Cap-go/capgo/commit/1dc516e305316a37a9959ee5910138c03d04e5b4))
+
+## [1.45.0](https://github.com/Cap-go/capgo/compare/1.44.26...1.45.0) (2022-11-10)
+
+
+### Features
+
+* add insights app and updates ([5a42570](https://github.com/Cap-go/capgo/commit/5a425705bc2043f6a004a71aa87949e17f38d08d))
+
+### [1.44.26](https://github.com/Cap-go/capgo/compare/1.44.25...1.44.26) (2022-11-10)
+
+
+### Bug Fixes
+
+* sripe event make good plan direct ([12e6007](https://github.com/Cap-go/capgo/commit/12e6007b0e2f34c2e12283353bbb5dfcefa2dcbc))
+* stats and use secure check hasOwnProperty ([fa181dd](https://github.com/Cap-go/capgo/commit/fa181dd6c972a6aba5ac0f5030c17d420317ec88))
+
+### [1.44.25](https://github.com/Cap-go/capgo/compare/1.44.24...1.44.25) (2022-11-10)
+
+### [1.44.24](https://github.com/Cap-go/capgo/compare/1.44.23...1.44.24) (2022-11-09)
+
+
+### Bug Fixes
+
+* github action ([f44006f](https://github.com/Cap-go/capgo/commit/f44006fac545643e22bbeb65622ede294ce141a4))
+
+### [1.44.23](https://github.com/Cap-go/capgo/compare/1.44.22...1.44.23) (2022-11-09)
+
+
+### Bug Fixes
+
+* pnpm version ([4d99ac3](https://github.com/Cap-go/capgo/commit/4d99ac3777406133376facb1e81f8d54684297c4))
+
+### [1.44.22](https://github.com/Cap-go/capgo/compare/1.44.21...1.44.22) (2022-11-09)
+
+### [1.44.21](https://github.com/Cap-go/capgo/compare/1.44.20...1.44.21) (2022-11-08)
+
+
+### Bug Fixes
+
+* devices counting ([5aa0bec](https://github.com/Cap-go/capgo/commit/5aa0becc9956334543c30a03f7faeb9375e7b1a0))
+
+### [1.44.20](https://github.com/Cap-go/capgo/compare/1.44.19...1.44.20) (2022-11-08)
+
+
+### Bug Fixes
+
+* issue trial renewed ([21a9264](https://github.com/Cap-go/capgo/commit/21a9264efc1a271b89d36883206c2f292357d2d9))
+
+### [1.44.19](https://github.com/Cap-go/capgo/compare/1.44.18...1.44.19) (2022-11-07)
+
+
+### Bug Fixes
+
+* message error use new wording ([4038dfd](https://github.com/Cap-go/capgo/commit/4038dfd0f1cb1a550d66d4e010158dede0bbef72))
+
+### [1.44.18](https://github.com/Cap-go/capgo/compare/1.44.17...1.44.18) (2022-11-07)
+
+
+### Bug Fixes
+
+* trigger version no jwt needed ([8ed352a](https://github.com/Cap-go/capgo/commit/8ed352a371bf201f892a09f89fb1c19dfeb6c48c))
+
+### [1.44.17](https://github.com/Cap-go/capgo/compare/1.44.16...1.44.17) (2022-11-07)
+
+
+### Bug Fixes
+
+* channel page add more info ([1dc916e](https://github.com/Cap-go/capgo/commit/1dc916e62daeed9c67ba4f053ecfdb285d896045))
+
+### [1.44.16](https://github.com/Cap-go/capgo/compare/1.44.15...1.44.16) (2022-11-07)
+
+
+### Bug Fixes
+
+* change public to default wording ([f6cee70](https://github.com/Cap-go/capgo/commit/f6cee705956555b9addfc49e5860f8c3ecee6eff))
+* naming public to default ([b35314f](https://github.com/Cap-go/capgo/commit/b35314fa42c480eae0b7030b51c80753e6dd0f17))
+
+### [1.44.15](https://github.com/Cap-go/capgo/compare/1.44.14...1.44.15) (2022-11-07)
+
+
+### Bug Fixes
+
+* crisp for web ([07f4b97](https://github.com/Cap-go/capgo/commit/07f4b9739df5e2170cfa0f59138ed863d34a5feb))
+
+### [1.44.14](https://github.com/Cap-go/capgo/compare/1.44.13...1.44.14) (2022-11-07)
+
+
+### Bug Fixes
+
+* add more badge ([7402de9](https://github.com/Cap-go/capgo/commit/7402de91958467e2f2e727a5011e955f11521cc9))
+
+### [1.44.13](https://github.com/Cap-go/capgo/compare/1.44.12...1.44.13) (2022-11-07)
+
+
+### Bug Fixes
+
+* double init css + double crisp init ([16b7c69](https://github.com/Cap-go/capgo/commit/16b7c698aa2c0a22a9cf642e55658916b2595659))
+
+### [1.44.12](https://github.com/Cap-go/capgo/compare/1.44.11...1.44.12) (2022-11-07)
+
+### [1.44.11](https://github.com/Cap-go/capgo/compare/1.44.10...1.44.11) (2022-11-07)
+
+
+### Bug Fixes
+
+* remove commented code ([a265f1d](https://github.com/Cap-go/capgo/commit/a265f1d09d5c985f4ac0dff6a4e4937f3dbedfac))
+* remove commented code ([a15c263](https://github.com/Cap-go/capgo/commit/a15c2638bf2b3ee01e4e958069af2d46fbc7f7dc))
+
+### [1.44.10](https://github.com/Cap-go/capgo/compare/1.44.9...1.44.10) (2022-11-07)
+
+
+### Bug Fixes
+
+* remove code smell ([1dd2e7b](https://github.com/Cap-go/capgo/commit/1dd2e7b086fd377981c4f0e1618003296b3a551b))
+
+### [1.44.9](https://github.com/Cap-go/capgo/compare/1.44.8...1.44.9) (2022-11-07)
+
+
+### Bug Fixes
+
+* auth codesmell complexity ([9178299](https://github.com/Cap-go/capgo/commit/9178299a34b7c4f0c28af3dfaadd18867e64bcbe))
+* remove comment code ([76b4c9b](https://github.com/Cap-go/capgo/commit/76b4c9b671c61f705e66d58d97543bc80a5f13cf))
+
+### [1.44.8](https://github.com/Cap-go/capgo/compare/1.44.7...1.44.8) (2022-11-07)
+
+
+### Bug Fixes
+
+* codesmell ([08dfed3](https://github.com/Cap-go/capgo/commit/08dfed38a11c66c38c5bf7c3716ccde04421808f))
+* remove useless comment ([1b6a6e0](https://github.com/Cap-go/capgo/commit/1b6a6e0bc3345dac5f4556060b61ccccb36f79d9))
+
+### [1.44.7](https://github.com/Cap-go/capgo/compare/1.44.6...1.44.7) (2022-11-07)
+
+
+### Bug Fixes
+
+* code smell ([1fd9fae](https://github.com/Cap-go/capgo/commit/1fd9faeac9023b0c3476d3a18e6bca39154283a1))
+
+### [1.44.6](https://github.com/Cap-go/capgo/compare/1.44.5...1.44.6) (2022-11-07)
+
+
+### Bug Fixes
+
+* codesmell ([9507d7b](https://github.com/Cap-go/capgo/commit/9507d7b6ebfe358674a9994cd58da3ac333a8f35))
+
+### [1.44.5](https://github.com/Cap-go/capgo/compare/1.44.4...1.44.5) (2022-11-07)
+
+
+### Bug Fixes
+
+* dup cond ([d9caee9](https://github.com/Cap-go/capgo/commit/d9caee9791aa57e9370931aeafab10fa0bb5308a))
+
+### [1.44.4](https://github.com/Cap-go/capgo/compare/1.44.3...1.44.4) (2022-11-07)
+
+
+### Bug Fixes
+
+* remove useless css ([de1912e](https://github.com/Cap-go/capgo/commit/de1912efa7c4d14d9ce9f937a4b516fe16c0708c))
+
+### [1.44.3](https://github.com/Cap-go/capgo/compare/1.44.2...1.44.3) (2022-11-06)
+
+### [1.44.2](https://github.com/Cap-go/capgo/compare/1.44.1...1.44.2) (2022-11-06)
+
+
+### Bug Fixes
+
+* custom id set ([370809f](https://github.com/Cap-go/capgo/commit/370809fee5bc75f24f50aeb2e9f32fcaebf200ca))
+
+### [1.44.1](https://github.com/Cap-go/capgo/compare/1.44.0...1.44.1) (2022-11-04)
+
+
+### Bug Fixes
+
+* xForwardedFor ([d24374c](https://github.com/Cap-go/capgo/commit/d24374cc28017924c30480c64ff36da8e305033c))
+
+## [1.44.0](https://github.com/Cap-go/capgo/compare/1.43.2...1.44.0) (2022-11-04)
+
+
+### Features
+
+* add invalid IP system ([1220651](https://github.com/Cap-go/capgo/commit/12206518868221b8c3f978e77be86d990db62811))
+
+### [1.43.2](https://github.com/Cap-go/capgo/compare/1.43.1...1.43.2) (2022-11-04)
+
+
+### Bug Fixes
+
+* disable allowEmulatorProd so see if there a difference ([9395024](https://github.com/Cap-go/capgo/commit/9395024366b697d6280978acd602a32ec981b5bb))
+
+### [1.43.1](https://github.com/Cap-go/capgo/compare/1.43.0...1.43.1) (2022-11-04)
+
+
+### Bug Fixes
+
+* url for debug ([f6e0583](https://github.com/Cap-go/capgo/commit/f6e0583f748bdaa9bef64eb61e1b7a35ebeda22c))
+
+## [1.43.0](https://github.com/Cap-go/capgo/compare/1.42.1...1.43.0) (2022-11-04)
+
+
+### Features
+
+* add updates_test for store purpose ([1d01386](https://github.com/Cap-go/capgo/commit/1d01386e832fee6ad9cc515008e3ca9624d1e5ba))
+
+### [1.42.1](https://github.com/Cap-go/capgo/compare/1.42.0...1.42.1) (2022-11-03)
+
+
+### Bug Fixes
+
+* message set custom ID ([f74e825](https://github.com/Cap-go/capgo/commit/f74e82526cab89557448d53759f99d89c4e9a932))
+
+## [1.42.0](https://github.com/Cap-go/capgo/compare/1.41.0...1.42.0) (2022-11-03)
+
+
+### Features
+
+* allow search in device list by custom_id ([ce0a7b5](https://github.com/Cap-go/capgo/commit/ce0a7b5e806066c74cf3492591a6f2a9eed94abd))
+
+## [1.41.0](https://github.com/Cap-go/capgo/compare/1.40.1...1.41.0) (2022-11-03)
+
+
+### Features
+
+* add custom ID in device ([0d4b557](https://github.com/Cap-go/capgo/commit/0d4b5579adfcfaeed2638c14f0fe1e75d3a0aeb0))
+
+### [1.40.1](https://github.com/Cap-go/capgo/compare/1.40.0...1.40.1) (2022-11-03)
+
+
+### Bug Fixes
+
+* use put instead of get ([2f477d1](https://github.com/Cap-go/capgo/commit/2f477d1d4ca10e12db1a061198eef040771ad8e3))
+
+## [1.40.0](https://github.com/Cap-go/capgo/compare/1.39.0...1.40.0) (2022-11-03)
+
+
+### Features
+
+* allow read self channel ([25d06a1](https://github.com/Cap-go/capgo/commit/25d06a115c4c1f0eb4c93d3e39554169f0e4ade7))
 
 ## [1.39.0](https://github.com/Cap-go/capgo/compare/1.38.1...1.39.0) (2022-11-03)
 

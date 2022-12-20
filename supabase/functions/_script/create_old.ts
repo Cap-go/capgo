@@ -1,21 +1,22 @@
-import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.6'
-import type { definitions } from '../_utils/types_supabase.ts'
+import { crc32 } from 'https://deno.land/x/crc32@v0.2.2/mod.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import type { Database } from '../_utils/supabase.types.ts'
 
 const supabaseUrl = 'https://***.supabase.co'
 const supabaseAnonKey = '***'
 
 const useSupabase = () => {
   const options = {
-    // const options: SupabaseClientOptions = {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
   }
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }
 
-const createMeta = async (record: definitions['app_versions']) => {
+const createMeta = async (record: Database['public']['Tables']['app_versions']['Row']) => {
   // get the size of the storage and add it to the row
   if (!record.bucket_id) {
     console.log('Cannot find bucket_id', record.id)
@@ -23,7 +24,7 @@ const createMeta = async (record: definitions['app_versions']) => {
   }
   // check if exist already in the database
   const { data, error } = await useSupabase()
-    .from<definitions['app_versions_meta']>('app_versions_meta')
+    .from('app_versions_meta')
     .select()
     .eq('id', record.id)
     .single()
@@ -44,7 +45,7 @@ const createMeta = async (record: definitions['app_versions']) => {
   const checksum = crc32(new Uint8Array(u))
   // create app version meta
   const { error: dbError } = await useSupabase()
-    .from<definitions['app_versions_meta']>('app_versions_meta')
+    .from('app_versions_meta')
     .insert({
       id: record.id,
       app_id: record.app_id,
@@ -62,13 +63,13 @@ const createMeta = async (record: definitions['app_versions']) => {
 const pageSize = 100
 const createAll = async () => {
   // list all app_versions
-  const allData: definitions['app_versions'][] = []
+  const allData: Database['public']['Tables']['app_versions']['Row'][] = []
   // loop through all app_versions
   for (let skip = 0; skip >= 0;) {
     const end = skip + pageSize
     // console.log('skip', skip, 'end', end)
     const { data: appVersions, error: appVersionsError } = await useSupabase()
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('deleted', false)
       .not('bucket_id', 'is', null)

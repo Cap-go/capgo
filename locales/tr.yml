@@ -3,7 +3,7 @@ MAU: Aylık aktif kullanıcılar
 Storage: Depolamak
 account:
   backButton: Geri
-  billing: faturalandırma
+  billing: Faturalandırma
   changePassword: Şifre değiştir
   delete-account: Hesabımı sil
   delete_sure: Emin misin ?
@@ -40,50 +40,51 @@ activation:
   heading: aktivasyon
   headline: Ayarlarım
   legal: Hizmet şartları
-  legal-desc: >-
-    Capgo uygulaması gizlilik politikasını ve kullanım koşullarını kabul
-    ediyorum
+  legal-desc: Capgo uygulaması gizlilik politikasını ve kullanım şartlarını kabul ediyorum
   notification: Bildirimler
   notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
   validate: Doğrula
-add-another-app: Başka bir uygulama ekle
+add-another-app: başka bir uygulama ekle
 add-this-code-to-you: Bu kodu projenize ekleyin
 add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
 afternoon: öğleden sonra
 alert:
   confirm-delete: Silmeyi Onayla
-  delete-message: |-
-    Bu eylem geri alınamaz. 
-    Bunu silmek istediğinizden emin misiniz
-allow-device-to-self: Cihazların kendi kendine ilişki kurmasına izin ver
+  delete-message: Bunu silmek istediğinizden emin misiniz
+  not-reverse-message: Bu eylem geri alınamaz
+allow-develoment-bui: Geliştirme derlemesine izin ver
+allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
+allow-emulator: Öykünücülere İzin Ver
 api-key: API anahtarı
 api-keys: API Anahtarları
 apikeys:
   all: anahtarlar
   checkbelow: daha fazla bilgi almak için aşağıdaki bağlantıyı kontrol edin
-  cli: capgo CLI
+  cli: capgo CLI'sı
   explain: >-
-    Tüm bu API anahtarları, Capgo CLI aracı veya kapasitör güncelleyici
-    eklentisi ile kullanılmak üzere yapılmıştır
+    Tüm bu api anahtarları, Capgo CLI aracı veya kapasitör güncelleyici
+    eklentisi ile kullanılmak üzere yapılmıştır.
   keyCopied: Anahtarlar panonuza kopyalandı
   links: Bağlantılar
   title: API anahtarları
-  updater: kapasitör-güncelleyici
+  updater: kondansatör güncelleyici
 app-id-example: Uygulama kimliği örneği
+available-in-the-san: Korumalı alan uygulamasında mevcuttur
+back-to-login-page: Giriş sayfasına geri dön
 bigger-app-size: Daha büyük uygulama boyutu
 build-your-code-and-: Kodunuzu oluşturun
-bulk-upload: Toplu yükleme
-bundle-number: Paket numarası
+bulk-upload: toplu yükleme
+bundle-number: paket numarası
 button:
-  about: Hakkımda
+  about: Hakkında
   back: Geri
   browse: Araştır
   camera: Kamera
   cancel: İptal
   delete: Silmek
-  go: İLERİ
-  home: Anasayfa
+  go: GİT
+  home: Ev
   remove: Kaldırmak
   tabs: Sekmeler
   toggle_dark: Karanlık modu değiştir
@@ -91,55 +92,60 @@ button:
 by-clicking-on-them: üzerlerine tıklayarak.
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
-cannot-delete-channel: Kanal silinemiyor
+cannot-delete-channel: kanal silinemiyor
+cannot-save-custom-i: Özel kimlik kaydedilemiyor
 change: Değiştirmek
 channel:
   add: Ekle
-  beta-channel: Beta kanalı
+  beta-channel: beta kanalı
   cannot-delete-device: Cihaz silinemiyor
   confirm-public-desc: >-
-    Bu kanalı herkese açık hale getirmek, tüm kullanıcılarınıza güncellemeler
-    göndermesini sağlayacaktır. 
+    Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler
+    göndermesini sağlar.
 
-    Diğer tüm genel kanallar özel hale gelecektir.
+
+    Diğer varsayılan kanallar artık varsayılan olmayacaktır.
   copy: Url'yi kopyala
   device: Cihaz
   device-deleted: Cihaz silindi
   invit: Davet etmek için e-posta yazın
-  is_public: genel kanal
-  make-now: Kamu yapmak
+  is_public: kanal varsayılanı
+  make-now: Varsayılan yap
   make_it: Bunu yapmak
-  makeprivate: Kanalınız herkese açık, özel yapmak için tıklayın
-  makepublic: Kanalınız gizli, herkese açık yapmak için tıklayın
+  makeprivate: Kanalınız herkese açık, gizli yapmak için tıklayın
+  makepublic: Kanalınız gizli, herkese açık hale getirmek için tıklayın
   open: Açık
   private_desc: Özel
-  public: Kapasitör-güncelleyici bağlantısı
+  public: Kondansatör güncelleyici bağlantısı
   public_desc: Halk
   title: Kanal
   user: kullanıcı
-  user_no_found: Kullanıcı bulunamadı, önce kaydolmayı isteyin
-  users: Kullanıcılarla paylaşıldı
+  user_no_found: Kullanıcı bulunamadı, önce kayıt olmayı isteyin
+  users: kullanıcılarla paylaşıldı
   v3: V3 ayarları
 channel-deleted: Kanal silindi
 checksum: sağlama toplamı
 commands: komutlar
 copied-to-clipboard: Panoya kopyalandı
-copy-your: seninkini kopyala
+copy-your: kopyala
+create-a-free-accoun: Ücretsiz bir hesap oluştur
 custom-domain: Özel alan
+custom-id: özel kimlik
+custom-id-saved: Özel kimlik kaydedildi
 dashboard: Gösterge Paneli
 days: günler
 defined-as: olarak tanımlandı
-defined-as-private: özel olarak tanımlanmış
-defined-as-public: kamu olarak tanımlanan
+defined-as-private: normal olarak tanımlanmış
+defined-as-public: varsayılan olarak tanımlanmış
 delete-account: Hesabı sil
 device:
-  channel: Kanal bağlantısı
-  created_at: 'Şu saatte oluşturuldu:'
-  force_version: Zorla sürüm
-  info: bilgi
+  channel: kanal bağlantısı
+  created_at: oluşturuldu
+  force_version: Kuvvet versiyonu
+  info: bilgiler
   last_update: Son Güncelleme
   link_channel: Cihaza bağlı kanal
-  link_fail: Yanlış bir şey oldu bağlantı kurulamıyor
+  link_fail: Bağlantı kurulamıyor yanlış bir şey oldu
   link_version: cihaza bağlı sürüm
   no_channel: Kanal yok, eklemek için tıklayın
   no_override: Geçersiz kılma yok, eklemek için tıklayın
@@ -147,49 +153,65 @@ device:
   platform: platformu
   plugin_version: Eklenti sürümü
   title: Cihaz
-  unlink_channel: Cihazla kanal bağlantısını kaldır
-  unlink_version: Cihazla sürüm bağlantısını kaldır
-  version: sürüm
+  unlink_channel: Kanalın cihaz bağlantısını kaldırma
+  unlink_version: Sürümün cihaz bağlantısını kaldırma
+  version: Sürüm
 devices:
-  title: cihazlar
+  title: Cihazlar
 devices-using-this-b: Bu paketi kullanan cihazlar
-disable-auto-downgra: Yerel olarak otomatik düşürmeyi devre dışı bırak
-disable-auto-upgrade: Binbaşı üzerinde otomatik yükseltmeyi devre dışı bırak
+disable-auto-downgra: Yerel altında otomatik düşürmeyi devre dışı bırak
+disable-auto-upgrade: Binbaşının üzerinde otomatik yükseltmeyi devre dışı bırak
+discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
-documentation: belgeler
+documentation: Belgeler
+dont-have-an-account: Hesabınız yok mu?
+email-address: E-posta adresi
+enter-your-email-add: >-
+  E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
+  gönderelim.
+enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 forgot:
-  check_email: Şifrenizi sıfırlamak için bağlantıyı almak için e-postanızı kontrol edin
+  check_email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
   email: E-posta
   heading: Parolanızı mı unuttunuz
   success: şifre başarıyla güncellendi
+from-device: cihazdan
 good: İyi
 id: İD
-in-your-main-file: Ana dosyanızda
+in-your-main-file: ana dosyanızda
 informations: bilgiler
 into-your-app-folder: Uygulama klasörünüze.
 intro:
   aka: Ayrıca şöyle bilinir
-  desc: Görüşlü Vite Başlangıç Şablonu
+  desc: Görüşlü Vite Başlangıç ​​Şablonu
   dynamic-route: Dinamik rota demosu
-  hi: Merhaba, {name}!
-  whats-your-name: Adınız nedir?
-invalid-auth: geçersiz yetkilendirme
+  hi: Merhaba {isim}!
+  whats-your-name: Adınız ne?
+invalid-auth: geçersiz kimlik doğrulama
+is-emulator: Emülatör mü
+is-production-app: Üretim uygulaması mı
 last-upload: Son yükleme
 last-version: Son sürüm
 limit-reached: Sınıra ulaşıldı
 loading-more-data: Daha fazla veri yükleniyor...
+log-in: Giriş yapmak
 log-to-the-capgo-cli: Capgo CLI'da oturum açın
 login:
   andpass: Ve şifre
   connexion: Giriş yapmak
   create-new: Yeni hesap oluştur
   email: E-posta
-  forgot: Unuttun
+  forgot: Unutmuş olmak
   hello: Merhaba
   login-in: Giriş yap
   or: veya
   password: Şifre
   withemail: e-posta adresi ile
+login-to-your-accoun: hesabınıza giriş yapın
+make-normal: normal yap
+making-this-channel-: >-
+  Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
+  veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
 module:
   heading: Modüller
 monthly-active-users: Aylık aktif kullanıcılar
@@ -211,28 +233,28 @@ onboarding:
 one-day-left: Bir gün kaldı
 open-sidebar: Kenar çubuğunu aç
 package:
-  cannot-delete-version: Sürüm silinemiyor
+  cannot-delete-version: Paket silinemiyor
   channels: Kanallar
   device_list: Cihaz listesi
-  devices: Cihazları görün
+  devices: Cihaz istatistiklerini görün
   devices-list: Bağlı cihazlar
-  download: Sürümü indir
+  download: Paketi indir
   externally: harici olarak depolanır
   link_channel: kanala bağlantı
-  link_version: sürüme bağlantı
+  link_version: Paket bağlantısı
   mobiles-stats: cep telefonu istatistikleri
   name: Uygulama
-  not_available: Paket bulunamadı
-  set: Sürümü kanala ayarla
+  not_available: paket bulunamadı
+  set: Paketi kanala ayarla
   stats: istatistikler
-  test: Sürümü başlat
+  test: Paketi başlat
   title: bilgi
   version:
     is-used-in-device: >-
-      bir cihaz geçersiz kılma işleminde kullanılıyorsa, önce bağlantısını
+      bir cihaz geçersiz kılma işleminde kullanılıyorsa önce bağlantısını
       kaldırın
-  version-deleted: Sürüm silindi
-  versions: Sürümler
+  version-deleted: Paket silindi
+  versions: paket
 pages: Sayfalar
 password:
   heading: Şifre oluştur
@@ -240,7 +262,7 @@ password:
   validate: Doğrula
 pckage:
   version:
-    is-used-in-channel: bir kanalda kullanılıyorsa, önce bağlantısını kaldırın
+    is-used-in-channel: bir kanalda kullanılıyor, önce bağlantısını kaldırın
 personal-information: Kişisel bilgiler
 plan:
   abtest: A / B testi
@@ -262,7 +284,7 @@ plan:
   mau: Aylık aktif kullanıcılar
   monthly-billing: Aylık faturalandırma
   payasyougo:
-    desc: Ölçekli işletmeler için en iyisi
+    desc: İşletmeleri ölçeklendirmek için en iyisi
   pricing-plans: Fiyatlandırma Planları
   progressive_deploy: aşamalı dağıtım
   shared_channel: Paylaşılan Kanal
@@ -273,40 +295,46 @@ plan:
   team:
     desc: Büyük işletme sahipleri için en iyisi
   update: Güncelleme
-  updates: güncellemeler
-  version: sürüm
-  versions: Sürümler
+  updates: Güncellemeler
+  version: Sürüm
+  versions: Versiyonlar
   whats-included: Neler dahil
-  yearly-billing: Yıllık faturalandırma
-plan-inactive: Plan inaktif
+  yearly-billing: yıllık faturalandırma
+plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
-plan-member: planı üyesi.
-plans: Planlar
+plan-member: plan üyesi.
+plans: planlar
 please-choose-your-p: Lütfen tercihlerinizi seçin
-please-upgrade: Lütfen daha fazla kullanıcı eklemek için planınızı yükseltin
-pro-tip-you-can-copy: 'Profesyonel ipucu:'
+please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
+pro-tip-you-can-copy: 'Profesyonel ipucu: kopyalayabilirsiniz'
+projection: Projeksiyonlar
 projects:
-  list: senin
+  list: seninki
   sharedlist: Benimle paylaştı
   title: Projeler
-refresh-this-page: Bu sayfayı yenile
+refresh-this-page: bu sayfayı yenile
 register:
   already-account: Zaten bir hesabınız var mı?
   check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
-  confirm-email: E-postanızı Onaylayın
+  confirm-email: e-postanızı onaylayın
   confirm-password: Şifreyi Onayla
   desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
   email: E-posta
-  first-name: ilk adı
-  heading: kayıt
+  first-name: İlk adı
+  heading: Kayıt
   last-name: Soyadı
   lowerCaseError: Küçük harfler içermelidir
-  next: Sonraki
-  password: şifre
-  password-hint: En az 6 rakam, harf ve noktalama işaretinden oluşan bir kombinasyon girin.
+  next: Kayıt ol
+  password: Şifre
+  password-hint: >-
+    En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon
+    girin.
   specialError: Özel karakterler içermelidir
   upperCaseError: Büyük harfler içermelidir
+reset-password: Şifreyi yenile
+reset-your-password: şifrenizi sıfırlayın
 see-usage: Kullanıma bakın
+session_key: IvSessionKey
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
 sign-out: Oturumu Kapat
@@ -317,34 +345,36 @@ something-went-wrong-try-again-later: |-
 special-api-access: Özel API erişimi
 start-using-capgo: Capgo'yu kullanmaya başlayın!
 stats:
-  devices: cihazlar
+  devices: Cihazlar
   downloads: İndirilenler
   subtitle: Geçen ay
-  title: istatistikler
-  versions: Sürümler
+  title: İstatistikler
+  versions: Versiyonlar
 submit: Göndermek
 terms-of-use: Kullanım Şartları
+tests: testler
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
 title: Başlık
 top-apps: Benim uygulamalarım
 trial-left: Kalan günler
-trial-plan-expired: Deneme Planının Süresi Doldu
-trial-plan-expires-in: 'Deneme Planı şu tarihte sona eriyor:'
+trial-plan-expired: Deneme sürümünün süresi doldu
+trial-plan-expires-in: deneme bitiyor
 unlimited-updates: Sınırsız güncelleme
-updated-at: 'Güncellenme tarihi:'
+updated-at: 'Şurada güncellendi:'
 upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
 url: URL
 usage:
-  success: Planınız kuruldu, bu sayfa birkaç dakika içinde güncellenecektir.
+  success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
   title: kullanım
 version-builtin: Sürüm yerleşik
-welcome-to-your-capg: Capgo Kontrol Panelinize hoş geldiniz
+welcome-to: Hoşgeldiniz
+welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
 your-api-key: 'API anahtarınız:'
 your-are-a: Senin alanın
-your-current-plan-is: Şu anki planınız
+your-current-plan-is: Mevcut planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'

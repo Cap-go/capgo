@@ -1,9 +1,14 @@
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^1.35.3'
-import type { definitions } from './types_supabase.ts'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+
+import type { Database } from './supabase.types.ts'
 import type { JwtUser } from './types.ts'
 
 export const jwtDecoder = (jwt: string): JwtUser =>
   JSON.parse(atob(jwt.split('.')[1]))
+
+export const fetchLimit = 50
+
+export const methodJson = ['POST', 'PUT', 'PATCH']
 
 const basicHeaders = {
   'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
@@ -16,12 +21,13 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-export const checkKey = async (authorization: string | undefined, supabase: SupabaseClient, allowed: definitions['apikeys']['mode'][]): Promise<definitions['apikeys'] | null> => {
+export const checkKey = async (authorization: string | undefined,
+  supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> => {
   if (!authorization)
     return null
   try {
     const { data, error } = await supabase
-      .from<definitions['apikeys']>('apikeys')
+      .from('apikeys')
       .select()
       .eq('key', authorization)
       .in('mode', allowed)
@@ -36,13 +42,18 @@ export const checkKey = async (authorization: string | undefined, supabase: Supa
   }
 }
 
-export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => (new Response(
-  JSON.stringify(data),
-  {
-    status: statusCode,
-    headers: { ...basicHeaders, ...corsHeaders },
-  },
-))
+export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+  if (statusCode >= 400)
+    console.error('sendRes error', JSON.stringify(data, null, 2))
+
+  return new Response(
+    JSON.stringify(data),
+    {
+      status: statusCode,
+      headers: { ...basicHeaders, ...corsHeaders },
+    },
+  )
+}
 
 export const sendOptionsRes = () => (new Response(
   'ok',
@@ -52,3 +63,8 @@ export const sendOptionsRes = () => (new Response(
     },
   },
 ))
+
+export const getEnv = (key: string): string => {
+  const val = Deno.env.get(key)
+  return val || ''
+}

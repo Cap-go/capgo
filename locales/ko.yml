@@ -51,10 +51,11 @@ add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 �
 afternoon: 오후
 alert:
   confirm-delete: 삭제 확인
-  delete-message: |-
-    이 작업은 되돌릴 수 없습니다. 
-    삭제하시겠습니까?
+  delete-message: 삭제하시겠습니까?
+  not-reverse-message: 이 작업은 되돌릴 수 없습니다.
+allow-develoment-bui: 개발 빌드 허용
 allow-device-to-self: 장치가 자체 연결하도록 허용
+allow-emulator: 에뮬레이터 허용
 api-key: API 키
 api-keys: API 키
 apikeys:
@@ -67,6 +68,8 @@ apikeys:
   title: API 키
   updater: 커패시터 업데이터
 app-id-example: 앱 ID 예시
+available-in-the-san: 샌드박스 앱에서 사용 가능
+back-to-login-page: 로그인 페이지로 돌아가기
 bigger-app-size: 더 큰 앱 크기
 build-your-code-and-: 코드 작성
 bulk-upload: 일괄 업로드
@@ -88,20 +91,22 @@ by-clicking-on-them: 클릭하여.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
 cannot-delete-channel: 채널을 삭제할 수 없습니다
+cannot-save-custom-i: 사용자 정의 ID를 저장할 수 없습니다
 change: 변화
 channel:
   add: 추가하다
   beta-channel: 베타 채널
   cannot-delete-device: 장치를 삭제할 수 없습니다
   confirm-public-desc: |-
-    이 채널을 공개하면 모든 사용자에게 업데이트가 전송됩니다. 
-    다른 모든 공개 채널은 비공개가 됩니다.
+    이 채널을 기본값으로 설정하면 모든 사용자에게 업데이트가 전송됩니다.
+
+    다른 기본 채널은 더 이상 기본 채널이 아닙니다.
   copy: URL 복사
   device: 장치
   device-deleted: 기기가 삭제됨
   invit: 초대할 이메일 입력
-  is_public: 채널 공개
-  make-now: 공개적으로해라
+  is_public: 채널 기본값
+  make-now: 기본값으로 설정
   make_it: 만들어
   makeprivate: 채널이 공개되어 있습니다. 비공개로 설정하려면 클릭하세요.
   makepublic: 채널이 비공개입니다. 공개하려면 클릭하세요.
@@ -119,12 +124,15 @@ checksum: 체크섬
 commands: 명령
 copied-to-clipboard: 클립보드에 복사됨
 copy-your: 복사
+create-a-free-accoun: 무료 계정을 만들다
 custom-domain: 사용자 정의 도메인
+custom-id: 맞춤 ID
+custom-id-saved: 맞춤 ID가 저장되었습니다.
 dashboard: 계기반
 days: 날
 defined-as: 로써 정의 된
-defined-as-private: 비공개로 정의
-defined-as-public: 공개로 정의
+defined-as-private: 정상으로 정의
+defined-as-public: 기본값으로 정의
 delete-account: 계정 삭제
 device:
   channel: 채널 링크
@@ -149,13 +157,19 @@ devices:
 devices-using-this-b: 이 번들을 사용하는 기기
 disable-auto-downgra: 기본에서 자동 다운그레이드 비활성화
 disable-auto-upgrade: 메이저 위의 자동 업그레이드 비활성화
+discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
+dont-have-an-account: 계정이 없습니까?
+email-address: 이메일 주소
+enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
+enter-your-new-passw: 새 비밀번호를 입력하고 확인
 forgot:
   check_email: 이메일을 확인하여 비밀번호 재설정 링크를 받으세요
   email: 이메일
   heading: 비밀번호를 잊으 셨나요
   success: 비밀번호가 성공적으로 업데이트되었습니다.
+from-device: 장치에서
 good: 좋은
 id: ID
 in-your-main-file: 기본 파일에서
@@ -168,10 +182,13 @@ intro:
   hi: 안녕, {name}!
   whats-your-name: 이름이 뭐예요?
 invalid-auth: 잘못된 인증
+is-emulator: 에뮬레이터임
+is-production-app: 프로덕션 앱
 last-upload: 마지막 업로드
 last-version: 마지막 버전
 limit-reached: 한도 도달
 loading-more-data: 추가 데이터 로드 중...
+log-in: 로그인
 log-to-the-capgo-cli: Capgo CLI에 로그인
 login:
   andpass: 그리고 비밀번호
@@ -184,6 +201,9 @@ login:
   or: 또는
   password: 비밀번호
   withemail: 이메일 주소로
+login-to-your-accoun: 계정에 로그인
+make-normal: 정상으로 만들기
+making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 module:
   heading: 모듈
 monthly-active-users: 월간 활성 사용자
@@ -275,6 +295,7 @@ plans: 계획
 please-choose-your-p: 선호하는 항목을 선택하세요.
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 pro-tip-you-can-copy: '전문가 팁: 복사할 수 있습니다.'
+projection: 예측
 projects:
   list: 당신 것
   sharedlist: 나와 공유됨
@@ -296,7 +317,10 @@ register:
   password-hint: 6개 이상의 숫자, 문자, 구두점 조합을 입력하세요.
   specialError: 특수 문자를 포함해야 합니다.
   upperCaseError: 대문자를 포함해야 합니다.
+reset-password: 암호를 재설정
+reset-your-password: 비밀번호를 재설정
 see-usage: 사용법 보기
+session_key: IvSessionKey
 settings: 설정
 shared-apps: 공유 앱
 sign-out: 로그아웃
@@ -314,6 +338,7 @@ stats:
   versions: 버전
 submit: 제출하다
 terms-of-use: 이용약관
+tests: 테스트
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
@@ -331,6 +356,7 @@ usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
   title: 용법
 version-builtin: 버전 내장
+welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-reached-the-limi: 한도 도달

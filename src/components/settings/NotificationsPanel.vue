@@ -3,8 +3,10 @@ import { IonToggle } from '@ionic/vue'
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
+const main = useMainStore()
 const supabase = useSupabase()
 const isLoading = ref(false)
 const form = reactive({
@@ -12,15 +14,13 @@ const form = reactive({
   optForNewsletters: false,
 })
 
-let user = supabase.auth.user()
-
-form.enableNotifications = !!user?.user_metadata?.activation?.enableNotifications
-form.optForNewsletters = !!user?.user_metadata?.activation?.optForNewsletters
+form.enableNotifications = !!main.auth?.user_metadata?.activation?.enableNotifications
+form.optForNewsletters = !!main.auth?.user_metadata?.activation?.optForNewsletters
 
 const submitNotif = async () => {
   isLoading.value = true
-  const activation = user?.user_metadata?.activation || {}
-  const { data, error } = await supabase.auth.update({
+  const activation = main.auth?.user_metadata?.activation || {}
+  const { data, error } = await supabase.auth.updateUser({
     data: {
       activation: {
         ...activation,
@@ -29,13 +29,13 @@ const submitNotif = async () => {
     },
   })
   if (!error && data)
-    user = data
+    main.auth = data.user
   isLoading.value = false
 }
 const submitDoi = async () => {
   isLoading.value = true
-  const activation = user?.user_metadata?.activation || {}
-  const { data, error } = await supabase.auth.update({
+  const activation = main.auth?.user_metadata?.activation || {}
+  const { data, error } = await supabase.auth.updateUser({
     data: {
       activation: {
         ...activation,
@@ -44,7 +44,7 @@ const submitDoi = async () => {
     },
   })
   if (!error && data)
-    user = data
+    main.auth = data.user
   isLoading.value = false
 }
 </script>
@@ -53,21 +53,21 @@ const submitDoi = async () => {
   <div class="grow">
     <!-- Panel body -->
     <div class="p-6 space-y-6">
-      <h2 class="text-2xl text-slate-800 dark:text-white font-bold ">
+      <h2 class="text-2xl font-bold text-slate-800 dark:text-white ">
         {{ t('my-notifications') }}
       </h2>
 
-      <div class="mx-auto w-full dark:text-white">
-        <div class="py-4 px-6">
-          <div class="flex justify-between items-center my-2">
-            <label for="notification" class="justify-self-start text-xl">{{ t('activation.notification') }}</label>
+      <div class="w-full mx-auto dark:text-white">
+        <div class="px-6 py-4">
+          <div class="flex items-center justify-between my-2">
+            <label for="notification" class="text-xl justify-self-start">{{ t('activation.notification') }}</label>
             <IonToggle v-model="form.enableNotifications" color="success" @ion-change="submitNotif()" />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.notification-desc') }}
           </p>
-          <div class="flex justify-between items-center mb-2 mt-4">
-            <label for="notification" class="justify-self-start text-xl w-64">{{ t('activation.doi') }}</label>
+          <div class="flex items-center justify-between mt-4 mb-2">
+            <label for="notification" class="w-64 text-xl justify-self-start">{{ t('activation.doi') }}</label>
             <IonToggle v-model="form.optForNewsletters" color="success" @ion-change="submitDoi()" />
           </div>
           <p class="col-span-2 text-left">

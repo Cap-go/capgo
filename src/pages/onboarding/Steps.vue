@@ -6,17 +6,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { arrowBack, copyOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
-import { CapacitorCrispWeb } from '~/services/crisp-web'
+import { pushEvent } from '~/services/crips'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done'])
 
-const crisp = new CapacitorCrispWeb()
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
@@ -24,7 +22,6 @@ const appId = ref<string>()
 const realtimeListener = ref(false)
 const mySubscription = ref()
 const supabase = useSupabase()
-const auth = supabase.auth.user()
 const router = useRouter()
 const main = useMainStore()
 const { t } = useI18n()
@@ -33,12 +30,12 @@ const snag = useLogSnag()
 const steps = ref([
   {
     title: t('log-to-the-capgo-cli'),
-    command: 'npx @capgo/cli@latest login [APIKEY]',
+    command: 'npx --yes @capgo/cli@latest login [APIKEY]',
     subtitle: '',
   },
   {
     title: t('add-your-app-to-your'),
-    command: 'npx @capgo/cli@latest add',
+    command: 'npx --yes @capgo/cli@latest add',
     subtitle: `${t('into-your-app-folder')}`,
   },
   {
@@ -49,7 +46,7 @@ CapacitorUpdater.notifyAppReady()`,
   },
   {
     title: t('build-your-code-and-'),
-    command: 'npx @capgo/cli@latest upload',
+    command: 'npx --yes @capgo/cli@latest upload',
     subtitle: '',
   },
   {
@@ -69,9 +66,9 @@ const setLog = () => {
       },
       notify: false,
     }).catch()
-    crisp.pushEvent({ name: `user:step-${step.value}`, color: 'blue' })
+    pushEvent({ name: `user:step-${step.value}`, color: 'blue' })
     if (step.value === 4)
-      crisp.pushEvent({ name: 'user:onboarding-done', color: 'green' })
+      pushEvent({ name: 'user:onboarding-done', color: 'green' })
     // TODO add emailing on onboarding done to send blog article versioning
   }
 }
@@ -91,13 +88,13 @@ const copyToast = async (text: string) => {
 const getKey = async (retry = true): Promise<void> => {
   isLoading.value = true
   const { data } = await supabase
-    .from<definitions['apikeys']>('apikeys')
+    .from('apikeys')
     .select()
-    .eq('user_id', auth?.id).eq('mode', 'all')
+    .eq('user_id', main.user?.id).eq('mode', 'all')
   if (data)
-    steps.value[0].command = `npx @capgo/cli@latest login ${data[0].key}`
+    steps.value[0].command = `npx --yes @capgo/cli@latest login ${data[0].key}`
 
-  else if (retry && auth?.id)
+  else if (retry && main.user?.id)
     return getKey(false)
 
   isLoading.value = false
@@ -107,30 +104,48 @@ watchEffect(async () => {
     // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from<definitions['apps']>(`apps:user_id=eq.${main.auth?.id}`)
-      .on('INSERT', (payload) => {
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'apps',
+          filter: `user_id=eq.${main.user?.id}`,
+        },
+        (payload) => {
         // console.log('Change received step 1!', payload)
-        setLog()
-        step.value += 1
-        appId.value = payload.new.id || ''
-        realtimeListener.value = false
-        mySubscription.value.unsubscribe()
-      })
+          setLog()
+          step.value += 1
+          appId.value = payload.new.id || ''
+          realtimeListener.value = false
+          mySubscription.value.unsubscribe()
+        },
+      )
       .subscribe()
   }
   else if (step.value === 4 && !realtimeListener.value) {
     // console.log('watch app change step 4')
     realtimeListener.value = true
     mySubscription.value = supabase
-      .from<definitions['app_versions']>(`app_versions:app_id=eq.${appId.value}`)
-      .on('INSERT', (payload) => {
-        // console.log('Change received step 4!', payload)
-        setLog()
-        step.value += 1
-        realtimeListener.value = false
-        mySubscription.value.unsubscribe()
-        emit('done')
-      })
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'app_versions',
+          filter: `app_id=eq.${appId.value}`,
+        },
+        (payload) => {
+        // console.log('Change received step 1!', payload)
+          setLog()
+          step.value += 1
+          realtimeListener.value = false
+          mySubscription.value.unsubscribe()
+          emit('done')
+        },
+      )
       .subscribe()
   }
 })
@@ -151,7 +166,7 @@ watchEffect(async () => {
         <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
           {{ t('add-your-first-app-t') }}
         </p>
-        <p class="mx-auto mt-2 text-md font-normal text-muted-blue-300 font-pj">
+        <p class="mx-auto mt-2 font-normal text-md text-muted-blue-300 font-pj">
           {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
         </p>
       </div>
@@ -164,7 +179,7 @@ watchEffect(async () => {
 
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="bg-gray-200 w-1 h-10 mx-auto" />
+          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" />
 
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
@@ -178,7 +193,7 @@ watchEffect(async () => {
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
-                <code v-if="s.command" class="text-pumpkin-orange-700 text-lg cursor-pointer" @click="copyToast(s.command)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
+                <code v-if="s.command" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
                 <br v-if="s.command">
                 <span class="text-sm">{{ s.subtitle }}</span>
               </p>

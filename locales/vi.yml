@@ -53,10 +53,11 @@ add-your-first-app-t: Thêm ứng dụng đầu tiên vào tài khoản của b�
 afternoon: buổi chiều
 alert:
   confirm-delete: Xác nhận Xóa
-  delete-message: |-
-    Hành động này là không thể đảo ngược. 
-    Bạn có chắc chắn muốn xóa cái này không
+  delete-message: Bạn có chắc chắn muốn xóa cái này
+  not-reverse-message: Hành động này là không thể đảo ngược
+allow-develoment-bui: Cho phép xây dựng phát triển
 allow-device-to-self: Cho phép các thiết bị tự liên kết
+allow-emulator: Cho phép giả lập
 api-key: Mã API
 api-keys: Khóa API
 apikeys:
@@ -71,6 +72,8 @@ apikeys:
   title: Khóa API
   updater: trình cập nhật tụ điện
 app-id-example: Ví dụ về ID ứng dụng
+available-in-the-san: Có sẵn trong ứng dụng sandbox
+back-to-login-page: Quay lại trang đăng nhập
 bigger-app-size: Kích thước ứng dụng lớn hơn
 build-your-code-and-: Xây dựng mã của bạn
 bulk-upload: Tải lên hàng loạt
@@ -92,22 +95,24 @@ by-clicking-on-them: bằng cách nhấp vào chúng.
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-channel: Không thể xóa kênh
+cannot-save-custom-i: Không thể lưu ID tùy chỉnh
 change: Biến đổi
 channel:
   add: Thêm vào
   beta-channel: Kênh beta
   cannot-delete-device: Không thể xóa thiết bị
   confirm-public-desc: >-
-    Đặt kênh này ở chế độ công khai sẽ làm cho kênh gửi thông tin cập nhật đến
-    tất cả người dùng của bạn. 
+    Đặt kênh này làm mặc định sẽ làm cho kênh gửi cập nhật cho tất cả người dùng
+    của bạn.
 
-    Tất cả các kênh công khai khác sẽ trở thành riêng tư.
+
+    Các kênh mặc định khác sẽ không còn là mặc định nữa.
   copy: Sao chép URL
   device: Thiết bị
   device-deleted: Đã xóa thiết bị
   invit: Nhập email để mời
-  is_public: Kênh công khai
-  make-now: Công bố công khai
+  is_public: Kênh mặc định
+  make-now: Làm mặc định
   make_it: Làm cho nó
   makeprivate: Kênh của bạn ở chế độ công khai, hãy nhấp để đặt kênh đó ở chế độ riêng tư
   makepublic: Kênh của bạn ở chế độ riêng tư, hãy nhấp để đặt kênh ở chế độ công khai
@@ -125,12 +130,15 @@ checksum: Checksum
 commands: lệnh
 copied-to-clipboard: Sao chép vào clipboard
 copy-your: Sao chép của bạn
+create-a-free-accoun: Tạo một tài khoản miễn phí
 custom-domain: Tên miền tùy chọn
+custom-id: ID tùy chỉnh
+custom-id-saved: ID tùy chỉnh đã được lưu
 dashboard: bảng điều khiển
 days: ngày
 defined-as: Định nghĩa là
-defined-as-private: được định nghĩa là riêng tư
-defined-as-public: được định nghĩa là công khai
+defined-as-private: được định nghĩa là bình thường
+defined-as-public: được định nghĩa là mặc định
 delete-account: Xóa tài khoản
 device:
   channel: Liên kết kênh
@@ -155,13 +163,21 @@ devices:
 devices-using-this-b: Các thiết bị sử dụng gói này
 disable-auto-downgra: Tắt tự động hạ cấp dưới gốc
 disable-auto-upgrade: Tắt nâng cấp tự động trên chính
+discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá trang tổng quan của bạn!
 documentation: Tài liệu
+dont-have-an-account: Bạn chưa có tài khoản?
+email-address: Địa chỉ email
+enter-your-email-add: >-
+  Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
+  mật khẩu của bạn.
+enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 forgot:
   check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
   email: E-mail
   heading: Quên mật khẩu
   success: Đã cập nhật mật khẩu thành công
+from-device: từ thiết bị
 good: Tốt
 id: Tôi
 in-your-main-file: Trong tệp chính của bạn
@@ -174,10 +190,13 @@ intro:
   hi: Hi, {name}!
   whats-your-name: Tên bạn là gì?
 invalid-auth: xác thực không hợp lệ
+is-emulator: là giả lập
+is-production-app: Là ứng dụng sản xuất
 last-upload: Lần tải lên cuối cùng
 last-version: Phiên bản cuối cùng
 limit-reached: Đạt tới giới hạn
 loading-more-data: Đang tải thêm dữ liệu ...
+log-in: Đăng nhập
 log-to-the-capgo-cli: Đăng nhập vào Capgo CLI
 login:
   andpass: Và mật khẩu
@@ -190,6 +209,11 @@ login:
   or: hoặc
   password: Mật khẩu
   withemail: Với địa chỉ email
+login-to-your-accoun: đăng nhập vào tài khoản của bạn
+make-normal: làm cho bình thường
+making-this-channel-: >-
+  Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
+  một kênh khác hoặc để thiết bị tự chỉ định.
 module:
   heading: Mô-đun
 monthly-active-users: Người dùng hoạt động hàng tháng
@@ -283,6 +307,7 @@ plans: Các kế hoạch
 please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 pro-tip-you-can-copy: 'Mẹo chuyên nghiệp: bạn có thể sao chép'
+projection: dự đoán
 projects:
   list: Của bạn
   sharedlist: Chia sẻ với tôi
@@ -304,7 +329,10 @@ register:
   password-hint: Nhập kết hợp của ít nhất 6 số, chữ cái và dấu chấm câu.
   specialError: Phải chứa các ký tự đặc biệt
   upperCaseError: Nên chứa các chữ cái in hoa
+reset-password: Đặt lại mật khẩu
+reset-your-password: Đặt lại mật khẩu của bạn
 see-usage: Xem mức sử dụng
+session_key: IvSessionKey
 settings: Cài đặt
 shared-apps: Ứng dụng được chia sẻ
 sign-out: Đăng xuất
@@ -322,6 +350,7 @@ stats:
   versions: Phiên bản
 submit: Nộp
 terms-of-use: Điều khoản sử dụng
+tests: kiểm tra
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
@@ -339,6 +368,7 @@ usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   title: Cách sử dụng
 version-builtin: Nội trang phiên bản
+welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của bạn ở đây.
 you-reached-the-limi: Đạt tới giới hạn

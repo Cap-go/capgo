@@ -1,7 +1,5 @@
 // list all apps in supabase and create version unknown for each
-// import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
-// import type { definitions } from '~/types/supabase'
 
 const supabaseUrl = 'https://***.supabase.co'
 const supabaseAnonKey = '***'
@@ -21,7 +19,7 @@ const fix_apps = async () => {
 
   const { data } = await supabase
     .from('apps')
-    // .from<definitions['apps']>('apps')
+    // .from('apps')
     .select()
 
   if (!data || !data.length) {
@@ -33,7 +31,7 @@ const fix_apps = async () => {
     console.log('app', app.app_id)
     const { data } = await supabase
       .from('app_versions')
-      // .from<definitions['app_versions']>('app_versions')
+      // .from('app_versions')
       .select()
       .eq('app_id', app.app_id)
       .eq('name', 'unknown')
@@ -41,7 +39,7 @@ const fix_apps = async () => {
     if (!data) {
       const { error: dbVersionUError } = await supabase
         .from('app_versions')
-      // .from<definitions['app_versions']>('app_versions')
+      // .from('app_versions')
         .insert({
           user_id: app.user_id,
           deleted: true,
@@ -53,7 +51,7 @@ const fix_apps = async () => {
     }
     const { data: data2 } = await supabase
       .from('app_versions')
-      // .from<definitions['app_versions']>('app_versions')
+      // .from('app_versions')
       .select()
       .eq('app_id', app.app_id)
       .eq('name', 'builtin')
@@ -61,7 +59,7 @@ const fix_apps = async () => {
     if (!data2) {
       const { error: dbVersionUError } = await supabase
         .from('app_versions')
-      // .from<definitions['app_versions']>('app_versions')
+      // .from('app_versions')
         .insert({
           user_id: app.user_id,
           deleted: true,

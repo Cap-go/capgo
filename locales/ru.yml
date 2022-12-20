@@ -55,10 +55,11 @@ add-your-first-app-t: >-
 afternoon: после полудня
 alert:
   confirm-delete: Подтвердите удаление
-  delete-message: |-
-    Это действие необратимо. 
-    Вы уверены, что хотите удалить это
+  delete-message: Вы уверены, что хотите удалить это
+  not-reverse-message: Это действие необратимо
+allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
+allow-emulator: Разрешить эмуляторы
 api-key: ключ API
 api-keys: Ключи API
 apikeys:
@@ -73,6 +74,8 @@ apikeys:
   title: ключи API
   updater: конденсатор-обновитель
 app-id-example: Пример идентификатора приложения
+available-in-the-san: Доступно в приложении песочницы
+back-to-login-page: Назад на страницу входа
 bigger-app-size: Большой размер приложения
 build-your-code-and-: Создайте свой код
 bulk-upload: Массовая загрузка
@@ -94,22 +97,24 @@ by-clicking-on-them: нажав на них.
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-version: Не могу удалить версию приложения
 cannot-delete-channel: Не могу удалить канал
+cannot-save-custom-i: Не удается сохранить пользовательский идентификатор
 change: Изменять
 channel:
   add: Добавлять
   beta-channel: Бета-канал
   cannot-delete-device: Невозможно удалить устройство
   confirm-public-desc: >-
-    Если сделать этот канал общедоступным, он будет отправлять обновления всем
-    вашим пользователям. 
+    Установка этого канала по умолчанию заставит его отправлять обновления всем
+    вашим пользователям.
 
-    Все остальные общедоступные каналы станут частными.
+
+    Другие каналы по умолчанию больше не будут использоваться по умолчанию.
   copy: Скопировать URL
   device: Устройство
   device-deleted: Устройство удалено
   invit: Введите адрес электронной почты, чтобы пригласить
-  is_public: Публичный канал
-  make-now: Опубликовать
+  is_public: Канал по умолчанию
+  make-now: Использовать по умолчанию
   make_it: Сделай это
   makeprivate: Ваш канал общедоступен. Нажмите, чтобы сделать его закрытым.
   makepublic: Ваш канал является закрытым, нажмите, чтобы сделать его общедоступным
@@ -127,12 +132,15 @@ checksum: Контрольная сумма
 commands: команды
 copied-to-clipboard: Скопировано в буфер обмена
 copy-your: Скопируйте свой
+create-a-free-accoun: Создать бесплатный аккаунт
 custom-domain: Пользовательский домен
+custom-id: Пользовательский идентификатор
+custom-id-saved: Пользовательский идентификатор сохранен
 dashboard: Приборная доска
 days: дни
 defined-as: Определяется как
-defined-as-private: определяется как частный
-defined-as-public: определяется как общественное
+defined-as-private: определяется как нормальный
+defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
 device:
   channel: Ссылка на канал
@@ -157,13 +165,19 @@ devices:
 devices-using-this-b: Устройства, использующие этот пакет
 disable-auto-downgra: Отключить автоматическое понижение версии под нативным
 disable-auto-upgrade: Отключить автоматическое обновление выше основного
+discover-module-in-a: Откройте для себя модуль в Awesome-capacitor
 discover-your-dashbo: Откройте для себя панель инструментов!
 documentation: Документация
+dont-have-an-account: У вас нет аккаунта?
+email-address: Адрес электронной почты
+enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
+enter-your-new-passw: Введите новый пароль и подтвердите
 forgot:
   check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
   email: Эл. адрес
   heading: Забыл пароль
   success: Пароль успешно обновлен
+from-device: с устройства
 good: Хороший
 id: я бы
 in-your-main-file: В вашем основном файле
@@ -176,10 +190,13 @@ intro:
   hi: Привет, {name}!
   whats-your-name: Как тебя зовут?
 invalid-auth: недействительная авторизация
+is-emulator: Эмулятор
+is-production-app: Является производственным приложением
 last-upload: Последняя загрузка
 last-version: Последняя версия
 limit-reached: Достигнут предел
 loading-more-data: Загрузка дополнительных данных...
+log-in: Авторизоваться
 log-to-the-capgo-cli: Войдите в интерфейс командной строки Capgo
 login:
   andpass: И пароль
@@ -192,6 +209,11 @@ login:
   or: или
   password: Пароль
   withemail: С адресом электронной почты
+login-to-your-accoun: Вход в свой аккаунт
+make-normal: Сделать нормальным
+making-this-channel-: >-
+  Чтобы сделать этот канал «обычным», вам потребуется настроить другой канал по
+  умолчанию или позволить устройству назначать его самостоятельно.
 module:
   heading: Модули
 monthly-active-users: Ежемесячные активные пользователи
@@ -283,6 +305,7 @@ plans: Планы
 please-choose-your-p: Пожалуйста, выберите ваши предпочтения
 please-upgrade: Обновите план, чтобы добавить больше пользователей
 pro-tip-you-can-copy: 'Совет: вы можете скопировать'
+projection: Прогнозы
 projects:
   list: Ваш
   sharedlist: Поделился со мной
@@ -304,7 +327,10 @@ register:
   password-hint: Введите комбинацию не менее 6 цифр, букв и знаков препинания.
   specialError: Должен содержать специальные символы
   upperCaseError: Должен содержать заглавные буквы
+reset-password: Сброс пароля
+reset-your-password: Сбросить пароль
 see-usage: См. использование
+session_key: IvSessionKey
 settings: Настройки
 shared-apps: Общие приложения
 sign-out: Выход
@@ -322,6 +348,7 @@ stats:
   versions: Версии
 submit: Представлять на рассмотрение
 terms-of-use: Условия эксплуатации
+tests: тесты
 thank-you-for-choosi: Спасибо, что выбрали Капго!
 the: ''
 this-page-will-self-: Эта страница будет автоматически обновляться
@@ -341,6 +368,7 @@ usage:
     минут.
   title: использование
 version-builtin: Встроенная версия
+welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.
 you-reached-the-limi: Достигнуто ограничение

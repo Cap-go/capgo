@@ -55,10 +55,11 @@ add-your-first-app-t: "Ajoutez votre première application à votre compte et po
 afternoon: après midi
 alert:
   confirm-delete: Confirmation de la suppression
-  delete-message: |-
-    Cette action n'est pas réversible. 
-    Êtes-vous sûr de vouloir supprimer ce
+  delete-message: Êtes-vous sûr de vouloir supprimer ce
+  not-reverse-message: Cette action n'est pas réversible
+allow-develoment-bui: Autoriser la compilation de développement
 allow-device-to-self: Autoriser les appareils à s'auto-associer
+allow-emulator: Autoriser les émulateurs
 api-key: Clé API
 api-keys: Clés API
 apikeys:
@@ -73,6 +74,8 @@ apikeys:
   title: Clés API
   updater: condensateur de mise à jour
 app-id-example: Exemple d'ID d'application
+available-in-the-san: Disponible dans l'application bac à sable
+back-to-login-page: Retour à la page de connexion
 bigger-app-size: Taille d'application plus grande
 build-your-code-and-: Construisez votre code
 bulk-upload: Transfert groupé
@@ -94,22 +97,24 @@ by-clicking-on-them: en cliquant dessus.
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-channel: Impossible de supprimer la chaîne
+cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
 change: Changer
 channel:
   add: Ajouter
   beta-channel: Chaîne bêta
   cannot-delete-device: Impossible de supprimer l'appareil
   confirm-public-desc: >-
-    Rendre cette chaîne publique lui fera envoyer des mises à jour à tous vos
-    utilisateurs. 
+    Si vous définissez ce canal par défaut, il enverra des mises à jour à tous
+    vos utilisateurs.
 
-    Toutes les autres chaînes publiques deviendront privées.
+
+    Les autres canaux par défaut ne seront plus par défaut.
   copy: Copier le lien
   device: Appareil
   device-deleted: Appareil supprimé
   invit: Tapez l'e-mail pour inviter
-  is_public: Chaîne publique
-  make-now: Rendre publique
+  is_public: Canal par défaut
+  make-now: Faire défaut
   make_it: Fais-le
   makeprivate: Votre chaîne est publique, cliquez pour la rendre privée
   makepublic: Votre chaîne est privée, cliquez pour la rendre publique
@@ -127,12 +132,15 @@ checksum: Somme de contrôle
 commands: commandes
 copied-to-clipboard: Copié dans le presse-papier
 copy-your: Copiez votre
+create-a-free-accoun: Créer un compte gratuit
 custom-domain: Domaine personnalisé
+custom-id: Identifiant personnalisé
+custom-id-saved: Identifiant personnalisé enregistré
 dashboard: Tableau de bord
 days: jours
 defined-as: Défini comme
-defined-as-private: défini comme privé
-defined-as-public: défini comme public
+defined-as-private: défini comme normal
+defined-as-public: défini par défaut
 delete-account: Supprimer le compte
 device:
   channel: Lien de chaîne
@@ -157,8 +165,15 @@ devices:
 devices-using-this-b: Appareils utilisant ce bundle
 disable-auto-downgra: Désactiver la rétrogradation automatique sous natif
 disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus du majeur
+discover-module-in-a: Découvrir le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: Documentation
+dont-have-an-account: "Vous n'avez pas de compte\_?"
+email-address: Adresse e-mail
+enter-your-email-add: >-
+  Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
+  votre mot de passe.
+enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 forgot:
   check_email: >-
     Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
@@ -166,6 +181,7 @@ forgot:
   email: E-mail
   heading: Mot de passe oublié
   success: Mot de passe mis à jour avec succès
+from-device: depuis l'appareil
 good: Bien
 id: identifiant
 in-your-main-file: Dans votre fichier principal
@@ -178,10 +194,13 @@ intro:
   hi: Salut, {name}!
   whats-your-name: Comment t'appelles-tu ?
 invalid-auth: authentification invalide
+is-emulator: Est un émulateur
+is-production-app: Est-ce que l'application Production
 last-upload: Dernier téléchargement
 last-version: Dernière version
 limit-reached: Limite atteinte
 loading-more-data: Chargement de plus de données...
+log-in: Connexion
 log-to-the-capgo-cli: Connectez-vous à la CLI Capgo
 login:
   andpass: Et mot de passe
@@ -194,6 +213,11 @@ login:
   or: ou
   password: Mot de passe
   withemail: Avec adresse e-mail
+login-to-your-accoun: Connectez-vous à votre compte
+make-normal: Rendre normal
+making-this-channel-: >-
+  Pour rendre ce canal "normal", vous devrez configurer un autre canal par
+  défaut ou laisser l'appareil s'auto-attribuer.
 module:
   heading: Modules
 monthly-active-users: Utilisateurs actifs mensuels
@@ -287,6 +311,7 @@ plans: Des plans
 please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 pro-tip-you-can-copy: "Conseil de pro\_: vous pouvez copier le"
+projection: Projections
 projects:
   list: Tous vos projets
   sharedlist: Partagé avec moi
@@ -310,7 +335,10 @@ register:
     ponctuation.
   specialError: Doit contenir des caractères spéciaux
   upperCaseError: Doit contenir des lettres majuscules
+reset-password: réinitialiser le mot de passe
+reset-your-password: réinitialisez votre mot de passe
 see-usage: Voir l'utilisation
+session_key: IvSessionKey
 settings: Réglages
 shared-apps: Applications partagées
 sign-out: Se déconnecter
@@ -326,6 +354,7 @@ stats:
   versions: Versions
 submit: Soumettre
 terms-of-use: Conditions d'utilisation
+tests: essais
 thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: La
 this-page-will-self-: Cette page s'actualisera automatiquement
@@ -345,6 +374,7 @@ usage:
     minutes
   title: Usage
 version-builtin: Version intégrée
+welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-reached-the-limi: Limite atteinte

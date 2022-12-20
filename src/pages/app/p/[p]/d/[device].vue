@@ -2,6 +2,7 @@
 import {
   IonContent, IonInfiniteScroll,
   IonInfiniteScrollContent,
+  IonInput,
   IonItem,
   IonItemDivider,
   IonLabel, IonList, IonListHeader, IonNote, IonPage, IonSearchbar,
@@ -10,20 +11,22 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { gt } from 'semver'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 import Spinner from '~/components/Spinner.vue'
+import type { Database } from '~/types/supabase.types'
+import { useMainStore } from '~/stores/main'
 
 interface Device {
-  version: definitions['app_versions']
+  version: Database['public']['Tables']['app_versions']['Row']
 }
 interface Channel {
-  version: definitions['app_versions']
+  version: Database['public']['Tables']['app_versions']['Row']
 }
 interface ChannelDev {
-  channel_id: definitions['channels'] & Channel
+  channel_id: Database['public']['Tables']['channels']['Row'] & Channel
 }
 interface InfiniteScrollCustomEvent extends CustomEvent {
   target: HTMLIonInfiniteScrollElement
@@ -37,21 +40,21 @@ const fetchLimit = 40
 let fetchOffset = 0
 const isDisabled = ref(false)
 const { t } = useI18n()
+const main = useMainStore()
 const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const search = ref<string>('')
 const id = ref<string>()
-const auth = supabase.auth.user()
 const isLoading = ref(true)
 const isLoadingSub = ref(true)
-const device = ref<definitions['devices'] & Device>()
-const logs = ref<(definitions['stats'] & Stat)[]>([])
-const filtered = ref<(definitions['stats'] & Stat)[]>([])
-const deviceOverride = ref<definitions['devices_override'] & Device>()
-const channels = ref<(definitions['channels'] & Channel)[]>([])
-const versions = ref<definitions['app_versions'][]>([])
-const channelDevice = ref<definitions['channel_devices'] & ChannelDev>()
+const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
+const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
+const filtered = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
+const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row'] & Device>()
+const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
+const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
+const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
 
 const logFiltered = computed(() => {
   if (search.value)
@@ -61,7 +64,7 @@ const logFiltered = computed(() => {
 const getVersion = async () => {
   try {
     const { data, error } = await supabase
-      .from<definitions['app_versions']>('app_versions')
+      .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('deleted', false)
@@ -79,7 +82,7 @@ const getVersion = async () => {
 const getChannels = async () => {
   try {
     const { data, error } = await supabase
-      .from<definitions['channels'] & Channel>('channels')
+      .from('channels')
       .select(`
         id,
         name,
@@ -91,21 +94,21 @@ const getChannels = async () => {
       console.error('getChannels', error)
       return
     }
-    channels.value = data || []
+    channels.value = (data || []) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
   }
   catch (error) {
     console.error(error)
   }
 }
 const onSearchLog = async (val: string | undefined) => {
-  if (val === undefined) {
+  if (val == null) {
     search.value = ''
     return
   }
   search.value = val
   isLoadingSub.value = true
   const { data: dataStats } = await supabase
-    .from<(definitions['stats'] & Stat)>('stats')
+    .from('stats')
     .select(`
         device_id,
         action,
@@ -120,7 +123,7 @@ const onSearchLog = async (val: string | undefined) => {
     .eq('device_id', id.value)
     .order('created_at', { ascending: false })
     .like('action', `%${search.value}%`)
-  logs.value = dataStats || []
+  logs.value = (dataStats || []) as (Database['public']['Tables']['stats']['Row'] & Stat)[]
   isLoadingSub.value = false
 }
 const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
@@ -128,7 +131,7 @@ const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
   try {
     // create a date object for the last day of the previous month with dayjs
     const { data: dataStats } = await supabase
-      .from<(definitions['stats'] & Stat)>('stats')
+      .from('stats')
       .select(`
         device_id,
         action,
@@ -145,7 +148,7 @@ const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
       .range(fetchOffset, fetchOffset + fetchLimit - 1)
     if (!dataStats)
       return
-    logs.value.push(...dataStats)
+    logs.value.push(...dataStats as (Database['public']['Tables']['stats']['Row'] & Stat)[])
     if (dataStats.length === fetchLimit)
       fetchOffset += fetchLimit
     else
@@ -160,7 +163,7 @@ const loadStatsData = async (event?: InfiniteScrollCustomEvent) => {
 }
 const getChannelOverride = async () => {
   const { data, error } = await supabase
-    .from<definitions['channel_devices'] & ChannelDev>('channel_devices')
+    .from('channel_devices')
     .select(`
       device_id,
       app_id,
@@ -180,11 +183,11 @@ const getChannelOverride = async () => {
     console.error('getChannelOverride', error)
     return
   }
-  channelDevice.value = data || undefined
+  channelDevice.value = (data || undefined) as Database['public']['Tables']['channel_devices']['Row'] & ChannelDev
 }
 const getDeviceOverride = async () => {
   const { data, error } = await supabase
-    .from<definitions['devices_override'] & Device>('devices_override')
+    .from('devices_override')
     .select(`
       device_id,
       app_id,
@@ -201,25 +204,28 @@ const getDeviceOverride = async () => {
     console.error('getDeviceOverride', error)
     return
   }
-  deviceOverride.value = data || undefined
+  deviceOverride.value = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
 }
 const getDevice = async () => {
   if (!id.value)
     return
   try {
     const { data, error } = await supabase
-      .from<definitions['devices'] & Device>('devices')
+      .from('devices')
       .select(`
           device_id,
           app_id,
           platform,
           os_version,
+          custom_id,
           version (
             name,
             app_id,
             bucket_id,
             created_at
           ),
+          is_prod,
+          is_emulator,
           version_build,
           created_at,
           plugin_version,
@@ -228,7 +234,7 @@ const getDevice = async () => {
       .eq('device_id', id.value)
       .single()
     if (data && !error)
-      device.value = data
+      device.value = data as Database['public']['Tables']['devices']['Row'] & Device
     else
       console.error('no devices', error)
     // console.log('device', device.value)
@@ -236,6 +242,10 @@ const getDevice = async () => {
   catch (error) {
     console.error(error)
   }
+}
+
+const minVersion = (val: string, min = '4.6.99') => {
+  return gt(val, min)
 }
 
 const loadData = async () => {
@@ -253,21 +263,21 @@ const loadData = async () => {
   isLoading.value = false
 }
 
-const upsertDevVersion = async (device: string, v: definitions['app_versions']) => {
+const upsertDevVersion = async (device: string, v: Database['public']['Tables']['app_versions']['Row']) => {
   return supabase
-    .from<definitions['devices_override']>('devices_override')
+    .from('devices_override')
     .upsert({
       device_id: device,
       version: v.id,
       app_id: packageId.value,
-      created_by: auth?.id,
+      created_by: main.user?.id,
     })
 }
 const didCancel = async (name: string) => {
   const alert = await alertController
     .create({
       header: t('alert.confirm-delete'),
-      message: `${t('alert.delete-message')} ${name}?`,
+      message: `${t('alert.delete-message')} ${name} ${t('from-device')} ?`,
       buttons: [
         {
           text: t('button.cancel'),
@@ -282,11 +292,26 @@ const didCancel = async (name: string) => {
   await alert.present()
   return alert.onDidDismiss().then(d => (d.role === 'cancel'))
 }
+const saveCustomId = async () => {
+  console.log('device.value?.custom_id', device.value?.custom_id)
+  await supabase
+    .from('devices')
+    .update({
+      custom_id: device.value?.custom_id,
+    })
+    .eq('device_id', id.value)
+  const toast = await toastController
+    .create({
+      message: t('custom-id-saved'),
+      duration: 2000,
+    })
+  await toast.present()
+}
 const delDevVersion = async (device: string) => {
   if (await didCancel(t('channel.device')))
     return
   return supabase
-    .from<definitions['devices_override']>('devices_override')
+    .from('devices_override')
     .delete()
     .eq('device_id', device)
     .eq('app_id', packageId.value)
@@ -351,21 +376,23 @@ const updateOverride = async () => {
   })
   await actionSheet.present()
 }
-const upsertDevChannel = async (device: string, channel: definitions['channels']) => {
+const upsertDevChannel = async (device: string, channel: Database['public']['Tables']['channels']['Row']) => {
+  if (!main?.user?.id)
+    return
   return supabase
-    .from<definitions['channel_devices']>('channel_devices')
+    .from('channel_devices')
     .upsert({
       device_id: device,
       channel_id: channel.id,
       app_id: packageId.value,
-      created_by: auth?.id,
+      created_by: main.user.id,
     })
 }
 const delDevChannel = async (device: string) => {
   if (await didCancel(t('channel.title')))
     return
   return supabase
-    .from<definitions['channel_devices']>('channel_devices')
+    .from('channel_devices')
     .delete()
     .eq('device_id', device)
     .eq('app_id', packageId.value)
@@ -445,7 +472,6 @@ watchEffect(async () => {
   <IonPage>
     <TitleHead :title="t('device.title')" color="warning" />
     <IonContent :fullscreen="true">
-      <!-- <TitleHead :title="t('device.title')" big color="warning" condense /> -->
       <IonList>
         <IonListHeader>
           <span class="text-vista-blue-500">
@@ -465,6 +491,16 @@ watchEffect(async () => {
           </IonLabel>
           <IonNote slot="end">
             {{ device.platform }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('custom-id') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            <IonInput v-model="device.custom_id" @ion-blur="saveCustomId()" />
           </IonNote>
         </IonItem>
         <IonItem v-if="device">
@@ -500,16 +536,6 @@ watchEffect(async () => {
         <IonItem v-if="device">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
-              {{ t('device.last_update') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ formatDate(device.updated_at) }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
               {{ t('device.os_version') }}
             </h2>
           </IonLabel>
@@ -517,7 +543,37 @@ watchEffect(async () => {
             {{ device.os_version || 'unknow' }}
           </IonNote>
         </IonItem>
-        <IonItem v-if="device">
+        <IonItem v-if="device && minVersion(device.plugin_version)">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('is-emulator') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ device.is_emulator }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="device && minVersion(device.plugin_version)">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('is-production-app') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ device.is_prod }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="(device && device.updated_at)">
+          <IonLabel>
+            <h2 class="text-sm text-azure-500">
+              {{ t('device.last_update') }}
+            </h2>
+          </IonLabel>
+          <IonNote slot="end">
+            {{ formatDate(device.updated_at) }}
+          </IonNote>
+        </IonItem>
+        <IonItem v-if="(device && device.created_at)">
           <IonLabel>
             <h2 class="text-sm text-azure-500">
               {{ t('device.created_at') }}
@@ -564,7 +620,7 @@ watchEffect(async () => {
               </h2>
             </IonLabel>
             <IonNote slot="end">
-              {{ formatDate(s.created_at) }}
+              {{ formatDate(s.created_at || '') }}
             </IonNote>
           </IonItem>
         </template>

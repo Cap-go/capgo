@@ -1,73 +1,81 @@
-import type { definitions } from '~/types/supabase'
+import { isSpoofed, spoofUser } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
-import { isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
+import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
 import { setUser, setUserId } from '~/services/crips'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
 
 const guard = async (next: any, to: string, from: string) => {
   const supabase = useSupabase()
-  const auth = supabase.auth.user()
+  const { data: auth } = await supabase.auth.getUser()
+
   const snag = useLogSnag()
 
   const main = useMainStore()
 
-  if (auth && !main.auth) {
-    main.auth = auth
+  if (auth.user && !main.auth) {
+    if (isSpoofed())
+      auth.user.id = spoofUser()
+    main.auth = auth.user
     // console.log('set auth', auth)
-    if (!main.user && auth) {
+    if (!main.user) {
       try {
-        isTrial(auth?.id).then((res) => {
-          // console.log('isTrial', res)
-          main.trialDaysLeft = res
-        })
-        isPaying(auth?.id).then((res) => {
-          main.paying = res
-        })
-        isGoodPlan(auth?.id).then((res) => {
-          main.goodPlan = res
-        })
-        isCanceled(auth?.id).then((res) => {
-          main.canceled = res
-        })
         const { data, error } = await supabase
-          .from<definitions['users']>('users')
+          .from('users')
           .select()
-          .eq('id', auth?.id)
+          .eq('id', main.auth?.id)
           .single()
         if (!error && data)
           main.user = data
-        else return next('/onboarding/verify_email')
-        snag.publish({
-          channel: 'user-login',
-          event: 'User Login',
-          icon: '✅',
-          tags: {
-            'user-id': data.id,
-          },
-          notify: false,
-        }).catch()
-        setUser({
-          nickname: `${data.first_name} ${data.last_name}`,
-          email: data.email,
-          avatar: data.image_url,
-        })
+        else
+          return next('/onboarding/verify_email')
       }
       catch (error) {
         console.error('auth', error)
+        return next('/onboarding/verify_email')
       }
     }
-    setUserId(auth.id)
+    isTrial(main.user?.id).then((res) => {
+      // console.log('isTrial', res)
+      main.trialDaysLeft = res
+    })
+    isPaying(main.user.id).then((res) => {
+      main.paying = res
+    })
+    isAllowedAction(main.user?.id).then((res) => {
+      main.canUseMore = res
+    })
+    isGoodPlan(main.user?.id).then((res) => {
+      main.goodPlan = res
+    })
+    isCanceled(main.user?.id).then((res) => {
+      main.canceled = res
+    })
+    snag.publish({
+      channel: 'user-login',
+      event: 'User Login',
+      icon: '✅',
+      tags: {
+        'user-id': main.user.id,
+      },
+      notify: false,
+    }).catch()
+    setUser({
+      nickname: `${main.user.first_name} ${main.user.last_name}`,
+      email: main.user.email,
+      avatar: main.user.image_url || '',
+    })
+    setUserId(main.user.id)
 
-    if ((!auth.user_metadata?.activation || !auth.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
+    if ((!main.auth?.user_metadata?.activation || !main.auth?.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
       next('/onboarding/activation')
     else
       next()
     hideLoader()
   }
   else if (from !== 'login' && !auth && to !== '/home') {
-    main.auth = null
+    main.auth = undefined
     next('/login')
   }
   else {
@@ -79,7 +87,9 @@ const guard = async (next: any, to: string, from: string) => {
 // // vueuse/head https://github.com/vueuse/head
 export const install: UserModule = ({ router }) => {
   router.beforeEach(async (to, from, next) => {
-    if (to.meta.middleware) { await guard(next, to.path, from.path) }
+    if (to.meta.middleware) {
+      await guard(next, to.path, from.path)
+    }
     else {
       hideLoader()
       next()

@@ -6,12 +6,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { autoAuth, useSupabase } from '~/services/supabase'
-import { useMainStore } from '~/stores/main'
 import { hideLoader } from '~/services/loader'
 
 const route = useRoute()
 const supabase = useSupabase()
-const main = useMainStore()
 const isLoading = ref(false)
 const router = useRouter()
 const { t } = useI18n()
@@ -51,7 +49,7 @@ const submit = async () => {
   v$.value.$touch()
   if (!v$.value.$invalid) {
     isLoading.value = true
-    const { error } = await supabase.auth.signIn({
+    const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
     })
@@ -89,10 +87,11 @@ const fixIOS = () => {
 }
 
 const checkLogin = async () => {
-  main.auth = null
   isLoading.value = true
-  const user = supabase.auth.user()
-  let session = supabase.auth.session()!
+  const resUser = await supabase.auth.getUser()
+  const user = resUser?.data.user
+  const resSession = await supabase.auth.getSession()!
+  let session = resSession?.data.session
   if (user) {
     await nextLogin()
   }
@@ -124,10 +123,12 @@ onMounted(checkLogin)
           <div class="max-w-2xl mx-auto text-center">
             <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
             <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
-              Welcome to Capgo !
+              {{ t('welcome-to') }} <p class="inline font-prompt">
+                Capgo
+              </p> !
             </h1>
             <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
-              Login to your account
+              {{ t('login-to-your-accoun') }}
             </p>
           </div>
 
@@ -166,7 +167,7 @@ onMounted(checkLogin)
 
                     <div>
                       <div class="flex items-center justify-between">
-                        <label for="" class="text-base font-medium text-gray-900"> Password </label>
+                        <label for="" class="text-base font-medium text-gray-900"> {{ t('register.password') }} </label>
                         <router-link
                           to="/forgot_password"
                           class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 focus:text-orange-600 hover:underline"
@@ -214,15 +215,15 @@ onMounted(checkLogin)
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
                         <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 hover:bg-blue-700 focus:bg-blue-700 focus:outline-none">
-                          Log in
+                          {{ t('log-in') }}
                         </button>
                       </button>
                     </div>
 
                     <div class="text-center">
                       <p class="text-base text-gray-600">
-                        Don’t have an account? <br> <router-link to="/register" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
-                          Create a free account
+                        {{ t('dont-have-an-account') }} <br> <router-link to="/register" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
+                          {{ t('create-a-free-accoun') }}
                         </router-link>
                       </p>
                       <p class="pt-2 text-gray-300">

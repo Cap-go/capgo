@@ -55,10 +55,11 @@ add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan mari doro
 afternoon: sore
 alert:
   confirm-delete: Konfirmasi Hapus
-  delete-message: |-
-    Tindakan ini tidak dapat dibalik. 
-    Apa kamu yakin ingin menghapus ini
+  delete-message: Apa kamu yakin ingin menghapus ini
+  not-reverse-message: Tindakan ini tidak dapat dibatalkan
+allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
+allow-emulator: Izinkan Emulator
 api-key: Kunci API
 api-keys: Kunci API
 apikeys:
@@ -73,6 +74,8 @@ apikeys:
   title: kunci API
   updater: kapasitor-pembaru
 app-id-example: Contoh ID Aplikasi
+available-in-the-san: Tersedia di aplikasi kotak pasir
+back-to-login-page: Kembali ke halaman login
 bigger-app-size: Ukuran aplikasi lebih besar
 build-your-code-and-: Buat kode Anda
 bulk-upload: Unggah massal
@@ -94,22 +97,24 @@ by-clicking-on-them: dengan mengkliknya.
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-channel: Tidak dapat menghapus saluran
+cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 change: Mengubah
 channel:
   add: Menambahkan
   beta-channel: saluran beta
   cannot-delete-device: Tidak dapat menghapus perangkat
   confirm-public-desc: >-
-    Menjadikan saluran ini publik akan membuatnya mengirim pembaruan ke semua
-    pengguna Anda. 
+    Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
+    semua pengguna Anda.
 
-    Semua saluran publik lainnya akan menjadi pribadi.
+
+    Saluran default lainnya tidak akan menjadi default lagi.
   copy: Salin URL
   device: Perangkat
   device-deleted: Perangkat dihapus
   invit: Ketik email untuk mengundang
-  is_public: Saluran publik
-  make-now: Publikasikan
+  is_public: Standar saluran
+  make-now: Jadikan default
   make_it: Buat itu
   makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi
   makepublic: Saluran Anda bersifat pribadi, klik untuk menjadikannya publik
@@ -127,12 +132,15 @@ checksum: Ceksum
 commands: perintah
 copied-to-clipboard: Disalin ke papan klip
 copy-your: Salin Anda
+create-a-free-accoun: Buat Akun gratis
 custom-domain: Domain khusus
+custom-id: ID Khusus
+custom-id-saved: ID khusus disimpan
 dashboard: Dasbor
 days: hari
 defined-as: Didefinisikan sebagai
-defined-as-private: didefinisikan sebagai pribadi
-defined-as-public: didefinisikan sebagai publik
+defined-as-private: didefinisikan sebagai normal
+defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
 device:
   channel: Tautan saluran
@@ -157,13 +165,21 @@ devices:
 devices-using-this-b: Perangkat yang menggunakan bundel ini
 disable-auto-downgra: Nonaktifkan penurunan versi otomatis di bawah asli
 disable-auto-upgrade: Nonaktifkan peningkatan otomatis di atas mayor
+discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
+dont-have-an-account: Belum punya akun?
+email-address: Alamat email
+enter-your-email-add: >-
+  Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
+  ulang kata sandi Anda.
+enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 forgot:
   check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
   email: Surel
   heading: Tidak ingat kata sandi
   success: Kata sandi berhasil diperbarui
+from-device: dari perangkat
 good: Bagus
 id: Indo
 in-your-main-file: Di file utama Anda
@@ -176,10 +192,13 @@ intro:
   hi: Halo, {name}!
   whats-your-name: Siapa nama anda?
 invalid-auth: autentik tidak valid
+is-emulator: Apakah Emulator
+is-production-app: Apakah aplikasi Produksi
 last-upload: Unggahan terakhir
 last-version: Versi terakhir
 limit-reached: Batas tercapai
 loading-more-data: Memuat lebih banyak data...
+log-in: Gabung
 log-to-the-capgo-cli: Masuk ke Capgo CLI
 login:
   andpass: Dan kata sandi
@@ -192,6 +211,11 @@ login:
   or: atau
   password: Kata sandi
   withemail: Dengan alamat email
+login-to-your-accoun: masuk ke akun Anda
+make-normal: Jadikan normal
+making-this-channel-: >-
+  Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
+  sebagai default atau membiarkan perangkat menetapkan sendiri.
 module:
   heading: Modul
 monthly-active-users: Pengguna aktif bulanan
@@ -283,6 +307,7 @@ plans: Rencana
 please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Harap tingkatkan paket Anda untuk menambahkan lebih banyak pengguna
 pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
+projection: Proyeksi
 projects:
   list: Milikmu
   sharedlist: Dibagikan dengan saya
@@ -304,7 +329,10 @@ register:
   password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
   specialError: Harus mengandung karakter khusus
   upperCaseError: Harus mengandung huruf besar
+reset-password: Atur Ulang Kata Sandi
+reset-your-password: Mereset password Anda
 see-usage: Lihat penggunaan
+session_key: IvSessionKey
 settings: Pengaturan
 shared-apps: Aplikasi yang Dibagikan
 sign-out: Keluar
@@ -322,6 +350,7 @@ stats:
   versions: Versi
 submit: Kirim
 terms-of-use: Syarat Penggunaan
+tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri sendiri
@@ -341,6 +370,7 @@ usage:
     menit
   title: Penggunaan
 version-builtin: Versi bawaan
+welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai

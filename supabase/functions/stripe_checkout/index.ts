@@ -1,7 +1,6 @@
-import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
-import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
+import { getEnv, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { createCheckout } from '../_utils/stripe.ts'
 
 // FIX: https://github.com/stripe-samples/stripe-node-deno-samples/issues/1
@@ -23,19 +22,18 @@ serve(async (event: Request) => {
     const body = (await event.json()) as PortalData
     console.log('body', body)
     console.log('auth')
-    const { user: auth, error } = await supabaseAdmin.auth.api.getUser(
+    const { data: auth, error } = await supabaseAdmin().auth.getUser(
       authorization?.split('Bearer ')[1],
     )
-    console.log('auth done', auth?.id)
-
     // console.log('auth', auth)
-    if (error || !auth)
+    if (error || !auth || !auth.user)
       return sendRes({ status: 'not authorize' }, 400)
+    console.log('auth done', auth.user?.id)
     // get user from users
-    const { data: user, error: dbError } = await supabaseAdmin
-      .from<definitions['users']>('users')
+    const { data: user, error: dbError } = await supabaseAdmin()
+      .from('users')
       .select()
-      .eq('id', auth.id)
+      .eq('id', auth.user.id)
       .single()
     if (dbError || !user)
       return sendRes({ status: 'not authorize' }, 400)
@@ -45,11 +43,10 @@ serve(async (event: Request) => {
 
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string
-    const checkout = await createCheckout(user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`)
+    const checkout = await createCheckout(user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv('WEBAPP_URL')}/app/usage`)
     return sendRes({ url: checkout.url })
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

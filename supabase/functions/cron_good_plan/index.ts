@@ -1,30 +1,27 @@
-import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { getEnv, sendRes } from '../_utils/utils.ts'
 
 serve(async (event: Request) => {
-  const API_SECRET = Deno.env.get('API_SECRET')
+  const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret) {
-    console.log('Cannot find authorization secret')
+  if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
-  }
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization', authorizationSecret, API_SECRET)
+
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
-  }
+
   try {
-    const { data: users } = await supabaseAdmin
-      .from<definitions['users']>('users')
+    const { data: users } = await supabaseAdmin()
+      .from('users')
       .select()
 
     if (!users || !users.length)
       return sendRes({ status: 'error', message: 'no apps' })
     const all = []
     for (const user of users) {
-      all.push(supabaseAdmin
-        .from<definitions['users']>('users')
+      all.push(supabaseAdmin()
+        .from('users')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', user.id))
     }
@@ -32,7 +29,6 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

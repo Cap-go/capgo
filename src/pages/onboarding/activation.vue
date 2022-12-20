@@ -26,7 +26,7 @@ const submit = async () => {
   if (isPlatform('capacitor') && form.enableNotifications)
     await PushNotifications.requestPermissions()
 
-  const { error } = await supabase.auth.update({
+  const { error } = await supabase.auth.updateUser({
     data: {
       activation: {
         formFilled: true,

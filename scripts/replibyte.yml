@@ -1,0 +1,12 @@
+source:
+  connection_uri: $DATABASE_URL
+  transformers:
+    - database: public
+      table: users
+      columns:
+        - name: email
+          transformer_name: email
+        - name: first_name
+          transformer_name: first-name
+        - name: last_name
+          transformer_name: last-name

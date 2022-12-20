@@ -7,6 +7,13 @@ html {
     --ion-safe-area-right: env(safe-area-inset-right);
 }
 
+.safe-zone {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 :root {
 
     --ion-toolbar-background: var(--color-transparent);
@@ -272,17 +279,17 @@ html {
   font-family: 'AirbnbCerealLight';
   font-style: normal;
   font-weight: normal;
-  src: url('../../fonts/AirbnbCerealLight.woff');
+  src: url('/fonts/AirbnbCerealLight.woff');
 }
 @font-face {
   font-family: 'AirbnbCerealMedium';
   font-style: normal;
   font-weight: normal;
-  src: url('../../fonts/AirbnbCerealMedium.woff');
+  src: url('/fonts/AirbnbCerealMedium.woff');
 }
 @font-face {
   font-family: 'AirbnbCerealBold';
   font-style: normal;
   font-weight: normal;
-  src: url('../../fonts/AirbnbCerealBold.woff');
+  src: url('/fonts/AirbnbCerealBold.woff');
 }

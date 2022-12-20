@@ -1,23 +1,23 @@
 import type { User } from '@supabase/supabase-js'
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import type { definitions } from '~/types/supabase'
+import { ref } from 'vue'
+import {
+  // deleteSupabaseToken,
+  unspoofUser,
+} from './../services/supabase'
 import { useSupabase } from '~/services/supabase'
 import { reset } from '~/services/crips'
+import type { Database } from '~/types/supabase.types'
 
 export const useMainStore = defineStore('main', () => {
-  const auth = ref<User | null>()
+  const auth = ref<User | undefined>()
   const path = ref('')
-  const user = ref<definitions['users']>()
+  const user = ref<Database['public']['Tables']['users']['Row']>()
   const trialDaysLeft = ref<number>(0)
   const paying = ref<boolean>(false)
   const canceled = ref<boolean>(false)
   const goodPlan = ref<boolean>(false)
-  const canUseMore = computed(() => {
-    if (trialDaysLeft.value)
-      return true
-    return paying.value && auth.value ? goodPlan.value : false
-  })
+  const canUseMore = ref<boolean>(false)
 
   const logout = async () => {
     return new Promise<void>((resolve) => {
@@ -30,7 +30,8 @@ export const useMainStore = defineStore('main', () => {
           resolve()
         }
       })
-      localStorage.removeItem('supabase.auth.token')
+      unspoofUser()
+      // deleteSupabaseToken()
       setTimeout(() => {
         supabase.auth.signOut()
       }, 300)

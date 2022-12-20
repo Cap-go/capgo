@@ -1,13 +1,21 @@
-import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import type { Database } from '../_utils/supabase.types.ts'
+import { isGoodPlan, isOnboarded, isPaying, isTrial, supabaseAdmin } from '../_utils/supabase.ts'
+import { getEnv, sendRes } from '../_utils/utils.ts'
 import { insights } from '../_utils/_logsnag.ts'
 
 interface UserStats {
   users: number
+  plans: {
+    Free: number
+    Solo: number
+    Maker: number
+    Team: number
+    'Pay as you go': number
+  }
   trial: number
   need_upgrade: number
+  onboarded: number
   not_paying: number
   paying: number
 }
@@ -24,121 +32,197 @@ const getGithubStars = async (): Promise<number> => {
   return json.stargazers_count
 }
 
+const defaultStats: UserStats = {
+  users: 0,
+  plans: {
+    'Free': 0,
+    'Solo': 0,
+    'Maker': 0,
+    'Team': 0,
+    'Pay as you go': 0,
+  },
+  trial: 0,
+  onboarded: 0,
+  need_upgrade: 0,
+  not_paying: 0,
+  paying: 0,
+}
+
 const getStats = (): GlobalStats => {
   return {
-    apps: supabaseAdmin.rpc<number>('count_all_apps', {}).single().then((res) => {
+    apps: supabaseAdmin().rpc('count_all_apps', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_apps', res.error)
       return res.data || 0
     }),
-    updates: supabaseAdmin.rpc<number>('count_all_updates', {}).single().then((res) => {
+    updates: supabaseAdmin().rpc('count_all_updates', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_updates', res.error)
       return res.data || 0
     }),
-    users: supabaseAdmin.from<definitions['users']>('users')
-      .select().then(async (res) => {
+    users: supabaseAdmin()
+      .from('users')
+      .select()
+      .then(async (res) => {
         if (res.error || !res.data) {
           console.log('get users', res.error)
-          return {
-            users: 0,
-            trial: 0,
-            need_upgrade: 0,
-            paying: 0,
-          } as UserStats
+          return defaultStats
         }
-        const data: UserStats = {
-          users: res.data.length,
-          trial: 0,
-          need_upgrade: 0,
-          not_paying: 0,
-          paying: 0,
-        }
+        const data: UserStats = defaultStats
+        data.users = res.data.length
         const all = []
         for (const user of res.data) {
-          all.push(supabaseAdmin
-            .rpc<boolean>('is_trial', { userid: user.id })
-            .single().then((res) => {
-              data.trial += res.data ? 1 : 0
+          all.push(supabaseAdmin()
+            .from('stripe_info')
+            .select(`
+              customer_id,
+              status,
+              product_id (
+                id,
+                name
+              )
+            `)
+            .eq('customer_id', user.customer_id)
+            .single()
+            .then((res) => {
+              if (res.error)
+                console.error('stripe_info error', res.error)
+              if (!res.data)
+                console.error('stripe_info no body', user.customer_id)
+              const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
+              const name = product.name as keyof typeof data.plans
+              // console.log('stripe_info name', name, res.data?.status, res.data)
+              if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
+                data.plans[name] += res.data?.status === 'succeeded' || name === 'Free' ? 1 : 0
             }))
-          all.push(supabaseAdmin
-            .rpc<boolean>('is_good_plan_v2', { userid: user.id })
-            .single().then((res) => {
-              data.need_upgrade += res.data ? 0 : 1
+          all.push(isTrial(user.id)
+            .then((res) => {
+              data.trial += res ? 1 : 0
             }))
-          all.push(supabaseAdmin
-            .rpc<boolean>('is_paying', { userid: user.id })
-            .single().then((res) => {
-              data.paying += res.data ? 1 : 0
-              data.not_paying += res.data ? 0 : 1
+          all.push(isOnboarded(user.id)
+            .then((res) => {
+              data.onboarded += res ? 1 : 0
+            }))
+          all.push(isPaying(user.id)
+            .then((res) => {
+              data.paying += res ? 1 : 0
+              data.not_paying += res ? 0 : 1
+              if (res) {
+                all.push(isGoodPlan(user.id)
+                  .then((res) => {
+                    data.need_upgrade += res ? 0 : 1
+                  }))
+              }
             }))
         }
+        console.log('all', all.length)
         await Promise.all(all)
-        data.need_upgrade -= data.not_paying
+        console.log('all done')
         data.not_paying -= data.trial
-        await insights([
-          {
-            title: 'User Count',
-            value: data.users,
-            icon: '👨',
-          },
-          {
-            title: 'User need upgrade',
-            value: data.need_upgrade,
-            icon: '🤒',
-          },
-          {
-            title: 'User trial',
-            value: data.trial,
-            icon: '👶',
-          },
-          {
-            title: 'User paying',
-            value: data.paying,
-            icon: '💰',
-          },
-          {
-            title: 'User not paying',
-            value: data.not_paying,
-            icon: '🥲',
-          }])
+        data.plans.Free -= data.trial
         return data
       }),
     stars: getGithubStars(),
   }
 }
 serve(async (event: Request) => {
-  const API_SECRET = Deno.env.get('API_SECRET')
+  const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret) {
-    console.log('Cannot find authorization secret')
+  if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
-  }
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization', authorizationSecret, API_SECRET)
+
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
-  }
+
   try {
     const res = getStats()
     const [apps, updates, stars, users] = await Promise.all([res.apps, res.updates, res.stars, res.users])
+    await insights([
+      {
+        title: 'Apps',
+        value: apps,
+        icon: '📱',
+      },
+      {
+        title: 'Updates',
+        value: updates,
+        icon: '📲',
+      },
+      {
+        title: 'User Count',
+        value: users.users,
+        icon: '👨',
+      },
+      {
+        title: 'User need upgrade',
+        value: users.need_upgrade,
+        icon: '🤒',
+      },
+      {
+        title: 'User onboarded',
+        value: users.onboarded,
+        icon: '✅',
+      },
+      {
+        title: 'User trial',
+        value: users.trial,
+        icon: '👶',
+      },
+      {
+        title: 'User paying',
+        value: users.paying,
+        icon: '💰',
+      },
+      {
+        title: 'User not paying',
+        value: users.not_paying,
+        icon: '🥲',
+      },
+      {
+        title: 'Free plan',
+        value: users.plans.Free,
+        icon: '🆓',
+      },
+      {
+        title: 'Solo Plan',
+        value: users.plans.Solo,
+        icon: '🎸',
+      },
+      {
+        title: 'Maker Plan',
+        value: users.plans.Maker,
+        icon: '🤝',
+      },
+      {
+        title: 'Team plan',
+        value: users.plans.Team,
+        icon: '👏',
+      },
+      {
+        title: 'Pay as you go plan',
+        value: users.plans['Pay as you go'],
+        icon: '📈',
+      },
+    ]).catch()
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
-    const newData: definitions['global_stats'] = {
+    const details = { ...users }
+    details.plans = undefined as any
+    const newData: Database['public']['Tables']['global_stats']['Insert'] = {
       date_id,
       apps,
       updates,
       stars,
-      ...users,
+      ...details,
     }
     // console.log('newData', newData)
-    await supabaseAdmin
-      .from<definitions['global_stats']>('global_stats')
+    await supabaseAdmin()
+      .from('global_stats')
       .upsert(newData)
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

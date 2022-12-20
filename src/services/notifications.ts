@@ -13,12 +13,16 @@ const firebaseConfig = import.meta.env.VITE_FIREBASE_CONFIG
 
 const registerToken = async (token: string) => {
   const supabase = useSupabase()
+  const { data: res } = await supabase.auth.getUser()
+  const user = res?.user
+  if (!user)
+    return
   // console.log(`Push registration success, token: ${token}`)
   const { error } = await supabase
     .from('notification_token')
     .insert([
       {
-        created_by: supabase.auth.user()?.id,
+        created_by: user.id,
         token,
       },
     ])

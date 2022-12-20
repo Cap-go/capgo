@@ -35,8 +35,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(self.clients.matchAll({
     type: 'window',
   }).then((clientList) => {
-    for (let i = 0; i < clientList.length; i++) {
-      const client = clientList[i]
+    for (const client of clientList) {
       if (client.url === '/' && 'focus' in client) {
         client.focus()
         if (data.link)

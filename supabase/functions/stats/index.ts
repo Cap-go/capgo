@@ -1,91 +1,122 @@
-import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import { methodJson, sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
+import type { AppStats, BaseHeaders } from '../_utils/types.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
-interface AppStats {
-  platform: string
-  action: string
-  device_id: string
-  version_name?: string
-  plugin_version?: string
-  version_os?: string
-  version: number
-  version_build: string
-  app_id: string
-}
-
-serve(async (event: Request) => {
+const main = async (url: URL, headers: BaseHeaders, method: string, body: AppStats) => {
   try {
-    const body = (await event.json()) as AppStats
+    console.log('body', body)
+    let {
+      version_name,
+      version_build,
+    } = body
+    const {
+      platform,
+      app_id,
+      version_os,
+      version,
+      device_id,
+      action,
+      plugin_version = '2.3.3',
+      custom_id,
+      is_emulator = false,
+      is_prod = true,
+    } = body
     let statsDb = 'stats'
     let deviceDb = 'devices'
 
-    console.log('body', body)
-    const device: Partial<definitions['devices'] | definitions['devices_onprem']> = {
-      platform: body.platform as definitions['stats']['platform'],
-      device_id: body.device_id,
-      app_id: body.app_id,
-      plugin_version: body.plugin_version || '2.3.3',
-      os_version: body.version_os,
+    const coerce = semver.coerce(version_build)
+    if (coerce)
+      version_build = coerce.version
+    version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
+    const device: Database['public']['Tables']['devices']['Insert'] | Database['public']['Tables']['devices_onprem']['Insert'] = {
+      platform: platform as Database['public']['Enums']['platform_os'],
+      device_id,
+      app_id,
+      plugin_version,
+      os_version: version_os,
+      version: version_name || 'unknown' as any,
+      is_emulator: is_emulator == null ? false : is_emulator,
+      is_prod: is_prod == null ? true : is_prod,
+      ...(custom_id != null ? { custom_id } : {}),
     }
 
-    const stat: Partial<definitions['stats']> = {
-      platform: body.platform as definitions['stats']['platform'],
-      device_id: body.device_id,
-      action: body.action,
-      app_id: body.app_id,
-      version_build: body.version_build,
+    const stat: Database['public']['Tables']['stats']['Insert'] = {
+      platform: platform as Database['public']['Enums']['platform_os'],
+      device_id,
+      action,
+      app_id,
+      version_build,
+      version: version || 0,
     }
     const all = []
-    const { data, error } = await supabaseAdmin
-      .from<definitions['app_versions']>('app_versions')
-      .select()
-      .eq('app_id', body.app_id)
-      .eq('name', body.version_name || 'unknown')
-    if (data && data.length && !error) {
-      stat.version = data[0].id
-      device.version = data[0].id
-      all.push(updateVersionStats({
-        app_id: body.app_id,
-        version_id: data[0].id,
-        devices: 1,
-      }))
-      const { data: deviceData, error: deviceError } = await supabaseAdmin
-        .from<definitions['devices']>(deviceDb)
-        .select()
-        .eq('app_id', body.app_id)
-        .eq('device_id', body.device_id)
-        .single()
-      if (deviceData && !deviceError) {
-        all.push(updateVersionStats({
-          app_id: body.app_id,
-          version_id: deviceData.version,
-          devices: -1,
-        }))
+    const { data } = await supabaseAdmin()
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', app_id)
+      .or(`name.eq.${version_name},name.eq.builtin`)
+      .order('id', { ascending: false })
+      .limit(1)
+      .single()
+    if (data) {
+      stat.version = data.id
+      device.version = data.id
+      if (action === 'set' && !device.is_emulator && device.is_prod) {
+        const { data: deviceData } = await supabaseAdmin()
+          .from(deviceDb)
+          .select()
+          .eq('app_id', app_id)
+          .eq('device_id', device_id)
+          .single()
+        if (deviceData && deviceData.version !== data.id) {
+          all.push(updateVersionStats({
+            app_id,
+            version_id: deviceData.version,
+            devices: -1,
+          }))
+        }
+        if (!deviceData || deviceData.version !== data.id) {
+          all.push(updateVersionStats({
+            app_id,
+            version_id: data.id,
+            devices: 1,
+          }))
+        }
       }
     }
     else {
-      console.log('switch to onprem', body.app_id)
-      device.version = body.version_name || 'unknown'
-      stat.version = body.version || 0
+      console.error('switch to onprem', app_id)
       statsDb = `${statsDb}_onprem`
       deviceDb = `${deviceDb}_onprem`
     }
-    all.push(supabaseAdmin
+    all.push(supabaseAdmin()
       .from(deviceDb)
       .upsert(device))
-    all.push(supabaseAdmin
+    all.push(supabaseAdmin()
       .from(statsDb)
       .insert(stat))
     await Promise.all(all)
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
     }, 500)
+  }
+}
+
+serve(async (event: Request) => {
+  try {
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 })

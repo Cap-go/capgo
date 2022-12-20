@@ -6,17 +6,18 @@ import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
 // import { addOutline } from 'ionicons/icons'
 import { useSupabase } from '~/services/supabase'
-import type { definitions } from '~/types/supabase'
 import Sidebar from '~/components/Sidebar.vue'
 import Navbar from '~/components/Navbar.vue'
+import type { Database } from '~/types/supabase.types'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
+const main = useMainStore()
 const isLoading = ref(false)
 const sidebarOpen = ref(false)
 const supabase = useSupabase()
-const auth = supabase.auth.user()
-const apps = ref<definitions['apikeys'][]>()
-const copyKey = async (app: definitions['apikeys']) => {
+const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
   const toast = await toastController
     .create({
@@ -28,13 +29,13 @@ const copyKey = async (app: definitions['apikeys']) => {
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true
   const { data } = await supabase
-    .from<definitions['apikeys']>('apikeys')
+    .from('apikeys')
     .select()
-    .eq('user_id', auth?.id)
+    .eq('user_id', main.user?.id)
   if (data && data.length)
     apps.value = data
 
-  else if (retry && auth?.id)
+  else if (retry && main.user?.id)
     return geKeys(false)
 
   isLoading.value = false
@@ -43,36 +44,36 @@ geKeys()
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+  <div class="flex h-screen overflow-hidden bg-white safe-zone dark:bg-gray-900/90">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
 
     <!-- Content area -->
-    <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    <div class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
       <!-- Site header -->
       <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
       <main>
-        <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+        <div class="w-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
           <!-- Page header -->
           <div class="mb-8">
             <!-- Title -->
-            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
+            <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
               {{ t('api-keys') }} 🔑
             </h1>
           </div>
 
           <!-- Content -->
-          <div class="bg-white dark:bg-gray-800 dark:text-white shadow-lg rounded-sm mb-8">
+          <div class="mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800 dark:text-white">
             <div class="flex flex-col md:flex-row md:-mr-px">
               <div class="grow">
                 <!-- Panel body -->
                 <div class="p-6 space-y-6">
                   <!-- API Keys -->
                   <section>
-                    <div v-for="app in apps" :key="app.id" class="cursor-pointer space-y-2 mb-2" @click="copyKey(app)">
+                    <div v-for="app in apps" :key="app.id" class="mb-2 space-y-2 cursor-pointer" @click="copyKey(app)">
                       <div>
-                        <label class="block text-lg font-medium mb-1" for="location">{{ app.mode.toUpperCase() }} :</label>
+                        <label class="block mb-1 text-lg font-medium" for="location">{{ app.mode.toUpperCase() }} :</label>
                         <p class="font-bold">
                           {{ app.key }}
                         </p>
@@ -89,7 +90,7 @@ geKeys()
     </div>
   </div>
   <!-- <button
-    class="fixed z-90 bottom-10 right-8 bg-blue-600 w-16 h-16 rounded-full drop-shadow-lg flex justify-center items-center text-white text-3xl hover:bg-muted-blue-700 hover:drop-shadow-2xl focus:border-muted-blue-100 focus:border-2"
+    class="fixed flex items-center justify-center w-16 h-16 text-3xl text-white bg-blue-600 rounded-full z-90 bottom-10 right-8 drop-shadow-lg hover:bg-muted-blue-700 hover:drop-shadow-2xl focus:border-muted-blue-100 focus:border-2"
   >
     <IonIcon :icon="addOutline" />
   </button> -->

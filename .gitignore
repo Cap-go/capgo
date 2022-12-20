@@ -25,3 +25,8 @@ play_config.json
 play_config.json.b64
 android/app/keystore.jks
 report.xml
+fastlane/metadata/review_information/demo_password.txt
+fastlane/metadata/review_information/demo_user.txt
+fastlane/metadata/review_information/phone_number.txt
+.capgo_key
+.capgo_key.pub

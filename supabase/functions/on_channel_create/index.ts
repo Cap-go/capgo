@@ -1,38 +1,45 @@
-import { serve } from 'https://deno.land/std@0.161.0/http/server.ts'
-import type { AppStatsIncrement } from '../_utils/supabase.ts'
+import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
-import type { definitions } from '../_utils/types_supabase.ts'
-import { sendRes } from '../_utils/utils.ts'
+import type { Database } from '../_utils/supabase.types.ts'
+import { getEnv, sendRes } from '../_utils/utils.ts'
 
 serve(async (event: Request) => {
-  const API_SECRET = Deno.env.get('API_SECRET')
+  const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
-  if (!authorizationSecret)
-    return sendRes({ status: 'Cannot find authorization secret' }, 400)
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.log('Fail Authorization')
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
     return sendRes({ message: 'Fail Authorization' }, 400)
-  }
+
   try {
-    console.log('body')
-    const body = (await event.json()) as { record: definitions['channels'] }
+    const table: keyof Database['public']['Tables'] = 'channels'
+    const body = (await event.json()) as InsertPayload<typeof table>
+    if (body.table !== table) {
+      console.log(`Not ${table}`)
+      return sendRes({ message: `Not ${table}` }, 200)
+    }
+    if (body.type !== 'INSERT') {
+      console.log('Not INSERT')
+      return sendRes({ message: 'Not INSERT' }, 200)
+    }
     const record = body.record
+    console.log('record', record)
 
     const today_id = new Date().toISOString().slice(0, 10)
-    const increment: AppStatsIncrement = {
+    const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
       app_id: record.app_id,
       date_id: today_id,
       bandwidth: 0,
       mlu: 0,
       mlu_real: 0,
       devices: 0,
+      devices_real: 0,
       version_size: 0,
       channels: 1,
       shared: 0,
       versions: 0,
     }
-    const { data: dataApp } = await supabaseAdmin
-      .from<definitions['apps']>('apps')
+    const { data: dataApp } = await supabaseAdmin()
+      .from('apps')
       .select()
       .eq('app_id', record.app_id)
       .single()
@@ -44,7 +51,6 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
-    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LineChartStats from '~/components/LineChartStats.vue'
+import { getDaysInCurrentMonth } from '~/services/date'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -14,17 +15,21 @@ const props = defineProps({
   },
   datas: {
     type: Array,
-    default: () => new Array(new Date().getDate()).fill(0),
+    default: () => new Array(getDaysInCurrentMonth()).fill(undefined),
   },
 })
 const { t } = useI18n()
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
 const total = computed(() => {
-  return sum(props.datas as number[])
+  // remove undefined values
+  const arr = props.datas as number[]
+  const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
+  return sum(arrWithoutUndefined as number[])
 })
 const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
-  const oldTotal = sum(arr.slice(0, -2))
+  const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
+  const oldTotal = sum(arrWithoutUndefined.slice(0, -2))
   const diff = total.value - oldTotal
   const res = diff / (arr.length > 2 ? oldTotal : diff) * 100
   return res
@@ -54,6 +59,6 @@ const lastDayEvolution = computed(() => {
     <!-- Chart built with Chart.js 3 -->
 
     <!-- Change the height attribute to adjust the chart height -->
-    <LineChartStats class="w-full px-3 mx-auto my-3 aspect-square" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
+    <LineChartStats class="w-full px-3 mx-auto aspect-square" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
   </div>
 </template>

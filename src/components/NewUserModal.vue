@@ -12,7 +12,6 @@ import { required } from '@vuelidate/validators'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { generate } from 'generate-password-browser'
-import type { definitions } from '~/types/supabase'
 import { useSupabase } from '~/services/supabase'
 
 const props = defineProps({
@@ -40,6 +39,8 @@ const v$ = useVuelidate(rules, form)
 const { t } = useI18n()
 
 const submit = async () => {
+  if (!userEmail.value)
+    return
   isLoading.value = true
   try {
     const isFormCorrect = await v$.value.$validate()
@@ -52,39 +53,45 @@ const submit = async () => {
       numbers: true,
       symbols: true,
     })
-    const { error, user } = await supabase.auth.signUp({
-
+    const { error, data: user } = await supabase.auth.signUp({
       email: userEmail.value,
       password,
-    },
-    {
-      data: {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        activation: {
-          formFilled: true,
-          enableNotifications: false,
-          legal: false,
-          optForNewsletters: false,
+      options: {
+        data: {
+          first_name: form.first_name,
+          last_name: form.last_name,
+          activation: {
+            formFilled: true,
+            enableNotifications: false,
+            legal: false,
+            optForNewsletters: false,
+          },
         },
+        emailRedirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/set_password`,
       },
-      redirectTo: `${import.meta.env.VITE_APP_URL}/onboarding/set_password`,
     })
+    if (error || !user.user || !user.user.id || !user.user.email) {
+      isLoading.value = false
+      if (error)
+        errorMessage.value = error.message
+      else
+        errorMessage.value = t('error-occurred')
+      return
+    }
     const { error: userTableError } = await supabase
-      .from<definitions['users']>('users')
+      .from('users')
       .insert(
         {
-          id: user?.id,
-          first_name: user?.user_metadata.first_name,
-          last_name: user?.user_metadata.last_name,
-          email: user?.email,
-        }, { returning: 'minimal' },
-      )
+          id: user.user?.id,
+          first_name: user.user?.user_metadata.first_name,
+          last_name: user.user?.user_metadata.last_name,
+          email: user.user?.email,
+        })
     isLoading.value = false
     if (error || userTableError)
-      errorMessage.value = error ? error.message : userTableError!.message
+      errorMessage.value = userTableError!.message
     else
-      emit('inviteUser', user?.id)
+      emit('inviteUser', user.user?.id)
   }
   catch (err) {
     console.error(err)
@@ -104,15 +111,15 @@ const submit = async () => {
     </IonToolbar>
   </IonHeader>
   <IonContent>
-    <div class="grid lg:w-1/2 mx-auto w-full h-full min-h-screen p-8">
+    <div class="grid w-full h-full min-h-screen p-8 mx-auto lg:w-1/2">
       <form
-        class="mt-2 relative"
+        class="relative mt-2"
         @submit.prevent="submit"
       >
-        <p v-if="errorMessage" class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+        <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
           {{ errorMessage }}
         </p>
-        <div class="mx-auto max-w-lg grid item-cente">
+        <div class="grid max-w-lg mx-auto item-cente">
           <div class="py-1">
             <IonInput
               v-model="form.first_name"
@@ -124,7 +131,7 @@ const submit = async () => {
             />
 
             <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-              <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+              <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
                 {{ t('register.first-name') }}: {{ error.$message }}
               </p>
             </div>
@@ -132,7 +139,7 @@ const submit = async () => {
           <div class="py-1">
             <IonInput v-model="form.last_name" required class="z-0 text-left border-b-2 ion-padding-start" :placeholder="t('register.last-name')" type="text" />
             <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-              <p class="text-sweet-pink-900 text-xs italic mt-2 mb-4">
+              <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
                 {{ t('register.last-name') }}: {{ error.$message }}
               </p>
             </div>
@@ -142,7 +149,7 @@ const submit = async () => {
               v-model="userEmail"
               required
               inputmode="email"
-              class="text-left border-b-2 z-0 ion-padding-start"
+              class="z-0 text-left border-b-2 ion-padding-start"
               :placeholder="t('register.email')"
               type="email"
             />
@@ -151,7 +158,7 @@ const submit = async () => {
             :disabled="isLoading"
             type="submit"
             color="secondary"
-            class="ion-margin-top w-45 mx-auto font-semibold"
+            class="mx-auto font-semibold ion-margin-top w-45"
           >
             <span v-if="!isLoading" class="rounded-4xl">
               {{ t('submit') }}
