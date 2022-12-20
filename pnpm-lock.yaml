@@ -74,6 +74,7 @@ specifiers:
   chartjs-plugin-annotation: ^2.1.0
   copy-text-to-clipboard: ^3.0.1
   critters: 0.0.16
+  cron-schedule: ^3.0.6
   cross-env: ^7.0.3
   crypto-random-string: ^5.0.0
   cypress: 11.2.0
@@ -168,6 +169,7 @@ dependencies:
   chartjs-adapter-dayjs: 1.0.0_n5tccgukjl67bs6o7rkvlyi7my
   chartjs-plugin-annotation: 2.1.0_chart.js@4.0.1
   copy-text-to-clipboard: 3.0.1
+  cron-schedule: 3.0.6
   crypto-random-string: 5.0.0
   dayjs: 1.11.6
   firebase: 9.14.0
@@ -7486,6 +7488,10 @@ packages:
     dependencies:
       luxon: 3.1.0
     dev: true
+
+  /cron-schedule/3.0.6:
+    resolution: {integrity: sha512-izfGgKyzzIyLaeb1EtZ3KbglkS6AKp9cv7LxmiyoOu+fXfol1tQDC0Cof0enVZGNtudTHW+3lfuW9ZkLQss4Wg==}
+    dev: false
 
   /cross-env/7.0.3:
     resolution: {integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==}

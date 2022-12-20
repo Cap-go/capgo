@@ -79,6 +79,7 @@
     "chartjs-adapter-dayjs": "^1.0.0",
     "chartjs-plugin-annotation": "^2.1.0",
     "copy-text-to-clipboard": "^3.0.1",
+    "cron-schedule": "^3.0.6",
     "crypto-random-string": "^5.0.0",
     "dayjs": "1.11.6",
     "firebase": "9.14.0",
