@@ -78,8 +78,10 @@ const baseNetlifyRes = `export const sendRes = (data: any = { status: 'ok' }, st
   }
 }`
 
+// escape url for regex
+const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const mutations = [
-  { from: 'https://cdn.logsnag.com/deno/.*/index.ts', to: 'logsnag' },
+  { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.1.2', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
@@ -127,7 +129,7 @@ for (let i = 0; i < files.length; i++) {
   let newContent = `// This code is generated don't modify it\n${content}`
   mutations.forEach((m) => {
     const { from, to } = m
-    newContent = newContent.replaceAll(from, to)
+    newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
   // write in new path
   writeFileSync(netlifyFile, newContent)
@@ -151,7 +153,7 @@ catch (e) {
       let newContent = `// This code is generated don't modify it\n${content}`
       mutations.forEach((m) => {
         const { from, to } = m
-        newContent = newContent.replaceAll(from, to)
+        newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
       })
       writeFileSync(`${baseNetlifyUtils}/${f}`, newContent)
     }
@@ -175,7 +177,7 @@ catch (e) {
     let newContent = `// This code is generated don't modify it\n${content}`
     mutations.forEach((m) => {
       const { from, to } = m
-      newContent = newContent.replaceAll(from, to)
+      newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
     })
     writeFileSync(`${baseNetlifyTests}/${f}`, newContent)
   })

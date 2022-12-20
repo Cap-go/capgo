@@ -24,9 +24,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     const supabaseRes = await postUpdate(baseSupabase)
     let valid = true
     Object.entries(supabaseRes).forEach(([key, value]) => {
-      if (key !== 'url' && value !== defaultUpdateRes[key as keyof typeof supabaseRes])
+      const valueString: string = value as any
+      if (key !== 'url' && valueString !== (defaultUpdateRes as any)[key])
         valid = false
-      if (key === 'url' && value && !value.startsWith(defaultUpdateRes[key as keyof typeof defaultUpdateRes] || ''))
+      if (key === 'url' && valueString && !valueString.startsWith((defaultUpdateRes as any)[key] || ''))
         valid = false
     })
     if (valid)
