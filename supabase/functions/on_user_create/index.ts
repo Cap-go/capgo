@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
-import { addDataPerson, addEventPerson, postPerson } from '../_utils/crisp.ts'
+import { addDataPerson, addEventPerson, Person, postPerson, updatePerson } from '../_utils/crisp.ts'
 import { createCustomer } from '../_utils/stripe.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
@@ -47,6 +47,14 @@ serve(async (event: Request) => {
           mode: 'read',
         }])
     await postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined)
+      .catch(() => {
+        const person: Person = {
+          nickname: `${record.first_name} ${record.last_name}`,
+          avatar: record.image_url ? record.image_url : undefined,
+          country: record.country ? record.country : undefined,
+        }
+        return updatePerson(record.email, person)
+      })
     console.log('createCustomer stripe')
     if (record.customer_id)
       return sendRes()
