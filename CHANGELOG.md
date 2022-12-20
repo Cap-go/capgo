@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.66.7...1.67.0-alpha.0) (2022-12-20)
+
+
+### Features
+
+* add auto get netlify functions ([6276c6b](https://github.com/Cap-go/capgo/commit/6276c6bbed7c09425d22d0e2b600f3053bddc854))
+* add generate netlify functions ([20a8b24](https://github.com/Cap-go/capgo/commit/20a8b24b4dd7ee3682bd248db44c7bfb7a76a808))
+
+
+### Bug Fixes
+
+* make convert v0 ([9cb85e1](https://github.com/Cap-go/capgo/commit/9cb85e1594f4aa05410d14ffe789d1ea441a237f))
+* make deno to node more easier ([0111a43](https://github.com/Cap-go/capgo/commit/0111a43c3059ce178de8a69c140cf96a68d8a175))
+
+### [1.39.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.39.0...1.39.1-alpha.0) (2022-11-03)
+
+### [1.36.24-alpha.0](https://github.com/Cap-go/capgo/compare/1.36.24...1.36.24-alpha.0) (2022-10-27)
+
+### [1.27.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.27.1...1.27.1-alpha.0) (2022-10-03)
+
 ### [1.66.7](https://github.com/Cap-go/capgo/compare/1.66.6...1.66.7) (2022-12-19)
 
 ### [1.66.6](https://github.com/Cap-go/capgo/compare/1.66.5...1.66.6) (2022-12-19)
