@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.7](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.6...1.67.0-alpha.7) (2022-12-20)
+
+
+### Bug Fixes
+
+* supabase options ([243d96f](https://github.com/Cap-go/capgo/commit/243d96f502686e05d054aaf81ea1118353a4a076))
+
 ## [1.67.0-alpha.6](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.5...1.67.0-alpha.6) (2022-12-20)
 
 
