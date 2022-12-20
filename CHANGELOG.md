@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.6](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.5...1.67.0-alpha.6) (2022-12-20)
+
+
+### Bug Fixes
+
+* lint issue ([b8e62e7](https://github.com/Cap-go/capgo/commit/b8e62e73b7a373fee724bcebedae9e3895af758f))
+
 ## [1.67.0-alpha.5](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.4...1.67.0-alpha.5) (2022-12-20)
 
 
