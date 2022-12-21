@@ -14,6 +14,7 @@ const defaultChannel = 'dev'
 const defaultAction = 'get'
 const defaultOs = 'ios'
 const defaultVersionOs = '16.0.2'
+const defaultStatus = 'default'
 const defaultVersionName = 'builtin'
 const defaultpluginVersion = '4.3.4'
 const defaultChecksum = 'ebf52a10'
@@ -80,7 +81,7 @@ export const setChannelSelf = async (baseUrl: string) => {
   return response.data
 }
 
-export const defaultPutChannelRes = { channel: 'production', status: 'default' }
+export const defaultPutChannelRes = { channel: defaultChannel, status: defaultStatus }
 export const putChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel_self`
   const response = await axios.put<typeof defaultPutChannelRes>(url, defaultUpdatePayload)
