@@ -3,7 +3,7 @@ import type { Person } from '../_utils/crisp.ts'
 import { addDataPerson, addEventPerson, postPerson, updatePerson } from '../_utils/crisp.ts'
 import { createCustomer } from '../_utils/stripe.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { createApiKey, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { logsnag } from '../_utils/_logsnag.ts'
@@ -29,24 +29,7 @@ serve(async (event: Request) => {
     }
     const record = body.record
     console.log('record', record)
-    await supabaseAdmin()
-      .from('apikeys')
-      .insert([
-        {
-          user_id: record.id,
-          key: crypto.randomUUID(),
-          mode: 'all',
-        },
-        {
-          user_id: record.id,
-          key: crypto.randomUUID(),
-          mode: 'upload',
-        },
-        {
-          user_id: record.id,
-          key: crypto.randomUUID(),
-          mode: 'read',
-        }])
+    await createApiKey(record.id)
     await postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined)
       .catch(() => {
         const person: Person = {
@@ -69,8 +52,8 @@ serve(async (event: Request) => {
       id: record.id,
       customer_id: customer.id,
       product_id: 'free',
-    })
-    await addEventPerson(record.email, {}, 'user:register', 'green')
+    }).catch()
+    await addEventPerson(record.email, {}, 'user:register', 'green').catch()
     console.log('stripe_info done')
     const { error: dbError } = await supabaseAdmin()
       .from('users')

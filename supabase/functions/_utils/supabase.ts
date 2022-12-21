@@ -398,3 +398,35 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
   }
   return newData
 }
+
+export const createApiKey = async (userId: string) => {
+  // check if user has apikeys
+  const total = await supabaseAdmin()
+    .from('apikeys')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .then(res => res.count || 0)
+
+  if (total === 0) {
+    // create apikeys
+    return supabaseAdmin()
+      .from('apikeys')
+      .insert([
+        {
+          user_id: userId,
+          key: crypto.randomUUID(),
+          mode: 'all',
+        },
+        {
+          user_id: userId,
+          key: crypto.randomUUID(),
+          mode: 'upload',
+        },
+        {
+          user_id: userId,
+          key: crypto.randomUUID(),
+          mode: 'read',
+        }])
+  }
+  return Promise.resolve()
+}
