@@ -41,6 +41,7 @@ export const get = async (body: GetDevice, apikey: Database['public']['Tables'][
         public,
         disableAutoUpdateUnderNative,
         disableAutoUpdateToMajor,
+        allow_device_self_set,
         is_emulator,
         is_prod,
         version (
@@ -72,6 +73,7 @@ export const get = async (body: GetDevice, apikey: Database['public']['Tables'][
         public,
         disableAutoUpdateUnderNative,
         disableAutoUpdateToMajor,
+        allow_device_self_set,
         allow_emulator,
         allow_dev,
         version (

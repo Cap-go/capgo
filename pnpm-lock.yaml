@@ -85,6 +85,7 @@ specifiers:
   generate-password-browser: ^1.1.0
   https-localhost: 4.7.1
   json2csv: ^5.0.7
+  lauqe: ^1.5.0
   logsnag: ^0.1.6
   mime: ^3.0.0
   netlify-cli: 12.2.9
@@ -175,6 +176,7 @@ dependencies:
   firebase: 9.14.0
   generate-password-browser: 1.1.0
   json2csv: 5.0.7
+  lauqe: 1.5.0
   logsnag: 0.1.6
   mime: 3.0.0
   nprogress: 1.0.0-1
@@ -7695,6 +7697,10 @@ packages:
   /csstype/2.6.21:
     resolution: {integrity: sha512-Z1PhmomIfypOpoMjRQB70jfvy/wxT50qW08YXO5lMIJkrdq4yOTR+AW7FqutScmB9NkLwxo+jU+kZLbofZZq/w==}
 
+  /curry-rice/1.0.0:
+    resolution: {integrity: sha512-rpXOEtPurOBZGieMQf/wG7YW+zi2N7EWrkaVBFLZYCUyG2LiLLuNup9yIdasuiCmo+O/LTwPDiijotmSlRLYXA==}
+    dev: false
+
   /cyclist/1.0.1:
     resolution: {integrity: sha512-NJGVKPS81XejHcLhaLJS7plab0fK3slPh11mESeeDq2W4ZI5kUKK/LRRdVDvjJseojbPB7ZwjnyOybg3Igea/A==}
     dev: true
@@ -9905,6 +9911,12 @@ packages:
       debug: 4.3.4
     dev: true
 
+  /fonction/1.9.0:
+    resolution: {integrity: sha512-kFt8/QbJdrVukhppuOwuSmNsAxfkl2LH9OygARP7pUfb7aJzJUoF7triyww6YjY40F/m9x+qoJX9zhEk2c6gjA==}
+    dependencies:
+      curry-rice: 1.0.0
+    dev: false
+
   /for-each/0.3.3:
     resolution: {integrity: sha512-jqYfLp7mo9vIyQf8ykW2v7A+2N4QjeCeI5+Dz9XraiO1ign81wjiH7Fb9vSOWvQfNtmSa4H2RoQTrrXivdUZmw==}
     dependencies:
@@ -11994,6 +12006,12 @@ packages:
       picocolors: 1.0.0
       shell-quote: 1.7.4
     dev: true
+
+  /lauqe/1.5.0:
+    resolution: {integrity: sha512-GlBF1bdD27NPrRSZ3UAp7eH1S1nCbFEMP1Hz/22M3Bh/9mgqwNYif2WiersbqtafJ7sPMALPQrVZAx9EFopfFg==}
+    dependencies:
+      fonction: 1.9.0
+    dev: false
 
   /lazy-ass/1.6.0:
     resolution: {integrity: sha512-cc8oEVoctTvsFZ/Oje/kGnHbpWHYBe8IAJe4C0QNc3t8uM/0Y8+erSz/7Y1ALuXTEZTMvxXwO6YbX1ey3ujiZw==}

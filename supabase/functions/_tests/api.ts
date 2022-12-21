@@ -8,7 +8,7 @@ export const baseNetlify = 'https://netlify.capgo.app/'
 const defaultAppId = 'unknow.unknow'
 const defaultVersion = '1.2.3'
 const defaultVersionCode = '10203999'
-const defaultVersionId = 2041
+const defaultVersionId = 6640
 const defaultChannelId = 591
 const defaultChannel = 'dev'
 const defaultAction = 'get'
@@ -22,7 +22,7 @@ const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
 const defaultBucketId = 'test_bucket.zip'
 const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 const defaultCreatedAt = '2022-12-13T23:22:50.057507+00:00'
-const defaultUpdatedAt = '2022-12-13T10:11:59.241191+00:00'
+const defaultUpdatedAt = '2022-12-21T13:35:17.523397+00:00'
 
 const headers = {
   Authorization: getEnv('TEST_APIKEY'),
