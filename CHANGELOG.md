@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.67.0) (2022-12-21)
+
+
+### Features
+
+* add email for update fail and semver issue ([6eddffe](https://github.com/Cap-go/capgo/commit/6eddffe1b7fe4c3f96588ca179bfee26b5175a0a))
+
+
+### Bug Fixes
+
+* api test endpoint ([05e4688](https://github.com/Cap-go/capgo/commit/05e468847fd0775d57fb8317abaede881a7d53af))
+* body parsing ([613f26b](https://github.com/Cap-go/capgo/commit/613f26bb8971f55fb7e8f16db201efe50bdfc701))
+* change updatedAt for device and bundle ([4596336](https://github.com/Cap-go/capgo/commit/45963365ad3315d3606fb4a837a1eaf682b9f7cb))
+* consistency ([bc8e9bf](https://github.com/Cap-go/capgo/commit/bc8e9bfaea41ab34a390005cec48e5c40e5dfc0c))
+* consistency and ok function ([310d1bb](https://github.com/Cap-go/capgo/commit/310d1bb2ee66daab1fae2cff79f9346521506827))
+* issue created at ([03d5c1b](https://github.com/Cap-go/capgo/commit/03d5c1b4a4c6eb25e7844f484ef25d548e55b587))
+* issue test data ([9f0c4ca](https://github.com/Cap-go/capgo/commit/9f0c4ca4905d3ade71f2db51ab33588c41f64d4d))
+* last issue with consistency ([94341df](https://github.com/Cap-go/capgo/commit/94341dfcc41d81eadb8b815e49eda7dbef9fc6e5))
+* netlify deploy ([0bae264](https://github.com/Cap-go/capgo/commit/0bae264c5f9795b0fb1071807127f9101b2ece7e))
+* netlify double deploy [skip netlify] ([80cb54b](https://github.com/Cap-go/capgo/commit/80cb54b01d9568b1515d9108dd5bfbc8e3f4489d))
+* send query ([d2fa17f](https://github.com/Cap-go/capgo/commit/d2fa17fd8686af8698afee332988791d54968c88))
+* services unknow ([75d3e6f](https://github.com/Cap-go/capgo/commit/75d3e6f066edb4b7be446345ce91dde535754ba0))
+* stripe deprecated btoa netlify ([685cda9](https://github.com/Cap-go/capgo/commit/685cda929f4bc6fa0a9fded19f22676fb7f9f55f))
+* tags ([c2809f2](https://github.com/Cap-go/capgo/commit/c2809f2997b3fe2029a85443050eee8f38996a17))
+* update check endpoint ([274cf36](https://github.com/Cap-go/capgo/commit/274cf365166bd445f8c2930997919125a2721134))
+* use latest node ([d48e75f](https://github.com/Cap-go/capgo/commit/d48e75fbf5f83cd6487d742c29b3727e8ce2da93))
+
 ### [1.66.21](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.66.21) (2022-12-21)
 
 
