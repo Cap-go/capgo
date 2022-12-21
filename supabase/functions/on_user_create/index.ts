@@ -1,8 +1,8 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
-import { addDataPerson, addEventPerson, Person, postPerson, updatePerson } from '../_utils/crisp.ts'
-import { createCustomer } from '../_utils/stripe.ts'
+import type { Person } from '../_utils/crisp.ts'
+import { addEventPerson, postPerson, updatePerson } from '../_utils/crisp.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { logsnag } from '../_utils/logsnag.ts'
@@ -28,24 +28,7 @@ serve(async (event: Request) => {
     }
     const record = body.record
     console.log('record', record)
-    await supabaseAdmin()
-      .from('apikeys')
-      .insert([
-        {
-          user_id: record.id,
-          key: crypto.randomUUID(),
-          mode: 'all',
-        },
-        {
-          user_id: record.id,
-          key: crypto.randomUUID(),
-          mode: 'upload',
-        },
-        {
-          user_id: record.id,
-          key: crypto.randomUUID(),
-          mode: 'read',
-        }])
+    await createApiKey(record.id)
     await postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined)
       .catch(() => {
         const person: Person = {
@@ -58,29 +41,8 @@ serve(async (event: Request) => {
     console.log('createCustomer stripe')
     if (record.customer_id)
       return sendRes()
-    const customer = await createCustomer(record.email)
-    const { error: dbStripeError } = await supabaseAdmin()
-      .from('stripe_info')
-      .insert({
-        customer_id: customer.id,
-      })
-    await addDataPerson(record.email, {
-      id: record.id,
-      customer_id: customer.id,
-      product_id: 'free',
-    })
-    await addEventPerson(record.email, {}, 'user:register', 'green')
-    console.log('stripe_info done')
-    const { error: dbError } = await supabaseAdmin()
-      .from('users')
-      .update({
-        customer_id: customer.id,
-      })
-      .eq('email', record.email)
-    console.log('users done')
-    if (dbError || dbStripeError)
-      return sendRes({ message: dbError }, 400)
-
+    await createStripeCustomer(record.id, record.email)
+    await addEventPerson(record.email, {}, 'user:register', 'green').catch()
     await logsnag.publish({
       channel: 'user-register',
       event: 'User Joined',
