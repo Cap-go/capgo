@@ -4,7 +4,14 @@ import { methodJson, sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
+import { sendNotif } from '../_utils/notifications.ts'
 
+const actionsNotif = [
+  'set_fail',
+  'update_fail',
+  'download_fail',
+  'update_fail',
+]
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppStats) => {
   try {
     console.log('body', body)
@@ -54,7 +61,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     const all = []
     const { data } = await supabaseAdmin()
       .from('app_versions')
-      .select('id')
+      .select('id, user_id')
       .eq('app_id', app_id)
       .or(`name.eq.${version_name},name.eq.builtin`)
       .order('id', { ascending: false })
@@ -84,6 +91,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
             devices: 1,
           }))
         }
+      }
+      else if (actionsNotif.includes(action)) {
+        await sendNotif('user:update_fail', data.user_id, '0 0 * * 1', 'orange')
       }
     }
     else {

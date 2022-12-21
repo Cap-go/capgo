@@ -8,6 +8,7 @@ import { checkPlan } from '../_utils/plans.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { defaultDeviceID } from '../_tests/api.ts'
+import { sendNotif } from '../_utils/notifications.ts'
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
@@ -34,10 +35,30 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       version_build = coerce.version
     }
     else {
+      // get app owner with app_id
+      const { data: appOwner } = await supabaseAdmin()
+        .from('apps')
+        .select('user_id')
+        .eq('id', app_id)
+        .single()
+      if (appOwner)
+        await sendNotif('user:semver_issue', appOwner.user_id, '0 0 * * 1', 'red')
+
       return sendRes({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
       }, 400)
+    }
+    // if plugin_version is < 4 send notif to alert
+    if (semver.lt(plugin_version, '4.0.0')) {
+      // get app owner with app_id
+      const { data: appOwner } = await supabaseAdmin()
+        .from('apps')
+        .select('user_id')
+        .eq('id', app_id)
+        .single()
+      if (appOwner)
+        await sendNotif('user:plugin_issue', appOwner.user_id, '0 0 * * 1', 'red')
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
