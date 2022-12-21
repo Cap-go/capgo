@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.14-alpha.5](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.66.14-alpha.5) (2022-12-21)
+
+
+### Bug Fixes
+
+* netlify double deploy [skip netlify] ([80cb54b](https://github.com/Cap-go/capgo/commit/80cb54b01d9568b1515d9108dd5bfbc8e3f4489d))
+
 ### [1.66.14-alpha.4](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.3...1.66.14-alpha.4) (2022-12-21)
 
 
