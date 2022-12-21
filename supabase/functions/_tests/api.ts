@@ -22,7 +22,9 @@ const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
 const defaultBucketId = 'test_bucket.zip'
 const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 const defaultCreatedAt = '2022-12-13T23:22:50.057507+00:00'
-const defaultUpdatedAt = '2022-12-21T13:35:17.523397+00:00'
+const channelUpdatedAt = '2022-12-21T13:35:17.523397+00:00'
+const deviceUpdatedAt = '2022-12-21T14:12:11.897144+00:00'
+const bundleUpdatedAt = '2022-12-21T13:35:17.523397+00:00'
 
 const headers = {
   Authorization: getEnv('TEST_APIKEY'),
@@ -89,7 +91,7 @@ export const putChannel = async (baseUrl: string) => {
 
 export const defaultGetDevicesRes = [{
   created_at: defaultCreatedAt,
-  updated_at: defaultUpdatedAt,
+  updated_at: deviceUpdatedAt,
   device_id: defaultDeviceID,
   custom_id: '',
   is_prod: true,
@@ -98,7 +100,7 @@ export const defaultGetDevicesRes = [{
   platform: defaultOs,
   plugin_version: defaultpluginVersion,
   os_version: defaultVersionOs,
-  version_build: defaultVersionName,
+  version_build: defaultVersion,
   version: { name: defaultVersion, id: defaultVersionId },
 }]
 export const getDevice = async (baseUrl: string) => {
@@ -138,7 +140,7 @@ export const postDevice = async (baseUrl: string) => {
 
 export const defaultGetChannelRes = [{
   created_at: defaultCreatedAt,
-  updated_at: defaultUpdatedAt,
+  updated_at: channelUpdatedAt,
   id: defaultChannelId,
   name: defaultChannel,
   app_id: defaultAppId,
@@ -179,7 +181,7 @@ export const defaultSetBundleRes = {
   user_id: defaultUserId,
   deleted: false,
   created_at: defaultCreatedAt,
-  updated_at: defaultUpdatedAt,
+  updated_at: bundleUpdatedAt,
   bucket_id: defaultBucketId,
   external_url: false,
   checksum: defaultChecksum,
