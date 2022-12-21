@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.11](https://github.com/Cap-go/capgo/compare/1.66.10...1.66.11) (2022-12-21)
+
+
+### Bug Fixes
+
+* make on create user more safe ([74ae636](https://github.com/Cap-go/capgo/commit/74ae63643b758d6bdd957c793f829197980217e4))
+
 ### [1.66.10](https://github.com/Cap-go/capgo/compare/1.66.9...1.66.10) (2022-12-21)
 
 
