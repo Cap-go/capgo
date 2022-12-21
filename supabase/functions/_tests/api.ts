@@ -7,6 +7,7 @@ export const baseNetlify = 'https://netlify.capgo.app/'
 
 const defaultAppId = 'unknow.unknow'
 const defaultVersion = '1.2.3'
+const defaultVersionDev = '1.2.2'
 const defaultVersionCode = '10203999'
 const defaultVersionId = 6640
 const defaultChannelId = 591
@@ -18,6 +19,7 @@ const defaultStatus = 'default'
 const defaultVersionName = 'builtin'
 const defaultpluginVersion = '4.3.4'
 const defaultChecksum = 'ebf52a10'
+const defaultStorageSplit = '?token='
 const defaultSessionKey = null
 const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
 const defaultBucketId = 'test_bucket.zip'
@@ -43,11 +45,13 @@ export const defaultUpdateRes = {
   version: defaultVersion,
   session_key: defaultSessionKey,
   checksum: defaultChecksum,
-  url: `https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/sign/apps/${defaultUserId}/${defaultAppId}/versions/${defaultBucketId}?token=`,
+  url: `https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/sign/apps/${defaultUserId}/${defaultAppId}/versions/${defaultBucketId}`,
 }
 export const postUpdate = async (baseUrl: string) => {
   const url = `${baseUrl}/updates`
-  const response = await axios.post<typeof defaultUpdateRes>(url, defaultUpdatePayload)
+  const payload = { ...defaultUpdatePayload, version_build: defaultVersionDev }
+  const response = await axios.post<typeof defaultUpdateRes>(url, payload)
+  response.data.url = response.data.url.split(defaultStorageSplit)[0]
   return response.data
 }
 

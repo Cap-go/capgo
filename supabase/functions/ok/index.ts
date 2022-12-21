@@ -26,17 +26,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (service === 'update') {
     const supabaseRes = await postUpdate(baseSupabase)
-    let valid = true
-    Object.entries(supabaseRes).forEach(([key, value]) => {
-      const valueString: string = value as any
-      if (key !== 'url' && valueString !== (defaultUpdateRes as any)[key])
-        valid = false
-      if (key === 'url' && valueString && !valueString.startsWith((defaultUpdateRes as any)[key] || ''))
-        valid = false
-    })
-    if (valid)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    if (!equal(supabaseRes, defaultUpdateRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'stats') {
     const supabaseRes = await postStats(baseSupabase)
