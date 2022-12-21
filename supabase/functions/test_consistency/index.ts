@@ -17,7 +17,10 @@ serve(async (event: Request) => {
     const url = new URL(event.url)
     const service = url.searchParams.get('service')
 
-    if (service === 'ok') {
+    if (service == null) {
+      return sendRes()
+    }
+    else if (service === 'ok') {
       const supabaseRes = await getOk(baseSupabase)
       const netlifyRes = await getOk(baseNetlify)
       if (!equal(supabaseRes, netlifyRes))
@@ -97,7 +100,7 @@ serve(async (event: Request) => {
       if (!equal(supabaseRes, netlifyRes))
         sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     }
-    return sendRes()
+    return sendRes({ error: 'service not found', service }, 500)
   }
   catch (error) {
     return sendRes({ error: JSON.stringify(error) }, 500)

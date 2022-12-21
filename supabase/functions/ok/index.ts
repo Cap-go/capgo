@@ -15,7 +15,10 @@ import type { BaseHeaders } from '../_utils/types.ts'
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   const service = body.service
   console.log('service', service)
-  if (service === 'database') {
+  if (service == null) {
+    return sendRes()
+  }
+  else if (service === 'database') {
     const db = await getDatabase()
     if (db)
       return sendRes({ status: 'ok', service })
@@ -102,7 +105,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
-  return sendRes()
+  return sendRes({ error: 'service not found', service }, 500)
 }
 
 serve(async (event: Request) => {
