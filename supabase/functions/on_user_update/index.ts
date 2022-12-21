@@ -3,9 +3,8 @@ import { checkPlan } from '../_utils/plans.ts'
 import { updatePerson } from '../_utils/crisp.ts'
 import type { Person } from '../_utils/crisp.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { createCustomer } from '../_utils/stripe.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
@@ -37,7 +36,7 @@ serve(async (event: Request) => {
       console.log('No id')
       return sendRes()
     }
-
+    await createApiKey(record.id)
     console.log('updatePerson crisp')
     const person: Person = {
       nickname: `${record.first_name} ${record.last_name}`,
@@ -47,26 +46,9 @@ serve(async (event: Request) => {
     await updatePerson(record.email, person).catch((e) => {
       console.log('updatePerson error', e)
     })
-    if (!record.customer_id) {
-      const customer = await createCustomer(record.email)
-      await supabaseAdmin()
-        .from('stripe_info')
-        .insert({
-          customer_id: customer.id,
-        })
-      await supabaseAdmin()
-        .from('users')
-        .update({
-          customer_id: customer.id,
-        })
-        .eq('email', record.email)
-      await updatePerson(record.email, {
-        customer_id: customer.id,
-        product_id: 'free',
-      }).catch((e) => {
-        console.log('updatePerson error', e)
-      })
-    }
+    if (!record.customer_id)
+      await createStripeCustomer(record.id, record.email)
+
     await checkPlan(record.id)
     return sendRes()
   }

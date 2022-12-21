@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import { updatePerson } from './crisp.ts'
+import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 // Import Supabase client
 
@@ -429,4 +431,27 @@ export const createApiKey = async (userId: string) => {
         }])
   }
   return Promise.resolve()
+}
+
+export const createStripeCustomer = async (userId: string, email: string) => {
+  const customer = await createCustomer(userId)
+  await supabaseAdmin()
+    .from('stripe_info')
+    .insert({
+      customer_id: customer.id,
+    })
+  await supabaseAdmin()
+    .from('users')
+    .update({
+      customer_id: customer.id,
+    })
+    .eq('id', userId)
+  await updatePerson(email, {
+    id: userId,
+    customer_id: customer.id,
+    product_id: 'free',
+  }).catch((e) => {
+    console.log('updatePerson error', e)
+  })
+  console.log('stripe_info done')
 }
