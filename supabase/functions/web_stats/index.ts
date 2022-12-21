@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.170.0/http/server.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { isGoodPlan, isOnboarded, isPaying, isTrial, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
