@@ -30,7 +30,9 @@ jobs:
       - name: Push to origin
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          CURRENT_MESSAGE=$(git show-branch --no-name HEAD)
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
+          git commit --amend -o -m "$CURRENT_MESSAGE [skip netlify]"
           git pull $remote_repo $CURRENT_BRANCH
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
   create-cache:
