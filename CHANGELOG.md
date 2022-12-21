@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.14-alpha.3](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.2...1.66.14-alpha.3) (2022-12-21)
+
+
+### Bug Fixes
+
+* better script loggin ([123795c](https://github.com/Cap-go/capgo/commit/123795c6077192d1a217aa15aea234f2f00f2667))
+
 ### [1.66.14-alpha.2](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.1...1.66.14-alpha.2) (2022-12-21)
 
 
