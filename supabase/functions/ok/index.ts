@@ -52,8 +52,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (service === 'channel_self_get') {
     const supabaseRes = await putChannel(baseSupabase)
-    // console.log('supabaseRes', supabaseRes)
-    // console.log('defaultPutChannelRes', defaultPutChannelRes)
     if (!equal(supabaseRes, defaultPutChannelRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
@@ -93,8 +91,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (service === 'bundle_get') {
     const supabaseRes = await getBundle(baseSupabase)
-    // console.log('supabaseRes', supabaseRes)
-    // console.log('defaultGetBundleRes', defaultGetBundleRes)
     if (!equal(supabaseRes, defaultGetBundleRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })

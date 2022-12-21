@@ -109,9 +109,10 @@ export const getDevice = async (baseUrl: string) => {
     },
     headers,
   })
-  return response.data.map((device) => {
-    device.updated_at = defaultUpdatedAt
-    return device
+  return response.data.map((res) => {
+    res.updated_at = defaultUpdatedAt
+    res.created_at = defaultCreatedAt
+    return res
   })
 }
 const defaultSetDevice = {
@@ -162,9 +163,10 @@ export const getChannel = async (baseUrl: string) => {
     },
     headers,
   })
-  return response.data.map((device) => {
-    device.updated_at = defaultUpdatedAt
-    return device
+  return response.data.map((res) => {
+    res.updated_at = defaultUpdatedAt
+    res.created_at = defaultCreatedAt
+    return res
   })
 }
 export const setChannel = async (baseUrl: string) => {
@@ -187,7 +189,7 @@ export const defaultSetBundleRes = {
   created_at: defaultCreatedAt,
   updated_at: defaultUpdatedAt,
   bucket_id: defaultBucketId,
-  external_url: false,
+  external_url: null,
   checksum: defaultChecksum,
   session_key: defaultSessionKey,
 }
@@ -215,9 +217,10 @@ export const getBundle = async (baseUrl: string) => {
     },
     headers,
   })
-  return response.data.map((device) => {
-    device.updated_at = defaultUpdatedAt
-    return device
+  return response.data.map((res) => {
+    res.updated_at = defaultUpdatedAt
+    res.created_at = defaultCreatedAt
+    return res
   })
 }
 
