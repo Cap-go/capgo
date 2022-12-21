@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.10](https://github.com/Cap-go/capgo/compare/1.66.9...1.66.10) (2022-12-21)
+
+
+### Bug Fixes
+
+* if crisp cannot create still process ([6ecf759](https://github.com/Cap-go/capgo/commit/6ecf759fb9ae45d368b25d013b69436d6e8de29a))
+
 ### [1.66.9](https://github.com/Cap-go/capgo/compare/1.66.8...1.66.9) (2022-12-21)
 
 
