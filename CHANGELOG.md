@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.9](https://github.com/Cap-go/capgo/compare/1.66.8...1.66.9) (2022-12-21)
+
+
+### Bug Fixes
+
+* create user crisp ([ebb6f61](https://github.com/Cap-go/capgo/commit/ebb6f6108953e503b5a428670dcf02c4d62aeb02))
+
 ### [1.66.8](https://github.com/Cap-go/capgo/compare/1.66.7...1.66.8) (2022-12-19)
 
 
