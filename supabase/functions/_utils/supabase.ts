@@ -434,7 +434,7 @@ export const createApiKey = async (userId: string) => {
 }
 
 export const createStripeCustomer = async (userId: string, email: string) => {
-  const customer = await createCustomer(userId)
+  const customer = await createCustomer(email)
   await supabaseAdmin()
     .from('stripe_info')
     .insert({
