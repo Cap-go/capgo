@@ -8,6 +8,10 @@ const baseNetlify = 'netlify'
 const baseUtils = '_utils'
 const baseTests = '_tests'
 const baseFunctions = 'functions'
+const baseScripts = 'scripts'
+const baseTemplate = 'template'
+const baseSupaTemplate = `${baseScripts}/${baseTemplate}/${baseSupa}`
+const baseNetlifyTemplate = `${baseScripts}/${baseTemplate}/${baseNetlify}`
 const baseSupaFunctions = `${baseSupa}/${baseFunctions}`
 const baseNetlifyFunctions = `${baseNetlify}/${baseFunctions}`
 const baseSupaUtils = `${baseSupa}/${baseFunctions}/${baseUtils}`
@@ -16,78 +20,38 @@ const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates']
 const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'notifications']
-const supabaseHandler = `serve(async (event: Request) => {
+
+const supaTempl = {}
+const netlifyTempl = {}
+// list files in baseSupaTemplate
+const supaTemplFiles = readdirSync(baseSupaTemplate)
+const netlifyTemplFiles = readdirSync(baseNetlifyTemplate)
+// open file and copy content in supaTempl with key = filename without extension
+supaTemplFiles.forEach((file) => {
   try {
-    const url: URL = new URL(event.url)
-    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
-    const method: string = event.method
-    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
-    return main(url, headers, method, body)
+    const content = readFileSync(`${baseSupaTemplate}/${file}`, 'utf8')
+    const key = file.replace('.ts', '')
+    // split content at "// import from here" and use only second part
+    supaTempl[key] = content.split('// import from here')[1]
   }
   catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+    console.error(e)
   }
-})`
-
-const netlifyHandler = `export const handler: Handler = async (event) => {
+})
+netlifyTemplFiles.forEach((file) => {
   try {
-    const url: URL = new URL(event.rawUrl)
-    const headers: BaseHeaders = { ...event.headers }
-    const method: string = event.httpMethod
-    const body: any = methodJson.includes(method) ? await event.body : Object.fromEntries(url.searchParams.entries())
-    return main(url, headers, method, body)
+    const content = readFileSync(`${baseNetlifyTemplate}/${file}`, 'utf8')
+    const key = file.replace('.ts', '')
+    // split content at "// import from here" and use only second part
+    netlifyTempl[key] = content.split('// import from here')[1]
   }
   catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+    console.error(e)
   }
-}
-`
+})
 
-const supabaseEnvFunction = `export const getEnv = (key: string): string => {
-  const val = Deno.env.get(key)
-  return val || ''
-}`
-
-const netlifyEnvFunction = `export const getEnv = (key: string): string => {
-  const val = process.env[key]
-  return val || ''
-}`
-
-const supabaseRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
-  if (statusCode >= 400)
-    console.error('sendRes error', JSON.stringify(data, null, 2))
-
-  return new Response(
-    JSON.stringify(data),
-    {
-      status: statusCode,
-      headers: { ...basicHeaders, ...corsHeaders },
-    },
-  )
-}`
-
-const netlifyRes = `export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
-  if (statusCode >= 400)
-    console.error('sendRes error', JSON.stringify(data, null, 2))
-
-  return {
-    statusCode,
-    headers: { ...basicHeaders, ...corsHeaders },
-    body: JSON.stringify(data),
-  }
-}`
-
-const hmacSupabase = `export const createHmac = (data: string, details: Details) => {
-  return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
-}`
-
-const hmacNetlify = `export const createHmac = (data: string, details: Details) => {
-  const hmac = crypto.createHmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET'))
-  hmac.write(makeHMACContent(data, details))
-  hmac.end()
-  return hmac.read().toString('hex')
-}`
-
+console.log('supaTempl', supaTempl)
+console.log('netlifyTempl', netlifyTempl)
 // escape url for regex
 const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const mutations = [
@@ -101,10 +65,10 @@ const mutations = [
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
   { from: 'import { serve } from \'https://deno.land/std@0.167.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
-  { from: supabaseHandler, to: netlifyHandler },
-  { from: supabaseEnvFunction, to: netlifyEnvFunction },
-  { from: supabaseRes, to: netlifyRes },
-  { from: hmacSupabase, to: hmacNetlify },
+  { from: supaTempl.handler, to: netlifyTempl.handler },
+  { from: supaTempl.getEnv, to: netlifyTempl.getEnv },
+  { from: supaTempl.res, to: netlifyTempl.res },
+  { from: supaTempl.hmac, to: netlifyTempl.hmac },
   { from: '.ts\'', to: '\'' },
 ]
 // list deno functions folder and filter by allowed

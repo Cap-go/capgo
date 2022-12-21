@@ -20,7 +20,8 @@
   "deno.lint": true,
   "deno.unstable": true,
   "deno.enablePaths": [
-    "./supabase/functions"
+    "./supabase/functions",
+    "./scripts/template/supabase"
   ],
   "nuxt.isNuxtApp": false,
   "java.configuration.updateBuildConfiguration": "disabled"

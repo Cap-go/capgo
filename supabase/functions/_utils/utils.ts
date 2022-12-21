@@ -10,12 +10,12 @@ export const fetchLimit = 50
 
 export const methodJson = ['POST', 'PUT', 'PATCH']
 
-const basicHeaders = {
+export const basicHeaders = {
   'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
   'Content-Type': 'application/json',
 }
 
-const corsHeaders = {
+export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -69,7 +69,7 @@ export const getEnv = (key: string): string => {
   return val || ''
 }
 
-const makeHMACContent = (payload: string, details: Details) => {
+export const makeHMACContent = (payload: string, details: Details) => {
   return `${details.timestamp}.${payload}`
 }
 
