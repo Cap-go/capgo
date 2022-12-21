@@ -7,6 +7,7 @@ import { invalidIp } from '../_utils/invalids_ip.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
+import { defaultDeviceID } from '../_tests/api.ts'
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
@@ -158,10 +159,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     const versionId = versionData ? versionData.id : version.id
 
     const xForwardedFor = headers['x-forwarded-for'] || ''
+    console.log('xForwardedFor', xForwardedFor)
     // check if version is created_at more than 4 hours
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
-    if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
+    if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
       await sendStats('invalidIP', platform, device_id, app_id, version_build, versionId)
       return sendRes({ message: 'invalid ip' }, 400)
     }

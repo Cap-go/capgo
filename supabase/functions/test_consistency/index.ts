@@ -39,6 +39,7 @@ serve(async (event: Request) => {
       found = true
       const supabaseRes = await postUpdate(baseSupabase)
       const netlifyRes = await postUpdate(baseNetlify)
+      console.log('service update', supabaseRes, netlifyRes)
       if (!equal(supabaseRes, netlifyRes))
         return sendRes({ error: 'supabaseRes !== supabaseRes', service }, 500)
     }

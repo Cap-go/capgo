@@ -21,7 +21,7 @@ const defaultpluginVersion = '4.3.4'
 const defaultChecksum = 'ebf52a10'
 const defaultStorageSplit = '?token='
 const defaultSessionKey = null
-const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
+export const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
 const defaultBucketId = 'test_bucket.zip'
 const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 const defaultCreatedAt = '2022-12-13T23:22:50.057507+00:00'
@@ -50,7 +50,11 @@ export const defaultUpdateRes = {
 export const postUpdate = async (baseUrl: string) => {
   const url = `${baseUrl}/updates`
   const payload = { ...defaultUpdatePayload, version_build: defaultVersionDev }
-  const response = await axios.post<typeof defaultUpdateRes>(url, payload)
+  const response = await axios.post<typeof defaultUpdateRes>(url, payload, {
+    headers: {
+      'x-forwarded-for': '1.1.1.1',
+    },
+  })
   response.data.url = response.data.url.split(defaultStorageSplit)[0]
   return response.data
 }
@@ -72,7 +76,7 @@ export const getDatabase = async () => {
 }
 
 export const postStats = async (baseUrl: string) => {
-  const url = `${baseUrl}/updates`
+  const url = `${baseUrl}/stats`
   const payload = { ...defaultUpdatePayload, action: defaultAction }
   const response = await axios.post<typeof defaultRes>(url, payload)
   return response.data
@@ -117,6 +121,8 @@ export const getDevice = async (baseUrl: string) => {
   return response.data.map((res) => {
     res.updated_at = defaultUpdatedAt
     res.created_at = defaultCreatedAt
+    res.version_build = defaultVersion
+    res.version = { name: defaultVersion, id: defaultVersionId }
     return res
   })
 }
