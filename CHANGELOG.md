@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.14-alpha.1](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.0...1.66.14-alpha.1) (2022-12-21)
+
+
+### Bug Fixes
+
+* crisp lint ([07b8fff](https://github.com/Cap-go/capgo/commit/07b8fffb000cef419477f042fcd08d8f1f311723))
+
 ### [1.66.14-alpha.0](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.9...1.66.14-alpha.0) (2022-12-21)
 
 
