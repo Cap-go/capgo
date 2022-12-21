@@ -2,6 +2,82 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.67.0-alpha.8](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.7...1.67.0-alpha.8) (2022-12-20)
+
+
+### Bug Fixes
+
+* issue when email already exist in crisp before they create account ([dc3cfa7](https://github.com/Cap-go/capgo/commit/dc3cfa7a5ee5c619f182bb9b39cc7d8c7f570f18))
+
+## [1.67.0-alpha.7](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.6...1.67.0-alpha.7) (2022-12-20)
+
+
+### Bug Fixes
+
+* supabase options ([243d96f](https://github.com/Cap-go/capgo/commit/243d96f502686e05d054aaf81ea1118353a4a076))
+
+## [1.67.0-alpha.6](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.5...1.67.0-alpha.6) (2022-12-20)
+
+
+### Bug Fixes
+
+* lint issue ([b8e62e7](https://github.com/Cap-go/capgo/commit/b8e62e73b7a373fee724bcebedae9e3895af758f))
+
+## [1.67.0-alpha.5](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.4...1.67.0-alpha.5) (2022-12-20)
+
+
+### Bug Fixes
+
+* redirect netlify ([ab74796](https://github.com/Cap-go/capgo/commit/ab74796d30890cc26db835eb197619bea7b2c2dc))
+
+## [1.67.0-alpha.4](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.3...1.67.0-alpha.4) (2022-12-20)
+
+
+### Bug Fixes
+
+* missing dep ([3369522](https://github.com/Cap-go/capgo/commit/3369522d3cd26486949ffbd058b9a8652af5c507))
+
+## [1.67.0-alpha.3](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.2...1.67.0-alpha.3) (2022-12-20)
+
+
+### Bug Fixes
+
+* for hmac ([58ea453](https://github.com/Cap-go/capgo/commit/58ea45350e407cafd3c2cfeae854cdc44b59e609))
+
+## [1.67.0-alpha.2](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.1...1.67.0-alpha.2) (2022-12-20)
+
+
+### Bug Fixes
+
+* missing deps ([e94e81b](https://github.com/Cap-go/capgo/commit/e94e81b41d911fca771c76aa53319355c1dfd2ef))
+
+## [1.67.0-alpha.1](https://github.com/Cap-go/capgo/compare/1.67.0-alpha.0...1.67.0-alpha.1) (2022-12-20)
+
+
+### Bug Fixes
+
+* for netlify build ([83e086b](https://github.com/Cap-go/capgo/commit/83e086b9264ea5a1c3afddd5c17f7ab4ded9fb0f))
+
+## [1.67.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.66.7...1.67.0-alpha.0) (2022-12-20)
+
+
+### Features
+
+* add auto get netlify functions ([6276c6b](https://github.com/Cap-go/capgo/commit/6276c6bbed7c09425d22d0e2b600f3053bddc854))
+* add generate netlify functions ([20a8b24](https://github.com/Cap-go/capgo/commit/20a8b24b4dd7ee3682bd248db44c7bfb7a76a808))
+
+
+### Bug Fixes
+
+* make convert v0 ([9cb85e1](https://github.com/Cap-go/capgo/commit/9cb85e1594f4aa05410d14ffe789d1ea441a237f))
+* make deno to node more easier ([0111a43](https://github.com/Cap-go/capgo/commit/0111a43c3059ce178de8a69c140cf96a68d8a175))
+
+### [1.39.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.39.0...1.39.1-alpha.0) (2022-11-03)
+
+### [1.36.24-alpha.0](https://github.com/Cap-go/capgo/compare/1.36.24...1.36.24-alpha.0) (2022-10-27)
+
+### [1.27.1-alpha.0](https://github.com/Cap-go/capgo/compare/1.27.1...1.27.1-alpha.0) (2022-10-03)
+
 ### [1.66.7](https://github.com/Cap-go/capgo/compare/1.66.6...1.66.7) (2022-12-19)
 
 ### [1.66.6](https://github.com/Cap-go/capgo/compare/1.66.5...1.66.6) (2022-12-19)
