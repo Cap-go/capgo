@@ -50,8 +50,8 @@ netlifyTemplFiles.forEach((file) => {
   }
 })
 
-console.log('supaTempl', supaTempl)
-console.log('netlifyTempl', netlifyTempl)
+// console.log('supaTempl', supaTempl)
+// console.log('netlifyTempl', netlifyTempl)
 // escape url for regex
 const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const mutations = [
@@ -75,11 +75,11 @@ const mutations = [
 
 const folders = readdirSync(baseSupaFunctions).filter(f => allowed.includes(f))
 
-console.log('folders', folders)
+console.log(`Api found: ${folders.join(', ')}\n`)
 // create list of files from folders folder/index.ts
 
 const files = folders.map(f => `${baseSupaFunctions}/${f}/index.ts`)
-console.log('files', files)
+// console.log('supabase files', files)
 
 // create list of netlify functions from files supabase/functions/folder/index.ts -> netlify/functions/folder.ts
 const netlifyFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyFunctions}/`).replace('/index.ts', '.ts'))
@@ -88,17 +88,17 @@ try {
   readdirSync('baseNetlifyFunctions')
 }
 catch (e) {
-  console.log(`creating ${baseNetlifyFunctions} folder`)
+  console.log(`Creating folder: ${baseNetlifyFunctions}`)
   mkdirSync(baseNetlifyFunctions, { recursive: true })
 }
 
-console.log('netlifyFiles', netlifyFiles)
+// console.log('netlify files', netlifyFiles)
 
 for (let i = 0; i < files.length; i++) {
   const file = files[i]
   const netlifyFile = netlifyFiles[i]
-  console.log('file', file)
-  console.log('netlifyFile', netlifyFile)
+  // console.log('file', file)
+  // console.log('netlifyFile', netlifyFile)
   // replace imports
   const content = readFileSync(file, 'utf8')
   let newContent = `// This code is generated don't modify it\n${content}`
@@ -107,6 +107,7 @@ for (let i = 0; i < files.length; i++) {
     newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
   // write in new path
+  console.log('Generate :', netlifyFile)
   writeFileSync(netlifyFile, newContent)
 }
 
@@ -117,12 +118,11 @@ try {
 }
 catch (e) {
   // copy baseSupaUtils folder content to baseNetlifyUtils
-  console.log(`creating ${baseNetlifyUtils} folder`)
+  console.log(`Creating folder: ${baseNetlifyUtils}`)
   mkdirSync(baseNetlifyUtils, { recursive: true })
   const utilsFiles = readdirSync(baseSupaUtils)
   utilsFiles.forEach((f) => {
     const fileName = f.split('.')[0]
-    console.log('fileName', fileName)
     if (allowedUtil.includes(fileName)) {
       const content = readFileSync(`${baseSupaUtils}/${f}`, 'utf8')
       let newContent = `// This code is generated don't modify it\n${content}`
@@ -130,6 +130,7 @@ catch (e) {
         const { from, to } = m
         newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
       })
+      console.log('Generate :', `${baseNetlifyUtils}/${f}`)
       writeFileSync(`${baseNetlifyUtils}/${f}`, newContent)
     }
   })
@@ -141,12 +142,10 @@ try {
     throw new Error('test folder is empty')
 }
 catch (e) {
-  console.log(`creating ${baseNetlifyTests} folder`)
+  console.log(`Creating folder: ${baseNetlifyTests}`)
   mkdirSync(baseNetlifyTests, { recursive: true })
   const testFiles = readdirSync(baseSupaTests)
   testFiles.forEach((f) => {
-    const fileName = f.split('.')[0]
-    console.log('fileName', fileName)
     // if allowedUtil file copy to netlify/_utils
     const content = readFileSync(`${baseSupaTests}/${f}`, 'utf8')
     let newContent = `// This code is generated don't modify it\n${content}`
@@ -154,6 +153,7 @@ catch (e) {
       const { from, to } = m
       newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
     })
+    console.log('Generate :', `${baseNetlifyTests}/${f}`)
     writeFileSync(`${baseNetlifyTests}/${f}`, newContent)
   })
 }
