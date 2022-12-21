@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.66.17](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.66.17) (2022-12-21)
+
+
+### Bug Fixes
+
+* body parsing ([613f26b](https://github.com/Cap-go/capgo/commit/613f26bb8971f55fb7e8f16db201efe50bdfc701))
+* change updatedAt for device and bundle ([4596336](https://github.com/Cap-go/capgo/commit/45963365ad3315d3606fb4a837a1eaf682b9f7cb))
+* consistency and ok function ([310d1bb](https://github.com/Cap-go/capgo/commit/310d1bb2ee66daab1fae2cff79f9346521506827))
+* issue test data ([9f0c4ca](https://github.com/Cap-go/capgo/commit/9f0c4ca4905d3ade71f2db51ab33588c41f64d4d))
+* netlify deploy ([0bae264](https://github.com/Cap-go/capgo/commit/0bae264c5f9795b0fb1071807127f9101b2ece7e))
+* netlify double deploy [skip netlify] ([80cb54b](https://github.com/Cap-go/capgo/commit/80cb54b01d9568b1515d9108dd5bfbc8e3f4489d))
+* send query ([d2fa17f](https://github.com/Cap-go/capgo/commit/d2fa17fd8686af8698afee332988791d54968c88))
+* stripe deprecated btoa netlify ([685cda9](https://github.com/Cap-go/capgo/commit/685cda929f4bc6fa0a9fded19f22676fb7f9f55f))
+* tags ([c2809f2](https://github.com/Cap-go/capgo/commit/c2809f2997b3fe2029a85443050eee8f38996a17))
+* use latest node ([d48e75f](https://github.com/Cap-go/capgo/commit/d48e75fbf5f83cd6487d742c29b3727e8ce2da93))
+
 ### [1.66.16](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.66.16) (2022-12-21)
 
 
