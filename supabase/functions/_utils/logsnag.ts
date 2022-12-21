@@ -1,9 +1,10 @@
 import { LogSnag } from 'https://cdn.logsnag.com/deno/0.1.5/index.ts'
+import { getEnv } from './utils.ts'
 
-const logsnag = Deno.env.get('LOGSNAG_TOKEN')
+const logsnag = getEnv('LOGSNAG_TOKEN')
   ? new LogSnag({
-    token: Deno.env.get('LOGSNAG_TOKEN') || '',
-    project: Deno.env.get('LOGSNAG_PROJECT') || '',
+    token: getEnv('LOGSNAG_TOKEN'),
+    project: getEnv('LOGSNAG_PROJECT'),
   })
   : { publish: () => Promise.resolve(true), insight: () => Promise.resolve(true), insights: () => Promise.resolve(true) }
 

@@ -1,4 +1,4 @@
-import { logsnag } from './_logsnag.ts'
+import { logsnag } from './logsnag.ts'
 import { addEventPerson } from './crisp.ts'
 import { sendNotif } from './notifications.ts'
 import {

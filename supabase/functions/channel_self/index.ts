@@ -2,15 +2,14 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
-import type { AppInfos } from '../_utils/types.ts'
-import { sendRes } from '../_utils/utils.ts'
+import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
+import { methodJson, sendRes } from '../_utils/utils.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
 }
 
-const post = async (event: Request): Promise<Response> => {
-  const body = await event.json() as DeviceLink
+const post = async (body: DeviceLink): Promise<Response> => {
   console.log('body', body)
   let {
     version_name,
@@ -132,8 +131,7 @@ const post = async (event: Request): Promise<Response> => {
   return sendRes()
 }
 
-const put = async (event: Request): Promise<Response> => {
-  const body = await event.json() as DeviceLink
+const put = async (body: DeviceLink): Promise<Response> => {
   console.log('body', body)
   let {
     version_name,
@@ -245,15 +243,28 @@ const put = async (event: Request): Promise<Response> => {
   }, 400)
 }
 
-serve((event: Request) => {
+const main = (url: URL, headers: BaseHeaders, method: string, body: any) => {
   try {
-    if (event.method === 'POST')
-      return post(event)
-    else if (event.method === 'PUT')
-      return put(event)
+    if (method === 'POST')
+      return post(body)
+    else if (method === 'PUT')
+      return put(body)
   }
   catch (error) {
     return sendRes({ message: `Error ${JSON.stringify(error)}`, error: 'general_error' }, 400)
   }
   return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
+}
+
+serve(async (event: Request) => {
+  try {
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+  }
 })

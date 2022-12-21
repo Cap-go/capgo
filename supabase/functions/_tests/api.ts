@@ -1,5 +1,6 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
+import { getEnv } from '../_utils/utils.ts'
 
 export const baseSupabase = 'https://supabase.capgo.app/'
 export const baseNetlify = 'https://netlify.capgo.app/'
@@ -24,7 +25,7 @@ const defaultCreatedAt = '2022-12-13T23:22:50.057507+00:00'
 const defaultUpdatedAt = '2022-12-13T10:11:59.241191+00:00'
 
 const headers = {
-  Authorization: Deno.env.get('TEST_APIKEY') || '',
+  Authorization: getEnv('TEST_APIKEY'),
 }
 export const defaultUpdatePayload = {
   platform: defaultOs,

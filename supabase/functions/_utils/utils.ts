@@ -1,19 +1,21 @@
+import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
-
 import type { Database } from './supabase.types.ts'
-import type { JwtUser } from './types.ts'
+import type { Details, JwtUser } from './types.ts'
 
 export const jwtDecoder = (jwt: string): JwtUser =>
   JSON.parse(atob(jwt.split('.')[1]))
 
 export const fetchLimit = 50
 
-const basicHeaders = {
+export const methodJson = ['POST', 'PUT', 'PATCH']
+
+export const basicHeaders = {
   'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
   'Content-Type': 'application/json',
 }
 
-const corsHeaders = {
+export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -61,3 +63,17 @@ export const sendOptionsRes = () => (new Response(
     },
   },
 ))
+
+export const getEnv = (key: string): string => {
+  const val = Deno.env.get(key)
+  return val || ''
+}
+
+export const makeHMACContent = (payload: string, details: Details) => {
+  return `${details.timestamp}.${payload}`
+}
+
+export const createHmac = (data: string, details: Details) => {
+  return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
+}
+

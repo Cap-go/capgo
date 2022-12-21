@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
-import { checkKey, fetchLimit, sendRes } from '../_utils/utils.ts'
+import { checkKey, fetchLimit, methodJson, sendRes } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
 
 interface GetLatest {
   app_id?: string
@@ -9,9 +10,8 @@ interface GetLatest {
   page?: number
 }
 
-export const deleteBundle = async (event: Request,
+export const deleteBundle = async (body: GetLatest,
   apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
-  const body = await event.json() as GetLatest
   if (!body.app_id)
     return sendRes({ status: 'Missing app_id' }, 400)
   if (!body.version)
@@ -49,11 +49,9 @@ export const deleteBundle = async (event: Request,
   return sendRes()
 }
 
-export const get = async (event: Request,
+export const get = async (body: GetLatest,
   apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   try {
-    const url = new URL(event.url)
-    const body = Object.fromEntries(url.searchParams.entries() as any) as GetLatest
     if (!body.app_id)
       return sendRes({ status: 'Missing app_id' }, 400)
 
@@ -83,8 +81,8 @@ export const get = async (event: Request,
   }
 }
 
-serve(async (event: Request) => {
-  const apikey_string = event.headers.get('authorization')
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  const apikey_string = headers.authorization
 
   if (!apikey_string)
     return sendRes({ status: 'Missing apikey' }, 400)
@@ -95,13 +93,26 @@ serve(async (event: Request) => {
     if (!apikey)
       return sendRes({ status: 'Missing apikey' }, 400)
 
-    if (event.method === 'GET')
-      return get(event, apikey)
-    else if (event.method === 'DELETE')
-      return deleteBundle(event, apikey)
+    if (method === 'GET')
+      return get(body, apikey)
+    else if (method === 'DELETE')
+      return deleteBundle(body, apikey)
   }
   catch (e) {
     return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
   return sendRes({ status: 'Method now allowed' }, 400)
+}
+
+serve(async (event: Request) => {
+  try {
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+  }
 })

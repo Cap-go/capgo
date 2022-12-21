@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import { updatePerson } from './crisp.ts'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
+import { getEnv } from './utils.ts'
 // Import Supabase client
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
@@ -30,18 +31,29 @@ export interface VersionStatsIncrement {
   version_id: number
   devices: number
 }
-export const supabaseClient = () => createClient<Database>(
-  // Supabase API URL - env var exported by default.
-  Deno.env.get('SUPABASE_URL') ?? '',
-  // Supabase API ANON KEY - env var exported by default.
-  Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-)
+
+export const supabaseClient = () => {
+  const options = {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
+  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
+}
 
 // WARNING: The service role key has admin priviliges and should only be used in secure server environments!
-export const supabaseAdmin = () => createClient<Database>(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-)
+export const supabaseAdmin = () => {
+  const options = {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
+  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'), options)
+}
 
 const allObject = async <T extends string, R>(all: { [key in T]: PromiseLike<R> }) => {
   const allAwaited: { [key in T]: number } = await Object

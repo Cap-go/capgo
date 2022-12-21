@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { methodJson, sendRes } from '../_utils/utils.ts'
 import {
   baseSupabase, defaultGetBundleRes,
   defaultGetChannelRes, defaultGetDevicesRes,
@@ -9,10 +9,10 @@ import {
   postStats, postUpdate, putChannel, setChannel,
   setChannelSelf,
 } from '../_tests/api.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
 
-serve(async (event: Request) => {
-  const url = new URL(event.url)
-  const service = url.searchParams.get('service')
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  const service = body.service
   console.log('service', service)
   if (service === 'database') {
     const db = await getDatabase()
@@ -24,9 +24,10 @@ serve(async (event: Request) => {
     const supabaseRes = await postUpdate(baseSupabase)
     let valid = true
     Object.entries(supabaseRes).forEach(([key, value]) => {
-      if (key !== 'url' && value !== defaultUpdateRes[key as keyof typeof supabaseRes])
+      const valueString: string = value as any
+      if (key !== 'url' && valueString !== (defaultUpdateRes as any)[key])
         valid = false
-      if (key === 'url' && value && !value.startsWith(defaultUpdateRes[key as keyof typeof defaultUpdateRes] || ''))
+      if (key === 'url' && valueString && !valueString.startsWith((defaultUpdateRes as any)[key] || ''))
         valid = false
     })
     if (valid)
@@ -94,4 +95,17 @@ serve(async (event: Request) => {
     return sendRes({ error: 'db not answering as expected', service }, 500)
   }
   return sendRes()
+}
+
+serve(async (event: Request) => {
+  try {
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+  }
 })

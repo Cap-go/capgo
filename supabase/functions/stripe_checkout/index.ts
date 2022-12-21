@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
+import { getEnv, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { createCheckout } from '../_utils/stripe.ts'
 
 // FIX: https://github.com/stripe-samples/stripe-node-deno-samples/issues/1
@@ -43,7 +43,7 @@ serve(async (event: Request) => {
 
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string
-    const checkout = await createCheckout(user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${Deno.env.get('WEBAPP_URL')}/app/usage`)
+    const checkout = await createCheckout(user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv('WEBAPP_URL')}/app/usage`)
     return sendRes({ url: checkout.url })
   }
   catch (e) {

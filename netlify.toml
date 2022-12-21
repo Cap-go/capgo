@@ -4,7 +4,22 @@
 
 [build]
   publish = "dist"
-  command = "npx pnpm i --store=node_modules/.pnpm-store && npx pnpm run build"
+  command = "npx pnpm i --store=node_modules/.pnpm-store && npx pnpm run build && npm run generate:node_serverless"
+
+[[redirects]]
+  from = "/api/auto_update"
+  to = "/.netlify/functions/updates"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    cache-control = "public, s-max-age=60"
 
 [[redirects]]
   from = "/*"

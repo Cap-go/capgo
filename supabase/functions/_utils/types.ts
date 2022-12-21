@@ -25,3 +25,12 @@ export interface AppStats extends AppInfos {
   action: string
   version?: number
 }
+
+export interface BaseHeaders {
+  [k: string]: string | undefined
+}
+
+export interface Details {
+  timestamp: number
+  signatures: string[]
+}
