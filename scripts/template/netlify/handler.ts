@@ -11,7 +11,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
 // import from here
 export const handler: Handler = async (event) => {
   try {
-    const url: URL = new URL(event.rawUrl)
+    const url: URL = new URL(`${event.rawUrl}?${event.rawQuery}`)
+    console.log('url', url)
     const headers: BaseHeaders = { ...event.headers }
     const method: string = event.httpMethod
     const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : Object.fromEntries(url.searchParams.entries())

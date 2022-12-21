@@ -68,6 +68,8 @@ serve(async (event: Request) => {
     else if (service === 'device_get') {
       const supabaseRes = await getDevice(baseSupabase)
       const netlifyRes = await getDevice(baseNetlify)
+      // console.log('supabaseRes', supabaseRes)
+      // console.log('netlifyRes', netlifyRes)
       if (!equal(supabaseRes, netlifyRes))
         return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     }
