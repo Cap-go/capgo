@@ -44,7 +44,9 @@ serve(async (event: Request) => {
       avatar: record.image_url ? record.image_url : undefined,
       country: record.country ? record.country : undefined,
     }
-    await updatePerson(record.email, person)
+    await updatePerson(record.email, person).catch((e) => {
+      console.log('updatePerson error', e)
+    })
     if (!record.customer_id) {
       const customer = await createCustomer(record.email)
       await supabaseAdmin()
@@ -61,6 +63,8 @@ serve(async (event: Request) => {
       await updatePerson(record.email, {
         customer_id: customer.id,
         product_id: 'free',
+      }).catch((e) => {
+        console.log('updatePerson error', e)
       })
     }
     await checkPlan(record.id)
