@@ -19,7 +19,7 @@ const baseSupaTests = `${baseSupa}/${baseFunctions}/${baseTests}`
 const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates']
-const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'notifications']
+const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'notifications', 'stripe']
 
 const supaTempl = {}
 const netlifyTempl = {}
@@ -53,6 +53,12 @@ netlifyTemplFiles.forEach((file) => {
 // console.log('supaTempl', supaTempl)
 // console.log('netlifyTempl', netlifyTempl)
 // escape url for regex
+export const encodeBase64 = (data) => {
+  return Buffer.from(data).toString('base64')
+}
+export const decodeBase64 = (data) => {
+  return Buffer.from(data, 'base64').toString('ascii')
+}
 const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const mutations = [
   { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
@@ -65,6 +71,7 @@ const mutations = [
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
   { from: 'import { serve } from \'https://deno.land/std@0.167.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
+  { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
   { from: supaTempl.handler, to: netlifyTempl.handler },
   { from: supaTempl.getEnv, to: netlifyTempl.getEnv },
   { from: supaTempl.res, to: netlifyTempl.res },
