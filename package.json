@@ -66,7 +66,7 @@
     "@ionic/vue": "6.3.9",
     "@ionic/vue-router": "6.3.9",
     "@netlify/functions": "^1.3.0",
-    "@supabase/supabase-js": "2.1.2",
+    "@supabase/supabase-js": "2.1.3",
     "@tailwindcss/forms": "^0.5.3",
     "@vuelidate/core": "2.0.0",
     "@vuelidate/validators": "2.0.0",
