@@ -82,7 +82,7 @@
     "cron-schedule": "^3.0.6",
     "crypto-random-string": "^5.0.0",
     "dayjs": "1.11.6",
-    "firebase": "9.14.0",
+    "firebase": "9.15.0",
     "generate-password-browser": "^1.1.0",
     "json2csv": "^5.0.7",
     "lauqe": "^1.5.0",
