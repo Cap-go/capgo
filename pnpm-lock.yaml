@@ -42,7 +42,7 @@ specifiers:
   '@capgo/capacitor-updater': 4.14.1
   '@capgo/native-audio': ^5.0.1
   '@capgo/native-market': ^1.1.6
-  '@iconify-json/carbon': 1.1.11
+  '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': ^1.1.6
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.3
@@ -195,7 +195,7 @@ devDependencies:
   '@antfu/eslint-config': 0.33.1_ha6vam6werchizxrnqvarmz2zu
   '@capacitor/cli': 4.5.0
   '@capacitor/core': 4.6.0
-  '@iconify-json/carbon': 1.1.11
+  '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': 1.1.6
   '@iconify-json/ion': 1.1.4
   '@iconify-json/ls': 1.1.3
@@ -2601,8 +2601,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dev: false
 
-  /@iconify-json/carbon/1.1.11:
-    resolution: {integrity: sha512-IHkHSNmTM6q6b8DuKSzd+AEMYPZywSxcb+37kZU7ywtcwsGen3aVEvWFykopIWjjwj3xdZ/5UdwJRqhZDQMlNg==}
+  /@iconify-json/carbon/1.1.12:
+    resolution: {integrity: sha512-P2T+Ob/ylTDYALcYWI5cTmfDFdwQJno2KN5yZnJYn9UaccSk687axROtHJrvfll/UncZlzP2s4rIRJUWoJ51mA==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
@@ -2658,8 +2658,8 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/message-compiler': 9.3.0-beta.11
-      '@intlify/shared': 9.3.0-beta.11
+      '@intlify/message-compiler': 9.3.0-beta.12
+      '@intlify/shared': 9.3.0-beta.12
       jsonc-eslint-parser: 1.4.1
       source-map: 0.6.1
       vue-i18n: 9.2.2_vue@3.2.45
@@ -2688,8 +2688,8 @@ packages:
       '@intlify/shared': 9.2.2
       source-map: 0.6.1
 
-  /@intlify/message-compiler/9.3.0-beta.11:
-    resolution: {integrity: sha512-gGGfBGzM7JBXp1Q9gbDAy5jELz9ho3ILqnpxp2yp64+gkqohrqc2YXIvCdwZoc6AtKIh/Zmv4sWVqxkvMsBWtQ==}
+  /@intlify/message-compiler/9.3.0-beta.12:
+    resolution: {integrity: sha512-A8/s7pb3v8nf6HG77qFPJntxgQKI9GXxGnkn7aO+b03/X/GkF/4WceDSAIk3i+yLeIgszeBn9GZ23tSg4sTEHA==}
     engines: {node: '>= 14'}
     dependencies:
       '@intlify/shared': 9.3.0-beta.11
@@ -2702,6 +2702,11 @@ packages:
 
   /@intlify/shared/9.3.0-beta.11:
     resolution: {integrity: sha512-CtbotesxTRiC3bRyXyv1NG39fkqJ790f8z8xFaeIXSZpOdiyxoh5BIyypCzSFQZDGLwz0Q9gyWbW1XpxQJm68Q==}
+    engines: {node: '>= 14'}
+    dev: true
+
+  /@intlify/shared/9.3.0-beta.12:
+    resolution: {integrity: sha512-WsmaS54sA8xuwezPKpa/OMoaX1v2VF2fCgAmYS6prDr2ir0CkUFWPm9A8ilmxzv4nkS61/v8+vf4lGGkn5uBdA==}
     engines: {node: '>= 14'}
     dev: true
 
@@ -2721,7 +2726,7 @@ packages:
         optional: true
     dependencies:
       '@intlify/bundle-utils': 3.4.0_vue-i18n@9.2.2
-      '@intlify/shared': 9.3.0-beta.11
+      '@intlify/shared': 9.3.0-beta.12
       '@rollup/pluginutils': 4.2.1
       debug: 4.3.4
       fast-glob: 3.2.12
