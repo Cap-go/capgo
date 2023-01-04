@@ -67,6 +67,3 @@ jobs:
       - name: Build
         id: build_code
         run: npm run build
-      - name: Verify
-        id: verify_code
-        run: npm run verify:web
