@@ -242,6 +242,7 @@ package:
   stats: stats
   test: Launch bundle
   title: info
+  unset: Unlink channel from bundle
   version:
     is-used-in-device: is used in a device override, unlink it first
   version-deleted: Bundle deleted

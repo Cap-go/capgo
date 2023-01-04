@@ -251,6 +251,7 @@ package:
   stats: số liệu thống kê
   test: Phiên bản khởi chạy
   title: thông tin
+  unset: Hủy liên kết kênh khỏi gói
   version:
     is-used-in-device: >-
       được sử dụng trong ghi đè thiết bị, trước tiên hãy hủy liên kết thiết bị

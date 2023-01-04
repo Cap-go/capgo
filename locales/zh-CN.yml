@@ -241,6 +241,7 @@ package:
   stats: 统计数据
   test: 发布版本
   title: 信息
+  unset: 取消频道与捆绑包的链接
   version:
     is-used-in-device: 在设备覆盖中使用，请先取消链接
   version-deleted: 版本已删除

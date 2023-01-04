@@ -241,6 +241,7 @@ package:
   stats: 통계
   test: 출시 버전
   title: 정보
+  unset: 번들에서 채널 연결 해제
   version:
     is-used-in-device: 장치 재정의에 사용되는 경우 먼저 연결을 해제하십시오.
   version-deleted: 버전이 삭제됨

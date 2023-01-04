@@ -257,6 +257,7 @@ package:
   stats: Statistiken
   test: Bündel starten
   title: die Info
+  unset: Verknüpfung des Kanals mit dem Bundle aufheben
   version:
     is-used-in-device: >-
       in einer Geräteüberschreibung verwendet wird, heben Sie zuerst die

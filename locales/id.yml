@@ -253,6 +253,7 @@ package:
   stats: statistik
   test: Luncurkan versi
   title: informasi
+  unset: Batalkan tautan saluran dari bundel
   version:
     is-used-in-device: digunakan dalam penggantian perangkat, batalkan tautannya terlebih dahulu
   version-deleted: Versi dihapus

@@ -252,6 +252,7 @@ package:
   stats: statistiche
   test: Versione di lancio
   title: Informazioni
+  unset: Scollega il canale dal gruppo
   version:
     is-used-in-device: viene utilizzato in una sostituzione del dispositivo, scollegarlo prima
   version-deleted: Versione eliminata

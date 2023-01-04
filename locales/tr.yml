@@ -249,6 +249,7 @@ package:
   stats: istatistikler
   test: Paketi başlat
   title: bilgi
+  unset: Kanalın paketle bağlantısını kaldır
   version:
     is-used-in-device: >-
       bir cihaz geçersiz kılma işleminde kullanılıyorsa önce bağlantısını

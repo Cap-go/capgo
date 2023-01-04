@@ -255,6 +255,7 @@ package:
   stats: Statistiques
   test: Version de lancement
   title: Info
+  unset: Dissocier la chaîne du groupe
   version:
     is-used-in-device: est utilisé dans un remplacement de périphérique, dissociez-le d'abord
   version-deleted: Version supprimée

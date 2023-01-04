@@ -241,6 +241,7 @@ package:
   stats: 統計
   test: 起動バージョン
   title: 情報
+  unset: バンドルからチャンネルのリンクを解除
   version:
     is-used-in-device: デバイスオーバーライドで使用されている場合は、最初にリンクを解除してください
   version-deleted: バージョンが削除されました

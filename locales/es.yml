@@ -257,6 +257,7 @@ package:
   stats: estadísticas
   test: Versión de lanzamiento
   title: información
+  unset: Desvincular canal del paquete
   version:
     is-used-in-device: se usa en una anulación de dispositivo, desvincúlelo primero
   version-deleted: Versión eliminada

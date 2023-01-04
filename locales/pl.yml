@@ -249,6 +249,7 @@ package:
   stats: statystyki
   test: Uruchom wersję
   title: informacje
+  unset: Odłącz kanał od pakietu
   version:
     is-used-in-device: jest używany w nadpisaniu urządzenia, najpierw odłącz je
   version-deleted: Wersja usunięta
