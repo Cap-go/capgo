@@ -21,7 +21,11 @@
   "deno.unstable": true,
   "deno.enablePaths": [
     "./supabase/functions",
-    "./scripts/template/supabase"
+    "./netlify/edge-functions",
+    "./netlify/edge-functions_utils",
+    "./netlify/edge-functions_tests",
+    "./scripts/template/supabase",
+    "./scripts/template/netlify-edge"
   ],
   "nuxt.isNuxtApp": false,
   "java.configuration.updateBuildConfiguration": "disabled"

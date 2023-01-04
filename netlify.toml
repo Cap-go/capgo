@@ -12,6 +12,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api-edge/auto_update"
+  to = "/.netlify/functions/updates"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
@@ -30,3 +35,5 @@
   for = "/manifest.webmanifest"
   [headers.values]
     Content-Type = "application/manifest+json"
+
+# auto egde generate
