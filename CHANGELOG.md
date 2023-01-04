@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.80.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.80.0) (2023-01-04)
+
+
+### Features
+
+* add email for update fail and semver issue ([6eddffe](https://github.com/Cap-go/capgo/commit/6eddffe1b7fe4c3f96588ca179bfee26b5175a0a))
+* add netlify edge provider ([aabca90](https://github.com/Cap-go/capgo/commit/aabca90aa13f87649402350a7e9775ec59623adc))
+* add unlink channel ([245f5a6](https://github.com/Cap-go/capgo/commit/245f5a65fd79cffd8ef891a001f4948be9a1af00))
+
+
+### Bug Fixes
+
+* add missing endpoint website_stats ([8b326ea](https://github.com/Cap-go/capgo/commit/8b326eacddb37516997a37bc3e7591fbdd308ee9))
+* api test endpoint ([05e4688](https://github.com/Cap-go/capgo/commit/05e468847fd0775d57fb8317abaede881a7d53af))
+* back old workflow ([a5f1ee9](https://github.com/Cap-go/capgo/commit/a5f1ee98df040e32f5856574948b1c661ee6c9be))
+* body parsing ([613f26b](https://github.com/Cap-go/capgo/commit/613f26bb8971f55fb7e8f16db201efe50bdfc701))
+* change updatedAt for device and bundle ([4596336](https://github.com/Cap-go/capgo/commit/45963365ad3315d3606fb4a837a1eaf682b9f7cb))
+* consistency ([bc8e9bf](https://github.com/Cap-go/capgo/commit/bc8e9bfaea41ab34a390005cec48e5c40e5dfc0c))
+* consistency and ok function ([310d1bb](https://github.com/Cap-go/capgo/commit/310d1bb2ee66daab1fae2cff79f9346521506827))
+* issue created at ([03d5c1b](https://github.com/Cap-go/capgo/commit/03d5c1b4a4c6eb25e7844f484ef25d548e55b587))
+* issue test data ([9f0c4ca](https://github.com/Cap-go/capgo/commit/9f0c4ca4905d3ade71f2db51ab33588c41f64d4d))
+* last issue with consistency ([94341df](https://github.com/Cap-go/capgo/commit/94341dfcc41d81eadb8b815e49eda7dbef9fc6e5))
+* min lenght name ([b58cc32](https://github.com/Cap-go/capgo/commit/b58cc32dfe0d8b41942d1523f90d041067e41197))
+* missing plan function ([6d2c4e5](https://github.com/Cap-go/capgo/commit/6d2c4e57cf6de296cd1fa741e7d29198f69841b1))
+* netlify deploy ([0bae264](https://github.com/Cap-go/capgo/commit/0bae264c5f9795b0fb1071807127f9101b2ece7e))
+* netlify double deploy [skip netlify] ([80cb54b](https://github.com/Cap-go/capgo/commit/80cb54b01d9568b1515d9108dd5bfbc8e3f4489d))
+* send query ([d2fa17f](https://github.com/Cap-go/capgo/commit/d2fa17fd8686af8698afee332988791d54968c88))
+* services unknow ([75d3e6f](https://github.com/Cap-go/capgo/commit/75d3e6f066edb4b7be446345ce91dde535754ba0))
+* stripe deprecated btoa netlify ([685cda9](https://github.com/Cap-go/capgo/commit/685cda929f4bc6fa0a9fded19f22676fb7f9f55f))
+* tags ([c2809f2](https://github.com/Cap-go/capgo/commit/c2809f2997b3fe2029a85443050eee8f38996a17))
+* udd add missing script file ([22ae463](https://github.com/Cap-go/capgo/commit/22ae463830503abe6c575bfc942928b9ac343de1))
+* update check endpoint ([274cf36](https://github.com/Cap-go/capgo/commit/274cf365166bd445f8c2930997919125a2721134))
+* update deps ([0ccd52a](https://github.com/Cap-go/capgo/commit/0ccd52aabf8d4b3ea92559e7fec657b61e5383f6))
+* upgrade deno version ([003b7d3](https://github.com/Cap-go/capgo/commit/003b7d35b67be6ca96605a191f6d6bd5fa1afb6b))
+* use latest node ([d48e75f](https://github.com/Cap-go/capgo/commit/d48e75fbf5f83cd6487d742c29b3727e8ce2da93))
+
 ## [1.79.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.79.0) (2023-01-04)
 
 
