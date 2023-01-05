@@ -447,10 +447,14 @@ export const createApiKey = async (userId: string) => {
 
 export const createStripeCustomer = async (userId: string, email: string) => {
   const customer = await createCustomer(email)
+  // create date + 15 days
+  const trial_at = new Date()
+  trial_at.setDate(trial_at.getDate() + 15)
   const { error: createInfoError } = await supabaseAdmin()
     .from('stripe_info')
     .insert({
       customer_id: customer.id,
+      trial_at: trial_at.toISOString(),
     })
   if (createInfoError)
     console.log('createInfoError', createInfoError)
