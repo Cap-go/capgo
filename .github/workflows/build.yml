@@ -145,6 +145,7 @@ jobs:
           with:
             ruby-version: '3.0'
             bundler-cache: true
+            working-directory: 'ios'
         - uses: maierj/fastlane-action@v3.0.0
           env:
             DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
@@ -165,6 +166,7 @@ jobs:
             DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
           with:
             lane: closed_beta
+            subdirectory: 'ios'
         - name: Upload release bundle
           uses: actions/upload-artifact@v3
           with:
