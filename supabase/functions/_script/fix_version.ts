@@ -46,7 +46,7 @@ const main = async () => {
     .update({
       size: 0,
     })
-    .in('app_version_id', app_versions.map(v => v.id))
+    .in('app_version_id', app_versions.map((v: any) => v.id))
 }
 
 main()
