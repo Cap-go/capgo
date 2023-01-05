@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.170.0/http/server.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
-import { createAppStat, supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
+import { createAppStat, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import type { Database } from './../_utils/supabase.types.ts'
 
@@ -28,7 +28,6 @@ serve(async (event: Request) => {
     console.log('record', record)
     // explore all apps
     const month_id = new Date().toISOString().slice(0, 7)
-    const today_id = new Date().toISOString().slice(0, 10)
     if (record.date_id === month_id) {
       console.log('Already updated')
       return sendRes({ message: 'Already updated' }, 200)
@@ -45,28 +44,11 @@ serve(async (event: Request) => {
       return sendRes({ message: 'Already created' }, 200)
     }
     const newData = await createAppStat(record.user_id, record.app_id, month_id)
-    if (new Date().getDate() === 1) {
-      const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
-        ...newData,
-        date_id: today_id,
-        bandwidth: 0,
-        mlu: 0,
-        mlu_real: 0,
-        devices: 0,
-        devices_real: 0,
-        channels: 0,
-        shared: 0,
-        versions: 0,
-      }
-      await updateOrAppStats(increment, today_id, record.user_id)
-    }
-    else {
-      const { error } = await supabaseAdmin()
-        .from('app_stats')
-        .upsert(newData)
-      if (error)
-        console.error('error.message', error.message)
-    }
+    const { error } = await supabaseAdmin()
+      .from('app_stats')
+      .upsert(newData)
+    if (error)
+      console.error('error.message', error.message)
     return sendRes()
   }
   catch (e) {
