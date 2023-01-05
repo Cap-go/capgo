@@ -50,14 +50,16 @@ platform :ios do
       in_house: false
     )
 
-    match(
-      type: 'appstore',
-      git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
-      readonly: true,
-      keychain_name: TEMP_KEYCHAIN_USER,
-      keychain_password: TEMP_KEYCHAIN_PASSWORD,
-      api_key: api_key
-    )
+    # match(
+    #   type: 'appstore',
+    #   git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
+    #   readonly: true,
+    #   keychain_name: TEMP_KEYCHAIN_USER,
+    #   keychain_password: TEMP_KEYCHAIN_PASSWORD,
+    #   api_key: api_key
+    # )
+    get_certificates           # invokes cert
+    get_provisioning_profile   # invokes sigh
 
     gym(
       configuration: "Release",
