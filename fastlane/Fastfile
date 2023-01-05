@@ -61,7 +61,7 @@ platform :ios do
     get_certificates           # invokes cert
     get_provisioning_profile   # invokes sigh
 
-    gym(
+    build_app(
       configuration: "Release",
       workspace: "./ios/App/App.xcworkspace",
       scheme: "App",
@@ -70,7 +70,9 @@ platform :ios do
         provisioningProfiles: { 
             DEVELOPER_APP_ID => "#{PROVISIONING_PROFILE_SPECIFIER}"
         }
-      }
+      },
+      xcargs: "-allowProvisioningUpdates"
+      # xcargs: "-allowProvisioningUpdates -authenticationKeyIssuerID xxx -authenticationKeyID xxx -authenticationKeyPath #{File.expand_path('path_to_key')}"
     )
 
     pilot(
