@@ -447,17 +447,22 @@ export const createApiKey = async (userId: string) => {
 
 export const createStripeCustomer = async (userId: string, email: string) => {
   const customer = await createCustomer(email)
-  await supabaseAdmin()
+  const { error: createInfoError } = await supabaseAdmin()
     .from('stripe_info')
     .insert({
       customer_id: customer.id,
     })
-  await supabaseAdmin()
+  if (createInfoError)
+    console.log('createInfoError', createInfoError)
+
+  const { error: updateUserError } = await supabaseAdmin()
     .from('users')
     .update({
       customer_id: customer.id,
     })
     .eq('id', userId)
+  if (updateUserError)
+    console.log('updateUserError', updateUserError)
   await updatePerson(email, {
     id: userId,
     customer_id: customer.id,

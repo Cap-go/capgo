@@ -217,9 +217,11 @@ serve(async (event: Request) => {
       ...details,
     }
     // console.log('newData', newData)
-    await supabaseAdmin()
+    const { error } = await supabaseAdmin()
       .from('global_stats')
       .upsert(newData)
+    if (error)
+      console.error('global_stats error', error)
     return sendRes()
   }
   catch (e) {
