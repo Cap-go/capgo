@@ -58,7 +58,10 @@ platform :ios do
     #   keychain_password: TEMP_KEYCHAIN_PASSWORD,
     #   api_key: api_key
     # )
-    get_certificates           # invokes cert
+    get_certificates(
+            readonly:		    true,
+            fail_on_name_taken:   true,
+    )        # invokes cert
     get_provisioning_profile   # invokes sigh
 
     build_app(
