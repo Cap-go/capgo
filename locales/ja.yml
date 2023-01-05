@@ -44,7 +44,7 @@ activation:
   notification: 通知
   notification-desc: 新しいアプリのバージョンが利用可能になったときに通知を受け取ることに同意します
   validate: 検証
-add-another-app: 別のアプリを追加
+add-another-app: アプリを追加する
 add-this-code-to-you: このコードをプロジェクトに追加します
 add-your-app-to-your: アプリをアカウントに追加する
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
@@ -71,7 +71,8 @@ app-id-example: アプリ ID の例
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
 bigger-app-size: アプリのサイズが大きい
-build-your-code-and-: コードをビルドする
+build-your-app-and-s: アプリをビルドして同期する
+build-your-code-and-: コードを Capgo にアップロードする
 bulk-upload: 一括アップロード
 bundle-number: バンドル番号
 button:
@@ -173,7 +174,9 @@ from-device: デバイスから
 good: 良い
 id: ID
 in-your-main-file: メインファイルで
+in-your-project-fold: プロジェクト フォルダー内
 informations: インフォメーション
+install-the-capacito: Capacitor プラグインをインストールする
 into-your-app-folder: アプリ フォルダーに移動します。
 intro:
   aka: としても知られている
@@ -224,6 +227,7 @@ onboarding:
   loading: 読み込み中
 one-day-left: 残り一日
 open-sidebar: サイドバーを開く
+open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
 package:
   cannot-delete-version: バージョンを削除できません
   channels: チャネル
@@ -339,6 +343,7 @@ stats:
   versions: バージョン
 submit: 送信
 terms-of-use: 利用規約
+test-your-update-in-: アプリで更新をテストする
 tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 the: の

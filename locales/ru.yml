@@ -46,7 +46,7 @@ activation:
   notification: Уведомления
   notification-desc: Я согласен получать уведомления о появлении новой версии приложения
   validate: Подтвердить
-add-another-app: Добавить другое приложение
+add-another-app: Добавьте свое приложение
 add-this-code-to-you: Добавьте этот код в свой проект
 add-your-app-to-your: Добавьте свое приложение в свой аккаунт
 add-your-first-app-t: >-
@@ -77,7 +77,8 @@ app-id-example: Пример идентификатора приложения
 available-in-the-san: Доступно в приложении песочницы
 back-to-login-page: Назад на страницу входа
 bigger-app-size: Большой размер приложения
-build-your-code-and-: Создайте свой код
+build-your-app-and-s: создайте свое приложение и синхронизируйте
+build-your-code-and-: Загрузите в Capgo свой код
 bulk-upload: Массовая загрузка
 bundle-number: Номер пакета
 button:
@@ -181,7 +182,9 @@ from-device: с устройства
 good: Хороший
 id: я бы
 in-your-main-file: В вашем основном файле
+in-your-project-fold: В папке вашего проекта
 informations: Информация
+install-the-capacito: Установите плагин конденсатора
 into-your-app-folder: В папку вашего приложения.
 intro:
   aka: Также известен как
@@ -234,6 +237,7 @@ onboarding:
   loading: Загрузка
 one-day-left: В один прекрасный день покинул
 open-sidebar: Открыть боковую панель
+open-this-link-to-le: Откройте эту ссылку, чтобы узнать, как протестировать обновление
 package:
   cannot-delete-version: Не могу удалить версию
   channels: каналы
@@ -349,6 +353,7 @@ stats:
   versions: Версии
 submit: Представлять на рассмотрение
 terms-of-use: Условия эксплуатации
+test-your-update-in-: Протестируйте обновление в своем приложении
 tests: тесты
 thank-you-for-choosi: Спасибо, что выбрали Капго!
 the: ''

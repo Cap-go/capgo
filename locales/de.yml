@@ -48,7 +48,7 @@ activation:
     Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
     verfügbar sind
   validate: Bestätigen
-add-another-app: Fügen Sie eine weitere App hinzu
+add-another-app: Fügen Sie Ihre Anwendung hinzu
 add-this-code-to-you: Fügen Sie diesen Code Ihrem Projekt hinzu
 add-your-app-to-your: Fügen Sie Ihre App zu Ihrem Konto hinzu
 add-your-first-app-t: >-
@@ -79,7 +79,8 @@ app-id-example: App-ID-Beispiel
 available-in-the-san: Verfügbar in der Sandbox-App
 back-to-login-page: Zurück zur Anmeldeseite
 bigger-app-size: Größere App-Größe
-build-your-code-and-: Erstellen Sie Ihren Code
+build-your-app-and-s: Erstellen Sie Ihre App und synchronisieren Sie sie
+build-your-code-and-: Laden Sie Ihren Code auf Capgo hoch
 bulk-upload: Bulk-Upload
 bundle-number: Bündelnummer
 button:
@@ -187,7 +188,9 @@ from-device: vom Gerät
 good: Gut
 id: Ich würde
 in-your-main-file: In Ihrer Hauptdatei
+in-your-project-fold: In Ihrem Projektordner
 informations: Informationen
+install-the-capacito: Installieren Sie das Kondensator-Plugin
 into-your-app-folder: In Ihren App-Ordner.
 intro:
   aka: Auch bekannt als
@@ -240,6 +243,7 @@ onboarding:
   loading: Wird geladen
 one-day-left: Ein Tag übrig
 open-sidebar: Seitenleiste öffnen
+open-this-link-to-le: Öffnen Sie diesen Link, um zu erfahren, wie Sie Ihr Update testen können
 package:
   cannot-delete-version: Paket kann nicht gelöscht werden
   channels: Kanäle
@@ -361,6 +365,7 @@ stats:
   versions: Versionen
 submit: Einreichen
 terms-of-use: Nutzungsbedingungen
+test-your-update-in-: Testen Sie Ihr Update in Ihrer App
 tests: Prüfungen
 thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
 the: Das

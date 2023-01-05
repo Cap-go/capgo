@@ -44,7 +44,7 @@ activation:
   notification: Bildirimler
   notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
   validate: Doğrula
-add-another-app: başka bir uygulama ekle
+add-another-app: uygulamanızı ekleyin
 add-this-code-to-you: Bu kodu projenize ekleyin
 add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
@@ -73,7 +73,8 @@ app-id-example: Uygulama kimliği örneği
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
 bigger-app-size: Daha büyük uygulama boyutu
-build-your-code-and-: Kodunuzu oluşturun
+build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
+build-your-code-and-: Kodunuzu Capgo'ya yükleyin
 bulk-upload: toplu yükleme
 bundle-number: paket numarası
 button:
@@ -179,7 +180,9 @@ from-device: cihazdan
 good: İyi
 id: İD
 in-your-main-file: ana dosyanızda
+in-your-project-fold: proje klasörünüzde
 informations: bilgiler
+install-the-capacito: Kapasitör eklentisini kurun
 into-your-app-folder: Uygulama klasörünüze.
 intro:
   aka: Ayrıca şöyle bilinir
@@ -232,6 +235,7 @@ onboarding:
   loading: Yükleniyor
 one-day-left: Bir gün kaldı
 open-sidebar: Kenar çubuğunu aç
+open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
 package:
   cannot-delete-version: Paket silinemiyor
   channels: Kanallar
@@ -353,6 +357,7 @@ stats:
   versions: Versiyonlar
 submit: Göndermek
 terms-of-use: Kullanım Şartları
+test-your-update-in-: Güncellemenizi uygulamanızda test edin
 tests: testler
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu

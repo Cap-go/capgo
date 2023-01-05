@@ -44,7 +44,7 @@ activation:
   notification: 通知
   notification-desc: 我接受在有新应用版本可用时接收通知
   validate: 证实
-add-another-app: 添加其他应用
+add-another-app: 添加您的应用
 add-this-code-to-you: 将此代码添加到您的项目中
 add-your-app-to-your: 将您的应用添加到您的帐户
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
@@ -71,7 +71,8 @@ app-id-example: 应用 ID 示例
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
 bigger-app-size: 更大的应用程序大小
-build-your-code-and-: 构建你的代码
+build-your-app-and-s: 构建您的应用程序并同步
+build-your-code-and-: 将您的代码上传到 Capgo
 bulk-upload: 批量上传
 bundle-number: 捆绑号
 button:
@@ -173,7 +174,9 @@ from-device: 从设备
 good: 好的
 id: ID
 in-your-main-file: 在你的主文件中
+in-your-project-fold: 在您的项目文件夹中
 informations: 资讯
+install-the-capacito: 安装电容器插件
 into-your-app-folder: 进入您的应用程序文件夹。
 intro:
   aka: 也叫
@@ -224,6 +227,7 @@ onboarding:
   loading: 正在加载
 one-day-left: 还剩一天
 open-sidebar: 打开侧边栏
+open-this-link-to-le: 打开此链接以了解如何测试您的更新
 package:
   cannot-delete-version: 无法删除版本
   channels: 频道
@@ -339,6 +343,7 @@ stats:
   versions: 版本
 submit: 提交
 terms-of-use: 使用条款
+test-your-update-in-: 在您的应用程序中测试您的更新
 tests: 测试
 thank-you-for-choosi: 感谢您选择 Capgo！
 the: 这

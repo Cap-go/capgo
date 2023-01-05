@@ -50,7 +50,7 @@ activation:
     Acepto recibir notificaciones cuando haya una nueva versión de la aplicación
     disponible
   validate: Validar
-add-another-app: Agregar otra aplicación
+add-another-app: Agrega tu aplicación
 add-this-code-to-you: Agrega este código a tu proyecto
 add-your-app-to-your: Agrega tu aplicación a tu cuenta
 add-your-first-app-t: ¡Agregue su primera aplicación a su cuenta y empujemos las actualizaciones!
@@ -79,7 +79,8 @@ app-id-example: Ejemplo de ID de aplicación
 available-in-the-san: Disponible en la aplicación sandbox
 back-to-login-page: Volver a la página de inicio de sesión
 bigger-app-size: Tamaño de aplicación más grande
-build-your-code-and-: Crea tu código
+build-your-app-and-s: crea tu aplicación y sincroniza
+build-your-code-and-: Sube a Capgo tu código
 bulk-upload: Carga masiva
 bundle-number: Número de paquete
 button:
@@ -187,7 +188,9 @@ from-device: desde el dispositivo
 good: Bueno
 id: identificación
 in-your-main-file: En su archivo principal
+in-your-project-fold: En la carpeta de tu proyecto
 informations: Informaciones
+install-the-capacito: Instale el complemento Capacitor
 into-your-app-folder: En la carpeta de tu aplicación.
 intro:
   aka: También conocido como
@@ -240,6 +243,7 @@ onboarding:
   loading: Cargando
 one-day-left: Queda un día
 open-sidebar: Abrir barra lateral
+open-this-link-to-le: Abre este enlace para saber cómo probar tu actualización
 package:
   cannot-delete-version: No se puede eliminar la versión
   channels: Canales
@@ -359,6 +363,7 @@ stats:
   versions: Versiones
 submit: Enviar
 terms-of-use: Términos de Uso
+test-your-update-in-: Prueba tu actualización en tu aplicación
 tests: pruebas
 thank-you-for-choosi: ¡Gracias por elegir Capgo!
 the: los

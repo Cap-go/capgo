@@ -44,7 +44,7 @@ activation:
   notification: 알림
   notification-desc: 새 앱 버전을 사용할 수 있을 때 알림 수신에 동의합니다.
   validate: 확인
-add-another-app: 다른 앱 추가
+add-another-app: 앱 추가
 add-this-code-to-you: 이 코드를 프로젝트에 추가
 add-your-app-to-your: 계정에 앱 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
@@ -71,7 +71,8 @@ app-id-example: 앱 ID 예시
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
 bigger-app-size: 더 큰 앱 크기
-build-your-code-and-: 코드 작성
+build-your-app-and-s: 앱 빌드 및 동기화
+build-your-code-and-: Capgo에 코드 업로드
 bulk-upload: 일괄 업로드
 bundle-number: 번들 번호
 button:
@@ -173,7 +174,9 @@ from-device: 장치에서
 good: 좋은
 id: ID
 in-your-main-file: 기본 파일에서
+in-your-project-fold: 프로젝트 폴더에서
 informations: 정보
+install-the-capacito: Capacitor 플러그인 설치
 into-your-app-folder: 앱 폴더로.
 intro:
   aka: 또한 ~으로 알려진
@@ -224,6 +227,7 @@ onboarding:
   loading: 로딩 중
 one-day-left: 하루 남았다
 open-sidebar: 사이드바 열기
+open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.
 package:
   cannot-delete-version: 버전을 삭제할 수 없습니다
   channels: 채널
@@ -339,6 +343,7 @@ stats:
   versions: 버전
 submit: 제출하다
 terms-of-use: 이용약관
+test-your-update-in-: 앱에서 업데이트 테스트
 tests: 테스트
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
