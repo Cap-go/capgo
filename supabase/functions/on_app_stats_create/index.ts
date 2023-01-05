@@ -61,9 +61,11 @@ serve(async (event: Request) => {
       await updateOrAppStats(increment, today_id, record.user_id)
     }
     else {
-      await supabaseAdmin()
+      const { error } = await supabaseAdmin()
         .from('app_stats')
         .upsert(newData)
+      if (error)
+        console.error('error.message', error.message)
     }
     return sendRes()
   }

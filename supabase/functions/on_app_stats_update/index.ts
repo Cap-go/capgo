@@ -39,9 +39,11 @@ serve(async (event: Request) => {
     const newData = await createAppStat(record.user_id, record.app_id, month_id)
 
     // console.log('newData', newData)
-    await supabaseAdmin()
+    const { error } = await supabaseAdmin()
       .from('app_stats')
       .upsert(newData)
+    if (error)
+      console.log('error', error)
     return sendRes()
   }
   catch (e) {

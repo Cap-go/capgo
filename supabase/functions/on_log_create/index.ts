@@ -84,12 +84,14 @@ serve(async (event: Request) => {
       // compare date with today
         increment.devices = 1
         changed = true
-        await supabaseAdmin()
+        const { error } = await supabaseAdmin()
           .from('devices')
           .update({
             date_id: month_id,
           })
           .eq('device_id', record.device_id)
+        if (error)
+          console.log('Error update device', error)
       }
     }
     if (changed) {

@@ -65,10 +65,13 @@ serve(async (event: Request) => {
     }
     await updateOrAppStats(increment, today_id, record.user_id)
     // set app_versions_meta versionSize = 0
-    await supabaseAdmin()
+    const { error: errorUpdate } = await supabaseAdmin()
       .from('app_versions_meta')
       .update({ size: 0 })
       .eq('id', record.id)
+    if (errorUpdate)
+      console.log('error', errorUpdate)
+
     return sendRes()
   }
   catch (e) {

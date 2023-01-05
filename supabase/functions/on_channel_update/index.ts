@@ -28,12 +28,14 @@ serve(async (event: Request) => {
 
     if (record.public) {
       // find all other channels with same app_i with public true and update them to false
-      await supabaseAdmin()
+      const { error } = await supabaseAdmin()
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
         .eq('public', true)
         .neq('id', record.id)
+      if (error)
+        console.log('error', error)
     }
     return sendRes()
   }

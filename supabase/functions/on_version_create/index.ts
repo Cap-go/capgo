@@ -27,13 +27,15 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
-    await supabaseAdmin()
+    const { error: errorUpdate } = await supabaseAdmin()
       .from('apps')
       .update({
         last_version: record.name,
       })
       .eq('app_id', record.app_id)
       .eq('user_id', record.user_id)
+    if (errorUpdate)
+      console.log('errorUpdate', errorUpdate)
 
     if (!record.bucket_id) {
       console.log('No bucket_id')
