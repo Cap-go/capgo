@@ -21,12 +21,16 @@ const props = defineProps({
   big: { type: Boolean, default: false },
   plusIcon: { type: String, default: '' },
   search: { type: Boolean, default: false },
+  searchIcon: { type: String, default: '' },
 })
-const emit = defineEmits(['searchInput', 'plusClick'])
+const emit = defineEmits(['searchInput', 'plusClick', 'searchButtonClick'])
 const router = useRouter()
 const { t } = useI18n()
 const onSearch = (val: string | undefined) => {
   emit('searchInput', val)
+}
+const onSearchButtonClick = (val: string | undefined) => {
+  emit('searchButtonClick', null)
 }
 const back = () => {
   if (window.history.length > 2)
@@ -56,6 +60,11 @@ const back = () => {
     </IonToolbar>
     <IonToolbar v-if="search">
       <IonSearchbar @ion-change="onSearch($event.detail.value)" />
+      <IonButtons v-if="searchIcon" slot="end">
+        <IonButton @click="onSearchButtonClick">
+          <IonIcon :icon="searchIcon" />
+        </IonButton>
+      </IonButtons>
     </IonToolbar>
     <Banner />
   </IonHeader>

@@ -342,6 +342,8 @@ stats:
   title: 통계
   versions: 버전
 submit: 제출하다
+switch-to-all-device: 모든 기기로 전환
+switch-to-only-devic: 연결된 기기로만 전환
 terms-of-use: 이용약관
 test-your-update-in-: 앱에서 업데이트 테스트
 tests: 테스트

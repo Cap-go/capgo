@@ -342,6 +342,8 @@ stats:
   title: 統計
   versions: バージョン
 submit: 送信
+switch-to-all-device: すべてのデバイスに切り替える
+switch-to-only-devic: リンクされているデバイスのみに切り替える
 terms-of-use: 利用規約
 test-your-update-in-: アプリで更新をテストする
 tests: テスト

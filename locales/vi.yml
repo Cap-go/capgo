@@ -354,6 +354,8 @@ stats:
   title: Số liệu thống kê
   versions: Phiên bản
 submit: Nộp
+switch-to-all-device: Chuyển sang tất cả các thiết bị
+switch-to-only-devic: Chuyển sang thiết bị duy nhất được liên kết
 terms-of-use: Điều khoản sử dụng
 test-your-update-in-: Kiểm tra bản cập nhật của bạn trong ứng dụng của bạn
 tests: kiểm tra

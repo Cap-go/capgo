@@ -342,6 +342,8 @@ stats:
   title: 统计数据
   versions: 版本
 submit: 提交
+switch-to-all-device: 切换到所有设备
+switch-to-only-devic: 切换到仅链接的设备
 terms-of-use: 使用条款
 test-your-update-in-: 在您的应用程序中测试您的更新
 tests: 测试

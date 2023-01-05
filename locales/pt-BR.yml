@@ -352,6 +352,8 @@ stats:
   title: Estatísticas
   versions: Versões
 submit: Enviar
+switch-to-all-device: Alternar para todos os dispositivos
+switch-to-only-devic: Alternar para apenas o dispositivo vinculado
 terms-of-use: Termos de uso
 test-your-update-in-: Teste sua atualização em seu aplicativo
 tests: testes

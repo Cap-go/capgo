@@ -356,6 +356,8 @@ stats:
   title: İstatistikler
   versions: Versiyonlar
 submit: Göndermek
+switch-to-all-device: Tüm cihazlara geç
+switch-to-only-devic: Yalnızca bağlı cihaza geç
 terms-of-use: Kullanım Şartları
 test-your-update-in-: Güncellemenizi uygulamanızda test edin
 tests: testler
