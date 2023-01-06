@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import { createCustomer } from '../_utils/stripe.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
 const supabaseUrl = 'https://***.supabase.co'
 const supabaseAnonKey = '***'
@@ -13,7 +14,7 @@ const useSupabase = () => {
       detectSessionInUrl: false,
     },
   }
-  return createClient(supabaseUrl, supabaseAnonKey, options)
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 // get all users from supabase
 const initCustomers = async () => {

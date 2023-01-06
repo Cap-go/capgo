@@ -13,7 +13,7 @@ const useSupabase = () => {
       detectSessionInUrl: false,
     },
   }
-  return createClient(supabaseUrl, supabaseAnonKey, options)
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 
 const createMeta = async (record: Database['public']['Tables']['app_versions']['Row']) => {
@@ -28,7 +28,9 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
     .select()
     .eq('id', record.id)
     .single()
-  if (!error || data)
+  if (error)
+    return
+  if (data !== null && data.size)
     return
   const { data: data2, error: error2 } = await useSupabase()
     .storage
