@@ -9,6 +9,7 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { ellipsisHorizontalCircle } from 'ionicons/icons'
 import Spinner from '~/components/Spinner.vue'
 import { existUser, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
@@ -98,7 +99,8 @@ const getDevices = async () => {
     console.error(error)
   }
 }
-const saveChannelChange = async (key: string, val: boolean) => {
+
+const saveChannelChange = async (key: string, val: any) => {
   if (!id.value || !channel.value)
     return
   try {
@@ -376,11 +378,60 @@ const inviteUser = async (userId: string) => {
     await getUsers()
   }
 }
+
+const getUnknownVersion = async (): Promise<number> => {
+  if (!channel.value)
+    return 0
+  try {
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('id, app_id, name')
+      .eq('app_id', channel.value.version.app_id)
+      .eq('name', 'unknown')
+      .single()
+    if (error) {
+      console.error('no unknow version', error)
+      return 0
+    }
+    return data.id
+  }
+  catch (error) {
+    console.error(error)
+  }
+  return 0
+}
+
+const openPannel = async () => {
+  if (!channel.value || !main.auth)
+    return
+  const actionSheet = await actionSheetController.create({
+    buttons: [
+      {
+        text: t('package.unset'),
+        handler: async () => {
+          actionSheet.dismiss()
+          const id = await getUnknownVersion()
+          if (!id)
+            return
+          saveChannelChange('version', id)
+        },
+      },
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+        handler: () => {
+          // console.log('Cancel clicked')
+        },
+      },
+    ],
+  })
+  await actionSheet.present()
+}
 </script>
 
 <template>
   <IonPage>
-    <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
+    <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
     <IonContent :fullscreen="true">
       <IonHeader collapse="condense">
         <IonToolbar mode="ios">

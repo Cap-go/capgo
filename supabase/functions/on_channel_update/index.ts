@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.170.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -28,12 +28,14 @@ serve(async (event: Request) => {
 
     if (record.public) {
       // find all other channels with same app_i with public true and update them to false
-      await supabaseAdmin()
+      const { error } = await supabaseAdmin()
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
         .eq('public', true)
         .neq('id', record.id)
+      if (error)
+        console.log('error', error)
     }
     return sendRes()
   }

@@ -44,7 +44,7 @@ activation:
   notification: Notifications
   notification-desc: I accept to receive notification when new app version are available
   validate: Validate
-add-another-app: Add another app
+add-another-app: Add your app
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
@@ -73,7 +73,8 @@ app-id-example: App ID example
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
 bigger-app-size: Bigger app size
-build-your-code-and-: Build your code & Upload your version
+build-your-app-and-s: build your app and sync
+build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle-number: Bundle number
 button:
@@ -174,7 +175,9 @@ from-device: from device
 good: Good
 id: id
 in-your-main-file: In your main file
+in-your-project-fold: In your project folder
 informations: Informations
+install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 intro:
   aka: Also known as
@@ -225,6 +228,7 @@ onboarding:
   loading: Loading
 one-day-left: One day left
 open-sidebar: Open sidebar
+open-this-link-to-le: Open this link to learn how to test your update
 package:
   cannot-delete-version: Cannot delete bundle
   channels: Channels
@@ -242,6 +246,7 @@ package:
   stats: stats
   test: Launch bundle
   title: info
+  unset: Unlink channel from bundle
   version:
     is-used-in-device: is used in a device override, unlink it first
   version-deleted: Bundle deleted
@@ -336,7 +341,10 @@ stats:
   title: Stats
   versions: Versions
 submit: Submit
+switch-to-all-device: Switch to all devices
+switch-to-only-devic: Switch to only device linked
 terms-of-use: Terms of Use
+test-your-update-in-: Test your update in your app
 tests: tests
 thank-you-for-choosi: Thank you for choosing Capgo !
 the: The

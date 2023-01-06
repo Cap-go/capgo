@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.170.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
@@ -27,13 +27,15 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
-    await supabaseAdmin()
+    const { error: errorUpdate } = await supabaseAdmin()
       .from('apps')
       .update({
         last_version: record.name,
       })
       .eq('app_id', record.app_id)
       .eq('user_id', record.user_id)
+    if (errorUpdate)
+      console.log('errorUpdate', errorUpdate)
 
     if (!record.bucket_id) {
       console.log('No bucket_id')

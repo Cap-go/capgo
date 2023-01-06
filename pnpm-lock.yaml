@@ -39,12 +39,12 @@ specifiers:
   '@capgo/capacitor-mute': ^1.1.27
   '@capgo/capacitor-purchases': ^1.3.36
   '@capgo/capacitor-screen-recorder': ^1.2.22
-  '@capgo/capacitor-updater': 4.14.1
+  '@capgo/capacitor-updater': 4.15.3
   '@capgo/native-audio': ^5.0.1
   '@capgo/native-market': ^1.1.6
-  '@iconify-json/carbon': 1.1.11
+  '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': ^1.1.6
-  '@iconify-json/ion': 1.1.4
+  '@iconify-json/ion': 1.1.5
   '@iconify-json/ls': 1.1.3
   '@intlify/vite-plugin-vue-i18n': 6.0.3
   '@ionic/vue': 6.3.9
@@ -99,7 +99,7 @@ specifiers:
   semver: ^7.3.8
   tailwindcss: ^3.2.4
   typescript: 4.9.4
-  unplugin-icons: 0.14.14
+  unplugin-icons: 0.15.0
   vite: 3.2.5
   vite-plugin-environment: 1.1.3
   vite-plugin-inspect: 0.7.9
@@ -151,7 +151,7 @@ dependencies:
   '@capgo/capacitor-mute': 1.1.27_@capacitor+core@4.6.0
   '@capgo/capacitor-purchases': 1.3.36_@capacitor+core@4.6.0
   '@capgo/capacitor-screen-recorder': 1.2.22_@capacitor+core@4.6.0
-  '@capgo/capacitor-updater': 4.14.1_@capacitor+core@4.6.0
+  '@capgo/capacitor-updater': 4.15.3_@capacitor+core@4.6.0
   '@capgo/native-audio': 5.0.1_@capacitor+core@4.6.0
   '@capgo/native-market': 1.1.6
   '@ionic/vue': 6.3.9
@@ -195,9 +195,9 @@ devDependencies:
   '@antfu/eslint-config': 0.33.1_ha6vam6werchizxrnqvarmz2zu
   '@capacitor/cli': 4.5.0
   '@capacitor/core': 4.6.0
-  '@iconify-json/carbon': 1.1.11
+  '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': 1.1.6
-  '@iconify-json/ion': 1.1.4
+  '@iconify-json/ion': 1.1.5
   '@iconify-json/ls': 1.1.3
   '@intlify/vite-plugin-vue-i18n': 6.0.3_vite@3.2.5+vue-i18n@9.2.2
   '@types/fs-extra': 9.0.13
@@ -222,7 +222,7 @@ devDependencies:
   sass: 1.56.1
   tailwindcss: 3.2.4_postcss@8.4.19
   typescript: 4.9.4
-  unplugin-icons: 0.14.14_@vue+compiler-sfc@3.2.45
+  unplugin-icons: 0.15.0_@vue+compiler-sfc@3.2.45
   vite: 3.2.5_lsvry4w5nj6evwofoi5nudk2oa
   vite-plugin-inspect: 0.7.9_vite@3.2.5
   vite-plugin-pages: 0.27.1_ddag3muocym7uexovvmjvx6a4q
@@ -351,8 +351,8 @@ packages:
     resolution: {integrity: sha512-CQkeV+oJxUazwjlHD0/3ZD08QWKuGQkhnrKo3e6ly5pd48VUpXbb77q0xMU4+vc2CkJnDS02Eq/M9ugyX20XZA==}
     dev: true
 
-  /@antfu/utils/0.6.3:
-    resolution: {integrity: sha512-sEYpyyKUPOew9QsXZ8feRVMzW6DWLviwOl+/ap06UQW02A8Srbc95CPHVm4eUbiBzBgD46eyIT+przv//KSSlQ==}
+  /@antfu/utils/0.7.2:
+    resolution: {integrity: sha512-vy9fM3pIxZmX07dL+VX1aZe7ynZ+YyB0jY+jE6r3hOK6GNY2t6W8rzpFC4tgpbXUYABkFQwgJq2XYXlxbXAI0g==}
     dev: true
 
   /@apideck/better-ajv-errors/0.3.6_ajv@8.11.2:
@@ -1945,8 +1945,8 @@ packages:
       '@capacitor/core': 4.6.0
     dev: false
 
-  /@capgo/capacitor-updater/4.14.1_@capacitor+core@4.6.0:
-    resolution: {integrity: sha512-j6PQMPvr8PmehjhAyQnqXrpRzbZA72+ZZ1/LMKgpQlWEKoBGiOhQd6Ww/E7CgHr2GObYPPGZMuO8Fd+3P3U+ww==}
+  /@capgo/capacitor-updater/4.15.3_@capacitor+core@4.6.0:
+    resolution: {integrity: sha512-Hpq/x6IZaT518vkQTsEcjANOxKM7aF5cZC1jeVpKWBj8MSC8hqdKHtB0mdK1dUa+eTtpB+j3Vsb41XIndZBu4Q==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
@@ -2601,8 +2601,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dev: false
 
-  /@iconify-json/carbon/1.1.11:
-    resolution: {integrity: sha512-IHkHSNmTM6q6b8DuKSzd+AEMYPZywSxcb+37kZU7ywtcwsGen3aVEvWFykopIWjjwj3xdZ/5UdwJRqhZDQMlNg==}
+  /@iconify-json/carbon/1.1.12:
+    resolution: {integrity: sha512-P2T+Ob/ylTDYALcYWI5cTmfDFdwQJno2KN5yZnJYn9UaccSk687axROtHJrvfll/UncZlzP2s4rIRJUWoJ51mA==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
@@ -2613,8 +2613,8 @@ packages:
       '@iconify/types': 2.0.0
     dev: true
 
-  /@iconify-json/ion/1.1.4:
-    resolution: {integrity: sha512-30sOiE7OIboJXCFqIUfyAcskE49pEUjPyQs2Pl35o4lBXKZ46Jy3RzD+atkWBVz6ftlvTk9jE/qFi2mZ+gk78g==}
+  /@iconify-json/ion/1.1.5:
+    resolution: {integrity: sha512-oxDdGkK3BPBsXgCY1TuujGeLKHg9+C61beUtdOwsdILN/c0CYfcYpLPuJVD4Toc2xjPbSpYfLdWEA+wlpLfm0w==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
@@ -2629,11 +2629,11 @@ packages:
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
     dev: true
 
-  /@iconify/utils/2.0.2:
-    resolution: {integrity: sha512-13B3wJxDLmSNBEIEpKleKSkJVQgdAy9ra3Xsu233i/5qD5yXBGhpOFxTB/k8cqme0xVsMKBPV5vbvq9MgQlX+w==}
+  /@iconify/utils/2.0.9:
+    resolution: {integrity: sha512-ropNqaeamoxZvXxvaTJXrI0MrqdWdDVIs/mW7/sEQbNi0aXYUGL2iuLs1da3QR163gyG63kiyTsqw2oQYamw3Q==}
     dependencies:
       '@antfu/install-pkg': 0.1.1
-      '@antfu/utils': 0.5.2
+      '@antfu/utils': 0.7.2
       '@iconify/types': 2.0.0
       debug: 4.3.4
       kolorist: 1.6.0
@@ -2658,8 +2658,8 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/message-compiler': 9.3.0-beta.11
-      '@intlify/shared': 9.3.0-beta.11
+      '@intlify/message-compiler': 9.3.0-beta.12
+      '@intlify/shared': 9.3.0-beta.12
       jsonc-eslint-parser: 1.4.1
       source-map: 0.6.1
       vue-i18n: 9.2.2_vue@3.2.45
@@ -2688,8 +2688,8 @@ packages:
       '@intlify/shared': 9.2.2
       source-map: 0.6.1
 
-  /@intlify/message-compiler/9.3.0-beta.11:
-    resolution: {integrity: sha512-gGGfBGzM7JBXp1Q9gbDAy5jELz9ho3ILqnpxp2yp64+gkqohrqc2YXIvCdwZoc6AtKIh/Zmv4sWVqxkvMsBWtQ==}
+  /@intlify/message-compiler/9.3.0-beta.12:
+    resolution: {integrity: sha512-A8/s7pb3v8nf6HG77qFPJntxgQKI9GXxGnkn7aO+b03/X/GkF/4WceDSAIk3i+yLeIgszeBn9GZ23tSg4sTEHA==}
     engines: {node: '>= 14'}
     dependencies:
       '@intlify/shared': 9.3.0-beta.11
@@ -2702,6 +2702,11 @@ packages:
 
   /@intlify/shared/9.3.0-beta.11:
     resolution: {integrity: sha512-CtbotesxTRiC3bRyXyv1NG39fkqJ790f8z8xFaeIXSZpOdiyxoh5BIyypCzSFQZDGLwz0Q9gyWbW1XpxQJm68Q==}
+    engines: {node: '>= 14'}
+    dev: true
+
+  /@intlify/shared/9.3.0-beta.12:
+    resolution: {integrity: sha512-WsmaS54sA8xuwezPKpa/OMoaX1v2VF2fCgAmYS6prDr2ir0CkUFWPm9A8ilmxzv4nkS61/v8+vf4lGGkn5uBdA==}
     engines: {node: '>= 14'}
     dev: true
 
@@ -2721,7 +2726,7 @@ packages:
         optional: true
     dependencies:
       '@intlify/bundle-utils': 3.4.0_vue-i18n@9.2.2
-      '@intlify/shared': 9.3.0-beta.11
+      '@intlify/shared': 9.3.0-beta.12
       '@rollup/pluginutils': 4.2.1
       debug: 4.3.4
       fast-glob: 3.2.12
@@ -16963,8 +16968,8 @@ packages:
     engines: {node: '>= 0.8'}
     dev: true
 
-  /unplugin-icons/0.14.14_@vue+compiler-sfc@3.2.45:
-    resolution: {integrity: sha512-5apStlsB9AetB7JQ0DpHG+aFNGQOL8yrO+6XbYadywMXwCeLAPDPdSW0gWd8R3aB/rER1PM+LQikXlaakHH1Uw==}
+  /unplugin-icons/0.15.0_@vue+compiler-sfc@3.2.45:
+    resolution: {integrity: sha512-/BGtBL8y/2wjey4GLyb0w90mhc9d7XKlewWGMxBPROHS7mR84AV1Y0zDapYK0Q/cc/+u4WUcloreev5cABDa5w==}
     peerDependencies:
       '@svgr/core': '>=5.5.0'
       '@vue/compiler-sfc': ^3.0.2
@@ -16981,24 +16986,24 @@ packages:
         optional: true
     dependencies:
       '@antfu/install-pkg': 0.1.1
-      '@antfu/utils': 0.6.3
-      '@iconify/utils': 2.0.2
+      '@antfu/utils': 0.7.2
+      '@iconify/utils': 2.0.9
       '@vue/compiler-sfc': 3.2.45
       debug: 4.3.4
       kolorist: 1.6.0
       local-pkg: 0.4.2
-      unplugin: 1.0.0
+      unplugin: 1.0.1
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /unplugin/1.0.0:
-    resolution: {integrity: sha512-H5UnBUxfhTXBXGo2AwKsl0UaLSHzSNDZNehPQSgdhVfO/t+XAS1Yoj3vmLrrlBrS9ZwtH5tejbX/TCp5DcyCKg==}
+  /unplugin/1.0.1:
+    resolution: {integrity: sha512-aqrHaVBWW1JVKBHmGo33T5TxeL0qWzfvjWokObHA9bYmN7eNDkwOxmLjhioHl9878qDFMAaT51XNroRyuz7WxA==}
     dependencies:
       acorn: 8.8.1
       chokidar: 3.5.3
       webpack-sources: 3.2.3
-      webpack-virtual-modules: 0.4.6
+      webpack-virtual-modules: 0.5.0
     dev: true
 
   /unset-value/1.0.0:
@@ -17705,6 +17710,10 @@ packages:
 
   /webpack-virtual-modules/0.4.6:
     resolution: {integrity: sha512-5tyDlKLqPfMqjT3Q9TAqf2YqjwmnUleZwzJi1A5qXnlBCdj2AtOJ6wAWdglTIDOPgOiOrXeBeFcsQ8+aGQ6QbA==}
+    dev: true
+
+  /webpack-virtual-modules/0.5.0:
+    resolution: {integrity: sha512-kyDivFZ7ZM0BVOUteVbDFhlRt7Ah/CSPwJdi8hBpkK7QLumUqdLtVfm/PX/hkcnrvr0i77fO5+TjZ94Pe+C9iw==}
     dev: true
 
   /webpack/5.75.0:

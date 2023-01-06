@@ -18,6 +18,7 @@ const emit = defineEmits(['done'])
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
+const clicked = ref(0)
 const appId = ref<string>()
 const realtimeListener = ref(false)
 const mySubscription = ref()
@@ -39,15 +40,30 @@ const steps = ref([
     subtitle: `${t('into-your-app-folder')}`,
   },
   {
+    title: t('install-the-capacito'),
+    command: 'npm i @capgo/capacitor-updater',
+    subtitle: t('in-your-project-fold'),
+  },
+  {
     title: t('add-this-code-to-you'),
     command: `import { CapacitorUpdater } from '@capgo/capacitor-updater'
 CapacitorUpdater.notifyAppReady()`,
     subtitle: t('in-your-main-file'),
   },
   {
+    title: t('build-your-app-and-s'),
+    command: 'npm run build && npx cap sync',
+    subtitle: '',
+  },
+  {
     title: t('build-your-code-and-'),
     command: 'npx --yes @capgo/cli@latest upload',
     subtitle: '',
+  },
+  {
+    title: t('test-your-update-in-'),
+    command: 'https://capgo.app/blog/update-your-capacitor-apps-seamlessly-using-capacitor-updater/#receive-a-live-update-on-a-device',
+    subtitle: t('open-this-link-to-le'),
   },
   {
     title: t('discover-your-dashbo'),
@@ -72,16 +88,34 @@ const setLog = () => {
     // TODO add emailing on onboarding done to send blog article versioning
   }
 }
-const copyToast = async (text: string) => {
+const scrollToElement = (id: string) => {
+  // Get the element with the id
+  const el = document.getElementById(id)
+  console.log('el', el)
+  if (el) {
+    // Use el.scrollIntoView() to instantly scroll to the element
+    el.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
+const copyToast = async (text: string, allowed: boolean, id: string) => {
+  if (!allowed)
+    return
   copy(text)
   const toast = await toastController
     .create({
       message: t('copied-to-clipboard'),
       duration: 2000,
     })
-  if (!realtimeListener.value) {
+  clicked.value += 1
+  if (!realtimeListener.value || clicked.value === 3) {
     setLog()
     step.value += 1
+    clicked.value = 0
+    realtimeListener.value = false
+    if (mySubscription.value)
+      mySubscription.value.unsubscribe()
+    scrollToElement(id)
   }
   await toast.present()
 }
@@ -184,7 +218,7 @@ watchEffect(async () => {
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
               <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-                <template v-if="i < 4">
+                <template v-if="i < 7">
                   {{ i + 1 }}
                 </template>
                 <template v-else>
@@ -193,7 +227,7 @@ watchEffect(async () => {
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
-                <code v-if="s.command" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
+                <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
                 <br v-if="s.command">
                 <span class="text-sm">{{ s.subtitle }}</span>
               </p>

@@ -70,7 +70,7 @@ const fix_apps = async () => {
       const today_id = new Date().toISOString().slice(0, 10)
       const increment = {
         app_id: app.app_id,
-        date_id: '2022-09-01',
+        date_id: '2023-01-01',
         bandwidth: 0,
         mlu: 0,
         mlu_real: 0,

@@ -9,7 +9,7 @@ const sendNow = async (eventName: string,
   console.log('send notif', eventName, email)
   await addEventPerson(email, {}, eventName, color)
   if (past != null) {
-    await supabaseAdmin()
+    const { error } = await supabaseAdmin()
       .from('notifications')
       .update({
         user_id: userId,
@@ -17,15 +17,19 @@ const sendNow = async (eventName: string,
         total_send: past.total_send + 1,
       })
       .eq('id', `${eventName}__${userId}`)
+    if (error)
+      console.log('update notif', error)
   }
   else {
-    await supabaseAdmin()
+    const { error } = await supabaseAdmin()
       .from('notifications')
       .insert({
         id: `${eventName}__${userId}`,
         user_id: userId,
         last_send_at: dayjs().toISOString(),
       })
+    if (error)
+      console.log('insert notif', error)
   }
 }
 
