@@ -20,7 +20,7 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
   // get the size of the storage and add it to the row
   if (!record.bucket_id) {
     console.log('Cannot find bucket_id', record.id)
-    return
+    return Promise.resolve()
   }
   // check if exist already in the database
   const { data, error } = await useSupabase()
@@ -28,17 +28,19 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
     .select()
     .eq('id', record.id)
     .single()
-  if (error)
-    return
+  if (error && error.code !== 'PGRST116') {
+    console.log('Error', record.id, error)
+    return Promise.resolve()
+  }
   if (data !== null && data.size)
-    return
+    return Promise.resolve()
   const { data: data2, error: error2 } = await useSupabase()
     .storage
     .from(`apps/${record.user_id}/${record.app_id}/versions`)
     .download(record.bucket_id)
   if (error2 || !data2) {
     console.log('Error', record.bucket_id, error2)
-    return
+    return Promise.resolve()
   }
   const u = await new Response(data2).arrayBuffer()
   // get the size of the Uint8Array
@@ -84,15 +86,15 @@ const createAll = async () => {
     // console.log('app_versions', appVersions.length)
     // add to allData
     allData.push(...appVersions)
-    if (appVersions.length !== pageSize + 1) {
-      console.log('No more app_versions to delete')
+    if (appVersions.length !== pageSize) {
+      console.log('No more app_versions to get')
       skip = -1
     }
     else {
       skip += pageSize
     }
   }
-  console.log('app_versions to delete', allData.length)
+  console.log('app_versions to set', allData.length)
 
   if (allData.length) {
     // loop on all element and create metadata for each
