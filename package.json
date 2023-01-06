@@ -81,7 +81,7 @@
     "copy-text-to-clipboard": "^3.0.1",
     "cron-schedule": "^3.0.6",
     "crypto-random-string": "^5.0.0",
-    "dayjs": "1.11.6",
+    "dayjs": "1.11.7",
     "firebase": "9.15.0",
     "generate-password-browser": "^1.1.0",
     "json2csv": "^5.0.7",
