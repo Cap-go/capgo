@@ -15,6 +15,7 @@
 [![Bump version](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml)
 [![Build source code and send to Capgo](https://github.com/Cap-go/capgo/actions/workflows/build.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/build.yml)
 [![udd-update-dependencies](https://github.com/Cap-go/capgo/actions/workflows/udd.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/udd.yml)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/2ebcdd5c-362b-4135-8fac-9ce872309174/deploy-status)](https://app.netlify.com/sites/webcapgo/deploys)
 <a href="#badge">
   <img alt="semantic-release" src="https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg">
 </a>

@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.170.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { isGoodPlan, isOnboarded, isPaying, isTrial, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -217,9 +217,11 @@ serve(async (event: Request) => {
       ...details,
     }
     // console.log('newData', newData)
-    await supabaseAdmin()
+    const { error } = await supabaseAdmin()
       .from('global_stats')
       .upsert(newData)
+    if (error)
+      console.error('global_stats error', error)
     return sendRes()
   }
   catch (e) {

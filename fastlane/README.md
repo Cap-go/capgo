@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 
 
+### ios submit_review
+
+```sh
+[bundle exec] fastlane ios submit_review
+```
+
+
+
 ----
 
 
@@ -34,7 +42,15 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 [bundle exec] fastlane android beta
 ```
 
-Deploy a beta version to the Google Play
+
+
+### android prod_release
+
+```sh
+[bundle exec] fastlane android prod_release
+```
+
+
 
 ----
 

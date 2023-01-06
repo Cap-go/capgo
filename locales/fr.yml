@@ -48,7 +48,7 @@ activation:
     J'accepte de recevoir une notification lorsqu'une nouvelle version de
     l'application est disponible
   validate: Valider
-add-another-app: Ajouter une autre application
+add-another-app: Ajoutez votre application
 add-this-code-to-you: Ajoutez ce code à votre projet
 add-your-app-to-your: Ajoutez votre application à votre compte
 add-your-first-app-t: "Ajoutez votre première application à votre compte et poussons les mises à jour\_!"
@@ -77,7 +77,8 @@ app-id-example: Exemple d'ID d'application
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
 bigger-app-size: Taille d'application plus grande
-build-your-code-and-: Construisez votre code
+build-your-app-and-s: créer votre application et synchroniser
+build-your-code-and-: Télécharger sur Capgo votre code
 bulk-upload: Transfert groupé
 bundle-number: Numéro de forfait
 button:
@@ -185,7 +186,9 @@ from-device: depuis l'appareil
 good: Bien
 id: identifiant
 in-your-main-file: Dans votre fichier principal
+in-your-project-fold: Dans votre dossier de projet
 informations: Informations
+install-the-capacito: Installer le plugin Capacitor
 into-your-app-folder: Dans votre dossier d'application.
 intro:
   aka: Aussi connu sous le nom de
@@ -238,6 +241,7 @@ onboarding:
   loading: Chargement
 one-day-left: Reste un jour
 open-sidebar: Ouvrir la barre latérale
+open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jour
 package:
   cannot-delete-version: Impossible de supprimer la version
   channels: Chaînes
@@ -255,6 +259,7 @@ package:
   stats: Statistiques
   test: Version de lancement
   title: Info
+  unset: Dissocier la chaîne du groupe
   version:
     is-used-in-device: est utilisé dans un remplacement de périphérique, dissociez-le d'abord
   version-deleted: Version supprimée
@@ -353,7 +358,10 @@ stats:
   title: Statistiques
   versions: Versions
 submit: Soumettre
+switch-to-all-device: Passer à tous les appareils
+switch-to-only-devic: Basculer vers le seul appareil lié
 terms-of-use: Conditions d'utilisation
+test-your-update-in-: Testez votre mise à jour dans votre application
 tests: essais
 thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: La

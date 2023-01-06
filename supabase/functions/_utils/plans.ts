@@ -67,11 +67,13 @@ export const checkPlan = async (userId: string): Promise<void> => {
     if (userError)
       throw userError
     if (await isTrial(userId)) {
-      await supabaseAdmin()
+      const { error } = await supabaseAdmin()
         .from('stripe_info')
         .update({ is_good_plan: true })
         .eq('customer_id', user.customer_id)
         .then()
+      if (error)
+        console.error('error.message', error.message)
       return Promise.resolve()
     }
     const dateid = new Date().toISOString().slice(0, 7)

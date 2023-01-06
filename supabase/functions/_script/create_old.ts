@@ -60,7 +60,7 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
 // delete all app_versions_meta as sql query
 // delete from app_versions_meta where id in (select id from app_versions where deleted = true)
 
-const pageSize = 100
+const pageSize = 1000
 const createAll = async () => {
   // list all app_versions
   const allData: Database['public']['Tables']['app_versions']['Row'][] = []

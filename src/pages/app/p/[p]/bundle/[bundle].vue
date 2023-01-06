@@ -9,7 +9,7 @@ import {
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { addOutline } from 'ionicons/icons'
+import { ellipsisHorizontalCircle } from 'ionicons/icons'
 import copy from 'copy-text-to-clipboard'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
@@ -220,7 +220,7 @@ const devicesFilter = computed(() => {
 
 <template>
   <IonPage>
-    <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="addOutline" @plus-click="openPannel" />
+    <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
     <IonContent :fullscreen="true">
       <IonHeader collapse="condense">
         <IonToolbar mode="ios">

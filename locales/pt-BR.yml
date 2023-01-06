@@ -46,7 +46,7 @@ activation:
     Aceito receber notificação quando uma nova versão do aplicativo estiver
     disponível
   validate: Validar
-add-another-app: Adicionar outro aplicativo
+add-another-app: Adicione seu aplicativo
 add-this-code-to-you: Adicione este código ao seu projeto
 add-your-app-to-your: Adicione seu aplicativo à sua conta
 add-your-first-app-t: Adicione seu primeiro aplicativo à sua conta e vamos enviar atualizações!
@@ -75,7 +75,8 @@ app-id-example: Exemplo de ID do aplicativo
 available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
 bigger-app-size: Maior tamanho de aplicativo
-build-your-code-and-: Construa seu código
+build-your-app-and-s: crie seu aplicativo e sincronize
+build-your-code-and-: Envie para o Capgo seu código
 bulk-upload: Upload em massa
 bundle-number: Número do pacote
 button:
@@ -179,7 +180,9 @@ from-device: do dispositivo
 good: Bom
 id: Eu iria
 in-your-main-file: No seu arquivo principal
+in-your-project-fold: Na pasta do seu projeto
 informations: Informações
+install-the-capacito: Instale o plug-in Capacitor
 into-your-app-folder: Na pasta do seu aplicativo.
 intro:
   aka: Também conhecido como
@@ -232,6 +235,7 @@ onboarding:
   loading: Carregando
 one-day-left: Falta um dia
 open-sidebar: Abrir barra lateral
+open-this-link-to-le: Abra este link para saber como testar sua atualização
 package:
   cannot-delete-version: Não é possível excluir a versão
   channels: Canais
@@ -249,6 +253,7 @@ package:
   stats: Estatísticas
   test: Versão de lançamento
   title: informação
+  unset: Desvincular canal do pacote
   version:
     is-used-in-device: for usado em uma substituição de dispositivo, desvincule-o primeiro
   version-deleted: Versão excluída
@@ -347,7 +352,10 @@ stats:
   title: Estatísticas
   versions: Versões
 submit: Enviar
+switch-to-all-device: Alternar para todos os dispositivos
+switch-to-only-devic: Alternar para apenas o dispositivo vinculado
 terms-of-use: Termos de uso
+test-your-update-in-: Teste sua atualização em seu aplicativo
 tests: testes
 thank-you-for-choosi: Obrigado por escolher a Capgo!
 the: o

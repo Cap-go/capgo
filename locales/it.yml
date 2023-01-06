@@ -46,7 +46,7 @@ activation:
     Accetto di ricevere una notifica quando sono disponibili nuove versioni
     dell'app
   validate: Convalidare
-add-another-app: Aggiungi un'altra app
+add-another-app: Aggiungi la tua app
 add-this-code-to-you: Aggiungi questo codice al tuo progetto
 add-your-app-to-your: Aggiungi la tua app al tuo account
 add-your-first-app-t: Aggiungi la tua prima app al tuo account e spingiamo gli aggiornamenti!
@@ -76,7 +76,8 @@ app-id-example: Esempio di ID app
 available-in-the-san: Disponibile nell'app sandbox
 back-to-login-page: Torna alla pagina di accesso
 bigger-app-size: Dimensioni dell'app più grandi
-build-your-code-and-: Costruisci il tuo codice
+build-your-app-and-s: crea la tua app e sincronizza
+build-your-code-and-: Carica su Capgo il tuo codice
 bulk-upload: Caricamento collettivo
 bundle-number: Numero di pacco
 button:
@@ -182,7 +183,9 @@ from-device: dal dispositivo
 good: Bene
 id: id
 in-your-main-file: Nel tuo file principale
+in-your-project-fold: Nella cartella del tuo progetto
 informations: Informazioni
+install-the-capacito: Installa il plug-in Condensatore
 into-your-app-folder: Nella cartella dell'app.
 intro:
   aka: Conosciuto anche come
@@ -235,6 +238,7 @@ onboarding:
   loading: Caricamento in corso
 one-day-left: Manca un giorno
 open-sidebar: Apri barra laterale
+open-this-link-to-le: Apri questo link per scoprire come testare il tuo aggiornamento
 package:
   cannot-delete-version: Impossibile eliminare la versione
   channels: Canali
@@ -252,6 +256,7 @@ package:
   stats: statistiche
   test: Versione di lancio
   title: Informazioni
+  unset: Scollega il canale dal gruppo
   version:
     is-used-in-device: viene utilizzato in una sostituzione del dispositivo, scollegarlo prima
   version-deleted: Versione eliminata
@@ -350,7 +355,10 @@ stats:
   title: Statistiche
   versions: Versioni
 submit: Invia
+switch-to-all-device: Passa a tutti i dispositivi
+switch-to-only-devic: Passa al solo dispositivo collegato
 terms-of-use: Termini di utilizzo
+test-your-update-in-: Testa l'aggiornamento nella tua app
 tests: test
 thank-you-for-choosi: Grazie per aver scelto Capgo!
 the: Il

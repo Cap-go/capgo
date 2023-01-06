@@ -6,13 +6,13 @@ import {
   IonItem,
   IonLabel,
   IonList,
-  IonNote, IonPage, IonRefresher, IonRefresherContent,
+  IonNote, IonPage, IonRefresher, IonRefresherContent, toastController,
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { subDays } from 'date-fns'
-import dayjs from 'dayjs'
+import { filterOutline } from 'ionicons/icons'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
@@ -35,6 +35,7 @@ const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const isDisabled = ref(false)
+const isFilter = ref(false)
 const id = ref('')
 const search = ref('')
 const isLoading = ref(true)
@@ -48,13 +49,36 @@ const deviceFiltered = computed(() => {
   return devices.value
 })
 
+const getDeviceIds = async () => {
+  const { data: channelDevices } = await supabase
+    .from('channel_devices')
+    .select('device_id')
+    .eq('app_id', id.value)
+  const { data: deviceOverride } = await supabase
+    .from('devices_override')
+    .select('device_id')
+    .eq('app_id', id.value)
+
+  // create a list of unique id
+  const deviceIds = [
+    ...new Set([
+      ...(channelDevices ? channelDevices.map(d => d.device_id) : []),
+      ...(deviceOverride ? deviceOverride.map(d => d.device_id) : []),
+    ]),
+  ]
+  console.log('deviceIds', deviceIds)
+  return deviceIds
+}
 const loadData = async (event?: InfiniteScrollCustomEvent) => {
   try {
     // create a date object for the last day of the previous month with dayjs
-    const lastDay = dayjs().subtract(1, 'month')
-    const { data: dataDev } = await supabase
-      .from('devices')
-      .select(`
+    let total = 0
+    if (isFilter.value) {
+      // list all devices override
+      const deviceIds = await getDeviceIds()
+      const { data: dataDev } = await supabase
+        .from('devices')
+        .select(`
         device_id,
         platform,
         plugin_version,
@@ -64,14 +88,38 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
         created_at,
         updated_at
       `)
-      .eq('app_id', id.value)
-      .gt('updated_at', lastDay.toISOString())
-      .order('updated_at', { ascending: false })
-      .range(fetchOffset, fetchOffset + fetchLimit - 1)
-    if (!dataDev)
-      return
-    devices.value.push(...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[])
-    if (dataDev.length === fetchLimit)
+        .eq('app_id', id.value)
+        .order('updated_at', { ascending: false })
+        .in('device_id', deviceIds)
+        .range(fetchOffset, fetchOffset + fetchLimit - 1)
+      if (!dataDev)
+        return
+      devices.value.push(...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[])
+      total = dataDev.length
+    }
+    else {
+      const { data: dataDev } = await supabase
+        .from('devices')
+        .select(`
+        device_id,
+        platform,
+        plugin_version,
+        version (
+            name
+        ),
+        created_at,
+        updated_at
+      `)
+        .eq('app_id', id.value)
+        .order('updated_at', { ascending: false })
+        .range(fetchOffset, fetchOffset + fetchLimit - 1)
+      if (!dataDev)
+        return
+      devices.value.push(...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[])
+      total = dataDev.length
+    }
+
+    if (total === fetchLimit)
       fetchOffset += fetchLimit
     else
       isDisabled.value = true
@@ -142,11 +190,22 @@ const onSearch = (val: string) => {
   search.value = val
   searchDevices()
 }
+const onFilter = async () => {
+  console.log('filter')
+  isFilter.value = !isFilter.value
+  const toast = await toastController
+    .create({
+      message: isFilter.value ? t('switch-to-only-devic') : t('switch-to-all-device'),
+      duration: 2000,
+    })
+  await toast.present()
+  await refreshData()
+}
 </script>
 
 <template>
   <IonPage>
-    <TitleHead :title="t('devices.title')" :search="!isLoading" @search-input="onSearch" />
+    <TitleHead :title="t('devices.title')" :search="!isLoading" :search-icon="filterOutline" @search-input="onSearch" @search-button-click="onFilter" />
     <IonContent :fullscreen="true">
       <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
         <IonRefresherContent />

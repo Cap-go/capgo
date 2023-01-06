@@ -50,16 +50,21 @@ platform :ios do
       in_house: false
     )
 
-    match(
-      type: 'appstore',
-      git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
-      readonly: true,
-      keychain_name: TEMP_KEYCHAIN_USER,
-      keychain_password: TEMP_KEYCHAIN_PASSWORD,
-      api_key: api_key
-    )
+    # match(
+    #   type: 'appstore',
+    #   git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
+    #   readonly: true,
+    #   keychain_name: TEMP_KEYCHAIN_USER,
+    #   keychain_password: TEMP_KEYCHAIN_PASSWORD,
+    #   api_key: api_key
+    # )
+    get_certificates(
+            readonly:		    true,
+            fail_on_name_taken:   true,
+    )        # invokes cert
+    get_provisioning_profile   # invokes sigh
 
-    gym(
+    build_app(
       configuration: "Release",
       workspace: "./ios/App/App.xcworkspace",
       scheme: "App",
@@ -68,7 +73,9 @@ platform :ios do
         provisioningProfiles: { 
             DEVELOPER_APP_ID => "#{PROVISIONING_PROFILE_SPECIFIER}"
         }
-      }
+      },
+      xcargs: "-allowProvisioningUpdates"
+      # xcargs: "-allowProvisioningUpdates -authenticationKeyIssuerID xxx -authenticationKeyID xxx -authenticationKeyPath #{File.expand_path('path_to_key')}"
     )
 
     pilot(
