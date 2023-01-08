@@ -8,7 +8,7 @@ const logsnag = getEnv('LOGSNAG_TOKEN')
   })
   : { publish: () => Promise.resolve(true), insight: () => Promise.resolve(true), insights: () => Promise.resolve(true) }
 
-const insights = async (data: { title: string; value: number; icon: string }[]) => {
+const insights = async (data: { title: string; value: string | boolean | number; icon: string }[]) => {
   const all = []
   for (const d of data)
     all.push(logsnag.insight(d))
