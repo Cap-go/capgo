@@ -235,7 +235,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       const { data } = await supabaseAdmin()
         .storage
         .from(`apps/${version.user_id}/${app_id}/versions`)
-        .createSignedUrl(version.bucket_id, 60)
+        .createSignedUrl(version.bucket_id, 120)
       if (data && data.signedUrl)
         signedURL = data.signedUrl
     }
