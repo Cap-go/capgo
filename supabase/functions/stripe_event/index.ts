@@ -37,6 +37,12 @@ serve(async (event: Request) => {
       .single()
 
     console.log('stripeData', stripeData)
+    if (!customer) {
+      console.log('no customer found')
+      return sendRes({ status: 'ok' }, 200)
+    }
+    if (!customer.subscription_id)
+      stripeData.status = 'succeeded'
 
     await addDataPerson(user.email, {
       id: user.id,
