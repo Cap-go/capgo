@@ -4,7 +4,7 @@ import { supa_url } from './utils.mjs'
 
 const exec = util.promisify(execCb)
 const supaId = supa_url.split('//')[1].split('.')[0]
-const command = `npx --yes supabase gen types typescript --project-id=${supaId} > src/types/supabase.types.ts`
+const command = `npx --yes supabase@latest gen types typescript --project-id=${supaId} > src/types/supabase.types.ts`
 
 const main = async () => {
   try {
