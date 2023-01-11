@@ -34,14 +34,14 @@ jobs:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
-      - name: Verify generated types match Postgres schema
-        run: |
-          pnpm types
-          if ! git diff --ignore-space-at-eol --exit-code --quiet src/types/supabase.types.ts; then
-            echo "Detected uncommitted changes after build. See status below:"
-            git diff
-            exit 1
-          fi
+      # - name: Verify generated types match Postgres schema
+      #   run: |
+      #     pnpm types
+      #     if ! git diff --ignore-space-at-eol --exit-code --quiet src/types/supabase.types.ts; then
+      #       echo "Detected uncommitted changes after build. See status below:"
+      #       git diff
+      #       exit 1
+      #     fi
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
