@@ -2,6 +2,74 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.108.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.108.0) (2023-01-11)
+
+
+### Features
+
+* add email for update fail and semver issue ([6eddffe](https://github.com/Cap-go/capgo/commit/6eddffe1b7fe4c3f96588ca179bfee26b5175a0a))
+* add filter device by override ([3417340](https://github.com/Cap-go/capgo/commit/34173403f816ed7748f742f25b5c95b556a8eb6b))
+* add netlify edge provider ([aabca90](https://github.com/Cap-go/capgo/commit/aabca90aa13f87649402350a7e9775ec59623adc))
+* add unlink channel ([245f5a6](https://github.com/Cap-go/capgo/commit/245f5a65fd79cffd8ef891a001f4948be9a1af00))
+
+
+### Bug Fixes
+
+* add error display when supabase refuse to write ([0f4dc83](https://github.com/Cap-go/capgo/commit/0f4dc830543a2917678642382b7841b11cdcfbdd))
+* add log message for error in supabase write ([7422e35](https://github.com/Cap-go/capgo/commit/7422e35ea9d0ae70e86a9a729248e1f3349c81cb))
+* add missing endpoint website_stats ([8b326ea](https://github.com/Cap-go/capgo/commit/8b326eacddb37516997a37bc3e7591fbdd308ee9))
+* api test endpoint ([05e4688](https://github.com/Cap-go/capgo/commit/05e468847fd0775d57fb8317abaede881a7d53af))
+* back old workflow ([a5f1ee9](https://github.com/Cap-go/capgo/commit/a5f1ee98df040e32f5856574948b1c661ee6c9be))
+* body parsing ([613f26b](https://github.com/Cap-go/capgo/commit/613f26bb8971f55fb7e8f16db201efe50bdfc701))
+* build brew ([9d180ec](https://github.com/Cap-go/capgo/commit/9d180ecebd1499a4620a771e2fc62418b36019c4))
+* change updatedAt for device and bundle ([4596336](https://github.com/Cap-go/capgo/commit/45963365ad3315d3606fb4a837a1eaf682b9f7cb))
+* consistency ([bc8e9bf](https://github.com/Cap-go/capgo/commit/bc8e9bfaea41ab34a390005cec48e5c40e5dfc0c))
+* consistency and ok function ([310d1bb](https://github.com/Cap-go/capgo/commit/310d1bb2ee66daab1fae2cff79f9346521506827))
+* create trial for 15 days now ([2d17d67](https://github.com/Cap-go/capgo/commit/2d17d6745d9b3f0f8f7fb9527225fcae379d1657))
+* detect issue types ([e67c3b4](https://github.com/Cap-go/capgo/commit/e67c3b42134569efee0ee1844d96114f11794efc))
+* expire signed url in 120 sec ([d0570b1](https://github.com/Cap-go/capgo/commit/d0570b115397fae446bf060ffdea50d7568b1911))
+* faster fix ([bdff191](https://github.com/Cap-go/capgo/commit/bdff1910f48457d9399b0c0eeb868888f37aa26b))
+* fastlane ios and local dev ([bca7ead](https://github.com/Cap-go/capgo/commit/bca7ead2999ac74eb615e46ff3d12eff5ef1d6b6))
+* fix script ([393f85c](https://github.com/Cap-go/capgo/commit/393f85c73deb3c0f4a0596bd0054334ceb01cffc))
+* issue certif ([03077a6](https://github.com/Cap-go/capgo/commit/03077a63a66f6a1ff25e749d815a94749c8ca7fc))
+* issue created at ([03d5c1b](https://github.com/Cap-go/capgo/commit/03d5c1b4a4c6eb25e7844f484ef25d548e55b587))
+* issue storage display ([afc121c](https://github.com/Cap-go/capgo/commit/afc121c5b80f10062a5078c6f486824666cebea6))
+* issue sub event ([237cac5](https://github.com/Cap-go/capgo/commit/237cac5b48ccbd863849aaebcc5491f8d6a2dee8))
+* issue test data ([9f0c4ca](https://github.com/Cap-go/capgo/commit/9f0c4ca4905d3ade71f2db51ab33588c41f64d4d))
+* issue webstats ([fec5ccf](https://github.com/Cap-go/capgo/commit/fec5ccf689f64eee938ead2a004d3f843846ea2f))
+* last issue with consistency ([94341df](https://github.com/Cap-go/capgo/commit/94341dfcc41d81eadb8b815e49eda7dbef9fc6e5))
+* lint issue ([f5c248e](https://github.com/Cap-go/capgo/commit/f5c248e37f335a47631aec673f965195bd1bc282))
+* lockfile ([056a4e3](https://github.com/Cap-go/capgo/commit/056a4e37256db2e58922309924e1656500caeaa2))
+* log order ([b6ceba0](https://github.com/Cap-go/capgo/commit/b6ceba086b7e31eeb031a940c80188b920389ca7))
+* logsnag typing ([53ebc39](https://github.com/Cap-go/capgo/commit/53ebc39bfea312cf6871ad67a6e920020ed7c1a8))
+* min lenght name ([b58cc32](https://github.com/Cap-go/capgo/commit/b58cc32dfe0d8b41942d1523f90d041067e41197))
+* missing plan function ([6d2c4e5](https://github.com/Cap-go/capgo/commit/6d2c4e57cf6de296cd1fa741e7d29198f69841b1))
+* netlify deploy ([0bae264](https://github.com/Cap-go/capgo/commit/0bae264c5f9795b0fb1071807127f9101b2ece7e))
+* netlify double deploy [skip netlify] ([80cb54b](https://github.com/Cap-go/capgo/commit/80cb54b01d9568b1515d9108dd5bfbc8e3f4489d))
+* remove useless ([df7d048](https://github.com/Cap-go/capgo/commit/df7d04800c9ff1d2232b7b04c83b5578be5b698b))
+* script maintainance ([d367bf1](https://github.com/Cap-go/capgo/commit/d367bf15cf3af0a81d4c48ea4463cc0dece5b2f5))
+* send query ([d2fa17f](https://github.com/Cap-go/capgo/commit/d2fa17fd8686af8698afee332988791d54968c88))
+* services unknow ([75d3e6f](https://github.com/Cap-go/capgo/commit/75d3e6f066edb4b7be446345ce91dde535754ba0))
+* steps ([da05dc3](https://github.com/Cap-go/capgo/commit/da05dc31cfbb2eb6b6b1397da9ece83213ae57ed))
+* stripe deprecated btoa netlify ([685cda9](https://github.com/Cap-go/capgo/commit/685cda929f4bc6fa0a9fded19f22676fb7f9f55f))
+* tags ([c2809f2](https://github.com/Cap-go/capgo/commit/c2809f2997b3fe2029a85443050eee8f38996a17))
+* try subdir ([d6fd60b](https://github.com/Cap-go/capgo/commit/d6fd60b335eeec5fd353de8feaed870d0310f6a6))
+* types ([c5f225c](https://github.com/Cap-go/capgo/commit/c5f225c388e6eebf1cd04f54ab03d8ce96d16847))
+* udd add missing script file ([22ae463](https://github.com/Cap-go/capgo/commit/22ae463830503abe6c575bfc942928b9ac343de1))
+* update check endpoint ([274cf36](https://github.com/Cap-go/capgo/commit/274cf365166bd445f8c2930997919125a2721134))
+* update deps ([0ccd52a](https://github.com/Cap-go/capgo/commit/0ccd52aabf8d4b3ea92559e7fec657b61e5383f6))
+* update latest updater ([c33b696](https://github.com/Cap-go/capgo/commit/c33b69639f3f38b29a15280048a9082f97bdda0e))
+* upgrade @ionic/vue from 6.3.9 to 6.4.0 ([7529287](https://github.com/Cap-go/capgo/commit/75292872fc5807985f4b453c236a1eefb3ddb2f6))
+* upgrade @ionic/vue-router from 6.3.9 to 6.4.0 ([42ff93e](https://github.com/Cap-go/capgo/commit/42ff93efe7e401b8af18681225539881edae5e9a))
+* upgrade @supabase/supabase-js from 2.1.2 to 2.1.3 ([e0f061c](https://github.com/Cap-go/capgo/commit/e0f061c34fa26e985f4ca6e78369316856847d2a))
+* upgrade dayjs from 1.11.6 to 1.11.7 ([369b7a6](https://github.com/Cap-go/capgo/commit/369b7a674bd32eee6fc068f82c60f10ea7faaa2f))
+* upgrade deno version ([003b7d3](https://github.com/Cap-go/capgo/commit/003b7d35b67be6ca96605a191f6d6bd5fa1afb6b))
+* upgrade firebase from 9.14.0 to 9.15.0 ([f4f8317](https://github.com/Cap-go/capgo/commit/f4f83174a05db4c301d70812d97a0bc3c1c15f10))
+* use allowProvisioningUpdates in fastlane ([f3400a4](https://github.com/Cap-go/capgo/commit/f3400a45aa319f070d6205c814d949f6e3870046))
+* use latest action ([8828e10](https://github.com/Cap-go/capgo/commit/8828e105d75f1153097b584ef87ed314074dbf2d))
+* use latest node ([d48e75f](https://github.com/Cap-go/capgo/commit/d48e75fbf5f83cd6487d742c29b3727e8ce2da93))
+* version size meta ([3904bef](https://github.com/Cap-go/capgo/commit/3904bef85ead625a8d15c4c902d1cb1485143462))
+
 ## [1.107.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.107.0) (2023-01-11)
 
 
