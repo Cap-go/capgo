@@ -36,13 +36,13 @@ serve(async (event: Request) => {
       .eq('customer_id', stripeData.customer_id)
       .single()
 
-    console.log('stripeData', stripeData)
     if (!customer) {
       console.log('no customer found')
       return sendRes({ status: 'ok' }, 200)
     }
     if (!customer.subscription_id)
       stripeData.status = 'succeeded'
+    console.log('stripeData', stripeData)
 
     await addDataPerson(user.email, {
       id: user.id,
