@@ -32,19 +32,8 @@ jobs:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-      - name: Cache Homebrew Bundler RubyGems
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
-          key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
-          restore-keys: ${{ runner.os }}-rubygems-
-      - name: Install Supabase CLI Homebrew dependencies
-        run: |
-          HOMEBREW_NO_INSTALL_CLEANUP=1 brew install supabase/tap/supabase
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
