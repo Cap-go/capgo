@@ -34,10 +34,10 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create bump and changelog
         if: github.ref == 'refs/heads/main'
-        run: npx capacitor-standard-version
+        run: pnpm dlx capacitor-standard-version
       - name: Create bump and changelog
         if: github.ref != 'refs/heads/main'
-        run: npx capacitor-standard-version --prerelease alpha
+        run: pnpm dlx capacitor-standard-version --prerelease alpha
       - name: Push to origin
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -63,3 +63,5 @@ jobs:
       - name: Install dependencies
         id: install_code
         run: pnpm install --frozen-lockfile
+      - name: CLI install
+        run: pnpm dlx @capgo/cli@latest --version
