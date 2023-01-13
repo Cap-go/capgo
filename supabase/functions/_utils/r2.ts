@@ -15,8 +15,18 @@ export const upload = (file: Blob) => {
   })
 
   // Upload a file:
-  s3client.getObject(id)
   return s3client.putObject(id, file.stream())
+}
+
+export const deleteObject = (fileId: string) => {
+  const s3client = new S3Client({
+    endPoint: `https://${accountid}.r2.cloudflarestorage.com`,
+    region: 'us-east-1',
+    bucket: 'capgo',
+    accessKey: access_key_id,
+    secretKey: access_key_secret,
+  })
+  return s3client.deleteObject(fileId)
 }
 
 export const checkIfExist = (fileId: string) => {
