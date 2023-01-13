@@ -32,8 +32,13 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
     console.log('Error', record.id, error)
     return Promise.resolve()
   }
-  if (data !== null && data.size)
+  if (error)
+    console.log('Error', record.id, error)
+  if (data && data.size > 0) {
+    // console.log('Already exists', record.id)
     return Promise.resolve()
+  }
+  console.log('Download', record.id)
   const { data: data2, error: error2 } = await useSupabase()
     .storage
     .from(`apps/${record.user_id}/${record.app_id}/versions`)
@@ -42,7 +47,7 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
     console.log('Error', record.bucket_id, error2)
     return Promise.resolve()
   }
-  const u = await new Response(data2).arrayBuffer()
+  const u = await data2.arrayBuffer()
   // get the size of the Uint8Array
   const size = u.byteLength
   // cr32 hash the file
@@ -50,7 +55,7 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
   // create app version meta
   const { error: dbError } = await useSupabase()
     .from('app_versions_meta')
-    .insert({
+    .upsert({
       id: record.id,
       app_id: record.app_id,
       user_id: record.user_id,
@@ -60,6 +65,7 @@ const createMeta = async (record: Database['public']['Tables']['app_versions']['
   if (dbError)
     console.error('Cannot create app version meta', dbError)
   console.log('app_versions_meta create', record.id)
+  return Promise.resolve()
 }
 // delete all app_versions_meta as sql query
 // delete from app_versions_meta where id in (select id from app_versions where deleted = true)
@@ -99,9 +105,12 @@ const createAll = async () => {
     const all = []
     for (const version of allData)
       all.push(createMeta(version))
-    // all.push(createMeta(data[0]))
-
-    await Promise.all(all)
+    try {
+      await Promise.all(all)
+    }
+    catch (error) {
+      console.error(error)
+    }
   }
 }
 createAll()

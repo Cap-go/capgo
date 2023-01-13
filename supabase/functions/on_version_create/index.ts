@@ -61,7 +61,7 @@ serve(async (event: Request) => {
       console.log('Error', record.bucket_id, error)
       return sendRes()
     }
-    const u = await new Response(data).arrayBuffer()
+    const u = await data.arrayBuffer()
     // get the size of the Uint8Array
     const size = u.byteLength
     // cr32 hash the file
