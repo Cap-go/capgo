@@ -24,12 +24,13 @@ const main = async () => {
   const app_versions: any = []
   let continueLoop = true
   let page = 0
+  const pageSize = 1000
   while (continueLoop) {
     const { data, error } = await useSupabase()
       .from('app_versions')
       .select('id')
       .eq('deleted', true)
-      .range(page * 1000, (page + 1) * 1000)
+      .range(page * pageSize, (page + 1) * pageSize)
     if (error) {
       console.log('Error', error)
       return
@@ -37,7 +38,7 @@ const main = async () => {
     if (data)
       app_versions.push(...data)
 
-    if (data && data.length < 1000)
+    if (data && data.length < pageSize)
       continueLoop = false
     console.log('page', page, 'count', data.length)
     page++

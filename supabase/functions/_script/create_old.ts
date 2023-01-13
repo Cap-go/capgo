@@ -69,15 +69,16 @@ const createAll = async () => {
   // list all app_versions
   const allData: Database['public']['Tables']['app_versions']['Row'][] = []
   // loop through all app_versions
-  for (let skip = 0; skip >= 0;) {
-    const end = skip + pageSize
+  let continueLoop = true
+  let page = 0
+  while (continueLoop) {
     // console.log('skip', skip, 'end', end)
     const { data: appVersions, error: appVersionsError } = await useSupabase()
       .from('app_versions')
       .select()
       .eq('deleted', false)
       .not('bucket_id', 'is', null)
-      .range(skip, end)
+      .range(page * pageSize, (page + 1) * pageSize)
 
     if (appVersionsError) {
       console.error(appVersionsError)
@@ -86,13 +87,10 @@ const createAll = async () => {
     // console.log('app_versions', appVersions.length)
     // add to allData
     allData.push(...appVersions)
-    if (appVersions.length !== pageSize) {
-      console.log('No more app_versions to get')
-      skip = -1
-    }
-    else {
-      skip += pageSize
-    }
+    if (appVersions && appVersions.length < pageSize)
+      continueLoop = false
+    console.log('page', page, 'count', appVersions.length)
+    page++
   }
   console.log('app_versions to set', allData.length)
 
