@@ -9,6 +9,21 @@ import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { defaultDeviceID } from '../_tests/api.ts'
 import { sendNotif } from '../_utils/notifications.ts'
+// import { r2 } from '../_utils/r2.ts'
+
+const getBundleUrl = async (platform: string, bucket_id: string, path: string) => {
+  if (platform === 'supabase') {
+    const { data } = await supabaseAdmin()
+      .storage
+      .from(path)
+      .createSignedUrl(bucket_id, 120)
+    return data?.signedUrl
+  }
+  // else if (platform === 'r2') {
+  //   return r2.getSignedUrl(bucket_id, 120)
+  // }
+  return null
+}
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
@@ -107,6 +122,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
             session_key,
             user_id,
             bucket_id,
+            storage_provider,
             external_url
           )
         `)
@@ -137,6 +153,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
               session_key,
               user_id,
               bucket_id,
+              storage_provider,
               external_url
             )
           ),
@@ -160,6 +177,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
             session_key,
             user_id,
             bucket_id,
+            storage_provider,
             external_url
           )
         `)
@@ -169,8 +187,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     if (dbError || !channelData) {
       console.log(id, 'Cannot get channel', app_id, `no default channel ${JSON.stringify(dbError)}`)
       return sendRes({
-        message: 'Cannot get channel',
-        err: `no default channel ${JSON.stringify(dbError)}`,
+        message: `no default channel ${JSON.stringify(dbError)}`,
+        err: 'no_channel',
       }, 200)
     }
     let channel = channelData
@@ -186,7 +204,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
       await sendStats('invalidIP', platform, device_id, app_id, version_build, versionId)
-      return sendRes({ message: 'invalid ip' }, 400)
+      return sendRes({
+        message: 'invalid ip',
+        err: 'invalid_ip',
+      }, 400)
     }
     await updateOrCreateDevice({
       app_id,
@@ -207,7 +228,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
-        err: 'not good plan',
+        err: 'need_plan_upgrade',
       }, 200)
     }
     if (channelOverride && channelOverride.channel_id) {
@@ -225,19 +246,17 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
 
     if (!version.bucket_id && !version.external_url) {
-      console.log(id, 'Cannot get zip file', app_id)
+      console.log(id, 'Cannot get bundle', app_id)
       return sendRes({
-        message: 'Cannot get zip file',
+        message: 'Cannot get bundle',
+        err: 'no_bundle',
       }, 200)
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const { data } = await supabaseAdmin()
-        .storage
-        .from(`apps/${version.user_id}/${app_id}/versions`)
-        .createSignedUrl(version.bucket_id, 120)
-      if (data && data.signedUrl)
-        signedURL = data.signedUrl
+      const res = await getBundleUrl(version.storage_provider, version.bucket_id, `apps/${version.user_id}/${app_id}/versions`)
+      if (res)
+        signedURL = res
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
@@ -321,6 +340,14 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     // console.log(id, 'save stats', device_id)
     await sendStats('get', platform, device_id, app_id, version_build, version.id)
+    //  check signedURL and if it's url
+    if (!signedURL || (!signedURL.startsWith('http') && !signedURL.startsWith('https'))) {
+      console.log(id, 'Wrong signedURL', app_id)
+      return sendRes({
+        message: 'Cannot get bundle',
+        err: 'no_bundle',
+      }, 200)
+    }
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,

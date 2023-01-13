@@ -12,27 +12,34 @@ const initR2 = () => new S3Client({
   secretKey: access_key_secret,
 })
 
-export const upload = (fileId: string, file: Blob) => {
+const upload = (fileId: string, file: Blob) => {
   const s3client = initR2()
   // Upload a file:
   return s3client.putObject(fileId, file.stream())
 }
 
-export const deleteObject = (fileId: string) => {
+const deleteObject = (fileId: string) => {
   const s3client = initR2()
   return s3client.deleteObject(fileId)
 }
 
-export const checkIfExist = (fileId: string) => {
+const checkIfExist = (fileId: string) => {
   const s3client = initR2()
 
   // Upload a file:
   return s3client.exists(fileId)
 }
 
-export const getSignedUrl = (fileId: string) => {
+const getSignedUrl = (fileId: string, expirySeconds: number) => {
   const s3client = initR2()
   return s3client.getPresignedUrl('GET', fileId, {
-    expirySeconds: 120,
+    expirySeconds,
   })
+}
+
+export const r2 = {
+  upload,
+  deleteObject,
+  checkIfExist,
+  getSignedUrl,
 }

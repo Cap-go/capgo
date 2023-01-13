@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
+// import { r2 } from '../_utils/r2.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -93,6 +94,17 @@ serve(async (event: Request) => {
       versions: 1,
     }
     await updateOrAppStats(increment, today_id, record.user_id)
+    // TODO: allow r2 switch
+    // await r2.upload(record.bucket_id, data)
+    // // modify app_versions to set storage to r2
+    // const { error: errorUpdateStorage } = await supabaseAdmin()
+    //   .from('app_versions')
+    //   .update({
+    //     storage_provider: 'r2',
+    //   })
+    //   .eq('id', record.id)
+    // if (errorUpdateStorage)
+    //   console.log('errorUpdateStorage', errorUpdateStorage)
     return sendRes()
   }
   catch (e) {
