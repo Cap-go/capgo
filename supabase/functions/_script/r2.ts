@@ -4,8 +4,6 @@ const accountid = Deno.env.get('R2_ACCOUNT_ID')
 const access_key_id = Deno.env.get('R2_ACCESS_KEY_ID')
 const access_key_secret = Deno.env.get('R2_SECRET_ACCESS_KEY')
 
-// https://9ee3d7479a3c359681e3fab2c8cb22c0.r2.cloudflarestorage.com/capgo
-
 export const upload = (file: Blob) => {
   const id = crypto.randomUUID()
   const s3client = new S3Client({
