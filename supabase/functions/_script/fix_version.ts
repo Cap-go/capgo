@@ -1,8 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import 'https://deno.land/x/dotenv/load.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
-const supabaseUrl = 'https://***.supabase.co'
-const supabaseAnonKey = '***'
+// deno run  --allow-env --allow-read --allow-net  functions/_script/fix_version.ts
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***'
+const supabaseAnonKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***'
 
 const useSupabase = () => {
   const options = {
