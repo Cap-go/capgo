@@ -128,6 +128,7 @@ export interface Database {
           id: number
           name: string
           session_key: string | null
+          storage_provider: string
           updated_at: string | null
           user_id: string
         }
@@ -141,6 +142,7 @@ export interface Database {
           id?: number
           name: string
           session_key?: string | null
+          storage_provider?: string
           updated_at?: string | null
           user_id: string
         }
@@ -154,6 +156,7 @@ export interface Database {
           id?: number
           name?: string
           session_key?: string | null
+          storage_provider?: string
           updated_at?: string | null
           user_id?: string
         }
