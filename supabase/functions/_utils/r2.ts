@@ -12,12 +12,10 @@ const initR2 = () => new S3Client({
   secretKey: access_key_secret,
 })
 
-export const upload = (file: Blob) => {
-  const id = crypto.randomUUID()
+export const upload = (fileId: string, file: Blob) => {
   const s3client = initR2()
-
   // Upload a file:
-  return s3client.putObject(id, file.stream())
+  return s3client.putObject(fileId, file.stream())
 }
 
 export const deleteObject = (fileId: string) => {
