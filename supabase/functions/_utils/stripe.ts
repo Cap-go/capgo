@@ -43,6 +43,32 @@ const getPriceIds = async (planId: string, reccurence: string): Promise<{ priceI
   }
   return { priceId, meteredIds }
 }
+export interface MeteredData {
+  [key: string]: string
+}
+
+export const parsePriceIds = (prices: any): { priceId: string | null; productId: string | null; meteredData: MeteredData } => {
+  let priceId: string | null = null
+  let productId: string | null = null
+  const meteredData: { [key: string]: string } = {}
+  try {
+    console.log('prices stripe', prices)
+    prices.forEach((price: any) => {
+      if (price.plan.usage_type === 'licensed') {
+        priceId = price.plan.id
+        productId = price.plan.product
+      }
+      if (price.plan.billing_scheme === 'per_unit' && price?.plan?.usage_type !== 'licensed') {
+        meteredData[price.plan.nickname.toLocaleLowerCase()] = price.plan.id
+        console.log('metered price', price)
+      }
+    })
+  }
+  catch (err) {
+    console.log('search err', err)
+  }
+  return { priceId, productId, meteredData }
+}
 
 export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
   const prices = await getPriceIds(planId, reccurence)
