@@ -62,7 +62,7 @@ export const openPortal = async () => {
   return null
 }
 
-export const openCheckout = async (priceId: string, successUrl: string, cancelUrl: string) => {
+export const openCheckout = async (priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) => {
 //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
@@ -73,7 +73,7 @@ export const openCheckout = async (priceId: string, successUrl: string, cancelUr
   })
   try {
     await loading.present()
-    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId, successUrl, cancelUrl }) })
+    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId, successUrl, cancelUrl, reccurence: isYear ? 'year' : 'month' }) })
     await loading.dismiss()
     if (!resp.error && resp.data && resp.data.url)
       openBlank(resp.data.url)

@@ -540,32 +540,6 @@ export interface Database {
           user_id?: string
         }
       }
-      pay_as_you_go: {
-        Row: {
-          bandwidth: number
-          created_at: string | null
-          id: number
-          mau: number
-          storage: number
-          type: Database["public"]["Enums"]["pay_as_you_go_type"]
-        }
-        Insert: {
-          bandwidth: number
-          created_at?: string | null
-          id?: number
-          mau: number
-          storage: number
-          type: Database["public"]["Enums"]["pay_as_you_go_type"]
-        }
-        Update: {
-          bandwidth?: number
-          created_at?: string | null
-          id?: number
-          mau?: number
-          storage?: number
-          type?: Database["public"]["Enums"]["pay_as_you_go_type"]
-        }
-      }
       plans: {
         Row: {
           abtest: boolean
@@ -581,7 +555,10 @@ export interface Database {
           mau_unit: number | null
           name: string
           price_m: number
+          price_m_bandwidth_id: string | null
           price_m_id: string
+          price_m_mau_id: string | null
+          price_m_storage_id: string | null
           price_y: number
           price_y_id: string
           progressive_deploy: boolean
@@ -607,7 +584,10 @@ export interface Database {
           mau_unit?: number | null
           name?: string
           price_m?: number
+          price_m_bandwidth_id?: string | null
           price_m_id: string
+          price_m_mau_id?: string | null
+          price_m_storage_id?: string | null
           price_y?: number
           price_y_id: string
           progressive_deploy?: boolean
@@ -633,7 +613,10 @@ export interface Database {
           mau_unit?: number | null
           name?: string
           price_m?: number
+          price_m_bandwidth_id?: string | null
           price_m_id?: string
+          price_m_mau_id?: string | null
+          price_m_storage_id?: string | null
           price_y?: number
           price_y_id?: string
           progressive_deploy?: boolean
@@ -725,6 +708,7 @@ export interface Database {
           price_id: string | null
           product_id: string
           status: Database["public"]["Enums"]["stripe_status"] | null
+          subscription_anchor: string
           subscription_id: string | null
           subscription_metered: Json
           trial_at: string
@@ -738,6 +722,7 @@ export interface Database {
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
+          subscription_anchor?: string
           subscription_id?: string | null
           subscription_metered?: Json
           trial_at?: string
@@ -751,6 +736,7 @@ export interface Database {
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
+          subscription_anchor?: string
           subscription_id?: string | null
           subscription_metered?: Json
           trial_at?: string

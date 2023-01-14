@@ -47,7 +47,7 @@ serve(async (event: Request) => {
       console.log('updatePerson error', e)
     })
     if (!record.customer_id)
-      await createStripeCustomer(record.id, record.email)
+      await createStripeCustomer(record.id, record.email, `${record.first_name || ''} ${record.last_name || ''}`)
 
     await checkPlan(record.id)
     return sendRes()

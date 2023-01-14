@@ -445,8 +445,8 @@ export const createApiKey = async (userId: string) => {
   return Promise.resolve()
 }
 
-export const createStripeCustomer = async (userId: string, email: string) => {
-  const customer = await createCustomer(email)
+export const createStripeCustomer = async (userId: string, email: string, name: string) => {
+  const customer = await createCustomer(email, userId, name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)

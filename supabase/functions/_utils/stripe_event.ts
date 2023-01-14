@@ -18,8 +18,7 @@ const parseHeader = (header: string, scheme: string): Details => {
     {
       timestamp: -1,
       signatures: [] as string[],
-    } as Details,
-  )
+    } as Details)
 }
 const scmpCompare = (a: string, b: string) => {
   const len = a.length
@@ -57,8 +56,6 @@ export const extractDataEvent = (event: any): Database['public']['Tables']['stri
     price_id: '',
     subscription_id: undefined,
     customer_id: '',
-    updated_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
     is_good_plan: true,
     status: undefined,
   }
