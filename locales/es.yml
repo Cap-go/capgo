@@ -27,6 +27,7 @@ accountPassword:
   success: Contraseña cambiada con éxito
   validate: Validar
 accountProfile:
+  billing_email: Correo Electrónico de Facturas
   country: País
   email: Correo electrónico
   first-name: Nombre de pila

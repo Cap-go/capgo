@@ -27,6 +27,7 @@ accountPassword:
   success: 修改密码成功
   validate: 证实
 accountProfile:
+  billing_email: 帐单电子邮件
   country: 国家
   email: 电子邮件
   first-name: 名

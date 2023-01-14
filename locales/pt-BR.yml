@@ -27,6 +27,7 @@ accountPassword:
   success: Senha alterada com sucesso
   validate: Validar
 accountProfile:
+  billing_email: E-mail de cobrança
   country: País
   email: E-mail
   first-name: Primeiro nome

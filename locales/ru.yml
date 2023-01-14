@@ -27,6 +27,7 @@ accountPassword:
   success: Пароль успешно изменен
   validate: Подтвердить
 accountProfile:
+  billing_email: Электронная почта для выставления счетов
   country: Страна
   email: Эл. адрес
   first-name: Имя

@@ -27,6 +27,7 @@ accountPassword:
   success: パスワードが正常に変更されました
   validate: 検証
 accountProfile:
+  billing_email: 請求メール
   country: 国
   email: Eメール
   first-name: ファーストネーム

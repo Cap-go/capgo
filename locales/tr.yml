@@ -27,6 +27,7 @@ accountPassword:
   success: Şifre başarıyla değiştirildi
   validate: Doğrula
 accountProfile:
+  billing_email: Faturalandırma e-postası
   country: Ülke
   email: E-posta
   first-name: İlk adı

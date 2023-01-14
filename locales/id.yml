@@ -27,6 +27,7 @@ accountPassword:
   success: Berhasil mengubah kata sandi
   validate: Mengesahkan
 accountProfile:
+  billing_email: Email penagihan
   country: Negara
   email: Surel
   first-name: Nama depan

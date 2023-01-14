@@ -27,6 +27,7 @@ accountPassword:
   success: Đã thay đổi mật khẩu thành công
   validate: Xác thực
 accountProfile:
+  billing_email: Thanh toán bằng thư điện tử
   country: Quốc gia
   email: E-mail
   first-name: Tên đầu tiên

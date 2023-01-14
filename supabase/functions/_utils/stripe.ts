@@ -80,7 +80,6 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
 
 export const createCustomer = async (email: string, userId: string, name: string) => {
   const config = getConfig(true)
-  console.log('config', config)
   const customerData = {
     email,
     name,
@@ -91,9 +90,21 @@ export const createCustomer = async (email: string, userId: string, name: string
   return response.data
 }
 
+export const updateCustomer = async (customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) => {
+  const config = getConfig(true)
+  const customerData = {
+    email: billing_email || email,
+    name,
+  }
+  const data = new URLSearchParams(customerData as any)
+  data.append('metadata[user_id]', userId)
+  data.append('metadata[email]', email)
+  const response = await axios.post(`https://api.stripe.com/v1/customers/${customerId}`, data, config)
+  return response.data
+}
+
 export const recordUsage = async (subscriptionId: string, quantity: number) => {
   const config = getConfig(true)
-  console.log('config', config)
   const checkoutData = {
     quantity,
     action: 'set',

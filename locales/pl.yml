@@ -27,6 +27,7 @@ accountPassword:
   success: Pomyślnie zmieniono hasło
   validate: Uprawomocnić
 accountProfile:
+  billing_email: E-mail rozliczeniowy
   country: Kraj
   email: E-mail
   first-name: Imię

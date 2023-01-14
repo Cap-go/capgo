@@ -27,6 +27,7 @@ accountPassword:
   success: Passwort erfolgreich geändert
   validate: Bestätigen
 accountProfile:
+  billing_email: Abrechnung per E-Mail
   country: Land
   email: Email
   first-name: Vorname

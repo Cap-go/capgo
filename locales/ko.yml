@@ -27,6 +27,7 @@ accountPassword:
   success: 비밀번호가 성공적으로 변경되었습니다.
   validate: 확인
 accountProfile:
+  billing_email: 결제 이메일
   country: 국가
   email: 이메일
   first-name: 이름

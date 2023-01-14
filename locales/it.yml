@@ -27,6 +27,7 @@ accountPassword:
   success: Password modificata con successo
   validate: Convalidare
 accountProfile:
+  billing_email: E-mail di fatturazione
   country: Nazione
   email: E-mail
   first-name: Nome di battesimo

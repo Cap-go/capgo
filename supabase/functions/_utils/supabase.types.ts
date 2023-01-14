@@ -745,6 +745,7 @@ export interface Database {
       }
       users: {
         Row: {
+          billing_email: string | null
           country: string | null
           created_at: string | null
           customer_id: string | null
@@ -759,6 +760,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          billing_email?: string | null
           country?: string | null
           created_at?: string | null
           customer_id?: string | null
@@ -773,6 +775,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          billing_email?: string | null
           country?: string | null
           created_at?: string | null
           customer_id?: string | null

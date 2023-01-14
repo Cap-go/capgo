@@ -247,7 +247,8 @@ watchEffect(async () => {
         first_name,
         last_name,
         country,
-        email
+        email,
+        billing_email
       `)
       .eq('id', main.user?.id)
       .single()
@@ -300,7 +301,7 @@ watchEffect(async () => {
 
           <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">First Name</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">{{ t('accountProfile.first-name') }}</label>
               <input
                 v-model="form.first_name" class="w-full form-input dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
@@ -316,7 +317,7 @@ watchEffect(async () => {
               </div>
             </div>
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="business-id">Last Name</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="business-id">{{ t('accountProfile.last-name') }}</label>
               <input
                 v-model="form.last_name" class="w-full form-input dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
@@ -333,7 +334,7 @@ watchEffect(async () => {
           </div>
           <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">Email</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('accountProfile.email') }}</label>
               <input
                 v-model="form.email" class="w-full form-input dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
                 required
@@ -344,7 +345,7 @@ watchEffect(async () => {
               >
             </div>
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">Country</label>
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('accountProfile.country') }}</label>
               <input
                 v-model="form.country"
                 class="w-full form-input dark:bg-gray-700 dark:text-white"

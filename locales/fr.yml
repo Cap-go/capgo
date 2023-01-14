@@ -27,6 +27,7 @@ accountPassword:
   success: Mot de passe changé avec succès
   validate: Valider
 accountProfile:
+  billing_email: E-mail de facturation
   country: Pays
   email: E-mail
   first-name: Prénom
