@@ -726,6 +726,7 @@ export interface Database {
           product_id: string
           status: Database["public"]["Enums"]["stripe_status"] | null
           subscription_id: string | null
+          subscription_metered: Json
           trial_at: string
           updated_at: string
         }
@@ -738,6 +739,7 @@ export interface Database {
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
           subscription_id?: string | null
+          subscription_metered?: Json
           trial_at?: string
           updated_at?: string
         }
@@ -750,6 +752,7 @@ export interface Database {
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
           subscription_id?: string | null
+          subscription_metered?: Json
           trial_at?: string
           updated_at?: string
         }
