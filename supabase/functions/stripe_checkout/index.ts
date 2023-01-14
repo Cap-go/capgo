@@ -47,6 +47,7 @@ serve(async (event: Request) => {
     return sendRes({ url: checkout.url })
   }
   catch (e) {
+    console.log('error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

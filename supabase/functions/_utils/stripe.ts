@@ -24,53 +24,30 @@ export const createPortal = async (customerId: string, callbackUrl: string) => {
   return response.data
 }
 
-const getPriceId = async (planId: string, reccurence: string): Promise<null | string> => {
+const getPriceIds = async (planId: string, reccurence: string): Promise<{ priceId: string | null; meteredIds: string[] }> => {
   let priceId = null
+  const meteredIds: string[] = []
   try {
     const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
     const prices = response.data.data
+    console.log('prices stripe', prices)
     prices.forEach((price: any) => {
-      if (price.recurring.interval === reccurence && price.active)
+      if (price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
-    })
-  }
-  catch (err) {
-    console.log('search err', err)
-  }
-  return priceId
-}
-
-const getPriceIdMetered = async (planId: string) => {
-  const priceIds: string[] = []
-  try {
-    const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
-    const prices = response.data.data
-    prices.forEach((price: any) => {
       if (price.billing_scheme === 'per_unit' && price.active)
-        priceIds.push(price.id)
+        meteredIds.push(price.id)
     })
   }
   catch (err) {
     console.log('search err', err)
   }
-  return priceIds
-}
-
-const getPlanName = async (planId: string) => {
-  let planName = null
-  try {
-    const response = await axios.get(`https://api.stripe.com/v1/products/${planId}`, getConfig())
-    planName = response.data.data.name
-  }
-  catch (err) {
-    console.log('search err', err)
-  }
-  return planName
+  return { priceId, meteredIds }
 }
 
 export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
-  const priceId = await getPriceId(planId, reccurence)
-  if (!priceId)
+  const prices = await getPriceIds(planId, reccurence)
+  console.log('prices', prices)
+  if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const checkoutData = {
     billing_address_collection: 'auto',
@@ -78,21 +55,23 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
     customer: customerId,
     success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: cancelUrl,
-    automatic_tax: {
-      enabled: true,
-    },
   }
   const data = new URLSearchParams(checkoutData as any)
-  data.append('line_items[0][price]', priceId)
+  data.append('automatic_tax[enabled]', 'true')
+  data.append('billing_address_collection', 'auto')
+  data.append('customer_update[address]', 'auto')
+  data.append('customer_update[name]', 'auto')
+  data.append('tax_id_collection[enabled]', 'true')
+  data.append('line_items[0][price]', prices.priceId)
   data.append('line_items[0][quantity]', '1')
-  const planName = await getPlanName(planId)
-  if (planName === 'Pay as you go') {
-    const meteredPrices = await getPriceIdMetered(planId)
-    meteredPrices.forEach((priceId, index) => {
-      data.append(`line_items[${index}][price_data][product]`, priceId)
-      data.append(`line_items[${index}][recurring][usage_type]`, 'metered')
-    })
-  }
+  console.log('data', data)
+  // prices.meteredIds.forEach((priceId, index) => {
+  //   data.append(`line_items[${index + 1}][price_data][product]`, priceId)
+  //   data.append(`line_items[${index + 1}][price_data][currency]`, 'USD')
+  //   data.append(`line_items[${index + 1}][price_data][recurring][usage_type]`, 'metered')
+  //   data.append(`line_items[${index + 1}][price_data][recurring][interval]`, 'month')
+  //   data.append(`line_items[${index + 1}][price_data][recurring][interval_count]`, '1')
+  // })
   try {
     const response = await axios.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(true))
     return response.data
