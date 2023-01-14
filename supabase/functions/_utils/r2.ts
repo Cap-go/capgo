@@ -1,8 +1,9 @@
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.3.0/mod.ts'
+import { getEnv } from './utils.ts'
 
-const accountid = Deno.env.get('R2_ACCOUNT_ID')
-const access_key_id = Deno.env.get('R2_ACCESS_KEY_ID')
-const access_key_secret = Deno.env.get('R2_SECRET_ACCESS_KEY')
+const accountid = getEnv('R2_ACCOUNT_ID')
+const access_key_id = getEnv('R2_ACCESS_KEY_ID')
+const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
 
 const initR2 = () => new S3Client({
   endPoint: `https://${accountid}.r2.cloudflarestorage.com`,
