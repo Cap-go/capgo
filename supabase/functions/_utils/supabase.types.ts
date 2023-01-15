@@ -843,17 +843,9 @@ export interface Database {
         Args: { e_mail: string }
         Returns: string
       }
-      find_best_plan_v2: {
-        Args: { mau: number; storage: number; bandwidth: number }
-        Returns: string
-      }
       find_best_plan_v3: {
         Args: { mau: number; bandwidth: number; storage: number }
         Returns: string
-      }
-      find_fit_plan_v2: {
-        Args: { mau: number; storage: number; bandwidth: number }
-        Returns: { name: string }[]
       }
       find_fit_plan_v3: {
         Args: { mau: number; bandwidth: number; storage: number }
@@ -900,6 +892,10 @@ export interface Database {
         Args: { userid: string }
         Returns: number
       }
+      get_metered_usage: {
+        Args: { userid: string }
+        Returns: unknown
+      }
       get_plan_usage_percent: {
         Args: { userid: string; dateid: string }
         Returns: number
@@ -915,10 +911,6 @@ export interface Database {
           max_device: number
           mau: number
         }[]
-      }
-      get_total_stats: {
-        Args: { userid: string; dateid: string }
-        Returns: { mau: number; storage: number; bandwidth: number }[]
       }
       get_total_stats_v2: {
         Args: { userid: string; dateid: string }
@@ -1004,10 +996,6 @@ export interface Database {
         Returns: boolean
       }
       is_free_usage: {
-        Args: { userid: string }
-        Returns: boolean
-      }
-      is_good_plan_v2: {
         Args: { userid: string }
         Returns: boolean
       }
