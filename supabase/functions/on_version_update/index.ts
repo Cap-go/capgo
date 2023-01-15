@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
-// import { r2 } from '../_utils/r2.ts'
+import { r2 } from '../_utils/r2.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -35,53 +35,52 @@ serve(async (event: Request) => {
       console.log('no bucket_id')
       return sendRes()
     }
-    // TODO: allow r2 switch
     // // check if not deleted it's present in r2 storage
-    // if (!record.deleted) {
-    //   const exist = await r2.checkIfExist(record.bucket_id)
-    //   if (!exist) {
-    //     // upload to r2
-    //     const { data, error } = await supabaseAdmin()
-    //       .storage
-    //       .from(`apps/${record.user_id}/${record.app_id}/versions`)
-    //       .download(record.bucket_id)
-    //     if (error || !data) {
-    //       console.log('Cannot download', record.bucket_id)
-    //       return sendRes()
-    //     }
-    //     try {
-    //       await r2.upload(record.bucket_id, data)
-    //       const { error: errorUpdateStorage } = await supabaseAdmin()
-    //         .from('app_versions')
-    //         .update({
-    //           storage_provider: 'r2',
-    //         })
-    //         .eq('id', record.id)
-    //       if (errorUpdateStorage)
-    //         console.log('errorUpdateStorage', errorUpdateStorage)
-    //     }
-    //     catch (error) {
-    //       console.log('Cannot upload', record.bucket_id, error)
-    //       return sendRes()
-    //     }
-    //   }
-    // }
+    if (!record.deleted) {
+      const exist = await r2.checkIfExist(record.bucket_id)
+      if (!exist) {
+        // upload to r2
+        const { data, error } = await supabaseAdmin()
+          .storage
+          .from(`apps/${record.user_id}/${record.app_id}/versions`)
+          .download(record.bucket_id)
+        if (error || !data) {
+          console.log('Cannot download', record.bucket_id)
+          return sendRes()
+        }
+        try {
+          await r2.upload(record.bucket_id, data)
+          const { error: errorUpdateStorage } = await supabaseAdmin()
+            .from('app_versions')
+            .update({
+              storage_provider: 'r2',
+            })
+            .eq('id', record.id)
+          if (errorUpdateStorage)
+            console.log('errorUpdateStorage', errorUpdateStorage)
+        }
+        catch (error) {
+          console.log('Cannot upload', record.bucket_id, error)
+          return sendRes()
+        }
+      }
+    }
     if (record.deleted === body.old_record.deleted) {
       console.log('Update but not deleted')
       return sendRes()
     }
     // check if in r2 storage and delete
-    // const exist = await r2.checkIfExist(record.bucket_id)
-    // if (exist) {
-    //   // delete in r2
-    //   try {
-    //     await r2.deleteObject(record.bucket_id)
-    //   }
-    //   catch (error) {
-    //     console.log('Cannot delete r2', record.bucket_id, error)
-    //     return sendRes()
-    //   }
-    // }
+    const exist = await r2.checkIfExist(record.bucket_id)
+    if (exist) {
+      // delete in r2
+      try {
+        await r2.deleteObject(record.bucket_id)
+      }
+      catch (error) {
+        console.log('Cannot delete r2', record.bucket_id, error)
+        return sendRes()
+      }
+    }
 
     const { data, error: dbError } = await supabaseAdmin()
       .from('app_versions_meta')

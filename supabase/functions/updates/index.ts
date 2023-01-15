@@ -9,7 +9,7 @@ import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { defaultDeviceID } from '../_tests/api.ts'
 import { sendNotif } from '../_utils/notifications.ts'
-// import { r2 } from '../_utils/r2.ts'
+import { r2 } from '../_utils/r2.ts'
 
 const getBundleUrl = async (platform: string, bucket_id: string, path: string) => {
   if (platform === 'supabase') {
@@ -19,9 +19,9 @@ const getBundleUrl = async (platform: string, bucket_id: string, path: string) =
       .createSignedUrl(bucket_id, 120)
     return data?.signedUrl
   }
-  // else if (platform === 'r2') {
-  //   return r2.getSignedUrl(bucket_id, 120)
-  // }
+  else if (platform === 'r2') {
+    return r2.getSignedUrl(bucket_id, 120)
+  }
   return null
 }
 
