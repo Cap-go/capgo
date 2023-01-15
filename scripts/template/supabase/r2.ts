@@ -1,11 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// deno-lint-ignore-file no-unused-vars
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.3.0/mod.ts'
-import { getEnv } from './utils.ts'
 
-const accountid = getEnv('R2_ACCOUNT_ID')
-const access_key_id = getEnv('R2_ACCESS_KEY_ID')
-const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
+const accountid = ''
+const access_key_id = ''
+const access_key_secret = ''
 const bucket = 'capgo'
-
+// upper is ignored during netlify generation phase
+// import from here
 const initR2 = () => new S3Client({
   endPoint: `https://${accountid}.r2.cloudflarestorage.com`,
   region: 'us-east-1',
@@ -35,11 +37,4 @@ const getSignedUrl = (fileId: string, expirySeconds: number) => {
   return client.getPresignedUrl('GET', fileId, {
     expirySeconds,
   })
-}
-
-export const r2 = {
-  upload,
-  deleteObject,
-  checkIfExist,
-  getSignedUrl,
 }

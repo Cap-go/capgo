@@ -48,6 +48,7 @@ supaTemplFiles.forEach((file) => {
     console.error(e)
   }
 })
+console.log('supaTempl', Object.keys(supaTempl))
 netlifyTemplFiles.forEach((file) => {
   try {
     const content = readFileSync(`${baseNetlifyTemplate}/${file}`, 'utf8')
@@ -81,17 +82,12 @@ export const decodeBase64 = (data) => {
   return Buffer.from(data, 'base64').toString('ascii')
 }
 const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const mutations = [
+const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.1.2', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
-  { from: 'import { S3Client } from \'https://deno.land/x/s3_lite_client@0.3.0/mod.ts\'', to: 'import { Client } from \'minio\'' },
-  { from: '\n  bucket: \'capgo\',', to: '' },
-  { from: 'putObject(', to: 'putObject(\'capgo\', ' },
-  { from: 'client.deleteObject(', to: 'client.removeObject(\'capgo\', ' },
-  { from: 'getPresignedUrl(', to: 'getPresignedUrl(\'capgo\', ' },
-  { from: 'exists(fileId)', to: 'getPartialObject(\'capgo\', fileId, 0, 1, (err, dataStream) => err)' },
-  { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
+  { from: 'https://deno.land/x/s3_lite_client@0.3.0/mod.ts', to: 'minio' },
+  { from: 'S3Client', to: 'Client' },
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
   { from: 'https://deno.land/x/semver@v1.4.1/mod.ts', to: 'semver' },
   { from: 'https://deno.land/x/equal@v1.5.0/mod.ts', to: 'lauqe' },
@@ -100,6 +96,7 @@ const mutations = [
   { from: 'import { serve } from \'https://deno.land/std@0.171.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
+  { from: supaTempl.r2, to: netlifyTempl.r2 },
   { from: supaTempl.handler, to: netlifyTempl.handler },
   { from: supaTempl.getEnv, to: netlifyTempl.getEnv },
   { from: supaTempl.res, to: netlifyTempl.res },
@@ -152,7 +149,7 @@ for (let i = 0; i < files.length; i++) {
   // replace imports
   const content = readFileSync(file, 'utf8')
   let newContent = `// This code is generated don't modify it\n${content}`
-  mutations.forEach((m) => {
+  mutationsNode.forEach((m) => {
     const { from, to } = m
     newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
@@ -183,7 +180,7 @@ catch (e) {
     if (allowedUtil.includes(fileName)) {
       const content = readFileSync(`${baseSupaUtils}/${f}`, 'utf8')
       let newContent = `// This code is generated don't modify it\n${content}`
-      mutations.forEach((m) => {
+      mutationsNode.forEach((m) => {
         const { from, to } = m
         newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
       })
@@ -213,7 +210,7 @@ catch (e) {
     // if allowedUtil file copy to netlify/_utils
     const content = readFileSync(`${baseSupaTests}/${f}`, 'utf8')
     let newContent = `// This code is generated don't modify it\n${content}`
-    mutations.forEach((m) => {
+    mutationsNode.forEach((m) => {
       const { from, to } = m
       newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
     })
