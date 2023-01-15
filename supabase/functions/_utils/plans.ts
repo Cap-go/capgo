@@ -82,24 +82,22 @@ interface Prices {
 
 const setMetered = async (customer_id: string, userId: string) => {
   console.log('setMetered', customer_id, userId)
-  return await Promise.resolve({} as Prices)
-  //   getCurrentPlanMax
-  // get stripe_info of user
-  // const { data } = await supabaseAdmin()
-  //   .from('stripe_info')
-  //   .select()
-  //   .eq('customer_id', customer_id)
-  //   .single()
-  // if (data && data.subscription_metered) {
-  //   const prices = data.subscription_metered as any as Prices
-  //   const get_metered_usage = await getMeterdUsage(userId)
-  //   if (get_metered_usage.mau > 0 && prices.mau)
-  //     await recordUsage(prices.mau, get_metered_usage.mau)
-  //   if (get_metered_usage.storage > 0)
-  //     await recordUsage(prices.storage, get_metered_usage.storage)
-  //   if (get_metered_usage.bandwidth > 0)
-  //     await recordUsage(prices.bandwidth, get_metered_usage.bandwidth)
-  // }
+  // return await Promise.resolve({} as Prices)
+  const { data } = await supabaseAdmin()
+    .from('stripe_info')
+    .select()
+    .eq('customer_id', customer_id)
+    .single()
+  if (data && data.subscription_metered) {
+    const prices = data.subscription_metered as any as Prices
+    const get_metered_usage = await getMeterdUsage(userId)
+    if (get_metered_usage.mau > 0 && prices.mau)
+      await recordUsage(prices.mau, get_metered_usage.mau)
+    if (get_metered_usage.storage > 0)
+      await recordUsage(prices.storage, get_metered_usage.storage)
+    if (get_metered_usage.bandwidth > 0)
+      await recordUsage(prices.bandwidth, get_metered_usage.bandwidth)
+  }
 }
 
 export const checkPlan = async (userId: string): Promise<void> => {
