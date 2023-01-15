@@ -80,7 +80,9 @@ interface Prices {
   bandwidth: string
 }
 
-const setMetered = async (customer_id: string, userId: string) => {
+const setMetered = async (customer_id: string | null, userId: string) => {
+  if (customer_id === null)
+    return Promise.resolve()
   console.log('setMetered', customer_id, userId)
   // return await Promise.resolve({} as Prices)
   const { data } = await supabaseAdmin()
