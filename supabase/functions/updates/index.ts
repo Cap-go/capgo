@@ -20,7 +20,7 @@ const getBundleUrl = async (platform: string, bucket_id: string, path: string) =
     return data?.signedUrl
   }
   else if (platform === 'r2') {
-    return r2.getSignedUrl(`${bucket_id}.zip`, 120)
+    return r2.getSignedUrl(bucket_id, 120)
   }
   return null
 }

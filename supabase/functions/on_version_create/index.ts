@@ -95,7 +95,7 @@ serve(async (event: Request) => {
       versions: 1,
     }
     await updateOrAppStats(increment, today_id, record.user_id)
-    await r2.upload(`${record.bucket_id}.zip`, unit8)
+    await r2.upload(record.bucket_id, unit8)
     // modify app_versions to set storage to r2
     const { error: errorUpdateStorage } = await supabaseAdmin()
       .from('app_versions')

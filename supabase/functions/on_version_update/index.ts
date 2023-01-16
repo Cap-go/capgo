@@ -72,11 +72,11 @@ serve(async (event: Request) => {
       return sendRes()
     }
     // check if in r2 storage and delete
-    const exist = await r2.checkIfExist(`${record.bucket_id}.zip`)
+    const exist = await r2.checkIfExist(record.bucket_id)
     if (exist) {
       // delete in r2
       try {
-        await r2.deleteObject(`${record.bucket_id}.zip`)
+        await r2.deleteObject(record.bucket_id)
       }
       catch (error) {
         console.log('Cannot delete r2', record.bucket_id, error)
