@@ -2,7 +2,8 @@ import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 import {
-  baseSupabase, defaultGetBundleRes,
+  baseSupabase,
+  defaultGetBundleRes,
   defaultGetChannelRes, defaultGetDevicesRes,
   defaultPutChannelRes, defaultRes,
   defaultUpdateRes, deleteBundle, deleteDevice,

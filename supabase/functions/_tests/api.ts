@@ -4,6 +4,7 @@ import { getEnv } from '../_utils/utils.ts'
 
 export const baseSupabase = 'https://supabase.capgo.app/'
 export const baseNetlify = 'https://netlify.capgo.app/'
+export const baseNetlifyEdge = 'https://netlify-egde.capgo.app/'
 
 const defaultAppId = 'unknow.unknow'
 const defaultVersion = '1.2.3'
