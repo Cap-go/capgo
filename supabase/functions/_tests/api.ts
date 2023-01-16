@@ -40,6 +40,7 @@ export const defaultUpdatePayload = {
   version_name: defaultVersionName,
   plugin_version: defaultpluginVersion,
 }
+export const defaultDb = { status: 'ok', service: 'database' }
 
 export const defaultUpdateRes = {
   version: defaultVersion,

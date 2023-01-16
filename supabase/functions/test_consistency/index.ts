@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 
 import {
-  baseNetlify, baseSupabase, deleteBundle,
+  baseNetlify, baseSupabase, defaultDb, defaultRes, deleteBundle,
   deleteDevice, getBundle, getChannel, getDevice,
   getOk, postDevice, postStats, postUpdate, putChannel,
   setChannel, setChannelSelf,
@@ -25,14 +25,14 @@ serve(async (event: Request) => {
       found = true
       const supabaseRes = await getOk(baseSupabase)
       const netlifyRes = await getOk(baseNetlify)
-      if (!equal(supabaseRes, netlifyRes))
+      if (!equal(supabaseRes, netlifyRes) || supabaseRes !== defaultRes)
         return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     }
     else if (service === 'database') {
       found = true
       const supabaseRes = await getOk(baseSupabase)
       const netlifyRes = await getOk(baseNetlify)
-      if (!equal(supabaseRes, netlifyRes))
+      if (!equal(supabaseRes, netlifyRes) || supabaseRes !== defaultDb)
         return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     }
     else if (service === 'update') {
