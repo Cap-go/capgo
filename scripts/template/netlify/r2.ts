@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { reject } from 'cypress/types/bluebird'
 import { Client } from 'minio'
 
 const accountid = ''
@@ -15,11 +14,11 @@ const initR2 = () => new Client({
   secretKey: access_key_secret,
 })
 
-const upload = (fileId: string, file: Blob) => {
+const upload = (fileId: string, file: Uint8Array) => {
   const client = initR2()
   // Upload a file:
-  return new Promise((resolve) => {
-    client.putObject(bucket, fileId, file.stream() as any, (err, res) => {
+  return new Promise((resolve, reject) => {
+    client.putObject(bucket, fileId, Buffer.from(file), (err, res) => {
       if (err)
         return reject(err)
       resolve(res)
@@ -45,4 +44,3 @@ const getSignedUrl = (fileId: string, expirySeconds: number) => {
   const client = initR2()
   return client.presignedUrl('GET', bucket, fileId, expirySeconds)
 }
-

@@ -9,17 +9,16 @@ const bucket = 'capgo'
 // upper is ignored during netlify generation phase
 // import from here
 const initR2 = () => new S3Client({
-  endPoint: `https://${accountid}.r2.cloudflarestorage.com`,
+  endPoint: `${accountid}.r2.cloudflarestorage.com`,
   region: 'us-east-1',
   bucket,
   accessKey: access_key_id,
   secretKey: access_key_secret,
 })
 
-const upload = (fileId: string, file: Blob) => {
+const upload = (fileId: string, file: Uint8Array) => {
   const client = initR2()
-  // Upload a file:
-  return client.putObject(fileId, file.stream())
+  return client.putObject(fileId, file)
 }
 
 const deleteObject = (fileId: string) => {
@@ -34,7 +33,5 @@ const checkIfExist = (fileId: string) => {
 
 const getSignedUrl = (fileId: string, expirySeconds: number) => {
   const client = initR2()
-  return client.getPresignedUrl('GET', fileId, {
-    expirySeconds,
-  })
+  return client.getPresignedUrl('GET', fileId, { expirySeconds })
 }

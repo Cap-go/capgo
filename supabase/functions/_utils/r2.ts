@@ -16,7 +16,6 @@ const initR2 = () => new S3Client({
 
 const upload = (fileId: string, file: Uint8Array) => {
   const client = initR2()
-  // Upload a file:
   return client.putObject(fileId, file)
 }
 
@@ -32,9 +31,7 @@ const checkIfExist = (fileId: string) => {
 
 const getSignedUrl = (fileId: string, expirySeconds: number) => {
   const client = initR2()
-  return client.getPresignedUrl('GET', fileId, {
-    expirySeconds,
-  })
+  return client.getPresignedUrl('GET', fileId, { expirySeconds })
 }
 
 export const r2 = {
