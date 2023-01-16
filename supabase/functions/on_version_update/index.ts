@@ -39,6 +39,7 @@ serve(async (event: Request) => {
     if (!record.deleted) {
       const exist = await r2.checkIfExist(record.bucket_id)
       if (!exist) {
+        console.log('upload to r2', record.bucket_id)
         // upload to r2
         const { data, error } = await supabaseAdmin()
           .storage
