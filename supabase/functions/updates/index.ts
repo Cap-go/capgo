@@ -20,7 +20,7 @@ const getBundleUrl = async (platform: string, bucket_id: string, path: string) =
     return data?.signedUrl
   }
   else if (platform === 'r2') {
-    return r2.getSignedUrl(bucket_id, 120)
+    return r2.getSignedUrl(`${bucket_id}.zip`, 120)
   }
   return null
 }
@@ -358,6 +358,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     })
   }
   catch (e) {
+    console.error('e', e)
     return sendRes({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',

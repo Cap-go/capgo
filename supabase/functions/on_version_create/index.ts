@@ -65,8 +65,9 @@ serve(async (event: Request) => {
     const u = await data.arrayBuffer()
     // get the size of the Uint8Array
     const size = u.byteLength
+    const unit8 = new Uint8Array(u)
     // cr32 hash the file
-    const checksum = crc32(new Uint8Array(u))
+    const checksum = crc32(unit8)
     // create app version meta
     const { error: dbError } = await supabaseAdmin()
       .from('app_versions_meta')
@@ -94,7 +95,7 @@ serve(async (event: Request) => {
       versions: 1,
     }
     await updateOrAppStats(increment, today_id, record.user_id)
-    await r2.upload(record.bucket_id, data)
+    await r2.upload(`${record.bucket_id}.zip`, unit8)
     // modify app_versions to set storage to r2
     const { error: errorUpdateStorage } = await supabaseAdmin()
       .from('app_versions')
@@ -107,6 +108,7 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
+    console.error('e', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

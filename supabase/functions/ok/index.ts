@@ -17,7 +17,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   const service = body.service
   console.log('service', service)
   if (service == null) {
-    return sendRes()
+    return sendRes({ status: 'ok', service: 'ok' })
   }
   else if (service === 'database') {
     const db = await getDatabase()
@@ -27,69 +27,77 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (service === 'update') {
     const supabaseRes = await postUpdate(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultUpdateRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'stats') {
     const supabaseRes = await postStats(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_self_post') {
     const supabaseRes = await setChannelSelf(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_self_get') {
     const supabaseRes = await putChannel(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultPutChannelRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_get') {
     const supabaseRes = await getChannel(baseSupabase)
-    // map on list and remove all updatedAt
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultGetChannelRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_post') {
     const supabaseRes = await setChannel(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_get') {
     const supabaseRes = await getDevice(baseSupabase)
-    // map on list and remove all updatedAt
-
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultGetDevicesRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_post') {
     const supabaseRes = await postDevice(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_delete') {
     const supabaseRes = await deleteDevice(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'bundle_get') {
     const supabaseRes = await getBundle(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultGetBundleRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'bundle_delete') {
     const supabaseRes = await deleteBundle(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })

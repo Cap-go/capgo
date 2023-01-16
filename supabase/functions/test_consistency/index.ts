@@ -154,7 +154,7 @@ serve(async (event: Request) => {
     }
     if (!found)
       return sendRes({ error: 'service not found', service }, 500)
-    return sendRes()
+    return sendRes({ status: 'ok', service })
   }
   catch (error) {
     return sendRes({ error: JSON.stringify(error) }, 500)

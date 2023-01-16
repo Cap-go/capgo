@@ -7,17 +7,17 @@ const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
 const bucket = 'capgo'
 
 const initR2 = () => new S3Client({
-  endPoint: `https://${accountid}.r2.cloudflarestorage.com`,
+  endPoint: `${accountid}.r2.cloudflarestorage.com`,
   region: 'us-east-1',
   bucket,
   accessKey: access_key_id,
   secretKey: access_key_secret,
 })
 
-const upload = (fileId: string, file: Blob) => {
+const upload = (fileId: string, file: Uint8Array) => {
   const client = initR2()
   // Upload a file:
-  return client.putObject(fileId, file.stream())
+  return client.putObject(fileId, file)
 }
 
 const deleteObject = (fileId: string) => {

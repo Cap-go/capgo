@@ -49,7 +49,9 @@ serve(async (event: Request) => {
           return sendRes()
         }
         try {
-          await r2.upload(record.bucket_id, data)
+          const u = await data.arrayBuffer()
+          const unit8 = new Uint8Array(u)
+          await r2.upload(record.bucket_id, unit8)
           const { error: errorUpdateStorage } = await supabaseAdmin()
             .from('app_versions')
             .update({
@@ -70,11 +72,11 @@ serve(async (event: Request) => {
       return sendRes()
     }
     // check if in r2 storage and delete
-    const exist = await r2.checkIfExist(record.bucket_id)
+    const exist = await r2.checkIfExist(`${record.bucket_id}.zip`)
     if (exist) {
       // delete in r2
       try {
-        await r2.deleteObject(record.bucket_id)
+        await r2.deleteObject(`${record.bucket_id}.zip`)
       }
       catch (error) {
         console.log('Cannot delete r2', record.bucket_id, error)
