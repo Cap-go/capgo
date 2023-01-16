@@ -8,7 +8,7 @@ const bucket = 'capgo'
 // upper is ignored during netlify generation phase
 // import from here
 const initR2 = () => new Client({
-  endPoint: `https://${accountid}.r2.cloudflarestorage.com`,
+  endPoint: `${accountid}.r2.cloudflarestorage.com`,
   region: 'us-east-1',
   accessKey: access_key_id,
   secretKey: access_key_secret,
