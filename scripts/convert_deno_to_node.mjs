@@ -88,6 +88,7 @@ const mutationsNode = [
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://deno.land/x/s3_lite_client@0.3.0/mod.ts', to: 'minio' },
   { from: 'S3Client', to: 'Client' },
+  { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
   { from: 'https://deno.land/x/semver@v1.4.1/mod.ts', to: 'semver' },
   { from: 'https://deno.land/x/equal@v1.5.0/mod.ts', to: 'lauqe' },
