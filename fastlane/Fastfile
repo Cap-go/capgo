@@ -53,10 +53,20 @@ platform :ios do
     match(
       type: 'appstore',
       git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
-      readonly: true,
       keychain_name: TEMP_KEYCHAIN_USER,
       keychain_password: TEMP_KEYCHAIN_PASSWORD,
-      api_key: api_key
+      api_key: api_key,
+      readonly: is_ci
+    )
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      code_sign_identity: 'iPhone Distribution',
+      path: "ios/App/App.xcodeproj"
+    )
+    update_code_signing_settings(
+      targets: 'App',
+      profile_name: PROVISIONING_PROFILE_SPECIFIER,
+      path: "ios/App/App.xcodeproj"
     )
 
     build_app(
