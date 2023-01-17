@@ -170,6 +170,7 @@ export const defaultGetChannelRes = [{
   allow_dev: true,
   version: { name: defaultVersion, id: defaultVersionId },
 }]
+
 export const getChannel = async (baseUrl: string) => {
   const url = `${baseUrl}/channel`
   const response = await axios.get<typeof defaultGetChannelRes>(url, {
