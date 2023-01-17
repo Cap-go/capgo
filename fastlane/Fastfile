@@ -59,8 +59,7 @@ platform :ios do
     #   api_key: api_key
     # )
     get_certificates(
-            readonly:		    true,
-            fail_on_name_taken:   true,
+            force:		    true,
     )        # invokes cert
     get_provisioning_profile   # invokes sigh
 
