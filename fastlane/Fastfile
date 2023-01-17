@@ -50,26 +50,14 @@ platform :ios do
       in_house: false
     )
 
-    # match(
-    #   type: 'appstore',
-    #   git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
-    #   readonly: true,
-    #   keychain_name: TEMP_KEYCHAIN_USER,
-    #   keychain_password: TEMP_KEYCHAIN_PASSWORD,
-    #   api_key: api_key
-    # )
-    update_code_signing_settings(
-      use_automatic_signing: false,
-      code_sign_identity: 'iPhone Distribution',
-      path: "ios/App/App.xcodeproj"
+    match(
+      type: 'appstore',
+      git_basic_authorization: Base64.strict_encode64("#{GIT_USERNAME}:#{GIT_TOKEN}"),
+      readonly: true,
+      keychain_name: TEMP_KEYCHAIN_USER,
+      keychain_password: TEMP_KEYCHAIN_PASSWORD,
+      api_key: api_key
     )
-    update_code_signing_settings(
-      targets: 'App',
-      profile_name: PROVISIONING_PROFILE_SPECIFIER,
-      path: "ios/App/App.xcodeproj"
-    )
-    get_certificates
-    get_provisioning_profile   # invokes sigh
 
     build_app(
       configuration: "Release",
@@ -81,8 +69,6 @@ platform :ios do
             DEVELOPER_APP_ID => "#{PROVISIONING_PROFILE_SPECIFIER}"
         }
       },
-      xcargs: "-allowProvisioningUpdates"
-      # xcargs: "-allowProvisioningUpdates -authenticationKeyIssuerID xxx -authenticationKeyID xxx -authenticationKeyPath #{File.expand_path('path_to_key')}"
     )
 
     pilot(
