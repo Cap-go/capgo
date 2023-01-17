@@ -4,7 +4,7 @@ import { getEnv } from '../_utils/utils.ts'
 
 export const baseSupabase = 'https://supabase.capgo.app/'
 export const baseNetlify = 'https://netlify.capgo.app/'
-export const baseNetlifyEdge = 'https://netlify-egde.capgo.app/'
+export const baseNetlifyEdge = 'https://netlify-edge.capgo.app/'
 
 const defaultAppId = 'unknow.unknow'
 const defaultVersion = '1.2.3'
@@ -62,10 +62,11 @@ export const postUpdate = async (baseUrl: string) => {
   return response.data
 }
 
+export const defaultResOk = { status: 'ok', service: 'ok' }
 export const defaultRes = { status: 'ok' }
 export const getOk = async (baseUrl: string) => {
   const url = `${baseUrl}/ok`
-  const response = await axios.get<typeof defaultRes>(url)
+  const response = await axios.get<typeof defaultResOk>(url)
   return response.data
 }
 

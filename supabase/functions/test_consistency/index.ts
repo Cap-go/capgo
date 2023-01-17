@@ -48,7 +48,7 @@ serve(async (event: Request) => {
       const netlifyEdgeRes = await postUpdate(baseNetlifyEdge)
       console.log('service update', supabaseRes, netlifyRes)
       if (!equal(supabaseRes, netlifyRes))
-        return sendRes({ error: 'supabaseRes !== supabaseRes', service }, 500)
+        return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
       if (!equal(supabaseRes, netlifyEdgeRes))
         return sendRes({ error: '!equal(supabaseRes, netlifyEdgeRes)', service }, 500)
     }
@@ -58,7 +58,7 @@ serve(async (event: Request) => {
       const netlifyRes = await postStats(baseNetlify)
       const netlifyEdgeRes = await postStats(baseNetlifyEdge)
       if (!equal(supabaseRes, netlifyRes))
-        return sendRes({ error: 'supabaseSetChannelSelf  !== netlifySetChannelSelf' }, 500)
+        return sendRes({ error: '!equal(supabaseRes, netlifyRes)' }, 500)
       if (!equal(supabaseRes, netlifyEdgeRes))
         return sendRes({ error: '!equal(supabaseRes, netlifyEdgeRes)', service }, 500)
     }
@@ -68,7 +68,7 @@ serve(async (event: Request) => {
       const netlifyRes = await setChannelSelf(baseNetlify)
       const netlifyEdgeRes = await setChannelSelf(baseNetlifyEdge)
       if (!equal(supabaseRes, netlifyRes))
-        return sendRes({ error: 'supabaseRes  !== supabaseRes', service }, 500)
+        return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
       if (!equal(supabaseRes, netlifyEdgeRes))
         return sendRes({ error: '!equal(supabaseRes, netlifyEdgeRes)', service }, 500)
     }
@@ -98,7 +98,7 @@ serve(async (event: Request) => {
       const netlifyRes = await setChannel(baseNetlify)
       const netlifyEdgeRes = await setChannel(baseNetlifyEdge)
       if (!equal(supabaseRes, netlifyRes))
-        return sendRes({ error: 'netlifyRes !== supabaseRes', service }, 500)
+        return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
       if (!equal(supabaseRes, netlifyEdgeRes))
         return sendRes({ error: '!equal(supabaseRes, netlifyEdgeRes)', service }, 500)
     }
