@@ -49,7 +49,7 @@ const createR2 = async (record: Database['public']['Tables']['app_versions']['Ro
   catch (error) {
     console.log('Cannot upload', record.bucket_id, error)
   }
-  console.log('app_versions_meta create', record.id)
+  console.log('r2 create', record.id)
   return Promise.resolve()
 }
 
@@ -68,18 +68,20 @@ const createAll = async () => {
       .eq('deleted', false)
       .eq('storage_provider', 'supabase')
       .not('bucket_id', 'is', null)
+      .order('id', { ascending: true })
       .range(page * pageSize, (page + 1) * pageSize)
 
     if (appVersionsError) {
       console.error(appVersionsError)
       return
     }
-    // console.log('app_versions', appVersions.length)
+    console.log('app_versions', appVersions.length)
     // add to allData
     allData.push(...appVersions)
     if (appVersions && appVersions.length < pageSize)
       continueLoop = false
     console.log('page', page, 'count', appVersions.length)
+    // continueLoop = false
     page++
   }
   console.log('app_versions to set', allData.length)

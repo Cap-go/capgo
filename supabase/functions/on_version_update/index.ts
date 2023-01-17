@@ -24,6 +24,7 @@ serve(async (event: Request) => {
       console.log('Not UPDATE')
       return sendRes({ message: 'Not UPDATE' }, 200)
     }
+    // console.log('body', body)
     const record = body.record
     console.log('record', record)
 
@@ -38,6 +39,7 @@ serve(async (event: Request) => {
     // // check if not deleted it's present in r2 storage
     if (!record.deleted) {
       const exist = await r2.checkIfExist(record.bucket_id)
+      console.log('exist ?', exist)
       if (!exist) {
         console.log('upload to r2', record.bucket_id)
         // upload to r2
@@ -66,6 +68,16 @@ serve(async (event: Request) => {
           console.log('Cannot upload', record.bucket_id, error)
           return sendRes()
         }
+      }
+      else if (record.storage_provider !== 'r2') {
+        const { error: errorUpdateStorage } = await supabaseAdmin()
+          .from('app_versions')
+          .update({
+            storage_provider: 'r2',
+          })
+          .eq('id', record.id)
+        if (errorUpdateStorage)
+          console.log('errorUpdateStorage', errorUpdateStorage)
       }
     }
     if (record.deleted === body.old_record.deleted) {
