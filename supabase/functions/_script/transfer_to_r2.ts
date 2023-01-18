@@ -31,7 +31,7 @@ const createR2 = async (record: Database['public']['Tables']['app_versions']['Ro
     console.log('Error', record.bucket_id, error2)
     return Promise.resolve()
   }
-  console.log('upload to r2', record.bucket_id)
+  console.log('Upload to R2', record.bucket_id)
   // upload to r2
   try {
     const u = await data.arrayBuffer()
@@ -49,7 +49,7 @@ const createR2 = async (record: Database['public']['Tables']['app_versions']['Ro
   catch (error) {
     console.log('Cannot upload', record.bucket_id, error)
   }
-  console.log('r2 create', record.id)
+  console.log('R2 uploaded', record.id)
   return Promise.resolve()
 }
 

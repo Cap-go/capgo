@@ -127,9 +127,15 @@ serve(async (event: Request) => {
       .from('app_versions_meta')
       .update({ size: 0 })
       .eq('id', record.id)
+    
     if (errorUpdate)
       console.log('error', errorUpdate)
-
+    const { error: errorDelete } = await supabaseAdmin()
+      .storage
+      .from(`apps/${record.user_id}/${record.app_id}/versions`)
+      .remove([record.bucket_id])
+    if (errorDelete)
+      console.log('errorDelete', errorDelete)
     return sendRes()
   }
   catch (e) {
