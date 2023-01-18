@@ -119,7 +119,6 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
       developer: item.developer,
       icon: item.icon,
       score: item.score,
-      priceText: item.priceText,
       free: item.free,
       category,
       collection,
@@ -140,7 +139,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_app')
-    .upsert(res2)
+    .up(res2)
   if (error)
     console.log('error', error)
   return sendRes(res2)
