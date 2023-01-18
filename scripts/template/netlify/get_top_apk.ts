@@ -1,6 +1,5 @@
 import type { BaseHeaders } from 'supabase/functions/_utils/types'
 import type { Handler } from '@netlify/functions'
-import type { IAppItem, IAppItemFullDetail } from 'google-play-scraper'
 import gplay from 'google-play-scraper'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
