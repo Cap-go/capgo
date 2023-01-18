@@ -111,7 +111,22 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   // return res.map((item, i) => ({ ...item, category, collection, rank: i + 1 } as resList))
   const upgraded = res.map(async (item, i) => {
     const res: IAppItemFullDetail = await gplay.app({ appId: item.appId })
-    return { ...item, category, collection, rank: i + 1, developerEmail: res.developerEmail, installs: res.maxInstalls } as resList
+    return {
+      url: item.url,
+      appId: item.appId,
+      title: item.title,
+      summary: item.summary,
+      developer: item.developer,
+      icon: item.icon,
+      score: item.score,
+      priceText: item.priceText,
+      free: item.free,
+      category,
+      collection,
+      rank: i + 1,
+      developerEmail: res.developerEmail,
+      installs: res.maxInstalls,
+    } as resList
   })
   return Promise.all(upgraded)
 }
@@ -125,7 +140,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_app')
-    .insert(res2)
+    .upsert(res2)
   if (error)
     console.log('error', error)
   return sendRes(res2)
