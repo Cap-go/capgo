@@ -384,6 +384,7 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
     .eq('app_id', appId)
     .eq('user_id', userId)
     .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.size || 0), 0))
+  //  write in SQL select all id of app_versions who match app_id = "toto" and use the result to find all app_versions_meta and sum all size
   const versions = supabaseAdmin()
     .from('app_versions')
     .select('id', { count: 'exact', head: true })

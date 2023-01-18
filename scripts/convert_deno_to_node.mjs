@@ -27,6 +27,7 @@ const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const baseNetlifyEdgeTests = `${baseNetlify}/${baseEdgeFunctions + baseTests}`
 const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates']
+const onlyNode = ['get_capacitor']
 const allowedUtil = ['utils', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'notifications', 'stripe', 'r2']
 
 const supaTempl = {}
@@ -125,6 +126,7 @@ const files = folders.map(f => `${baseSupaFunctions}/${f}/index.ts`)
 
 // create list of netlify functions from files supabase/functions/folder/index.ts -> netlify/functions/folder.ts
 const netlifyFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyFunctions}/`).replace('/index.ts', '.ts'))
+const onlyNodeNetlify = onlyNode.map(f => `${baseNetlifyFunctions}/${f}.ts`)
 const netlifyEdgeFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyEdgeFunctions}/`).replace('/index.ts', '.ts'))
 // create netlify/functions folder if not exists
 try {
@@ -142,7 +144,19 @@ catch (e) {
   mkdirSync(baseNetlifyEdgeFunctions, { recursive: true })
 }
 
-// console.log('netlify files', netlifyFiles)
+// copy file from onlyNode to netlify/functions
+for (let i = 0; i < onlyNode.length; i++) {
+  const file = `${baseNetlifyTemplate}/${onlyNode[i]}.ts`
+  const netlifyFile = onlyNodeNetlify[i]
+  const source = readFileSync(file)
+  let newContent = `// This code is generated don't modify it\n${source}`
+  mutationsNode.forEach((m) => {
+    const { from, to } = m
+    newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
+  })
+  writeFileSync(netlifyFile, newContent)
+  console.log(`Copied: ${file} -> ${netlifyFile}`)
+}
 
 for (let i = 0; i < files.length; i++) {
   const file = files[i]

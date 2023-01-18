@@ -1,3 +1,4 @@
+import 'https://deno.land/x/dotenv/load.ts'
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import type { Database } from './supabase.types.ts'
