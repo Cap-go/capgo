@@ -123,9 +123,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   const res: Promise<resApp>[] = list.map(item => isCapacitor(item.appId).then(res => ({ capacitor: res, ...item } as resApp)))
   const res2 = await Promise.all(res)
   // save in supabase
-  await supabaseClient()
+  const { error } = await supabaseClient()
     .from('store_app')
     .insert(res2)
+  if (error)
+    console.log('error', error)
   return sendRes(res2)
 }
 // upper is ignored during netlify generation phase
