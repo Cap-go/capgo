@@ -2,8 +2,6 @@ import type { BaseHeaders } from 'supabase/functions/_utils/types'
 import type { Handler } from '@netlify/functions'
 import AdmZip from 'adm-zip'
 import apk from 'apkmirror.js'
-import type { IAppItem, IAppItemFullDetail } from 'google-play-scraper'
-import gplay from 'google-play-scraper'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
 
@@ -86,63 +84,21 @@ const isCapacitor = async (id: string) => {
   //   console.log('found', id, found)
   return found
 }
-// com.canva.editor
-// isCapacitor('de.burgerking.kingfinder')
-// isCapacitor('com.canva.editor')
-
-interface resList extends IAppItem {
-  category: string
-  developerEmail: string
-  installs: number
-  collection: string
-  rank: number
-}
-
-interface resApp extends resList {
-  capacitor: boolean
-}
-
-const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000) => {
-  const res = await gplay.list({
-    category,
-    collection,
-    num: limit,
-  })
-  // return res.map((item, i) => ({ ...item, category, collection, rank: i + 1 } as resList))
-  const upgraded = res.map(async (item, i) => {
-    const res: IAppItemFullDetail = await gplay.app({ appId: item.appId })
-    return {
-      url: item.url,
-      appId: item.appId,
-      title: item.title,
-      summary: item.summary,
-      developer: item.developer,
-      icon: item.icon,
-      score: item.score,
-      free: item.free,
-      category,
-      collection,
-      rank: i + 1,
-      developerEmail: res.developerEmail,
-      installs: res.maxInstalls,
-    } as resList
-  })
-  return Promise.all(upgraded)
-}
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
-  const list = await getList(body.category, body.collection, body.limit)
   // remove from list apps already in supabase
-  const res: Promise<resApp>[] = list.map(item => isCapacitor(item.appId).then(res => ({ capacitor: res, ...item } as resApp)))
-  const res2 = await Promise.all(res)
+  const res = isCapacitor(body.appId)
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_app')
-    .up(res2)
+    .upsert({
+      appId: body.appId,
+      capacitor: res,
+    })
   if (error)
     console.log('error', error)
-  return sendRes(res2)
+  return sendRes(res)
 }
 // upper is ignored during netlify generation phase
 // import from here
