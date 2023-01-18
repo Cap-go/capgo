@@ -699,6 +699,59 @@ export interface Database {
           version_build?: string
         }
       }
+      store_app: {
+        Row: {
+          appId: string
+          capacitor: boolean
+          category: string
+          collection: string
+          created_at: string | null
+          developer: string
+          developerEmail: string
+          free: boolean
+          icon: string
+          installs: number
+          rank: number
+          score: number
+          summary: string
+          title: string
+          url: string
+        }
+        Insert: {
+          appId: string
+          capacitor?: boolean
+          category?: string
+          collection?: string
+          created_at?: string | null
+          developer?: string
+          developerEmail?: string
+          free?: boolean
+          icon?: string
+          installs?: number
+          rank?: number
+          score?: number
+          summary?: string
+          title?: string
+          url?: string
+        }
+        Update: {
+          appId?: string
+          capacitor?: boolean
+          category?: string
+          collection?: string
+          created_at?: string | null
+          developer?: string
+          developerEmail?: string
+          free?: boolean
+          icon?: string
+          installs?: number
+          rank?: number
+          score?: number
+          summary?: string
+          title?: string
+          url?: string
+        }
+      }
       stripe_info: {
         Row: {
           created_at: string

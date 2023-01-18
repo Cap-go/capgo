@@ -40,14 +40,6 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_ANON_KEY || '', options)
 }
 
-interface resList extends IAppItem {
-  category: string
-  developerEmail: string
-  installs: number
-  collection: string
-  rank: number
-}
-
 const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000) => {
   const res = await gplay.list({
     category,
@@ -71,7 +63,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
       rank: i + 1,
       developerEmail: res.developerEmail,
       installs: res.maxInstalls,
-    } as resList
+    } as Database['public']['Tables']['store_apps']['Insert']
   })
   return Promise.all(upgraded)
 }
@@ -81,7 +73,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   const list = await getList(body.category, body.collection, body.limit)
   // save in supabase
   const { error } = await supabaseClient()
-    .from('store_app')
+    .from('store_apps')
     .upsert(list)
   if (error)
     console.log('error', error)

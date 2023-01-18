@@ -88,10 +88,10 @@ const isCapacitor = async (id: string) => {
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
   // remove from list apps already in supabase
-  const res = isCapacitor(body.appId)
+  const res = await isCapacitor(body.appId)
   // save in supabase
   const { error } = await supabaseClient()
-    .from('store_app')
+    .from('store_apps')
     .upsert({
       appId: body.appId,
       capacitor: res,
