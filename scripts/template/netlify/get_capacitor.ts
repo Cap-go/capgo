@@ -3,7 +3,7 @@ import { methodJson, sendRes } from 'supabase/functions/_utils/utils'
 import type { Handler } from '@netlify/functions'
 import AdmZip from 'adm-zip'
 import apk from 'apkmirror.js'
-import type { IAppItem } from 'google-play-scraper'
+import type { IAppItem, IAppItemFullDetail } from 'google-play-scraper'
 import gplay from 'google-play-scraper'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
@@ -69,6 +69,8 @@ const isCapacitor = async (id: string) => {
 
 interface resList extends IAppItem {
   category: string
+  developerEmail: string
+  installs: number
   collection: string
   rank: number
 }
@@ -83,7 +85,12 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     collection,
     num: limit,
   })
-  return res.map((item, i) => ({ ...item, category, collection, rank: i + 1 } as resList))
+  // return res.map((item, i) => ({ ...item, category, collection, rank: i + 1 } as resList))
+  const upgraded = res.map(async (item, i) => {
+    const res: IAppItemFullDetail = await gplay.app({ appId: item.appId })
+    return { ...item, category, collection, rank: i + 1, developerEmail: res.developerEmail, installs: res.maxInstalls } as resList
+  })
+  return Promise.all(upgraded)
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
