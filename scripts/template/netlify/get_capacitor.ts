@@ -1,5 +1,4 @@
 import type { BaseHeaders } from 'supabase/functions/_utils/types'
-import { methodJson, sendRes } from 'supabase/functions/_utils/utils'
 import type { Handler } from '@netlify/functions'
 import AdmZip from 'adm-zip'
 import apk from 'apkmirror.js'
@@ -7,6 +6,30 @@ import type { IAppItem, IAppItemFullDetail } from 'google-play-scraper'
 import gplay from 'google-play-scraper'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
+
+export const methodJson = ['POST', 'PUT', 'PATCH']
+export const basicHeaders = {
+  'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
+  'Content-Type': 'application/json',
+}
+
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+  if (statusCode >= 400)
+    console.error('sendRes error', JSON.stringify(data, null, 2))
+
+  return new Response(
+    JSON.stringify(data),
+    {
+      status: statusCode,
+      headers: { ...basicHeaders, ...corsHeaders },
+    },
+  )
+}
 
 export const supabaseClient = () => {
   const options = {
