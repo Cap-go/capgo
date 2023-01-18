@@ -699,7 +699,7 @@ export interface Database {
           version_build?: string
         }
       }
-      store_app: {
+      store_apps: {
         Row: {
           appId: string
           capacitor: boolean
