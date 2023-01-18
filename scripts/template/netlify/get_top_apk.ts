@@ -39,12 +39,14 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_ANON_KEY || '', options)
 }
 
-const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000) => {
+const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, skip = 0) => {
   const res = await gplay.list({
     category,
     collection,
-    num: limit,
+    num: limit + skip,
   })
+  // remove the first skip
+  res.splice(0, skip)
   const upgraded = res.map((item, i) => {
     return gplay.app({ appId: item.appId }).then(res => ({
       url: item.url,
@@ -67,7 +69,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
-  const list = await getList(body.category, body.collection, body.limit)
+  const list = await getList(body.category, body.collection, body.limit, body.skip)
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_apps')
