@@ -127,7 +127,6 @@ serve(async (event: Request) => {
       .from('app_versions_meta')
       .update({ size: 0 })
       .eq('id', record.id)
-    
     if (errorUpdate)
       console.log('error', errorUpdate)
     const { error: errorDelete } = await supabaseAdmin()
