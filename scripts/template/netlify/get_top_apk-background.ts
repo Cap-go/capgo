@@ -1,32 +1,10 @@
 import type { BaseHeaders } from 'supabase/functions/_utils/types'
-import type { Handler } from '@netlify/functions'
+import type { BackgroundHandler } from '@netlify/functions'
 import gplay from 'google-play-scraper'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
 
 export const methodJson = ['POST', 'PUT', 'PATCH']
-export const basicHeaders = {
-  'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
-  'Content-Type': 'application/json',
-}
-
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
-  if (statusCode >= 400)
-    console.error('sendRes error', JSON.stringify(data, null, 2))
-
-  return new Response(
-    JSON.stringify(data),
-    {
-      status: statusCode,
-      headers: { ...basicHeaders, ...corsHeaders },
-    },
-  )
-}
 
 export const supabaseClient = () => {
   const options = {
@@ -76,21 +54,19 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     .upsert(list)
   if (error)
     console.log('error', error)
-  return sendRes(list)
 }
 // upper is ignored during netlify generation phase
 // import from here
-export const handler: Handler = async (event) => {
+export const handler: BackgroundHandler = async (event) => {
   try {
     const url: URL = new URL(event.rawUrl)
     console.log('queryStringParameters', event.queryStringParameters)
     const headers: BaseHeaders = { ...event.headers }
     const method: string = event.httpMethod
     const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : event.queryStringParameters
-    const res = await main(url, headers, method, body)
-    return res as any
+    await main(url, headers, method, body)
   }
   catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+    console.log('error', e)
   }
 }

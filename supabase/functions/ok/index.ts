@@ -7,7 +7,7 @@ import {
   defaultGetChannelRes, defaultGetDevicesRes,
   defaultPutChannelRes, defaultRes,
   defaultUpdateRes, deleteBundle, deleteDevice,
-  getBundle, getChannel, getDatabase, getDevice, postDevice,
+  getBundle, getChannels, getDatabase, getDevice, postDevice,
   postStats, postUpdate, putChannel, setChannel,
   setChannelSelf,
 } from '../_tests/api.ts'
@@ -54,7 +54,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_get') {
-    const supabaseRes = await getChannel(baseSupabase)
+    const supabaseRes = await getChannels(baseSupabase)
     console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultGetChannelRes))
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)

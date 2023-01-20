@@ -171,7 +171,7 @@ export const defaultGetChannelRes = [{
   version: { name: defaultVersion, id: defaultVersionId },
 }]
 
-export const getChannel = async (baseUrl: string) => {
+export const getChannels = async (baseUrl: string) => {
   const url = `${baseUrl}/channel`
   const response = await axios.get<typeof defaultGetChannelRes>(url, {
     params: {
@@ -182,6 +182,7 @@ export const getChannel = async (baseUrl: string) => {
   return response.data.map((res) => {
     res.updated_at = defaultUpdatedAt
     res.created_at = defaultCreatedAt
+    res.version = { name: defaultVersion, id: defaultVersionId }
     return res
   })
 }

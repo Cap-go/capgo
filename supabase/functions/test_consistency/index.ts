@@ -3,7 +3,7 @@ import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 
 import {
   baseNetlify, baseNetlifyEdge, baseSupabase, deleteBundle,
-  deleteDevice, getBundle, getChannel, getDevice,
+  deleteDevice, getBundle, getChannels, getDevice,
   getOk, postDevice, postStats, postUpdate, putChannel,
   setChannel, setChannelSelf,
 } from '../_tests/api.ts'
@@ -84,9 +84,9 @@ serve(async (event: Request) => {
     }
     else if (service === 'channel_get') {
       found = true
-      const supabaseRes = await getChannel(baseSupabase)
-      const netlifyRes = await getChannel(baseNetlify)
-      const netlifyEdgeRes = await getChannel(baseNetlifyEdge)
+      const supabaseRes = await getChannels(baseSupabase)
+      const netlifyRes = await getChannels(baseNetlify)
+      const netlifyEdgeRes = await getChannels(baseNetlifyEdge)
       if (!equal(supabaseRes, netlifyRes))
         return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
       if (!equal(supabaseRes, netlifyEdgeRes))
