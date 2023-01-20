@@ -48,7 +48,6 @@ specifiers:
   '@iconify-json/ls': 1.1.3
   '@intlify/vite-plugin-vue-i18n': 6.0.3
   '@ionic/vue': 6.4.0
-  '@ionic/vue-router': 6.4.0
   '@netlify/functions': ^1.4.0
   '@supabase/supabase-js': 2.1.3
   '@tailwindcss/forms': ^0.5.3
@@ -160,7 +159,6 @@ dependencies:
   '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.1
   '@capgo/native-market': 1.1.18
   '@ionic/vue': 6.4.0
-  '@ionic/vue-router': 6.4.0
   '@netlify/functions': 1.4.0
   '@supabase/supabase-js': 2.1.3
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.4
@@ -2847,12 +2845,6 @@ packages:
       wrap-ansi: 7.0.0
     transitivePeerDependencies:
       - supports-color
-
-  /@ionic/vue-router/6.4.0:
-    resolution: {integrity: sha512-sB63rmDFrqma7wz4kFZtWssrvoTJIoyrMvFOzc80WazQU1UyihtWAbN+Bol4HO5/0S136/wB6HzVHf78kcIlbA==}
-    dependencies:
-      '@ionic/vue': 6.4.0
-    dev: false
 
   /@ionic/vue/6.4.0:
     resolution: {integrity: sha512-dMFf9h4K4UK5IKR/F5FbCpPsthJDkt99YbgacyS/Zl/tXxd4ZsQ2ViBB9wUf56lDbx3GdJMe+XmElqWxvrOg7w==}
