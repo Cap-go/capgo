@@ -35,6 +35,7 @@ const getPackage = async (id: string) => {
     },
   })
   const res = await response.json()
+  console.log('res', res)
   return res[0]
 }
 
