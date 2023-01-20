@@ -72,7 +72,6 @@
     "@vuelidate/validators": "2.0.0",
     "@vueuse/core": "9.6.0",
     "adm-zip": "^0.5.10",
-    "apkmirror.js": "0.0.1-alpha.9",
     "axios": "^1.2.2",
     "base64-arraybuffer": "1.0.2",
     "capacitor-native-biometric": "4.1.3",

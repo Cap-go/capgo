@@ -1,7 +1,6 @@
 import type { BaseHeaders } from 'supabase/functions/_utils/types'
 import type { BackgroundHandler } from '@netlify/functions'
 import AdmZip from 'adm-zip'
-import apk from 'apkmirror.js'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
 
@@ -21,11 +20,29 @@ const headers = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
 }
 
+const getPackage = async (id: string) => {
+  const body = {
+    pnames: [id],
+    exclude: ['alpha', 'beta'],
+  }
+  const response = await fetch('https://www.apkmirror.com/wp-json/apkm/v1/app_exists/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: {
+      'User-Agent': 'APKMirror.js-v0.0.1',
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${Buffer.from('api-apkupdater:rm5rcfruUjKy04sMpyMPJXW8').toString('base64')}`,
+    },
+  })
+  const res = await response.json()
+  return res[0]
+}
+
 const isCapacitor = async (id: string) => {
   let found = false
   try {
-    const res = await apk.getPackages([id])
-    const pageHome = `https://www.apkmirror.com${res[0].apks[0].link}`
+    const res = await getPackage(id)
+    const pageHome = `https://www.apkmirror.com${res.apks[0].link}`
     //   console.log('pageHome', pageHome)
     const response = await fetch(pageHome, { headers })
     const resTxt = await response.text()
