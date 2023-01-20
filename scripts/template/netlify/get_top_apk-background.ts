@@ -18,36 +18,36 @@ export const supabaseClient = () => {
 }
 
 const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, skip = 0) => {
-  const res = await gplay.list({
+  const res = (await gplay.list({
     category,
     collection,
     fullDetail: true,
     num: limit + skip,
-  })
+  })) as gplay.IAppItemFullDetail[]
   // remove the first skip
   const ids = res.map(item => item.appId)
   console.log('ids', ids)
   console.log('res', res)
   res.splice(0, skip)
-  // const upgraded = res.map((item, i) => {
-  //   return gplay.app({ appId: item.appId }).then(res => ({
-  //     url: item.url,
-  //     appId: item.appId,
-  //     title: item.title,
-  //     summary: item.summary,
-  //     developer: item.developer,
-  //     icon: item.icon,
-  //     score: item.score,
-  //     free: item.free,
-  //     category,
-  //     collection,
-  //     rank: i + 1,
-  //     developerEmail: res.developerEmail,
-  //     installs: res.maxInstalls,
-  //   } as Database['public']['Tables']['store_apps']['Insert']))
-  // })
-  // return Promise.all(res)
-  return res
+  const upgraded = res.map((item, i) => {
+    return {
+      url: item.url,
+      appId: item.appId,
+      title: item.title,
+      summary: item.summary,
+      developer: item.developer,
+      icon: item.icon,
+      score: item.score,
+      free: item.free,
+      category,
+      collection,
+      rank: i + 1,
+      developerEmail: item.developerEmail,
+      installs: item.maxInstalls,
+    } as Database['public']['Tables']['store_apps']['Insert']
+  })
+  return Promise.all(upgraded)
+  // return res
 }
 getList()
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
