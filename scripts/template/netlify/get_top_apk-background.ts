@@ -23,7 +23,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     collection,
     fullDetail: false,
     num: limit + skip,
-  })) as gplay.IAppItemFullDetail[]
+  }))
   // remove the first skip
   const ids = res.map(item => item.appId)
   console.log('ids', ids, ids.length)
@@ -46,6 +46,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   //     installs: item.maxInstalls,
   //   } as Database['public']['Tables']['store_apps']['Insert']
   // })
+  // return upgraded
   const upgraded = res.map((item, i) => {
     console.log('item', item.appId)
     return gplay.app({ appId: item.appId }).then(res => ({
@@ -65,13 +66,28 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     } as Database['public']['Tables']['store_apps']['Insert']))
       .catch((err) => {
         console.log('err', err)
-        return null
+        return {
+          url: item.url,
+          appId: item.appId,
+          title: item.title,
+          summary: item.summary,
+          developer: item.developer,
+          icon: item.icon,
+          score: item.score,
+          free: item.free,
+          category,
+          collection,
+          rank: i + 1,
+          developerEmail: '',
+          installs: 0,
+        } as Database['public']['Tables']['store_apps']['Insert']
       })
   })
-  const enriched = await Promise.all(upgraded)
-  // filter out null
-  const filtered = enriched.filter(item => item)
-  return filtered
+  return await Promise.all(upgraded)
+  // const enriched = await Promise.all(upgraded)
+  // // filter out null
+  // const filtered = enriched.filter(item => item != null)
+  // return filtered
 }
 getList()
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
