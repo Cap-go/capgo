@@ -20,57 +20,57 @@ const headers = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
 }
 
-const getPackage = async (id: string) => {
-  const body = {
-    pnames: [id],
-    exclude: ['alpha', 'beta'],
-  }
-  const response = await fetch('https://www.apkmirror.com/wp-json/apkm/v1/app_exists/', {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: {
-      'User-Agent': 'APKMirror.js-v0.0.1',
-      'Content-Type': 'application/json',
-      'Authorization': `Basic ${Buffer.from('api-apkupdater:rm5rcfruUjKy04sMpyMPJXW8').toString('base64')}`,
-    },
-  })
-  const res = await response.json()
-  console.log('res', res)
-  return res.data[0]
-}
+// const getPackage = async (id: string) => {
+//   const body = {
+//     pnames: [id],
+//     exclude: ['alpha', 'beta'],
+//   }
+//   const response = await fetch('https://www.apkmirror.com/wp-json/apkm/v1/app_exists/', {
+//     method: 'POST',
+//     body: JSON.stringify(body),
+//     headers: {
+//       'User-Agent': 'APKMirror.js-v0.0.1',
+//       'Content-Type': 'application/json',
+//       'Authorization': `Basic ${Buffer.from('api-apkupdater:rm5rcfruUjKy04sMpyMPJXW8').toString('base64')}`,
+//     },
+//   })
+//   const res = await response.json()
+//   console.log('res', res)
+//   return res.data[0]
+// }
+
+// const downloadApkMirror = async (id: string) => {
+//   const res = await getPackage(id)
+//   const pageHome = `https://www.apkmirror.com${res.apks[0].link}`
+//   console.log('pageHome', pageHome)
+//   const response = await fetch(pageHome, { headers })
+//   const resTxt = await response.text()
+//   const matchKey = resTxt.match(/\?key=(.*)"/)
+//   if (!matchKey) {
+//     console.log('no matchKey', resTxt)
+//     return null
+//   }
+//   const pageDownload = `${pageHome}download/?key=${matchKey[1]}`
+//   console.log('pageDownload', pageDownload)
+//   const responseDownload = await fetch(pageDownload, { headers })
+//   const resTxtresponseDownload = await responseDownload.text()
+//   const matchResponseDownload = resTxtresponseDownload.match(/\/download\.php\?(.*)"/)
+//   if (!matchResponseDownload) {
+//     console.log('no matchResponseDownload', resTxtresponseDownload)
+//     return null
+//   }
+//   console.log('matchResponseDownload', matchResponseDownload[0])
+//   let downloadUrl = `https://www.apkmirror.com/wp-content/themes/APKMirror${matchResponseDownload[0]}`
+//   downloadUrl = downloadUrl.replace('"', '')
+//   console.log('downloadUrl', downloadUrl)
+//   const responseApk = await fetch(downloadUrl, { headers })
+//   const arrayBuffer = await responseApk.arrayBuffer()
+//   const buffer = Buffer.from(arrayBuffer)
+//   return buffer
+// }
 
 const downloadApkPure = async (id: string) => {
   const downloadUrl = `https://d.apkpure.com/b/APK/${id}?version=latest`
-  const responseApk = await fetch(downloadUrl, { headers })
-  const arrayBuffer = await responseApk.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  return buffer
-}
-
-const downloadApkMirror = async (id: string) => {
-  const res = await getPackage(id)
-  const pageHome = `https://www.apkmirror.com${res.apks[0].link}`
-  console.log('pageHome', pageHome)
-  const response = await fetch(pageHome, { headers })
-  const resTxt = await response.text()
-  const matchKey = resTxt.match(/\?key=(.*)"/)
-  if (!matchKey) {
-    console.log('no matchKey', resTxt)
-    return null
-  }
-  const pageDownload = `${pageHome}download/?key=${matchKey[1]}`
-  console.log('pageDownload', pageDownload)
-  const responseDownload = await fetch(pageDownload, { headers })
-  const resTxtresponseDownload = await responseDownload.text()
-  const matchResponseDownload = resTxtresponseDownload.match(/\/download\.php\?(.*)"/)
-  if (!matchResponseDownload) {
-    console.log('no matchResponseDownload', resTxtresponseDownload)
-    return null
-  }
-  console.log('matchResponseDownload', matchResponseDownload[0])
-  let downloadUrl = `https://www.apkmirror.com/wp-content/themes/APKMirror${matchResponseDownload[0]}`
-  downloadUrl = downloadUrl.replace('"', '')
-  console.log('downloadUrl', downloadUrl)
   const responseApk = await fetch(downloadUrl, { headers })
   const arrayBuffer = await responseApk.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
