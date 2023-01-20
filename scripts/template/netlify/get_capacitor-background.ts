@@ -107,6 +107,7 @@ const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
       'sec-gpc': '1',
       'upgrade-insecure-requests': '1',
     },
+    redirect: 'follow',
     referrer: 'https://m.apkpure.com/',
     referrerPolicy: 'strict-origin-when-cross-origin',
     body: null,
