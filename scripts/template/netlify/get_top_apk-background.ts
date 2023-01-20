@@ -21,7 +21,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   const res = (await gplay.list({
     category,
     collection,
-    fullDetail: true,
+    fullDetail: false,
     num: limit + skip,
   })) as gplay.IAppItemFullDetail[]
   // remove the first skip
