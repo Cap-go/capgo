@@ -77,7 +77,7 @@ const isCapacitor = async (id: string) => {
   catch (e) {
     console.log('error', id, e)
   }
-  //   console.log('found', id, found)
+  console.log('found', id, found)
   return found
 }
 
