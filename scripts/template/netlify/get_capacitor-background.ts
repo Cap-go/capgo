@@ -69,9 +69,51 @@ const headers = {
 //   return buffer
 // }
 
-const downloadApkPure = async (id: string) => {
-  const downloadUrl = `https://d.apkpure.com/b/APK/${id}?version=latest`
-  const responseApk = await fetch(downloadUrl, { headers })
+fetch('https://d.apkpure.com/b/APK/com.pizzahutau?version=latest', {
+  headers: {
+    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'accept-language': 'en-GB,en;q=0.8',
+    'cache-control': 'no-cache',
+    'pragma': 'no-cache',
+    'sec-fetch-dest': 'document',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-site': 'same-site',
+    'sec-fetch-user': '?1',
+    'sec-gpc': '1',
+    'upgrade-insecure-requests': '1',
+  },
+  referrer: 'https://m.apkpure.com/',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  body: null,
+  method: 'GET',
+  mode: 'cors',
+  credentials: 'include',
+})
+
+const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
+  const downloadUrl = `https://d.apkpure.com/b/${mode}/${id}?version=latest`
+  // https://d.apkpure.com/b/APK/com.pizzahutau?version=latest
+  // const responseApk = await fetch(downloadUrl, { headers })
+  const responseApk = await fetch(downloadUrl, {
+    headers: {
+      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'accept-language': 'en-GB,en;q=0.8',
+      'cache-control': 'no-cache',
+      'pragma': 'no-cache',
+      'sec-fetch-dest': 'document',
+      'sec-fetch-mode': 'navigate',
+      'sec-fetch-site': 'same-site',
+      'sec-fetch-user': '?1',
+      'sec-gpc': '1',
+      'upgrade-insecure-requests': '1',
+    },
+    referrer: 'https://m.apkpure.com/',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    body: null,
+    method: 'GET',
+    mode: 'cors',
+    credentials: 'include',
+  })
   const arrayBuffer = await responseApk.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
   return buffer
