@@ -63,9 +63,15 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
       developerEmail: res.developerEmail,
       installs: res.maxInstalls,
     } as Database['public']['Tables']['store_apps']['Insert']))
+      .catch((err) => {
+        console.log('err', err)
+        return null
+      })
   })
-  return Promise.all(upgraded)
-  // return res
+  const enriched = await Promise.all(upgraded)
+  // filter out null
+  const filtered = enriched.filter(item => item)
+  return filtered
 }
 getList()
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
