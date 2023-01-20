@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import type { Database } from './../_utils/supabase.types.ts'
 
@@ -29,16 +28,8 @@ serve(async (event: Request) => {
     console.log('record', record)
     // explore all apps
     // axios get on https://netlify.capgo.app/get_capacitor with record.appId
-    const res = await axios.get(`https://netlify.capgo.app/get_capacitor/${record.appId}`)
-
-    const { error } = await supabaseAdmin()
-      .from('store_apps')
-      .upsert({
-        appId: record.appId,
-        capacitor: res.data,
-      })
-    if (error)
-      console.error('error.message', error.message)
+    // https://netlify.capgo.app/get_capacitor-background?appId=com.pizzahutau
+    await axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${record.appId}`)
     return sendRes()
   }
   catch (e) {
