@@ -26,8 +26,8 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   })) as gplay.IAppItemFullDetail[]
   // remove the first skip
   const ids = res.map(item => item.appId)
-  console.log('ids', ids)
-  console.log('res', res)
+  console.log('ids', ids, ids.length)
+  // console.log('res', res)
   res.splice(0, skip)
   const upgraded = res.map((item, i) => {
     return {
