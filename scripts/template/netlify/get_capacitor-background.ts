@@ -80,7 +80,9 @@ const downloadApkPure = async (id: string) => {
 const isCapacitor = async (id: string) => {
   let found = false
   try {
+    console.log('downloadApkPure', id)
     const buffer = await downloadApkPure(id)
+    console.log('AdmZip', id)
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
