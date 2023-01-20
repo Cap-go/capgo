@@ -44,30 +44,30 @@ const isCapacitor = async (id: string) => {
   try {
     const res = await getPackage(id)
     const pageHome = `https://www.apkmirror.com${res.apks[0].link}`
-    //   console.log('pageHome', pageHome)
+    console.log('pageHome', pageHome)
     const response = await fetch(pageHome, { headers })
     const resTxt = await response.text()
     const matchKey = resTxt.match(/\?key=(.*)"/)
     if (!matchKey)
       return found
     const pageDownload = `${pageHome}download/?key=${matchKey[1]}`
-    //   console.log('pageDownload', pageDownload)
+    console.log('pageDownload', pageDownload)
     const responseDownload = await fetch(pageDownload, { headers })
     const resTxtresponseDownload = await responseDownload.text()
     const matchResponseDownload = resTxtresponseDownload.match(/\/download\.php\?(.*)"/)
     if (!matchResponseDownload)
       return found
-    //   console.log('matchResponseDownload', matchResponseDownload[0])
+    console.log('matchResponseDownload', matchResponseDownload[0])
     let downloadUrl = `https://www.apkmirror.com/wp-content/themes/APKMirror${matchResponseDownload[0]}`
     downloadUrl = downloadUrl.replace('"', '')
-    //   console.log('downloadUrl', downloadUrl)
+    console.log('downloadUrl', downloadUrl)
     const responseApk = await fetch(downloadUrl, { headers })
     const arrayBuffer = await responseApk.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
-      // console.log('zipEntry', zipEntry.entryName)
+      console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
         console.log(zipEntry.getData().toString('utf8'))
         found = true
