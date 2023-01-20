@@ -39,31 +39,48 @@ const getPackage = async (id: string) => {
   return res.data[0]
 }
 
+const downloadApkPure = async (id: string) => {
+  const downloadUrl = `https://d.apkpure.com/b/APK/${id}?version=latest`
+  const responseApk = await fetch(downloadUrl, { headers })
+  const arrayBuffer = await responseApk.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  return buffer
+}
+
+const downloadApkMirror = async (id: string) => {
+  const res = await getPackage(id)
+  const pageHome = `https://www.apkmirror.com${res.apks[0].link}`
+  console.log('pageHome', pageHome)
+  const response = await fetch(pageHome, { headers })
+  const resTxt = await response.text()
+  const matchKey = resTxt.match(/\?key=(.*)"/)
+  if (!matchKey) {
+    console.log('no matchKey', resTxt)
+    return null
+  }
+  const pageDownload = `${pageHome}download/?key=${matchKey[1]}`
+  console.log('pageDownload', pageDownload)
+  const responseDownload = await fetch(pageDownload, { headers })
+  const resTxtresponseDownload = await responseDownload.text()
+  const matchResponseDownload = resTxtresponseDownload.match(/\/download\.php\?(.*)"/)
+  if (!matchResponseDownload) {
+    console.log('no matchResponseDownload', resTxtresponseDownload)
+    return null
+  }
+  console.log('matchResponseDownload', matchResponseDownload[0])
+  let downloadUrl = `https://www.apkmirror.com/wp-content/themes/APKMirror${matchResponseDownload[0]}`
+  downloadUrl = downloadUrl.replace('"', '')
+  console.log('downloadUrl', downloadUrl)
+  const responseApk = await fetch(downloadUrl, { headers })
+  const arrayBuffer = await responseApk.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  return buffer
+}
+
 const isCapacitor = async (id: string) => {
   let found = false
   try {
-    const res = await getPackage(id)
-    const pageHome = `https://www.apkmirror.com${res.apks[0].link}`
-    console.log('pageHome', pageHome)
-    const response = await fetch(pageHome, { headers })
-    const resTxt = await response.text()
-    const matchKey = resTxt.match(/\?key=(.*)"/)
-    if (!matchKey)
-      return found
-    const pageDownload = `${pageHome}download/?key=${matchKey[1]}`
-    console.log('pageDownload', pageDownload)
-    const responseDownload = await fetch(pageDownload, { headers })
-    const resTxtresponseDownload = await responseDownload.text()
-    const matchResponseDownload = resTxtresponseDownload.match(/\/download\.php\?(.*)"/)
-    if (!matchResponseDownload)
-      return found
-    console.log('matchResponseDownload', matchResponseDownload[0])
-    let downloadUrl = `https://www.apkmirror.com/wp-content/themes/APKMirror${matchResponseDownload[0]}`
-    downloadUrl = downloadUrl.replace('"', '')
-    console.log('downloadUrl', downloadUrl)
-    const responseApk = await fetch(downloadUrl, { headers })
-    const arrayBuffer = await responseApk.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    const buffer = await downloadApkPure(id)
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
