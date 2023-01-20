@@ -36,7 +36,7 @@ const getPackage = async (id: string) => {
   })
   const res = await response.json()
   console.log('res', res)
-  return res[0]
+  return res.data[0]
 }
 
 const isCapacitor = async (id: string) => {
