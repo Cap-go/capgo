@@ -48,8 +48,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     const coerce = semver.coerce(version_build)
     const { data: appOwner } = await supabaseAdmin()
       .from('apps')
-      .select('user_id')
-      .eq('id', app_id)
+      .select('user_id, app_id')
+      .eq('app_id', app_id)
       .single()
 
     if (!appOwner) {
