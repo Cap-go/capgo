@@ -24,20 +24,56 @@ export const createPortal = async (customerId: string, callbackUrl: string) => {
   return response.data
 }
 
-export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
+const getPriceIds = async (planId: string, reccurence: string): Promise<{ priceId: string | null; meteredIds: string[] }> => {
   let priceId = null
+  const meteredIds: string[] = []
   try {
     const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
     const prices = response.data.data
+    console.log('prices stripe', prices)
     prices.forEach((price: any) => {
-      if (price.recurring.interval === reccurence && price.active)
+      if (price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
+      if (price.billing_scheme === 'per_unit' && price.active && price?.recurring?.usage_type !== 'licensed')
+        meteredIds.push(price.id)
     })
   }
   catch (err) {
     console.log('search err', err)
   }
-  if (!priceId)
+  return { priceId, meteredIds }
+}
+export interface MeteredData {
+  [key: string]: string
+}
+
+export const parsePriceIds = (prices: any): { priceId: string | null; productId: string | null; meteredData: MeteredData } => {
+  let priceId: string | null = null
+  let productId: string | null = null
+  const meteredData: { [key: string]: string } = {}
+  try {
+    console.log('prices stripe', prices)
+    prices.forEach((price: any) => {
+      if (price.plan.usage_type === 'licensed') {
+        priceId = price.plan.id
+        productId = price.plan.product
+      }
+      if (price.plan.billing_scheme === 'per_unit' && price?.plan?.usage_type !== 'licensed') {
+        meteredData[price.plan.nickname.toLocaleLowerCase()] = price.plan.id
+        console.log('metered price', price)
+      }
+    })
+  }
+  catch (err) {
+    console.log('search err', err)
+  }
+  return { priceId, productId, meteredData }
+}
+
+export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
+  const prices = await getPriceIds(planId, reccurence)
+  console.log('prices', prices)
+  if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const checkoutData = {
     billing_address_collection: 'auto',
@@ -47,8 +83,17 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
     cancel_url: cancelUrl,
   }
   const data = new URLSearchParams(checkoutData as any)
-  data.append('line_items[0][price]', priceId)
+  data.append('automatic_tax[enabled]', 'true')
+  data.append('billing_address_collection', 'auto')
+  data.append('customer_update[address]', 'auto')
+  data.append('customer_update[name]', 'auto')
+  data.append('tax_id_collection[enabled]', 'true')
+  data.append('line_items[0][price]', prices.priceId)
   data.append('line_items[0][quantity]', '1')
+  prices.meteredIds.forEach((priceId, index) => {
+    data.append(`line_items[${index + 1}][price]`, priceId)
+  })
+  console.log('data', data.toString())
   try {
     const response = await axios.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(true))
     return response.data
@@ -59,27 +104,45 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
   }
 }
 
-export const createCustomer = async (email: string) => {
+export const createCustomer = async (email: string, userId: string, name: string) => {
   const config = getConfig(true)
-  console.log('config', config)
-  const response = await axios.post('https://api.stripe.com/v1/customers', new URLSearchParams({
+  const customerData = {
     email,
-  }), config)
+    name,
+  }
+  const data = new URLSearchParams(customerData as any)
+  data.append('metadata[user_id]', userId)
+  const response = await axios.post('https://api.stripe.com/v1/customers', data, config)
+  return response.data
+}
+
+export const updateCustomer = async (customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) => {
+  const config = getConfig(true)
+  const customerData = {
+    email: billing_email || email,
+    name,
+  }
+  const data = new URLSearchParams(customerData as any)
+  data.append('metadata[user_id]', userId)
+  data.append('metadata[email]', email)
+  const response = await axios.post(`https://api.stripe.com/v1/customers/${customerId}`, data, config)
+  return response.data
+}
+
+export const recordUsage = async (subscriptionId: string, quantity: number) => {
+  const config = getConfig(true)
+  const checkoutData = {
+    quantity,
+    action: 'set',
+  }
+  const data = new URLSearchParams(checkoutData as any)
+  const response = await axios.post(`https://api.stripe.com/v1/subscription_items/${subscriptionId}/usage_records`, data, config)
   return response.data
 }
 
 export const removeOldSubscription = async (subscriptionId: string) => {
+  const config = getConfig(true)
   console.log('removeOldSubscription', subscriptionId)
-  const STRIPE_SECRET_KEY = getEnv('STRIPE_SECRET_KEY') || ''
-  const STRIPE_TOKEN = `${STRIPE_SECRET_KEY}`
-  console.log('STRIPE_TOKEN', STRIPE_TOKEN)
-  const requestOptions = {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${STRIPE_TOKEN}`,
-    },
-  }
-
-  const response = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, requestOptions)
-  return response.json()
+  const response = await axios.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, undefined, config)
+  return response.data
 }

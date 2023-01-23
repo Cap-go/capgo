@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
@@ -41,6 +41,7 @@ export const get = async (body: GetDevice, apikey: Database['public']['Tables'][
         public,
         disableAutoUpdateUnderNative,
         disableAutoUpdateToMajor,
+        allow_device_self_set,
         is_emulator,
         is_prod,
         version (
@@ -72,6 +73,7 @@ export const get = async (body: GetDevice, apikey: Database['public']['Tables'][
         public,
         disableAutoUpdateUnderNative,
         disableAutoUpdateToMajor,
+        allow_device_self_set,
         allow_emulator,
         allow_dev,
         version (

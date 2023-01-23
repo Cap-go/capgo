@@ -1,3 +1,5 @@
+import type { MeteredData } from './stripe.ts'
+import { parsePriceIds } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import type { Details } from './types.ts'
 import { createHmac } from './utils.ts'
@@ -18,8 +20,7 @@ const parseHeader = (header: string, scheme: string): Details => {
     {
       timestamp: -1,
       signatures: [] as string[],
-    } as Details,
-  )
+    } as Details)
 }
 const scmpCompare = (a: string, b: string) => {
   const len = a.length
@@ -56,9 +57,8 @@ export const extractDataEvent = (event: any): Database['public']['Tables']['stri
     product_id: 'free',
     price_id: '',
     subscription_id: undefined,
+    subscription_metered: {} as MeteredData,
     customer_id: '',
-    updated_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
     is_good_plan: true,
     status: undefined,
   }
@@ -67,6 +67,11 @@ export const extractDataEvent = (event: any): Database['public']['Tables']['stri
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
       const subscription = event.data.object as any
+      const res = parsePriceIds(subscription.items.data)
+      data.price_id = res.priceId
+      if (res.productId)
+        data.product_id = res.productId
+      data.subscription_metered = res.meteredData
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
       data.status = subscription.cancel_at ? 'canceled' : 'updated'

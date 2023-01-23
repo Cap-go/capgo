@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
@@ -7,6 +7,23 @@ import { invalidIp } from '../_utils/invalids_ip.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
+import { defaultDeviceID } from '../_tests/api.ts'
+import { sendNotif } from '../_utils/notifications.ts'
+import { r2 } from '../_utils/r2.ts'
+
+const getBundleUrl = async (platform: string, bucket_id: string, path: string) => {
+  if (platform === 'supabase') {
+    const { data } = await supabaseAdmin()
+      .storage
+      .from(path)
+      .createSignedUrl(bucket_id, 120)
+    return data?.signedUrl
+  }
+  else if (platform === 'r2') {
+    return r2.getSignedUrl(bucket_id, 120)
+  }
+  return null
+}
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
@@ -29,15 +46,40 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
+    const { data: appOwner } = await supabaseAdmin()
+      .from('apps')
+      .select('user_id, app_id')
+      .eq('app_id', app_id)
+      .single()
+
+    if (!appOwner) {
+      await supabaseAdmin()
+        .from('apps_onprem')
+        .upsert({
+          app_id,
+        })
+      return sendRes({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 404)
+    }
     if (coerce) {
       version_build = coerce.version
     }
     else {
+      // get app owner with app_id
+
+      await sendNotif('user:semver_issue', appOwner.user_id, '0 0 * * 1', 'red')
+
       return sendRes({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
       }, 400)
     }
+    // if plugin_version is < 4 send notif to alert
+    if (semver.lt(plugin_version, '4.0.0'))
+      await sendNotif('user:plugin_issue', appOwner.user_id, '0 0 * * 1', 'red')
+
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       return sendRes({
@@ -85,6 +127,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
             session_key,
             user_id,
             bucket_id,
+            storage_provider,
             external_url
           )
         `)
@@ -115,6 +158,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
               session_key,
               user_id,
               bucket_id,
+              storage_provider,
               external_url
             )
           ),
@@ -138,32 +182,47 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
             session_key,
             user_id,
             bucket_id,
+            storage_provider,
             external_url
           )
         `)
       .eq('device_id', device_id)
       .eq('app_id', app_id)
       .single()
-    if (dbError || !channelData) {
-      console.log(id, 'Cannot get channel', app_id, `no default channel ${JSON.stringify(dbError)}`)
+    if (dbError || (!channelData && !channelOverride && !devicesOverride)) {
+      console.log(id, 'Cannot get channel or override', app_id, `no default channel ${JSON.stringify(dbError)}`)
+      if (versionData)
+        await sendStats('NoChannelOrOverride', platform, device_id, app_id, version_build, versionData.id)
+
       return sendRes({
-        message: 'Cannot get channel',
-        err: `no default channel ${JSON.stringify(dbError)}`,
+        message: `no default channel or override ${JSON.stringify(dbError)}`,
+        err: 'no_channel',
       }, 200)
     }
     let channel = channelData
-    const planValid = await isAllowedAction(channel.created_by)
-    await checkPlan(channel.created_by)
+    if (channelOverride && channelOverride.channel_id) {
+      const channelId = channelOverride.channel_id as Database['public']['Tables']['channels']['Row'] & {
+        version: Database['public']['Tables']['app_versions']['Row']
+      }
+      console.log(id, 'Set channel override', app_id, channelId.version.name)
+      channel = channelId
+    }
+    const planValid = await isAllowedAction(appOwner.user_id)
+    await checkPlan(appOwner.user_id)
     let version = channel.version as Database['public']['Tables']['app_versions']['Row']
     const versionId = versionData ? versionData.id : version.id
 
     const xForwardedFor = headers['x-forwarded-for'] || ''
+    console.log('xForwardedFor', xForwardedFor)
     // check if version is created_at more than 4 hours
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
-    if (!isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
+    if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
       await sendStats('invalidIP', platform, device_id, app_id, version_build, versionId)
-      return sendRes({ message: 'invalid ip' }, 400)
+      return sendRes({
+        message: 'invalid ip',
+        err: 'invalid_ip',
+      }, 400)
     }
     await updateOrCreateDevice({
       app_id,
@@ -184,17 +243,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
-        err: 'not good plan',
+        err: 'need_plan_upgrade',
       }, 200)
     }
-    if (channelOverride && channelOverride.channel_id) {
-      const channelId = channelOverride.channel_id as Database['public']['Tables']['channels']['Row'] & {
-        version: Database['public']['Tables']['app_versions']['Row']
-      }
-      console.log(id, 'Set channel override', app_id, channelId.version.name)
-      version = channelId.version
-      channel = channelId
-    }
+
     if (devicesOverride && devicesOverride.version) {
       const deviceVersion = devicesOverride.version as Database['public']['Tables']['app_versions']['Row']
       console.log(id, 'Set device override', app_id, deviceVersion.name)
@@ -202,19 +254,17 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
 
     if (!version.bucket_id && !version.external_url) {
-      console.log(id, 'Cannot get zip file', app_id)
+      console.log(id, 'Cannot get bundle', app_id)
       return sendRes({
-        message: 'Cannot get zip file',
+        message: 'Cannot get bundle',
+        err: 'no_bundle',
       }, 200)
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const { data } = await supabaseAdmin()
-        .storage
-        .from(`apps/${version.user_id}/${app_id}/versions`)
-        .createSignedUrl(version.bucket_id, 60)
-      if (data && data.signedUrl)
-        signedURL = data.signedUrl
+      const res = await getBundleUrl(version.storage_provider, version.bucket_id, `apps/${version.user_id}/${app_id}/versions`)
+      if (res)
+        signedURL = res
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
@@ -297,7 +347,15 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
 
     // console.log(id, 'save stats', device_id)
-    await sendStats('get', platform, device_id, app_id, version_build, version.id)
+    await sendStats('get', platform, device_id, app_id, version_build, versionId)
+    //  check signedURL and if it's url
+    if (!signedURL || (!signedURL.startsWith('http') && !signedURL.startsWith('https'))) {
+      console.log(id, 'Wrong signedURL', app_id)
+      return sendRes({
+        message: 'Cannot get bundle',
+        err: 'no_bundle',
+      }, 200)
+    }
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,
@@ -308,6 +366,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     })
   }
   catch (e) {
+    console.error('e', e)
     return sendRes({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',

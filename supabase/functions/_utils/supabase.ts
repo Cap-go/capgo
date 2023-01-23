@@ -384,6 +384,7 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
     .eq('app_id', appId)
     .eq('user_id', userId)
     .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.size || 0), 0))
+  //  write in SQL select all id of app_versions who match app_id = "toto" and use the result to find all app_versions_meta and sum all size
   const versions = supabaseAdmin()
     .from('app_versions')
     .select('id', { count: 'exact', head: true })
@@ -445,19 +446,28 @@ export const createApiKey = async (userId: string) => {
   return Promise.resolve()
 }
 
-export const createStripeCustomer = async (userId: string, email: string) => {
-  const customer = await createCustomer(email)
-  await supabaseAdmin()
+export const createStripeCustomer = async (userId: string, email: string, name: string) => {
+  const customer = await createCustomer(email, userId, name)
+  // create date + 15 days
+  const trial_at = new Date()
+  trial_at.setDate(trial_at.getDate() + 15)
+  const { error: createInfoError } = await supabaseAdmin()
     .from('stripe_info')
     .insert({
       customer_id: customer.id,
+      trial_at: trial_at.toISOString(),
     })
-  await supabaseAdmin()
+  if (createInfoError)
+    console.log('createInfoError', createInfoError)
+
+  const { error: updateUserError } = await supabaseAdmin()
     .from('users')
     .update({
       customer_id: customer.id,
     })
     .eq('id', userId)
+  if (updateUserError)
+    console.log('updateUserError', updateUserError)
   await updatePerson(email, {
     id: userId,
     customer_id: customer.id,

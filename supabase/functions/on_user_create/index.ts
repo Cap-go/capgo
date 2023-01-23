@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import type { Person } from '../_utils/crisp.ts'
 import { addEventPerson, postPerson, updatePerson } from '../_utils/crisp.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
@@ -41,7 +41,7 @@ serve(async (event: Request) => {
     console.log('createCustomer stripe')
     if (record.customer_id)
       return sendRes()
-    await createStripeCustomer(record.id, record.email)
+    await createStripeCustomer(record.id, record.email, `${record.first_name || ''} ${record.last_name || ''}`)
     await addEventPerson(record.email, {}, 'user:register', 'green').catch()
     await logsnag.publish({
       channel: 'user-register',

@@ -6,6 +6,7 @@ import {
   isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin,
 } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
+import { recordUsage } from './stripe.ts'
 
 const planToInt = (plan: string) => {
   switch (plan) {
@@ -57,6 +58,50 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
   }
 }
 
+export const getMeterdUsage = async (userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> => {
+  const { data, error } = await supabaseAdmin()
+    .rpc('get_metered_usage', { userid: userId })
+    .single()
+
+  if (error) {
+    console.error('error.message', error.message)
+    throw new Error(error.message)
+  }
+
+  return data as Database['public']['Functions']['get_max_plan']['Returns'][0] || {
+    mau: 0,
+    storage: 0,
+    bandwidth: 0,
+  }
+}
+interface Prices {
+  mau: string
+  storage: string
+  bandwidth: string
+}
+
+const setMetered = async (customer_id: string | null, userId: string) => {
+  if (customer_id === null)
+    return Promise.resolve()
+  console.log('setMetered', customer_id, userId)
+  // return await Promise.resolve({} as Prices)
+  const { data } = await supabaseAdmin()
+    .from('stripe_info')
+    .select()
+    .eq('customer_id', customer_id)
+    .single()
+  if (data && data.subscription_metered) {
+    const prices = data.subscription_metered as any as Prices
+    const get_metered_usage = await getMeterdUsage(userId)
+    if (get_metered_usage.mau > 0 && prices.mau)
+      await recordUsage(prices.mau, get_metered_usage.mau)
+    if (get_metered_usage.storage > 0)
+      await recordUsage(prices.storage, get_metered_usage.storage)
+    if (get_metered_usage.bandwidth > 0)
+      await recordUsage(prices.bandwidth, get_metered_usage.bandwidth)
+  }
+}
+
 export const checkPlan = async (userId: string): Promise<void> => {
   try {
     const { data: user, error: userError } = await supabaseAdmin()
@@ -67,11 +112,13 @@ export const checkPlan = async (userId: string): Promise<void> => {
     if (userError)
       throw userError
     if (await isTrial(userId)) {
-      await supabaseAdmin()
+      const { error } = await supabaseAdmin()
         .from('stripe_info')
         .update({ is_good_plan: true })
         .eq('customer_id', user.customer_id)
         .then()
+      if (error)
+        console.error('error.message', error.message)
       return Promise.resolve()
     }
     const dateid = new Date().toISOString().slice(0, 7)
@@ -88,11 +135,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
       if (get_total_stats) {
         const best_plan = await findBestPlan(get_total_stats)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-        // TODO create a rpc method to calculate % of plan usage.
-        // TODO send email for 50%, 70%, 90% of current plan usage.
-        // TODO Allow upgrade email to be send again every 30 days
-        // TODO send to logsnag maker opportunity by been in crisp
-
+        await setMetered(user.customer_id, userId)
         if (best_plan === 'Free' && current_plan === 'Free') {
           await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
           console.log('best_plan is free', userId)

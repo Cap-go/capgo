@@ -27,6 +27,7 @@ accountPassword:
   success: Pomyślnie zmieniono hasło
   validate: Uprawomocnić
 accountProfile:
+  billing_email: E-mail rozliczeniowy
   country: Kraj
   email: E-mail
   first-name: Imię
@@ -46,7 +47,7 @@ activation:
     Zgadzam się na otrzymywanie powiadomień, gdy nowa wersja aplikacji będzie
     dostępna
   validate: Uprawomocnić
-add-another-app: Dodaj kolejną aplikację
+add-another-app: Dodaj swoją aplikację
 add-this-code-to-you: Dodaj ten kod do swojego projektu
 add-your-app-to-your: Dodaj swoją aplikację do swojego konta
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i przesyłaj aktualizacje!
@@ -75,7 +76,8 @@ app-id-example: Przykład identyfikatora aplikacji
 available-in-the-san: Dostępne w aplikacji piaskownicy
 back-to-login-page: Powrót do strony logowania
 bigger-app-size: Większy rozmiar aplikacji
-build-your-code-and-: Zbuduj swój kod
+build-your-app-and-s: zbuduj swoją aplikację i zsynchronizuj
+build-your-code-and-: Prześlij do Capgo swój kod
 bulk-upload: Przesyłanie zbiorcze
 bundle-number: Numer pakietu
 button:
@@ -179,7 +181,9 @@ from-device: z urządzenia
 good: Dobrze
 id: ID
 in-your-main-file: W twoim głównym pliku
+in-your-project-fold: W twoim folderze projektu
 informations: Informacje
+install-the-capacito: Zainstaluj wtyczkę Kondensator
 into-your-app-folder: Do folderu aplikacji.
 intro:
   aka: Znany też jako
@@ -232,6 +236,7 @@ onboarding:
   loading: Ładowanie
 one-day-left: Został jeden dzień
 open-sidebar: Otwórz pasek boczny
+open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację
 package:
   cannot-delete-version: Nie można usunąć wersji
   channels: Kanały
@@ -249,6 +254,7 @@ package:
   stats: statystyki
   test: Uruchom wersję
   title: informacje
+  unset: Odłącz kanał od pakietu
   version:
     is-used-in-device: jest używany w nadpisaniu urządzenia, najpierw odłącz je
   version-deleted: Wersja usunięta
@@ -345,7 +351,10 @@ stats:
   title: Statystyki
   versions: Wersje
 submit: Składać
+switch-to-all-device: Przełącz na wszystkie urządzenia
+switch-to-only-devic: Przełącz na tylko połączone urządzenie
 terms-of-use: Warunki korzystania
+test-your-update-in-: Przetestuj aktualizację w swojej aplikacji
 tests: testy
 thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 the: The

@@ -12,9 +12,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
 export const handler: Handler = async (event) => {
   try {
     const url: URL = new URL(event.rawUrl)
+    console.log('queryStringParameters', event.queryStringParameters)
     const headers: BaseHeaders = { ...event.headers }
     const method: string = event.httpMethod
-    const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : Object.fromEntries(url.searchParams.entries())
+    const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : event.queryStringParameters
     return main(url, headers, method, body)
   }
   catch (e) {

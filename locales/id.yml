@@ -27,6 +27,7 @@ accountPassword:
   success: Berhasil mengubah kata sandi
   validate: Mengesahkan
 accountProfile:
+  billing_email: Email penagihan
   country: Negara
   email: Surel
   first-name: Nama depan
@@ -48,7 +49,7 @@ activation:
     Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru
     tersedia
   validate: Mengesahkan
-add-another-app: Tambahkan aplikasi lain
+add-another-app: Tambahkan aplikasi Anda
 add-this-code-to-you: Tambahkan kode ini ke proyek Anda
 add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan mari dorong pembaruan!
@@ -77,7 +78,8 @@ app-id-example: Contoh ID Aplikasi
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
 bigger-app-size: Ukuran aplikasi lebih besar
-build-your-code-and-: Buat kode Anda
+build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
+build-your-code-and-: Unggah ke Capgo kode Anda
 bulk-upload: Unggah massal
 bundle-number: Nomor paket
 button:
@@ -183,7 +185,9 @@ from-device: dari perangkat
 good: Bagus
 id: Indo
 in-your-main-file: Di file utama Anda
+in-your-project-fold: Di folder proyek Anda
 informations: Informasi
+install-the-capacito: Instal plugin Kapasitor
 into-your-app-folder: Ke folder aplikasi Anda.
 intro:
   aka: Juga diketahui sebagai
@@ -236,6 +240,7 @@ onboarding:
   loading: Memuat
 one-day-left: Tinggal satu hari lagi
 open-sidebar: Buka bilah sisi
+open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
 package:
   cannot-delete-version: Tidak dapat menghapus versi
   channels: saluran
@@ -253,6 +258,7 @@ package:
   stats: statistik
   test: Luncurkan versi
   title: informasi
+  unset: Batalkan tautan saluran dari bundel
   version:
     is-used-in-device: digunakan dalam penggantian perangkat, batalkan tautannya terlebih dahulu
   version-deleted: Versi dihapus
@@ -349,7 +355,10 @@ stats:
   title: Statistik
   versions: Versi
 submit: Kirim
+switch-to-all-device: Beralih ke semua perangkat
+switch-to-only-devic: Beralih ke hanya perangkat yang ditautkan
 terms-of-use: Syarat Penggunaan
+test-your-update-in-: Uji pembaruan Anda di aplikasi Anda
 tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu

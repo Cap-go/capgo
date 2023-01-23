@@ -1,5 +1,6 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
+import { r2 } from '../_utils/r2.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -27,13 +28,15 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
-    await supabaseAdmin()
+    const { error: errorUpdate } = await supabaseAdmin()
       .from('apps')
       .update({
         last_version: record.name,
       })
       .eq('app_id', record.app_id)
       .eq('user_id', record.user_id)
+    if (errorUpdate)
+      console.log('errorUpdate', errorUpdate)
 
     if (!record.bucket_id) {
       console.log('No bucket_id')
@@ -59,11 +62,12 @@ serve(async (event: Request) => {
       console.log('Error', record.bucket_id, error)
       return sendRes()
     }
-    const u = await new Response(data).arrayBuffer()
+    const u = await data.arrayBuffer()
     // get the size of the Uint8Array
     const size = u.byteLength
+    const unit8 = new Uint8Array(u)
     // cr32 hash the file
-    const checksum = crc32(new Uint8Array(u))
+    const checksum = crc32(unit8)
     // create app version meta
     const { error: dbError } = await supabaseAdmin()
       .from('app_versions_meta')
@@ -91,9 +95,20 @@ serve(async (event: Request) => {
       versions: 1,
     }
     await updateOrAppStats(increment, today_id, record.user_id)
+    await r2.upload(record.bucket_id, unit8)
+    // modify app_versions to set storage to r2
+    const { error: errorUpdateStorage } = await supabaseAdmin()
+      .from('app_versions')
+      .update({
+        storage_provider: 'r2',
+      })
+      .eq('id', record.id)
+    if (errorUpdateStorage)
+      console.log('errorUpdateStorage', errorUpdateStorage)
     return sendRes()
   }
   catch (e) {
+    console.error('e', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

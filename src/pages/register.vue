@@ -33,8 +33,8 @@ const containsLowercase = helpers.regex(/[a-z]/)
 const containsSpecial = helpers.regex(/[#?!@$%^&*-]/)
 
 const rules = computed(() => ({
-  first_name: { required, minLength: minLength(3) },
-  last_name: { required, minLength: minLength(3) },
+  first_name: { required, minLength: minLength(2) },
+  last_name: { required, minLength: minLength(2) },
   email: { required, email },
   password: {
     required,

@@ -12,10 +12,10 @@ jobs:
       - uses: actions/checkout@v3
       - uses: denoland/setup-deno@v1
         with:
-          deno-version: 1.23.1
+          deno-version: 1.29.1
       - name: Update dependencies
         run: |
-          deno run -A https://deno.land/x/udd/main.ts supabase/functions/**/*.ts 
+          deno run -A https://deno.land/x/udd/main.ts supabase/functions/**/*.ts scripts/convert_deno_to_node.mjs
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v4
         id: pr

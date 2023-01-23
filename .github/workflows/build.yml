@@ -17,7 +17,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 18
           cache: 'pnpm'
       - name: Install dependencies
         id: install_code
@@ -32,19 +32,16 @@ jobs:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-      - name: Cache Homebrew Bundler RubyGems
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
-          key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
-          restore-keys: ${{ runner.os }}-rubygems-
-      - name: Install Supabase CLI Homebrew dependencies
-        run: |
-          HOMEBREW_NO_INSTALL_CLEANUP=1 brew install supabase/tap/supabase
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+      # - name: Verify generated types match Postgres schema
+      #   run: |
+      #     pnpm types
+      #     if ! git diff --ignore-space-at-eol --exit-code --quiet src/types/supabase.types.ts; then
+      #       echo "Detected uncommitted changes after build. See status below:"
+      #       git diff
+      #       exit 1
+      #     fi
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
@@ -61,11 +58,11 @@ jobs:
       - name: Create Release Alpha
         if: "contains(github.ref, '-alpha.')"
         id: create_release_prepro
-        run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+        run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: "!contains(github.ref, '-alpha.')"
         id: create_release_prod
-        run: npx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+        run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
   build_android:
     runs-on: ubuntu-latest
     steps:
@@ -73,10 +70,10 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 7
-      - name: Use Node.js 16
+      - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 18
           cache: 'pnpm'
       - name: Install dependencies
         id: install_code
@@ -86,7 +83,7 @@ jobs:
         run: pnpm mobile
       - name: Sync
         id: sync_code
-        run: npx cap sync
+        run: pnpm --package=@capacitor/cli dlx cap sync
       - name: Setup java
         uses: actions/setup-java@v3
         with:
@@ -119,7 +116,7 @@ jobs:
         with:
           name: android-release
           path: ./android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: 60
+          retention-days: 10
   build_ios:
       runs-on: macOS-latest
       steps:
@@ -127,10 +124,10 @@ jobs:
         - uses: pnpm/action-setup@v2
           with:
             version: 7
-        - name: Use Node.js 16
+        - name: Use Node.js
           uses: actions/setup-node@v3
           with:
-            node-version: 16
+            node-version: 18
             cache: 'pnpm'
         - name: Install dependencies
           id: install_code
@@ -140,7 +137,7 @@ jobs:
           run: pnpm mobile
         - name: Sync
           id: sync_code
-          run: npx cap sync
+          run: pnpm --package=@capacitor/cli dlx cap sync
         - uses: ruby/setup-ruby@v1
           with:
             ruby-version: '2.7.2'
@@ -164,9 +161,10 @@ jobs:
             DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
           with:
             lane: closed_beta
+            # subdirectory: 'ios'
         - name: Upload release bundle
           uses: actions/upload-artifact@v3
           with:
             name: ios-release
             path: ./App.ipa
-            retention-days: 60
+            retention-days: 10

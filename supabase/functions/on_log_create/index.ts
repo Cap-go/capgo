@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -84,12 +84,14 @@ serve(async (event: Request) => {
       // compare date with today
         increment.devices = 1
         changed = true
-        await supabaseAdmin()
+        const { error } = await supabaseAdmin()
           .from('devices')
           .update({
             date_id: month_id,
           })
           .eq('device_id', record.device_id)
+        if (error)
+          console.log('Error update device', error)
       }
     }
     if (changed) {

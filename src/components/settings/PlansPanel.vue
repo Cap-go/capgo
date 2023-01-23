@@ -61,7 +61,7 @@ const segmentChanged = (e: SegmentCustomEvent) => {
 const openChangePlan = (planId: string) => {
   // get the current url
   if (planId)
-    openCheckout(planId, window.location.href, window.location.href)
+    openCheckout(planId, window.location.href, window.location.href, isYearly.value)
 }
 const showToastMessage = async (message: string) => {
   const toast = await toastController

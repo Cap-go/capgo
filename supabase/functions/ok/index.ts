@@ -1,11 +1,13 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
+import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 import {
-  baseSupabase, defaultGetBundleRes,
+  baseSupabase,
+  defaultGetBundleRes,
   defaultGetChannelRes, defaultGetDevicesRes,
   defaultPutChannelRes, defaultRes,
   defaultUpdateRes, deleteBundle, deleteDevice,
-  getBundle, getChannel, getDatabase, getDevice, postDevice,
+  getBundle, getChannels, getDatabase, getDevice, postDevice,
   postStats, postUpdate, putChannel, setChannel,
   setChannelSelf,
 } from '../_tests/api.ts'
@@ -14,7 +16,10 @@ import type { BaseHeaders } from '../_utils/types.ts'
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   const service = body.service
   console.log('service', service)
-  if (service === 'database') {
+  if (service == null) {
+    return sendRes({ status: 'ok', service: 'ok' })
+  }
+  else if (service === 'database') {
     const db = await getDatabase()
     if (db)
       return sendRes({ status: 'ok', service })
@@ -22,79 +27,82 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (service === 'update') {
     const supabaseRes = await postUpdate(baseSupabase)
-    let valid = true
-    Object.entries(supabaseRes).forEach(([key, value]) => {
-      const valueString: string = value as any
-      if (key !== 'url' && valueString !== (defaultUpdateRes as any)[key])
-        valid = false
-      if (key === 'url' && valueString && !valueString.startsWith((defaultUpdateRes as any)[key] || ''))
-        valid = false
-    })
-    if (valid)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultUpdateRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'stats') {
     const supabaseRes = await postStats(baseSupabase)
-    if (supabaseRes === defaultRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_self_post') {
     const supabaseRes = await setChannelSelf(baseSupabase)
-    if (supabaseRes === defaultRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_self_get') {
     const supabaseRes = await putChannel(baseSupabase)
-    if (supabaseRes === defaultPutChannelRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultPutChannelRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_get') {
-    const supabaseRes = await getChannel(baseSupabase)
-    if (supabaseRes === defaultGetChannelRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    const supabaseRes = await getChannels(baseSupabase)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultGetChannelRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'channel_post') {
     const supabaseRes = await setChannel(baseSupabase)
-    if (supabaseRes === defaultRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_get') {
     const supabaseRes = await getDevice(baseSupabase)
-    if (supabaseRes === defaultGetDevicesRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultGetDevicesRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_post') {
     const supabaseRes = await postDevice(baseSupabase)
-    if (supabaseRes === defaultRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_delete') {
     const supabaseRes = await deleteDevice(baseSupabase)
-    if (supabaseRes === defaultRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'bundle_get') {
     const supabaseRes = await getBundle(baseSupabase)
-    if (supabaseRes === defaultGetBundleRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultGetBundleRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
   else if (service === 'bundle_delete') {
     const supabaseRes = await deleteBundle(baseSupabase)
-    if (supabaseRes === defaultRes)
-      return sendRes({ status: 'ok', service })
-    return sendRes({ error: 'db not answering as expected', service }, 500)
+    console.log('supabaseRes', service, supabaseRes)
+    if (!equal(supabaseRes, defaultRes))
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+    return sendRes({ status: 'ok', service })
   }
-  return sendRes()
+  return sendRes({ error: 'service not found', service }, 500)
 }
 
 serve(async (event: Request) => {

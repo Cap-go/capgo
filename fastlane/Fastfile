@@ -39,6 +39,26 @@ def ensure_temp_keychain(name, password)
 end
 
 platform :ios do
+  lane :refresh_profiles do
+    match(
+      type: "development",
+      force: true)
+    match(
+      type: "adhoc",
+      force: true)
+  end
+  desc "Register new device"
+  lane :register_new_device do  |options|
+      device_name = prompt(text: "Enter the device name: ")
+      device_udid = prompt(text: "Enter the device UDID: ")
+      device_hash = {}
+      device_hash[device_name] = device_udid
+      register_devices(
+                       devices: device_hash
+                       )
+    refresh_profiles
+  end
+
   lane :closed_beta do
     ensure_temp_keychain(TEMP_KEYCHAIN_USER, TEMP_KEYCHAIN_PASSWORD)
 
@@ -59,7 +79,7 @@ platform :ios do
       api_key: api_key
     )
 
-    gym(
+    build_app(
       configuration: "Release",
       workspace: "./ios/App/App.xcworkspace",
       scheme: "App",

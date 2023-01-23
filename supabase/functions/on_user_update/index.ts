@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import { updatePerson } from '../_utils/crisp.ts'
 import type { Person } from '../_utils/crisp.ts'
@@ -6,6 +6,7 @@ import { getEnv, sendRes } from '../_utils/utils.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
 import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
+import { updateCustomer } from '../_utils/stripe.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
@@ -47,8 +48,9 @@ serve(async (event: Request) => {
       console.log('updatePerson error', e)
     })
     if (!record.customer_id)
-      await createStripeCustomer(record.id, record.email)
-
+      await createStripeCustomer(record.id, record.email, `${record.first_name || ''} ${record.last_name || ''}`)
+    else
+      await updateCustomer(record.customer_id, record.email, record.billing_email, record.id, `${record.first_name || ''} ${record.last_name || ''}`)
     await checkPlan(record.id)
     return sendRes()
   }

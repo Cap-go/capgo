@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
@@ -36,6 +36,12 @@ serve(async (event: Request) => {
       .eq('customer_id', stripeData.customer_id)
       .single()
 
+    if (!customer) {
+      console.log('no customer found')
+      return sendRes({ status: 'ok' }, 200)
+    }
+    if (!customer.subscription_id)
+      stripeData.status = 'succeeded'
     console.log('stripeData', stripeData)
 
     await addDataPerson(user.email, {
@@ -45,7 +51,7 @@ serve(async (event: Request) => {
       price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
     })
-    if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id) {
+    if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
       stripeData.status = 'succeeded'
       const { data: plan } = await supabaseAdmin()
@@ -85,6 +91,7 @@ serve(async (event: Request) => {
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
+        stripeData.subscription_anchor = new Date().toISOString()
         await updatePerson(user.email, undefined, ['Canceled'])
         await addEventPerson(user.email, {}, 'user:cancel', 'red')
         await logsnag.publish({

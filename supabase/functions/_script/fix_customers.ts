@@ -1,8 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import { createCustomer } from '../_utils/stripe.ts'
+import 'https://deno.land/x/dotenv/load.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
-const supabaseUrl = 'https://***.supabase.co'
-const supabaseAnonKey = '***'
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***'
+const supabaseAnonKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***'
 
 const useSupabase = () => {
   const options = {
@@ -13,7 +15,7 @@ const useSupabase = () => {
       detectSessionInUrl: false,
     },
   }
-  return createClient(supabaseUrl, supabaseAnonKey, options)
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 // get all users from supabase
 const initCustomers = async () => {

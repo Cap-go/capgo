@@ -24,7 +24,7 @@ const stats = ref({
   mau: 0,
   storage: 0,
   bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats']['Returns'][0])
+} as Database['public']['Functions']['get_total_stats_v2']['Returns'][0])
 
 const planSuggest = ref('')
 const planCurrrent = ref('')
@@ -86,6 +86,7 @@ const getUsages = async () => {
     datas.value.mau = new Array(getDaysInCurrentMonth()).fill(undefined)
     datas.value.storage = new Array(getDaysInCurrentMonth()).fill(undefined)
     datas.value.bandwidth = new Array(getDaysInCurrentMonth()).fill(undefined)
+    let currentStorage = 0
     data.forEach((item: Database['public']['Tables']['app_stats']['Row']) => {
       if (item.date_id.length > 7) {
         const dayNumber = Number(item.date_id.slice(8)) - 1
@@ -102,7 +103,13 @@ const getUsages = async () => {
         else
           datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
+      else if (item.date_id.length === 7) {
+        currentStorage = item.version_size ? bytesToGb(item.version_size) : 0
+      }
     })
+    const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
+    console.log('storageVariance', storageVariance, currentStorage)
+    datas.value.storage[0] = currentStorage - storageVariance
   }
 }
 
