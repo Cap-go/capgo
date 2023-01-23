@@ -46,18 +46,30 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
+    const { data: appOwner } = await supabaseAdmin()
+      .from('apps')
+      .select('user_id')
+      .eq('id', app_id)
+      .single()
+
+    if (!appOwner) {
+      await supabaseAdmin()
+        .from('apps_onprem')
+        .upsert({
+          app_id,
+        })
+      return sendRes({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 404)
+    }
     if (coerce) {
       version_build = coerce.version
     }
     else {
       // get app owner with app_id
-      const { data: appOwner } = await supabaseAdmin()
-        .from('apps')
-        .select('user_id')
-        .eq('id', app_id)
-        .single()
-      if (appOwner)
-        await sendNotif('user:semver_issue', appOwner.user_id, '0 0 * * 1', 'red')
+
+      await sendNotif('user:semver_issue', appOwner.user_id, '0 0 * * 1', 'red')
 
       return sendRes({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
@@ -65,16 +77,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 400)
     }
     // if plugin_version is < 4 send notif to alert
-    if (semver.lt(plugin_version, '4.0.0')) {
-      // get app owner with app_id
-      const { data: appOwner } = await supabaseAdmin()
-        .from('apps')
-        .select('user_id')
-        .eq('id', app_id)
-        .single()
-      if (appOwner)
-        await sendNotif('user:plugin_issue', appOwner.user_id, '0 0 * * 1', 'red')
-    }
+    if (semver.lt(plugin_version, '4.0.0'))
+      await sendNotif('user:plugin_issue', appOwner.user_id, '0 0 * * 1', 'red')
+
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       return sendRes({
@@ -184,16 +189,26 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       .eq('device_id', device_id)
       .eq('app_id', app_id)
       .single()
-    if (dbError || !channelData) {
-      console.log(id, 'Cannot get channel', app_id, `no default channel ${JSON.stringify(dbError)}`)
+    if (dbError || (!channelData && !channelOverride && !devicesOverride)) {
+      console.log(id, 'Cannot get channel or override', app_id, `no default channel ${JSON.stringify(dbError)}`)
+      if (versionData)
+        await sendStats('NoChannelOrOverride', platform, device_id, app_id, version_build, versionData.id)
+
       return sendRes({
-        message: `no default channel ${JSON.stringify(dbError)}`,
+        message: `no default channel or override ${JSON.stringify(dbError)}`,
         err: 'no_channel',
       }, 200)
     }
     let channel = channelData
-    const planValid = await isAllowedAction(channel.created_by)
-    await checkPlan(channel.created_by)
+    if (channelOverride && channelOverride.channel_id) {
+      const channelId = channelOverride.channel_id as Database['public']['Tables']['channels']['Row'] & {
+        version: Database['public']['Tables']['app_versions']['Row']
+      }
+      console.log(id, 'Set channel override', app_id, channelId.version.name)
+      channel = channelId
+    }
+    const planValid = await isAllowedAction(appOwner.user_id)
+    await checkPlan(appOwner.user_id)
     let version = channel.version as Database['public']['Tables']['app_versions']['Row']
     const versionId = versionData ? versionData.id : version.id
 
@@ -231,14 +246,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
         err: 'need_plan_upgrade',
       }, 200)
     }
-    if (channelOverride && channelOverride.channel_id) {
-      const channelId = channelOverride.channel_id as Database['public']['Tables']['channels']['Row'] & {
-        version: Database['public']['Tables']['app_versions']['Row']
-      }
-      console.log(id, 'Set channel override', app_id, channelId.version.name)
-      version = channelId.version
-      channel = channelId
-    }
+
     if (devicesOverride && devicesOverride.version) {
       const deviceVersion = devicesOverride.version as Database['public']['Tables']['app_versions']['Row']
       console.log(id, 'Set device override', app_id, deviceVersion.name)
@@ -339,7 +347,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
 
     // console.log(id, 'save stats', device_id)
-    await sendStats('get', platform, device_id, app_id, version_build, version.id)
+    await sendStats('get', platform, device_id, app_id, version_build, versionId)
     //  check signedURL and if it's url
     if (!signedURL || (!signedURL.startsWith('http') && !signedURL.startsWith('https'))) {
       console.log(id, 'Wrong signedURL', app_id)

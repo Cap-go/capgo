@@ -225,6 +225,29 @@ export interface Database {
           user_id?: string
         }
       }
+      apps_onprem: {
+        Row: {
+          app_id: string
+          created_at: string | null
+          email: string | null
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          app_id: string
+          created_at?: string | null
+          email?: string | null
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          app_id?: string
+          created_at?: string | null
+          email?: string | null
+          name?: string | null
+          updated_at?: string | null
+        }
+      }
       channel_devices: {
         Row: {
           app_id: string
