@@ -4,4 +4,9 @@
     <string name="title_activity_main">Capgo</string>
     <string name="package_name">ee.forgr.capacitor_go</string>
     <string name="custom_url_scheme">ee.forgr.capacitor_go</string>
+    <string name="asset_statements" translatable="false">
+      [{
+        \"include\": \"https://web.capgo.app/.well-known/assetlinks.json\"
+      }]
+    </string>
 </resources>
