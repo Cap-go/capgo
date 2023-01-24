@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { IonContent, IonPage, isPlatform, toastController } from '@ionic/vue'
+import { IonContent, IonPage, toastController } from '@ionic/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { email, required } from '@vuelidate/validators'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
 
@@ -66,7 +67,7 @@ const submit = async () => {
 
 const fixIOS = () => {
   // fix: https://github.com/ionic-team/ionic-framework/issues/23335
-  if (isPlatform('ios')) {
+  if (Capacitor.getPlatform() === 'ios') {
     const emailInput = document.getElementById('emailInput')
     const passwordInput = document.getElementById('passwordInput')
     if (emailInput) {

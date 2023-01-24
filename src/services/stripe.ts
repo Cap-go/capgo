@@ -1,4 +1,5 @@
-import { actionSheetController, isPlatform, loadingController, toastController } from '@ionic/vue'
+import { Capacitor } from '@capacitor/core'
+import { actionSheetController, loadingController, toastController } from '@ionic/vue'
 import { useSupabase } from './supabase'
 
 const presentActionSheetOpen = async (url: string) => {
@@ -16,7 +17,7 @@ const presentActionSheetOpen = async (url: string) => {
 }
 const openBlank = (link: string) => {
   console.log('openBlank', link)
-  if (isPlatform('ios'))
+  if (Capacitor.getPlatform() === 'ios')
     presentActionSheetOpen(link)
   else
     window.open(link, '_blank')

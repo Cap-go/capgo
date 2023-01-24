@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
-import { IonFab, IonFabButton, IonIcon, isPlatform } from '@ionic/vue'
+import { IonFab, IonFabButton, IonIcon } from '@ionic/vue'
 import { addOutline } from 'ionicons/icons'
 import { useRoute } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
 import Sidebar from '../../components/Sidebar.vue'
 import Navbar from '../../components/Navbar.vue'
 import WelcomeBanner from '../../components/dashboard/WelcomeBanner.vue'
@@ -24,7 +25,7 @@ const props = defineProps<{
   sharedApps: (Database['public']['Tables']['channel_users']['Row'])[] & ChannelUserApp[]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
-const isMobile = isPlatform('capacitor')
+const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
 const main = useMainStore()

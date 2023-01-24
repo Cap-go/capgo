@@ -4,13 +4,14 @@ import {
   IonHeader, IonItem,
   IonItemDivider, IonLabel,
   IonList, IonListHeader, IonNote, IonPage,
-  IonSearchbar, IonTitle, IonToolbar, actionSheetController, isPlatform, toastController,
+  IonSearchbar, IonTitle, IonToolbar, actionSheetController, toastController,
 } from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ellipsisHorizontalCircle } from 'ionicons/icons'
 import copy from 'copy-text-to-clipboard'
+import { Capacitor } from '@capacitor/core'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
@@ -133,7 +134,7 @@ const openPannel = async () => {
   const actionSheet = await actionSheetController.create({
     buttons: [
       {
-        text: isPlatform('capacitor') ? t('package.test') : t('package.download'),
+        text: Capacitor.isNativePlatform() ? t('package.test') : t('package.download'),
         handler: () => {
           actionSheet.dismiss()
           if (!version.value)

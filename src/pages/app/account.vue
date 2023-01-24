@@ -6,7 +6,6 @@ import {
   IonIcon,
   IonPage,
   actionSheetController,
-  isPlatform,
 } from '@ionic/vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { cameraOutline, chevronForwardOutline } from 'ionicons/icons'
@@ -14,6 +13,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
+import { Capacitor } from '@capacitor/core'
 import TitleHead from '~/components/TitleHead.vue'
 import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
@@ -27,7 +27,7 @@ const main = useMainStore()
 const isLoading = ref(false)
 const errorMessage = ref('')
 const version = ref(import.meta.env.VITE_APP_VERSION)
-const isMobile = ref(isPlatform('capacitor'))
+const isMobile = ref(Capacitor.isNativePlatform())
 
 const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage

@@ -2,10 +2,10 @@
 import {
   IonTitle,
   IonToolbar,
-  isPlatform,
 } from '@ionic/vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
 
 defineProps({
@@ -14,7 +14,8 @@ defineProps({
 })
 const main = useMainStore()
 const { t } = useI18n()
-const isMobile = isPlatform('capacitor')
+
+const isMobile = Capacitor.isNativePlatform()
 
 const bannerText = computed(() => {
   if (main.canceled)
@@ -57,14 +58,14 @@ const bannerColor = computed(() => {
 <template>
   <IonToolbar v-if="bannerText" id="banner-toolbar" mode="ios" :color="bannerColor" class="z-0">
     <IonTitle>
-      <p class="text-white text-center">
+      <p class="text-center text-white">
         {{ bannerText }}
       </p>
     </IonTitle>
-    <router-link v-if="!isMobile" id="banner" slot="end" to="/dashboard/settings/plans" class="text-white bg-blue-600 px-2 py-1 rounded hover:bg-blue-500">
+    <router-link v-if="!isMobile" id="banner" slot="end" to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
       {{ t('upgrade') }}
     </router-link>
-    <router-link v-else id="banner" slot="end" to="/app/home" class="text-white bg-blue-600 px-2 py-1 rounded hover:bg-blue-500">
+    <router-link v-else id="banner" slot="end" to="/app/home" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
       {{ t('see-usage') }}
     </router-link>
   </IonToolbar>

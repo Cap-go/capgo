@@ -1,9 +1,10 @@
-import { IonicVue, isPlatform, loadingController, toastController } from '@ionic/vue'
+import { IonicVue, loadingController, toastController } from '@ionic/vue'
 import type { HttpOptions, HttpParams } from '@capacitor-community/http'
 import { Http } from '@capacitor-community/http'
 import type { URLOpenListenerEvent } from '@capacitor/app'
 import { App } from '@capacitor/app'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { Capacitor } from '@capacitor/core'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { hideLoader } from '~/services/loader'
@@ -15,7 +16,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 export const install: UserModule = ({ app, router }) => {
   app.use(IonicVue)
   const main = useMainStore()
-  if (isPlatform('capacitor')) {
+  if (Capacitor.isNativePlatform()) {
     CapacitorUpdater.notifyAppReady()
     App.addListener('appUrlOpen', async (event: URLOpenListenerEvent) => {
       const loading = await loadingController.create({
