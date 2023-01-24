@@ -6,8 +6,8 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:capgo.app</string>
-		<string>webcredentials:capgo.app</string>
+		<string>applinks:web.capgo.app</string>
+		<string>webcredentials:web.capgo.app</string>
 		<string>applinks:*.capgo.app</string>
 		<string>applinks:xvwzpoazmxkqosrdewyv.supabase.co</string>
 	</array>
