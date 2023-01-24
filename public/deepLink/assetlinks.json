@@ -10,5 +10,17 @@
                 "B2:02:A2:82:47:C6:C0:7B:17:43:4B:37:07:D3:48:B3:E2:42:AF:91:29:DF:80:4B:64:5B:ED:DA:F0:E9:62:28"
             ]
         }
+    },
+    {
+        "relation": [
+            "delegate_permission/common.get_login_creds"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "ee.forgr.capacitor_go",
+            "sha256_cert_fingerprints": [
+                "B2:02:A2:82:47:C6:C0:7B:17:43:4B:37:07:D3:48:B3:E2:42:AF:91:29:DF:80:4B:64:5B:ED:DA:F0:E9:62:28"
+            ]
+        }
     }
 ]
