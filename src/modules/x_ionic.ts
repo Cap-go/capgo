@@ -40,10 +40,11 @@ export const install: UserModule = ({ app, router }) => {
             message: 'Cannot handle this redirect',
             duration: 2000,
           })
+          await loading.dismiss()
           return toast.present()
         }
       }
-      if (!url.startsWith(appUrl)) {
+      else {
         await loading.dismiss()
         return
       }
