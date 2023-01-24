@@ -16,6 +16,15 @@
             "delegate_permission/common.get_login_creds"
         ],
         "target": {
+            "namespace": "web",
+            "site": "https://web.capgo.app"
+        }
+    },
+    {
+        "relation": [
+            "delegate_permission/common.get_login_creds"
+        ],
+        "target": {
             "namespace": "android_app",
             "package_name": "ee.forgr.capacitor_go",
             "sha256_cert_fingerprints": [
