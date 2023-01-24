@@ -98,6 +98,9 @@ project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modul
 include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.15.3_@capacitor+core@4.6.1/node_modules/@capgo/capacitor-updater/android')
 
+include ':capgo-inappbrowser'
+project(':capgo-inappbrowser').projectDir = new File('../node_modules/.pnpm/@capgo+inappbrowser@0.3.7_@capacitor+core@4.6.1/node_modules/@capgo/inappbrowser/android')
+
 include ':capgo-native-audio'
 project(':capgo-native-audio').projectDir = new File('../node_modules/.pnpm/@capgo+native-audio@5.0.7_@capacitor+core@4.6.1/node_modules/@capgo/native-audio/android')
 

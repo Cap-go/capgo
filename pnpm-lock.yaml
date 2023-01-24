@@ -40,6 +40,7 @@ specifiers:
   '@capgo/capacitor-purchases': ^1.3.36
   '@capgo/capacitor-screen-recorder': ^1.2.22
   '@capgo/capacitor-updater': 4.15.3
+  '@capgo/inappbrowser': ^0.3.7
   '@capgo/native-audio': ^5.0.1
   '@capgo/native-market': ^1.1.6
   '@iconify-json/carbon': 1.1.12
@@ -156,6 +157,7 @@ dependencies:
   '@capgo/capacitor-purchases': 1.3.49_@capacitor+core@4.6.1
   '@capgo/capacitor-screen-recorder': 1.2.35_@capacitor+core@4.6.1
   '@capgo/capacitor-updater': 4.15.3_@capacitor+core@4.6.1
+  '@capgo/inappbrowser': 0.3.7_@capacitor+core@4.6.1
   '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.1
   '@capgo/native-market': 1.1.18
   '@ionic/vue': 6.4.0
@@ -1960,6 +1962,14 @@ packages:
 
   /@capgo/capacitor-updater/4.15.3_@capacitor+core@4.6.1:
     resolution: {integrity: sha512-Hpq/x6IZaT518vkQTsEcjANOxKM7aF5cZC1jeVpKWBj8MSC8hqdKHtB0mdK1dUa+eTtpB+j3Vsb41XIndZBu4Q==}
+    peerDependencies:
+      '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.6.1
+    dev: false
+
+  /@capgo/inappbrowser/0.3.7_@capacitor+core@4.6.1:
+    resolution: {integrity: sha512-KC0B6Il6lOKxHnUprOZScHXIb2UBwItEVzOXHWqfHFqAJ1CDv6TEjviqda9xRDfMCQW0lXBHxPCdaP51JDrdDw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
