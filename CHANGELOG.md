@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-## [1.192.0-alpha.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.192.0-alpha.0) (2023-01-23)
+## [1.192.0](https://github.com/Cap-go/capgo/compare/1.66.14-alpha.4...1.192.0) (2023-01-24)
 
 
 ### Features
@@ -86,6 +86,7 @@ All notable changes to this project will be documented in this file. See [standa
 * issue with get store ([fa36409](https://github.com/Cap-go/capgo/commit/fa364097dde938ef319517c6403f76893b44b28e))
 * issue with save ([da9f1ba](https://github.com/Cap-go/capgo/commit/da9f1baa23f7be8e23b8ac8490e7beb6ec7599b6))
 * last issue with consistency ([94341df](https://github.com/Cap-go/capgo/commit/94341dfcc41d81eadb8b815e49eda7dbef9fc6e5))
+* link android ([d1a4029](https://github.com/Cap-go/capgo/commit/d1a4029ed078d233b2819096caf246426f769ac1))
 * lint issue ([f5c248e](https://github.com/Cap-go/capgo/commit/f5c248e37f335a47631aec673f965195bd1bc282))
 * lock ([6685af5](https://github.com/Cap-go/capgo/commit/6685af581477bc2c3db392abb9755aa3367a2865))
 * lockfile ([056a4e3](https://github.com/Cap-go/capgo/commit/056a4e37256db2e58922309924e1656500caeaa2))
