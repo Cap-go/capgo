@@ -1,9 +1,9 @@
 import { getMessaging, getToken, onMessage } from 'firebase/messaging'
 import { initializeApp } from 'firebase/app'
-import { isPlatform } from '@ionic/vue'
 import type { ActionPerformed, PushNotificationSchema, Token } from '@capacitor/push-notifications'
 import { PushNotifications } from '@capacitor/push-notifications'
 import type { Router } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
 import { useSupabase } from '~/services/supabase'
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -32,7 +32,7 @@ const registerToken = async (token: string) => {
 
 export const initNotif = () => {
 // Initialize Firebase
-  if (!isPlatform('capacitor')) {
+  if (!Capacitor.isNativePlatform()) {
     // console.log('register web', firebaseConfig)
     const app = initializeApp(JSON.parse(firebaseConfig as string))
     const messaging = getMessaging(app)
@@ -86,7 +86,7 @@ export const initNotif = () => {
 }
 
 export const listenNotif = (router: Router) => {
-  if (!isPlatform('capacitor')) {
+  if (!Capacitor.isNativePlatform()) {
     const app = initializeApp(JSON.parse(firebaseConfig as string))
     const messaging = getMessaging(app)
     onMessage(messaging, (payload) => {

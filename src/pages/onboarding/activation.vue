@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { IonContent, IonPage, IonSpinner, IonToggle, isPlatform } from '@ionic/vue'
+import { IonContent, IonPage, IonSpinner, IonToggle } from '@ionic/vue'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
 import { useSupabase } from '~/services/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 
@@ -23,7 +24,7 @@ const { t } = useI18n()
 
 const submit = async () => {
   isLoading.value = true
-  if (isPlatform('capacitor') && form.enableNotifications)
+  if (Capacitor.isNativePlatform() && form.enableNotifications)
     await PushNotifications.requestPermissions()
 
   const { error } = await supabase.auth.updateUser({

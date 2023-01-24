@@ -1,6 +1,7 @@
-import { isPlatform, loadingController, toastController } from '@ionic/vue'
+import { loadingController, toastController } from '@ionic/vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import dayjs from 'dayjs'
+import { Capacitor } from '@capacitor/core'
 import { useSupabase } from './supabase'
 import type { Database } from '~/types/supabase.types'
 
@@ -26,7 +27,7 @@ export const openVersion = async (app: Database['public']['Tables']['app_version
     signedURL = app.external_url
   }
 
-  if (signedURL && isPlatform('capacitor')) {
+  if (signedURL && Capacitor.isNativePlatform()) {
     try {
       // const newBundle = await CapacitorUpdater.download({
       //   url: signedURL

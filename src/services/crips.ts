@@ -1,10 +1,10 @@
-import { isPlatform } from '@ionic/vue'
+import { Capacitor } from '@capacitor/core'
 import { isSpoofed } from './supabase'
 import type { eventColor } from './crisp-web'
 import { CapacitorCrispWeb } from './crisp-web'
 
 const CapacitorCrisp = new CapacitorCrispWeb()
-if (!isPlatform('capacitor'))
+if (!Capacitor.isNativePlatform())
   CapacitorCrisp.isIframe = false
 CapacitorCrisp.init()
 

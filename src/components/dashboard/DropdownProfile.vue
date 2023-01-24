@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { isPlatform } from '@ionic/vue'
+import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
 import { openChat } from '~/services/crips'
@@ -17,7 +17,7 @@ const { t } = useI18n()
 
 const router = useRouter()
 const main = useMainStore()
-const isMobile = isPlatform('capacitor')
+const isMobile = Capacitor.isNativePlatform()
 const planCurrent = ref('')
 const acronym = computed(() => {
   if (main.user?.first_name && main.user.last_name)
