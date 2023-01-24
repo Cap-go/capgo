@@ -1,8 +1,14 @@
-[{
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target" : {
-        "namespace": "android_app",
-        "package_name": "ee.forgr.capacitor_go",
-        "sha256_cert_fingerprints": ["2F:DC:FD:AB:D4:E0:EB:23:C8:D9:A4:B4:17:DD:F2:86:45:B6:A2:80:05:A5:A2:88:B8:B7:D3:A3:9B:B3:D3:AC"]
+[
+    {
+        "relation": [
+            "delegate_permission/common.handle_all_urls"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "ee.forgr.capacitor_go",
+            "sha256_cert_fingerprints": [
+                "B2:02:A2:82:47:C6:C0:7B:17:43:4B:37:07:D3:48:B3:E2:42:AF:91:29:DF:80:4B:64:5B:ED:DA:F0:E9:62:28"
+            ]
+        }
     }
-}]
+]
