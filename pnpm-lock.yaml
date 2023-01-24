@@ -41,8 +41,8 @@ specifiers:
   '@capgo/capacitor-screen-recorder': ^1.2.35
   '@capgo/capacitor-updater': 4.15.3
   '@capgo/inappbrowser': ^0.3.7
-  '@capgo/native-audio': ^5.0.7
-  '@capgo/native-market': ^1.1.18
+  '@capgo/native-audio': ^5.0.1
+  '@capgo/native-market': ^1.1.6
   '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': ^1.1.8
   '@iconify-json/ion': 1.1.5
@@ -128,37 +128,37 @@ dependencies:
   '@capacitor/app': 4.1.1_@capacitor+core@4.6.2
   '@capacitor/app-launcher': 4.1.0_@capacitor+core@4.6.2
   '@capacitor/assets': 2.0.4_moeqx3xmzxqxagf2sz6mqkbb7m
-  '@capacitor/browser': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/camera': 4.1.4_@capacitor+core@4.6.2
-  '@capacitor/clipboard': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/device': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/dialog': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/filesystem': 4.1.4_@capacitor+core@4.6.2
-  '@capacitor/geolocation': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/haptics': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/ios': 4.6.2_@capacitor+core@4.6.2
-  '@capacitor/keyboard': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/local-notifications': 4.1.4_@capacitor+core@4.6.2
-  '@capacitor/motion': 4.0.2_@capacitor+core@4.6.2
-  '@capacitor/network': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/preferences': 4.0.2_@capacitor+core@4.6.2
-  '@capacitor/push-notifications': 4.1.2_@capacitor+core@4.6.2
-  '@capacitor/screen-reader': 4.1.2_@capacitor+core@4.6.2
-  '@capacitor/share': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/splash-screen': 4.1.3_@capacitor+core@4.6.2
-  '@capacitor/status-bar': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/text-zoom': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/toast': 4.1.0_@capacitor+core@4.6.2
-  '@capawesome/capacitor-file-picker': 0.5.9_@capacitor+core@4.6.2
-  '@capawesome/capacitor-screen-orientation': 2.0.2_@capacitor+core@4.6.2
-  '@capgo/capacitor-crisp': 1.1.21_@capacitor+core@4.6.2
-  '@capgo/capacitor-flash': 1.2.27_@capacitor+core@4.6.2
-  '@capgo/capacitor-mute': 1.1.36_@capacitor+core@4.6.2
-  '@capgo/capacitor-purchases': 1.3.49_@capacitor+core@4.6.2
-  '@capgo/capacitor-screen-recorder': 1.2.35_@capacitor+core@4.6.2
-  '@capgo/capacitor-updater': 4.15.3_@capacitor+core@4.6.2
-  '@capgo/inappbrowser': 0.3.7_@capacitor+core@4.6.2
-  '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.2
+  '@capacitor/browser': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/camera': 4.1.4_@capacitor+core@4.6.1
+  '@capacitor/clipboard': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/device': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/dialog': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/filesystem': 4.1.4_@capacitor+core@4.6.1
+  '@capacitor/geolocation': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/haptics': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/ios': 4.6.1_@capacitor+core@4.6.1
+  '@capacitor/keyboard': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/local-notifications': 4.1.4_@capacitor+core@4.6.1
+  '@capacitor/motion': 4.0.2_@capacitor+core@4.6.1
+  '@capacitor/network': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/preferences': 4.0.2_@capacitor+core@4.6.1
+  '@capacitor/push-notifications': 4.1.2_@capacitor+core@4.6.1
+  '@capacitor/screen-reader': 4.1.2_@capacitor+core@4.6.1
+  '@capacitor/share': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/splash-screen': 4.1.2_@capacitor+core@4.6.1
+  '@capacitor/status-bar': 4.1.1_@capacitor+core@4.6.1
+  '@capacitor/text-zoom': 4.1.0_@capacitor+core@4.6.1
+  '@capacitor/toast': 4.1.0_@capacitor+core@4.6.1
+  '@capawesome/capacitor-file-picker': 0.5.8_@capacitor+core@4.6.1
+  '@capawesome/capacitor-screen-orientation': 2.0.1_@capacitor+core@4.6.1
+  '@capgo/capacitor-crisp': 1.1.21_@capacitor+core@4.6.1
+  '@capgo/capacitor-flash': 1.2.27_@capacitor+core@4.6.1
+  '@capgo/capacitor-mute': 1.1.35_@capacitor+core@4.6.1
+  '@capgo/capacitor-purchases': 1.3.49_@capacitor+core@4.6.1
+  '@capgo/capacitor-screen-recorder': 1.2.35_@capacitor+core@4.6.1
+  '@capgo/capacitor-updater': 4.15.3_@capacitor+core@4.6.1
+  '@capgo/inappbrowser': 0.3.7_@capacitor+core@4.6.1
+  '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.1
   '@capgo/native-market': 1.1.18
   '@ionic/vue': 6.4.0
   '@netlify/functions': 1.4.0
@@ -1968,15 +1968,15 @@ packages:
       '@capacitor/core': 4.6.2
     dev: false
 
-  /@capgo/inappbrowser/0.3.7_@capacitor+core@4.6.2:
+  /@capgo/inappbrowser/0.3.7_@capacitor+core@4.6.1:
     resolution: {integrity: sha512-KC0B6Il6lOKxHnUprOZScHXIb2UBwItEVzOXHWqfHFqAJ1CDv6TEjviqda9xRDfMCQW0lXBHxPCdaP51JDrdDw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.1
     dev: false
 
-  /@capgo/native-audio/5.0.7_@capacitor+core@4.6.2:
+  /@capgo/native-audio/5.0.7_@capacitor+core@4.6.1:
     resolution: {integrity: sha512-sSDNYt9xE+7ICJ6AVfqJJoxKdTMCArIIjyeTsOnggbrIc5+m7EeBIdOnyglPgr3rVQOS7tliKEq2T5K+gC6iEw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
