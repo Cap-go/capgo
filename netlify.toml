@@ -7,6 +7,11 @@
   command = "npx pnpm i --store=node_modules/.pnpm-store && npx pnpm run build && npm run generate:node_serverless"
 
 [[redirects]]
+  from = '/.well-known/*'
+  status = 200
+  to = '/deepLink/:splat'
+
+[[redirects]]
   from = "/api/auto_update"
   to = "/.netlify/functions/updates"
   status = 200
@@ -25,6 +30,11 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/.well-known/*"
+  [headers.values]
+    Content-Type = "application/json"
 
 [[headers]]
   for = "/manifest.webmanifest"
