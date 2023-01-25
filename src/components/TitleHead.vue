@@ -44,15 +44,14 @@ const back = () => {
     <template #title>
       {{ title }}
     </template>
-    <template #subnavbar>
+    <template v-if="search" #subnavbar>
       <k-navbar
-        v-if="search"
         class="sticky top-0"
         inner-class="!h-16"
         right-class="w-full pt-1"
       >
         <template #right>
-          <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
+          <Searchbar :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
         </template>
       </k-navbar>
     </template>

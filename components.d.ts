@@ -43,4 +43,7 @@ declare module '@vue/runtime-core' {
     UsageCard: typeof import('./src/components/dashboard/UsageCard.vue')['default']
     WelcomeBanner: typeof import('./src/components/dashboard/WelcomeBanner.vue')['default']
   }
+  export interface ComponentCustomProperties {
+    vInfiniteScroll: typeof import('element-plus/es')['ElInfiniteScroll']
+  }
 }
