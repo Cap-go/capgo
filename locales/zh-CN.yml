@@ -157,6 +157,7 @@ device:
   unlink_channel: 频道取消与设备的关联
   unlink_version: 版本取消链接到设备
   version: 版本
+device-id: 设备编号
 devices:
   title: 设备
 devices-using-this-b: 使用此捆绑包的设备

@@ -165,6 +165,7 @@ device:
   unlink_channel: Chaîne dissociée de l'appareil
   unlink_version: Dissocier la version de l'appareil
   version: Version
+device-id: Reference de l'appareil
 devices:
   title: Dispositifs
 devices-using-this-b: Appareils utilisant ce bundle

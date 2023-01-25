@@ -163,6 +163,7 @@ device:
   unlink_channel: Desvincular o canal do dispositivo
   unlink_version: Versão desvinculada do dispositivo
   version: Versão
+device-id: ID de dispositivo
 devices:
   title: Dispositivos
 devices-using-this-b: Dispositivos que usam este pacote

@@ -165,6 +165,7 @@ device:
   unlink_channel: Отменить связь канала с устройством
   unlink_version: Отвязать версию от устройства
   version: Версия
+device-id: Идентификатор устройства
 devices:
   title: Устройства
 devices-using-this-b: Устройства, использующие этот пакет

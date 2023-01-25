@@ -157,6 +157,7 @@ device:
   unlink_channel: デバイスへのチャネルリンク解除
   unlink_version: バージョンはデバイスへのリンクを解除します
   version: バージョン
+device-id: デバイスID
 devices:
   title: デバイス
 devices-using-this-b: このバンドルを使用するデバイス
