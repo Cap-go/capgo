@@ -330,6 +330,7 @@ register:
 reset-password: Reset Password
 reset-your-password: Reset your password
 search: Search
+search-device: Search device
 see-usage: See usage
 session_key: IvSessionKey
 settings: Settings

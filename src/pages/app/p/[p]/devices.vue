@@ -188,8 +188,8 @@ const onFilter = async () => {
 </script>
 
 <template>
-  <TitleHead :title="t('devices.title')" :search="!isLoading" :search-icon="filterOutline" @search-input="onSearch" @search-button-click="onFilter" />
-  <k-list v-infinite-scroll="[loadData, { distance: 10 }]" class="md:hidden" strong-ios outline-ios>
+  <TitleHead :title="t('devices.title')" :search-placeholder="t('search-device')" :search="!isLoading" :search-icon="filterOutline" @search-input="onSearch" @search-button-click="onFilter" />
+  <k-list v-infinite-scroll="[loadData, { distance: 10 }]" class="h-full overflow-y-scroll md:hidden max-h-fit" strong-ios outline-ios>
     <k-list-item v-if="isLoading || isLoadingSub">
       <template #text>
         <Spinner />
@@ -208,13 +208,13 @@ const onFilter = async () => {
     <div class="h-full px-0 mx-auto sm:px-2">
       <div class="flex flex-col h-full">
         <div class="h-full overflow-x-auto">
-          <div class="inline-block h-full min-w-full py-2 align-middle md:px-6 lg:px-8">
+          <div v-infinite-scroll="[loadData, { distance: 10 }]" class="inline-block h-full min-w-full py-2 overflow-y-scroll align-middle md:px-6 lg:px-8">
             <table class="w-full h-full lg:divide-y lg:divide-gray-200">
               <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
                 <tr>
                   <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-500 sm:pl-6 md:pl-0">
                     <div class="flex items-center">
-                      ID
+                      Device ID
                     </div>
                   </th>
                   <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
@@ -239,13 +239,13 @@ const onFilter = async () => {
                   </th>
                 </tr>
               </thead>
-              <tbody v-infinite-scroll="[loadData, { distance: 10 }]" class="overflow-y-scroll divide-y divide-gray-200 max-h-fit">
+              <tbody class="w-full h-full divide-y divide-gray-200 max-h-fit">
                 <tr v-if="isLoading || isLoadingSub">
                   <td align="center" colspan="5">
                     <Spinner />
                   </td>
                 </tr>
-                <tr v-for="(item, i) in deviceFiltered" v-else :key="i" class="cursor-pointer" @click="openDevice(item)">
+                <tr v-for="(item, i) in deviceFiltered" v-else :key="i" class="w-full cursor-pointer" @click="openDevice(item)">
                   <td class="hidden py-4 pl-4 pr-3 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
                     {{ item.device_id }}
                   </td>

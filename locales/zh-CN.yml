@@ -329,6 +329,7 @@ register:
 reset-password: 重设密码
 reset-your-password: 重置你的密码
 search: 搜索
+search-device: 搜索设备
 see-usage: 查看用法
 session_key: Iv会话密钥
 settings: 设置

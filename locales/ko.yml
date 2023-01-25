@@ -329,6 +329,7 @@ register:
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 search: 찾다
+search-device: 장치 검색
 see-usage: 사용법 보기
 session_key: IvSessionKey
 settings: 설정

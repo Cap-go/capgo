@@ -85,6 +85,7 @@
     "crypto-random-string": "^5.0.0",
     "daisyui": "^2.47.0",
     "dayjs": "1.11.7",
+    "el-table-infinite-scroll": "^3.0.1",
     "firebase": "9.15.0",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.1.1",

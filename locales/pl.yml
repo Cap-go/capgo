@@ -337,6 +337,7 @@ register:
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
 search: Szukaj
+search-device: Wyszukaj urządzenie
 see-usage: Zobacz użycie
 session_key: IvSessionKey
 settings: Ustawienia

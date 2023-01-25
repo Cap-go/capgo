@@ -339,6 +339,7 @@ register:
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
 search: Поиск
+search-device: Поиск устройства
 see-usage: См. использование
 session_key: IvSessionKey
 settings: Настройки
