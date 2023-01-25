@@ -68,6 +68,7 @@ apikeys:
   links: 链接
   title: API 密钥
   updater: 电容更新器
+app-deleted: 应用已删除
 app-id-example: 应用 ID 示例
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
@@ -94,7 +95,9 @@ cannot-delete-app: 无法删除应用
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-channel: 无法删除频道
 cannot-save-custom-i: 无法保存自定义 ID
+cannot-test-app-some: 无法测试应用程序发生错误
 change: 改变
+changed-password-suc: 密码更换成功
 channel:
   add: 添加
   beta-channel: 测试通道
@@ -325,6 +328,7 @@ register:
   upperCaseError: 应包含大写字母
 reset-password: 重设密码
 reset-your-password: 重置你的密码
+search: 搜索
 see-usage: 查看用法
 session_key: Iv会话密钥
 settings: 设置

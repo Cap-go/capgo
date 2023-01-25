@@ -1,21 +1,15 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonIcon,
-  IonItemDivider,
-  IonLabel,
-  IonPage,
-  toastController,
-} from '@ionic/vue'
-import { chevronForwardOutline } from 'ionicons/icons'
+import { kBlockTitle, kList, kListItem } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Mute } from '@capgo/capacitor-mute'
 import TitleHead from '~/components/TitleHead.vue'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
+const displayStore = useDisplayStore()
 
 interface Module {
   name: string
@@ -93,29 +87,17 @@ modules.value.push(...[
 ])
 // CapacitorUpdater.
 const runMethod = async (m: Module) => {
-  console.log('runMethod', m);
-  (await toastController
-    .create({
-      message: `runMethod: ${JSON.stringify(m)}`,
-      duration: 2000,
-    })).present();
+  console.log('runMethod', m)
+  displayStore.messageToast.push(`runMethod: ${JSON.stringify(m)}`);
   (mods as any)[m.name][m.method]({ ...m.option }).then((res: any) => {
     console.log('resMethod', m, res)
     setTimeout(async () => {
-      (await toastController
-        .create({
-          message: `resMethod: ${JSON.stringify(res)}`,
-          duration: 2000,
-        })).present()
+      displayStore.messageToast.push(`resMethod: ${JSON.stringify(res)}`)
     }, 2000)
   }).catch((err: any) => {
     console.log('errMethod', m, err)
     setTimeout(async () => {
-      (await toastController
-        .create({
-          message: `errMethod: ${err}`,
-          duration: 2000,
-        })).present()
+      displayStore.messageToast.push(`errMethod: ${err}`)
     }, 2000)
   })
 }
@@ -123,26 +105,11 @@ const runMethod = async (m: Module) => {
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="`${t('module.heading')} ${t('tests')}`" default-back="/app/home" color="warning" />
-    <IonContent :fullscreen="true">
-      <div class="p-6">
-        <ul class="grid grid-rows-4 mb-6 gap-y-5">
-          <IonItemDivider>
-            <IonLabel>
-              {{ t('available-in-the-san') }}
-            </IonLabel>
-          </IonItemDivider>
-          <li v-for="(module, index) in modules" :key="index" class="cursor-pointer" @click="runMethod(module)">
-            <div
-              class="flex items-center justify-between"
-            >
-              <span class="font-bold">{{ module.name }}@{{ module.method }} with {{ module.option }}</span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </div>
-          </li>
-        </ul>
-      </div>
-    </IonContent>
-  </IonPage>
+  <TitleHead :title="`${t('module.heading')} ${t('tests')}`" default-back="/app/home" color="warning" />
+  <k-block-title>{{ t('available-in-the-san') }}</k-block-title>
+  <k-list strong-ios outline-ios>
+    <k-list-item
+      v-for="(module, index) in modules" :key="index" link :footer="`with ${JSON.stringify(module.option)}`" :title="`${module.name}@${module.method}`" @click="runMethod(module)"
+    />
+  </k-list>
 </template>

@@ -3,3 +3,38 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+@font-face {
+  font-family: 'AirbnbCerealLight';
+  font-style: normal;
+  font-weight: normal;
+  src: url('/fonts/AirbnbCerealLight.woff');
+}
+@font-face {
+  font-family: 'AirbnbCerealMedium';
+  font-style: normal;
+  font-weight: normal;
+  src: url('/fonts/AirbnbCerealMedium.woff');
+}
+@font-face {
+  font-family: 'AirbnbCerealBold';
+  font-style: normal;
+  font-weight: normal;
+  src: url('/fonts/AirbnbCerealBold.woff');
+}
+
+#app-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: theme('colors.gray.900');
+  z-index: 100;
+  background-image: url('/capgo.webp');
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position: center;
+  background-size: 150px 150px;
+}

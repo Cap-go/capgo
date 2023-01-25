@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import {
-  IonContent, IonInfiniteScroll,
+  IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonInput,
   IonItem,
   IonItemDivider,
-  IonLabel, IonList, IonListHeader, IonNote, IonPage, IonSearchbar,
-  actionSheetController, alertController, toastController,
+  IonLabel, IonList, IonListHeader, IonNote,
+  IonSearchbar,
 } from '@ionic/vue'
+
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -18,6 +19,7 @@ import TitleHead from '~/components/TitleHead.vue'
 import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
+import { useDisplayStore } from '~/stores/display'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -39,6 +41,7 @@ interface Stat {
 const fetchLimit = 40
 let fetchOffset = 0
 const isDisabled = ref(false)
+const displayStore = useDisplayStore()
 const { t } = useI18n()
 const main = useMainStore()
 const route = useRoute()
@@ -274,23 +277,22 @@ const upsertDevVersion = async (device: string, v: Database['public']['Tables'][
     })
 }
 const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.delete-message')} ${name} ${t('from-device')} ?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+  displayStore.dialogOption = {
+    header: t('alert.confirm-delete'),
+    message: `${t('alert.delete-message')} ${name} ${t('from-device')} ?`,
+    buttons: [
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button.delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 const saveCustomId = async () => {
   console.log('device.value?.custom_id', device.value?.custom_id)
@@ -300,12 +302,7 @@ const saveCustomId = async () => {
       custom_id: device.value?.custom_id,
     })
     .eq('device_id', id.value)
-  const toast = await toastController
-    .create({
-      message: t('custom-id-saved'),
-      duration: 2000,
-    })
-  await toast.present()
+  displayStore.messageToast.push(t('custom-id-saved'))
 }
 const delDevVersion = async (device: string) => {
   if (await didCancel(t('channel.device')))
@@ -323,12 +320,7 @@ const updateOverride = async () => {
       text: t('button.remove'),
       handler: async () => {
         device.value?.device_id && delDevVersion(device.value?.device_id)
-        const toast = await toastController
-          .create({
-            message: t('device.unlink_version'),
-            duration: 2000,
-          })
-        await toast.present()
+        displayStore.messageToast.push(t('device.unlink_version'))
         await loadData()
       },
     })
@@ -342,22 +334,12 @@ const updateOverride = async () => {
         isLoading.value = true
         try {
           await upsertDevVersion(device.value?.device_id, version)
-          const toast = await toastController
-            .create({
-              message: t('device.link_version'),
-              duration: 2000,
-            })
-          await toast.present()
+          displayStore.messageToast.push(t('device.link_version'))
           await loadData()
         }
         catch (error) {
           console.error(error)
-          const toast = await toastController
-            .create({
-              message: t('device.link_fail'),
-              duration: 2000,
-            })
-          await toast.present()
+          displayStore.messageToast.push(t('device.link_fail'))
         }
         isLoading.value = false
       },
@@ -370,11 +352,11 @@ const updateOverride = async () => {
       // console.log('Cancel clicked')
     },
   })
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     header: t('package.link_version'),
     buttons,
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 const upsertDevChannel = async (device: string, channel: Database['public']['Tables']['channels']['Row']) => {
   if (!main?.user?.id)
@@ -404,12 +386,7 @@ const updateChannel = async () => {
       text: t('button.remove'),
       handler: async () => {
         device.value?.device_id && delDevChannel(device.value?.device_id)
-        const toast = await toastController
-          .create({
-            message: t('device.unlink_channel'),
-            duration: 2000,
-          })
-        await toast.present()
+        displayStore.messageToast.push(t('device.unlink_channel'))
         await loadData()
       },
     })
@@ -423,22 +400,12 @@ const updateChannel = async () => {
         isLoading.value = true
         try {
           await upsertDevChannel(device.value?.device_id, channel)
-          const toast = await toastController
-            .create({
-              message: t('device.link_channel'),
-              duration: 2000,
-            })
-          await toast.present()
+          displayStore.messageToast.push(t('device.link_channel'))
           await loadData()
         }
         catch (error) {
           console.error(error)
-          const toast = await toastController
-            .create({
-              message: t('device.link_fail'),
-              duration: 2000,
-            })
-          await toast.present()
+          displayStore.messageToast.push(t('device.link_fail'))
         }
         isLoading.value = false
       },
@@ -451,11 +418,11 @@ const updateChannel = async () => {
       // console.log('Cancel clicked')
     },
   })
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     header: t('package.link_channel'),
     buttons,
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 
 watchEffect(async () => {
@@ -469,174 +436,170 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('device.title')" color="warning" />
-    <IonContent :fullscreen="true">
-      <IonList>
-        <IonListHeader>
-          <span class="text-vista-blue-500">
-            {{ device?.device_id }}
-          </span>
-        </IonListHeader>
-        <IonItemDivider>
-          <IonLabel>
-            {{ t('device.info') }}
-          </IonLabel>
-        </IonItemDivider>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.platform') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.platform }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('custom-id') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            <IonInput v-model="device.custom_id" @ion-blur="saveCustomId()" />
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.plugin_version') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.plugin_version }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.version') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.version.name }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('version-builtin') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.version_build }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.os_version') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.os_version || 'unknow' }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device && minVersion(device.plugin_version)">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('is-emulator') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.is_emulator }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device && minVersion(device.plugin_version)">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('is-production-app') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ device.is_prod }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="(device && device.updated_at)">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.last_update') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ formatDate(device.updated_at) }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="(device && device.created_at)">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.created_at') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ formatDate(device.created_at) }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device" class="cursor-pointer" @click="updateOverride">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.force_version') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ deviceOverride?.version?.name || t('device.no_override') }}
-          </IonNote>
-        </IonItem>
-        <IonItem v-if="device" class="cursor-pointer" @click="updateChannel">
-          <IonLabel>
-            <h2 class="text-sm text-azure-500">
-              {{ t('device.channel') }}
-            </h2>
-          </IonLabel>
-          <IonNote slot="end">
-            {{ channelDevice?.channel_id.name || t('device.no_channel') }}
-          </IonNote>
-        </IonItem>
-      </IonList>
-      <IonList>
-        <IonListHeader>
-          <IonLabel>Logs</IonLabel>
-        </IonListHeader>
-        <div v-if="isLoadingSub" class="flex justify-center chat-items">
-          <Spinner />
-        </div>
-        <IonSearchbar v-if="!isLoadingSub" @ion-change="onSearchLog($event.detail.value)" />
-        <template v-for="s in logFiltered" :key="s.id">
-          <IonItem>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ s.action }} {{ s.version.name }}, builtin {{ s.version_build }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(s.created_at || '') }}
-            </IonNote>
-          </IonItem>
-        </template>
-        <IonInfiniteScroll
-          threshold="100px"
-          :disabled="isDisabled || !!search"
-          @ion-infinite="loadStatsData($event)"
-        >
-          <IonInfiniteScrollContent
-            loading-spinner="bubbles"
-            :loading-text="t('loading-more-data')"
-          />
-        </IonInfiniteScroll>
-      </IonList>
-    </IonContent>
-  </IonPage>
+  <TitleHead :title="t('device.title')" color="warning" />
+  <IonList>
+    <IonListHeader>
+      <span class="text-vista-blue-500">
+        {{ device?.device_id }}
+      </span>
+    </IonListHeader>
+    <IonItemDivider>
+      <IonLabel>
+        {{ t('device.info') }}
+      </IonLabel>
+    </IonItemDivider>
+    <IonItem v-if="device">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.platform') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.platform }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('custom-id') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        <IonInput v-model="device.custom_id" @ion-blur="saveCustomId()" />
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.plugin_version') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.plugin_version }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.version') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.version.name }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('version-builtin') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.version_build }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.os_version') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.os_version || 'unknow' }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device && minVersion(device.plugin_version)">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('is-emulator') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.is_emulator }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device && minVersion(device.plugin_version)">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('is-production-app') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ device.is_prod }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="(device && device.updated_at)">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.last_update') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ formatDate(device.updated_at) }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="(device && device.created_at)">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.created_at') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ formatDate(device.created_at) }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device" class="cursor-pointer" @click="updateOverride">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.force_version') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ deviceOverride?.version?.name || t('device.no_override') }}
+      </IonNote>
+    </IonItem>
+    <IonItem v-if="device" class="cursor-pointer" @click="updateChannel">
+      <IonLabel>
+        <h2 class="text-sm text-azure-500">
+          {{ t('device.channel') }}
+        </h2>
+      </IonLabel>
+      <IonNote slot="end">
+        {{ channelDevice?.channel_id.name || t('device.no_channel') }}
+      </IonNote>
+    </IonItem>
+  </IonList>
+  <IonList>
+    <IonListHeader>
+      <IonLabel>Logs</IonLabel>
+    </IonListHeader>
+    <div v-if="isLoadingSub" class="flex justify-center chat-items">
+      <Spinner />
+    </div>
+    <IonSearchbar v-if="!isLoadingSub" @ion-change="onSearchLog($event.detail.value)" />
+    <template v-for="s in logFiltered" :key="s.id">
+      <IonItem>
+        <IonLabel>
+          <h2 class="text-sm text-azure-500">
+            {{ s.action }} {{ s.version.name }}, builtin {{ s.version_build }}
+          </h2>
+        </IonLabel>
+        <IonNote slot="end">
+          {{ formatDate(s.created_at || '') }}
+        </IonNote>
+      </IonItem>
+    </template>
+    <IonInfiniteScroll
+      threshold="100px"
+      :disabled="isDisabled || !!search"
+      @ion-infinite="loadStatsData($event)"
+    >
+      <IonInfiniteScrollContent
+        loading-spinner="bubbles"
+        :loading-text="t('loading-more-data')"
+      />
+    </IonInfiniteScroll>
+  </IonList>
 </template>
 
 <style>

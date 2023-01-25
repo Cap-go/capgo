@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import {
-  IonButton,
-  IonContent,
-  IonInput,
-  IonPage,
-  IonSpinner,
-} from '@ionic/vue'
+  kPreloader,
+} from 'konsta/vue'
+
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import { useI18n } from 'vue-i18n'
@@ -93,105 +90,80 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('account.personalInformation')" />
-    <IonContent :fullscreen="true" class="w-full">
-      <div class="grid w-full p-8 mx-auto lg:w-1/2">
-        <form
-          class="w-full mt-12"
-          @submit.prevent="submit"
-        >
-          <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-            {{ errorMessage }}
-          </p>
-          <div class="grid w-full item-center">
-            <div class="py-1">
-              <IonInput
-                v-model="form.first_name"
-                :disabled="isLoading"
-                autofocus
-                required
-                class="z-0 text-left border-b-2 ion-padding-start"
-                :placeholder="t('accountProfile.first-name')"
-                type="text"
-              />
+  <TitleHead :title="t('account.personalInformation')" />
+  <div class="grid w-full p-8 mx-auto lg:w-1/2">
+    <form
+      class="w-full mt-12"
+      @submit.prevent="submit"
+    >
+      <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
+        {{ errorMessage }}
+      </p>
+      <div class="grid w-full item-center">
+        <div class="py-1">
+          <input
+            v-model="form.first_name"
+            :disabled="isLoading"
+            autofocus
+            required
+            class="z-0 text-left border-b-2 ion-padding-start"
+            :placeholder="t('accountProfile.first-name')"
+            type="text"
+          >
 
-              <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                  {{ t('accountProfile.first-name') }}: {{ error.$message }}
-                </p>
-              </div>
-            </div>
-            <div class="py-1">
-              <IonInput
-                v-model="form.last_name"
-                :disabled="isLoading"
-                required
-                class="z-0 text-left border-b-2 ion-padding-start"
-                :placeholder="t('accountProfile.last-name')"
-                type="text"
-              />
-              <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                  {{ t('accountProfile.last-name') }}: {{ error.$message }}
-                </p>
-              </div>
-            </div>
-            <div class="py-1">
-              <IonInput
-                v-model="form.email"
-                required
-                disabled
-                inputmode="email"
-                class="z-0 text-left border-b-2 ion-padding-start"
-                :placeholder="t('accountProfile.email')"
-                type="email"
-              />
-            </div>
-            <div class="py-1">
-              <IonInput
-                v-model="form.country"
-                :disabled="isLoading"
-                required
-                class="z-0 text-left border-b-2 ion-padding-start"
-                :placeholder="t('accountProfile.country')"
-                type="text"
-              />
-            </div>
-
-            <IonButton
-              :disabled="isLoading"
-              type="submit"
-              color="secondary"
-              shape="round"
-              class="mx-auto mt-8 font-semibold ion-margin-top w-45"
-            >
-              <span v-if="!isLoading" class="rounded-4xl">
-                {{ t('accountProfile.update') }}
-              </span>
-              <IonSpinner v-else name="crescent" color="light" />
-            </IonButton>
+          <div v-for="(error, index) of v$.first_name.$errors" :key="index">
+            <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
+              {{ t('accountProfile.first-name') }}: {{ error.$message }}
+            </p>
           </div>
-        </form>
+        </div>
+        <div class="py-1">
+          <input
+            v-model="form.last_name"
+            :disabled="isLoading"
+            required
+            class="z-0 text-left border-b-2 ion-padding-start"
+            :placeholder="t('accountProfile.last-name')"
+            type="text"
+          >
+          <div v-for="(error, index) of v$.last_name.$errors" :key="index">
+            <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
+              {{ t('accountProfile.last-name') }}: {{ error.$message }}
+            </p>
+          </div>
+        </div>
+        <div class="py-1">
+          <input
+            v-model="form.email"
+            required
+            disabled
+            inputmode="email"
+            class="z-0 text-left border-b-2 ion-padding-start"
+            :placeholder="t('accountProfile.email')"
+            type="email"
+          >
+        </div>
+        <div class="py-1">
+          <input
+            v-model="form.country"
+            :disabled="isLoading"
+            required
+            class="z-0 text-left border-b-2 ion-padding-start"
+            :placeholder="t('accountProfile.country')"
+            type="text"
+          >
+        </div>
+
+        <button class="btn btn-secondary" :disabled="isLoading">
+          <span v-if="!isLoading" class="rounded-4xl">
+            {{ t('accountProfile.update') }}
+          </span>
+          <k-preloader v-else size="w-16 h-16" />
+        </button>
       </div>
-    </IonContent>
-  </IonPage>
+    </form>
+  </div>
 </template>
 
 <style scoped>
-ion-datetime {
-    height: auto;
-    width: auto;
-
-    max-width: 350px;
-  }
-  ion-modal {
-    --width: 290px;
-    --height: 382px;
-    --border-radius: 8px;
-  }
-
-  ion-modal ion-datetime {
-    height: 382px;
-  }
 </style>

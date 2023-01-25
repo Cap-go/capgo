@@ -72,6 +72,7 @@ apikeys:
   links: Liên kết
   title: Khóa API
   updater: trình cập nhật tụ điện
+app-deleted: Đã xóa ứng dụng
 app-id-example: Ví dụ về ID ứng dụng
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
@@ -98,7 +99,9 @@ cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-channel: Không thể xóa kênh
 cannot-save-custom-i: Không thể lưu ID tùy chỉnh
+cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
 change: Biến đổi
+changed-password-suc: Đã đổi mật khẩu thành công
 channel:
   add: Thêm vào
   beta-channel: Kênh beta
@@ -337,6 +340,7 @@ register:
   upperCaseError: Nên chứa các chữ cái in hoa
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
+search: Tìm kiếm
 see-usage: Xem mức sử dụng
 session_key: IvSessionKey
 settings: Cài đặt

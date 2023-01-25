@@ -70,6 +70,7 @@ apikeys:
   links: Bağlantılar
   title: API anahtarları
   updater: kondansatör güncelleyici
+app-deleted: Uygulama silindi
 app-id-example: Uygulama kimliği örneği
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
@@ -96,7 +97,9 @@ cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-save-custom-i: Özel kimlik kaydedilemiyor
+cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 change: Değiştirmek
+changed-password-suc: parola başarıyla değiştirildi
 channel:
   add: Ekle
   beta-channel: beta kanalı
@@ -339,6 +342,7 @@ register:
   upperCaseError: Büyük harfler içermelidir
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
+search: Arama
 see-usage: Kullanıma bakın
 session_key: IvSessionKey
 settings: Ayarlar

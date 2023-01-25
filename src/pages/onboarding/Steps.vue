@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { IonFab, IonFabButton, IonIcon, toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useRoute, useRouter } from 'vue-router'
-import { arrowBack, copyOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
+import {
+  kFab,
+} from 'konsta/vue'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/crips'
+import { useDisplayStore } from '~/stores/display'
+import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done'])
 
+const displayStore = useDisplayStore()
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
@@ -102,11 +106,7 @@ const copyToast = async (text: string, allowed: boolean, id: string) => {
   if (!allowed)
     return
   copy(text)
-  const toast = await toastController
-    .create({
-      message: t('copied-to-clipboard'),
-      duration: 2000,
-    })
+  displayStore.messageToast.push(t('copied-to-clipboard'))
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
     setLog()
@@ -117,7 +117,6 @@ const copyToast = async (text: string, allowed: boolean, id: string) => {
       mySubscription.value.unsubscribe()
     scrollToElement(id)
   }
-  await toast.present()
 }
 const getKey = async (retry = true): Promise<void> => {
   isLoading.value = true
@@ -227,7 +226,10 @@ watchEffect(async () => {
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
-                <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
+                <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">
+                  {{ s.command }}
+                  <i-ion-copy-outline class="text-muted-blue-800" />
+                </code>
                 <br v-if="s.command">
                 <span class="text-sm">{{ s.subtitle }}</span>
               </p>
@@ -245,9 +247,9 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <IonFab slot="fixed" vertical="bottom" horizontal="end">
-    <IonFabButton color="secondary" @click="emit('done')">
-      <IonIcon :icon="arrowBack" />
-    </IonFabButton>
-  </IonFab>
+  <k-fab class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
+    <template #icon>
+      <component :is="arrowBack" />
+    </template>
+  </k-fab>
 </template>
