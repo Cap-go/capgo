@@ -214,27 +214,27 @@ const onFilter = async () => {
                 <tr>
                   <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-500 sm:pl-6 md:pl-0">
                     <div class="flex items-center">
-                      Device ID
+                      {{ t('device-id') }}
                     </div>
                   </th>
                   <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
                     <div class="flex items-center">
-                      Platform
+                      {{ t('device.platform') }}
                     </div>
                   </th>
                   <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
                     <div class="flex items-center">
-                      Date
+                      {{ t('updated-at') }}
                     </div>
                   </th>
                   <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
                     <div class="flex items-center">
-                      Version
+                      {{ t('device.version') }}
                     </div>
                   </th>
                   <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
                     <div class="flex items-center">
-                      Custom ID
+                      {{ t('custom-id') }}
                     </div>
                   </th>
                 </tr>

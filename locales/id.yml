@@ -165,6 +165,7 @@ device:
   unlink_channel: Putuskan tautan saluran ke perangkat
   unlink_version: Versi batalkan tautan ke perangkat
   version: 'Versi: kapan'
+device-id: ID perangkat
 devices:
   title: Perangkat
 devices-using-this-b: Perangkat yang menggunakan bundel ini

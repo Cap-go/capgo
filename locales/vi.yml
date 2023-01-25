@@ -163,6 +163,7 @@ device:
   unlink_channel: Hủy liên kết kênh với thiết bị
   unlink_version: Hủy liên kết phiên bản với thiết bị
   version: Phiên bản
+device-id: ID thiết bị
 devices:
   title: Thiết bị
 devices-using-this-b: Các thiết bị sử dụng gói này

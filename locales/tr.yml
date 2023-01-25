@@ -161,6 +161,7 @@ device:
   unlink_channel: Kanalın cihaz bağlantısını kaldırma
   unlink_version: Sürümün cihaz bağlantısını kaldırma
   version: Sürüm
+device-id: Cihaz Kimliği
 devices:
   title: Cihazlar
 devices-using-this-b: Bu paketi kullanan cihazlar

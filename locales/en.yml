@@ -140,6 +140,7 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
+details-and-logs: details and logs.
 device:
   channel: Channel link
   created_at: Created at
@@ -158,6 +159,7 @@ device:
   unlink_channel: Channel unlink to device
   unlink_version: Version unlink to device
   version: Version
+device-id: Device ID
 devices:
   title: Devices
 devices-using-this-b: Devices using this bundle

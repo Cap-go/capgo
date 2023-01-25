@@ -1,14 +1,5 @@
 <script setup lang="ts">
-import {
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
-  IonInput,
-  IonItem,
-  IonItemDivider,
-  IonLabel, IonList, IonListHeader, IonNote,
-  IonSearchbar,
-} from '@ionic/vue'
-
+import { kBlockTitle, kList, kListInput, kListItem } from 'konsta/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -16,7 +7,6 @@ import { gt } from 'semver'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import TitleHead from '~/components/TitleHead.vue'
-import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
@@ -437,7 +427,7 @@ watchEffect(async () => {
 
 <template>
   <TitleHead :title="t('device.title')" color="warning" />
-  <IonList>
+  <!-- <IonList>
     <IonListHeader>
       <span class="text-vista-blue-500">
         {{ device?.device_id }}
@@ -599,7 +589,187 @@ watchEffect(async () => {
         :loading-text="t('loading-more-data')"
       />
     </IonInfiniteScroll>
-  </IonList>
+  </IonList> -->
+  <k-block-title class="md:hidden">
+    {{ t('device.info') }}
+  </k-block-title>
+  <k-list v-if="device" class="h-full overflow-y-scroll md:hidden max-h-fit" strong-ios outline-ios>
+    <k-list-item
+      :title="t('device-id')"
+      :text="device.device_id"
+    />
+    <k-list-item
+      v-if="device.platform"
+      :title="t('device.platform')"
+      :after="device.platform"
+    />
+    <k-list-input :label="t('custom-id')" type="text" placeholder="1234" />
+    <k-list-item
+      :title="t('device.plugin_version')"
+      :after="device.plugin_version"
+    />
+    <k-list-item
+      :title="t('device.version')"
+      :after="device.version.name"
+    />
+    <k-list-item
+      v-if="device.version_build"
+      :title="t('version-builtin')"
+      :after="device.version_build"
+    />
+    <k-list-item
+      :title="t('device.os_version')"
+      :after="device.os_version || 'unknow'"
+    />
+    <k-list-item
+      v-if="device.is_emulator && minVersion(device.plugin_version)"
+      :title="t('is-emulator')"
+      :after="device.is_emulator"
+    />
+    <k-list-item
+      v-if="device.is_emulator && minVersion(device.plugin_version)"
+      :title="t('is-production-app')"
+      :after="device.is_prod"
+    />
+    <k-list-item
+      v-if="device.updated_at"
+      :title="t('device.last_update')"
+      :after="formatDate(device.updated_at)"
+    />
+    <k-list-item
+      v-if="device.created_at"
+      :title="t('device.created_at')"
+      :after="formatDate(device.created_at)"
+    />
+    <k-list-item
+      :title="t('device.force_version')"
+      :after="deviceOverride?.version?.name || t('device.no_override') "
+      @click="updateOverride"
+    />
+    <k-list-item
+      :title="t('device.channel')"
+      :after="channelDevice?.channel_id.name || t('device.no_channel')"
+      @click="updateChannel"
+    />
+  </k-list>
+  <div v-if="device" class="hidden h-full p-8 pb-16 overflow-y-scroll md:block">
+    <div>
+      <h3 class="text-lg font-medium leading-6 text-gray-300">
+        {{ t('device.info') }}
+      </h3>
+      <p class="max-w-2xl mt-1 text-sm text-gray-500">
+        {{ t('details-and-logs') }}
+      </p>
+    </div>
+    <div class="mt-5 border-t border-gray-200">
+      <dl class="sm:divide-y sm:divide-gray-200">
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device-id') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.device_id }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.platform') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.platform }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('custom-id') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <input v-model="device.custom_id" class="w-full max-w-xs input input-bordered" @ion-blur="saveCustomId()">
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.plugin_version') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.plugin_version }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.version') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.version.name }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('version-builtin') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.version_build }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.os_version') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.os_version || 'unknow' }}
+          </dd>
+        </div>
+        <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('is-emulator') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.is_emulator }}
+          </dd>
+        </div>
+        <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('is-production-app') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ device.is_prod }}
+          </dd>
+        </div>
+        <div v-if="device.updated_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.last_update') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ formatDate(device.updated_at) }}
+          </dd>
+        </div>
+        <div v-if="device.created_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.created_at') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            {{ formatDate(device.created_at) }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.force_version') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0" @click="updateOverride">
+            {{ deviceOverride?.version?.name || t('device.no_override') }}
+          </dd>
+        </div>
+        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+          <dt class="text-sm font-medium text-gray-500">
+            {{ t('device.channel') }}
+          </dt>
+          <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0" @click="updateChannel">
+            {{ channelDevice?.channel_id.name || t('device.no_channel') }}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </div>
 </template>
 
 <style>

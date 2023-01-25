@@ -167,6 +167,7 @@ device:
   unlink_channel: Verknüpfung des Kanals mit dem Gerät aufheben
   unlink_version: Version Verknüpfung zum Gerät aufheben
   version: Ausführung
+device-id: Geräte ID
 devices:
   title: Geräte
 devices-using-this-b: Geräte, die dieses Paket verwenden
