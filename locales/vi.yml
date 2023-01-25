@@ -341,6 +341,7 @@ register:
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
 search: Tìm kiếm
+search-device: Tìm kiếm thiết bị
 see-usage: Xem mức sử dụng
 session_key: IvSessionKey
 settings: Cài đặt

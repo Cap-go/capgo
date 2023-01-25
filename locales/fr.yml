@@ -347,6 +347,7 @@ register:
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
 search: Rechercher
+search-device: Appareil de recherche
 see-usage: Voir l'utilisation
 session_key: IvSessionKey
 settings: Réglages

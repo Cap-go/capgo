@@ -13,6 +13,7 @@ const props = defineProps({
   big: { type: Boolean, default: false },
   plusIcon: { type: String as any, default: '' },
   search: { type: Boolean, default: false },
+  searchPlaceholder: { type: String, default: '' },
   searchIcon: { type: String as any, default: '' },
 })
 const emit = defineEmits(['searchInput', 'plusClick', 'searchButtonClick'])
@@ -36,7 +37,7 @@ const back = () => {
 <template>
   <k-navbar
     class="sticky top-0 md:hidden"
-    :subnavbar-class="`flex-col ${searchIcon ? '!h-24' : ''}`"
+    :subnavbar-class="`flex-col ${searchIcon ? '!h-16' : ''}`"
   >
     <template #left>
       <div v-if="!noBack">
@@ -54,7 +55,7 @@ const back = () => {
         right-class="w-full pt-1"
       >
         <template #right>
-          <Searchbar v-if="search" :search-icon="searchIcon" @filter-button-click="onSearchButtonClick" />
+          <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @filter-button-click="onSearchButtonClick" />
         </template>
       </k-navbar>
     </template>
@@ -65,7 +66,7 @@ const back = () => {
         <a class="text-xl normal-case btn btn-ghost">{{ title }}</a>
       </div>
       <div class="navbar-end">
-        <Searchbar v-if="search" :search-icon="searchIcon" @filter-button-click="onSearchButtonClick" />
+        <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @filter-button-click="onSearchButtonClick" />
       </div>
     </div>
   </div>

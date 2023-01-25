@@ -339,6 +339,7 @@ register:
 reset-password: Redefinir senha
 reset-your-password: Redefina sua senha
 search: Procurar
+search-device: dispositivo de pesquisa
 see-usage: Ver uso
 session_key: IvSessionKey
 settings: Definições

@@ -349,6 +349,7 @@ register:
 reset-password: Restablecer la contraseña
 reset-your-password: Restablecer su contraseña
 search: Buscar
+search-device: Buscar dispositivo
 see-usage: Ver uso
 session_key: IvSessionKey
 settings: Ajustes

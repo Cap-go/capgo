@@ -343,6 +343,7 @@ register:
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
 search: Arama
+search-device: Cihaz ara
 see-usage: Kullanıma bakın
 session_key: IvSessionKey
 settings: Ayarlar

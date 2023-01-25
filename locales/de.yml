@@ -351,6 +351,7 @@ register:
 reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
 search: Suche
+search-device: Gerät suchen
 see-usage: Siehe Verwendung
 session_key: IvSessionKey
 settings: Einstellungen
