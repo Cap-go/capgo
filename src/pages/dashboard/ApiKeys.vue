@@ -36,7 +36,7 @@ geKeys()
 </script>
 
 <template>
-  <div class="w-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
+  <div class="w-full h-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
     <!-- Page header -->
     <div class="mb-8">
       <!-- Title -->
@@ -46,7 +46,7 @@ geKeys()
     </div>
 
     <!-- Content -->
-    <div class="mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800 dark:text-white">
+    <div class="h-full mb-8 overflow-y-scroll bg-white rounded-sm shadow-lg dark:bg-gray-800 dark:text-white max-h-fit">
       <div class="flex flex-col md:flex-row md:-mr-px">
         <div class="grow">
           <!-- Panel body -->

@@ -125,7 +125,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="!isLoading" class="bg-white dark:bg-gray-800">
+  <div v-if="!isLoading" class="h-full overflow-y-scroll bg-white dark:bg-gray-800 max-h-fit">
     <div class="px-4 pt-6 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="sm:flex sm:flex-col sm:align-center">
         <h1 class="text-5xl font-extrabold text-gray-900 dark:text-white sm:text-center">

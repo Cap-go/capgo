@@ -267,7 +267,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div class="grow">
+  <div class="h-full pb-8 overflow-y-scroll md:pb-0 grow max-h-fit">
     <form
       @submit.prevent="submit"
     >
