@@ -11,7 +11,6 @@ const emit = defineEmits(['searchInput', 'filterButtonClick'])
 
 const searchInput = ref('')
 watch(searchInput, debounce(() => {
-  console.log('Send API request')
   emit('searchInput', searchInput.value)
 }, 500))
 const click = () => {

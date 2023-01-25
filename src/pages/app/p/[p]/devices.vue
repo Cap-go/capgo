@@ -209,7 +209,7 @@ const onFilter = async () => {
       <div class="flex flex-col h-full">
         <div class="h-full overflow-x-auto">
           <div v-infinite-scroll="[loadData, { distance: 10 }]" class="inline-block h-full min-w-full py-2 overflow-y-scroll align-middle md:px-6 lg:px-8">
-            <table class="w-full h-full lg:divide-y lg:divide-gray-200">
+            <table class="w-full max-h-full lg:divide-y lg:divide-gray-200">
               <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
                 <tr>
                   <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-500 sm:pl-6 md:pl-0">
@@ -239,7 +239,7 @@ const onFilter = async () => {
                   </th>
                 </tr>
               </thead>
-              <tbody class="w-full h-full divide-y divide-gray-200 max-h-fit">
+              <tbody class="w-full max-h-full divide-y divide-gray-200 max-h-fit">
                 <tr v-if="isLoading || isLoadingSub">
                   <td align="center" colspan="5">
                     <Spinner />

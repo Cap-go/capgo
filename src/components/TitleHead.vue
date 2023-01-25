@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { kNavbar, kNavbarBackLink } from 'konsta/vue'
 import { useRouter } from 'vue-router'
-import debounce from 'lodash.debounce'
-import { ref, watch } from 'vue'
 import Searchbar from '~/components/Searchbar.vue'
 
 const props = defineProps({
@@ -17,14 +15,13 @@ const props = defineProps({
   searchIcon: { type: String as any, default: '' },
 })
 const emit = defineEmits(['searchInput', 'plusClick', 'searchButtonClick'])
-const searchInput = ref('')
-watch(searchInput, debounce(() => {
+const onSearchInput = (val: string) => {
   console.log('Send API request')
-  emit('searchInput', searchInput.value)
-}, 500))
+  emit('searchInput', val)
+}
 const router = useRouter()
 const onSearchButtonClick = (val: string | undefined) => {
-  emit('searchButtonClick', null)
+  emit('searchButtonClick', val)
 }
 const back = () => {
   if (window.history.length > 2)
@@ -55,7 +52,7 @@ const back = () => {
         right-class="w-full pt-1"
       >
         <template #right>
-          <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @filter-button-click="onSearchButtonClick" />
+          <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
         </template>
       </k-navbar>
     </template>
@@ -66,7 +63,7 @@ const back = () => {
         <a class="text-xl normal-case btn btn-ghost">{{ title }}</a>
       </div>
       <div class="navbar-end">
-        <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @filter-button-click="onSearchButtonClick" />
+        <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
       </div>
     </div>
   </div>
