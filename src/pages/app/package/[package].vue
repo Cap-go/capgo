@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import {
-  IonContent,
-  IonIcon,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonItem,
@@ -9,10 +7,10 @@ import {
   IonItemOption,
   IonItemOptions, IonItemSliding,
   IonLabel, IonList,
-  IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
-  alertController, toastController,
+  IonNote,
+  IonRefresher, IonRefresherContent, IonSearchbar,
 } from '@ionic/vue'
-import { chevronForwardOutline } from 'ionicons/icons'
+
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -23,6 +21,7 @@ import TitleHead from '~/components/TitleHead.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
 import { bytesToMbText } from '~/services/conversion'
+import { useDisplayStore } from '~/stores/display'
 
 interface InfiniteScrollCustomEvent extends CustomEvent {
   target: HTMLIonInfiniteScrollElement
@@ -36,6 +35,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
+const displayStore = useDisplayStore()
 const id = ref('')
 const search = ref('')
 const isLoading = ref(false)
@@ -160,23 +160,22 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
 }
 
 const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+  displayStore.dialogOption = {
+    header: t('alert.confirm-delete'),
+    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    buttons: [
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button.delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 const deleteChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
@@ -192,30 +191,15 @@ const deleteChannel = async (channel: Database['public']['Tables']['channels']['
       .eq('app_id', channel.app_id)
       .eq('id', channel.id)
     if (delChanError) {
-      const toast = await toastController
-        .create({
-          message: t('cannot-delete-channel'),
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('cannot-delete-channel'))
     }
     else {
       await refreshData()
-      const toast = await toastController
-        .create({
-          message: t('channel-deleted'),
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('channel-deleted'))
     }
   }
   catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('cannot-delete-channel'),
-        duration: 2000,
-      })
-    await toast.present()
+    displayStore.messageToast.push(t('cannot-delete-channel'))
   }
 }
 
@@ -232,12 +216,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('version', version.id)
     if ((channelFound && channelFound.length) || errorChannel) {
-      const toast = await toastController
-        .create({
-          message: `${t('device.version')} ${version.app_id}@${version.name} ${t('pckage.version.is-used-in-channel')}`,
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(`${t('device.version')} ${version.app_id}@${version.name} ${t('pckage.version.is-used-in-channel')}`)
       return
     }
     const { data: deviceFound, error: errorDevice } = await supabase
@@ -246,12 +225,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('version', version.id)
     if ((deviceFound && deviceFound.length) || errorDevice) {
-      const toast = await toastController
-        .create({
-          message: `${t('device.version')} ${version.app_id}@${version.name} ${t('package.version.is-used-in-device')}`,
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(`${t('device.version')} ${version.app_id}@${version.name} ${t('package.version.is-used-in-device')}`)
       return
     }
     const { error: delError } = await supabase
@@ -264,30 +238,15 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('id', version.id)
     if (delAppError || delError) {
-      const toast = await toastController
-        .create({
-          message: t('package.cannot-delete-version'),
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('package.cannot-delete-version'))
     }
     else {
-      const toast = await toastController
-        .create({
-          message: t('package.version-deleted'),
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('package.version-deleted'))
       await refreshData()
     }
   }
   catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('package.cannot-delete-version'),
-        duration: 2000,
-      })
-    await toast.present()
+    displayStore.messageToast.push(t('package.cannot-delete-version'))
   }
 }
 
@@ -326,100 +285,96 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="app?.name || ''" default-back="/app" color="warning" />
-    <IonContent :fullscreen="true">
-      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent />
-      </IonRefresher>
-      <div v-if="isLoading" class="flex justify-center chat-items">
-        <Spinner />
-      </div>
-      <div v-else>
-        <div class="grid gap-6 grid-cols-16 md:mx-10">
-          <Usage :app-id="id" />
-        </div>
-        <IonList ref="listRef">
-          <IonItem class="cursor-pointer" @click="openDevices()">
+  <TitleHead :title="app?.name || ''" default-back="/app" color="warning" />
+  <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
+    <IonRefresherContent />
+  </IonRefresher>
+  <div v-if="isLoading" class="flex justify-center chat-items">
+    <Spinner />
+  </div>
+  <div v-else>
+    <div class="grid gap-6 grid-cols-16 md:mx-10">
+      <Usage :app-id="id" />
+    </div>
+    <IonList ref="listRef">
+      <IonItem class="cursor-pointer" @click="openDevices()">
+        <IonLabel>
+          <h2 class="text-sm text-azure-500">
+            {{ t('package.device_list') }}
+          </h2>
+        </IonLabel>
+        <IonNote slot="end">
+          <i-ion-chevron-forward-outline class="text-azure-500" />
+        </IonNote>
+      </IonItem>
+      <IonItemDivider v-if="channels?.length">
+        <IonLabel>
+          {{ t('package.channels') }}
+        </IonLabel>
+      </IonItemDivider>
+      <template v-for="ch in channels" :key="ch.name">
+        <IonItemSliding>
+          <IonItem button :detail="true" :color="ch.public ? 'primary' : ''" @click="openChannel(ch)">
             <IonLabel>
               <h2 class="text-sm text-azure-500">
-                {{ t('package.device_list') }}
+                {{ ch.name }}
               </h2>
             </IonLabel>
             <IonNote slot="end">
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
+              <p>{{ ch.version.name }}</p>
+              {{ formatDate(ch.updated_at) }}
             </IonNote>
           </IonItem>
-          <IonItemDivider v-if="channels?.length">
+          <IonItemOptions side="end">
+            <IonItemOption color="warning" @click="deleteChannel(ch)">
+              Delete
+            </IonItemOption>
+          </IonItemOptions>
+        </IonItemSliding>
+      </template>
+      <IonItemDivider v-if="versions?.length">
+        <IonLabel>
+          {{ t('package.versions') }}
+        </IonLabel>
+      </IonItemDivider>
+      <!-- add item with searchbar -->
+      <IonItem>
+        <IonSearchbar @ion-change="search = ($event.detail.value || '').toLowerCase(); searchVersion()" />
+      </IonItem>
+      <template v-for="v in versionFilter" :key="v.name">
+        <IonItemSliding>
+          <IonItem button :detail="true" @click="openVersion(v)">
             <IonLabel>
-              {{ t('package.channels') }}
+              <h2 class="text-sm text-azure-500">
+                {{ v.name }} ( {{ showSize(v) }} )
+              </h2>
             </IonLabel>
-          </IonItemDivider>
-          <template v-for="ch in channels" :key="ch.name">
-            <IonItemSliding>
-              <IonItem button :detail="true" :color="ch.public ? 'primary' : ''" @click="openChannel(ch)">
-                <IonLabel>
-                  <h2 class="text-sm text-azure-500">
-                    {{ ch.name }}
-                  </h2>
-                </IonLabel>
-                <IonNote slot="end">
-                  <p>{{ ch.version.name }}</p>
-                  {{ formatDate(ch.updated_at) }}
-                </IonNote>
-              </IonItem>
-              <IonItemOptions side="end">
-                <IonItemOption color="warning" @click="deleteChannel(ch)">
-                  Delete
-                </IonItemOption>
-              </IonItemOptions>
-            </IonItemSliding>
-          </template>
-          <IonItemDivider v-if="versions?.length">
-            <IonLabel>
-              {{ t('package.versions') }}
-            </IonLabel>
-          </IonItemDivider>
-          <!-- add item with searchbar -->
-          <IonItem>
-            <IonSearchbar @ion-change="search = ($event.detail.value || '').toLowerCase(); searchVersion()" />
+            <IonNote slot="end">
+              {{ formatDate(v.created_at || '') }}
+            </IonNote>
           </IonItem>
-          <template v-for="v in versionFilter" :key="v.name">
-            <IonItemSliding>
-              <IonItem button :detail="true" @click="openVersion(v)">
-                <IonLabel>
-                  <h2 class="text-sm text-azure-500">
-                    {{ v.name }} ( {{ showSize(v) }} )
-                  </h2>
-                </IonLabel>
-                <IonNote slot="end">
-                  {{ formatDate(v.created_at || '') }}
-                </IonNote>
-              </IonItem>
-              <IonItemOptions side="end">
-                <IonItemOption color="warning" @click="deleteVersion(v)">
-                  Delete
-                </IonItemOption>
-              </IonItemOptions>
-            </IonItemSliding>
-          </template>
-          <div v-if="isLoadingSub" class="flex justify-center chat-items">
-            <Spinner />
-          </div>
-          <IonInfiniteScroll
-            threshold="100px"
-            :disabled="isDisabled || !!search"
-            @ion-infinite="loadData($event)"
-          >
-            <IonInfiniteScrollContent
-              loading-spinner="bubbles"
-              :loading-text="t('loading-more-data')"
-            />
-          </IonInfiniteScroll>
-        </IonList>
+          <IonItemOptions side="end">
+            <IonItemOption color="warning" @click="deleteVersion(v)">
+              Delete
+            </IonItemOption>
+          </IonItemOptions>
+        </IonItemSliding>
+      </template>
+      <div v-if="isLoadingSub" class="flex justify-center chat-items">
+        <Spinner />
       </div>
-    </IonContent>
-  </IonPage>
+      <IonInfiniteScroll
+        threshold="100px"
+        :disabled="isDisabled || !!search"
+        @ion-infinite="loadData($event)"
+      >
+        <IonInfiniteScrollContent
+          loading-spinner="bubbles"
+          :loading-text="t('loading-more-data')"
+        />
+      </IonInfiniteScroll>
+    </IonList>
+  </div>
 </template>
 
 <style>

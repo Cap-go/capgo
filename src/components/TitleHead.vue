@@ -1,17 +1,9 @@
 <script setup lang="ts">
-import {
-  IonButton,
-  IonButtons,
-  IonHeader,
-  IonIcon,
-  IonSearchbar,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/vue'
-import { chevronBackOutline } from 'ionicons/icons'
-import { useI18n } from 'vue-i18n'
+import { kNavbar, kNavbarBackLink } from 'konsta/vue'
 import { useRouter } from 'vue-router'
-import Banner from '~/components/Banner.vue'
+import debounce from 'lodash.debounce'
+import { ref, watch } from 'vue'
+import Searchbar from '~/components/Searchbar.vue'
 
 const props = defineProps({
   defaultBack: { type: String, default: '/app' },
@@ -19,16 +11,17 @@ const props = defineProps({
   color: { type: String, default: 'default' },
   title: { type: String, default: '' },
   big: { type: Boolean, default: false },
-  plusIcon: { type: String, default: '' },
+  plusIcon: { type: String as any, default: '' },
   search: { type: Boolean, default: false },
-  searchIcon: { type: String, default: '' },
+  searchIcon: { type: String as any, default: '' },
 })
 const emit = defineEmits(['searchInput', 'plusClick', 'searchButtonClick'])
+const searchInput = ref('')
+watch(searchInput, debounce(() => {
+  console.log('Send API request')
+  emit('searchInput', searchInput.value)
+}, 500))
 const router = useRouter()
-const { t } = useI18n()
-const onSearch = (val: string | undefined) => {
-  emit('searchInput', val)
-}
 const onSearchButtonClick = (val: string | undefined) => {
   emit('searchButtonClick', null)
 }
@@ -41,31 +34,39 @@ const back = () => {
 </script>
 
 <template>
-  <IonHeader :collapse="big ? 'condense' : undefined">
-    <IonToolbar mode="ios">
-      <IonButtons v-if="!noBack && !big" slot="start">
-        <IonButton @click="back">
-          <IonIcon slot="start" :icon="chevronBackOutline" />
-          {{ t('button.back') }}
-        </IonButton>
-      </IonButtons>
-      <IonTitle :color="color" :size="big ? 'large' : undefined">
-        {{ title }}
-      </IonTitle>
-      <IonButtons v-if="plusIcon" slot="end">
-        <IonButton @click="emit('plusClick')">
-          <IonIcon :icon="plusIcon" />
-        </IonButton>
-      </IonButtons>
-    </IonToolbar>
-    <IonToolbar v-if="search">
-      <IonSearchbar @ion-change="onSearch($event.detail.value)" />
-      <IonButtons v-if="searchIcon" slot="end">
-        <IonButton @click="onSearchButtonClick">
-          <IonIcon :icon="searchIcon" />
-        </IonButton>
-      </IonButtons>
-    </IonToolbar>
-    <Banner />
-  </IonHeader>
+  <k-navbar
+    class="sticky top-0 md:hidden"
+    :subnavbar-class="`flex-col ${searchIcon ? '!h-24' : ''}`"
+  >
+    <template #left>
+      <div v-if="!noBack">
+        <k-navbar-back-link text="Back" @click="back()" />
+      </div>
+    </template>
+    <template #title>
+      {{ title }}
+    </template>
+    <template #subnavbar>
+      <k-navbar
+        v-if="search"
+        class="sticky top-0"
+        inner-class="!h-16"
+        right-class="w-full pt-1"
+      >
+        <template #right>
+          <Searchbar v-if="search" :search-icon="searchIcon" @filter-button-click="onSearchButtonClick" />
+        </template>
+      </k-navbar>
+    </template>
+  </k-navbar>
+  <div class="hidden md:block">
+    <div class="hidden navbar bg-base-100 md:flex">
+      <div class="flex-1">
+        <a class="text-xl normal-case btn btn-ghost">{{ title }}</a>
+      </div>
+      <div class="navbar-end">
+        <Searchbar v-if="search" :search-icon="searchIcon" @filter-button-click="onSearchButtonClick" />
+      </div>
+    </div>
+  </div>
 </template>

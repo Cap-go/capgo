@@ -1,8 +1,4 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonPage,
-} from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import Dashboard from '../dashboard/Dashboard.vue'
@@ -81,13 +77,9 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <IonPage>
-    <IonContent :fullscreen="true">
-      <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
-      <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
-      <div v-else class="flex justify-center">
-        <Spinner />
-      </div>
-    </IonContent>
-  </IonPage>
+  <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
+  <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
+  <div v-else class="flex justify-center">
+    <Spinner />
+  </div>
 </template>

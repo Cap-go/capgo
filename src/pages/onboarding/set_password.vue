@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import { IonButton, IonContent, IonInput, IonItem, IonPage, IonToast } from '@ionic/vue'
 import { helpers, minLength, required, sameAs } from '@vuelidate/validators'
 import { useVuelidate } from '@vuelidate/core'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
 const showPassword = ref(false)
 const supabase = useSupabase()
-const success = ref(false)
 const errorMessage = ref('')
 const form = reactive({
   password: '',
@@ -38,7 +37,7 @@ const rules = computed(() => ({
 }))
 
 const v$ = useVuelidate(rules, form)
-
+const displayStore = useDisplayStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -71,7 +70,8 @@ const submit = async () => {
   isLoading.value = false
   if (updateError)
     errorMessage.value = updateError.message
-
+  else
+    displayStore.messageToast.push(t('changed-password-suc'))
   router.push('/onboarding/activation')
 }
 
@@ -82,71 +82,60 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <IonPage>
-    <IonContent :fullscreen="true">
-      <div class="w-full px-6 py-16 mx-auto lg:w-1/2">
-        <h1 class="text-2xl font-bold">
-          {{ t('password.heading') }}
-        </h1>
-        <form @submit.prevent="submit">
-          <div v-if="errorMessage" class="text-center">
-            <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
-              {{ errorMessage }}
-            </p>
-          </div>
-          <div class="ion-padding">
-            <IonItem class="ion-no-padding">
-              <IonInput v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password.new')" :required="true" />
-              <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
-              <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
-            </IonItem>
-            <div v-for="(error, index) of v$.password.$errors" :key="index" class="text-center">
-              <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
-                {{ error.$message }}
-              </p>
-            </div>
-          </div>
-          <div class="ion-padding">
-            <IonItem class="ion-no-padding">
-              <IonInput v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('register.confirm-password')" :required="true" />
-              <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
-              <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
-            </IonItem>
-            <div v-for="(error, index) of v$.confirmPassword.$errors" :key="index" class="text-center">
-              <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
-                {{ error.$message }}
-              </p>
-            </div>
-          </div>
-          <IonButton
-            color="secondary"
-            shape="round"
-            expand="block"
-            type="submit"
-            class="mx-auto mt-12 font-light ion-margin-top w-45"
-          >
-            <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span v-if="!isLoading">{{ t('password.validate') }}</span>
-          </IonButton>
-        </form>
+  <div class="w-full px-6 py-16 mx-auto lg:w-1/2">
+    <h1 class="text-2xl font-bold">
+      {{ t('password.heading') }}
+    </h1>
+    <form @submit.prevent="submit">
+      <div v-if="errorMessage" class="text-center">
+        <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
+          {{ errorMessage }}
+        </p>
       </div>
-      <IonToast
-        :is-open="success"
-        message="Changed password successfully"
-        :duration="2000"
-        color="success"
-        @did-dismiss="success = false"
-      />
-    </IonContent>
-  </IonPage>
+      <div class="ion-padding">
+        <div>
+          <input v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password.new')" :required="true">
+          <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
+          <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
+        </div>
+        <div v-for="(error, index) of v$.password.$errors" :key="index" class="text-center">
+          <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
+            {{ error.$message }}
+          </p>
+        </div>
+      </div>
+      <div class="ion-padding">
+        <div class="ion-no-padding">
+          <input v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('register.confirm-password')" :required="true">
+          <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
+          <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
+        </div>
+        <div v-for="(error, index) of v$.confirmPassword.$errors" :key="index" class="text-center">
+          <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
+            {{ error.$message }}
+          </p>
+        </div>
+      </div>
+      <button
+        color="secondary"
+        shape="round"
+        expand="block"
+        type="submit"
+        class="mx-auto mt-12 font-light ion-margin-top w-45"
+      >
+        <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span v-if="!isLoading">{{ t('password.validate') }}</span>
+      </button>
+    </form>
+  </div>
 </template>

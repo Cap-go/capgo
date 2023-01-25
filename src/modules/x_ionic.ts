@@ -1,4 +1,4 @@
-import { IonicVue, loadingController, toastController } from '@ionic/vue'
+import { IonicVue } from '@ionic/vue'
 import type { HttpOptions, HttpParams } from '@capacitor-community/http'
 import { Http } from '@capacitor-community/http'
 import type { URLOpenListenerEvent } from '@capacitor/app'
@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { hideLoader } from '~/services/loader'
+import { useDisplayStore } from '~/stores/display'
 
 const appUrl = import.meta.env.VITE_APP_URL as string
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
@@ -16,13 +17,13 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 export const install: UserModule = ({ app, router }) => {
   app.use(IonicVue)
   const main = useMainStore()
+  const displayStore = useDisplayStore()
+
   if (Capacitor.isNativePlatform()) {
     CapacitorUpdater.notifyAppReady()
     App.addListener('appUrlOpen', async (event: URLOpenListenerEvent) => {
-      const loading = await loadingController.create({
-        message: 'Please wait...',
-      })
-      await loading.present()
+      displayStore.showLoader = true
+      displayStore.messageLoader = 'Please wait...'
       let { url } = event
       if (url.startsWith(supabaseUrl)) {
         const urlParams = Object.fromEntries(new URLSearchParams(url.split('?')[1]) as any) as HttpParams
@@ -37,16 +38,12 @@ export const install: UserModule = ({ app, router }) => {
         }
         catch (e) {
           console.error('appUrlOpen', e)
-          const toast = await toastController.create({
-            message: 'Cannot handle this redirect',
-            duration: 2000,
-          })
-          await loading.dismiss()
-          return toast.present()
+          displayStore.messageToast.push('Cannot handle this redirect')
+          displayStore.showLoader = false
         }
       }
       else {
-        await loading.dismiss()
+        displayStore.showLoader = false
         return
       }
 
@@ -54,7 +51,7 @@ export const install: UserModule = ({ app, router }) => {
       // We only push to the route if there is a slug present
       if (slug) {
         router.push(slug)
-        await loading.dismiss()
+        displayStore.showLoader = false
         hideLoader()
       }
     })

@@ -2,8 +2,8 @@
 import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
 import {
-  IonSpinner, actionSheetController,
-} from '@ionic/vue'
+  kPreloader,
+} from 'konsta/vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,9 +14,11 @@ import { required } from '@vuelidate/validators'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const supabase = useSupabase()
+const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
@@ -117,7 +119,8 @@ const pickPhoto = async () => {
 }
 
 const deleteAccount = async () => {
-  const actionSheet = await actionSheetController.create({
+  displayStore.showActionSheet = true
+  displayStore.actionSheetOption = {
     header: t('account.delete_sure'),
     buttons: [
       {
@@ -148,8 +151,7 @@ const deleteAccount = async () => {
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
 }
 
 const acronym = computed(() => {
@@ -163,19 +165,21 @@ const acronym = computed(() => {
 })
 
 const presentActionSheet = async () => {
-  const actionSheet = await actionSheetController.create({
+  displayStore.showActionSheet = true
+  displayStore.actionSheetOption = {
+    header: '',
     buttons: [
       {
         text: t('button.camera'),
         handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           takePhoto()
         },
       },
       {
         text: t('button.browse'),
         handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           pickPhoto()
         },
       },
@@ -187,8 +191,7 @@ const presentActionSheet = async () => {
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
 }
 
 const route = useRoute()
@@ -375,7 +378,7 @@ watchEffect(async () => {
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('accountProfile.update') }}
               </span>
-              <IonSpinner v-else name="crescent" color="light" />
+              <k-preloader v-else size="w-16 h-16" />
             </button>
           </div>
         </div>

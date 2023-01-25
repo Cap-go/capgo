@@ -74,6 +74,7 @@ apikeys:
   links: Ссылки
   title: ключи API
   updater: конденсатор-обновитель
+app-deleted: Приложение удалено
 app-id-example: Пример идентификатора приложения
 available-in-the-san: Доступно в приложении песочницы
 back-to-login-page: Назад на страницу входа
@@ -100,7 +101,9 @@ cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-version: Не могу удалить версию приложения
 cannot-delete-channel: Не могу удалить канал
 cannot-save-custom-i: Не удается сохранить пользовательский идентификатор
+cannot-test-app-some: Невозможно протестировать приложение, что-то случилось
 change: Изменять
+changed-password-suc: Пароль успешно изменен
 channel:
   add: Добавлять
   beta-channel: Бета-канал
@@ -335,6 +338,7 @@ register:
   upperCaseError: Должен содержать заглавные буквы
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
+search: Поиск
 see-usage: См. использование
 session_key: IvSessionKey
 settings: Настройки

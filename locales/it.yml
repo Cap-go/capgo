@@ -73,6 +73,7 @@ apikeys:
   links: Collegamenti
   title: Chiavi API
   updater: condensatore di aggiornamento
+app-deleted: Applicazione eliminata
 app-id-example: Esempio di ID app
 available-in-the-san: Disponibile nell'app sandbox
 back-to-login-page: Torna alla pagina di accesso
@@ -99,7 +100,9 @@ cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-version: Impossibile eliminare la versione dell'app
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-save-custom-i: Impossibile salvare l'ID personalizzato
+cannot-test-app-some: Impossibile testare l'app, è successo qualcosa di sbagliato
 change: Modificare
+changed-password-suc: password cambiata con successo
 channel:
   add: Aggiungere
   beta-channel: Canale beta
@@ -338,6 +341,7 @@ register:
   upperCaseError: Dovrebbe contenere lettere maiuscole
 reset-password: Resetta la password
 reset-your-password: reimposta la tua password
+search: Ricerca
 see-usage: Vedi utilizzo
 session_key: IvSessionKey
 settings: Impostazioni

@@ -70,6 +70,7 @@ apikeys:
   links: Links
   title: API keys
   updater: capacitor-updater
+app-deleted: App deleted
 app-id-example: App ID example
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
@@ -96,7 +97,9 @@ cannot-delete-app: Cannot delete App
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
 cannot-save-custom-i: Cannot save custom ID
+cannot-test-app-some: Cannot test app something wrong happened
 change: Change
+changed-password-suc: Password changed successfully
 channel:
   add: Add
   beta-channel: Beta channel
@@ -326,6 +329,7 @@ register:
   upperCaseError: Should contain uppercase letters
 reset-password: Reset Password
 reset-your-password: Reset your password
+search: Search
 see-usage: See usage
 session_key: IvSessionKey
 settings: Settings

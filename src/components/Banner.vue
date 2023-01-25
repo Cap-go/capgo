@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import {
-  IonTitle,
-  IonToolbar,
-} from '@ionic/vue'
-import { computed } from 'vue'
+  kNavbar,
+} from 'konsta/vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
@@ -36,46 +35,62 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
+  const warning = 'bg-warning'
+  // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
+  const success = 'bg-success'
   if (main.canceled)
-    return 'warning'
+    return warning
 
   else if (!main.paying && main.trialDaysLeft > 1 && main.trialDaysLeft <= 7)
-    return 'warning'
+    return warning
 
   else if (!main.paying && main.trialDaysLeft === 1)
-    return 'warning'
+    return warning
 
   else if (!main.paying && !main.canUseMore)
-    return 'warning'
+    return warning
 
   else if (main.paying && !main.canUseMore)
-    return 'warning'
+    return warning
 
-  return 'success'
+  return success
+})
+const konstaColors = ref({
+  bgIos: bannerColor,
+  bgMaterial: bannerColor,
 })
 </script>
 
 <template>
-  <IonToolbar v-if="bannerText" id="banner-toolbar" mode="ios" :color="bannerColor" class="z-0">
-    <IonTitle>
-      <p class="text-center text-white">
-        {{ bannerText }}
-      </p>
-    </IonTitle>
-    <router-link v-if="!isMobile" id="banner" slot="end" to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
-      {{ t('upgrade') }}
-    </router-link>
-    <router-link v-else id="banner" slot="end" to="/app/home" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
-      {{ t('see-usage') }}
-    </router-link>
-  </IonToolbar>
+  <k-navbar
+    v-if="bannerText"
+    :title="bannerText"
+    class="sticky top-0 md:hidden"
+    :colors="konstaColors"
+  >
+    <template #right>
+      <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
+        {{ t('upgrade') }}
+      </router-link>
+      <router-link v-else id="banner" slot="end" navbar to="/app/home" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
+        {{ t('see-usage') }}
+      </router-link>
+    </template>
+  </k-navbar>
+  <div class="hidden navbar md:flex" :class="bannerColor">
+    <div class="flex-1">
+      <a class="text-xl normal-case btn btn-ghost">{{ bannerText }}</a>
+    </div>
+    <div class="navbar-end">
+      <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
+        {{ t('upgrade') }}
+      </router-link>
+      <router-link v-else id="banner" slot="end" navbar to="/app/home" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
+        {{ t('see-usage') }}
+      </router-link>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.header-collapse-condense-inactive ion-toolbar #banner {
-  display: none;
-}
-/* .header-collapse-main  #banner-toolbar {
-  display: none;
-} */
 </style>

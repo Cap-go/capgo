@@ -1,38 +1,29 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonNote, IonPage, IonRefresher, IonRefresherContent, toastController,
-} from '@ionic/vue'
+import { kList, kListItem } from 'konsta/vue'
+import { vInfiniteScroll } from '@vueuse/components'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { subDays } from 'date-fns'
-import { filterOutline } from 'ionicons/icons'
+import filterOutline from '~icons/ion/filter-outline?raw'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import TitleHead from '~/components/TitleHead.vue'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 interface Device {
   version: {
     name: string
   }
 }
-interface InfiniteScrollCustomEvent extends CustomEvent {
-  target: HTMLIonInfiniteScrollElement
-}
-
 const fetchLimit = 40
 let fetchOffset = 0
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
+const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const isDisabled = ref(false)
 const isFilter = ref(false)
@@ -69,7 +60,8 @@ const getDeviceIds = async () => {
   console.log('deviceIds', deviceIds)
   return deviceIds
 }
-const loadData = async (event?: InfiniteScrollCustomEvent) => {
+const loadData = async () => {
+  console.log('loadData', fetchOffset, fetchLimit)
   try {
     // create a date object for the last day of the previous month with dayjs
     let total = 0
@@ -127,10 +119,7 @@ const loadData = async (event?: InfiniteScrollCustomEvent) => {
   catch (error) {
     console.error(error)
   }
-  if (event)
-    event.target.complete()
 }
-
 const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
@@ -193,62 +182,92 @@ const onSearch = (val: string) => {
 const onFilter = async () => {
   console.log('filter')
   isFilter.value = !isFilter.value
-  const toast = await toastController
-    .create({
-      message: isFilter.value ? t('switch-to-only-devic') : t('switch-to-all-device'),
-      duration: 2000,
-    })
-  await toast.present()
+  displayStore.messageToast.push(isFilter.value ? t('switch-to-only-devic') : t('switch-to-all-device'))
   await refreshData()
 }
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('devices.title')" :search="!isLoading" :search-icon="filterOutline" @search-input="onSearch" @search-button-click="onFilter" />
-    <IonContent :fullscreen="true">
-      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent />
-      </IonRefresher>
-      <div v-if="isLoading" class="flex justify-center chat-items">
+  <TitleHead :title="t('devices.title')" :search="!isLoading" :search-icon="filterOutline" @search-input="onSearch" @search-button-click="onFilter" />
+  <k-list v-infinite-scroll="[loadData, { distance: 10 }]" class="md:hidden" strong-ios outline-ios>
+    <k-list-item v-if="isLoading || isLoadingSub">
+      <template #text>
         <Spinner />
-      </div>
-      <div v-else>
-        <IonList>
-          <div v-if="isLoadingSub" class="flex justify-center chat-items">
-            <Spinner />
+      </template>
+    </k-list-item>
+    <k-list-item
+      v-for="(item, i) in deviceFiltered"
+      v-else
+      :key="i"
+      :title="item.device_id"
+      :footer="`${item.platform} ${item.version.name} ${item.custom_id || ''}`"
+      :after="formatDate(item.updated_at || '')" link @click="openDevice(item)"
+    />
+  </k-list>
+  <div class="hidden md:block">
+    <div class="px-0 mx-auto sm:px-2">
+      <div class="flex flex-col">
+        <div class="overflow-x-auto">
+          <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+            <table class="w-full lg:divide-y lg:divide-gray-200">
+              <thead class="hidden lg:table-header-group">
+                <tr>
+                  <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-500 sm:pl-6 md:pl-0">
+                    <div class="flex items-center">
+                      ID
+                    </div>
+                  </th>
+                  <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <div class="flex items-center">
+                      Platform
+                    </div>
+                  </th>
+                  <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <div class="flex items-center">
+                      Date
+                    </div>
+                  </th>
+                  <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <div class="flex items-center">
+                      Version
+                    </div>
+                  </th>
+                  <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <div class="flex items-center">
+                      Custom ID
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody v-infinite-scroll="[loadData, { distance: 10 }]" class="overflow-y-scroll divide-y divide-gray-200 max-h-fit">
+                <tr v-if="isLoading || isLoadingSub">
+                  <td align="center" colspan="5">
+                    <Spinner />
+                  </td>
+                </tr>
+                <tr v-for="(item, i) in deviceFiltered" v-else :key="i" class="cursor-pointer" @click="openDevice(item)">
+                  <td class="hidden py-4 pl-4 pr-3 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
+                    {{ item.device_id }}
+                  </td>
+                  <td class="hidden px-4 py-4 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap">
+                    {{ item.platform }}
+                  </td>
+                  <td class="hidden px-4 py-4 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap">
+                    {{ formatDate(item.updated_at || '') }}
+                  </td>
+                  <td class="hidden px-4 py-4 text-sm font-bold text-gray-200 lg:table-cell whitespace-nowrap">
+                    {{ item.version.name }}
+                  </td>
+                  <td class="hidden px-4 py-4 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap">
+                    {{ item.custom_id }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <template v-for="d in deviceFiltered" :key="d.device_id">
-            <IonItem class="cursor-pointer" @click="openDevice(d)">
-              <IonLabel>
-                <div class="flex flex-col col-span-6">
-                  <div class="flex items-center justify-between">
-                    <h3 class="py-1 text-sm text-azure-500">
-                      {{ d.device_id }}
-                    </h3>
-                  </div>
-                  <p class="text-xs truncate text-true-gray-400 font-black-light">
-                    {{ d.platform }} {{ d.version.name }} {{ d.custom_id }}
-                  </p>
-                </div>
-              </IonLabel>
-              <IonNote slot="end">
-                {{ formatDate(d.updated_at || '') }}
-              </IonNote>
-            </IonItem>
-          </template>
-          <IonInfiniteScroll
-            threshold="100px"
-            :disabled="isDisabled || !!search"
-            @ion-infinite="loadData($event)"
-          >
-            <IonInfiniteScrollContent
-              loading-spinner="bubbles"
-              :loading-text="t('loading-more-data')"
-            />
-          </IonInfiniteScroll>
-        </IonList>
+        </div>
       </div>
-    </IonContent>
-  </IonPage>
+    </div>
+  </div>
 </template>

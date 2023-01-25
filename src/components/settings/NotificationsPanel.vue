@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IonToggle } from '@ionic/vue'
+import { kToggle } from 'konsta/vue'
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
@@ -61,14 +61,24 @@ const submitDoi = async () => {
         <div class="px-6 py-4">
           <div class="flex items-center justify-between my-2">
             <label for="notification" class="text-xl justify-self-start">{{ t('activation.notification') }}</label>
-            <IonToggle v-model="form.enableNotifications" color="success" @ion-change="submitNotif()" />
+            <k-toggle
+              component="div"
+              class="k-color-success"
+              :checked="form.enableNotifications"
+              @change="submitNotif()"
+            />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.notification-desc') }}
           </p>
           <div class="flex items-center justify-between mt-4 mb-2">
             <label for="notification" class="w-64 text-xl justify-self-start">{{ t('activation.doi') }}</label>
-            <IonToggle v-model="form.optForNewsletters" color="success" @ion-change="submitDoi()" />
+            <k-toggle
+              component="div"
+              class="k-color-success"
+              :checked="form.optForNewsletters"
+              @change="submitDoi()"
+            />
           </div>
           <p class="col-span-2 text-left">
             {{ t('activation.doi-desc') }}

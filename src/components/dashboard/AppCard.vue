@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { alertController, toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -7,12 +6,14 @@ import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
   channel: string
 }>()
 const emit = defineEmits(['reload'])
+const displayStore = useDisplayStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
@@ -22,23 +23,22 @@ const devicesNb = ref(0)
 const { t } = useI18n()
 
 const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+  displayStore.dialogOption = {
+    header: t('alert.confirm-delete'),
+    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    buttons: [
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button.delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
@@ -59,12 +59,7 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
         .from('apps')
         .remove(filesToRemove)
       if (delError) {
-        const toast = await toastController
-          .create({
-            message: t('cannot-delete-app-version'),
-            duration: 2000,
-          })
-        await toast.present()
+        displayStore.messageToast.push(t('cannot-delete-app-version'))
         return
       }
     }
@@ -75,30 +70,15 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
     if (vError || dbAppError) {
-      const toast = await toastController
-        .create({
-          message: t('cannot-delete-app'),
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('cannot-delete-app'))
     }
     else {
-      const toast = await toastController
-        .create({
-          message: 'App deleted',
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('app-deleted'))
       await emit('reload')
     }
   }
   catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('cannot-delete-app'),
-        duration: 2000,
-      })
-    await toast.present()
+    displayStore.messageToast.push(t('cannot-delete-app'))
   }
 }
 

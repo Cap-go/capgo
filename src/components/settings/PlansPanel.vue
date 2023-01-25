@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import type { SegmentChangeEventDetail } from '@ionic/vue'
 import {
-  IonLabel,
-  IonSegment, IonSegmentButton, toastController,
-} from '@ionic/vue'
+  kSegmented,
+  kSegmentedButton,
+} from 'konsta/vue'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
@@ -13,6 +12,7 @@ import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTot
 import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 const openSupport = () => {
   sendMessage('I need a custom plan')
@@ -38,6 +38,7 @@ const segmentVal = ref<'m' | 'y'>('m')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
+const displayStore = useDisplayStore()
 
 const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
   `${plan.mau.toLocaleString()} ${t('plan.mau')}`,
@@ -50,27 +51,13 @@ const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
 const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
 const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
 
-interface SegmentCustomEvent extends CustomEvent {
-  target: HTMLIonSegmentElement
-  detail: SegmentChangeEventDetail
-}
-const segmentChanged = (e: SegmentCustomEvent) => {
-  segmentVal.value = e.detail.value === 'y' ? 'y' : 'm'
-}
-
 const openChangePlan = (planId: string) => {
   // get the current url
   if (planId)
     openCheckout(planId, window.location.href, window.location.href, isYearly.value)
 }
 const showToastMessage = async (message: string) => {
-  const toast = await toastController
-    .create({
-      position: 'middle',
-      message,
-      duration: 4000,
-    })
-  await toast.present()
+  displayStore.messageToast.push(message)
 }
 
 const getPrice = (plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number => {
@@ -150,14 +137,22 @@ watchEffect(async () => {
           {{ t('the') }} <span class="font-bold underline">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
 
-        <IonSegment :value="segmentVal" class="mx-auto mt-6 sm:w-max-80 sm:mt-8 dark:text-gray-300 dark:bg-black" mode="ios" @ion-change="segmentChanged($event)">
-          <IonSegmentButton class="h-10" value="m">
-            <IonLabel>{{ t('plan.monthly-billing') }}</IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton class="h-10" value="y">
-            <IonLabel>{{ t('plan.yearly-billing') }}</IonLabel>
-          </IonSegmentButton>
-        </IonSegment>
+        <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 dark:text-gray-300 dark:bg-black">
+          <k-segmented-button
+            class="h-10"
+            :active="segmentVal === 'm'"
+            @click="() => (segmentVal = 'm')"
+          >
+            {{ t('plan.monthly-billing') }}
+          </k-segmented-button>
+          <k-segmented-button
+            class="h-10"
+            :active="segmentVal === 'y'"
+            @click="() => (segmentVal = 'y')"
+          >
+            {{ t('plan.yearly-billing') }}
+          </k-segmented-button>
+        </k-segmented>
       </div>
       <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
         <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">

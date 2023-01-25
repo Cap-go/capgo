@@ -1,9 +1,47 @@
 const plugin = require('tailwindcss/plugin')
 const colors = require('tailwindcss/colors')
 const defaultTheme = require('tailwindcss/defaultTheme')
+const konstaConfig = require('konsta/config')
 
-module.exports = {
+const primary = '#515271'
+const secondary = '#119eff'
+const tertiary = '#6876e1'
+const success = '#88d4a6'
+const warning = '#ff7211'
+const danger = '#456b9a'
+const accent = '#1FB2A5'
+const neutral = '#191D24'
+const base100 = '#2A303C'
+const info = '#3ABFF8'
+
+module.exports = konstaConfig({
   mode: 'jit',
+  konsta: {
+    colors: {
+      primary,
+      secondary,
+      success,
+      warning,
+      danger,
+    },
+  },
+  daisyui: {
+    themes: [
+      {
+        capgotheme: {
+          primary,
+          secondary,
+          success,
+          warning,
+          'error': danger,
+          accent,
+          neutral,
+          'base-100': base100,
+          info,
+        },
+      },
+    ],
+  },
   content: [
     './index.html',
     './src/**/*.{vue,js,ts,jsx,tsx}',
@@ -85,7 +123,7 @@ module.exports = {
           200: '#ff902f',
           300: '#ff8625',
           400: '#ff7c1b',
-          500: '#ff7211',
+          500: warning,
           600: '#f56807',
           700: '#eb5e00',
           800: '#e15400',
@@ -97,7 +135,7 @@ module.exports = {
           200: '#6389b8',
           300: '#597fae',
           400: '#4f75a4',
-          500: '#456b9a',
+          500: danger,
           600: '#3b6190',
           700: '#315786',
           800: '#274d7c',
@@ -109,7 +147,7 @@ module.exports = {
           200: '#2fbcff',
           300: '#25b2ff',
           400: '#1ba8ff',
-          500: '#119eff',
+          500: secondary,
           600: '#0794f5',
           700: '#008aeb',
           800: '#0080e1',
@@ -133,7 +171,7 @@ module.exports = {
           200: '#a6f2c4',
           300: '#9ce8ba',
           400: '#92deb0',
-          500: '#88d4a6',
+          500: success,
           600: '#7eca9c',
           700: '#74c092',
           800: '#6ab688',
@@ -145,7 +183,7 @@ module.exports = {
           200: '#6f708f',
           300: '#656685',
           400: '#5b5c7b',
-          500: '#515271',
+          500: primary,
           600: '#474867',
           700: '#3d3e5d',
           800: '#333453',
@@ -169,7 +207,7 @@ module.exports = {
           200: '#8694ff',
           300: '#7c8af5',
           400: '#7280eb',
-          500: '#6876e1',
+          500: tertiary,
           600: '#5e6cd7',
           700: '#5462cd',
           800: '#4a58c3',
@@ -232,7 +270,11 @@ module.exports = {
     },
   },
   plugins: [
-    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/aspect-ratio'),
+    require('@tailwindcss/line-clamp'),
+    require('@tailwindcss/container-queries'),
+    require('daisyui'),
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {
       addVariant('sidebar-expanded', ({ modifySelectors, separator }) => {
@@ -240,4 +282,4 @@ module.exports = {
       })
     }),
   ],
-}
+})
