@@ -34,6 +34,7 @@ accountProfile:
   heading: Personal information
   last-name: Last name
   update: Update
+action: Action
 activation:
   desc: Fill the following fields to complete your registration
   doi: Optional consent
@@ -212,6 +213,7 @@ login:
   password: Password
   withemail: With email adress
 login-to-your-accoun: Login to your account
+logs: Logs
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
@@ -370,6 +372,7 @@ url: URL
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
+version-build: Version build
 version-builtin: Version builtin
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
