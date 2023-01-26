@@ -29,7 +29,7 @@ const getAppInfo = async (appId: string) => {
     icon: item.icon,
     score: item.score,
     free: item.free,
-    category: item.familyGenre,
+    category: item.genre,
     developerEmail: item.developerEmail,
     installs: item.maxInstalls,
     to_get_info: false,
@@ -39,10 +39,11 @@ const getAppInfo = async (appId: string) => {
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', url, headers, method, body)
+  console.log('main', method, body)
   // remove from list apps already in supabase
   try {
     const res = await getAppInfo(body.appId)
+    console.log('res', res)
     // save in supabase
     const { error } = await supabaseClient()
       .from('store_apps')

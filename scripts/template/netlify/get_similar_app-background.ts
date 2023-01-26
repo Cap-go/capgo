@@ -29,7 +29,7 @@ const getAppsInfo = async (appId: string) => {
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', url, headers, method, body)
+  console.log('main', method, body)
   // remove from list apps already in supabase
   try {
     const res = await getAppsInfo(body.appId)
