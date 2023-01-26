@@ -31,8 +31,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       is_emulator = false,
       is_prod = true,
     } = body
-    let statsDb = 'stats'
-    let deviceDb = 'devices'
 
     const coerce = semver.coerce(version_build)
 
@@ -44,7 +42,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
 
     if (!appOwner) {
       await supabaseAdmin()
-        .from('apps_onprem')
+        .from('store_apps')
         .upsert({
           app_id,
         })
@@ -57,7 +55,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     if (coerce)
       version_build = coerce.version
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-    const device: Database['public']['Tables']['devices']['Insert'] | Database['public']['Tables']['devices_onprem']['Insert'] = {
+    const device: Database['public']['Tables']['devices']['Insert'] = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       app_id,
@@ -91,7 +89,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       device.version = data.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
         const { data: deviceData } = await supabaseAdmin()
-          .from(deviceDb)
+          .from('devices')
           .select()
           .eq('app_id', app_id)
           .eq('device_id', device_id)
@@ -117,14 +115,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     }
     else {
       console.error('switch to onprem', app_id)
-      statsDb = `${statsDb}_onprem`
-      deviceDb = `${deviceDb}_onprem`
+      return sendRes({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 200)
     }
     all.push(supabaseAdmin()
-      .from(deviceDb)
+      .from('devices')
       .upsert(device))
     all.push(supabaseAdmin()
-      .from(statsDb)
+      .from('stats')
       .insert(stat))
     await Promise.all(all)
     return sendRes()

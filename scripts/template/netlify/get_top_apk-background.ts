@@ -51,7 +51,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     console.log('item', item.appId)
     return gplay.app({ appId: item.appId }).then(res => ({
       url: item.url,
-      appId: item.appId,
+      app_id: item.appId,
       title: item.title,
       summary: item.summary,
       developer: item.developer,
@@ -68,7 +68,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
         console.log('err', err)
         return {
           url: item.url,
-          appId: item.appId,
+          app_id: item.appId,
           title: item.title,
           summary: item.summary,
           developer: item.developer,
