@@ -32,3 +32,4 @@ fastlane/metadata/review_information/phone_number.txt
 .capgo_key.pub
 
 /netlify
+scripts/template/netlify/test.gplay.js
