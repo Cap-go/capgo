@@ -124,6 +124,8 @@ const isCapacitor = async (id: string) => {
   const found = {
     capacitor: false,
     cordova: false,
+    react_native: false,
+    capgo: false,
   }
   try {
     console.log('downloadApkPure', id)
@@ -134,12 +136,22 @@ const isCapacitor = async (id: string) => {
     zipEntries.forEach((zipEntry) => {
       // console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
-        console.log(zipEntry.getData().toString('utf8'))
+        const res = zipEntry.getData().toString('utf8')
+        console.log('capacitor', res)
         found.capacitor = true
+        if (res.includes('CapacitorUpdater'))
+          found.capgo = true
       }
       if (zipEntry.entryName === 'res/xml/config.xml') {
-        console.log(zipEntry.getData().toString('utf8'))
+        const res = zipEntry.getData().toString('utf8')
+        console.log('cordova', res)
         found.cordova = true
+      }
+      if (zipEntry.entryName === 'res/xml/rn_dev_preferences.xml') {
+        const res = zipEntry.getData().toString('utf8')
+        console.log('react_native', res)
+        // if ()
+        found.react_native = true
       }
     })
   }
@@ -162,6 +174,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
         app_id: body.appId,
         capacitor: res.capacitor,
         cordova: res.cordova,
+        react_native: res.react_native,
+        capgo: res.capgo,
         to_get_capacitor: false,
       })
     if (error)
