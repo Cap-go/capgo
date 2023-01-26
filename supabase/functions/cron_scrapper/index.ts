@@ -18,21 +18,21 @@ serve(async (event: Request) => {
       .select()
       .eq('to_get_capacitor', true)
       .limit(50)
-      .order('app_id', { ascending: true })
+      .order('created_at', { ascending: true })
 
     const { data: appsToGetInfo } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_info', true)
       .limit(50)
-      .order('app_id', { ascending: true })
+      .order('created_at', { ascending: true })
 
     const { data: appsToGetSimilar } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_similar', true)
       .limit(50)
-      .order('app_id', { ascending: true })
+      .order('created_at', { ascending: true })
 
     const all = []
     console.log('appsToGetCapacitor', appsToGetCapacitor?.length || 0)
