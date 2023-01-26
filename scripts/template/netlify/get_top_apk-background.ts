@@ -42,7 +42,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   //     category,
   //     collection,
   //     rank: i + 1,
-  //     developerEmail: item.developerEmail,
+  //     developer_email: item.developerEmail,
   //     installs: item.maxInstalls,
   //   } as Database['public']['Tables']['store_apps']['Insert']
   // })
@@ -61,7 +61,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
       category,
       collection,
       rank: i + 1,
-      developerEmail: res.developerEmail,
+      developer_email: res.developerEmail,
       installs: res.maxInstalls,
     } as Database['public']['Tables']['store_apps']['Insert']))
       .catch((err) => {
@@ -78,7 +78,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
           category,
           collection,
           rank: i + 1,
-          developerEmail: '',
+          developer_email: '',
           installs: 0,
         } as Database['public']['Tables']['store_apps']['Insert']
       })
