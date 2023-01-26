@@ -57,6 +57,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
         .from('store_apps')
         .upsert({
           app_id,
+          onprem: true,
+          capacitor: true,
         })
       return sendRes({
         message: 'App not found',
