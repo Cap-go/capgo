@@ -432,7 +432,7 @@ watchEffect(async () => {
 <template>
   <TitleHead :title="t('device.title')" color="warning" />
   <div class="h-full md:hidden">
-    <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 dark:text-gray-300 dark:bg-black">
+    <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 dark text-gray-600:dark:text-gray-300 dark:bg-black">
       <k-segmented-button
         class="h-10"
         :active="!showLog"
@@ -536,7 +536,7 @@ watchEffect(async () => {
   <div v-if="device" class="hidden h-full p-8 overflow-y-scroll md:block">
     <div>
       <div>
-        <h3 class="text-lg font-medium leading-6 text-gray-300">
+        <h3 class="text-lg font-medium leading-6 text-gray-600 dark:text-gray-300">
           {{ t('device.info') }}
         </h3>
         <p class="max-w-2xl mt-1 text-sm text-gray-500">
@@ -546,106 +546,106 @@ watchEffect(async () => {
       <div class="mt-5 border-t border-gray-200">
         <dl class="sm:divide-y sm:divide-gray-200">
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device-id') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.device_id }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.platform') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.platform }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('custom-id') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
-              <input v-model="device.custom_id" class="w-full max-w-xs input input-bordered" @ion-blur="saveCustomId()">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+              <input v-model="device.custom_id" class="w-full max-w-xs input input-bordered text-white" @ion-blur="saveCustomId()">
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.plugin_version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.plugin_version }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.version.name }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('version-builtin') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.version_build }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.os_version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.os_version || 'unknow' }}
             </dd>
           </div>
           <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('is-emulator') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.is_emulator }}
             </dd>
           </div>
           <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('is-production-app') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.is_prod }}
             </dd>
           </div>
           <div v-if="device.updated_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.last_update') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ formatDate(device.updated_at) }}
             </dd>
           </div>
           <div v-if="device.created_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.created_at') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ formatDate(device.created_at) }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.force_version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0" @click="updateOverride">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateOverride">
               {{ deviceOverride?.version?.name || t('device.no_override') }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-500">
+            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
               {{ t('device.channel') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-300 sm:col-span-2 sm:mt-0" @click="updateChannel">
+            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateChannel">
               {{ channelDevice?.channel_id.name || t('device.no_channel') }}
             </dd>
           </div>
@@ -660,22 +660,22 @@ watchEffect(async () => {
               <table class="w-full max-h-full lg:divide-y lg:divide-gray-200">
                 <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
                   <tr>
-                    <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-500 sm:pl-6 md:pl-0">
+                    <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 sm:pl-6 md:pl-0">
                       <div class="flex items-center">
                         {{ t('action') }}
                       </div>
                     </th>
-                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400">
                       <div class="flex items-center">
                         {{ t('device.version') }}
                       </div>
                     </th>
-                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400">
                       <div class="flex items-center">
                         {{ t('version-build') }}
                       </div>
                     </th>
-                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-500">
+                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400">
                       <div class="flex items-center">
                         {{ t('updated-at') }}
                       </div>

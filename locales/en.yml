@@ -258,7 +258,7 @@ package:
   version:
     is-used-in-device: is used in a device override, unlink it first
   version-deleted: Bundle deleted
-  versions: Bundle
+  versions: Bundles
 pages: Pages
 password:
   heading: Create Password
@@ -267,6 +267,7 @@ password:
 pckage:
   version:
     is-used-in-channel: is used in a channel, unlink it first
+    created-at: Created at
 personal-information: Personal Informations
 plan:
   abtest: A / B testing
