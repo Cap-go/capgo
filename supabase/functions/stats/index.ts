@@ -35,6 +35,25 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     let deviceDb = 'devices'
 
     const coerce = semver.coerce(version_build)
+
+    const { data: appOwner } = await supabaseAdmin()
+      .from('apps')
+      .select('user_id, app_id')
+      .eq('app_id', app_id)
+      .single()
+
+    if (!appOwner) {
+      await supabaseAdmin()
+        .from('apps_onprem')
+        .upsert({
+          app_id,
+        })
+      return sendRes({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 200)
+    }
+
     if (coerce)
       version_build = coerce.version
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
