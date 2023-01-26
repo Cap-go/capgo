@@ -17,21 +17,21 @@ serve(async (event: Request) => {
       .from('store_apps')
       .select()
       .eq('to_get_capacitor', true)
-      .limit(500)
+      .limit(5000)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetInfo } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_info', true)
-      .limit(500)
+      .limit(5000)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetSimilar } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_similar', true)
-      .limit(50)
+      .limit(500)
       .order('created_at', { ascending: true })
 
     const all = []
