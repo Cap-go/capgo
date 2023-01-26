@@ -1,55 +1,18 @@
 <script setup lang="ts">
-import {
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
-  IonItem,
-  IonItemDivider,
-  IonItemOption,
-  IonItemOptions, IonItemSliding,
-  IonLabel, IonList,
-  IonNote,
-  IonRefresher, IonRefresherContent, IonSearchbar,
-} from '@ionic/vue'
-
-import { computed, ref, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { formatDate } from '~/services/date'
+import { ref, watchEffect } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import TitleHead from '~/components/TitleHead.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { bytesToMbText } from '~/services/conversion'
-import { useDisplayStore } from '~/stores/display'
 
-interface InfiniteScrollCustomEvent extends CustomEvent {
-  target: HTMLIonInfiniteScrollElement
-}
-
-const fetchLimit = 10
-let fetchOffset = 0
-const isDisabled = ref(false)
-const listRef = ref()
-const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
-const displayStore = useDisplayStore()
 const id = ref('')
-const search = ref('')
 const isLoading = ref(false)
-const isLoadingSub = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
-const versions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
-const filtered = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
 
-const versionFilter = computed(() => {
-  if (search.value)
-    return filtered.value
-  return versions.value
-})
 const loadAppInfo = async () => {
   try {
     const { data: dataApp } = await supabase
@@ -81,76 +44,10 @@ const loadAppInfo = async () => {
   }
 }
 
-const showSize = (version: (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])) => {
-  if (version.size)
-    return bytesToMbText(version.size)
-  else if (version.external_url)
-    return t('package.externally')
-  else
-    return t('package.not_available')
-}
-
-const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['app_versions']['Row'][]) => {
-  const { data: dataVersionsMeta } = await supabase
-    .from('app_versions_meta')
-    .select()
-    .in('id', dataVersions.map(({ id }) => id))
-  const newVersions = dataVersions.map(({ id, ...rest }) => {
-    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-    return { id, ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
-  })
-  return newVersions
-}
-
-const searchVersion = async () => {
-  isLoadingSub.value = true
-  const { data: dataVersions } = await supabase
-    .from('app_versions')
-    .select()
-    .eq('app_id', id.value)
-    .eq('deleted', false)
-    .order('created_at', { ascending: false })
-    .like('name', `%${search.value}%`)
-  if (!dataVersions) {
-    filtered.value = []
-    isLoadingSub.value = false
-    return
-  }
-  filtered.value = await enhenceVersionElems(dataVersions)
-  isLoadingSub.value = false
-}
-const loadData = async (event?: InfiniteScrollCustomEvent) => {
-  try {
-    const { data: dataVersions } = await supabase
-      .from('app_versions')
-      .select()
-      .eq('app_id', id.value)
-      .eq('deleted', false)
-      .order('created_at', { ascending: false })
-      .range(fetchOffset, fetchOffset + fetchLimit - 1)
-    if (!dataVersions)
-      return
-    versions.value.push(...(await enhenceVersionElems(dataVersions)))
-
-    if (dataVersions.length === fetchLimit)
-      fetchOffset += fetchLimit
-    else
-      isDisabled.value = true
-  }
-  catch (error) {
-    console.error(error)
-  }
-  if (event)
-    event.target.complete()
-}
-
 const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
     await loadAppInfo()
-    versions.value = []
-    fetchOffset = 0
-    await loadData()
   }
   catch (error) {
     console.error(error)
@@ -159,107 +56,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-const didCancel = async (name: string) => {
-  displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-    buttons: [
-      {
-        text: t('button.cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button.delete'),
-        id: 'confirm-button',
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
-}
-
-const deleteChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
-  // console.log('deleteChannel', channel)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('channel.title')))
-    return
-  try {
-    const { error: delChanError } = await supabase
-      .from('channels')
-      .delete()
-      .eq('app_id', channel.app_id)
-      .eq('id', channel.id)
-    if (delChanError) {
-      displayStore.messageToast.push(t('cannot-delete-channel'))
-    }
-    else {
-      await refreshData()
-      displayStore.messageToast.push(t('channel-deleted'))
-    }
-  }
-  catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-channel'))
-  }
-}
-
-const deleteVersion = async (version: Database['public']['Tables']['app_versions']['Row']) => {
-  // console.log('deleteVersion', version)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('device.version')))
-    return
-  try {
-    const { data: channelFound, error: errorChannel } = await supabase
-      .from('channels')
-      .select()
-      .eq('app_id', version.app_id)
-      .eq('version', version.id)
-    if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.messageToast.push(`${t('device.version')} ${version.app_id}@${version.name} ${t('pckage.version.is-used-in-channel')}`)
-      return
-    }
-    const { data: deviceFound, error: errorDevice } = await supabase
-      .from('devices_override')
-      .select()
-      .eq('app_id', version.app_id)
-      .eq('version', version.id)
-    if ((deviceFound && deviceFound.length) || errorDevice) {
-      displayStore.messageToast.push(`${t('device.version')} ${version.app_id}@${version.name} ${t('package.version.is-used-in-device')}`)
-      return
-    }
-    const { error: delError } = await supabase
-      .storage
-      .from('apps')
-      .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
-    const { error: delAppError } = await supabase
-      .from('app_versions')
-      .update({ deleted: true })
-      .eq('app_id', version.app_id)
-      .eq('id', version.id)
-    if (delAppError || delError) {
-      displayStore.messageToast.push(t('package.cannot-delete-version'))
-    }
-    else {
-      displayStore.messageToast.push(t('package.version-deleted'))
-      await refreshData()
-    }
-  }
-  catch (error) {
-    displayStore.messageToast.push(t('package.cannot-delete-version'))
-  }
-}
-
-const openChannel = (channel: Database['public']['Tables']['channels']['Row']) => {
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
-}
-const openVersion = (version: Database['public']['Tables']['app_versions']['Row']) => {
-  console.log('openVersion', version)
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/bundle/${version.id}`)
-}
-const openDevices = () => {
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/devices`)
-}
 interface Channel {
   id: string
   version: {
@@ -285,18 +81,20 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <TitleHead :title="app?.name || ''" default-back="/app" color="warning" />
-  <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
-    <IonRefresherContent />
-  </IonRefresher>
   <div v-if="isLoading" class="flex justify-center chat-items">
     <Spinner />
   </div>
-  <div v-else>
-    <div class="grid gap-6 grid-cols-16 md:mx-10">
-      <Usage :app-id="id" />
-    </div>
-    <IonList ref="listRef">
+  <div v-else class="h-full w-full">
+    <div class="w-full h-full px-4 py-8  mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
+      <div class="grid gap-6 grid-cols-16 md:mx-10">
+        <Usage :app-id="id" />
+      </div>
+      <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2 mt-5">
+        <Channels :channels="channels" />
+        <Devices :app-id="id" />
+        <Versions :app-id="id" />
+      </div>
+    <!-- <IonList ref="listRef">
       <IonItem class="cursor-pointer" @click="openDevices()">
         <IonLabel>
           <h2 class="text-sm text-azure-500">
@@ -312,32 +110,12 @@ watchEffect(async () => {
           {{ t('package.channels') }}
         </IonLabel>
       </IonItemDivider>
-      <template v-for="ch in channels" :key="ch.name">
-        <IonItemSliding>
-          <IonItem button :detail="true" :color="ch.public ? 'primary' : ''" @click="openChannel(ch)">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ ch.name }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              <p>{{ ch.version.name }}</p>
-              {{ formatDate(ch.updated_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItemOptions side="end">
-            <IonItemOption color="warning" @click="deleteChannel(ch)">
-              Delete
-            </IonItemOption>
-          </IonItemOptions>
-        </IonItemSliding>
-      </template>
+      <Channels :channels="channels" :open-channel="openChannel" :delete-channel="deleteChannel" />
       <IonItemDivider v-if="versions?.length">
         <IonLabel>
           {{ t('package.versions') }}
         </IonLabel>
       </IonItemDivider>
-      <!-- add item with searchbar -->
       <IonItem>
         <IonSearchbar @ion-change="search = ($event.detail.value || '').toLowerCase(); searchVersion()" />
       </IonItem>
@@ -373,7 +151,8 @@ watchEffect(async () => {
           :loading-text="t('loading-more-data')"
         />
       </IonInfiniteScroll>
-    </IonList>
+    </IonList> -->
+    </div>
   </div>
 </template>
 
