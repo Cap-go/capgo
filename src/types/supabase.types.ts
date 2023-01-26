@@ -728,6 +728,7 @@ export interface Database {
           capacitor: boolean
           category: string
           collection: string
+          cordova: boolean
           created_at: string | null
           developer: string
           developerEmail: string
@@ -754,6 +755,7 @@ export interface Database {
           capacitor?: boolean
           category?: string
           collection?: string
+          cordova?: boolean
           created_at?: string | null
           developer?: string
           developerEmail?: string
@@ -780,6 +782,7 @@ export interface Database {
           capacitor?: boolean
           category?: string
           collection?: string
+          cordova?: boolean
           created_at?: string | null
           developer?: string
           developerEmail?: string
