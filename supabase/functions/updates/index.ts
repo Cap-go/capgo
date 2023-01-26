@@ -61,7 +61,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       return sendRes({
         message: 'App not found',
         error: 'app_not_found',
-      }, 404)
+      }, 200)
     }
     if (coerce) {
       version_build = coerce.version
