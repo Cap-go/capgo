@@ -29,7 +29,7 @@ serve(async (event: Request) => {
     // explore all apps
     // axios get on https://netlify.capgo.app/get_capacitor with record.appId
     // https://netlify.capgo.app/get_capacitor-background?appId=com.pizzahutau
-    await axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${record.appId}`)
+    await axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${record.app_id}`)
     return sendRes()
   }
   catch (e) {

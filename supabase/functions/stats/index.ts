@@ -45,6 +45,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
         .from('store_apps')
         .upsert({
           app_id,
+          onprem: true,
+          capacitor: true,
         })
       if (action === 'get') {
         await updateOnpremStats({

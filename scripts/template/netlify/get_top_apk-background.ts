@@ -89,7 +89,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   // const filtered = enriched.filter(item => item != null)
   // return filtered
 }
-getList()
+// getList()
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
   const list = await getList(body.category, body.collection, body.limit, body.skip)

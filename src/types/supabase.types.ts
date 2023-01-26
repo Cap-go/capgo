@@ -726,12 +726,14 @@ export interface Database {
         Row: {
           app_id: string
           capacitor: boolean
-          capacitor_checked: boolean
           category: string
           collection: string
           created_at: string | null
           developer: string
           developerEmail: string
+          error_get_capacitor: string
+          error_get_info: string
+          error_get_similar: string
           free: boolean
           icon: string
           installs: number
@@ -740,19 +742,24 @@ export interface Database {
           score: number
           summary: string
           title: string
+          to_get_capacitor: boolean
           to_get_info: boolean
+          to_get_similar: boolean
+          updated_at: string
           updates: number
           url: string
         }
         Insert: {
           app_id: string
           capacitor?: boolean
-          capacitor_checked?: boolean
           category?: string
           collection?: string
           created_at?: string | null
           developer?: string
           developerEmail?: string
+          error_get_capacitor?: string
+          error_get_info?: string
+          error_get_similar?: string
           free?: boolean
           icon?: string
           installs?: number
@@ -761,19 +768,24 @@ export interface Database {
           score?: number
           summary?: string
           title?: string
+          to_get_capacitor?: boolean
           to_get_info?: boolean
+          to_get_similar?: boolean
+          updated_at?: string
           updates?: number
           url?: string
         }
         Update: {
           app_id?: string
           capacitor?: boolean
-          capacitor_checked?: boolean
           category?: string
           collection?: string
           created_at?: string | null
           developer?: string
           developerEmail?: string
+          error_get_capacitor?: string
+          error_get_info?: string
+          error_get_similar?: string
           free?: boolean
           icon?: string
           installs?: number
@@ -782,7 +794,10 @@ export interface Database {
           score?: number
           summary?: string
           title?: string
+          to_get_capacitor?: boolean
           to_get_info?: boolean
+          to_get_similar?: boolean
+          updated_at?: string
           updates?: number
           url?: string
         }

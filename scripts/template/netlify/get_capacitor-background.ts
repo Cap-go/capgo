@@ -145,17 +145,32 @@ const isCapacitor = async (id: string) => {
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
-  // remove from list apps already in supabase
-  const res = await isCapacitor(body.appId)
-  // save in supabase
-  const { error } = await supabaseClient()
-    .from('store_apps')
-    .upsert({
-      app_id: body.appId,
-      capacitor: res,
-    })
-  if (error)
-    console.log('error', error)
+  try {
+    // remove from list apps already in supabase
+    const res = await isCapacitor(body.appId)
+    // save in supabase
+    const { error } = await supabaseClient()
+      .from('store_apps')
+      .upsert({
+        app_id: body.appId,
+        capacitor: res,
+        to_get_capacitor: false,
+      })
+    if (error)
+      console.log('error', error)
+  }
+  catch (e) {
+    console.log('error isCapacitor', e)
+    const { error } = await supabaseClient()
+      .from('store_apps')
+      .upsert({
+        app_id: body.appId,
+        to_get_capacitor: false,
+        error_get_capacitor: JSON.stringify(e),
+      })
+    if (error)
+      console.log('error insert', error)
+  }
 }
 // upper is ignored during netlify generation phase
 // import from here
@@ -169,6 +184,6 @@ export const handler: BackgroundHandler = async (event) => {
     await main(url, headers, method, body)
   }
   catch (e) {
-    console.log('error', e)
+    console.log('error general', e)
   }
 }
