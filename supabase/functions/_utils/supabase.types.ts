@@ -724,8 +724,9 @@ export interface Database {
       }
       store_apps: {
         Row: {
-          appId: string
+          app_id: string
           capacitor: boolean
+          capacitor_checked: boolean
           category: string
           collection: string
           created_at: string | null
@@ -734,15 +735,19 @@ export interface Database {
           free: boolean
           icon: string
           installs: number
+          onprem: boolean
           rank: number
           score: number
           summary: string
           title: string
+          to_get_info: boolean
+          updates: number
           url: string
         }
         Insert: {
-          appId: string
+          app_id: string
           capacitor?: boolean
+          capacitor_checked?: boolean
           category?: string
           collection?: string
           created_at?: string | null
@@ -751,15 +756,19 @@ export interface Database {
           free?: boolean
           icon?: string
           installs?: number
+          onprem?: boolean
           rank?: number
           score?: number
           summary?: string
           title?: string
+          to_get_info?: boolean
+          updates?: number
           url?: string
         }
         Update: {
-          appId?: string
+          app_id?: string
           capacitor?: boolean
+          capacitor_checked?: boolean
           category?: string
           collection?: string
           created_at?: string | null
@@ -768,10 +777,13 @@ export interface Database {
           free?: boolean
           icon?: string
           installs?: number
+          onprem?: boolean
           rank?: number
           score?: number
           summary?: string
           title?: string
+          to_get_info?: boolean
+          updates?: number
           url?: string
         }
       }

@@ -151,7 +151,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   const { error } = await supabaseClient()
     .from('store_apps')
     .upsert({
-      appId: body.appId,
+      app_id: body.appId,
       capacitor: res,
     })
   if (error)

@@ -54,7 +54,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     if (!appOwner) {
       await supabaseAdmin()
-        .from('apps_onprem')
+        .from('store_apps')
         .upsert({
           app_id,
         })
