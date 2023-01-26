@@ -30,7 +30,7 @@ const getAppInfo = async (appId: string) => {
     score: item.score,
     free: item.free,
     category: item.genre,
-    developerEmail: item.developerEmail,
+    developer_email: item.developerEmail,
     installs: item.maxInstalls,
     to_get_info: false,
   } as Database['public']['Tables']['store_apps']['Insert']
