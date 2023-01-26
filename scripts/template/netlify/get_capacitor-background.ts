@@ -69,26 +69,26 @@ export const supabaseClient = () => {
 //   return buffer
 // }
 
-fetch('https://d.apkpure.com/b/APK/com.pizzahutau?version=latest', {
-  headers: {
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'accept-language': 'en-GB,en;q=0.8',
-    'cache-control': 'no-cache',
-    'pragma': 'no-cache',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'same-site',
-    'sec-fetch-user': '?1',
-    'sec-gpc': '1',
-    'upgrade-insecure-requests': '1',
-  },
-  referrer: 'https://m.apkpure.com/',
-  referrerPolicy: 'strict-origin-when-cross-origin',
-  body: null,
-  method: 'GET',
-  mode: 'cors',
-  credentials: 'include',
-})
+// fetch('https://d.apkpure.com/b/APK/com.pizzahutau?version=latest', {
+//   headers: {
+//     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+//     'accept-language': 'en-GB,en;q=0.8',
+//     'cache-control': 'no-cache',
+//     'pragma': 'no-cache',
+//     'sec-fetch-dest': 'document',
+//     'sec-fetch-mode': 'navigate',
+//     'sec-fetch-site': 'same-site',
+//     'sec-fetch-user': '?1',
+//     'sec-gpc': '1',
+//     'upgrade-insecure-requests': '1',
+//   },
+//   referrer: 'https://m.apkpure.com/',
+//   referrerPolicy: 'strict-origin-when-cross-origin',
+//   body: null,
+//   method: 'GET',
+//   mode: 'cors',
+//   credentials: 'include',
+// })
 
 const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
   const downloadUrl = `https://d.apkpure.com/b/${mode}/${id}?version=latest`
@@ -132,7 +132,7 @@ const isCapacitor = async (id: string) => {
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
-      console.log('zipEntry', zipEntry.entryName)
+      // console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
         console.log(zipEntry.getData().toString('utf8'))
         found.capacitor = true
@@ -180,9 +180,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       console.log('error insert', error)
   }
 }
-isCapacitor('pl.jmpolska.clos0.mojabiedronka').then((res) => {
-  console.log('res', res)
-})
+// isCapacitor('pl.jmpolska.clos0.mojabiedronka').then((res) => {
+//   console.log('res', res)
+// })
 // upper is ignored during netlify generation phase
 // import from here
 export const handler: BackgroundHandler = async (event) => {
