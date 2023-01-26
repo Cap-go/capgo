@@ -22,7 +22,14 @@ const getAppsInfo = async (appId: string) => {
 
   return items.map((item) => {
     const insert = {
+      url: item.url,
       app_id: item.appId,
+      title: item.title,
+      summary: item.summary,
+      developer: item.developer,
+      icon: item.icon,
+      score: item.score,
+      free: item.free,
     } as Database['public']['Tables']['store_apps']['Insert']
     return insert
   })
