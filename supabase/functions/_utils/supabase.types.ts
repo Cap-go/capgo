@@ -726,6 +726,7 @@ export interface Database {
         Row: {
           app_id: string
           capacitor: boolean
+          capgo: boolean
           category: string
           collection: string
           cordova: boolean
@@ -740,6 +741,7 @@ export interface Database {
           installs: number
           onprem: boolean
           rank: number
+          react_native: boolean
           score: number
           summary: string
           title: string
@@ -753,6 +755,7 @@ export interface Database {
         Insert: {
           app_id: string
           capacitor?: boolean
+          capgo?: boolean
           category?: string
           collection?: string
           cordova?: boolean
@@ -767,6 +770,7 @@ export interface Database {
           installs?: number
           onprem?: boolean
           rank?: number
+          react_native?: boolean
           score?: number
           summary?: string
           title?: string
@@ -780,6 +784,7 @@ export interface Database {
         Update: {
           app_id?: string
           capacitor?: boolean
+          capgo?: boolean
           category?: string
           collection?: string
           cordova?: boolean
@@ -794,6 +799,7 @@ export interface Database {
           installs?: number
           onprem?: boolean
           rank?: number
+          react_native?: boolean
           score?: number
           summary?: string
           title?: string
