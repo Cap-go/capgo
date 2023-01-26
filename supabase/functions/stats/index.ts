@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOnpremStats, updateVersionStats } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -46,6 +46,12 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
         .upsert({
           app_id,
         })
+      if (action === 'get') {
+        await updateOnpremStats({
+          app_id,
+          updates: 1,
+        })
+      }
       return sendRes({
         message: 'App not found',
         error: 'app_not_found',
