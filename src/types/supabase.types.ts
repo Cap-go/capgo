@@ -1039,6 +1039,10 @@ export interface Database {
         }
         Returns: undefined
       }
+      increment_store: {
+        Args: { app_id: string; updates: number }
+        Returns: undefined
+      }
       increment_version_stats: {
         Args: { app_id: string; version_id: number; devices: number }
         Returns: undefined
