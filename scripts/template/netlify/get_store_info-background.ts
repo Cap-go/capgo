@@ -57,7 +57,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       .from('store_apps')
       .upsert({
         app_id: body.appId,
-        to_get_capacitor: false,
+        to_get_info: false,
         error_get_info: JSON.stringify(e),
       })
     if (error)
