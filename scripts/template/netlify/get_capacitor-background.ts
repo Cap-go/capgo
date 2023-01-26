@@ -121,7 +121,10 @@ const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
 }
 
 const isCapacitor = async (id: string) => {
-  let found = false
+  const found = {
+    capacitor: false,
+    cordova: false,
+  }
   try {
     console.log('downloadApkPure', id)
     const buffer = await downloadApkPure(id)
@@ -132,7 +135,11 @@ const isCapacitor = async (id: string) => {
       console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
         console.log(zipEntry.getData().toString('utf8'))
-        found = true
+        found.capacitor = true
+      }
+      if (zipEntry.entryName === 'res/xml/config.xml') {
+        console.log(zipEntry.getData().toString('utf8'))
+        found.cordova = true
       }
     })
   }
@@ -153,7 +160,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       .from('store_apps')
       .upsert({
         app_id: body.appId,
-        capacitor: res,
+        capacitor: res.capacitor,
+        cordova: res.cordova,
         to_get_capacitor: false,
       })
     if (error)
@@ -172,6 +180,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       console.log('error insert', error)
   }
 }
+isCapacitor('pl.jmpolska.clos0.mojabiedronka').then((res) => {
+  console.log('res', res)
+})
 // upper is ignored during netlify generation phase
 // import from here
 export const handler: BackgroundHandler = async (event) => {
