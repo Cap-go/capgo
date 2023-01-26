@@ -728,7 +728,6 @@ export interface Database {
           capacitor: boolean
           capgo: boolean
           category: string
-          collection: string
           cordova: boolean
           created_at: string | null
           developer: string
@@ -740,7 +739,6 @@ export interface Database {
           icon: string
           installs: number
           onprem: boolean
-          rank: number
           react_native: boolean
           score: number
           summary: string
@@ -757,7 +755,6 @@ export interface Database {
           capacitor?: boolean
           capgo?: boolean
           category?: string
-          collection?: string
           cordova?: boolean
           created_at?: string | null
           developer?: string
@@ -769,7 +766,6 @@ export interface Database {
           icon?: string
           installs?: number
           onprem?: boolean
-          rank?: number
           react_native?: boolean
           score?: number
           summary?: string
@@ -786,7 +782,6 @@ export interface Database {
           capacitor?: boolean
           capgo?: boolean
           category?: string
-          collection?: string
           cordova?: boolean
           created_at?: string | null
           developer?: string
@@ -798,7 +793,6 @@ export interface Database {
           icon?: string
           installs?: number
           onprem?: boolean
-          rank?: number
           react_native?: boolean
           score?: number
           summary?: string
