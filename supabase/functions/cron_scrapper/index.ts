@@ -17,14 +17,14 @@ serve(async (event: Request) => {
       .from('store_apps')
       .select()
       .eq('to_get_capacitor', true)
-      .limit(50)
+      .limit(500)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetInfo } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_info', true)
-      .limit(50)
+      .limit(500)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetSimilar } = await supabaseAdmin()
