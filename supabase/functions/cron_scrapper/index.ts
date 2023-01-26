@@ -35,7 +35,9 @@ serve(async (event: Request) => {
       .order('app_id', { ascending: true })
 
     const all = []
-
+    console.log('appsToGetCapacitor', appsToGetCapacitor?.length || 0)
+    console.log('appsToGetInfo', appsToGetInfo?.length || 0)
+    console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     for (const app of (appsToGetCapacitor || []))
       all.push(axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${app.app_id}`))
 
@@ -45,6 +47,7 @@ serve(async (event: Request) => {
     for (const app of (appsToGetSimilar || []))
       all.push(axios.get(`https://netlify.capgo.app/get_similar_app-background?appId=${app.app_id}`))
 
+    await Promise.all(all)
     return sendRes()
   }
   catch (e) {
