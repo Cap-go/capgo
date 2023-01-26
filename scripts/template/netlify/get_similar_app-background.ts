@@ -39,6 +39,13 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       .upsert(res)
     if (error)
       console.log('error', error)
+    // set to_get_similar to false
+    const { error: error2 } = await supabaseClient()
+      .from('store_apps')
+      .update({ to_get_similar: false })
+      .eq('app_id', body.appId)
+    if (error2)
+      console.log('error', error2)
   }
   catch (e) {
     console.log('error getAppInfo', e)
