@@ -155,7 +155,7 @@ watchEffect(async () => {
     </td>
     <td v-if="!channel" class="p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
-        <IconTrash />
+        <IconTrash class="text-red-600 text-lg" />
       </div>
     </td>
   </tr>

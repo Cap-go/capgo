@@ -124,7 +124,7 @@ watchEffect(async () => {
 
     <td class="" @click.stop="deleteChannel(props.channel)">
       <div class="text-left">
-        <IconTrash />
+        <IconTrash class="text-red-600 text-lg" />
       </div>
     </td>
   </tr>

@@ -81,6 +81,7 @@ build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle-number: Bundle number
 button:
+  options: Options
   about: About
   back: Back
   browse: Browse
@@ -240,7 +241,7 @@ open-this-link-to-le: Open this link to learn how to test your update
 package:
   cannot-delete-version: Cannot delete bundle
   channels: Channels
-  device_list: Devices list
+  device_list: Devices
   devices: See devices statistics
   devices-list: Devices linked
   download: Download bundle
@@ -250,6 +251,7 @@ package:
   mobiles-stats: Mobiles stats
   name: App
   not_available: Package not found
+  size_not_found: Not found
   set: Set bundle to channel
   stats: stats
   test: Launch bundle
@@ -268,6 +270,7 @@ pckage:
   version:
     is-used-in-channel: is used in a channel, unlink it first
     created-at: Created at
+    size: Size
 personal-information: Personal Informations
 plan:
   abtest: A / B testing

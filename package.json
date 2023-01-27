@@ -73,6 +73,7 @@
     "@vueuse/components": "^9.11.1",
     "@vueuse/core": "9.6.0",
     "adm-zip": "^0.5.10",
+    "atropos": "^1.0.2",
     "axios": "^1.2.2",
     "base64-arraybuffer": "1.0.2",
     "capacitor-native-biometric": "4.1.3",

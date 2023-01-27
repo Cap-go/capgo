@@ -1,36 +1,45 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { RefresherCustomEvent } from '@ionic/vue'
 import { useRoute } from 'vue-router'
-import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
+import { useSupabase } from '~/services/supabase'
 import IconPrevious from '~icons/heroicons/chevron-left'
 import IconNext from '~icons/heroicons/chevron-right'
 
-interface Device {
-  version: {
-    name: string
-  }
-}
+const emit = defineEmits(['reload'])
+const versions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
 const { t } = useI18n()
-const supabase = useSupabase()
-const route = useRoute()
-const isLoading = ref(true)
-const search = ref('')
 const isLoadingSub = ref(false)
-const devices = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
-const filtered = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
-const displayedDevices = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
+const supabase = useSupabase()
+const search = ref('')
+const route = useRoute()
+const isLoading = ref(false)
+const filtered = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
+const displayedVersions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
 const currentPageNumber = ref(1)
 const pageNumbers = ref<number[]>([1])
 const filteredPageNumbers = ref<number[]>([1])
 const appId = ref('')
 const offset = 10
 
-const devicesFiltered = computed(() => {
+const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['app_versions']['Row'][]) => {
+  const { data: dataVersionsMeta } = await supabase
+    .from('app_versions_meta')
+    .select()
+    .in('id', dataVersions.map(({ id }) => id))
+  const newVersions = dataVersions.map(({ id, ...rest }) => {
+    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
+    return { id, ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
+  })
+  return newVersions
+}
+
+const versionsFiltered = computed(() => {
   if (search.value)
     return filtered.value
-  return devices.value
+  return versions.value
 })
 
 const pageNumberFiltered = computed(() => {
@@ -40,69 +49,48 @@ const pageNumberFiltered = computed(() => {
 })
 
 const display = (pageNumber: number) => {
-  // Display the devices between the two indexes
   const firstIndex = (pageNumber - 1) * offset
   const lastIndex = firstIndex + offset
 
-  displayedDevices.value = devicesFiltered.value.slice(firstIndex, lastIndex)
+  displayedVersions.value = versionsFiltered.value.slice(firstIndex, lastIndex)
   currentPageNumber.value = pageNumber
+}
+
+const searchVersion = async () => {
+  isLoadingSub.value = true
+  const { data: dataVersions } = await supabase
+    .from('app_versions')
+    .select()
+    .eq('app_id', appId.value)
+    .eq('deleted', false)
+    .order('created_at', { ascending: false })
+    .like('name', `%${search.value}%`)
+  if (!dataVersions) {
+    filtered.value = []
+    isLoadingSub.value = false
+    return
+  }
+  const pages = Array.from(Array(Math.ceil(dataVersions.length / offset)).keys())
+  filteredPageNumbers.value = pages.slice(1, pages.length)
+  filtered.value = await enhenceVersionElems(dataVersions)
+  isLoadingSub.value = false
+  currentPageNumber.value = 1
+  display(currentPageNumber.value)
 }
 
 const loadData = async () => {
   try {
-    const { data: dataDev } = await supabase
-      .from('devices')
-      .select(`
-        app_id,
-        device_id,
-        platform,
-        plugin_version,
-        version (
-            name
-        ),
-        created_at,
-        updated_at
-      `)
+    const { data: dataVersions } = await supabase
+      .from('app_versions')
+      .select()
       .eq('app_id', appId.value)
-      .order('updated_at', { ascending: false })
-    if (!dataDev)
+      .eq('deleted', false)
+      .order('created_at', { ascending: false })
+    if (!dataVersions)
       return
-    devices.value.push(...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[])
-
-    const pages = Array.from(Array(Math.ceil(devices.value.length / offset)).keys())
+    versions.value.push(...(await enhenceVersionElems(dataVersions)))
+    const pages = Array.from(Array(Math.ceil(versions.value.length / offset)).keys())
     pageNumbers.value = pages.slice(1, pages.length)
-    display(currentPageNumber.value)
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
-
-const searchDevice = async () => {
-  try {
-    const { data: dataDev } = await supabase
-      .from('devices')
-      .select(`
-        app_id,
-        device_id,
-        platform,
-        plugin_version,
-        version (
-            name
-        ),
-        created_at,
-        updated_at
-      `)
-      .eq('app_id', appId.value)
-      .ilike('device_id', `%${search.value}%`)
-      .order('updated_at', { ascending: false })
-    if (!dataDev)
-      return
-
-    filtered.value = [...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[]]
-    const pages = Array.from(Array(Math.ceil(dataDev.length / offset)).keys())
-    filteredPageNumbers.value = pages.slice(1, pages.length)
-    currentPageNumber.value = 1
     display(currentPageNumber.value)
   }
   catch (error) {
@@ -113,7 +101,6 @@ const searchDevice = async () => {
 const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   isLoading.value = true
   try {
-    devices.value = []
     await loadData()
   }
   catch (error) {
@@ -123,16 +110,8 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-interface RefresherEventDetail {
-  complete(): void
-}
-interface RefresherCustomEvent extends CustomEvent {
-  detail: RefresherEventDetail
-  target: HTMLIonRefresherElement
-}
-
 watchEffect(async () => {
-  if (route.path.endsWith('/devices')) {
+  if (route.path.endsWith('/bundles')) {
     appId.value = route.params.p as string
     appId.value = appId.value.replace(/--/g, '.')
     await refreshData()
@@ -142,56 +121,46 @@ watchEffect(async () => {
 
 <template>
   <div class="h-full overflow-y-scroll py-4">
-    <div id="devices" class="mt-5 border md:w-2/3 mx-auto rounded-lg shadow-lg border-slate-200 dark:bg-gray-800 dark:border-slate-900 flex flex-col overflow-y-scroll">
+    <div id="versions" class="mt-5 border md:w-2/3 mx-auto rounded-lg shadow-lg border-slate-200 dark:bg-gray-800 dark:border-slate-900 flex flex-col overflow-y-scroll">
       <header class="px-5 py-4 border-b border-slate-100">
         <h2 class="font-semibold text-xl text-slate-800 dark:text-white">
-          {{ t('package.device_list') }}
+          {{ t('package.versions') }}
         </h2>
       </header>
-      <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="searchDevice">
+      <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="searchVersion">
       <div class="p-3">
         <!-- Table -->
-        <div class="overflow-y-scroll">
-          <table class="w-full table-auto" aria-label="">
+        <div class="overflow-x-auto">
+          <table class="w-full table-auto" aria-label="Table with your apps">
             <!-- Table header -->
             <thead class="text-md uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
               <tr>
                 <th class="p-2">
                   <div class="font-semibold text-left">
-                    {{ t('device-id') }}
+                    {{ t('name') }}
                   </div>
                 </th>
                 <th class="p-2">
                   <div class="font-semibold text-left">
-                    {{ t('device.platform') }}
+                    {{ t('pckage.version.created-at') }}
                   </div>
                 </th>
                 <th class="p-2">
                   <div class="font-semibold text-left">
-                    {{ t('updated-at') }}
+                    {{ t('pckage.version.size') }}
                   </div>
                 </th>
                 <th class="p-2">
                   <div class="font-semibold text-left">
-                    {{ t('device.version') }}
-                  </div>
-                </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
-                    {{ t('custom-id') }}
+                    {{ t('button.options') }}
                   </div>
                 </th>
               </tr>
             </thead>
             <!-- Table body -->
             <tbody class="text-md font-medium divide-y divide-slate-100">
-              <tr v-if="isLoading || isLoadingSub">
-                <td align="center" colspan="5">
-                  <Spinner />
-                </td>
-              </tr>
               <!-- Row -->
-              <DeviceCard v-for="(device, i) in displayedDevices" :key="device.device_id + i" :device="device" />
+              <VersionCard v-for="(version, i) in displayedVersions" :key="version.name + i" :version="version" @reload="emit('reload')" />
             </tbody>
           </table>
         </div>
