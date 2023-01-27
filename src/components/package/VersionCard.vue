@@ -78,7 +78,7 @@ const showSize = () => {
   else if (props.version.external_url)
     return t('package.externally')
   else
-    return t('package.not_available')
+    return t('package.size_not_found')
 }
 
 const deleteVersion = async (version: Database['public']['Tables']['app_versions']['Row']) => {
@@ -149,10 +149,14 @@ watchEffect(async () => {
         {{ formatDate(props.version.created_at || "") }}
       </div>
     </td>
-
+    <td class="p-2">
+      <div class="text-left">
+        {{ showSize() }}
+      </div>
+    </td>
     <td class="" @click.stop="deleteVersion(props.version)">
       <div class="text-left">
-        <IconTrash />
+        <IconTrash class="text-red-600 text-lg" />
       </div>
     </td>
   </tr>

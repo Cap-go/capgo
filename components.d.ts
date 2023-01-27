@@ -10,6 +10,7 @@ declare module '@vue/runtime-core' {
     AccountPanel: typeof import('./src/components/settings/AccountPanel.vue')['default']
     ActionSheet: typeof import('./src/components/ActionSheet.vue')['default']
     AppCard: typeof import('./src/components/dashboard/AppCard.vue')['default']
+    AppStat: typeof import('./src/components/package/AppStat.vue')['default']
     Banner: typeof import('./src/components/Banner.vue')['default']
     ChannelCard: typeof import('./src/components/package/ChannelCard.vue')['default']
     Channels: typeof import('./src/components/package/Channels.vue')['default']

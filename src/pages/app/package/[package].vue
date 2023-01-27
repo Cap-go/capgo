@@ -11,7 +11,9 @@ const supabase = useSupabase()
 const id = ref('')
 const isLoading = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
+const channelsNb = ref(0)
+const bundlesNb = ref(0)
+const devicesNb = ref(0)
 
 const loadAppInfo = async () => {
   try {
@@ -20,24 +22,23 @@ const loadAppInfo = async () => {
       .select()
       .eq('app_id', id.value)
       .single()
-    const { data: dataChannel } = await supabase
-      .from('channels')
-      .select(`
-          id,
-          name,
-          app_id,
-          public,
-          version (
-            name,
-            created_at
-          ),
-          created_at,
-          updated_at
-          `)
-      .eq('app_id', id.value)
-      .order('updated_at', { ascending: false })
     app.value = dataApp || app.value
-    channels.value = (dataChannel || channels.value) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
+
+    // get channels count
+    const { data: dataChannels } = await supabase
+      .from('channels')
+      .select('id').eq('app_id', id.value)
+    channelsNb.value = dataChannels?.length || 0
+    // get bundles count
+    const { data: dataBundles } = await supabase
+      .from('app_versions')
+      .select('id').eq('app_id', id.value).eq('deleted', false)
+    bundlesNb.value = dataBundles?.length || 0
+    // get devices count
+    const { data: dataDevices } = await supabase
+      .from('devices')
+      .select('device_id').eq('app_id', id.value)
+    devicesNb.value = dataDevices?.length || 0
   }
   catch (error) {
     console.error(error)
@@ -56,13 +57,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
   evt?.target?.complete()
 }
 
-interface Channel {
-  id: string
-  version: {
-    name: string
-    created_at: string
-  }
-}
 interface RefresherEventDetail {
   complete(): void
 }
@@ -85,73 +79,24 @@ watchEffect(async () => {
     <Spinner />
   </div>
   <div v-else class="h-full w-full">
-    <div class="w-full h-full px-4 py-8  mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
+    <div class="w-full h-full px-4 py-8 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
+      <div class="lg:max-w-xl lg:mx-auto sm:text-center pb-8">
+        <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
+          {{ app?.name }}
+        </h2>
+      </div>
       <div class="grid gap-6 grid-cols-16 md:mx-10">
         <Usage :app-id="id" />
       </div>
-      <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2 mt-5">
-        <Channels :channels="channels" />
-        <Devices :app-id="id" />
-        <Versions :app-id="id" />
-      </div>
-    <!-- <IonList ref="listRef">
-      <IonItem class="cursor-pointer" @click="openDevices()">
-        <IonLabel>
-          <h2 class="text-sm text-azure-500">
-            {{ t('package.device_list') }}
-          </h2>
-        </IonLabel>
-        <IonNote slot="end">
-          <i-ion-chevron-forward-outline class="text-azure-500" />
-        </IonNote>
-      </IonItem>
-      <IonItemDivider v-if="channels?.length">
-        <IonLabel>
-          {{ t('package.channels') }}
-        </IonLabel>
-      </IonItemDivider>
-      <Channels :channels="channels" :open-channel="openChannel" :delete-channel="deleteChannel" />
-      <IonItemDivider v-if="versions?.length">
-        <IonLabel>
-          {{ t('package.versions') }}
-        </IonLabel>
-      </IonItemDivider>
-      <IonItem>
-        <IonSearchbar @ion-change="search = ($event.detail.value || '').toLowerCase(); searchVersion()" />
-      </IonItem>
-      <template v-for="v in versionFilter" :key="v.name">
-        <IonItemSliding>
-          <IonItem button :detail="true" @click="openVersion(v)">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ v.name }} ( {{ showSize(v) }} )
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(v.created_at || '') }}
-            </IonNote>
-          </IonItem>
-          <IonItemOptions side="end">
-            <IonItemOption color="warning" @click="deleteVersion(v)">
-              Delete
-            </IonItemOption>
-          </IonItemOptions>
-        </IonItemSliding>
-      </template>
-      <div v-if="isLoadingSub" class="flex justify-center chat-items">
-        <Spinner />
-      </div>
-      <IonInfiniteScroll
-        threshold="100px"
-        :disabled="isDisabled || !!search"
-        @ion-infinite="loadData($event)"
-      >
-        <IonInfiniteScrollContent
-          loading-spinner="bubbles"
-          :loading-text="t('loading-more-data')"
-        />
-      </IonInfiniteScroll>
-    </IonList> -->
+      <section class="py-12">
+        <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+          <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-20">
+            <AppStat :number="channelsNb" label="Channels" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
+            <AppStat :number="bundlesNb" label="Bundles" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
+            <AppStat :number="devicesNb" label="Devices" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
