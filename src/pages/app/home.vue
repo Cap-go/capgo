@@ -48,6 +48,7 @@ const getSharedWithMe = async () => {
       app_id (
         app_id,
         name,
+        updated_at,
         icon_url,
         last_version,
         user_id,
