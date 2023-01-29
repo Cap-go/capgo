@@ -17,18 +17,17 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
 }
 
-const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, skip = 0) => {
+const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000) => {
   const res = (await gplay.list({
     category,
     collection,
     fullDetail: false,
-    num: limit + skip,
+    num: limit,
   }))
   // remove the first skip
   const ids = res.map(item => item.appId)
   console.log('ids', ids, ids.length)
   // console.log('res', res)
-  res.splice(0, skip)
   // const upgraded = res.map((item, i) => {
   //   return {
   //     url: item.url,
@@ -49,21 +48,24 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   // return upgraded
   const upgraded = res.map((item, i) => {
     console.log('item', item.appId)
-    return gplay.app({ appId: item.appId }).then(res => ({
-      url: item.url,
-      app_id: item.appId,
-      title: item.title,
-      summary: item.summary,
-      developer: item.developer,
-      icon: item.icon,
-      score: item.score,
-      free: item.free,
-      category,
-      collection,
-      rank: i + 1,
-      developer_email: res.developerEmail,
-      installs: res.maxInstalls,
-    } as Database['public']['Tables']['store_apps']['Insert']))
+
+    return gplay.app({ appId: item.appId })
+      .then((res) => {
+        const row: Database['public']['Tables']['store_apps']['Insert'] = {
+          url: item.url,
+          app_id: item.appId,
+          title: item.title,
+          summary: item.summary,
+          developer: item.developer,
+          icon: item.icon,
+          score: item.score,
+          free: item.free,
+          category,
+          developer_email: res.developerEmail,
+          installs: res.maxInstalls,
+        }
+        return row
+      })
       .catch((err) => {
         console.log('err', err)
         return {
@@ -92,7 +94,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
 // getList()
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
-  const list = await getList(body.category, body.collection, body.limit, body.skip)
+  const list = await getList(body.category, body.collection, body.limit)
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_apps')

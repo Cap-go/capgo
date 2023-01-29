@@ -20,7 +20,7 @@ export const supabaseClient = () => {
 const getAppInfo = async (appId: string) => {
   const item = await gplay.app({ appId })
   // return upgraded
-  const insert = {
+  const insert: Database['public']['Tables']['store_apps']['Insert'] = {
     url: item.url,
     app_id: item.appId,
     title: item.title,
@@ -33,7 +33,7 @@ const getAppInfo = async (appId: string) => {
     developer_email: item.developerEmail,
     installs: item.maxInstalls,
     to_get_info: false,
-  } as Database['public']['Tables']['store_apps']['Insert']
+  }
 
   return insert
 }
