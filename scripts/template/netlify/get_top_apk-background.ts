@@ -46,7 +46,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   //   } as Database['public']['Tables']['store_apps']['Insert']
   // })
   // return upgraded
-  const upgraded = res.map((item, i) => {
+  const upgraded = res.map((item) => {
     console.log('item', item.appId)
 
     return gplay.app({ appId: item.appId })
@@ -68,7 +68,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
       })
       .catch((err) => {
         console.log('err', err)
-        return {
+        const row: Database['public']['Tables']['store_apps']['Insert'] = {
           url: item.url,
           app_id: item.appId,
           title: item.title,
@@ -78,11 +78,10 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
           score: item.score,
           free: item.free,
           category,
-          collection,
-          rank: i + 1,
           developer_email: '',
           installs: 0,
-        } as Database['public']['Tables']['store_apps']['Insert']
+        }
+        return row
       })
   })
   return await Promise.all(upgraded)
