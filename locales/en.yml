@@ -113,6 +113,7 @@ channel:
   device: Device
   device-deleted: Device deleted
   invit: Type email to invite
+  info: Informations
   is_public: Channel default
   make-now: Make default
   make_it: Make it
@@ -122,6 +123,7 @@ channel:
   private_desc: Private
   public: Capacitor-updater link
   public_desc: Public
+  settings: Settings
   title: Channel
   user: User
   user_no_found: User not found, ask to register first
@@ -142,12 +144,12 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
-details-and-logs: details and logs.
+details-and-logs: Details and logs
 device:
   channel: Channel link
   created_at: Created at
   force_version: Force version
-  info: informations
+  info: Informations
   last_update: Last update
   link_channel: Channel linked to device
   link_fail: Cannot link something wrong happened
