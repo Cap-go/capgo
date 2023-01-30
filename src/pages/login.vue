@@ -150,7 +150,7 @@ onMounted(checkLogin)
                         <input
                           id="emailInput"
                           v-model="form.email"
-                          inputmode="email" autocomplete="email"
+                          inputmode="email" autocomplete="username"
                           name="email"
                           type="email"
                           :disabled="isLoading"
