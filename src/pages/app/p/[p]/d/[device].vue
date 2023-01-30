@@ -17,6 +17,8 @@ import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
 import Spinner from '~/components/Spinner.vue'
 import Searchbar from '~/components/Searchbar.vue'
+import IconLog from '~icons/heroicons/document'
+import IconInformations from '~icons/heroicons/information-circle'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -432,7 +434,7 @@ watchEffect(async () => {
 <template>
   <TitleHead :title="t('device.title')" color="warning" />
   <div class="h-full md:hidden">
-    <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 dark text-gray-600:dark:text-gray-300 dark:bg-black">
+    <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 text-gray-600 dark:text-gray-100">
       <k-segmented-button
         class="h-10"
         :active="!showLog"
@@ -448,8 +450,8 @@ watchEffect(async () => {
         {{ t('logs') }}
       </k-segmented-button>
     </k-segmented>
-    <k-block-title v-if="!showLog">
-      {{ t('device.info') }}
+    <k-block-title v-if="!showLog" class="text-gray-600 dark:text-gray-100">
+      {{ t('device.info').toLocaleUpperCase() }}
     </k-block-title>
     <k-list v-if="device && !showLog" class="h-full pb-16 overflow-y-scroll" strong-ios outline-ios>
       <k-list-item
@@ -510,15 +512,10 @@ watchEffect(async () => {
         @click="updateChannel"
       />
     </k-list>
-    <k-block-title v-if="showLog">
-      {{ t('logs') }}
+    <k-block-title v-if="showLog" class="text-gray-600 dark:text-gray-100">
+      {{ t('logs').toLocaleUpperCase() }}
     </k-block-title>
     <k-list v-if="showLog" v-infinite-scroll="[loadStatsData, { distance: 10 }]" class="h-full overflow-y-scroll max-h-fit" strong-ios outline-ios>
-      <k-list-item>
-        <template #text>
-          <Searchbar :search-placeholder="t('search-device')" />
-        </template>
-      </k-list-item>
       <k-list-item v-if="isLoading || isLoadingSub">
         <template #text>
           <Spinner />
@@ -534,178 +531,187 @@ watchEffect(async () => {
     </k-list>
   </div>
   <div v-if="device" class="hidden h-full p-8 overflow-y-scroll md:block">
-    <div>
-      <div>
-        <h3 class="text-lg font-medium leading-6 text-gray-600 dark:text-gray-300">
-          {{ t('device.info') }}
-        </h3>
-        <p class="max-w-2xl mt-1 text-sm text-gray-500">
-          {{ t('details-and-logs') }}
-        </p>
+    <div class="">
+      <div class="px-4 mx-auto sm:px-6 lg:px-8 max-w-7xl">
+        <div class="flex items-center justify-center">
+          <div class="">
+            <nav class="flex flex-wrap -mb-px sm:space-x-10">
+              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = false">
+                <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
+
+                {{ t('device.info') }}
+              </button>
+
+              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = true">
+                <IconLog class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
+                {{ t('logs') }}
+              </button>
+            </nav>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <div v-if="!showLog" id="informations">
       <div class="mt-5 border-t border-gray-200">
         <dl class="sm:divide-y sm:divide-gray-200">
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device-id') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
               {{ device.device_id }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.platform') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
               {{ device.platform }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('custom-id') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
               <input v-model="device.custom_id" class="w-full max-w-xs input input-bordered text-white" @ion-blur="saveCustomId()">
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.plugin_version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.plugin_version }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.version.name }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('version-builtin') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.version_build }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.os_version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.os_version || 'unknow' }}
             </dd>
           </div>
           <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('is-emulator') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.is_emulator }}
             </dd>
           </div>
           <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('is-production-app') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ device.is_prod }}
             </dd>
           </div>
           <div v-if="device.updated_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.last_update') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ formatDate(device.updated_at) }}
             </dd>
           </div>
           <div v-if="device.created_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.created_at') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
               {{ formatDate(device.created_at) }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.force_version') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateOverride">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateOverride">
               {{ deviceOverride?.version?.name || t('device.no_override') }}
             </dd>
           </div>
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-sm font-medium text-gray-700 dark:text-gray-400">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
               {{ t('device.channel') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateChannel">
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateChannel">
               {{ channelDevice?.channel_id.name || t('device.no_channel') }}
             </dd>
           </div>
         </dl>
       </div>
     </div>
-    <div class="hidden h-full md:block">
-      <div class="h-full px-0 mx-auto sm:px-2">
-        <div class="flex flex-col h-full">
-          <div class="h-full overflow-x-auto">
-            <div v-infinite-scroll="[loadStatsData, { distance: 10 }]" class="inline-block h-full min-w-full py-2 overflow-y-scroll align-middle md:px-6 lg:px-8">
-              <table class="w-full max-h-full lg:divide-y lg:divide-gray-200">
-                <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
-                  <tr>
-                    <th class="py-3.5 pl-4 pr-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400 sm:pl-6 md:pl-0">
-                      <div class="flex items-center">
-                        {{ t('action') }}
-                      </div>
-                    </th>
-                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400">
-                      <div class="flex items-center">
-                        {{ t('device.version') }}
-                      </div>
-                    </th>
-                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400">
-                      <div class="flex items-center">
-                        {{ t('version-build') }}
-                      </div>
-                    </th>
-                    <th class="py-3.5 px-3 text-left text-sm whitespace-nowrap font-medium text-gray-700 dark:text-gray-400">
-                      <div class="flex items-center">
-                        {{ t('updated-at') }}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="w-full max-h-full divide-y divide-gray-200 max-h-fit">
-                  <tr v-if="isLoading || isLoadingSub">
-                    <td align="center" colspan="5">
-                      <Spinner />
-                    </td>
-                  </tr>
-                  <tr v-for="(item, i) in logFiltered" v-else :key="i" class="w-full">
-                    <td class="hidden py-4 pl-4 pr-3 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
-                      {{ item.action }}
-                    </td>
-                    <td class="hidden px-4 py-4 text-sm font-bold text-gray-200 lg:table-cell whitespace-nowrap">
-                      {{ item.version.name }}
-                    </td>
-                    <td class="hidden px-4 py-4 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap">
-                      {{ item.version_build }}
-                    </td>
-                    <td class="hidden px-4 py-4 text-sm font-medium text-gray-200 lg:table-cell whitespace-nowrap">
-                      {{ formatDate(item.updated_at || '') }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+    <div v-if="showLog" id="logs" class="flex flex-col h-full">
+      <div class="h-full">
+        <div v-infinite-scroll="[loadStatsData, { distance: 10 }]" class="inline-block h-full min-w-full py-2 overflow-y-scroll align-middle">
+          <table class="w-full max-h-full lg:divide-y lg:divide-gray-200">
+            <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
+              <tr>
+                <th class="py-3.5 pl-4 pr-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
+                  <div class="flex items-center">
+                    {{ t('action') }}
+                  </div>
+                </th>
+                <th class="py-3.5 px-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
+                    {{ t('device.version') }}
+                  </div>
+                </th>
+                <th class="py-3.5 px-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
+                    {{ t('version-build') }}
+                  </div>
+                </th>
+                <th class="py-3.5 px-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
+                    {{ t('updated-at') }}
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="w-full divide-y divide-gray-200 max-h-fit">
+              <tr v-if="isLoading || isLoadingSub">
+                <td align="center" colspan="5">
+                  <Spinner />
+                </td>
+              </tr>
+              <tr v-for="(item, i) in logFiltered" v-else :key="i" class="w-full">
+                <td class="hidden py-4 pl-4 pr-3 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
+                  {{ item.action }}
+                </td>
+                <td class="hidden px-4 py-4 text-lg font-bold text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
+                  {{ item.version.name }}
+                </td>
+                <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
+                  {{ item.version_build }}
+                </td>
+                <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
+                  {{ formatDate(item.updated_at || '') }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

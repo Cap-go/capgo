@@ -1,17 +1,13 @@
 <script setup lang="ts">
+import {
+  IonButton, IonButtons, IonHeader,
+  IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
+  IonLabel, IonList, IonListHeader, IonModal, IonNote,
+  IonSearchbar, IonTitle, IonToggle, IonToolbar,
+} from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  kBlockTitle, kDialog, kDialogButton,
-  kList,
-  kListButton,
-  kListInput,
-  kListItem,
-  kSegmented,
-  kSegmentedButton,
-  kToggle,
-} from 'konsta/vue'
 import ellipsisHorizontalCircle from '~icons/ion/ellipsis-horizontal-circle?raw'
 import Spinner from '~/components/Spinner.vue'
 import { existUser, useSupabase } from '~/services/supabase'
@@ -45,8 +41,6 @@ const newUser = ref<string>()
 const newUserModalOpen = ref(false)
 const search = ref('')
 const devices = ref<Database['public']['Tables']['channel_devices']['Row'][]>([])
-const showSettings = ref(false)
-const addUserModal = ref(false)
 
 const openBundle = () => {
   if (!channel.value)
@@ -54,7 +48,11 @@ const openBundle = () => {
   console.log('openBundle', channel.value.version.id)
   router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
 }
-
+const openApp = () => {
+  if (!channel.value)
+    return
+  openVersion(channel.value.version, main.user?.id || '')
+}
 const getUsers = async () => {
   if (!channel.value)
     return
@@ -202,7 +200,7 @@ const addUser = async () => {
   // exist_user
   const exist = await existUser(newUser.value || '')
   if (!exist) {
-    newUserModalOpen.value = true
+    newUserModalOpen.value = false
     return
   }
 
@@ -222,11 +220,16 @@ const addUser = async () => {
     newUser.value = ''
   }
 }
+
 const makeDefault = async (val = true) => {
   displayStore.actionSheetOption = {
     header: t('account.delete_sure'),
     message: val ? t('channel.confirm-public-desc') : t('making-this-channel-'),
     buttons: [
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+      },
       {
         text: val ? t('channel.make-now') : t('make-normal'),
         id: 'confirm-button',
@@ -245,10 +248,6 @@ const makeDefault = async (val = true) => {
             displayStore.messageToast.push(val ? t('defined-as-public') : t('defined-as-private'))
           }
         },
-      },
-      {
-        text: t('button.cancel'),
-        role: 'cancel',
       },
     ],
   }
@@ -412,157 +411,197 @@ const openPannel = async () => {
 </script>
 
 <template>
-  <TitleHead :title="`${t('channel.title')} ${channel?.name}`" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-  <div class="h-full md:hidden">
-    <k-segmented strong rounded class="mx-auto mt-6 sm:mt-8 text-gray-600 dark:text-gray-100">
-      <k-segmented-button
-        class="h-10"
-        :active="!showSettings"
-        @click="showSettings = false"
-      >
-        {{ t('channel.info') }}
-      </k-segmented-button>
-      <k-segmented-button
-        class="h-10"
-        :active="showSettings"
-        @click="showSettings = true"
-      >
-        {{ t('channel.settings') }}
-      </k-segmented-button>
-    </k-segmented>
-    <k-list v-if="channel && !showSettings" class="h-full overflow-y-scroll" strong-ios outline-ios>
-      <k-list-item
-        :title="t('name')"
-        :after="channel?.name"
-      />
-      <k-list-item
-        :title="t('bundle-number')"
-        :after="channel?.version.name"
-        @click="openBundle"
-      />
-      <k-list-item
-        :title="t('device.created_at')"
-        :after="formatDate(channel?.created_at)"
-      />
-      <k-list-item
-        :title="t('device.last_update')"
-        :after="formatDate(channel?.updated_at)"
-      />
-    </k-list>
-    <k-list v-if="channel && showSettings" class="h-full overflow-y-scroll" strong-ios outline-ios>
-      <k-list-item label :title="t('channel.is_public')">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
+  <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
+  <IonHeader collapse="condense">
+    <IonToolbar mode="ios">
+      <IonTitle color="warning" size="large">
+        {{ t('channel.title') }}
+      </IonTitle>
+      <IonButtons v-if="channel" slot="end">
+        <IonButton color="danger" @click="openApp()">
+          {{ t('channel.open') }}
+        </IonButton>
+      </IonButtons>
+    </IonToolbar>
+  </IonHeader>
+  <IonList ref="listRef">
+    <template v-if="!loading">
+      <IonListHeader>
+        <span class="text-vista-blue-500">
+          {{ channel?.name }}
+        </span>
+      </IonListHeader>
+      <IonItemDivider>
+        <IonLabel>
+          {{ t('informations') }}
+        </IonLabel>
+      </IonItemDivider>
+      <IonItem class="cursor-pointer text-azure-500" @click="openBundle()">
+        <IonLabel class="my-6">
+          {{ t('package.versions') }}
+        </IonLabel>
+        <IonNote slot="end">
+          {{ channel?.version.name }}
+        </IonNote>
+      </IonItem>
+      <IonItem>
+        <IonLabel class="my-6">
+          {{ t('device.created_at') }}
+        </IonLabel>
+        <IonNote slot="end">
+          {{ formatDate(channel?.created_at) }}
+        </IonNote>
+      </IonItem>
+      <IonItem>
+        <IonLabel class="my-6">
+          {{ t('device.last_update') }}
+        </IonLabel>
+        <IonNote slot="end">
+          {{ formatDate(channel?.updated_at) }}
+        </IonNote>
+      </IonItem>
+      <IonItemDivider>
+        <IonLabel>
+          {{ t('settings') }}
+        </IonLabel>
+      </IonItemDivider>
+      <IonItem>
+        <IonLabel class="my-6 font-extrabold">
+          {{ t('channel.is_public') }}
+        </IonLabel>
+        <IonButtons slot="end">
+          <IonToggle
+            color="secondary"
             :checked="channel?.public"
-            @change="() => (makeDefault(!channel?.public))"
+            @ion-change="makeDefault($event.detail.checked)"
           />
-        </template>
-      </k-list-item>
-      <k-list-item label title="iOS">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.ios"
-            @change="() => (saveChannelChange('ios', !channel?.ios))"
-          />
-        </template>
-      </k-list-item>
-      <k-list-item label title="Android">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.android"
-            @change="() => (saveChannelChange('android', !channel?.android))"
-          />
-        </template>
-      </k-list-item>
-      <k-list-item label :title="t('disable-auto-downgra')">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.disableAutoUpdateUnderNative"
-            @change="() => (saveChannelChange('disableAutoUpdateUnderNative', !channel?.disableAutoUpdateUnderNative))"
-          />
-        </template>
-      </k-list-item>
-      <k-list-item label :title="t('disable-auto-upgrade')">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.disableAutoUpdateToMajor"
-            @change="() => (saveChannelChange('disableAutoUpdateToMajor', !channel?.disableAutoUpdateToMajor))"
-          />
-        </template>
-      </k-list-item>
-      <k-list-item label :title="t('allow-develoment-bui')">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.allow_dev"
-            @change="() => (saveChannelChange('allow_dev', !channel?.allow_dev))"
-          />
-        </template>
-      </k-list-item>
-      <k-list-item label :title="t('allow-emulator')">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.allow_emulator"
-            @change="() => (saveChannelChange('allow_emulator', !channel?.allow_emulator))"
-          />
-        </template>
-      </k-list-item>
-      <k-list-item label :title="t('allow-device-to-self')">
-        <template #after>
-          <k-toggle
-            class="-my-1"
-            component="div"
-            :checked="channel?.allow_device_self_set"
-            @change="() => (saveChannelChange('android', !channel?.allow_device_self_set))"
-          />
-        </template>
-      </k-list-item>
-      <k-block-title>{{ t('channel.users') }}</k-block-title>
-
-      <k-list class="mb-0">
-        <k-list-item
-          v-for="user in users"
-          :key="user.id"
-          :title="`${user.user_id.first_name} ${user.user_id.last_name}`"
-          :after="user.user_id.email"
-          @click="presentActionSheet(user.user_id)"
+        </IonButtons>
+      </IonItem>
+      <IonItem>
+        <IonLabel>{{ t('disable-auto-downgra') }}</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.disableAutoUpdateUnderNative"
+          @ion-change="saveChannelChange('disableAutoUpdateUnderNative', $event.target.checked)"
         />
-      </k-list>
-      <k-list-button class="text-bold text-lg border rounded-lg mx-2 bg-gray-100" @click="addUserModal = true">
-        {{ t('channel.add') }}
-      </k-list-button>
-    </k-list>
-  </div>
-  <k-dialog
-    :opened="addUserModal"
-    class="text-lg"
-    @backdropclick="() => (addUserModal = false)"
-  >
-    <template #title>
-      {{ t('channel.invit') }}
+      </IonItem>
+      <IonItem>
+        <IonLabel>{{ t('disable-auto-upgrade') }}</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.disableAutoUpdateToMajor"
+          @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
+        />
+      </IonItem>
+      <IonItem>
+        <IonLabel>{{ t('allow-develoment-bui') }} ( min 4.7.0)</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.allow_dev"
+          @ion-change="saveChannelChange('allow_dev', $event.target.checked)"
+        />
+      </IonItem>
+      <IonItem>
+        <IonLabel>{{ t('allow-emulator') }} ( min 4.7.0)</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.allow_emulator"
+          @ion-change="saveChannelChange('allow_emulator', $event.target.checked)"
+        />
+      </IonItem>
+      <IonItem>
+        <IonLabel>IOS</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.ios"
+          @ion-change="saveChannelChange('ios', $event.target.checked)"
+        />
+      </IonItem>
+      <IonItem>
+        <IonLabel>Android</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.android"
+          @ion-change="saveChannelChange('android', $event.target.checked)"
+        />
+      </IonItem>
+      <IonItem>
+        <IonLabel>{{ t('allow-device-to-self') }} ( min 4.7.0)</IonLabel>
+        <IonToggle
+          color="secondary"
+          :checked="channel?.allow_device_self_set"
+          @ion-change="saveChannelChange('allow_device_self_set', $event.target.checked)"
+        />
+      </IonItem>
+      <IonItemDivider>
+        <IonLabel>
+          {{ t('channel.users') }}
+        </IonLabel>
+      </IonItemDivider>
+      <IonItem>
+        <IonLabel position="floating">
+          {{ t('channel.invit') }}
+        </IonLabel>
+        <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
+        <div slot="end" class="flex items-center justify-center h-full">
+          <IonButton color="secondary" @click="addUser()">
+            {{ t('channel.add') }}
+          </IonButton>
+        </div>
+      </IonItem>
+      <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
+        <IonLabel>
+          <div class="flex flex-col col-span-6">
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm text-azure-500">
+                {{ usr.user_id.first_name }}  {{ usr.user_id.last_name }}
+              </h2>
+              <p>{{ usr.user_id.email }}</p>
+            </div>
+          </div>
+        </IonLabel>
+      </IonItem>
+      <IonItemDivider v-if="devices?.length">
+        <IonLabel>
+          {{ t('package.devices-list') }}
+        </IonLabel>
+      </IonItemDivider>
+      <!-- add item with searchbar -->
+      <IonItem v-if="devices?.length">
+        <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
+      </IonItem>
+      <template v-for="d in devicesFilter" :key="d.device_id">
+        <IonItemSliding>
+          <IonItem class="cursor-pointer">
+            <IonLabel>
+              <h2 class="text-sm text-azure-500">
+                {{ d.device_id }}
+              </h2>
+            </IonLabel>
+            <IonNote slot="end">
+              {{ formatDate(d.created_at || '') }}
+            </IonNote>
+          </IonItem>
+          <IonItemOptions side="end">
+            <IonItemOption color="warning" @click="deleteDevice(d)">
+              Delete
+            </IonItemOption>
+          </IonItemOptions>
+        </IonItemSliding>
+      </template>
     </template>
-    <input v-model="newUser" type="email" placeholder="hello@yourcompany.com" class="k-input w-full rounded-lg text-lg text-gray-200 p-1">
-    <template #buttons>
-      <k-dialog-button class="text-red-800" @click="() => (addUserModal = false)">
-        {{ t('button.cancel') }}
-      </k-dialog-button>
-      <k-dialog-button @click="() => (addUser())">
-        {{ t('channel.add') }}
-      </k-dialog-button>
-    </template>
-  </k-dialog>
-  <NewUserModal :email-address="newUser" :opened="newUserModalOpen" @close="newUserModalOpen = false" @invite-user="inviteUser" />
+    <div v-else class="flex justify-center">
+      <Spinner />
+    </div>
+  </IonList>
+  <IonModal :is-open="newUserModalOpen" :can-dismiss="true">
+    <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />
+  </IonModal>
 </template>
+
+<style>
+  #confirm-button {
+    background-color: theme('colors.red.500');
+    color: theme('colors.white');
+  }
+</style>

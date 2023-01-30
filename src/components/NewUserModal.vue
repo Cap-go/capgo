@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
-  kPreloader,
+  kDialog,
+  kDialogButton,
 } from 'konsta/vue'
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
@@ -11,6 +12,7 @@ import { useSupabase } from '~/services/supabase'
 
 const props = defineProps({
   emailAddress: String,
+  opened: Boolean,
 })
 const emit = defineEmits(['inviteUser', 'close'])
 const supabase = useSupabase()
@@ -95,66 +97,42 @@ const submit = async () => {
 </script>
 
 <template>
-  <IonHeader>
-    <IonToolbar mode="ios">
-      <IonTitle>
-        Invite user
-      </IonTitle>
-      <IonButton slot="end" @click="emit('close')">
-        Close
-      </IonButton>
-    </IonToolbar>
-  </IonHeader>
-  <div class="grid w-full h-full min-h-screen p-8 mx-auto lg:w-1/2">
-    <form
-      class="relative mt-2"
-      @submit.prevent="submit"
+  <k-dialog
+    :opened="props.opened"
+    class="text-lg"
+    @backdropclick="() => (emit('close'))"
+  >
+    <template #title>
+      {{ t('channel.add') }}
+    </template>
+    <input
+      v-model="form.first_name"
+      autofocus
+      required
+      class="k-input w-full rounded-lg text-lg text-gray-200 p-1 mb-2"
+      :placeholder="t('register.first-name')"
+      type="text"
     >
-      <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
-        {{ errorMessage }}
+    <div v-for="(error, index) of v$.first_name.$errors" :key="index">
+      <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
+        {{ t('register.first-name') }}: {{ error.$message }}
       </p>
-      <div class="grid max-w-lg mx-auto item-cente">
-        <div class="py-1">
-          <input
-            v-model="form.first_name"
-            autofocus
-            required
-            class="z-0 text-left border-b-2 ion-padding-start"
-            :placeholder="t('register.first-name')"
-            type="text"
-          >
-          <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-            <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
-              {{ t('register.first-name') }}: {{ error.$message }}
-            </p>
-          </div>
-        </div>
-        <div class="py-1">
-          <input v-model="form.last_name" required type="text" :placeholder="t('register.last-name')" class="w-full max-w-xs input input-bordered">
-          <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-            <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
-              {{ t('register.last-name') }}: {{ error.$message }}
-            </p>
-          </div>
-        </div>
-        <div class="py-1">
-          <input
-            v-model="userEmail" required inputmode="email" type="email" class="z-0 text-left border-b-2 ion-padding-start"
-            :placeholder="t('register.email')"
-          >
-        </div>
-        <IonButton
-          :disabled="isLoading"
-          type="submit"
-          color="secondary"
-          class="mx-auto font-semibold ion-margin-top w-45"
-        >
-          <span v-if="!isLoading" class="rounded-4xl">
-            {{ t('submit') }}
-          </span>
-          <k-preloader v-else size="w-16 h-16" />
-        </IonButton>
-      </div>
-    </form>
-  </div>
+    </div>
+    <input v-model="form.last_name" required type="text" :placeholder="t('register.last-name')" class="k-input w-full rounded-lg text-lg text-gray-200 p-1 mb-2">
+    <div v-for="(error, index) of v$.last_name.$errors" :key="index">
+      <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
+        {{ t('register.last-name') }}: {{ error.$message }}
+      </p>
+    </div>
+    <input v-model="userEmail" required type="email" :placeholder="t('register.email')" class="k-input w-full rounded-lg text-lg text-gray-200 p-1 mb-2">
+
+    <template #buttons>
+      <k-dialog-button class="text-red-800" @click="() => (emit('close'))">
+        {{ t('button.cancel') }}
+      </k-dialog-button>
+      <k-dialog-button @click="() => (submit)">
+        {{ t('channel.add') }}
+      </k-dialog-button>
+    </template>
+  </k-dialog>
 </template>
