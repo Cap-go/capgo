@@ -46,6 +46,12 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
   if (await didCancel(t('package.name')))
     return
   try {
+    const { error: errorIcon } = await supabase.storage
+      .from(`images/${app.user_id}`)
+      .remove([app.app_id])
+    if (errorIcon)
+      displayStore.messageToast.push(t('cannot-delete-app-icon'))
+
     const { data, error: vError } = await supabase
       .from('app_versions')
       .select()
@@ -155,7 +161,7 @@ watchEffect(async () => {
     </td>
     <td v-if="!channel" class="p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
-        <IconTrash class="text-red-600 text-lg" />
+        <IconTrash class="text-lg text-red-600" />
       </div>
     </td>
   </tr>
