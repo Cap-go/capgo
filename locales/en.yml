@@ -81,7 +81,6 @@ build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle-number: Bundle number
 button:
-  options: Options
   about: About
   back: Back
   browse: Browse
@@ -90,12 +89,14 @@ button:
   delete: Delete
   go: GO
   home: Home
+  options: Options
   remove: Remove
   tabs: Tabs
   toggle_dark: Toggle dark mode
   toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
+cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
 cannot-save-custom-i: Cannot save custom ID
@@ -112,8 +113,8 @@ channel:
   copy: Copy URL
   device: Device
   device-deleted: Device deleted
-  invit: Type email to invite
   info: Informations
+  invit: Type email to invite
   is_public: Channel default
   make-now: Make default
   make_it: Make it
@@ -253,8 +254,8 @@ package:
   mobiles-stats: Mobiles stats
   name: App
   not_available: Package not found
-  size_not_found: Not found
   set: Set bundle to channel
+  size_not_found: Not found
   stats: stats
   test: Launch bundle
   title: info
@@ -270,8 +271,8 @@ password:
   validate: Validate
 pckage:
   version:
-    is-used-in-channel: is used in a channel, unlink it first
     created-at: Created at
+    is-used-in-channel: is used in a channel, unlink it first
     size: Size
 personal-information: Personal Informations
 plan:
