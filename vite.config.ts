@@ -63,8 +63,12 @@ export default defineConfig({
       //   console.log('routes', routes)
       // },
       extendRoute: (route) => {
-        if (guestPath.includes(route.path))
-          return route
+        if (guestPath.includes(route.path)) {
+          return {
+            ...route,
+            meta: { ...route.meta, layout: 'auth' },
+          }
+        }
         // Augment the route with meta that indicates that the route requires authentication.
         return {
           ...route,
