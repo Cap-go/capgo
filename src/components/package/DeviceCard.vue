@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import {
+  kListItem,
+} from 'konsta/vue'
 import { formatDate } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
 
@@ -17,7 +20,7 @@ const openDevice = async () => {
 
 <template>
   <!-- Row -->
-  <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openDevice()">
+  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openDevice()">
     <td class="p-2">
       <div class="text-left">
         {{ props.device.device_id }}
@@ -40,10 +43,18 @@ const openDevice = async () => {
     </td>
     <td class="p-2">
       <div class="text-left">
-        {{ props.device.custom_id }}
+        {{ props.device.custom_id || '-' }}
       </div>
     </td>
   </tr>
+  <!-- Mobile -->
+  <k-list-item
+    link
+    class="md:hidden"
+    :title="props.device.device_id"
+    :subtitle="props.device.platform || ''"
+    @click="openDevice()"
+  />
 </template>
 
 <style>

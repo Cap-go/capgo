@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { kList } from 'konsta/vue'
 import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -110,7 +111,7 @@ const searchDevice = async () => {
   }
 }
 
-const refreshData = async (evt: RefresherCustomEvent | null = null) => {
+const refreshData = async () => {
   isLoading.value = true
   try {
     devices.value = []
@@ -120,15 +121,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
     console.error(error)
   }
   isLoading.value = false
-  evt?.target?.complete()
-}
-
-interface RefresherEventDetail {
-  complete(): void
-}
-interface RefresherCustomEvent extends CustomEvent {
-  detail: RefresherEventDetail
-  target: HTMLIonRefresherElement
 }
 
 watchEffect(async () => {
@@ -141,6 +133,7 @@ watchEffect(async () => {
 </script>
 
 <template>
+  <TitleHead :title="t('package.device_list')" color="warning" />
   <div class="h-full overflow-y-scroll py-4">
     <div id="devices" class="mt-5 border md:w-2/3 mx-auto rounded-lg shadow-lg border-slate-200 dark:bg-gray-800 dark:border-slate-900 flex flex-col overflow-y-scroll">
       <header class="px-5 py-4 border-b border-slate-100">
@@ -149,9 +142,9 @@ watchEffect(async () => {
         </h2>
       </header>
       <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="searchDevice">
-      <div class="p-3">
+      <div class="">
         <!-- Table -->
-        <div class="overflow-y-scroll">
+        <div class="hidden md:block overflow-y-scroll p-3">
           <table class="w-full table-auto" aria-label="">
             <!-- Table header -->
             <thead class="text-md uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
@@ -195,6 +188,9 @@ watchEffect(async () => {
             </tbody>
           </table>
         </div>
+        <k-list class="md:hidden w-full my-0">
+          <DeviceCard v-for="(device, i) in displayedDevices" :key="device.device_id + i" :device="device" />
+        </k-list>
       </div>
       <div class="py-6">
         <div class="px-4 mx-auto sm:px-6 lg:px-8">

@@ -2,6 +2,9 @@
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import {
+  kList,
+} from 'konsta/vue'
 import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import IconPrevious from '~icons/heroicons/chevron-left'
@@ -118,6 +121,7 @@ watchEffect(async () => {
 </script>
 
 <template>
+  <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" />
   <div class="h-full overflow-y-scroll py-4">
     <div id="versions" class="mt-5 border md:w-2/3 mx-auto rounded-lg shadow-lg border-slate-200 dark:bg-gray-800 dark:border-slate-900 flex flex-col overflow-y-scroll">
       <header class="px-5 py-4 border-b border-slate-100">
@@ -126,9 +130,9 @@ watchEffect(async () => {
         </h2>
       </header>
       <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="searchVersion">
-      <div class="p-3">
+      <div class="">
         <!-- Table -->
-        <div class="overflow-x-auto">
+        <div class="hidden md:block overflow-x-auto p-3">
           <table class="w-full table-auto" aria-label="Table with your apps">
             <!-- Table header -->
             <thead class="text-md uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
@@ -163,6 +167,9 @@ watchEffect(async () => {
           </table>
         </div>
       </div>
+      <k-list class="md:hidden w-full my-0">
+        <VersionCard v-for="(version, i) in displayedVersions" :key="version.name + i" :version="version" @reload="emit('reload')" />
+      </k-list>
       <div class="py-6">
         <div class="px-4 mx-auto sm:px-6 lg:px-8">
           <nav class="relative flex justify-center -space-x-px rounded-md">

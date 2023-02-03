@@ -50,7 +50,6 @@ watchEffect(async () => {
       <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
       <!-- Cards -->
       <div class="grid grid-cols-12 gap-6">
-        <!-- Line chart (Acme Plus) -->
         <Usage v-if="!isLoading" />
         <!-- Table (Top Channels) -->
         <TopApps :apps="props.apps" @reload="emit('reloadApp')" />

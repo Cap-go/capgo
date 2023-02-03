@@ -2,6 +2,9 @@
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  kListItem,
+} from 'konsta/vue'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -132,7 +135,7 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
+  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
     <td class="p-2">
       <div class="flex flex-wrap items-center">
         <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
@@ -165,6 +168,17 @@ watchEffect(async () => {
       </div>
     </td>
   </tr>
+  <!-- Mobile -->
+  <k-list-item
+    class="md:hidden"
+    :title="props.app.name || ''"
+    :subtitle="formatDate(props.app.updated_at || '')"
+    @click="openPackage(app.app_id)"
+  >
+    <template #after>
+      <IconTrash class="text-red-600 text-lg" @click.stop="deleteApp(app)" />
+    </template>
+  </k-list-item>
 </template>
 
 <style>

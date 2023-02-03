@@ -2,6 +2,9 @@
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  kListItem,
+} from 'konsta/vue'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -138,10 +141,10 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openVersion(props.version)">
+  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openVersion(props.version)">
     <td class="p-2">
       <div class="text-left">
-        {{ props.version.name }} ( {{ showSize() }} )
+        {{ props.version.name }}
       </div>
     </td>
     <td class="p-2">
@@ -160,6 +163,17 @@ watchEffect(async () => {
       </div>
     </td>
   </tr>
+  <!-- Mobile -->
+  <k-list-item
+    class="md:hidden"
+    :title="props.version.name"
+    :subtitle="formatDate(props.version.created_at || '')"
+    @click="openVersion(props.version)"
+  >
+    <template #after>
+      <IconTrash class="text-red-600 text-lg" @click.stop="deleteVersion(props.version)" />
+    </template>
+  </k-list-item>
 </template>
 
 <style>

@@ -215,7 +215,7 @@ const devicesFilter = computed(() => {
 </script>
 
 <template>
-  <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
+  <TitleHead :title="t('package.title')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
   <div class="h-full md:hidden">
     <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 text-gray-600 dark:text-gray-100">
       <k-segmented-button
@@ -334,7 +334,7 @@ const devicesFilter = computed(() => {
       </div>
     </div>
 
-    <div v-if="!showDevices" id="informations">
+    <div v-if="!showDevices" id="informations" class="">
       <div class="mt-5 border-t border-gray-200">
         <dl class="sm:divide-y sm:divide-gray-200">
           <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">

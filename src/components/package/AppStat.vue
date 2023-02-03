@@ -31,7 +31,7 @@ const open = () => {
   </div>
 
   <div class="cursor-pointer md:hidden" @click="open">
-    <div class="flex flex-col h-40 items-center justify-center rounded-3xl border border-gray-300 dark:bg-gray-700">
+    <div class="flex flex-col h-40 items-center justify-center rounded-3xl border border-gray-300 dark:bg-gray-700 dark:hover:bg-white/50 hover:bg-black/50 transition-all ease-in-out">
       <p class="text-5xl font-bold text-gray-900 dark:text-white font-pj">
         {{ props.number }}
       </p>

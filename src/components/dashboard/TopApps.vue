@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { kList } from 'konsta/vue'
 import AppCard from './AppCard.vue'
 import type { Database } from '~/types/supabase.types'
 
@@ -17,9 +18,9 @@ const { t } = useI18n()
         {{ t('top-apps') }}
       </h2>
     </header>
-    <div class="p-3">
+    <div class="">
       <!-- Table -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto p-3">
         <table class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="text-xs uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
@@ -54,6 +55,9 @@ const { t } = useI18n()
           </tbody>
         </table>
       </div>
+      <k-list class="md:hidden w-full my-0">
+        <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :app="app" channel="" @reload="emit('reload')" />
+      </k-list>
     </div>
   </div>
 </template>

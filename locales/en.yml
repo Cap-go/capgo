@@ -131,6 +131,7 @@ channel:
   user_no_found: User not found, ask to register first
   users: Shared with users
   v3: V3 settings
+channels: Channels
 channel-deleted: Channel deleted
 checksum: Checksum
 commands: commands
@@ -260,7 +261,7 @@ package:
   size_not_found: Not found
   stats: stats
   test: Launch bundle
-  title: info
+  title: Bundle
   unset: Unlink channel from bundle
   version:
     is-used-in-device: is used in a device override, unlink it first

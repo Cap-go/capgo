@@ -2,6 +2,9 @@
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  kList,
+} from 'konsta/vue'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 
@@ -38,7 +41,7 @@ const loadAppInfo = async () => {
   }
 }
 
-const refreshData = async (evt: RefresherCustomEvent | null = null) => {
+const refreshData = async () => {
   isLoading.value = true
   try {
     await loadAppInfo()
@@ -47,7 +50,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
     console.error(error)
   }
   isLoading.value = false
-  evt?.target?.complete()
 }
 
 interface Channel {
@@ -56,13 +58,6 @@ interface Channel {
     name: string
     created_at: string
   }
-}
-interface RefresherEventDetail {
-  complete(): void
-}
-interface RefresherCustomEvent extends CustomEvent {
-  detail: RefresherEventDetail
-  target: HTMLIonRefresherElement
 }
 
 watchEffect(async () => {
@@ -75,6 +70,7 @@ watchEffect(async () => {
 </script>
 
 <template>
+  <TitleHead :title="`${t('package.channels')}`" color="warning" :default-back="`/app/package/${route.params.p}`" />
   <div class="h-full overflow-y-scroll py-4">
     <div id="channels" class="mt-5 border md:w-2/3 mx-auto rounded-lg shadow-lg border-slate-200 dark:bg-gray-800 dark:border-slate-900 flex flex-col overflow-y-scroll">
       <header class="px-5 py-4 border-b border-slate-100">
@@ -82,9 +78,9 @@ watchEffect(async () => {
           {{ t('package.channels') }}
         </h2>
       </header>
-      <div class="p-3">
+      <div class="">
         <!-- Table -->
-        <div class="overflow-x-auto">
+        <div class="hidden md:block overflow-x-auto p-3">
           <table class="w-full table-auto" aria-label="Table with your apps">
             <!-- Table header -->
             <thead class="text-md uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
@@ -118,6 +114,9 @@ watchEffect(async () => {
             </tbody>
           </table>
         </div>
+        <k-list class="md:hidden w-full my-0">
+          <ChannelCard v-for="(channel, i) in channels" :key="channel.name + i" :channel="channel" @reload="emit('reload')" />
+        </k-list>
       </div>
     </div>
   </div>

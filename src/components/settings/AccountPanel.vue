@@ -306,7 +306,7 @@ watchEffect(async () => {
             <div class="sm:w-1/2">
               <label class="block mb-1 text-sm font-medium dark:text-white" for="name">{{ t('accountProfile.first-name') }}</label>
               <input
-                v-model="form.first_name" class="w-full form-input dark:bg-gray-700 dark:text-white"
+                v-model="form.first_name" class="w-full form-input p-2 dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 autofocus
                 required
@@ -322,7 +322,7 @@ watchEffect(async () => {
             <div class="sm:w-1/2">
               <label class="block mb-1 text-sm font-medium dark:text-white" for="business-id">{{ t('accountProfile.last-name') }}</label>
               <input
-                v-model="form.last_name" class="w-full form-input dark:bg-gray-700 dark:text-white"
+                v-model="form.last_name" class="w-full form-input p-2 dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 required
                 :placeholder="t('accountProfile.last-name')"
@@ -339,7 +339,7 @@ watchEffect(async () => {
             <div class="sm:w-1/2">
               <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('accountProfile.email') }}</label>
               <input
-                v-model="form.email" class="w-full form-input dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
+                v-model="form.email" class="w-full form-input p-2 dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
                 required
                 disabled
                 inputmode="email"
@@ -351,7 +351,7 @@ watchEffect(async () => {
               <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('accountProfile.country') }}</label>
               <input
                 v-model="form.country"
-                class="w-full form-input dark:bg-gray-700 dark:text-white"
+                class="w-full form-input p-2 dark:bg-gray-700 dark:text-white"
                 :disabled="isLoading"
                 required
                 :placeholder="t('accountProfile.country')"

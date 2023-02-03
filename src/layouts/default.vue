@@ -8,8 +8,8 @@ const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <k-page>
-    <div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+  <k-page class="overflow-hidden">
+    <div class="safe-areas flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
       <!-- Sidebar -->
       <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
       <!-- Content area -->
