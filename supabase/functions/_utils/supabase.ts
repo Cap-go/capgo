@@ -26,11 +26,6 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   record: null
   old_record: Database['public']['Tables'][T]['Row']
 }
-export interface VersionStatsIncrement {
-  app_id: string
-  version_id: number
-  devices: number
-}
 
 export const supabaseClient = () => {
   const options = {
@@ -89,7 +84,14 @@ export const updateOrCreateVersion = async (update: Database['public']['Tables']
   }
 }
 
-export const updateVersionStats = async (increment: VersionStatsIncrement) => {
+export const updateOnpremStats = async (increment: Database['public']['Functions']['increment_store']['Args']) => {
+  const { error } = await supabaseAdmin()
+    .rpc('increment_store', increment)
+  if (error)
+    console.error('increment_store', error)
+}
+
+export const updateVersionStats = async (increment: Database['public']['Functions']['increment_version_stats']['Args']) => {
   const { error } = await supabaseAdmin()
     .rpc('increment_version_stats', increment)
   if (error)

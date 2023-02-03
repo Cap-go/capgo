@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.171.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin, updateVersionStats } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOnpremStats, updateVersionStats } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -31,14 +31,39 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       is_emulator = false,
       is_prod = true,
     } = body
-    let statsDb = 'stats'
-    let deviceDb = 'devices'
 
     const coerce = semver.coerce(version_build)
+
+    const { data: appOwner } = await supabaseAdmin()
+      .from('apps')
+      .select('user_id, app_id')
+      .eq('app_id', app_id)
+      .single()
+
+    if (!appOwner) {
+      await supabaseAdmin()
+        .from('store_apps')
+        .upsert({
+          app_id,
+          onprem: true,
+          capacitor: true,
+        })
+      if (action === 'get') {
+        await updateOnpremStats({
+          app_id,
+          updates: 1,
+        })
+      }
+      return sendRes({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 200)
+    }
+
     if (coerce)
       version_build = coerce.version
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-    const device: Database['public']['Tables']['devices']['Insert'] | Database['public']['Tables']['devices_onprem']['Insert'] = {
+    const device: Database['public']['Tables']['devices']['Insert'] = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       app_id,
@@ -72,7 +97,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       device.version = data.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
         const { data: deviceData } = await supabaseAdmin()
-          .from(deviceDb)
+          .from('devices')
           .select()
           .eq('app_id', app_id)
           .eq('device_id', device_id)
@@ -98,14 +123,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     }
     else {
       console.error('switch to onprem', app_id)
-      statsDb = `${statsDb}_onprem`
-      deviceDb = `${deviceDb}_onprem`
+      return sendRes({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 200)
     }
     all.push(supabaseAdmin()
-      .from(deviceDb)
+      .from('devices')
       .upsert(device))
     all.push(supabaseAdmin()
-      .from(statsDb)
+      .from('stats')
       .insert(stat))
     await Promise.all(all)
     return sendRes()

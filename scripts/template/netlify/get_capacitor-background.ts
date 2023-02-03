@@ -14,7 +14,7 @@ export const supabaseClient = () => {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_ANON_KEY || '', options)
+  return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
 }
 // const headers = {
 //   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
@@ -69,26 +69,26 @@ export const supabaseClient = () => {
 //   return buffer
 // }
 
-fetch('https://d.apkpure.com/b/APK/com.pizzahutau?version=latest', {
-  headers: {
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'accept-language': 'en-GB,en;q=0.8',
-    'cache-control': 'no-cache',
-    'pragma': 'no-cache',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'same-site',
-    'sec-fetch-user': '?1',
-    'sec-gpc': '1',
-    'upgrade-insecure-requests': '1',
-  },
-  referrer: 'https://m.apkpure.com/',
-  referrerPolicy: 'strict-origin-when-cross-origin',
-  body: null,
-  method: 'GET',
-  mode: 'cors',
-  credentials: 'include',
-})
+// fetch('https://d.apkpure.com/b/APK/com.pizzahutau?version=latest', {
+//   headers: {
+//     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+//     'accept-language': 'en-GB,en;q=0.8',
+//     'cache-control': 'no-cache',
+//     'pragma': 'no-cache',
+//     'sec-fetch-dest': 'document',
+//     'sec-fetch-mode': 'navigate',
+//     'sec-fetch-site': 'same-site',
+//     'sec-fetch-user': '?1',
+//     'sec-gpc': '1',
+//     'upgrade-insecure-requests': '1',
+//   },
+//   referrer: 'https://m.apkpure.com/',
+//   referrerPolicy: 'strict-origin-when-cross-origin',
+//   body: null,
+//   method: 'GET',
+//   mode: 'cors',
+//   credentials: 'include',
+// })
 
 const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
   const downloadUrl = `https://d.apkpure.com/b/${mode}/${id}?version=latest`
@@ -121,7 +121,12 @@ const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
 }
 
 const isCapacitor = async (id: string) => {
-  let found = false
+  const found = {
+    capacitor: false,
+    cordova: false,
+    react_native: false,
+    capgo: false,
+  }
   try {
     console.log('downloadApkPure', id)
     const buffer = await downloadApkPure(id)
@@ -129,34 +134,70 @@ const isCapacitor = async (id: string) => {
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
-      console.log('zipEntry', zipEntry.entryName)
+      // console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
-        console.log(zipEntry.getData().toString('utf8'))
-        found = true
+        const res = zipEntry.getData().toString('utf8')
+        console.log('capacitor', res)
+        found.capacitor = true
+        if (res.includes('CapacitorUpdater'))
+          found.capgo = true
+      }
+      if (zipEntry.entryName === 'res/xml/config.xml') {
+        const res = zipEntry.getData().toString('utf8')
+        console.log('cordova', res)
+        found.cordova = true
+      }
+      if (zipEntry.entryName === 'res/xml/rn_dev_preferences.xml') {
+        const res = zipEntry.getData().toString('utf8')
+        console.log('react_native', res)
+        // if ()
+        found.react_native = true
       }
     })
   }
   catch (e) {
     console.log('error', id, e)
+    throw new Error(e as any)
   }
   console.log('found', id, found)
   return found
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', url, headers, method, body)
-  // remove from list apps already in supabase
-  const res = await isCapacitor(body.appId)
-  // save in supabase
-  const { error } = await supabaseClient()
-    .from('store_apps')
-    .upsert({
-      appId: body.appId,
-      capacitor: res,
-    })
-  if (error)
-    console.log('error', error)
+  console.log('main', method, body)
+  try {
+    // remove from list apps already in supabase
+    const res = await isCapacitor(body.appId)
+    // save in supabase
+    const { error } = await supabaseClient()
+      .from('store_apps')
+      .upsert({
+        app_id: body.appId,
+        capacitor: res.capacitor,
+        cordova: res.cordova,
+        react_native: res.react_native,
+        capgo: res.capgo,
+        to_get_capacitor: false,
+      })
+    if (error)
+      console.log('error', error)
+  }
+  catch (e) {
+    console.log('error isCapacitor', e)
+    const { error } = await supabaseClient()
+      .from('store_apps')
+      .upsert({
+        app_id: body.appId,
+        to_get_capacitor: false,
+        error_get_capacitor: JSON.stringify(e),
+      })
+    if (error)
+      console.log('error insert', error)
+  }
 }
+// isCapacitor('pl.jmpolska.clos0.mojabiedronka').then((res) => {
+//   console.log('res', res)
+// })
 // upper is ignored during netlify generation phase
 // import from here
 export const handler: BackgroundHandler = async (event) => {
@@ -169,6 +210,6 @@ export const handler: BackgroundHandler = async (event) => {
     await main(url, headers, method, body)
   }
   catch (e) {
-    console.log('error', e)
+    console.log('error general', e)
   }
 }

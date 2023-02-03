@@ -85,38 +85,6 @@ export interface Database {
           versions?: number
         }
       }
-      app_stats_onprem: {
-        Row: {
-          app_id: string
-          created_at: string | null
-          date_id: string
-          devices: number | null
-          mlu: number | null
-          mlu_real: number | null
-          updated_at: string | null
-          versions: number | null
-        }
-        Insert: {
-          app_id: string
-          created_at?: string | null
-          date_id: string
-          devices?: number | null
-          mlu?: number | null
-          mlu_real?: number | null
-          updated_at?: string | null
-          versions?: number | null
-        }
-        Update: {
-          app_id?: string
-          created_at?: string | null
-          date_id?: string
-          devices?: number | null
-          mlu?: number | null
-          mlu_real?: number | null
-          updated_at?: string | null
-          versions?: number | null
-        }
-      }
       app_versions: {
         Row: {
           app_id: string
@@ -223,29 +191,6 @@ export interface Database {
           name?: string | null
           updated_at?: string | null
           user_id?: string
-        }
-      }
-      apps_onprem: {
-        Row: {
-          app_id: string
-          created_at: string | null
-          email: string | null
-          name: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          app_id: string
-          created_at?: string | null
-          email?: string | null
-          name?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          app_id?: string
-          created_at?: string | null
-          email?: string | null
-          name?: string | null
-          updated_at?: string | null
         }
       }
       channel_devices: {
@@ -420,53 +365,6 @@ export interface Database {
           plugin_version?: string
           updated_at?: string | null
           version?: number
-          version_build?: string | null
-        }
-      }
-      devices_onprem: {
-        Row: {
-          app_id: string | null
-          created_at: string | null
-          custom_id: string | null
-          device_id: string | null
-          id: string
-          is_emulator: boolean | null
-          is_prod: boolean | null
-          os_version: string | null
-          platform: Database["public"]["Enums"]["platform_os"] | null
-          plugin_version: string
-          updated_at: string | null
-          version: string | null
-          version_build: string | null
-        }
-        Insert: {
-          app_id?: string | null
-          created_at?: string | null
-          custom_id?: string | null
-          device_id?: string | null
-          id?: string
-          is_emulator?: boolean | null
-          is_prod?: boolean | null
-          os_version?: string | null
-          platform?: Database["public"]["Enums"]["platform_os"] | null
-          plugin_version?: string
-          updated_at?: string | null
-          version?: string | null
-          version_build?: string | null
-        }
-        Update: {
-          app_id?: string | null
-          created_at?: string | null
-          custom_id?: string | null
-          device_id?: string | null
-          id?: string
-          is_emulator?: boolean | null
-          is_prod?: boolean | null
-          os_version?: string | null
-          platform?: Database["public"]["Enums"]["platform_os"] | null
-          plugin_version?: string
-          updated_at?: string | null
-          version?: string | null
           version_build?: string | null
         }
       }
@@ -687,91 +585,86 @@ export interface Database {
           version_build?: string
         }
       }
-      stats_onprem: {
-        Row: {
-          action: string
-          app_id: string
-          created_at: string | null
-          device_id: string
-          id: number
-          platform: Database["public"]["Enums"]["platform_os"]
-          updated_at: string | null
-          version: string
-          version_build: string
-        }
-        Insert: {
-          action: string
-          app_id: string
-          created_at?: string | null
-          device_id: string
-          id?: number
-          platform: Database["public"]["Enums"]["platform_os"]
-          updated_at?: string | null
-          version: string
-          version_build: string
-        }
-        Update: {
-          action?: string
-          app_id?: string
-          created_at?: string | null
-          device_id?: string
-          id?: number
-          platform?: Database["public"]["Enums"]["platform_os"]
-          updated_at?: string | null
-          version?: string
-          version_build?: string
-        }
-      }
       store_apps: {
         Row: {
-          appId: string
+          app_id: string
           capacitor: boolean
+          capgo: boolean
           category: string
-          collection: string
+          cordova: boolean
           created_at: string | null
           developer: string
-          developerEmail: string
+          developer_email: string
+          error_get_capacitor: string
+          error_get_info: string
+          error_get_similar: string
           free: boolean
           icon: string
           installs: number
-          rank: number
+          onprem: boolean
+          react_native: boolean
           score: number
           summary: string
           title: string
+          to_get_capacitor: boolean
+          to_get_info: boolean
+          to_get_similar: boolean
+          updated_at: string
+          updates: number
           url: string
         }
         Insert: {
-          appId: string
+          app_id: string
           capacitor?: boolean
+          capgo?: boolean
           category?: string
-          collection?: string
+          cordova?: boolean
           created_at?: string | null
           developer?: string
-          developerEmail?: string
+          developer_email?: string
+          error_get_capacitor?: string
+          error_get_info?: string
+          error_get_similar?: string
           free?: boolean
           icon?: string
           installs?: number
-          rank?: number
+          onprem?: boolean
+          react_native?: boolean
           score?: number
           summary?: string
           title?: string
+          to_get_capacitor?: boolean
+          to_get_info?: boolean
+          to_get_similar?: boolean
+          updated_at?: string
+          updates?: number
           url?: string
         }
         Update: {
-          appId?: string
+          app_id?: string
           capacitor?: boolean
+          capgo?: boolean
           category?: string
-          collection?: string
+          cordova?: boolean
           created_at?: string | null
           developer?: string
-          developerEmail?: string
+          developer_email?: string
+          error_get_capacitor?: string
+          error_get_info?: string
+          error_get_similar?: string
           free?: boolean
           icon?: string
           installs?: number
-          rank?: number
+          onprem?: boolean
+          react_native?: boolean
           score?: number
           summary?: string
           title?: string
+          to_get_capacitor?: boolean
+          to_get_info?: boolean
+          to_get_similar?: boolean
+          updated_at?: string
+          updates?: number
           url?: string
         }
       }
@@ -1025,6 +918,10 @@ export interface Database {
           devices: number
           devices_real: number
         }
+        Returns: undefined
+      }
+      increment_store: {
+        Args: { app_id: string; updates: number }
         Returns: undefined
       }
       increment_version_stats: {

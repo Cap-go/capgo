@@ -54,14 +54,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     if (!appOwner) {
       await supabaseAdmin()
-        .from('apps_onprem')
+        .from('store_apps')
         .upsert({
           app_id,
+          onprem: true,
+          capacitor: true,
         })
       return sendRes({
         message: 'App not found',
         error: 'app_not_found',
-      }, 404)
+      }, 200)
     }
     if (coerce) {
       version_build = coerce.version
@@ -359,8 +361,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendRes({
       version: version.name,
-      session_key: version.session_key,
-      ...(version.session_key == null ? { session_key: version.session_key } : {}),
+      session_key: version.session_key || '',
       checksum: version.checksum,
       url: signedURL,
     })
