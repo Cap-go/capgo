@@ -76,6 +76,7 @@ apikeys:
   links: Verknüpfungen
   title: API-Schlüssel
   updater: Kondensator-Updater
+app-deleted: Anwendung gelöscht
 app-id-example: App-ID-Beispiel
 available-in-the-san: Verfügbar in der Sandbox-App
 back-to-login-page: Zurück zur Anmeldeseite
@@ -102,7 +103,9 @@ cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-version: App-Version kann nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
+cannot-test-app-some: App kann nicht getestet werden, es ist ein Fehler aufgetreten
 change: Veränderung
+changed-password-suc: das Passwort wurde erfolgreich geändert
 channel:
   add: Hinzufügen
   beta-channel: Beta-Kanal
@@ -164,6 +167,7 @@ device:
   unlink_channel: Verknüpfung des Kanals mit dem Gerät aufheben
   unlink_version: Version Verknüpfung zum Gerät aufheben
   version: Ausführung
+device-id: Geräte ID
 devices:
   title: Geräte
 devices-using-this-b: Geräte, die dieses Paket verwenden
@@ -347,6 +351,8 @@ register:
   upperCaseError: Sollte Großbuchstaben enthalten
 reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
+search: Suche
+search-device: Gerät suchen
 see-usage: Siehe Verwendung
 session_key: IvSessionKey
 settings: Einstellungen

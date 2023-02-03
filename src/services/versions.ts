@@ -1,20 +1,17 @@
-import { loadingController, toastController } from '@ionic/vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
 import { useSupabase } from './supabase'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
+
+const displayStore = useDisplayStore()
 
 export const openVersion = async (app: Database['public']['Tables']['app_versions']['Row'], userId: string) => {
   const supabase = useSupabase()
 
-  const loading = await loadingController
-    .create({
-      message: 'Please wait...',
-      duration: 0,
-    })
-
-  await loading.present()
+  displayStore.messageLoader = 'Opening version...'
+  displayStore.showLoader = true
   let signedURL
   if (app.bucket_id) {
     const res = await supabase
@@ -48,28 +45,18 @@ export const openVersion = async (app: Database['public']['Tables']['app_version
     }
     catch (error) {
       console.error('Error', error)
-      const toast = await toastController
-        .create({
-          message: 'Cannot set this version',
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push('Cannot set this version')
     }
-    await loading.dismiss()
+    displayStore.showLoader = false
   }
   else {
     if (!signedURL) {
-      await loading.dismiss()
-      const toast = await toastController
-        .create({
-          message: 'Cannot get the test version',
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push('Cannot get the test version')
+      displayStore.showLoader = false
     }
     else {
       window.location.assign(signedURL)
-      await loading.dismiss()
+      displayStore.showLoader = false
     }
   }
 }

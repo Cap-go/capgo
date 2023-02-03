@@ -265,7 +265,7 @@ export interface Database {
           name: string
           public: boolean
           updated_at: string
-          version: number
+          version: {"name": "string", "created_at": "string"}
         }
         Insert: {
           allow_dev?: boolean
@@ -334,7 +334,7 @@ export interface Database {
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
           updated_at: string | null
-          version: number
+          version: {"name": "string"}
           version_build: string | null
         }
         Insert: {

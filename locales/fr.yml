@@ -74,6 +74,7 @@ apikeys:
   links: Liens
   title: Clés API
   updater: condensateur de mise à jour
+app-deleted: Application supprimée
 app-id-example: Exemple d'ID d'application
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
@@ -100,7 +101,9 @@ cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
+cannot-test-app-some: Impossible de tester l'application, quelque chose de mal s'est produit
 change: Changer
+changed-password-suc: Le mot de passe a été changé avec succès
 channel:
   add: Ajouter
   beta-channel: Chaîne bêta
@@ -162,6 +165,7 @@ device:
   unlink_channel: Chaîne dissociée de l'appareil
   unlink_version: Dissocier la version de l'appareil
   version: Version
+device-id: Reference de l'appareil
 devices:
   title: Dispositifs
 devices-using-this-b: Appareils utilisant ce bundle
@@ -343,6 +347,8 @@ register:
   upperCaseError: Doit contenir des lettres majuscules
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
+search: Rechercher
+search-device: Appareil de recherche
 see-usage: Voir l'utilisation
 session_key: IvSessionKey
 settings: Réglages

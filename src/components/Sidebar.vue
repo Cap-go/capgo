@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { IonIcon } from '@ionic/vue'
-import { bookOutline, keyOutline, logoDiscord } from 'ionicons/icons'
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -41,7 +39,7 @@ watch(sidebarExpanded, () => {
       :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between pr-3 mb-10 safe-zone sm:px-2">
+      <div class="flex justify-between pr-3 mb-10 sm:px-2">
         <!-- Close button -->
         <button
           ref="trigger"
@@ -92,7 +90,7 @@ watch(sidebarExpanded, () => {
               <router-link class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && 'hover:text-slate-200'" to="/dashboard/apikeys">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
-                    <IonIcon :icon="keyOutline" class="w-6 text-2xl text-slate-400" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && '!text-blue-500'" />
+                    <i-ion-key-outline class="w-6 text-2xl text-slate-400" :class="(currentRoute.fullPath === '/' || currentRoute.fullPath.includes('apikeys')) && '!text-blue-500'" />
                     <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100">{{ t('api-keys') }}</span>
                   </div>
                 </div>
@@ -104,7 +102,7 @@ watch(sidebarExpanded, () => {
               <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://docs.capgo.app/">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
-                    <IonIcon :icon="bookOutline" class="w-6 text-2xl text-slate-400" />
+                    <i-ion-book-outline class="w-6 text-2xl text-slate-400" />
                     <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100">{{ t('documentation') }}</span>
                   </div>
                 </div>
@@ -116,7 +114,7 @@ watch(sidebarExpanded, () => {
               <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://discord.gg/VnYRvBfgA6">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
-                    <IonIcon :icon="logoDiscord" class="w-6 text-2xl text-slate-400" />
+                    <i-ion-logo-discord class="w-6 text-2xl text-slate-400" />
                     <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100">{{ t('account.discord') }}</span>
                   </div>
                 </div>

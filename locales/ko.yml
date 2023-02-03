@@ -68,6 +68,7 @@ apikeys:
   links: 연결
   title: API 키
   updater: 커패시터 업데이터
+app-deleted: 앱 삭제됨
 app-id-example: 앱 ID 예시
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
@@ -94,7 +95,9 @@ cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
 cannot-delete-channel: 채널을 삭제할 수 없습니다
 cannot-save-custom-i: 사용자 정의 ID를 저장할 수 없습니다
+cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했습니다.
 change: 변화
+changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel:
   add: 추가하다
   beta-channel: 베타 채널
@@ -154,6 +157,7 @@ device:
   unlink_channel: 장치에 대한 채널 연결 해제
   unlink_version: 장치에 대한 버전 연결 해제
   version: 버전
+device-id: 장치 아이디
 devices:
   title: 장치
 devices-using-this-b: 이 번들을 사용하는 기기
@@ -325,6 +329,8 @@ register:
   upperCaseError: 대문자를 포함해야 합니다.
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
+search: 찾다
+search-device: 장치 검색
 see-usage: 사용법 보기
 session_key: IvSessionKey
 settings: 설정

@@ -1,5 +1,5 @@
 <template>
-  <div class="lds-roller safe-zone">
+  <div class="lds-roller">
     <div /><div /><div /><div /><div /><div /><div /><div />
   </div>
 </template>

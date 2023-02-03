@@ -1,32 +1,26 @@
 <script setup lang="ts">
-import { IonContent, IonItem, IonItemDivider, IonLabel, IonList, IonPage, toastController } from '@ionic/vue'
+import { kBlockTitle, kListItem } from 'konsta/vue'
+
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import TitleHead from '~/components/TitleHead.vue'
-import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const isLoading = ref(false)
 const route = useRoute()
 const main = useMainStore()
 const supabase = useSupabase()
+const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
 const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
-  const toast = await toastController
-    .create({
-      message: t('apikeys.keyCopied'),
-      duration: 2000,
-    })
-  await toast.present()
-}
-const openLink = (link: string) => {
-  window.open(link, '_system')
+  displayStore.messageToast.push(t('apikeys.keyCopied'))
 }
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true
@@ -49,66 +43,38 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('apikeys.title')" default-back="/app/account" />
-    <IonContent :fullscreen="true">
-      <div class="w-full mx-auto lg:w-1/2">
-        <div class="px-6 py-16">
-          <p class="m-3">
-            {{ t('apikeys.explain') }}
-          </p>
-          <p class="m-3">
-            {{ t('apikeys.checkbelow') }}
-          </p>
-          <IonList>
-            <IonItemDivider>
-              <IonLabel>
-                {{ t('apikeys.links') }}
-              </IonLabel>
-            </IonItemDivider>
-            <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/@capgo/cli')">
-              <IonLabel>
-                <h2 class="text-sm text-azure-500">
-                  {{ t('apikeys.cli') }}
-                </h2>
-              </IonLabel>
-            </IonItem>
-            <IonItem class="cursor-pointer" @click="openLink('https://www.npmjs.com/package/@capgo/capacitor-updater')">
-              <IonLabel>
-                <h2 class="text-sm text-azure-500">
-                  {{ t('apikeys.updater') }}
-                </h2>
-              </IonLabel>
-            </IonItem>
-            <IonItemDivider>
-              <IonLabel>
-                {{ t('apikeys.all') }}
-              </IonLabel>
-            </IonItemDivider>
-            <div v-if="isLoading" class="flex justify-center">
-              <Spinner />
-            </div>
-            <IonItem v-for="(app, index) in apps" v-else :key="index" @click="copyKey(app)">
-              <IonLabel class="cursor-pointer">
-                <div class="flex flex-col col-span-6 ">
-                  <div class="flex items-center justify-between">
-                    <h2 class="text-sm text-azure-500">
-                      {{ app.key }}
-                    </h2>
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <h3 class="py-1 font-bold text-true-gray-800">
-                      {{
-                        app.mode
-                      }}
-                    </h3>
-                  </div>
-                </div>
-              </IonLabel>
-            </IonItem>
-          </IonList>
-        </div>
-      </div>
-    </IonContent>
-  </IonPage>
+  <TitleHead :title="t('apikeys.title')" default-back="/app/account" />
+  <div class="w-full mx-auto lg:w-1/2">
+    <div class="px-6 py-16">
+      <p class="m-3">
+        {{ t('apikeys.explain') }}
+      </p>
+      <p class="m-3">
+        {{ t('apikeys.checkbelow') }}
+      </p>
+      <k-block-title>{{ t('apikeys.links') }}</k-block-title>
+      <k-list strong-ios outline-ios>
+        <k-list-item
+          link :title="t('apikeys.cli')"
+          target="_blank" rel="noopener noreferrer"
+          href="https://www.npmjs.com/package/@capgo/cli"
+        />
+        <k-list-item
+          link :title="t('apikeys.updater')"
+          target="_blank" rel="noopener noreferrer"
+          href="https://www.npmjs.com/package/@capgo/capacitor-updater"
+        />
+      </k-list>
+      <k-block-title>{{ t('apikeys.all') }}</k-block-title>
+      <k-block v-if="isLoading" strong inset-material outline-ios class="text-center">
+        <k-preloader />
+      </k-block>
+      <k-list v-else strong-ios outline-ios>
+        <k-list-item
+          v-for="(app, index) in apps" :key="index" :title="app.key" :after="app.mode"
+          @click="copyKey(app)"
+        />
+      </k-list>
+    </div>
+  </div>
 </template>

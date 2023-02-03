@@ -1,14 +1,8 @@
 <script setup lang="ts">
 import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
-import {
-  IonContent,
-  IonIcon,
-  IonPage,
-  actionSheetController,
-} from '@ionic/vue'
+
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
-import { cameraOutline, chevronForwardOutline } from 'ionicons/icons'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -19,9 +13,11 @@ import { openChat } from '~/services/crips'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { openPortal } from '~/services/stripe'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const supabase = useSupabase()
+const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
@@ -124,7 +120,7 @@ const pickPhoto = async () => {
 }
 
 const deleteAccount = async () => {
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     header: t('account.delete_sure'),
     buttons: [
       {
@@ -159,24 +155,24 @@ const deleteAccount = async () => {
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 
 const presentActionSheet = async () => {
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     buttons: [
       {
         text: t('button.camera'),
         handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           takePhoto()
         },
       },
       {
         text: t('button.browse'),
         handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           pickPhoto()
         },
       },
@@ -188,188 +184,184 @@ const presentActionSheet = async () => {
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('account.heading')" no-back color="warning" />
-    <IonContent :fullscreen="true">
-      <div class="px-6 py-16">
+  <TitleHead :title="t('account.heading')" no-back color="warning" />
+  <div class="px-6 py-16">
+    <div
+      v-if="!main.user?.image_url"
+      class="grid w-40 h-40 mx-auto mt-8 bg-pumpkin-orange-500 rounded-5xl place-content-center"
+      @click="presentActionSheet"
+    >
+      <svg
+        v-if="isLoading"
+        class="inline-block w-5 h-5 text-white align-middle animate-spin"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          class="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          stroke-width="4"
+        />
+        <path
+          class="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
+      <i-ion-camera-outline v-else class="text-white" />
+    </div>
+    <img
+      v-else
+      class="object-cover w-40 h-40 mx-auto mt-8 rounded-5xl"
+      alt="User"
+      :src="main.user?.image_url"
+      @click="presentActionSheet"
+    >
+
+    <h2 class="mt-4 text-2xl text-center text-black-light">
+      {{ `${main.user?.first_name} ${main.user?.last_name}` }}
+    </h2>
+    <p class="font-bold text-center text-azure-500">
+      <span class="uppercase">{{ main.user?.country }}</span>
+    </p>
+
+    <ul class="grid grid-rows-4 mt-12 mb-6 gap-y-5">
+      <li>
+        <router-link
+          class="flex items-center justify-between"
+          to="/app/profile_details"
+        >
+          <span class="font-bold">
+            {{ t("account.personalInformation") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
+        </router-link>
+      </li>
+      <li>
+        <router-link
+          class="flex items-center justify-between"
+          to="/app/change_password"
+        >
+          <span class="font-bold">
+            {{ t("account.changePassword") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
+        </router-link>
+      </li>
+      <li>
+        <router-link
+          class="flex items-center justify-between"
+          to="/app/usage"
+        >
+          <span class="font-bold first-letter:uppercase">
+            {{ t("account.usage") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
+        </router-link>
+      </li>
+      <li>
         <div
-          v-if="!main.user?.image_url"
-          class="grid w-40 h-40 mx-auto mt-8 bg-pumpkin-orange-500 rounded-5xl place-content-center"
-          @click="presentActionSheet"
+          v-if="!isMobile"
+          class="flex items-center justify-between cursor-pointer"
+          @click="openPortal"
         >
-          <svg
-            v-if="isLoading"
-            class="inline-block w-5 h-5 text-white align-middle animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            />
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          <IonIcon v-else :icon="cameraOutline" size="large" class="text-white" />
+          <span class="font-bold">
+            {{ t("account.billing") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
         </div>
-        <img
-          v-else
-          class="object-cover w-40 h-40 mx-auto mt-8 rounded-5xl"
-          alt="User"
-          :src="main.user?.image_url"
-          @click="presentActionSheet"
+      </li>
+      <li>
+        <router-link
+          class="flex items-center justify-between"
+          to="/app/apikeys"
         >
-
-        <h2 class="mt-4 text-2xl text-center text-black-light">
-          {{ `${main.user?.first_name} ${main.user?.last_name}` }}
-        </h2>
-        <p class="font-bold text-center text-azure-500">
-          <span class="uppercase">{{ main.user?.country }}</span>
-        </p>
-
-        <ul class="grid grid-rows-4 mt-12 mb-6 gap-y-5">
-          <li>
-            <router-link
-              class="flex items-center justify-between"
-              to="/app/profile_details"
-            >
-              <span class="font-bold">
-                {{ t("account.personalInformation") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </router-link>
-          </li>
-          <li>
-            <router-link
-              class="flex items-center justify-between"
-              to="/app/change_password"
-            >
-              <span class="font-bold">
-                {{ t("account.changePassword") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </router-link>
-          </li>
-          <li>
-            <router-link
-              class="flex items-center justify-between"
-              to="/app/usage"
-            >
-              <span class="font-bold first-letter:uppercase">
-                {{ t("account.usage") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </router-link>
-          </li>
-          <li>
-            <div
-              v-if="!isMobile"
-              class="flex items-center justify-between cursor-pointer"
-              @click="openPortal"
-            >
-              <span class="font-bold">
-                {{ t("account.billing") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </div>
-          </li>
-          <li>
-            <router-link
-              class="flex items-center justify-between"
-              to="/app/apikeys"
-            >
-              <span class="font-bold">
-                {{ t("account.keys") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </router-link>
-          </li>
-          <li>
-            <router-link
-              class="flex items-center justify-between"
-              to="/app/notification_settings"
-            >
-              <span class="font-bold">
-                {{ t("account.preferences") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </router-link>
-          </li>
-          <li>
-            <a
-              class="flex items-center justify-between"
-              rel="noopener"
-              href="https://discord.gg/VnYRvBfgA6"
-              target="_blank"
-            >
-              <span class="font-bold">
-                {{ t("account.discord") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </a>
-          </li>
-          <li>
-            <div
-              class="flex items-center justify-between cursor-pointer"
-              @click="openChat"
-            >
-              <span class="font-bold">
-                {{ t("account.support") }}
-              </span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </div>
-          </li>
-        </ul>
+          <span class="font-bold">
+            {{ t("account.keys") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
+        </router-link>
+      </li>
+      <li>
+        <router-link
+          class="flex items-center justify-between"
+          to="/app/notification_settings"
+        >
+          <span class="font-bold">
+            {{ t("account.preferences") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
+        </router-link>
+      </li>
+      <li>
         <a
-          class="block mt-4 text-sm text-center underline text-muted-blue-500"
-          href="https://capgo.app/tos/"
+          class="flex items-center justify-between"
+          rel="noopener"
+          href="https://discord.gg/VnYRvBfgA6"
           target="_blank"
         >
-          {{ t("account.legal") }}
+          <span class="font-bold">
+            {{ t("account.discord") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
         </a>
-        <a
-          class="block mt-4 text-sm text-center underline text-muted-blue-500"
-          href="https://capgo.app/privacy/"
-          target="_blank"
+      </li>
+      <li>
+        <div
+          class="flex items-center justify-between cursor-pointer"
+          @click="openChat"
         >
-          {{ t("account.privacy") }}
-        </a>
-        <div class="mx-auto mt-4 text-center">
-          <button
-            class="mx-auto font-bold text-muted-blue-500"
-            @click="deleteAccount()"
-          >
-            {{ t("account.delete-account") }}
-          </button>
+          <span class="font-bold">
+            {{ t("account.support") }}
+          </span>
+          <i-ion-chevron-forward-outline class="text-azure-500" />
         </div>
-        <div class="mx-auto mt-4 text-center">
-          <button
-            class="mx-auto font-bold text-pumpkin-orange-500"
-            @click="main.logout().then(() => router.replace('/login'))"
-          >
-            {{ t("account.logout") }}
-          </button>
-        </div>
-        <div class="mx-auto mt-4 text-center">
-          <button class="mx-auto font-bold text-dusk-500">
-            Version {{ version }}
-          </button>
-        </div>
-      </div>
-    </IonContent>
-  </IonPage>
+      </li>
+    </ul>
+    <a
+      class="block mt-4 text-sm text-center underline text-muted-blue-500"
+      href="https://capgo.app/tos/"
+      target="_blank"
+    >
+      {{ t("account.legal") }}
+    </a>
+    <a
+      class="block mt-4 text-sm text-center underline text-muted-blue-500"
+      href="https://capgo.app/privacy/"
+      target="_blank"
+    >
+      {{ t("account.privacy") }}
+    </a>
+    <div class="mx-auto mt-4 text-center">
+      <button
+        class="mx-auto font-bold text-muted-blue-500"
+        @click="deleteAccount()"
+      >
+        {{ t("account.delete-account") }}
+      </button>
+    </div>
+    <div class="mx-auto mt-4 text-center">
+      <button
+        class="mx-auto font-bold text-pumpkin-orange-500"
+        @click="main.logout().then(() => router.replace('/login'))"
+      >
+        {{ t("account.logout") }}
+      </button>
+    </div>
+    <div class="mx-auto mt-4 text-center">
+      <button class="mx-auto font-bold text-dusk-500">
+        Version {{ version }}
+      </button>
+    </div>
+  </div>
 </template>

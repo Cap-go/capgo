@@ -34,6 +34,7 @@ accountProfile:
   heading: Personal information
   last-name: Last name
   update: Update
+action: Action
 activation:
   desc: Fill the following fields to complete your registration
   doi: Optional consent
@@ -70,6 +71,7 @@ apikeys:
   links: Links
   title: API keys
   updater: capacitor-updater
+app-deleted: App deleted
 app-id-example: App ID example
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
@@ -78,6 +80,7 @@ build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle-number: Bundle number
+open-settings: Click to open settings
 button:
   about: About
   back: Back
@@ -87,16 +90,20 @@ button:
   delete: Delete
   go: GO
   home: Home
+  options: Options
   remove: Remove
   tabs: Tabs
   toggle_dark: Toggle dark mode
   toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
+cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-channel: Cannot delete channel
 cannot-save-custom-i: Cannot save custom ID
+cannot-test-app-some: Cannot test app something wrong happened
 change: Change
+changed-password-suc: Password changed successfully
 channel:
   add: Add
   beta-channel: Beta channel
@@ -107,6 +114,7 @@ channel:
   copy: Copy URL
   device: Device
   device-deleted: Device deleted
+  info: Informations
   invit: Type email to invite
   is_public: Channel default
   make-now: Make default
@@ -117,6 +125,7 @@ channel:
   private_desc: Private
   public: Capacitor-updater link
   public_desc: Public
+  settings: Settings
   title: Channel
   user: User
   user_no_found: User not found, ask to register first
@@ -137,11 +146,12 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
+details-and-logs: Details and logs
 device:
   channel: Channel link
   created_at: Created at
   force_version: Force version
-  info: informations
+  info: Informations
   last_update: Last update
   link_channel: Channel linked to device
   link_fail: Cannot link something wrong happened
@@ -155,9 +165,11 @@ device:
   unlink_channel: Channel unlink to device
   unlink_version: Version unlink to device
   version: Version
+device-id: Device ID
 devices:
   title: Devices
 devices-using-this-b: Devices using this bundle
+no-devices: No devices
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 discover-module-in-a: Discover module in Awesome-capacitor
@@ -174,7 +186,7 @@ forgot:
   success: Password updated successfully
 from-device: from device
 good: Good
-id: id
+id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
 informations: Informations
@@ -207,6 +219,7 @@ login:
   password: Password
   withemail: With email adress
 login-to-your-accoun: Login to your account
+logs: Logs
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
@@ -233,7 +246,7 @@ open-this-link-to-le: Open this link to learn how to test your update
 package:
   cannot-delete-version: Cannot delete bundle
   channels: Channels
-  device_list: Devices list
+  device_list: Devices
   devices: See devices statistics
   devices-list: Devices linked
   download: Download bundle
@@ -244,6 +257,7 @@ package:
   name: App
   not_available: Package not found
   set: Set bundle to channel
+  size_not_found: Not found
   stats: stats
   test: Launch bundle
   title: info
@@ -251,7 +265,7 @@ package:
   version:
     is-used-in-device: is used in a device override, unlink it first
   version-deleted: Bundle deleted
-  versions: Bundle
+  versions: Bundles
 pages: Pages
 password:
   heading: Create Password
@@ -259,7 +273,9 @@ password:
   validate: Validate
 pckage:
   version:
+    created-at: Created at
     is-used-in-channel: is used in a channel, unlink it first
+    size: Size
 personal-information: Personal Informations
 plan:
   abtest: A / B testing
@@ -326,6 +342,8 @@ register:
   upperCaseError: Should contain uppercase letters
 reset-password: Reset Password
 reset-your-password: Reset your password
+search: Search
+search-device: Search device
 see-usage: See usage
 session_key: IvSessionKey
 settings: Settings
@@ -363,6 +381,7 @@ url: URL
 usage:
   success: Your plan has been setup this page will be update, in few minutes
   title: Usage
+version-build: Version build
 version-builtin: Version builtin
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard

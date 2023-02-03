@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonHeader, IonItem,
-  IonItemDivider, IonLabel,
-  IonList, IonListHeader, IonNote, IonPage,
-  IonSearchbar, IonTitle, IonToolbar, actionSheetController, toastController,
-} from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ellipsisHorizontalCircle } from 'ionicons/icons'
 import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
-import Spinner from '~/components/Spinner.vue'
+import {
+  kBlockTitle, kList, kListItem,
+  kSegmented,
+  kSegmentedButton,
+} from 'konsta/vue'
+import ellipsisHorizontalCircle from '~icons/heroicons/plus'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
@@ -20,11 +17,14 @@ import { openVersion } from '~/services/versions'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
 import { bytesToMbText } from '~/services/conversion'
+import { useDisplayStore } from '~/stores/display'
+import IconDevice from '~icons/heroicons/device-phone-mobile'
+import IconInformations from '~icons/heroicons/information-circle'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const listRef = ref()
+const displayStore = useDisplayStore()
 const main = useMainStore()
 const supabase = useSupabase()
 const packageId = ref<string>('')
@@ -35,15 +35,11 @@ const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const search = ref('')
 const devices = ref<Database['public']['Tables']['devices']['Row'][]>([])
+const showDevices = ref(false)
 
 const copyToast = async (text: string) => {
   copy(text)
-  const toast = await toastController
-    .create({
-      message: t('copied-to-clipboard'),
-      duration: 2000,
-    })
-  await toast.present()
+  displayStore.messageToast.push(t('copied-to-clipboard'))
 }
 const getDevices = async () => {
   if (!version.value)
@@ -72,6 +68,10 @@ const getChannels = async () => {
     .eq('app_id', version.value.app_id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
+}
+
+const openDevice = async (device: Database['public']['Tables']['devices']['Row']) => {
+  router.push(`/app/p/${device.app_id.replace(/\./g, '--')}/d/${device.device_id}`)
 }
 
 const showSize = computed(() => {
@@ -105,12 +105,7 @@ const ASChannelChooser = async () => {
         }
         catch (error) {
           console.error(error)
-          const toast = await toastController
-            .create({
-              message: 'Cannot test app something wrong happened',
-              duration: 2000,
-            })
-          await toast.present()
+          displayStore.messageToast.push(t('cannot-test-app-some'))
         }
       },
     })
@@ -122,21 +117,21 @@ const ASChannelChooser = async () => {
       // console.log('Cancel clicked')
     },
   })
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     header: t('package.link_channel'),
     buttons,
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 const openPannel = async () => {
   if (!version.value || !main.auth)
     return
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     buttons: [
       {
         text: Capacitor.isNativePlatform() ? t('package.test') : t('package.download'),
         handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           if (!version.value)
             return
           openVersion(version.value, main.user?.id || '')
@@ -145,7 +140,7 @@ const openPannel = async () => {
       {
         text: t('package.set'),
         handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           ASChannelChooser()
         },
       },
@@ -157,8 +152,8 @@ const openPannel = async () => {
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 
 const getVersion = async () => {
@@ -220,141 +215,262 @@ const devicesFilter = computed(() => {
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-    <IonContent :fullscreen="true">
-      <IonHeader collapse="condense">
-        <IonToolbar mode="ios">
-          <IonTitle color="warning" size="large">
-            {{ t('package.versions') }}
-          </IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonList ref="listRef">
-        <template v-if="!loading">
-          <IonListHeader>
-            <span class="text-vista-blue-500">
-              {{ t('informations') }}
-            </span>
-          </IonListHeader>
-          <IonItem>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('bundle-number') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version?.name }}
-            </IonNote>
-          </IonItem>
-          <IonItem>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('id') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version?.id }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.created_at">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('device.created_at') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(version?.created_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.updated_at">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('updated-at') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(version?.updated_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.checksum">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('checksum') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version.checksum }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version_meta?.devices">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
+  <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
+  <div class="h-full md:hidden">
+    <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 text-gray-600 dark:text-gray-100">
+      <k-segmented-button
+        class="h-10"
+        :active="!showDevices"
+        @click="() => (showDevices = false)"
+      >
+        {{ t('device.info') }}
+      </k-segmented-button>
+      <k-segmented-button
+        class="h-10"
+        :active="showDevices"
+        @click="() => (showDevices = true)"
+      >
+        {{ t('devices.title') }}
+      </k-segmented-button>
+    </k-segmented>
+    <k-block-title v-if="!showDevices" class="text-gray-600 dark:text-gray-100">
+      {{ t('informations').toLocaleUpperCase() }}
+    </k-block-title>
+    <k-list v-if="version && !showDevices" class="h-full pb-16 overflow-y-scroll" strong-ios outline-ios>
+      <k-list-item
+        :title="t('bundle-number')"
+        :after="version.name"
+      />
+      <k-list-item
+        :title="t('id')"
+        :after="version.id"
+      />
+      <k-list-item
+        v-if="version.created_at"
+        :title="t('device.created_at')"
+        :after="formatDate(version.created_at)"
+      />
+      <k-list-item
+        v-if="version.updated_at"
+        :title="t('updated-at')"
+        :after="formatDate(version.updated_at)"
+      />
+      <k-list-item
+        v-if="version.checksum"
+        :title="t('checksum')"
+        :after="formatDate(version.checksum)"
+      />
+      <k-list-item
+        v-if="version_meta?.devices"
+        :title="t('devices.title')"
+        :after="version_meta?.devices"
+      />
+      <k-list-item
+        v-if="version.session_key"
+        :title="t('session_key')"
+        :after="hideString(version.session_key)"
+        @click="() => copyToast(version?.session_key || '')"
+      />
+      <k-list-item
+        v-if="version.external_url"
+        :title="t('url')"
+        :after="version.external_url"
+        @click="() => copyToast(version?.external_url || '')"
+      />
+      <k-list-item
+        v-else
+        :title="t('size')"
+        :after="showSize"
+      />
+      <k-list-item
+        :title="t('settings')"
+        link
+        @click="openPannel"
+      />
+    </k-list>
+
+    <k-block-title v-if="showDevices" class="text-gray-600 dark:text-gray-100">
+      {{ t('devices.title').toLocaleUpperCase() }}
+    </k-block-title>
+    <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
+
+    <div v-if="devicesFilter.length > 0" class="h-[70vh]">
+      <k-list v-if="showDevices" class="overflow-y-auto h-full" strong-ios outline-ios>
+        <k-list-item
+          v-for="device in devicesFilter"
+          :key="device.device_id"
+          class="cursor-pointer"
+          :title="`${device.device_id}`"
+          :footer="`${device.platform}`"
+          :after="formatDate(device.created_at || '')"
+          link
+          @click="openDevice(device)"
+        />
+      </k-list>
+    </div>
+    <div v-else class="text-center text-2xl mt-3">
+      {{ t('no-devices') }}
+    </div>
+  </div>
+  <div v-if="version" class="hidden md:block h-full p-8 overflow-y-scroll">
+    <div class="">
+      <div class="px-4 mx-auto sm:px-6 lg:px-8 max-w-7xl">
+        <div class="flex items-center justify-center">
+          <div class="">
+            <nav class="flex flex-wrap -mb-px sm:space-x-10">
+              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = false">
+                <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
+
+                {{ t('informations') }}
+              </button>
+
+              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = true">
+                <IconDevice class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
                 {{ t('devices.title') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version_meta.devices }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.session_key">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('session_key') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end" @click="copyToast(version?.session_key || '')">
-              {{ hideString(version.session_key) }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.external_url">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('url') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version.external_url }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-else>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('size') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ showSize }}
-            </IonNote>
-          </IonItem>
-          <IonItemDivider v-if="devices?.length">
-            <IonLabel>
-              {{ t('devices-using-this-b') }}
-            </IonLabel>
-          </IonItemDivider>
-          <!-- add item with searchbar -->
-          <IonItem v-if="devices?.length">
-            <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
-          </IonItem>
-          <template v-for="d in devicesFilter" :key="d.device_id">
-            <IonItem class="cursor-pointer">
-              <IonLabel>
-                <h2 class="text-sm text-azure-500">
-                  {{ d.device_id }}
-                </h2>
-              </IonLabel>
-              <IonNote slot="end">
-                {{ formatDate(d.created_at || '') }}
-              </IonNote>
-            </IonItem>
-          </template>
-        </template>
-        <div v-else class="flex justify-center">
-          <Spinner />
+              </button>
+            </nav>
+          </div>
         </div>
-      </IonList>
-    </IonContent>
-  </IonPage>
+      </div>
+    </div>
+
+    <div v-if="!showDevices" id="informations">
+      <div class="mt-5 border-t border-gray-200">
+        <dl class="sm:divide-y sm:divide-gray-200">
+          <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('bundle-number') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ version.name }}
+            </dd>
+          </div>
+          <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('id') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ version.id }}
+            </dd>
+          </div>
+          <div v-if="version.created_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('device.created_at') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ formatDate(version.created_at) }}
+            </dd>
+          </div>
+          <div v-if="version.updated_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('updated-at') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ formatDate(version.updated_at) }}
+            </dd>
+          </div>
+          <div v-if="version.checksum" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('checksum') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ version.checksum }}
+            </dd>
+          </div>
+          <div v-if="version_meta?.devices" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('devices.title') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ version_meta.devices }}
+            </dd>
+          </div>
+          <div v-if="version.session_key" class="cursor-pointer py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5" @click="copyToast(version?.session_key || '')">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('session_key') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ hideString(version.session_key) }}
+            </dd>
+          </div>
+          <div v-if="version.external_url" class="cursor pointer py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5" @click="copyToast(version?.external_url || '')">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('url') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ version.external_url }}
+            </dd>
+          </div>
+          <div v-else class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('size') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ showSize }}
+            </dd>
+          </div>
+          <div class="cursor-pointer py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5" @click="openPannel">
+            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              {{ t('settings') }}
+            </dt>
+            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
+              {{ t('open-settings') }}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+    <div v-else id="devices" class="flex flex-col py-6">
+      <div class="inline-block min-w-full overflow-y-scroll align-middle">
+        <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
+        <table v-if="devicesFilter.length > 0" class="h-full w-full lg:divide-y lg:divide-gray-200 mb-5">
+          <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
+            <tr>
+              <th class="py-3.5 pl-4 pr-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
+                <div class="flex items-center">
+                  {{ t('device-id') }}
+                </div>
+              </th>
+              <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                <div class="flex items-center">
+                  {{ t('device.platform') }}
+                </div>
+              </th>
+              <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                <div class="flex items-center">
+                  {{ t('device.os_version') }}
+                </div>
+              </th>
+              <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                <div class="flex items-center">
+                  {{ t('device.created_at') }}
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="w-full divide-y divide-gray-200 max-h-fit">
+            <tr v-for="(device, i) in devicesFilter" :key="i" class="w-full cursor-pointer" @click="openDevice(device)">
+              <td class="hidden py-4 pl-4 pr-3 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
+                {{ device.device_id }}
+              </td>
+              <td class="hidden px-4 py-4 text-lg font-bold text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
+                {{ device.platform }}
+              </td>
+              <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
+                {{ device.os_version || 'Unknown' }}
+              </td>
+              <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
+                {{ formatDate(device.created_at || '') }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="text-center text-2xl mt-3">
+          {{ t('no-devices') }}
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style>

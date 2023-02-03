@@ -72,6 +72,7 @@ apikeys:
   links: Links
   title: Chaves de API
   updater: atualizador de capacitor
+app-deleted: Aplicativo deletado
 app-id-example: Exemplo de ID do aplicativo
 available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
@@ -98,7 +99,9 @@ cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-version: Não é possível excluir a versão do aplicativo
 cannot-delete-channel: Não é possível excluir o canal
 cannot-save-custom-i: Não é possível salvar o ID personalizado
+cannot-test-app-some: Não é possível testar o aplicativo, algo errado aconteceu
 change: Mudar
+changed-password-suc: Senha alterada com sucesso
 channel:
   add: Adicionar
   beta-channel: Canal beta
@@ -160,6 +163,7 @@ device:
   unlink_channel: Desvincular o canal do dispositivo
   unlink_version: Versão desvinculada do dispositivo
   version: Versão
+device-id: ID de dispositivo
 devices:
   title: Dispositivos
 devices-using-this-b: Dispositivos que usam este pacote
@@ -335,6 +339,8 @@ register:
   upperCaseError: Deve conter letras maiúsculas
 reset-password: Redefinir senha
 reset-your-password: Redefina sua senha
+search: Procurar
+search-device: dispositivo de pesquisa
 see-usage: Ver uso
 session_key: IvSessionKey
 settings: Definições

@@ -72,6 +72,7 @@ apikeys:
   links: Spinki do mankietów
   title: Klucze API
   updater: aktualizacja kondensatorów
+app-deleted: Usunięto aplikację
 app-id-example: Przykład identyfikatora aplikacji
 available-in-the-san: Dostępne w aplikacji piaskownicy
 back-to-login-page: Powrót do strony logowania
@@ -98,7 +99,9 @@ cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
 cannot-delete-channel: Nie można usunąć kanału
 cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
+cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
 change: Zmiana
+changed-password-suc: Hasło zostało zmienione pomyślnie
 channel:
   add: Dodać
   beta-channel: Kanał beta
@@ -160,6 +163,7 @@ device:
   unlink_channel: Odłączenie kanału od urządzenia
   unlink_version: Wersja odłącza się od urządzenia
   version: Wersja
+device-id: Identyfikator urzadzenia
 devices:
   title: Urządzenia
 devices-using-this-b: Urządzenia korzystające z tego pakietu
@@ -333,6 +337,8 @@ register:
   upperCaseError: Powinien zawierać wielkie litery
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
+search: Szukaj
+search-device: Wyszukaj urządzenie
 see-usage: Zobacz użycie
 session_key: IvSessionKey
 settings: Ustawienia

@@ -68,6 +68,7 @@ apikeys:
   links: リンク
   title: APIキー
   updater: コンデンサアップデータ
+app-deleted: アプリを削除しました
 app-id-example: アプリ ID の例
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
@@ -94,7 +95,9 @@ cannot-delete-app: アプリを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-channel: チャネルを削除できません
 cannot-save-custom-i: カスタム ID を保存できません
+cannot-test-app-some: アプリをテストできません
 change: 変化する
+changed-password-suc: パスワードは正常に変更されました
 channel:
   add: 追加
   beta-channel: ベータチャンネル
@@ -154,6 +157,7 @@ device:
   unlink_channel: デバイスへのチャネルリンク解除
   unlink_version: バージョンはデバイスへのリンクを解除します
   version: バージョン
+device-id: デバイスID
 devices:
   title: デバイス
 devices-using-this-b: このバンドルを使用するデバイス
@@ -325,6 +329,8 @@ register:
   upperCaseError: 大文字を含める必要があります
 reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
+search: 探す
+search-device: 検索デバイス
 see-usage: 使用法を見る
 session_key: IvSessionKey
 settings: 設定
