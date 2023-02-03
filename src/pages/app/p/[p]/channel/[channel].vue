@@ -6,7 +6,6 @@ import {
   kBlockTitle, kDialog, kDialogButton,
   kList,
   kListButton,
-  kListInput,
   kListItem,
   kSegmented,
   kSegmentedButton,
@@ -22,6 +21,8 @@ import TitleHead from '~/components/TitleHead.vue'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import IconSettings from '~icons/heroicons/cog-6-tooth'
+import IconInformations from '~icons/heroicons/information-circle'
 
 interface ChannelUsers {
   user_id: Database['public']['Tables']['users']['Row']
@@ -308,38 +309,6 @@ const presentActionSheet = async (usr: Database['public']['Tables']['users']['Ro
   displayStore.showActionSheet = true
 }
 
-const devicesFilter = computed(() => {
-  const value = search.value
-  if (value) {
-    const filtered = devices.value.filter(device => device.device_id.toLowerCase().includes(value.toLowerCase()))
-    return filtered
-  }
-  return devices.value
-})
-const deleteDevice = async (device: Database['public']['Tables']['channel_devices']['Row']) => {
-  // console.log('deleteDevice', device)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('channel.device')))
-    return
-  try {
-    const { error: delDevError } = await supabase
-      .from('channel_devices')
-      .delete()
-      .eq('app_id', device.app_id)
-      .eq('device_id', device.device_id)
-    if (delDevError) {
-      displayStore.messageToast.push(t('channel.cannot-delete-device'))
-    }
-    else {
-      await getDevices()
-      displayStore.messageToast.push(t('channel.device-deleted'))
-    }
-  }
-  catch (error) {
-    displayStore.messageToast.push(t('channel.cannot-delete-device'))
-  }
-}
 const inviteUser = async (userId: string) => {
   if (!channel.value || !id.value)
     return
@@ -438,6 +407,7 @@ const openPannel = async () => {
       <k-list-item
         :title="t('bundle-number')"
         :after="channel?.version.name"
+        link
         @click="openBundle"
       />
       <k-list-item
@@ -530,6 +500,147 @@ const openPannel = async () => {
           />
         </template>
       </k-list-item>
+      <k-list-item label :title="t('package.unset')" link @click="openPannel" />
+      <k-block-title>{{ t('channel.users') }}</k-block-title>
+
+      <k-list class="mb-0">
+        <k-list-item
+          v-for="user in users"
+          :key="user.id"
+          :title="`${user.user_id.first_name} ${user.user_id.last_name}`"
+          :after="user.user_id.email"
+          @click="presentActionSheet(user.user_id)"
+        />
+      </k-list>
+      <k-list-button class="text-bold text-lg border rounded-lg mx-2 bg-gray-100" @click="addUserModal = true">
+        {{ t('channel.add') }}
+      </k-list-button>
+    </k-list>
+  </div>
+  <div class="hidden h-full p-8 overflow-y-scroll md:block">
+    <div class="">
+      <div class="px-4 mx-auto sm:px-6 lg:px-8 max-w-7xl">
+        <div class="flex items-center justify-center">
+          <div class="">
+            <nav class="flex flex-wrap -mb-px sm:space-x-10">
+              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showSettings ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showSettings = false">
+                <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
+
+                {{ t('channel.info') }}
+              </button>
+
+              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showSettings ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showSettings = true">
+                <IconSettings class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
+                {{ t('channel.settings') }}
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+    <k-list v-if="channel && !showSettings" class="h-full overflow-y-scroll" strong-ios outline-ios>
+      <k-list-item
+        :title="t('name')"
+        :after="channel?.name"
+      />
+      <k-list-item
+        :title="t('bundle-number')"
+        :after="channel?.version.name"
+        link
+        @click="openBundle"
+      />
+      <k-list-item
+        :title="t('device.created_at')"
+        :after="formatDate(channel?.created_at)"
+      />
+      <k-list-item
+        :title="t('device.last_update')"
+        :after="formatDate(channel?.updated_at)"
+      />
+    </k-list>
+    <k-list v-if="channel && showSettings" class="h-full overflow-y-scroll" strong-ios outline-ios>
+      <k-list-item label :title="t('channel.is_public')">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.public"
+            @change="() => (makeDefault(!channel?.public))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label title="iOS">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.ios"
+            @change="() => (saveChannelChange('ios', !channel?.ios))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label title="Android">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.android"
+            @change="() => (saveChannelChange('android', !channel?.android))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label :title="t('disable-auto-downgra')">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.disableAutoUpdateUnderNative"
+            @change="() => (saveChannelChange('disableAutoUpdateUnderNative', !channel?.disableAutoUpdateUnderNative))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label :title="t('disable-auto-upgrade')">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.disableAutoUpdateToMajor"
+            @change="() => (saveChannelChange('disableAutoUpdateToMajor', !channel?.disableAutoUpdateToMajor))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label :title="t('allow-develoment-bui')">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.allow_dev"
+            @change="() => (saveChannelChange('allow_dev', !channel?.allow_dev))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label :title="t('allow-emulator')">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.allow_emulator"
+            @change="() => (saveChannelChange('allow_emulator', !channel?.allow_emulator))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label :title="t('allow-device-to-self')">
+        <template #after>
+          <k-toggle
+            class="-my-1"
+            component="div"
+            :checked="channel?.allow_device_self_set"
+            @change="() => (saveChannelChange('android', !channel?.allow_device_self_set))"
+          />
+        </template>
+      </k-list-item>
+      <k-list-item label :title="t('package.unset')" link @click="openPannel" />
+
       <k-block-title>{{ t('channel.users') }}</k-block-title>
 
       <k-list class="mb-0">
