@@ -11,7 +11,7 @@ android {
         applicationId "ee.forgr.capacitor_go"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-		versionCode 122700601
+		versionCode 122700602
         versionName "1.227.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
