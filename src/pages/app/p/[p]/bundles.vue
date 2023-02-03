@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { RefresherCustomEvent } from '@ionic/vue'
 import { useRoute } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
@@ -98,7 +97,7 @@ const loadData = async () => {
   }
 }
 
-const refreshData = async (evt: RefresherCustomEvent | null = null) => {
+const refreshData = async () => {
   isLoading.value = true
   try {
     await loadData()
@@ -107,7 +106,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
     console.error(error)
   }
   isLoading.value = false
-  evt?.target?.complete()
 }
 
 watchEffect(async () => {

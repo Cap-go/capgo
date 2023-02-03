@@ -23,10 +23,9 @@ const close = (item: ActionSheetOptionButton | undefined) => {
     @backdropclick="close(undefined)"
   >
     <template #title>
-      Dialog Title
+      {{ displayStore.dialogOption?.header }}
     </template>
-    Dialog is a type of modal window that appears in front of app content to
-    provide critical information, or prompt for a decision to be made.
+    {{ displayStore.dialogOption?.message }}
 
     <template #buttons>
       <k-dialog-button v-for="(item, i) in displayStore.dialogOption?.buttons" :key="i" @click="close(item)">

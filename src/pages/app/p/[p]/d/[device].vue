@@ -16,7 +16,6 @@ import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
 import Spinner from '~/components/Spinner.vue'
-import Searchbar from '~/components/Searchbar.vue'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 
@@ -525,8 +524,10 @@ watchEffect(async () => {
         v-for="s in logFiltered"
         v-else
         :key="s.id"
-        :footer="`${s.action} ${s.version.name}, builtin ${s.version_build}`"
-        :after="formatDate(s.updated_at || '')" link
+        :title="`${s.action}`"
+        :footer="`${s.version.name}, builtin ${s.version_build}`"
+        :after="formatDate(s.updated_at || '')"
+        link
       />
     </k-list>
   </div>
@@ -608,7 +609,7 @@ watchEffect(async () => {
               {{ t('device.os_version') }}
             </dt>
             <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-              {{ device.os_version || 'unknow' }}
+              {{ device.os_version || 'Unknown' }}
             </dd>
           </div>
           <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">

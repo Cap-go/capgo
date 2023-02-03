@@ -80,6 +80,7 @@ build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle-number: Bundle number
+open-settings: Click to open settings
 button:
   about: About
   back: Back
@@ -168,6 +169,7 @@ device-id: Device ID
 devices:
   title: Devices
 devices-using-this-b: Devices using this bundle
+no-devices: No devices
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 discover-module-in-a: Discover module in Awesome-capacitor
@@ -184,7 +186,7 @@ forgot:
   success: Password updated successfully
 from-device: from device
 good: Good
-id: id
+id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
 informations: Informations

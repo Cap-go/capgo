@@ -49,7 +49,6 @@ specifiers:
   '@iconify-json/ls': 1.1.3
   '@iconify/json': ^2.2.11
   '@intlify/vite-plugin-vue-i18n': 6.0.3
-  '@ionic/vue': 6.4.0
   '@netlify/functions': ^1.4.0
   '@supabase/supabase-js': 2.1.3
   '@tailwindcss/aspect-ratio': ^0.4.2
@@ -173,7 +172,6 @@ dependencies:
   '@capgo/inappbrowser': 0.3.7_@capacitor+core@4.6.1
   '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.1
   '@capgo/native-market': 1.1.18
-  '@ionic/vue': 6.4.0
   '@netlify/functions': 1.4.0
   '@supabase/supabase-js': 2.1.3
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.4
@@ -2822,14 +2820,6 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/core/6.4.0:
-    resolution: {integrity: sha512-rWqXX67bWDD5r5Kleacy4dTBIXcB1gX+2Q5AK7LAtmtHUUuJPqGw/bAWE8hGKlF7ehJTyzb5CYV9XDzb8/00Zw==}
-    dependencies:
-      '@stencil/core': 2.21.0
-      ionicons: 6.0.4
-      tslib: 2.4.1
-    dev: false
-
   /@ionic/utils-array/2.1.5:
     resolution: {integrity: sha512-HD72a71IQVBmQckDwmA8RxNVMTbxnaLbgFOl+dO5tbvW9CkkSFCv41h6fUuNsSEVgngfkn0i98HDuZC8mk+lTA==}
     engines: {node: '>=10.3.0'}
@@ -2911,13 +2901,6 @@ packages:
       wrap-ansi: 7.0.0
     transitivePeerDependencies:
       - supports-color
-
-  /@ionic/vue/6.4.0:
-    resolution: {integrity: sha512-dMFf9h4K4UK5IKR/F5FbCpPsthJDkt99YbgacyS/Zl/tXxd4ZsQ2ViBB9wUf56lDbx3GdJMe+XmElqWxvrOg7w==}
-    dependencies:
-      '@ionic/core': 6.4.0
-      ionicons: 6.0.4
-    dev: false
 
   /@jest/types/25.5.0:
     resolution: {integrity: sha512-OXD0RgQ86Tu3MazKo8bnrkDRaDXXMGUqd+kTtLtK1Zb7CRzQcaSRPPPV37SvYTdevXEBVxe0HXylEjs8ibkmCw==}
@@ -4118,12 +4101,6 @@ packages:
   /@soda/get-current-script/1.0.2:
     resolution: {integrity: sha512-T7VNNlYVM1SgQ+VsMYhnDkcGmWhQdL0bDyGm5TlQ3GBXnJscEClUUOKduWTmm2zCnvNLC1hc3JpuXjs/nFOc5w==}
     dev: true
-
-  /@stencil/core/2.21.0:
-    resolution: {integrity: sha512-c4mVCl87wTV8u7ExQqiiQU5XrkzXjq8ll8skPlFHlJ7+5hGWhRpuVqKgVYJPN1mC/ucRqCUfjzSNUD7cFKHhkw==}
-    engines: {node: '>=12.10.0', npm: '>=6.0.0'}
-    hasBin: true
-    dev: false
 
   /@supabase/functions-js/2.0.0:
     resolution: {integrity: sha512-ozb7bds2yvf5k7NM2ZzUkxvsx4S4i2eRKFSJetdTADV91T65g4gCzEs9L3LUXSrghcGIkUaon03VPzOrFredqg==}
@@ -11685,12 +11662,6 @@ packages:
       from2: 2.3.0
       p-is-promise: 1.1.0
     dev: true
-
-  /ionicons/6.0.4:
-    resolution: {integrity: sha512-uDNOkBo0OVYV+kIhb51g9mb7r3Z0b+78GPZQBsjXuaetNmrB/mNTqN/uFtO+vxL/rQySKjzk8qeKJI5NWL9Ueg==}
-    dependencies:
-      '@stencil/core': 2.21.0
-    dev: false
 
   /ipaddr.js/1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
