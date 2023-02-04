@@ -157,13 +157,16 @@ serve(async (event: Request) => {
       .order('created_at', { ascending: true })
 
     const all = []
-    const randomCategory = categories[Math.floor(Math.random() * categories.length)]
-    const randomCountryCode = countryCode[Math.floor(Math.random() * countryCode.length)]
     console.log('appsToGetCapacitor', appsToGetCapacitor?.length || 0)
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
-    console.log('randomCategory', randomCategory)
-    all.push(axios.get(`https://netlify.capgo.app/get_top_apk-background?category=${randomCategory}&country=${randomCountryCode}`))
+    // loop 100 times to get more random apps
+    for (let i = 0; i < 100; i++) {
+      const randomCategory = categories[Math.floor(Math.random() * categories.length)]
+      const randomCountryCode = countryCode[Math.floor(Math.random() * countryCode.length)]
+      console.log('randomCategory', randomCategory,'randomCountryCode', randomCountryCode)
+      all.push(axios.get(`https://netlify.capgo.app/get_top_apk-background?category=${randomCategory}&country=${randomCountryCode}`))
+    }
     for (const app of (appsToGetCapacitor || []))
       all.push(axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${app.app_id}`))
 
