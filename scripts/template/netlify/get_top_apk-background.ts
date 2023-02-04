@@ -17,11 +17,12 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
 }
 
-const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 5000) => {
+const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, country = 'us') => {
   const res = (await gplay.list({
     category,
     collection,
     fullDetail: false,
+    country,
     num: limit,
   }))
   // remove the first skip
@@ -93,7 +94,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
 // getList()
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   console.log('main', url, headers, method, body)
-  const list = await getList(body.category, body.collection, body.limit)
+  const list = await getList(body.category, body.collection, body.limit, body.country)
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_apps')

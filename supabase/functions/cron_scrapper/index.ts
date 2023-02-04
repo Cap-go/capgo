@@ -3,6 +3,71 @@ import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
+const countryCode = [
+  'us',
+  'fr',
+  'de',
+  'gb',
+  'jp',
+  'kr',
+  'cn',
+  'br',
+  'ru',
+  'in',
+  'au',
+  'ca',
+  'mx',
+  'es',
+  'it',
+  'nl',
+  'se',
+  'dk',
+  'no',
+  'fi',
+  'tr',
+  'pl',
+  'cz',
+  'hu',
+  'ro',
+  'gr',
+  'pt',
+  'bg',
+  'il',
+  'ua',
+  'hr',
+  'sk',
+  'si',
+  'lt',
+  'lv',
+  'ee',
+  'by',
+  'mk',
+  'al',
+  'me',
+  'rs',
+  'ba',
+  'md',
+  'am',
+  'ge',
+  'az',
+  'kg',
+  'kz',
+  'uz',
+  'tj',
+  'tm',
+  'cy',
+  'mt',
+  'at',
+  'be',
+  'ch',
+  'ie',
+  'lu',
+  'li',
+  'is',
+  'mt',
+  'ad',
+]
+
 const categories = [
   'APPLICATION',
   'ANDROID_WEAR',
@@ -93,11 +158,12 @@ serve(async (event: Request) => {
 
     const all = []
     const randomCategory = categories[Math.floor(Math.random() * categories.length)]
+    const randomCountryCode = countryCode[Math.floor(Math.random() * countryCode.length)]
     console.log('appsToGetCapacitor', appsToGetCapacitor?.length || 0)
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     console.log('randomCategory', randomCategory)
-    all.push(axios.get(`https://netlify.capgo.app/get_top_apk-background?category=${randomCategory}`))
+    all.push(axios.get(`https://netlify.capgo.app/get_top_apk-background?category=${randomCategory}&country=${randomCountryCode}`))
     for (const app of (appsToGetCapacitor || []))
       all.push(axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${app.app_id}`))
 
