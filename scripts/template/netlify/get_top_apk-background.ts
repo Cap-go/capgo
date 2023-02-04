@@ -47,17 +47,20 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   //   } as Database['public']['Tables']['store_apps']['Insert']
   // })
   // return upgraded
-  const upgraded = res.map(async(item) => {
+  // filter the app already in supabase
+  const { data, error } = await supabaseClient()
+    .from('store_apps')
+    .select('app_id')
+    .in('app_id', ids)
+  if (error) {
+    console.log('error', error)
+    return []
+  }
+  // use data to filter res
+  const filtered = res.filter(item => !data?.find((row: Database['public']['Tables']['store_apps']['Row']) => row.app_id === item.appId))
+  const upgraded = filtered.map((item) => {
     // console.log('item', item.appId)
     // check if already exist in db and skip
-    const exist = await supabaseClient()
-      .from('store_apps')
-      .select('id')
-      .eq('app_id', item.appId)
-      .single()
-    if (exist.data) {
-      return Promise.resolve()
-    }
     return gplay.app({ appId: item.appId, country })
       .then((res) => {
         const row: Database['public']['Tables']['store_apps']['Insert'] = {
