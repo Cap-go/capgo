@@ -21,7 +21,8 @@ const defaultVersionName = 'builtin'
 const defaultpluginVersion = '4.3.4'
 const defaultChecksum = 'ebf52a10'
 const defaultStorageSplit = '?token='
-const defaultSessionKey = ''
+const defaultSessionUpdateKey = ''
+const defaultSessionKey = null
 const defaultStorageProvider = 'supabase'
 export const defaultDeviceID = 'F7D455A1-337C-4AF2-9494-BA938E83EB44'
 const defaultBucketId = 'test_bucket.zip'
@@ -46,7 +47,7 @@ export const defaultDb = { status: 'ok', service: 'database' }
 
 export const defaultUpdateRes = {
   version: defaultVersion,
-  session_key: defaultSessionKey,
+  session_key: defaultSessionUpdateKey,
   checksum: defaultChecksum,
   url: `https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/sign/apps/${defaultUserId}/${defaultAppId}/versions/${defaultBucketId}`,
 }

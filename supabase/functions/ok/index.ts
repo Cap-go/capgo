@@ -88,7 +88,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
     return sendRes({ status: 'ok', service })
   }
-  else if (service === 'bundle_get') {
+  else if (service === 'x') {
     const supabaseRes = await getBundle(baseSupabase)
     console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultGetBundleRes))
