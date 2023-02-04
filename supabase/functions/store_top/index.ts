@@ -8,7 +8,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     console.log('body', body)
     const { data, error } = await supabaseAdmin()
       .from('store_apps')
-      .select()
+      .select('url, title, icon, summary, installs, category')
       .order('installs', { ascending: false })
       .eq('capacitor', true)
       .limit(100)
