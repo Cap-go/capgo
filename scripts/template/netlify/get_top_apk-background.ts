@@ -47,7 +47,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   // })
   // return upgraded
   const upgraded = res.map((item) => {
-    console.log('item', item.appId)
+    // console.log('item', item.appId)
 
     return gplay.app({ appId: item.appId })
       .then((res) => {
