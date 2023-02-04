@@ -47,10 +47,18 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   //   } as Database['public']['Tables']['store_apps']['Insert']
   // })
   // return upgraded
-  const upgraded = res.map((item) => {
+  const upgraded = res.map(async(item) => {
     // console.log('item', item.appId)
-
-    return gplay.app({ appId: item.appId })
+    // check if already exist in db and skip
+    const exist = await supabaseClient()
+      .from('store_apps')
+      .select('id')
+      .eq('app_id', item.appId)
+      .single()
+    if (exist.data) {
+      return Promise.resolve()
+    }
+    return gplay.app({ appId: item.appId, country })
       .then((res) => {
         const row: Database['public']['Tables']['store_apps']['Insert'] = {
           url: item.url,
@@ -64,6 +72,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
           category,
           developer_email: res.developerEmail,
           installs: res.maxInstalls,
+          to_get_info: false,
         }
         return row
       })
@@ -81,6 +90,8 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
           category,
           developer_email: '',
           installs: 0,
+          to_get_info: false,
+          error_get_info: err.message,
         }
         return row
       })
