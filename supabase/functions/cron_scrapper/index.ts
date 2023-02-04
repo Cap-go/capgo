@@ -124,6 +124,8 @@ const categories = [
   'GAME_WORD',
   'FAMILY',
 ]
+const toGetInfo = 5000
+const toGetSimilar = 500
 
 serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
@@ -139,21 +141,21 @@ serve(async (event: Request) => {
       .from('store_apps')
       .select()
       .eq('to_get_capacitor', true)
-      .limit(5000)
+      .limit(toGetInfo)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetInfo } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_info', true)
-      .limit(5000)
+      .limit(toGetInfo)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetSimilar } = await supabaseAdmin()
       .from('store_apps')
       .select()
       .eq('to_get_similar', true)
-      .limit(500)
+      .limit(toGetSimilar)
       .order('created_at', { ascending: true })
 
     const all = []
@@ -161,7 +163,7 @@ serve(async (event: Request) => {
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     // loop 100 times to get more random apps
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < toGetSimilar; i++) {
       const randomCategory = categories[Math.floor(Math.random() * categories.length)]
       const randomCountryCode = countryCode[Math.floor(Math.random() * countryCode.length)]
       console.log('randomCategory', randomCategory,'randomCountryCode', randomCountryCode)
