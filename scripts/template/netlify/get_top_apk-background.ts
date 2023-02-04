@@ -17,7 +17,7 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
 }
 
-const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000) => {
+const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 5000) => {
   const res = (await gplay.list({
     category,
     collection,
