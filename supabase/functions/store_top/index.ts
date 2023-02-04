@@ -10,6 +10,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       .from('store_apps')
       .select()
       .order('installs', { ascending: false })
+      .eq('capacitor', true)
       .limit(100)
     if (data && !error)
       return sendRes({ apps: data || [] })
