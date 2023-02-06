@@ -96,7 +96,7 @@ const reset = () => {
                     <div class="sm:w-1/2">
                       <label class="block mb-1 text-sm font-medium dark:text-white" for="name">UUID</label>
                       <input
-                        v-model="form.uuid" class="w-full form-input dark:bg-gray-700 dark:text-white"
+                        v-model="form.uuid" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
                         :disabled="isLoading"
                         autofocus
                         required

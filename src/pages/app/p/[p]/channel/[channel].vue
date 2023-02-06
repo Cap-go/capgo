@@ -1,20 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  kBlockTitle, kDialog, kDialogButton,
-  kList,
-  kListButton,
-  kListItem,
-  kSegmented,
-  kSegmentedButton,
-  kToggle,
+  kDialog, kDialogButton,
+  kList, kListItem, kToggle,
 } from 'konsta/vue'
 import ellipsisHorizontalCircle from '~icons/ion/ellipsis-horizontal-circle?raw'
-import Spinner from '~/components/Spinner.vue'
 import { existUser, useSupabase } from '~/services/supabase'
-import { openVersion } from '~/services/versions'
 import NewUserModal from '~/components/NewUserModal.vue'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
@@ -43,7 +36,6 @@ const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const users = ref<(Database['public']['Tables']['channel_users']['Row'] & ChannelUsers)[]>()
 const newUser = ref<string>()
 const newUserModalOpen = ref(false)
-const search = ref('')
 const devices = ref<Database['public']['Tables']['channel_devices']['Row'][]>([])
 const showSettings = ref(false)
 const addUserModal = ref(false)
@@ -103,24 +95,6 @@ const getDevices = async () => {
   }
 }
 
-const saveChannelChange = async (key: string, val: any) => {
-  if (!id.value || !channel.value)
-    return
-  try {
-    const update = {
-      [key]: val,
-    }
-    const { error } = await supabase
-      .from('channels')
-      .update(update)
-      .eq('id', id.value)
-    if (error)
-      console.error('no channel update', error)
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
 const getChannel = async () => {
   if (!id.value)
     return
@@ -160,6 +134,34 @@ const getChannel = async () => {
     console.error(error)
   }
 }
+
+const reload = async () => {
+  await getChannel()
+  await getUsers()
+  await getDevices()
+}
+
+const saveChannelChange = async (key: string, val: any) => {
+  console.log('saveChannelChange', key, val)
+  if (!id.value || !channel.value)
+    return
+  try {
+    const update = {
+      [key]: val,
+    }
+    const { error } = await supabase
+      .from('channels')
+      .update(update)
+      .eq('id', id.value)
+    reload()
+    if (error)
+      console.error('no channel update', error)
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
@@ -381,19 +383,18 @@ const openPannel = async () => {
 
 <template>
   <TitleHead :title="`${t('channel.title')} ${channel?.name}`" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-  <div class="flex flex-col md:mx-24 pb-12  h-full p-8 overflow-y-scroll">
+  <div class="flex flex-col md:mx-24 h-full p-8 pb-12 overflow-y-scroll">
     <div class="">
-      <div class="px-4 mx-auto w-full sm:px-6 lg:px-8 max-w-7xl">
+      <div class="mx-auto w-full px-6 lg:px-8 max-w-7xl">
         <div class="flex items-center justify-center">
           <div class="">
-            <nav class="flex md:flex-wrap -mb-px sm:space-x-10">
-              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showSettings ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showSettings = false">
+            <nav class="flex md:flex-wrap -mb-px space-x-10">
+              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showSettings ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showSettings = false">
                 <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
-
                 {{ t('channel.info') }}
               </button>
 
-              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showSettings ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showSettings = true">
+              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showSettings ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showSettings = true">
                 <IconSettings class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
                 {{ t('channel.settings') }}
               </button>
@@ -402,169 +403,98 @@ const openPannel = async () => {
         </div>
       </div>
     </div>
-    <div v-if="channel && !showSettings" id="informations" class="">
-      <div class="mt-5 border-t border-gray-200">
-        <dl class="sm:divide-y sm:divide-gray-200">
-          <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('name') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
-              {{ channel?.name }}
-            </dd>
-          </div>
-        </dl>
-      </div>
-      <div class="border-t border-gray-200">
-        <dl class="sm:divide-y sm:divide-gray-200">
-          <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('bundle-number') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
-              <button class="text-blue-700 hover:text-blue-800" @click="openBundle">
-                {{ channel?.version.name }}
-              </button>
-            </dd>
-          </div>
-        </dl>
-      </div>
-      <div class="border-t border-gray-200">
-        <dl class="sm:divide-y sm:divide-gray-200">
-          <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('device.created_at') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
-              {{ formatDate(channel?.created_at) }}
-            </dd>
-          </div>
-        </dl>
-      </div>
-      <div class="border-t border-gray-200">
-        <dl class="sm:divide-y sm:divide-gray-200">
-          <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('device.last_update') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
-              {{ formatDate(channel?.updated_at) }}
-            </dd>
-          </div>
-        </dl>
-      </div>
+    <div v-if="channel && !showSettings" id="informations" class="pt-5">
+      <InfoRow :label="t('name')" :value="channel.name" />
+      <!-- Bundle Number -->
+      <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle" />
+      <!-- Created At -->
+      <InfoRow :label="t('device.created_at')" :value="formatDate(channel.created_at)" />
+      <!-- Last Update -->
+      <InfoRow :label="t('device.last_update')" :value="formatDate(channel.updated_at)" />
     </div>
-    <div class="flex flex-col justify-center items-center w-full">
-      <dl v-if="channel && showSettings" class="mt-5 border-t border-gray-200 w-full xl:w-1/2">
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            {{ t('channel.is_public') }}
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+    <div v-if="channel && showSettings" class="flex flex-col justify-center items-center w-full">
+      <k-list class="mt-5 border-t border-gray-200 w-full xl:w-1/2 list-none">
+        <k-list-item label :title="t('channel.is_public')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.public"
               @change="() => (makeDefault(!channel?.public))"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            iOS
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label title="iOS" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.ios"
-              @change="() => (saveChannelChange('ios', !channel?.ios))"
+              @change="saveChannelChange('ios', !channel?.ios)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            Android
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label title="Android" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.android"
-              @change="() => (saveChannelChange('android', !channel?.android))"
+              @change="saveChannelChange('android', !channel?.android)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            {{ t('disable-auto-downgra') }}
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label :title="t('disable-auto-downgra')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.disableAutoUpdateUnderNative"
-              @change="() => (saveChannelChange('disable_auto_downgrade', !channel?.disableAutoUpdateUnderNative))"
+              @change="saveChannelChange('disable_auto_downgrade', !channel?.disableAutoUpdateUnderNative)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            {{ t('disable-auto-upgrade') }}
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.disableAutoUpdateToMajor"
-              @change="() => (saveChannelChange('disable_auto_upgrade', !channel?.disableAutoUpdateToMajor))"
+              @change="saveChannelChange('disable_auto_upgrade', !channel?.disableAutoUpdateToMajor)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            {{ t('allow-develoment-bui') }}
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label :title="t('allow-develoment-bui')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.allow_dev"
-              @change="() => (saveChannelChange('allow_dev', !channel?.allow_dev))"
+              @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            {{ t('allow-emulator') }}
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label :title="t('allow-emulator')" class="text-xl font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.allow_emulator"
-              @change="() => (saveChannelChange('allow_emulator', !channel?.allow_emulator))"
+              @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-            {{ t('allow-device-to-self') }}
-          </dt>
-          <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200  sm:mt-0">
+          </template>
+        </k-list-item>
+        <k-list-item label :title="t('allow-device-to-self')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <template #after>
             <k-toggle
               class="-my-1"
               component="div"
               :checked="channel?.allow_device_self_set"
-              @change="() => (saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set))"
+              @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
             />
-          </dd>
-        </div>
-        <div class="py-4 flex flex-row justify-between w-full sm:py-5">
-          <dt class="cursor-pointer text-lg font-medium text-red-500" @click="openPannel">
-            {{ t('package.unset') }}
-          </dt>
-        </div>
+          </template>
+        </k-list-item>
+        <k-list-item label :title="t('package.unset')" class="text-lg font-medium text-red-500" link @click="openPannel" />
         <div class="py-4 flex flex-row justify-between w-full sm:py-5">
           <dt class="cursor-pointer text-lg font-medium text-gray-700 dark:text-gray-200">
             {{ t('channel.users') }}
@@ -583,7 +513,7 @@ const openPannel = async () => {
             {{ t('channel.add') }}
           </dt>
         </div>
-      </dl>
+      </k-list>
     </div>
   </div>
   <k-dialog

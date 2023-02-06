@@ -4,11 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
-import {
-  kBlockTitle, kList, kListItem,
-  kSegmented,
-  kSegmentedButton,
-} from 'konsta/vue'
 import ellipsisHorizontalCircle from '~icons/heroicons/plus'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
@@ -216,115 +211,18 @@ const devicesFilter = computed(() => {
 
 <template>
   <TitleHead :title="t('package.title')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-  <div class="h-full md:hidden">
-    <k-segmented strong rounded class="mx-auto mt-6 sm:w-max-80 sm:mt-8 text-gray-600 dark:text-gray-100">
-      <k-segmented-button
-        class="h-10"
-        :active="!showDevices"
-        @click="() => (showDevices = false)"
-      >
-        {{ t('device.info') }}
-      </k-segmented-button>
-      <k-segmented-button
-        class="h-10"
-        :active="showDevices"
-        @click="() => (showDevices = true)"
-      >
-        {{ t('devices.title') }}
-      </k-segmented-button>
-    </k-segmented>
-    <k-block-title v-if="!showDevices" class="text-gray-600 dark:text-gray-100">
-      {{ t('informations').toLocaleUpperCase() }}
-    </k-block-title>
-    <k-list v-if="version && !showDevices" class="h-full pb-16 overflow-y-scroll" strong-ios outline-ios>
-      <k-list-item
-        :title="t('bundle-number')"
-        :after="version.name"
-      />
-      <k-list-item
-        :title="t('id')"
-        :after="version.id"
-      />
-      <k-list-item
-        v-if="version.created_at"
-        :title="t('device.created_at')"
-        :after="formatDate(version.created_at)"
-      />
-      <k-list-item
-        v-if="version.updated_at"
-        :title="t('updated-at')"
-        :after="formatDate(version.updated_at)"
-      />
-      <k-list-item
-        v-if="version.checksum"
-        :title="t('checksum')"
-        :after="formatDate(version.checksum)"
-      />
-      <k-list-item
-        v-if="version_meta?.devices"
-        :title="t('devices.title')"
-        :after="version_meta?.devices"
-      />
-      <k-list-item
-        v-if="version.session_key"
-        :title="t('session_key')"
-        :after="hideString(version.session_key)"
-        @click="() => copyToast(version?.session_key || '')"
-      />
-      <k-list-item
-        v-if="version.external_url"
-        :title="t('url')"
-        :after="version.external_url"
-        @click="() => copyToast(version?.external_url || '')"
-      />
-      <k-list-item
-        v-else
-        :title="t('size')"
-        :after="showSize"
-      />
-      <k-list-item
-        :title="t('settings')"
-        link
-        @click="openPannel"
-      />
-    </k-list>
-
-    <k-block-title v-if="showDevices" class="text-gray-600 dark:text-gray-100">
-      {{ t('devices.title').toLocaleUpperCase() }}
-    </k-block-title>
-    <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
-
-    <div v-if="devicesFilter.length > 0" class="h-[70vh]">
-      <k-list v-if="showDevices" class="overflow-y-auto h-full" strong-ios outline-ios>
-        <k-list-item
-          v-for="device in devicesFilter"
-          :key="device.device_id"
-          class="cursor-pointer"
-          :title="`${device.device_id}`"
-          :footer="`${device.platform}`"
-          :after="formatDate(device.created_at || '')"
-          link
-          @click="openDevice(device)"
-        />
-      </k-list>
-    </div>
-    <div v-else class="text-center text-2xl mt-3">
-      {{ t('no-devices') }}
-    </div>
-  </div>
-  <div v-if="version" class="hidden md:block h-full p-8 overflow-y-scroll">
+  <div v-if="version" class="h-full p-8 overflow-y-scroll">
     <div class="">
-      <div class="px-4 mx-auto sm:px-6 lg:px-8 max-w-7xl">
+      <div class="mx-auto w-full px-6 lg:px-8 max-w-7xl">
         <div class="flex items-center justify-center">
           <div class="">
-            <nav class="flex flex-wrap -mb-px sm:space-x-10">
-              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = false">
+            <nav class="flex md:flex-wrap -mb-px space-x-10">
+              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = false">
                 <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
-
-                {{ t('informations') }}
+                {{ t('channel.info') }}
               </button>
 
-              <button class="inline-flex items-center w-1/2 mt-5 text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 sm:mt-0 sm:w-auto sm:border-transparent sm:border-b-2 sm:py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = true">
+              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = true">
                 <IconDevice class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
                 {{ t('devices.title') }}
               </button>
@@ -334,96 +232,28 @@ const devicesFilter = computed(() => {
       </div>
     </div>
 
-    <div v-if="!showDevices" id="informations" class="">
-      <div class="mt-5 border-t border-gray-200">
-        <dl class="sm:divide-y sm:divide-gray-200">
-          <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('bundle-number') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ version.name }}
-            </dd>
-          </div>
-          <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('id') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ version.id }}
-            </dd>
-          </div>
-          <div v-if="version.created_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('device.created_at') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ formatDate(version.created_at) }}
-            </dd>
-          </div>
-          <div v-if="version.updated_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('updated-at') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ formatDate(version.updated_at) }}
-            </dd>
-          </div>
-          <div v-if="version.checksum" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('checksum') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ version.checksum }}
-            </dd>
-          </div>
-          <div v-if="version_meta?.devices" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('devices.title') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ version_meta.devices }}
-            </dd>
-          </div>
-          <div v-if="version.session_key" class="cursor-pointer py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5" @click="copyToast(version?.session_key || '')">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('session_key') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ hideString(version.session_key) }}
-            </dd>
-          </div>
-          <div v-if="version.external_url" class="cursor pointer py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5" @click="copyToast(version?.external_url || '')">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('url') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ version.external_url }}
-            </dd>
-          </div>
-          <div v-else class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('size') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ showSize }}
-            </dd>
-          </div>
-          <div class="cursor-pointer py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5" @click="openPannel">
-            <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {{ t('settings') }}
-            </dt>
-            <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-              {{ t('open-settings') }}
-            </dd>
-          </div>
-        </dl>
-      </div>
+    <div v-if="!showDevices" id="informations" class="mt-5">
+      <InfoRow :label="t('bundle-number')" :value="version.name" />
+      <InfoRow :label="t('id')" :value="version.id.toString()" />
+      <InfoRow v-if="version.created_at" :label="t('device.created_at')" :value="formatDate(version.created_at)" />
+      <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
+      <!-- Checksum -->
+      <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
+      <!-- meta devices -->
+      <InfoRow v-if="version_meta?.devices" :label="t('devices.title')" :value="version_meta.devices.toString()" />
+      <!-- session_key -->
+      <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
+      <!-- version.external_url -->
+      <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
+      <!-- size -->
+      <InfoRow :label="t('size')" :value="showSize" />
+      <!-- settings -->
+      <InfoRow :label="t('settings')" :value="t('open-settings')" :is-link="true" @click="openPannel" />
     </div>
-    <div v-else id="devices" class="flex flex-col py-6">
+    <div v-else id="devices" class="flex flex-col">
+      <input v-model="search" class="w-full mt-3 px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
       <div class="inline-block min-w-full overflow-y-scroll align-middle">
-        <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
-        <table v-if="devicesFilter.length > 0" class="h-full w-full lg:divide-y lg:divide-gray-200 mb-5">
+        <table v-if="devicesFilter.length > 0" class="hidden md:table h-full w-full lg:divide-y lg:divide-gray-200 mb-5">
           <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
             <tr>
               <th class="py-3.5 pl-4 pr-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
@@ -465,6 +295,9 @@ const devicesFilter = computed(() => {
             </tr>
           </tbody>
         </table>
+        <k-list v-if="devicesFilter.length > 0" class="md:hidden w-full my-0 list-none">
+          <DeviceCard v-for="(device, i) in devicesFilter" :key="device.device_id + i" :device="device" />
+        </k-list>
         <div v-else class="text-center text-2xl mt-3">
           {{ t('no-devices') }}
         </div>

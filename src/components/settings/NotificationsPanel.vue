@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { kToggle } from 'konsta/vue'
-import { reactive, ref } from 'vue'
+import { kListItem, kToggle } from 'konsta/vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
@@ -9,22 +9,27 @@ const { t } = useI18n()
 const main = useMainStore()
 const supabase = useSupabase()
 const isLoading = ref(false)
-const form = reactive({
-  enableNotifications: false,
-  optForNewsletters: false,
-})
+const enableNotifications = ref(false)
+const optForNewsletters = ref(false)
 
-form.enableNotifications = !!main.auth?.user_metadata?.activation?.enableNotifications
-form.optForNewsletters = !!main.auth?.user_metadata?.activation?.optForNewsletters
+enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications || false
+optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters || false
+
+console.log('enableNotifications', enableNotifications.value)
+console.log('optForNewsletters', optForNewsletters.value)
 
 const submitNotif = async () => {
   isLoading.value = true
+  console.log('submitNotif')
+  enableNotifications.value = !enableNotifications.value
+  console.log('enableNotifications', enableNotifications.value)
+  console.log('optForNewsletters', optForNewsletters.value)
   const activation = main.auth?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.updateUser({
     data: {
       activation: {
         ...activation,
-        enableNotifications: form.enableNotifications,
+        enableNotifications: enableNotifications.value,
       },
     },
   })
@@ -34,17 +39,23 @@ const submitNotif = async () => {
 }
 const submitDoi = async () => {
   isLoading.value = true
+  console.log('submitDoi')
+
+  optForNewsletters.value = !optForNewsletters.value
+  console.log('enableNotifications', enableNotifications.value)
+  console.log('optForNewsletters', optForNewsletters.value)
   const activation = main.auth?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.updateUser({
     data: {
       activation: {
         ...activation,
-        optForNewsletters: form.optForNewsletters,
+        optForNewsletters: optForNewsletters.value,
       },
     },
   })
   if (!error && data)
     main.auth = data.user
+  console.log('main.auth', data)
   isLoading.value = false
 }
 </script>
@@ -58,31 +69,27 @@ const submitDoi = async () => {
       </h2>
 
       <div class="w-full mx-auto dark:text-white">
-        <div class="px-6 py-4">
-          <div class="flex items-center justify-between my-2">
-            <label for="notification" class="text-xl justify-self-start">{{ t('activation.notification') }}</label>
-            <k-toggle
-              component="div"
-              class="k-color-success"
-              :checked="form.enableNotifications"
-              @change="submitNotif()"
-            />
-          </div>
-          <p class="col-span-2 text-left">
-            {{ t('activation.notification-desc') }}
-          </p>
-          <div class="flex items-center justify-between mt-4 mb-2">
-            <label for="notification" class="w-64 text-xl justify-self-start">{{ t('activation.doi') }}</label>
-            <k-toggle
-              component="div"
-              class="k-color-success"
-              :checked="form.optForNewsletters"
-              @change="submitDoi()"
-            />
-          </div>
-          <p class="col-span-2 text-left">
-            {{ t('activation.doi-desc') }}
-          </p>
+        <div class="px-6 py-4 list-none">
+          <k-list-item label :title="t('activation.notification')" :subtitle="t('activation.notification-desc')">
+            <template #after>
+              <k-toggle
+                component="div"
+                class="k-color-success"
+                :checked="enableNotifications"
+                @change="submitNotif()"
+              />
+            </template>
+          </k-list-item>
+          <k-list-item label :title="t('activation.doi')" :subtitle="t('activation.doi-desc')">
+            <template #after>
+              <k-toggle
+                component="div"
+                class="k-color-success"
+                :checked="optForNewsletters"
+                @change="submitDoi()"
+              />
+            </template>
+          </k-list-item>
         </div>
       </div>
     </div>

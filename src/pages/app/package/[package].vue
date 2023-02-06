@@ -45,7 +45,7 @@ const loadAppInfo = async () => {
   }
 }
 
-const refreshData = async (evt: RefresherCustomEvent | null = null) => {
+const refreshData = async () => {
   isLoading.value = true
   try {
     await loadAppInfo()
@@ -54,15 +54,6 @@ const refreshData = async (evt: RefresherCustomEvent | null = null) => {
     console.error(error)
   }
   isLoading.value = false
-  evt?.target?.complete()
-}
-
-interface RefresherEventDetail {
-  complete(): void
-}
-interface RefresherCustomEvent extends CustomEvent {
-  detail: RefresherEventDetail
-  target: HTMLIonRefresherElement
 }
 
 watchEffect(async () => {
@@ -85,9 +76,8 @@ watchEffect(async () => {
           {{ app?.name }}
         </h2>
       </div>
-      <div class="grid gap-6 grid-cols-16 md:mx-10">
-        <Usage :app-id="id" />
-      </div>
+      <Usage :app-id="id" />
+
       <section class="py-12">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-20">

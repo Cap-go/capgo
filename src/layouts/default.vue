@@ -8,16 +8,16 @@ const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <k-page class="overflow-hidden">
-    <div class="safe-areas flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+  <k-page class="">
+    <div class="safe-areas overflow-hidden flex bg-white dark:bg-gray-900/90">
       <!-- Sidebar -->
       <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
       <!-- Content area -->
-      <div class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
+      <div class="relative flex overscroll-none overflow-hidden flex-col flex-1">
         <!-- Site header -->
         <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-        <main class="w-full h-full overflow-y-hidden">
-          <RouterView class="static" />
+        <main class="w-full min-h-screen overscroll-none">
+          <RouterView class="" />
         </main>
       </div>
     </div>

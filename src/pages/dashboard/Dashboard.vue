@@ -49,8 +49,9 @@ watchEffect(async () => {
       <!-- Welcome banner -->
       <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
       <!-- Cards -->
-      <div class="grid grid-cols-12 gap-6">
-        <Usage v-if="!isLoading" />
+      <Usage v-if="!isLoading" />
+
+      <div class="grid grid-cols-4 gap-6">
         <!-- Table (Top Channels) -->
         <TopApps :apps="props.apps" @reload="emit('reloadApp')" />
 

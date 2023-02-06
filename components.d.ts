@@ -25,6 +25,7 @@ declare module '@vue/runtime-core' {
     IIonCopyOutline: typeof import('~icons/ion/copy-outline')['default']
     IIonKeyOutline: typeof import('~icons/ion/key-outline')['default']
     IIonLogoDiscord: typeof import('~icons/ion/logo-discord')['default']
+    InfoRow: typeof import('./src/components/package/InfoRow.vue')['default']
     LineChartStats: typeof import('./src/components/LineChartStats.vue')['default']
     Loading: typeof import('./src/components/Loading.vue')['default']
     MobileStats: typeof import('./src/components/MobileStats.vue')['default']

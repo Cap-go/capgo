@@ -171,6 +171,7 @@ devices:
   title: Devices
 devices-using-this-b: Devices using this bundle
 no-devices: No devices
+no-logs: No logs
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 discover-module-in-a: Discover module in Awesome-capacitor
