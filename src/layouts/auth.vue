@@ -4,7 +4,7 @@ import { kPage } from 'konsta/vue'
 
 <template>
   <k-page>
-    <div class="safe-areas flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
+    <div class="pt-safe safe-areas flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
       <main class="w-full h-full overflow-y-hidden">
         <RouterView class="static" />
       </main>

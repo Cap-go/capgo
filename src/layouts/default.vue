@@ -9,7 +9,7 @@ const sidebarOpen = ref(false)
 
 <template>
   <k-page class="">
-    <div class="safe-areas overflow-hidden flex bg-white dark:bg-gray-900/90">
+    <div class="pt-safe overflow-hidden flex bg-white dark:bg-gray-900/90">
       <!-- Sidebar -->
       <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
       <!-- Content area -->
