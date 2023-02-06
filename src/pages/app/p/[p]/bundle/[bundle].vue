@@ -251,50 +251,53 @@ const devicesFilter = computed(() => {
       <InfoRow :label="t('settings')" :value="t('open-settings')" :is-link="true" @click="openPannel" />
     </div>
     <div v-else id="devices" class="flex flex-col">
-      <input v-model="search" class="w-full mt-3 px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
+      <input v-model="search" class="w-full mt-3 px-5 py-3 border-2 border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
       <div class="inline-block min-w-full overflow-y-scroll align-middle">
-        <table v-if="devicesFilter.length > 0" class="hidden md:table h-full w-full lg:divide-y lg:divide-gray-200 mb-5">
-          <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
-            <tr>
-              <th class="py-3.5 pl-4 pr-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
-                <div class="flex items-center">
-                  {{ t('device-id') }}
-                </div>
-              </th>
-              <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                <div class="flex items-center">
-                  {{ t('device.platform') }}
-                </div>
-              </th>
-              <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                <div class="flex items-center">
-                  {{ t('device.os_version') }}
-                </div>
-              </th>
-              <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                <div class="flex items-center">
-                  {{ t('device.created_at') }}
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="w-full divide-y divide-gray-200 max-h-fit">
-            <tr v-for="(device, i) in devicesFilter" :key="i" class="w-full cursor-pointer" @click="openDevice(device)">
-              <td class="hidden py-4 pl-4 pr-3 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
-                {{ device.device_id }}
-              </td>
-              <td class="hidden px-4 py-4 text-lg font-bold text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
-                {{ device.platform }}
-              </td>
-              <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
-                {{ device.os_version || 'Unknown' }}
-              </td>
-              <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
-                {{ formatDate(device.created_at || '') }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-if="devicesFilter.length > 0" class="hidden md:block">
+          <table class="h-full w-full lg:divide-y lg:divide-gray-200 mb-5">
+            <thead class="sticky top-0 bg-white dark:bg-gray-900/90">
+              <tr>
+                <th class="py-3.5 pl-4 pr-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
+                  <div class="flex items-center">
+                    {{ t('device-id') }}
+                  </div>
+                </th>
+                <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
+                    {{ t('device.platform') }}
+                  </div>
+                </th>
+                <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
+                    {{ t('device.os_version') }}
+                  </div>
+                </th>
+                <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
+                    {{ t('device.created_at') }}
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="w-full divide-y divide-gray-200 max-h-fit">
+              <tr v-for="(device, i) in devicesFilter" :key="i" class="w-full cursor-pointer" @click="openDevice(device)">
+                <td class="py-4 pl-4 pr-3 text-lg font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap sm:pl-6 md:pl-0">
+                  {{ device.device_id }}
+                </td>
+                <td class="px-4 py-4 text-lg font-bold text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                  {{ device.platform }}
+                </td>
+                <td class="px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                  {{ device.os_version || 'Unknown' }}
+                </td>
+                <td class="px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                  {{ formatDate(device.created_at || '') }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <k-list v-if="devicesFilter.length > 0" class="md:hidden w-full my-0 list-none">
           <DeviceCard v-for="(device, i) in devicesFilter" :key="device.device_id + i" :device="device" />
         </k-list>

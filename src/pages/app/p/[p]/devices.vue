@@ -145,32 +145,31 @@ watchEffect(async () => {
       <div class="">
         <!-- Table -->
         <div class="hidden md:block overflow-y-scroll p-3">
-          <table class="w-full table-auto" aria-label="">
-            <!-- Table header -->
-            <thead class="text-md uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
+          <table class="h-full w-full table-auto lg:divide-y lg:divide-gray-200 mb-5">
+            <thead class="sticky top-0 bg-white dark:bg-gray-900/90">
               <tr>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
+                <th class="p-2 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
                     {{ t('device-id') }}
                   </div>
                 </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
+                <th class="p-2 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
                     {{ t('device.platform') }}
                   </div>
                 </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
+                <th class="p-2 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
                     {{ t('updated-at') }}
                   </div>
                 </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
+                <th class="p-2 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
                     {{ t('device.version') }}
                   </div>
                 </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
+                <th class="p-2 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
+                  <div class="flex items-center">
                     {{ t('custom-id') }}
                   </div>
                 </th>
