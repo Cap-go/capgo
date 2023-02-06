@@ -16,7 +16,7 @@ const sidebarOpen = ref(false)
       <div class="relative flex overscroll-none overflow-hidden flex-col flex-1">
         <!-- Site header -->
         <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-        <main class="w-full min-h-screen overscroll-none">
+        <main class="w-full h-full overscroll-none">
           <RouterView class="" />
         </main>
       </div>
