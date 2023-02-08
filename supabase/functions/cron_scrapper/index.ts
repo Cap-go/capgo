@@ -126,6 +126,7 @@ const categories = [
 ]
 const toGetInfo = 5000
 const toGetSimilar = 500
+const toGetTop = 500
 
 serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
@@ -163,10 +164,10 @@ serve(async (event: Request) => {
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     // loop 100 times to get more random apps
-    for (let i = 0; i < toGetSimilar; i++) {
+    for (let i = 0; i < toGetTop; i++) {
       const randomCategory = categories[Math.floor(Math.random() * categories.length)]
       const randomCountryCode = countryCode[Math.floor(Math.random() * countryCode.length)]
-      console.log('randomCategory', randomCategory,'randomCountryCode', randomCountryCode)
+      console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
       all.push(axios.get(`https://netlify.capgo.app/get_top_apk-background?category=${randomCategory}&country=${randomCountryCode}`))
     }
     for (const app of (appsToGetCapacitor || []))
