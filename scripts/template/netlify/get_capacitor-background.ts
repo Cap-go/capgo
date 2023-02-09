@@ -162,17 +162,16 @@ const isCapacitor = async (id: string) => {
   console.log('found', id, found)
   return found
 }
-
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', method, body)
+const getInfoCap = async (appId: string) => {
   try {
+    console.log('getInfoCap', appId)
     // remove from list apps already in supabase
-    const res = await isCapacitor(body.appId)
+    const res = await isCapacitor(appId)
     // save in supabase
     const { error } = await supabaseClient()
       .from('store_apps')
       .upsert({
-        app_id: body.appId,
+        app_id: appId,
         capacitor: res.capacitor,
         cordova: res.cordova,
         react_native: res.react_native,
@@ -187,12 +186,23 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     const { error } = await supabaseClient()
       .from('store_apps')
       .upsert({
-        app_id: body.appId,
+        app_id: appId,
         to_get_capacitor: false,
         error_get_capacitor: JSON.stringify(e),
       })
     if (error)
       console.log('error insert', error)
+  }
+}
+
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  console.log('main', method, body)
+  if (body.appId) {
+    await getInfoCap(body.appId)
+  }
+  else if (body.appIds) {
+    for (const appId of body.appIds)
+      await getInfoCap(appId)
   }
 }
 // isCapacitor('pl.jmpolska.clos0.mojabiedronka').then((res) => {

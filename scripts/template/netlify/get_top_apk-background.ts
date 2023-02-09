@@ -57,7 +57,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     return []
   }
   // use data to filter res
-  const filtered = res.filter(item => !data?.find((row: Database['public']['Tables']['store_apps']['Row']) => row.app_id === item.appId))
+  const filtered = res.filter(item => !data?.find((row: { app_id: string }) => row.app_id === item.appId))
   const upgraded = filtered.map((item) => {
     // console.log('item', item.appId)
     // check if already exist in db and skip

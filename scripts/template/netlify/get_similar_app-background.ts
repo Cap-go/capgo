@@ -35,11 +35,10 @@ const getAppsInfo = async (appId: string) => {
   })
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', method, body)
-  // remove from list apps already in supabase
+const getInfo = async (appId: string) => {
   try {
-    const res = await getAppsInfo(body.appId)
+    console.log('getInfo', appId)
+    const res = await getAppsInfo(appId)
     // save in supabase
     const { error } = await supabaseClient()
       .from('store_apps')
@@ -50,7 +49,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     const { error: error2 } = await supabaseClient()
       .from('store_apps')
       .update({ to_get_similar: false })
-      .eq('app_id', body.appId)
+      .eq('app_id', appId)
     if (error2)
       console.log('error', error2)
   }
@@ -59,12 +58,24 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     const { error } = await supabaseClient()
       .from('store_apps')
       .upsert({
-        app_id: body.appId,
+        app_id: appId,
         to_get_similar: false,
         error_get_similar: JSON.stringify(e),
       })
     if (error)
       console.log('error insert', error)
+  }
+}
+
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  console.log('main', method, body)
+  // remove from list apps already in supabase
+  if (body.appId) {
+    await getInfo(body.appId)
+  }
+  else if (body.appIds) {
+    for (const appId of body.appIds)
+      await getInfo(appId)
   }
 }
 // upper is ignored during netlify generation phase
