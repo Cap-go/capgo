@@ -3,7 +3,7 @@ import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
-const countryCode = [
+const countries = [
   'us',
   'fr',
   'de',
@@ -164,20 +164,32 @@ serve(async (event: Request) => {
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     // loop 100 times to get more random apps
-    for (let i = 0; i < toGetTop; i++) {
-      const randomCategory = categories[Math.floor(Math.random() * categories.length)]
-      const randomCountryCode = countryCode[Math.floor(Math.random() * countryCode.length)]
-      console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
-      all.push(axios.get(`https://netlify.capgo.app/get_top_apk-background?category=${randomCategory}&country=${randomCountryCode}`))
+    // for (let i = 0; i < toGetTop; i++) {
+    //   const randomCategory = categories[Math.floor(Math.random() * categories.length)]
+    //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
+    //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
+    all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
+      categories,
+      countries,
+    }))
+    // }
+    for (const app of (appsToGetCapacitor || [])) {
+      all.push(axios.post('https://netlify.capgo.app/get_capacitor-background', {
+        appId: app.app_id,
+      }))
     }
-    for (const app of (appsToGetCapacitor || []))
-      all.push(axios.get(`https://netlify.capgo.app/get_capacitor-background?appId=${app.app_id}`))
 
-    for (const app of (appsToGetInfo || []))
-      all.push(axios.get(`https://netlify.capgo.app/get_store_info-background?appId=${app.app_id}`))
+    for (const app of (appsToGetInfo || [])) {
+      all.push(axios.post('https://netlify.capgo.app/get_store_info-background', {
+        appId: app.app_id,
+      }))
+    }
 
-    for (const app of (appsToGetSimilar || []))
-      all.push(axios.get(`https://netlify.capgo.app/get_similar_app-background?appId=${app.app_id}`))
+    for (const app of (appsToGetSimilar || [])) {
+      all.push(axios.post('https://netlify.capgo.app/get_similar_app-background', {
+        appId: app.app_id,
+      }))
+    }
 
     await Promise.all(all)
     return sendRes()

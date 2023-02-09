@@ -28,26 +28,6 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   // remove the first skip
   const ids = res.map(item => item.appId)
   console.log('ids', ids, ids.length)
-  // console.log('res', res)
-  // const upgraded = res.map((item, i) => {
-  //   return {
-  //     url: item.url,
-  //     appId: item.appId,
-  //     title: item.title,
-  //     summary: item.summary,
-  //     developer: item.developer,
-  //     icon: item.icon,
-  //     score: item.score,
-  //     free: item.free,
-  //     category,
-  //     collection,
-  //     rank: i + 1,
-  //     developer_email: item.developerEmail,
-  //     installs: item.maxInstalls,
-  //   } as Database['public']['Tables']['store_apps']['Insert']
-  // })
-  // return upgraded
-  // filter the app already in supabase
   const { data, error } = await supabaseClient()
     .from('store_apps')
     .select('app_id')
@@ -100,21 +80,32 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
       })
   })
   return await Promise.all(upgraded)
-  // const enriched = await Promise.all(upgraded)
-  // // filter out null
-  // const filtered = enriched.filter(item => item != null)
-  // return filtered
 }
-// getList()
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', url, headers, method, body)
-  const list = await getList(body.category, body.collection, body.limit, body.country)
+
+const getTop = async (category = gplay.category.APPLICATION, country: string, collection = gplay.collection.TOP_FREE, limit = 1000) => {
+  const list = await getList(category, collection, limit, country)
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_apps')
     .upsert(list)
   if (error)
     console.log('error', error)
+}
+
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  console.log('main', url, headers, method, body)
+  if (body.country && body.category) {
+    await getTop(body.category, body.country, body.collection, body.limit)
+  }
+  else if (body.countries && body.categories) {
+    // call getTop with all countries and categories
+    const countries = body.countries.split(',')
+    const categories = body.categories.split(',')
+    for (const country of countries) {
+      for (const category of categories)
+        await getTop(category, country, body.collection, body.limit)
+    }
+  }
 }
 // upper is ignored during netlify generation phase
 // import from here
