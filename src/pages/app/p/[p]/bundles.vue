@@ -1,5 +1,6 @@
+<!-- eslint-disable @typescript-eslint/no-use-before-define -->
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
@@ -20,11 +21,12 @@ const route = useRoute()
 const isLoading = ref(false)
 const filtered = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
 const displayedVersions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
-const currentPageNumber = ref(1)
+let currentPageNumber = 1
 const pageNumbers = ref<number[]>([1])
 const filteredPageNumbers = ref<number[]>([1])
 const appId = ref('')
 const offset = 10
+const currentVersionsNumber = ref(0)
 
 const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['app_versions']['Row'][]) => {
   const { data: dataVersionsMeta } = await supabase
@@ -50,12 +52,31 @@ const pageNumberFiltered = computed(() => {
   return pageNumbers.value
 })
 
-const display = (pageNumber: number) => {
+const display = async (pageNumber: number) => {
+  console.log('display', currentVersionsNumber.value, pageNumber, offset)
+  // Display the versions between the two indexes
   const firstIndex = (pageNumber - 1) * offset
   const lastIndex = firstIndex + offset
 
+  if (currentVersionsNumber.value < lastIndex) {
+    console.log('load more', currentVersionsNumber.value, lastIndex)
+    await getVersionsLength()
+    await loadData()
+  }
+
   displayedVersions.value = versionsFiltered.value.slice(firstIndex, lastIndex)
-  currentPageNumber.value = pageNumber
+  currentPageNumber = pageNumber
+}
+
+const getVersionsLength = async () => {
+  const length = await supabase
+    .from('app_versions')
+    .select('id', { count: 'exact', head: true })
+    .eq('app_id', appId.value)
+    .eq('deleted', false)
+    .then(res => res.count || 0)
+  const pages = Array.from(Array(Math.ceil(length / offset)).keys())
+  pageNumbers.value = pages.slice(1, pages.length)
 }
 
 const searchVersion = async () => {
@@ -76,24 +97,27 @@ const searchVersion = async () => {
   filteredPageNumbers.value = pages.slice(1, pages.length)
   filtered.value = await enhenceVersionElems(dataVersions)
   isLoadingSub.value = false
-  currentPageNumber.value = 1
-  display(currentPageNumber.value)
+  currentPageNumber = 1
+  display(currentPageNumber)
 }
 
 const loadData = async () => {
   try {
+    let total = 0
     const { data: dataVersions } = await supabase
       .from('app_versions')
       .select()
       .eq('app_id', appId.value)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
+      .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
+
     if (!dataVersions)
       return
     versions.value.push(...(await enhenceVersionElems(dataVersions)))
-    const pages = Array.from(Array(Math.ceil(versions.value.length / offset)).keys())
-    pageNumbers.value = pages.slice(1, pages.length)
-    display(currentPageNumber.value)
+    total = dataVersions.length
+    if (total === offset)
+      currentVersionsNumber.value += offset
   }
   catch (error) {
     console.error(error)
@@ -104,6 +128,8 @@ const refreshData = async () => {
   isLoading.value = true
   try {
     await loadData()
+    await getVersionsLength()
+    display(currentPageNumber)
   }
   catch (error) {
     console.error(error)
@@ -111,7 +137,7 @@ const refreshData = async () => {
   isLoading.value = false
 }
 
-watchEffect(async () => {
+onMounted(async () => {
   if (route.path.endsWith('/bundles')) {
     appId.value = route.params.p as string
     appId.value = appId.value.replace(/--/g, '.')

@@ -1,5 +1,6 @@
+<!-- eslint-disable @typescript-eslint/no-use-before-define -->
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { kList } from 'konsta/vue'
 import { useRoute } from 'vue-router'
@@ -13,6 +14,7 @@ interface Device {
     name: string
   }
 }
+
 const { t } = useI18n()
 const supabase = useSupabase()
 const route = useRoute()
@@ -22,11 +24,12 @@ const isLoadingSub = ref(false)
 const devices = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
 const filtered = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
 const displayedDevices = ref<(Database['public']['Tables']['devices']['Row'] & Device)[]>([])
-const currentPageNumber = ref(1)
+let currentPageNumber = 1
 const pageNumbers = ref<number[]>([1])
 const filteredPageNumbers = ref<number[]>([1])
 const appId = ref('')
 const offset = 10
+const currentDevicesNumber = ref(0)
 
 const devicesFiltered = computed(() => {
   if (search.value)
@@ -40,21 +43,46 @@ const pageNumberFiltered = computed(() => {
   return pageNumbers.value
 })
 
-const display = (pageNumber: number) => {
-  // Display the devices between the two indexes
-  const firstIndex = (pageNumber - 1) * offset
-  const lastIndex = firstIndex + offset
+const getDeviceIds = async () => {
+  const { data: channelDevices } = await supabase
+    .from('channel_devices')
+    .select('device_id')
+    .eq('app_id', appId.value)
+  const { data: deviceOverride } = await supabase
+    .from('devices_override')
+    .select('device_id')
+    .eq('app_id', appId.value)
+  // create a list of unique id
+  const deviceIds = [
+    ...new Set([
+      ...(channelDevices ? channelDevices.map(d => d.device_id) : []),
+      ...(deviceOverride ? deviceOverride.map(d => d.device_id) : []),
+    ]),
+  ]
+  console.log('deviceIds', deviceIds)
+  return deviceIds
+}
 
-  displayedDevices.value = devicesFiltered.value.slice(firstIndex, lastIndex)
-  currentPageNumber.value = pageNumber
+const getDevicesLength = async () => {
+  const length = await supabase
+    .from('devices')
+    .select('device_id', { count: 'exact', head: true })
+    .eq('is_emulator', false)
+    .eq('is_prod', true)
+    .eq('app_id', appId.value)
+    .then(res => res.count || 0)
+  const pages = Array.from(Array(Math.ceil(length / offset)).keys())
+  pageNumbers.value = pages.slice(1, pages.length)
 }
 
 const loadData = async () => {
   try {
+    console.log('loadData', currentDevicesNumber.value, offset)
+    let total = 0
+
     const { data: dataDev } = await supabase
       .from('devices')
       .select(`
-        app_id,
         device_id,
         platform,
         plugin_version,
@@ -66,20 +94,37 @@ const loadData = async () => {
       `)
       .eq('app_id', appId.value)
       .order('updated_at', { ascending: false })
+      .range(currentDevicesNumber.value, currentDevicesNumber.value + offset - 1)
     if (!dataDev)
       return
     devices.value.push(...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[])
-
-    const pages = Array.from(Array(Math.ceil(devices.value.length / offset)).keys())
-    pageNumbers.value = pages.slice(1, pages.length)
-    display(currentPageNumber.value)
+    total = dataDev.length
+    if (total === offset)
+      currentDevicesNumber.value += offset
   }
   catch (error) {
     console.error(error)
   }
 }
 
+const display = async (pageNumber: number) => {
+  console.log('display', currentDevicesNumber.value, pageNumber, offset)
+  // Display the devices between the two indexes
+  const firstIndex = (pageNumber - 1) * offset
+  const lastIndex = firstIndex + offset
+
+  if (currentDevicesNumber.value < lastIndex) {
+    console.log('load more', currentDevicesNumber.value, lastIndex)
+    await getDevicesLength()
+    await loadData()
+  }
+
+  displayedDevices.value = devicesFiltered.value.slice(firstIndex, lastIndex)
+  currentPageNumber = pageNumber
+}
+
 const searchDevice = async () => {
+  console.log('searchDevice')
   try {
     const { data: dataDev } = await supabase
       .from('devices')
@@ -103,8 +148,8 @@ const searchDevice = async () => {
     filtered.value = [...dataDev as (Database['public']['Tables']['devices']['Row'] & Device)[]]
     const pages = Array.from(Array(Math.ceil(dataDev.length / offset)).keys())
     filteredPageNumbers.value = pages.slice(1, pages.length)
-    currentPageNumber.value = 1
-    display(currentPageNumber.value)
+    currentPageNumber = 1
+    display(currentPageNumber)
   }
   catch (error) {
     console.error(error)
@@ -114,8 +159,11 @@ const searchDevice = async () => {
 const refreshData = async () => {
   isLoading.value = true
   try {
+    console.log('refreshData')
     devices.value = []
     await loadData()
+    await getDevicesLength()
+    display(currentPageNumber)
   }
   catch (error) {
     console.error(error)
@@ -123,10 +171,11 @@ const refreshData = async () => {
   isLoading.value = false
 }
 
-watchEffect(async () => {
+onMounted(async () => {
   if (route.path.endsWith('/devices')) {
     appId.value = route.params.p as string
     appId.value = appId.value.replace(/--/g, '.')
+    console.log('watchEffect', appId.value)
     await refreshData()
   }
 })

@@ -25,20 +25,29 @@ const loadAppInfo = async () => {
     app.value = dataApp || app.value
 
     // get channels count
-    const { data: dataChannels } = await supabase
+    const dataChannels = await supabase
       .from('channels')
-      .select('id').eq('app_id', id.value)
-    channelsNb.value = dataChannels?.length || 0
+      .select('id', { count: 'exact', head: true })
+      .eq('app_id', id.value)
+      .then(res => res.count || 0)
+    channelsNb.value = dataChannels || 0
     // get bundles count
-    const { data: dataBundles } = await supabase
+    const dataBundles = await supabase
       .from('app_versions')
-      .select('id').eq('app_id', id.value).eq('deleted', false)
-    bundlesNb.value = dataBundles?.length || 0
+      .select('id', { count: 'exact', head: true })
+      .eq('app_id', id.value)
+      .eq('deleted', false)
+      .then(res => res.count || 0)
+    bundlesNb.value = dataBundles || 0
     // get devices count
-    const { data: dataDevices } = await supabase
+    const dataDevices = await supabase
       .from('devices')
-      .select('device_id').eq('app_id', id.value)
-    devicesNb.value = dataDevices?.length || 0
+      .select('device_id', { count: 'exact', head: true })
+      .eq('is_emulator', false)
+      .eq('is_prod', true)
+      .eq('app_id', id.value)
+      .then(res => res.count || 0)
+    devicesNb.value = dataDevices || 0
   }
   catch (error) {
     console.error(error)
