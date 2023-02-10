@@ -53,7 +53,7 @@ serve(async (event: Request) => {
     }))
     // }
     for (const app of (appsToGetFramework || [])) {
-      all.push(axios.post('https://netlify.capgo.app/get_capacitor-background', {
+      all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
         appId: app.app_id,
       }))
     }
