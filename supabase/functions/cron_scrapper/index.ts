@@ -51,25 +51,21 @@ serve(async (event: Request) => {
       categories,
       countries,
     }))
-    // }
-    for (const app of (appsToGetFramework || [])) {
+    if (appsToGetFramework?.length) {
       all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
-        appId: app.app_id,
+        appIds: appsToGetFramework.map(app => app.app_id),
       }))
     }
-
-    for (const app of (appsToGetInfo || [])) {
+    if (appsToGetInfo?.length) {
       all.push(axios.post('https://netlify.capgo.app/get_store_info-background', {
-        appId: app.app_id,
+        appIds: appsToGetInfo.map(app => app.app_id),
       }))
     }
-
-    for (const app of (appsToGetSimilar || [])) {
-      all.push(axios.post('https://netlify.capgo.app/get_similar_app-background', {
-        appId: app.app_id,
+    if (appsToGetSimilar?.length) {
+      all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
+        appIds: appsToGetSimilar.map(app => app.app_id),
       }))
     }
-
     await Promise.all(all)
     return sendRes()
   }
