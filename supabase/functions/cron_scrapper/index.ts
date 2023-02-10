@@ -4,6 +4,7 @@ import { categories, countries } from '../_utils/gplay_categ.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
+const toGetFramwork = 5000
 const toGetInfo = 5000
 const toGetSimilar = 500
 
@@ -21,7 +22,7 @@ serve(async (event: Request) => {
       .from('store_apps')
       .select()
       .eq('to_get_framework', true)
-      .limit(toGetInfo)
+      .limit(toGetFramwork)
       .order('created_at', { ascending: true })
 
     const { data: appsToGetInfo } = await supabaseAdmin()
