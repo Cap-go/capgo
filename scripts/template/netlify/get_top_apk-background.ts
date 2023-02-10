@@ -101,10 +101,12 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     // call getTop with all countries and categories
     const countries = body.countries.split(',')
     const categories = body.categories.split(',')
+    const all = []
     for (const country of countries) {
       for (const category of categories)
-        await getTop(category, country, body.collection, body.limit)
+        all.push(getTop(category, country, body.collection, body.limit))
     }
+    await Promise.all(all)
   }
 }
 // upper is ignored during netlify generation phase

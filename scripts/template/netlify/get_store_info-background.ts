@@ -71,8 +71,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     await getInfo(body.appId)
   }
   else if (body.appIds) {
+    const all = []
     for (const appId of body.appIds)
-      await getInfo(appId)
+      all.push(getInfo(appId))
+    await Promise.all(all)
   }
 }
 // upper is ignored during netlify generation phase
