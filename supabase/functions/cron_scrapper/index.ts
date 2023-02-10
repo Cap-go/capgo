@@ -17,10 +17,10 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
 
   try {
-    const { data: appsToGetCapacitor } = await supabaseAdmin()
+    const { data: appsToGetFramework } = await supabaseAdmin()
       .from('store_apps')
       .select()
-      .eq('to_get_capacitor', true)
+      .eq('to_get_framework', true)
       .limit(toGetInfo)
       .order('created_at', { ascending: true })
 
@@ -39,7 +39,7 @@ serve(async (event: Request) => {
       .order('created_at', { ascending: true })
 
     const all = []
-    console.log('appsToGetCapacitor', appsToGetCapacitor?.length || 0)
+    console.log('appsToGetFramework', appsToGetFramework?.length || 0)
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     // loop 100 times to get more random apps
@@ -52,7 +52,7 @@ serve(async (event: Request) => {
       countries,
     }))
     // }
-    for (const app of (appsToGetCapacitor || [])) {
+    for (const app of (appsToGetFramework || [])) {
       all.push(axios.post('https://netlify.capgo.app/get_capacitor-background', {
         appId: app.app_id,
       }))

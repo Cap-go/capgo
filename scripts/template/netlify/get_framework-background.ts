@@ -52,7 +52,10 @@ const isCapacitor = async (id: string) => {
     capacitor: false,
     cordova: false,
     react_native: false,
+    native_script: false,
     capgo: false,
+    kotlin: false,
+    flutter: false,
   }
   try {
     console.log('downloadApkPure', id)
@@ -63,22 +66,35 @@ const isCapacitor = async (id: string) => {
     zipEntries.forEach((zipEntry) => {
       // console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
+        console.log('capacitor', 'assets/capacitor.config.json')
+        found.capacitor = true
+      }
+      if (zipEntry.entryName === 'assets/capacitor.plugins.json') {
         const res = zipEntry.getData().toString('utf8')
         console.log('capacitor', res)
         found.capacitor = true
-        if (res.includes('CapacitorUpdater'))
+        if (res.includes('@capgo/capacitor-updater'))
           found.capgo = true
       }
       if (zipEntry.entryName === 'res/xml/config.xml') {
-        const res = zipEntry.getData().toString('utf8')
-        console.log('cordova', res)
+        console.log('cordova', 'res/xml/config.xml')
         found.cordova = true
       }
       if (zipEntry.entryName === 'res/xml/rn_dev_preferences.xml') {
-        const res = zipEntry.getData().toString('utf8')
-        console.log('react_native', res)
-        // if ()
+        console.log('react_native', 'res/xml/rn_dev_preferences.xml')
         found.react_native = true
+      }
+      if (zipEntry.entryName === 'kotlin/kotlin.kotlin_builtins') {
+        console.log('kotlin', 'kotlin/kotlin.kotlin_builtins')
+        found.kotlin = true
+      }
+      if (zipEntry.entryName === 'assets/flutter_assets/AssetManifest.json') {
+        console.log('flutter', 'assets/flutter_assets/AssetManifest.json')
+        found.flutter = true
+      }
+      if (zipEntry.entryName === 'resources.arsc') {
+        console.log('flutter', 'resources.arsc')
+        found.native_script = true
       }
     })
   }
@@ -103,19 +119,22 @@ const getInfoCap = async (appId: string) => {
         cordova: res.cordova,
         react_native: res.react_native,
         capgo: res.capgo,
-        to_get_capacitor: false,
+        kotlin: res.kotlin,
+        native_script: res.native_script,
+        flutter: res.flutter,
+        to_get_framework: false,
       })
     if (error)
       console.log('error', error)
   }
   catch (e) {
-    console.log('error isCapacitor', e)
+    console.log('error getInfoCap', e)
     const { error } = await supabaseClient()
       .from('store_apps')
       .upsert({
         app_id: appId,
-        to_get_capacitor: false,
-        error_get_capacitor: JSON.stringify(e),
+        to_get_framework: false,
+        error_get_framework: JSON.stringify(e),
       })
     if (error)
       console.log('error insert', error)
