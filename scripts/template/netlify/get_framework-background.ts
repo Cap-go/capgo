@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/supabase.types'
 
 export const methodJson = ['POST', 'PUT', 'PATCH']
-
+// https://www.appbrain.com/stats/libraries/tag/app-framework/android-app-frameworks
 export const supabaseClient = () => {
   const options = {
     auth: {
