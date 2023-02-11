@@ -86,6 +86,7 @@
     "daisyui": "^2.50.0",
     "dayjs": "1.11.7",
     "firebase": "9.15.0",
+    "flowbite": "^1.6.3",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.1.1",
     "json2csv": "^5.0.7",

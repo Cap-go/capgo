@@ -387,7 +387,7 @@ usage:
   success: >-
     Votre plan a été configuré, cette page sera mise à jour dans quelques
     minutes
-  title: Usage
+  title: ''
 version-builtin: Version intégrée
 welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo

@@ -43,6 +43,7 @@ module.exports = konstaConfig({
     ],
   },
   content: [
+    './node_modules/flowbite/**/*.js',
     './index.html',
     './src/**/*.{vue,js,ts,jsx,tsx}',
   ],
@@ -270,6 +271,7 @@ module.exports = konstaConfig({
     },
   },
   plugins: [
+    require('flowbite/plugin'),
     require('@tailwindcss/typography'),
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/line-clamp'),

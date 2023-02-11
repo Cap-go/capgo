@@ -379,7 +379,7 @@ upgrade-now: Atualize agora
 url: URL
 usage:
   success: Seu plano foi configurado esta página será atualizada, em alguns minutos
-  title: Uso
+  title: ''
 version-builtin: Versão integrada
 welcome-to: Bem-vindo ao
 welcome-to-your-capg: Bem-vindo ao seu painel Capgo

@@ -51,7 +51,8 @@ watchEffect(async () => {
       <!-- Cards -->
       <Usage v-if="!isLoading" />
 
-      <div class="grid grid-cols-4 gap-6">
+      <div class="grid grid-cols-12 gap-6">
+        <!-- Line chart (Acme Plus) -->
         <!-- Table (Top Channels) -->
         <TopApps :apps="props.apps" @reload="emit('reloadApp')" />
 

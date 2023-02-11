@@ -369,7 +369,7 @@ upgrade-now: 지금 업그레이드
 url: URL
 usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
-  title: 용법
+  title: ''
 version-builtin: 버전 내장
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.

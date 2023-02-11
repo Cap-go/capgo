@@ -159,7 +159,7 @@ watchEffect(async () => {
     </td>
     <td class="" @click.stop="deleteVersion(props.version)">
       <div class="text-left">
-        <IconTrash class="text-red-600 text-lg" />
+        <IconTrash class="text-lg text-red-600" />
       </div>
     </td>
   </tr>

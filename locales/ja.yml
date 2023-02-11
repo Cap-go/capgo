@@ -369,7 +369,7 @@ upgrade-now: 今すぐアップグレード
 url: URL
 usage:
   success: プランが設定されましたこのページは数分で更新されます
-  title: 使用法
+  title: ''
 version-builtin: バージョン組み込み
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ

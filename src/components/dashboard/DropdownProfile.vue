@@ -63,7 +63,7 @@ onUnmounted(() => {
       :aria-expanded="dropdownOpen"
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
-      <img v-if="main.user?.image_url" class="w-8 h-8 rounded-full" :src="main.user?.image_url" width="32" height="32" alt="User">
+      <img v-if="main.user?.image_url" class="w-8 h-8 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
       <div v-else class="flex items-center justify-center w-8 h-8 border border-white rounded-full">
         <p>{{ acronym }}</p>
       </div>

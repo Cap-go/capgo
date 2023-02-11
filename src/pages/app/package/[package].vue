@@ -17,6 +17,9 @@ const devicesNb = ref(0)
 
 const loadAppInfo = async () => {
   try {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     const { data: dataApp } = await supabase
       .from('apps')
       .select()
@@ -45,6 +48,8 @@ const loadAppInfo = async () => {
       .select('device_id', { count: 'exact', head: true })
       .eq('is_emulator', false)
       .eq('is_prod', true)
+      .lte('updated_at', lastDay.toISOString())
+      .gte('updated_at', firstDay.toISOString())
       .eq('app_id', id.value)
       .then(res => res.count || 0)
     devicesNb.value = dataDevices || 0
@@ -78,15 +83,14 @@ watchEffect(async () => {
   <div v-if="isLoading" class="flex justify-center chat-items">
     <Spinner />
   </div>
-  <div v-else class="h-full w-full">
+  <div v-else class="w-full h-full">
     <div class="w-full h-full px-4 py-8 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
-      <div class="lg:max-w-xl lg:mx-auto sm:text-center pb-8">
+      <div class="pb-2 lg:max-w-xl lg:mx-auto sm:text-center">
         <h2 class="text-3xl font-bold text-gray-900 dark:text-white sm:text-4xl xl:text-5xl font-pj">
           {{ app?.name }}
         </h2>
       </div>
       <Usage :app-id="id" />
-
       <section class="py-12">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-20">

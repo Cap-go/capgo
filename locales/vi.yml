@@ -381,7 +381,7 @@ upgrade-now: Nâng cấp ngay bây giờ
 url: URL
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
-  title: Cách sử dụng
+  title: ''
 version-builtin: Nội trang phiên bản
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn

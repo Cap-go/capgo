@@ -17,13 +17,13 @@ const open = () => {
 </script>
 
 <template>
-  <div class="cursor-pointer hidden md:block" @click="open">
-    <Atropos class="z-10" :rotate-x-max="1" :rotate-y-max="1" :shadow="false">
-      <div class="flex flex-col h-56 items-center justify-center rounded-3xl border border-gray-300 bg-gray-800">
-        <p data-atropos-offset="10" class="text-7xl font-bold text-white font-pj">
+  <div class="hidden cursor-pointer md:block" @click="open">
+    <Atropos class="z-10" :rotate-x-max="15" :rotate-y-max="15" :shadow="false">
+      <div class="flex flex-col items-center justify-center h-56 bg-gray-800 border border-gray-300 rounded-3xl">
+        <p data-atropos-offset="5" class="font-bold text-white text-7xl font-pj">
           {{ props.number }}
         </p>
-        <p class="mt-4 text-2xl font-normal leading-tight text-gray-300 font-pj">
+        <p data-atropos-offset="5" class="mt-4 text-2xl font-normal leading-tight text-gray-300 font-pj">
           {{ props.label }}
         </p>
       </div>
@@ -31,11 +31,11 @@ const open = () => {
   </div>
 
   <div class="cursor-pointer md:hidden" @click="open">
-    <div class="flex flex-col h-40 items-center justify-center rounded-3xl border border-gray-300 dark:bg-gray-700 dark:hover:bg-white/50 hover:bg-black/50 transition-all ease-in-out">
-      <p class="text-5xl font-bold text-gray-900 dark:text-white font-pj">
+    <div class="flex flex-col items-center justify-center h-40 btn btn-outline">
+      <p class="text-5xl font-boldfont-pj">
         {{ props.number }}
       </p>
-      <p class="mt-4 text-lg font-normal leading-tight text-gray-900 dark:text-gray-300 font-pj">
+      <p class="mt-4 text-lg font-normal leading-tight font-pj">
         {{ props.label }}
       </p>
     </div>

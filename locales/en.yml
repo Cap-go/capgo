@@ -80,7 +80,6 @@ build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle-number: Bundle number
-open-settings: Click to open settings
 button:
   about: About
   back: Back
@@ -243,6 +242,7 @@ notifications: Notifications
 onboarding:
   loading: Loading
 one-day-left: One day left
+open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
 package:
@@ -382,7 +382,7 @@ upgrade-now: Upgrade now
 url: URL
 usage:
   success: Your plan has been setup this page will be update, in few minutes
-  title: Usage
+  title: Total
 version-build: Version build
 version-builtin: Version builtin
 welcome-to: Welcome to

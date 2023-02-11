@@ -369,7 +369,7 @@ upgrade-now: 现在升级
 url: 网址
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
-  title: 用法
+  title: ''
 version-builtin: 内置版本
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板

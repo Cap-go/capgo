@@ -86,10 +86,11 @@ const chartData = computed<ChartData<'doughnut'>>(() => ({
 const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
   plugins: {
     legend: {
+      display: false,
       position: 'left',
     },
     title: {
-      display: true,
+      display: false,
       text: 'Devices breakdown',
     },
   },

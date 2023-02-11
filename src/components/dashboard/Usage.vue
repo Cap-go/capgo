@@ -134,7 +134,7 @@ loadData()
 </script>
 
 <template>
-  <div class="w-full text-center text-xl font-semibold p-3 bg-blue-200 rounded-t-lg hover:bg-blue-300 cursor-pointer transition-all ease-in-out" @click="openPlan">
+  <div class="w-full p-3 text-xl font-semibold text-center transition-all ease-in-out bg-blue-200 rounded-t-lg cursor-pointer hover:bg-blue-300" @click="openPlan">
     Beta Charts
   </div>
   <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">

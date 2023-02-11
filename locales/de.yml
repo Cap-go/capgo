@@ -393,7 +393,7 @@ usage:
   success: >-
     Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten
     aktualisiert
-  title: Verwendungszweck
+  title: ''
 version-builtin: Version eingebaut
 welcome-to: Willkommen zu
 welcome-to-your-capg: Willkommen auf Ihrem Capgo-Dashboard

@@ -383,7 +383,7 @@ upgrade-now: Hemen Yükselt
 url: URL
 usage:
   success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
-  title: kullanım
+  title: ''
 version-builtin: Sürüm yerleşik
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz

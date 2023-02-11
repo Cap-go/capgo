@@ -233,3 +233,8 @@ onMounted(checkLogin)
     </div>
   </section>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: naked
+</route>

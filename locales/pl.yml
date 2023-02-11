@@ -379,7 +379,7 @@ usage:
   success: >-
     Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka
     minut
-  title: Stosowanie
+  title: ''
 version-builtin: Wbudowana wersja
 welcome-to: Witamy w
 welcome-to-your-capg: Witamy w Twoim panelu Capgo
