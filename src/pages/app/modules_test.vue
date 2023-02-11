@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
 import TitleHead from '~/components/TitleHead.vue'
 import { useDisplayStore } from '~/stores/display'
@@ -21,6 +22,7 @@ const modules = ref([] as Module[])
 const mods = {
   NativeMarket,
   CapacitorUpdater,
+  Camera,
   Mute,
 }
 modules.value.push(...[
@@ -84,8 +86,14 @@ modules.value.push(...[
     method: 'isMuted',
     option: {},
   },
+  {
+    name: 'Camera',
+    method: 'getPhoto',
+    option: {},
+  },
 ])
 // CapacitorUpdater.
+Camera.requestPermissions()
 const runMethod = async (m: Module) => {
   console.log('runMethod', m)
   displayStore.messageToast.push(`runMethod: ${JSON.stringify(m)}`);

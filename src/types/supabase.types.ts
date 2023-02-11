@@ -595,18 +595,21 @@ export interface Database {
           created_at: string | null
           developer: string
           developer_email: string
-          error_get_capacitor: string
+          error_get_framework: string
           error_get_info: string
           error_get_similar: string
+          flutter: boolean
           free: boolean
           icon: string
           installs: number
+          kotlin: boolean
+          native_script: boolean
           onprem: boolean
           react_native: boolean
           score: number
           summary: string
           title: string
-          to_get_capacitor: boolean
+          to_get_framework: boolean
           to_get_info: boolean
           to_get_similar: boolean
           updated_at: string
@@ -622,18 +625,21 @@ export interface Database {
           created_at?: string | null
           developer?: string
           developer_email?: string
-          error_get_capacitor?: string
+          error_get_framework?: string
           error_get_info?: string
           error_get_similar?: string
+          flutter?: boolean
           free?: boolean
           icon?: string
           installs?: number
+          kotlin?: boolean
+          native_script?: boolean
           onprem?: boolean
           react_native?: boolean
           score?: number
           summary?: string
           title?: string
-          to_get_capacitor?: boolean
+          to_get_framework?: boolean
           to_get_info?: boolean
           to_get_similar?: boolean
           updated_at?: string
@@ -649,18 +655,21 @@ export interface Database {
           created_at?: string | null
           developer?: string
           developer_email?: string
-          error_get_capacitor?: string
+          error_get_framework?: string
           error_get_info?: string
           error_get_similar?: string
+          flutter?: boolean
           free?: boolean
           icon?: string
           installs?: number
+          kotlin?: boolean
+          native_script?: boolean
           onprem?: boolean
           react_native?: boolean
           score?: number
           summary?: string
           title?: string
-          to_get_capacitor?: boolean
+          to_get_framework?: boolean
           to_get_info?: boolean
           to_get_similar?: boolean
           updated_at?: string
@@ -765,23 +774,34 @@ export interface Database {
     }
     Functions: {
       convert_bytes_to_gb: {
-        Args: { byt: number }
+        Args: {
+          byt: number
+        }
         Returns: number
       }
       convert_bytes_to_mb: {
-        Args: { byt: number }
+        Args: {
+          byt: number
+        }
         Returns: number
       }
       convert_gb_to_bytes: {
-        Args: { gb: number }
+        Args: {
+          gb: number
+        }
         Returns: number
       }
       convert_mb_to_bytes: {
-        Args: { gb: number }
+        Args: {
+          gb: number
+        }
         Returns: number
       }
       convert_number_to_percent: {
-        Args: { val: number; max_val: number }
+        Args: {
+          val: number
+          max_val: number
+        }
         Returns: number
       }
       count_all_apps: {
@@ -793,84 +813,156 @@ export interface Database {
         Returns: number
       }
       exist_app: {
-        Args: { appid: string; apikey: string }
+        Args: {
+          appid: string
+          apikey: string
+        }
         Returns: boolean
       }
       exist_app_v2: {
-        Args: { appid: string }
+        Args: {
+          appid: string
+        }
         Returns: boolean
       }
       exist_app_versions: {
-        Args: { appid: string; name_version: string; apikey: string }
+        Args: {
+          appid: string
+          name_version: string
+          apikey: string
+        }
         Returns: boolean
       }
       exist_channel: {
-        Args: { appid: string; name_channel: string; apikey: string }
+        Args: {
+          appid: string
+          name_channel: string
+          apikey: string
+        }
         Returns: boolean
       }
       exist_user: {
-        Args: { e_mail: string }
+        Args: {
+          e_mail: string
+        }
         Returns: string
       }
       find_best_plan_v3: {
-        Args: { mau: number; bandwidth: number; storage: number }
+        Args: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }
         Returns: string
       }
       find_fit_plan_v3: {
-        Args: { mau: number; bandwidth: number; storage: number }
-        Returns: { name: string }[]
+        Args: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }
+        Returns: {
+          name: string
+        }[]
       }
       get_current_plan_max: {
-        Args: { userid: string }
-        Returns: { mau: number; bandwidth: number; storage: number }[]
+        Args: {
+          userid: string
+        }
+        Returns: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }[]
       }
       get_current_plan_name: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: string
       }
       get_devices_version: {
-        Args: { app_id: string; version_id: number }
+        Args: {
+          app_id: string
+          version_id: number
+        }
         Returns: number
       }
       get_dl_by_month: {
-        Args: { userid: string; pastmonth: number }
-        Returns: { app_id: string; maxdownload: number }[]
+        Args: {
+          userid: string
+          pastmonth: number
+        }
+        Returns: {
+          app_id: string
+          maxdownload: number
+        }[]
       }
       get_dl_by_month_by_app:
         | {
-            Args: { pastmonth: number; appid: string }
+            Args: {
+              pastmonth: number
+              appid: string
+            }
             Returns: number
           }
         | {
-            Args: { userid: string; pastmonth: number; appid: string }
-            Returns: { app_id: string; maxdownload: number }[]
+            Args: {
+              userid: string
+              pastmonth: number
+              appid: string
+            }
+            Returns: {
+              app_id: string
+              maxdownload: number
+            }[]
           }
       get_max_channel: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: number
       }
       get_max_plan: {
-        Args: { userid: string }
-        Returns: { mau: number; storage: number; bandwidth: number }[]
+        Args: {
+          userid: string
+        }
+        Returns: {
+          mau: number
+          storage: number
+          bandwidth: number
+        }[]
       }
       get_max_shared: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: number
       }
       get_max_version: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: number
       }
       get_metered_usage: {
-        Args: { userid: string }
-        Returns: unknown
+        Args: {
+          userid: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["stats_table"]
       }
       get_plan_usage_percent: {
-        Args: { userid: string; dateid: string }
+        Args: {
+          userid: string
+          dateid: string
+        }
         Returns: number
       }
       get_stats: {
-        Args: { userid: string; dateid: string }
+        Args: {
+          userid: string
+          dateid: string
+        }
         Returns: {
           max_channel: number
           max_shared: number
@@ -882,11 +974,20 @@ export interface Database {
         }[]
       }
       get_total_stats_v2: {
-        Args: { userid: string; dateid: string }
-        Returns: { mau: number; bandwidth: number; storage: number }[]
+        Args: {
+          userid: string
+          dateid: string
+        }
+        Returns: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }[]
       }
       get_user_id: {
-        Args: { apikey: string }
+        Args: {
+          apikey: string
+        }
         Returns: string
       }
       increment_stats: {
@@ -921,23 +1022,36 @@ export interface Database {
         Returns: undefined
       }
       increment_store: {
-        Args: { app_id: string; updates: number }
+        Args: {
+          app_id: string
+          updates: number
+        }
         Returns: undefined
       }
       increment_version_stats: {
-        Args: { app_id: string; version_id: number; devices: number }
+        Args: {
+          app_id: string
+          version_id: number
+          devices: number
+        }
         Returns: undefined
       }
       is_admin: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_allowed_action: {
-        Args: { apikey: string }
+        Args: {
+          apikey: string
+        }
         Returns: boolean
       }
       is_allowed_action_user: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_allowed_capgkey:
@@ -957,51 +1071,79 @@ export interface Database {
             Returns: boolean
           }
       is_app_owner: {
-        Args: { userid: string; appid: string }
+        Args: {
+          userid: string
+          appid: string
+        }
         Returns: boolean
       }
       is_app_shared: {
-        Args: { userid: string; appid: string }
+        Args: {
+          userid: string
+          appid: string
+        }
         Returns: boolean
       }
       is_canceled: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_free_usage: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_good_plan_v3: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_in_channel: {
-        Args: { userid: string; ownerid: string }
+        Args: {
+          userid: string
+          ownerid: string
+        }
         Returns: boolean
       }
       is_not_deleted: {
-        Args: { email_check: string }
+        Args: {
+          email_check: string
+        }
         Returns: boolean
       }
       is_onboarded: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_onboarding_needed: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_paying: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: boolean
       }
       is_trial: {
-        Args: { userid: string }
+        Args: {
+          userid: string
+        }
         Returns: number
       }
       is_version_shared: {
-        Args: { userid: string; versionid: number }
+        Args: {
+          userid: string
+          versionid: number
+        }
         Returns: boolean
       }
     }
@@ -1017,6 +1159,16 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
+    }
+    CompositeTypes: {
+      match_plan: {
+        name: string
+      }
+      stats_table: {
+        mau: number
+        bandwidth: number
+        storage: number
+      }
     }
   }
 }
