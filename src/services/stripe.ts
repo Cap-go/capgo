@@ -53,6 +53,9 @@ export const openPortal = async () => {
   }
   return null
 }
+const getClientReferenceId = () => {
+  return window.Rewardful && window.Rewardful.referral ? window.Rewardful.referral : (`checkout_${(new Date()).getTime()}`)
+}
 
 export const openCheckout = async (priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) => {
 //   console.log('openCheckout')
@@ -63,7 +66,7 @@ export const openCheckout = async (priceId: string, successUrl: string, cancelUr
   displayStore.messageLoader = 'Please wait...'
   try {
     displayStore.showLoader = true
-    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId, successUrl, cancelUrl, reccurence: isYear ? 'year' : 'month' }) })
+    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId, successUrl, cancelUrl, reccurence: isYear ? 'year' : 'month', clientReferenceId: getClientReferenceId() }) })
     displayStore.showLoader = false
     if (!resp.error && resp.data && resp.data.url)
       openBlank(resp.data.url)
