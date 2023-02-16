@@ -87,11 +87,9 @@ const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
   plugins: {
     legend: {
       display: false,
-      position: 'left',
     },
     title: {
       display: false,
-      text: 'Devices breakdown',
     },
   },
 }))
@@ -133,6 +131,8 @@ watchEffect(async () => {
         </div>
       </div>
     </div>
-    <Doughnut class="w-full px-3 mx-auto my-3 h-max" :chart-data="chartData" :chart-options="chartOptions" />
+    <div class="w-full p-6">
+      <Doughnut :chart-data="chartData" :chart-options="chartOptions" />
+    </div>
   </div>
 </template>

@@ -136,11 +136,10 @@ const chartOptions = {
       annotations: generateAnnotations.value,
     },
     legend: {
-      labels: {
-        filter: (item: any) => {
-          return item.text !== 'none'
-        },
-      },
+      display: false,
+    },
+    title: {
+      display: false,
     },
   },
 }
@@ -148,5 +147,7 @@ const chartOptions = {
 </script>
 
 <template>
-  <Line class="" :chart-data="chartData" :chart-options="chartOptions" />
+  <div class="w-full p-6">
+    <Line class="" :chart-data="chartData" :chart-options="chartOptions" />
+  </div>
 </template>
