@@ -16,7 +16,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 border-b bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-slate-200">
+  <header class="border-b bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-slate-200">
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->

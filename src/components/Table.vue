@@ -13,7 +13,7 @@ import IconSortDown from '~icons/lucide/chevron-down'
 import IconSearch from '~icons/ic/round-search'
 import IconReload from '~icons/uiw/reload'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
-import IconFilter from '~icons/ic/round-check-box'
+import IconFilter from '~icons/system-uicons/filtering'
 import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
@@ -43,6 +43,15 @@ const filterList = computed(() => {
   if (!props.filters)
     return []
   return Object.keys(props.filters)
+})
+const filterActivated = computed(() => {
+  if (!props.filters)
+    return []
+  return Object.keys(props.filters).reduce((acc, key) => {
+    if (props.filters![key])
+      acc += 1
+    return acc
+  }, 0)
 })
 
 const sortClick = (key: number) => {
@@ -84,19 +93,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
-    <div class="flex items-start justify-between pb-4 md:items-center ">
+  <div class="relative pb-4 pb-20 overflow-x-auto shadow-md sm:rounded-lg md:pb-0">
+    <div class="flex items-start justify-between md:items-center ">
       <div class="mb-2 md:mb-0">
         <button class="inline-flex items-center mr-2 text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button" @click="emit('reload')">
           <IconReload class="m-1" />
         </button>
-        <button v-if="filterText && filterList" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="inline-flex items-center text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button">
+        <button v-if="filterText && filterList" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="relative inline-flex items-center text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button">
+          <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -top-2 -right-2 dark:border-gray-900">
+            {{ filterActivated }}
+          </div>
           <IconFilter class="m-1 mr-2" />
           <span class="hidden md:block">{{ filterText }}</span>
           <IconDown class="m-1 ml-2" />
         </button>
         <!-- Dropdown menu -->
-        <div id="dropdownRadio" class="z-10 hidden w-48 pl-4 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
+        <div id="dropdownRadio" class="z-50 hidden w-48 pl-4 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
           <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
@@ -173,7 +185,7 @@ onMounted(() => {
         </template>
       </kListItem>
     </kList>
-    <nav class="flex items-center justify-between pt-4" aria-label="Table navigation">
+    <nav class="fixed bottom-0 left-0 flex items-center justify-between w-full p-4 md:pt-4 bg-white/90 dark:bg-gray-900/90 md:bg-transparent md:dark:bg-transparent md:relative" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">Showing</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
         <li>

@@ -29,7 +29,7 @@
   width: 100vw;
   overscroll-behavior: none;
 } */
-html, body {
+html {
   height: 100%;
   overflow: hidden;
 }
