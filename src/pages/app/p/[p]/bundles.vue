@@ -1,30 +1,29 @@
 <!-- eslint-disable @typescript-eslint/no-use-before-define -->
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import {
-  kList,
-} from 'konsta/vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
-import IconPrevious from '~icons/heroicons/chevron-left'
-import IconNext from '~icons/heroicons/chevron-right'
+import IconTrash from '~icons/heroicons/trash?raw'
+import { bytesToMbText } from '~/services/conversion'
+import { formatDate } from '~/services/date'
+import { useDisplayStore } from '~/stores/display'
 
-const emit = defineEmits(['reload'])
+const displayStore = useDisplayStore()
+const router = useRouter()
 const versions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
 const { t } = useI18n()
-const isLoadingSub = ref(false)
 const supabase = useSupabase()
 const search = ref('')
+const total = ref(0)
 const route = useRoute()
 const isLoading = ref(false)
-const filtered = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
-const displayedVersions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
-let currentPageNumber = 1
-const pageNumbers = ref<number[]>([1])
-const filteredPageNumbers = ref<number[]>([1])
+const currentPageNumber = ref(1)
 const appId = ref('')
+const filters = ref({
+  external: false,
+})
 const offset = 10
 const currentVersionsNumber = ref(0)
 
@@ -40,101 +39,190 @@ const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['a
   return newVersions
 }
 
-const versionsFiltered = computed(() => {
-  if (search.value)
-    return filtered.value
-  return versions.value
-})
-
-const pageNumberFiltered = computed(() => {
-  if (search.value)
-    return filteredPageNumbers.value
-  return pageNumbers.value
-})
-
-const display = async (pageNumber: number) => {
-  console.log('display', currentVersionsNumber.value, pageNumber, offset)
-  // Display the versions between the two indexes
-  const firstIndex = (pageNumber - 1) * offset
-  const lastIndex = firstIndex + offset
-
-  if (currentVersionsNumber.value < lastIndex) {
-    console.log('load more', currentVersionsNumber.value, lastIndex)
-    await getVersionsLength()
-    await loadData()
+const didCancel = async (name: string) => {
+  displayStore.dialogOption = {
+    header: t('alert.confirm-delete'),
+    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    buttons: [
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button.delete'),
+        id: 'confirm-button',
+      },
+    ],
   }
-
-  displayedVersions.value = versionsFiltered.value.slice(firstIndex, lastIndex)
-  currentPageNumber = pageNumber
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
-const getVersionsLength = async () => {
-  const length = await supabase
-    .from('app_versions')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId.value)
-    .eq('deleted', false)
-    .then(res => res.count || 0)
-  const pages = Array.from(Array(Math.ceil(length / offset)).keys())
-  pageNumbers.value = pages.slice(1, pages.length)
-}
-
-const searchVersion = async () => {
-  isLoadingSub.value = true
-  const { data: dataVersions } = await supabase
-    .from('app_versions')
-    .select()
-    .eq('app_id', appId.value)
-    .eq('deleted', false)
-    .order('created_at', { ascending: false })
-    .like('name', `%${search.value}%`)
-  if (!dataVersions) {
-    filtered.value = []
-    isLoadingSub.value = false
+const deleteBundle = async (bundle: Database['public']['Tables']['app_versions']['Row']) => {
+  // console.log('deleteBundle', bundle)
+  if (await didCancel(t('device.version')))
     return
+  try {
+    const { data: channelFound, error: errorChannel } = await supabase
+      .from('channels')
+      .select()
+      .eq('app_id', bundle.app_id)
+      .eq('version', bundle.id)
+    if ((channelFound && channelFound.length) || errorChannel) {
+      displayStore.messageToast.push(`${t('device.version')} ${bundle.app_id}@${bundle.name} ${t('pckage.version.is-used-in-channel')}`)
+      return
+    }
+    const { data: deviceFound, error: errorDevice } = await supabase
+      .from('devices_override')
+      .select()
+      .eq('app_id', bundle.app_id)
+      .eq('version', bundle.id)
+    if ((deviceFound && deviceFound.length) || errorDevice) {
+      displayStore.messageToast.push(`${t('device.version')} ${bundle.app_id}@${bundle.name} ${t('package.version.is-used-in-device')}`)
+      return
+    }
+    const { error: delError } = await supabase
+      .storage
+      .from('apps')
+      .remove([`${bundle.user_id}/${bundle.app_id}/versions/${bundle.bucket_id}`])
+    const { error: delAppError } = await supabase
+      .from('app_versions')
+      .update({ deleted: true })
+      .eq('app_id', bundle.app_id)
+      .eq('id', bundle.id)
+    if (delAppError || delError) {
+      displayStore.messageToast.push(t('package.cannot-delete-version'))
+    }
+    else {
+      displayStore.messageToast.push(t('package.version-deleted'))
+      await refreshData()
+    }
   }
-  const pages = Array.from(Array(Math.ceil(dataVersions.length / offset)).keys())
-  filteredPageNumbers.value = pages.slice(1, pages.length)
-  filtered.value = await enhenceVersionElems(dataVersions)
-  isLoadingSub.value = false
-  currentPageNumber = 1
-  display(currentPageNumber)
+  catch (error) {
+    displayStore.messageToast.push(t('package.cannot-delete-version'))
+  }
 }
 
+const columns = ref([
+  {
+    label: 'Name',
+    key: 'name',
+    mobile: 'title',
+    sortable: true,
+    head: true,
+  },
+  {
+    label: 'Created at',
+    key: 'created_at',
+    mobile: 'header',
+    sortable: false,
+    displayFunction: (elem: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']) => formatDate(elem.created_at || ''),
+  },
+  {
+    label: 'Size',
+    mobile: 'footer',
+    key: 'size',
+    sortable: false,
+    displayFunction: (elem: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']) => {
+      if (elem.size)
+        return bytesToMbText(elem.size)
+      else if (elem.external_url)
+        return t('package.externally')
+      else
+        return t('package.size_not_found')
+    },
+  },
+  {
+    label: 'Action',
+    mobile: 'after',
+    icon: IconTrash,
+    class: 'text-red-500',
+    onClick: deleteBundle,
+  },
+])
 const loadData = async () => {
   try {
-    let total = 0
-    const { data: dataVersions } = await supabase
+    const req = supabase
       .from('app_versions')
-      .select()
+      .select('*', { count: 'exact' })
       .eq('app_id', appId.value)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
+    if (search.value)
+      req.like('name', `%${search.value}%`)
+
+    // if (filters.value.external)
+    //   req.eq('external_url', null)
+    const { data: dataVersions, count } = await req
+
     if (!dataVersions)
       return
     versions.value.push(...(await enhenceVersionElems(dataVersions)))
-    total = dataVersions.length
-    if (total === offset)
+    total.value = count || 0
+    if (dataVersions.length === offset) {
       currentVersionsNumber.value += offset
+      currentPageNumber.value = Math.ceil(currentVersionsNumber.value / offset)
+    }
   }
   catch (error) {
     console.error(error)
   }
 }
 
+const onSearch = async (s: string) => {
+  search.value = s
+  currentVersionsNumber.value = 0
+  await refreshData()
+}
+const prev = async () => {
+  console.log('prev')
+  if (currentPageNumber.value > 1) {
+    currentVersionsNumber.value -= offset * 2
+    versions.value.length = 0
+    await loadData()
+  }
+}
+const next = async () => {
+  console.log('next')
+  if (currentPageNumber.value < Math.ceil(total.value / offset)) {
+    versions.value.length = 0
+    await loadData()
+  }
+}
+const fastForward = async () => {
+  console.log('fastForward')
+  if (currentPageNumber.value < Math.ceil(total.value / offset)) {
+    currentVersionsNumber.value = total.value - offset
+    versions.value.length = 0
+    await loadData()
+  }
+}
+const fastBackward = async () => {
+  console.log('fastBackward')
+  if (currentPageNumber.value > 1) {
+    currentVersionsNumber.value = 0
+    versions.value.length = 0
+    await loadData()
+  }
+}
 const refreshData = async () => {
   isLoading.value = true
   try {
+    currentVersionsNumber.value = 0
+    versions.value.length = 0
     await loadData()
-    await getVersionsLength()
-    display(currentPageNumber)
   }
   catch (error) {
     console.error(error)
   }
   isLoading.value = false
+}
+
+const openBundle = (bundle: Database['public']['Tables']['app_versions']['Row']) => {
+  console.log('openBundle', bundle)
+  router.push(`/app/p/${appId.value.replace(/\./g, '--')}/bundle/${bundle.id}`)
 }
 
 onMounted(async () => {
@@ -148,65 +236,15 @@ onMounted(async () => {
 
 <template>
   <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" />
-  <div class="h-full overflow-y-scroll py-4">
-    <div id="versions" class="mt-5 border md:w-2/3 mx-auto rounded-lg shadow-lg border-slate-200 dark:bg-gray-800 dark:border-slate-900 flex flex-col overflow-y-scroll">
-      <header class="px-5 py-4 border-b border-slate-100">
-        <h2 class="font-semibold text-xl text-slate-800 dark:text-white">
-          {{ t('package.versions') }}
-        </h2>
-      </header>
-      <input v-model="search" class="w-full px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="searchVersion">
-      <div class="">
-        <!-- Table -->
-        <div class="hidden md:block overflow-x-auto p-3">
-          <table class="w-full table-auto" aria-label="Table with your apps">
-            <!-- Table header -->
-            <thead class="text-md uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
-              <tr>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
-                    {{ t('name') }}
-                  </div>
-                </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
-                    {{ t('pckage.version.created-at') }}
-                  </div>
-                </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
-                    {{ t('pckage.version.size') }}
-                  </div>
-                </th>
-                <th class="p-2">
-                  <div class="font-semibold text-left">
-                    {{ t('button.options') }}
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <!-- Table body -->
-            <tbody class="text-md font-medium divide-y divide-slate-100">
-              <!-- Row -->
-              <VersionCard v-for="(version, i) in displayedVersions" :key="version.name + i" :version="version" @reload="emit('reload')" />
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <k-list class="md:hidden w-full my-0">
-        <VersionCard v-for="(version, i) in displayedVersions" :key="version.name + i" :version="version" @reload="emit('reload')" />
-      </k-list>
-      <div class="py-6">
-        <div class="px-4 mx-auto sm:px-6 lg:px-8">
-          <nav class="relative flex justify-center -space-x-px rounded-md">
-            <IconPrevious v-if="currentPageNumber > 1" class="dark:text-white text-gray-400 self-center text-lg cursor-pointer" @click="display(currentPageNumber - 1)" />
-            <a v-if="currentPageNumber > 1" class="relative cursor-pointer text-gray-400 dark:text-gray-200 hover:text-gray-700 dark:hover:text-white bg-white dark:bg-gray-800  inline-flex items-center justify-center px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 focus:z-10 w-9" @click="display(currentPageNumber - 1)"> {{ currentPageNumber - 1 }} </a>
-            <a class="relative cursor-pointer text-lg text-gray-600 dark:text-white hover:text-gray-700 dark:hover:text-white bg-white dark:bg-gray-800  inline-flex items-center justify-center px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 focus:z-10 w-9"> {{ currentPageNumber }} </a>
-            <a v-if="currentPageNumber < pageNumberFiltered[pageNumberFiltered.length - 1]" class="relative cursor-pointer text-gray-400 dark:text-gray-200 hover:text-gray-700 dark:hover:text-white bg-white dark:bg-gray-800  inline-flex items-center justify-center px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 focus:z-10 w-9" @click="display(currentPageNumber + 1)"> {{ currentPageNumber + 1 }} </a>
-            <IconNext v-if="currentPageNumber < pageNumberFiltered[pageNumberFiltered.length - 1]" class="dark:text-white text-gray-400 self-center text-lg cursor-pointer" @click="display(currentPageNumber + 1)" />
-          </nav>
-        </div>
-      </div>
+  <div class="h-full overflow-y-scroll md:py-4">
+    <div id="versions" class="flex flex-col mx-auto overflow-y-scroll border rounded-lg shadow-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+      <Table
+        class="p-3" :total="total" :current-page="currentPageNumber" row-click
+
+        :element-list="versions" :columns="columns" :filters="filters" filter-text="Filters"
+        search-placeholder="Search Bundle" @search-input="onSearch" @reload="refreshData()"
+        @prev="prev" @next="next" @fast-backward="fastBackward" @fast-forward="fastForward" @row-click="openBundle"
+      />
     </div>
   </div>
 </template>

@@ -141,7 +141,7 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openVersion(props.version)">
+  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openVersion(props.version)">
     <td class="p-2">
       <div class="text-left">
         {{ props.version.name }}
@@ -171,7 +171,7 @@ watchEffect(async () => {
     @click="openVersion(props.version)"
   >
     <template #after>
-      <IconTrash class="text-red-600 text-lg" @click.stop="deleteVersion(props.version)" />
+      <IconTrash class="text-lg text-red-600" @click.stop="deleteVersion(props.version)" />
     </template>
   </k-list-item>
 </template>

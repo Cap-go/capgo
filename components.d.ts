@@ -40,6 +40,7 @@ declare module '@vue/runtime-core' {
     SharedApps: typeof import('./src/components/dashboard/SharedApps.vue')['default']
     Sidebar: typeof import('./src/components/Sidebar.vue')['default']
     Spinner: typeof import('./src/components/Spinner.vue')['default']
+    Table: typeof import('./src/components/Table.vue')['default']
     TitleHead: typeof import('./src/components/TitleHead.vue')['default']
     Toast: typeof import('./src/components/Toast.vue')['default']
     TopApps: typeof import('./src/components/dashboard/TopApps.vue')['default']
