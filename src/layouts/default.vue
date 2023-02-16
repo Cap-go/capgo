@@ -7,7 +7,7 @@ const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-full overflow-hidden bg-white pt-safe dark:bg-gray-900/90">
+  <div class="flex h-full overflow-hidden bg-white pt-safe dark:bg-gray-900/90 safe-areas">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
     <!-- Content area -->
@@ -15,7 +15,7 @@ const sidebarOpen = ref(false)
       <!-- Site header -->
       <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
       <main class="w-full h-full overflow-hidden">
-        <RouterView />
+        <RouterView class="h-full overflow-y-scroll" />
       </main>
     </div>
   </div>

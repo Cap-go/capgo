@@ -33,7 +33,7 @@ const back = () => {
 
 <template>
   <k-navbar
-    class="sticky top-0 md:hidden no-safe-areas"
+    class="md:hidden no-safe-areas"
     :subnavbar-class="`flex-col ${searchIcon ? '!h-16' : ''}`"
   >
     <template #left>
