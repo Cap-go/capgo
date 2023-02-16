@@ -5,7 +5,11 @@ import { initDropdowns } from 'flowbite'
 import {
   kList, kListItem,
 } from 'konsta/vue'
+import type { MobileColType, TableColumn } from './Table-def'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import IconSort from '~icons/lucide/chevrons-up-down'
+import IconSortUp from '~icons/lucide/chevron-up'
+import IconSortDown from '~icons/lucide/chevron-down'
 import IconSearch from '~icons/ic/round-search'
 import IconReload from '~icons/uiw/reload'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
@@ -14,33 +18,25 @@ import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
 
-type MobilePos = 'header' | 'title' | 'footer' | 'after'
-interface Column {
-  label: string
-  key: string
-  mobile: MobilePos
-  displayFunction?: (elem: any) => string
-  sortable?: boolean
-  head?: boolean
-  class?: string
-  icon?: string
-  onClick?: (elem: any) => void
-}
-
 interface Props {
   rowClick?: boolean
+  isLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
   searchPlaceholder?: string
   total: number
   currentPage: number
-  columns: Column[]
+  columns: TableColumn[]
   elementList: { [key: string]: any }[]
 }
-const props = defineProps<Props>()
-const emit = defineEmits(['reload', 'next', 'prev', 'fastForward', 'fastBackward', 'searchInput', 'filterButtonClick', 'rowClick'])
-const search = ref('')
 
+const props = defineProps<Props>()
+const emit = defineEmits([
+  'reload', 'next', 'prev', 'fastForward', 'fastBackward',
+  'searchInput', 'update:filters', 'update:columns',
+  'filterClick', 'rowClick', 'sortClick'])
+const search = ref('')
+// const sorts = ref<TableSort>({})
 // get columns from elementList
 
 const filterList = computed(() => {
@@ -49,24 +45,39 @@ const filterList = computed(() => {
   return Object.keys(props.filters)
 })
 
+const sortClick = (key: number) => {
+  let sortable = props.columns[key].sortable
+  if (sortable === 'asc')
+    sortable = 'desc'
+  else if (sortable === 'desc')
+    sortable = true
+  else
+    sortable = 'asc'
+  const newColumns = [...props.columns]
+  newColumns[key].sortable = sortable
+  emit('update:columns', newColumns)
+}
+
 watch(search, debounce(() => {
   if (search.value)
     emit('searchInput', search.value)
 }, 500))
 
-const displayValueKey = (elem: any, col: Column | undefined) => {
+const displayValueKey = (elem: any, col: TableColumn | undefined) => {
   if (!col)
     return ''
   return col.displayFunction ? col.displayFunction(elem) : elem[col.key]
 }
-const displayElemRange = computed((elem: any, col: Column) => {
+const displayElemRange = computed(() => {
   const begin = (props.currentPage - 1) * props.elementList.length
   const end = begin + props.elementList.length
   return `${begin}-${end}`
 })
-const findMobileCol = (cols: Column[], name: MobilePos) => {
-  return cols.find(col => col.mobile === name)
+
+const findMobileCol = (name: MobileColType) => {
+  return props.columns ? props.columns.find(col => col.mobile === name) : undefined
 }
+
 onMounted(() => {
   initDropdowns()
 })
@@ -87,9 +98,9 @@ onMounted(() => {
         <!-- Dropdown menu -->
         <div id="dropdownRadio" class="z-10 hidden w-48 pl-4 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
           <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
-            <li v-for="f, i in filterList" :key="i">
+            <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
-                <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" @click="emit('filterButtonClick', f)">
+                <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" @click="emit('filterClick', { clicked: f, filters })">
                 <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300">{{ f }}</label>
               </div>
             </li>
@@ -109,62 +120,56 @@ onMounted(() => {
       <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-for="col, i in columns" :key="i" scope="col" class="px-6 py-3">
-              {{ col.label }}
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable }" @click="sortClick(i)">
+              <div class="flex items-center">
+                {{ col.label }}
+                <div v-if="col.sortable">
+                  <IconSortUp v-if="col.sortable === 'asc'" />
+                  <IconSortDown v-else-if="col.sortable === 'desc'" />
+                  <IconSort v-else />
+                </div>
+              </div>
             </th>
           </tr>
         </thead>
-        <tbody v-if="elementList.length">
-          <template v-for="elem, i in elementList" :key="i">
-            <tr :class="{ 'cursor-pointer': rowClick }" class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" @click="emit('rowClick', elem)">
-              <template v-for="col, y in columns" :key="`${i}_${y}`">
-                <th v-if="col.head" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                  {{ displayValueKey(elem, col) }}
-                </th>
-                <td v-else-if="col.icon" :class="col.class" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick" v-html="col.icon" />
-                <td v-else class="px-6 py-4">
-                  {{ displayValueKey(elem, col) }}
-                </td>
-              </template>
-            </tr>
-          </template>
+        <tbody v-if="!isLoading">
+          <tr
+            v-for="(elem, i) in elementList" :key="i"
+            :class="{ 'cursor-pointer': rowClick }"
+            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+            @click="emit('rowClick', elem)"
+          >
+            <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
+              <th v-if="col.head" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                {{ displayValueKey(elem, col) }}
+              </th>
+              <td v-else-if="col.icon" :class="col.class" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick" v-html="col.icon" />
+              <td v-else class="px-6 py-4">
+                {{ displayValueKey(elem, col) }}
+              </td>
+            </template>
+          </tr>
         </tbody>
         <tbody v-else>
-          <template v-for="i in 10" :key="i">
-            <tr class="max-w-sm animate-pulse">
-              <template v-for="col, y in columns" :key="`${i}_${y}`">
-                <td class="px-6 py-4">
-                  <div class="bg-gray-200 rounded-full dark:bg-gray-700 max-w-[300px]" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
-                </td>
-              </template>
-            </tr>
-          </template>
+          <tr v-for="i in 10" :key="i" class="max-w-sm animate-pulse">
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-6 py-4">
+              <div class="bg-gray-200 rounded-full dark:bg-gray-700 max-w-[300px]" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
     <kList class="block !my-0 md:hidden">
       <kListItem
-        v-for="elem, i in elementList" :key="i"
+        v-for="(elem, i) in elementList" :key="i"
         :data-dropdown-toggle="`dropdownRadio_${i}`"
-        :title="displayValueKey(elem, findMobileCol(columns, 'title'))"
-        :footer="displayValueKey(elem, findMobileCol(columns, 'footer'))"
-        :header="displayValueKey(elem, findMobileCol(columns, 'header'))"
+        :title="displayValueKey(elem, findMobileCol('title'))"
+        :footer="displayValueKey(elem, findMobileCol('footer'))"
+        :header="displayValueKey(elem, findMobileCol('header'))"
         @click="emit('rowClick', elem)"
       >
-        <template #text>
-          <div :id="`dropdownRadio_${i}`" class="z-10 hidden w-48 pl-4 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
-            <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
-              <li v-for="f, i in filterList" :key="i">
-                <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
-                  <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" @click="emit('filterButtonClick', f)">
-                  <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300">{{ f }}</label>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </template>
         <template #after>
-          <div @click.stop="findMobileCol(columns, 'after')?.onClick" v-html="findMobileCol(columns, 'after')?.icon" />
+          <div @click.stop="findMobileCol('after')?.onClick" v-html="findMobileCol('after')?.icon" />
         </template>
       </kListItem>
     </kList>
@@ -172,31 +177,33 @@ onMounted(() => {
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">Showing</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
-          <a href="#" class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('fastBackward')">
+          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('fastBackward')">
             <span class="sr-only">Fast Backward</span>
             <IconFastBackward />
-          </a>
+          </button>
         </li>
         <li>
-          <a href="#" class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('prev')">
+          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('prev')">
             <span class="sr-only">Previous</span>
             <IconPrev />
-          </a>
+          </button>
         </li>
         <li>
-          <a href="#" aria-current="page" class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-700 dark:text-white">{{ currentPage }}</a>
+          <button aria-current="page" class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-700 dark:text-white">
+            {{ currentPage }}
+          </button>
         </li>
         <li>
-          <a href="#" class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('next')">
+          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('next')">
             <span class="sr-only">Next</span>
             <IconNext />
-          </a>
+          </button>
         </li>
         <li>
-          <a href="#" class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('fastForward')">
+          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('fastForward')">
             <span class="sr-only"> Fast Forward </span>
             <IconFastForward />
-          </a>
+          </button>
         </li>
       </ul>
     </nav>

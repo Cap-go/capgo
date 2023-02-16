@@ -1,6 +1,6 @@
 <!-- eslint-disable @typescript-eslint/no-use-before-define -->
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
@@ -9,6 +9,7 @@ import IconTrash from '~icons/heroicons/trash?raw'
 import { bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useDisplayStore } from '~/stores/display'
+import type { TableColumn } from '~/components/Table-def'
 
 const displayStore = useDisplayStore()
 const router = useRouter()
@@ -103,7 +104,7 @@ const deleteBundle = async (bundle: Database['public']['Tables']['app_versions']
   }
 }
 
-const columns = ref([
+const columns = ref<TableColumn[]>([
   {
     label: 'Name',
     key: 'name',
@@ -115,14 +116,14 @@ const columns = ref([
     label: 'Created at',
     key: 'created_at',
     mobile: 'header',
-    sortable: false,
+    sortable: 'desc',
     displayFunction: (elem: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']) => formatDate(elem.created_at || ''),
   },
   {
     label: 'Size',
     mobile: 'footer',
     key: 'size',
-    sortable: false,
+    sortable: true,
     displayFunction: (elem: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']) => {
       if (elem.size)
         return bytesToMbText(elem.size)
@@ -134,6 +135,7 @@ const columns = ref([
   },
   {
     label: 'Action',
+    key: 'action',
     mobile: 'after',
     icon: IconTrash,
     class: 'text-red-500',
@@ -141,22 +143,27 @@ const columns = ref([
   },
 ])
 const loadData = async () => {
+  isLoading.value = true
   try {
     const req = supabase
       .from('app_versions')
       .select('*', { count: 'exact' })
       .eq('app_id', appId.value)
       .eq('deleted', false)
-      .order('created_at', { ascending: false })
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
       req.like('name', `%${search.value}%`)
 
-    // if (filters.value.external)
-    //   req.eq('external_url', null)
+    if (filters.value.external)
+      req.neq('external_url', null)
+    if (columns.value.length) {
+      columns.value.forEach((col) => {
+        if (col.sortable && typeof col.sortable === 'string')
+          req.order(col.key as any, { ascending: col.sortable === 'asc' })
+      })
+    }
     const { data: dataVersions, count } = await req
-
     if (!dataVersions)
       return
     versions.value.push(...(await enhenceVersionElems(dataVersions)))
@@ -169,13 +176,14 @@ const loadData = async () => {
   catch (error) {
     console.error(error)
   }
+  isLoading.value = false
 }
 
 const onSearch = async (s: string) => {
   search.value = s
-  currentVersionsNumber.value = 0
   await refreshData()
 }
+
 const prev = async () => {
   console.log('prev')
   if (currentPageNumber.value > 1) {
@@ -207,8 +215,16 @@ const fastBackward = async () => {
     await loadData()
   }
 }
+watch(columns.value, () => {
+  console.log('onColumn', columns.value)
+  refreshData()
+})
+watch(filters.value, () => {
+  console.log('onFilter', filters.value)
+  refreshData()
+})
+
 const refreshData = async () => {
-  isLoading.value = true
   try {
     currentVersionsNumber.value = 0
     versions.value.length = 0
@@ -217,7 +233,6 @@ const refreshData = async () => {
   catch (error) {
     console.error(error)
   }
-  isLoading.value = false
 }
 
 const openBundle = (bundle: Database['public']['Tables']['app_versions']['Row']) => {
@@ -235,16 +250,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" />
-  <div class="h-full overflow-y-scroll md:py-4">
-    <div id="versions" class="flex flex-col mx-auto overflow-y-scroll border rounded-lg shadow-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-      <Table
-        class="p-3" :total="total" :current-page="currentPageNumber" row-click
-
-        :element-list="versions" :columns="columns" :filters="filters" filter-text="Filters"
-        search-placeholder="Search Bundle" @search-input="onSearch" @reload="refreshData()"
-        @prev="prev" @next="next" @fast-backward="fastBackward" @fast-forward="fastForward" @row-click="openBundle"
-      />
+  <div>
+    <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" />
+    <div class="h-full overflow-y-scroll md:py-4">
+      <div id="versions" class="flex flex-col mx-auto overflow-y-scroll border rounded-lg shadow-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <Table
+          v-model:filters="filters" v-model:columns="columns" class="p-3" :total="total"
+          :current-page="currentPageNumber" row-click :element-list="versions" filter-text="Filters"
+          :is-loading="isLoading"
+          search-placeholder="Search Bundle"
+          @search-input="onSearch" @reload="refreshData()"
+          @prev="prev" @next="next" @fast-backward="fastBackward" @fast-forward="fastForward" @row-click="openBundle"
+        />
+      </div>
     </div>
   </div>
 </template>
