@@ -17,7 +17,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <TitleHead :title="t('package.channels')" color="warning" :default-back="`/app/package/${route.params.p}`" />
+    <TitleHead :title="t('package.channels')" :default-back="`/app/package/${route.params.p}`" />
     <div class="h-full overflow-y-scroll md:py-4">
       <div id="versions" class="flex flex-col mx-auto overflow-y-scroll border rounded-lg shadow-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
         <ChannelTable class="p-3" :app-id="appId" />

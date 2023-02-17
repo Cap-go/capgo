@@ -29,37 +29,39 @@ const back = () => {
 </script>
 
 <template>
-  <k-navbar
-    class="md:hidden no-safe-areas"
-    :subnavbar-class="`flex-col ${searchIcon ? '!h-16' : ''}`"
-  >
-    <template #left>
-      <div v-if="!noBack">
-        <k-navbar-back-link text="Back" @click="back()" />
-      </div>
-    </template>
-    <template #title>
-      {{ title }}
-    </template>
-    <template v-if="search" #subnavbar>
-      <k-navbar
-        class="sticky top-0"
-        inner-class="!h-16"
-        right-class="w-full pt-1"
-      >
-        <template #right>
-          <Searchbar :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
-        </template>
-      </k-navbar>
-    </template>
-  </k-navbar>
-  <div class="hidden md:block">
-    <div class="hidden navbar bg-base-100 md:flex">
-      <div class="flex-1">
-        <a class="text-xl normal-case btn btn-ghost">{{ title }}</a>
-      </div>
-      <div class="navbar-end">
-        <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
+  <div>
+    <k-navbar
+      class="md:hidden no-safe-areas"
+      :subnavbar-class="`flex-col ${searchIcon ? '!h-16' : ''}`"
+    >
+      <template #left>
+        <div v-if="!noBack">
+          <k-navbar-back-link text="Back" @click="back()" />
+        </div>
+      </template>
+      <template #title>
+        {{ title }}
+      </template>
+      <template v-if="search" #subnavbar>
+        <k-navbar
+          class="sticky top-0"
+          inner-class="!h-16"
+          right-class="w-full pt-1"
+        >
+          <template #right>
+            <Searchbar :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
+          </template>
+        </k-navbar>
+      </template>
+    </k-navbar>
+    <div class="hidden md:block">
+      <div class="hidden navbar bg-base-100 md:flex">
+        <div class="flex-1">
+          <a class="text-xl normal-case btn btn-ghost">{{ title }}</a>
+        </div>
+        <div class="navbar-end">
+          <Searchbar v-if="search" :search-icon="searchIcon" :search-placeholder="searchPlaceholder" @search-input="onSearchInput" @filter-button-click="onSearchButtonClick" />
+        </div>
       </div>
     </div>
   </div>

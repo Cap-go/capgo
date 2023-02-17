@@ -438,19 +438,19 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <TitleHead :title="t('device.title')" color="warning" />
-  <div class="flex flex-col md:mx-24 h-full p-8 pb-12 overflow-y-scroll">
+  <TitleHead :title="t('device.title')" />
+  <div class="flex flex-col h-full p-8 pb-12 overflow-y-scroll md:mx-24">
     <div class="">
-      <div class="mx-auto w-full px-6 lg:px-8 max-w-7xl">
+      <div class="w-full px-6 mx-auto lg:px-8 max-w-7xl">
         <div class="flex items-center justify-center">
           <div class="">
-            <nav class="flex md:flex-wrap -mb-px space-x-10">
-              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = false">
+            <nav class="flex -mb-px space-x-10 md:flex-wrap">
+              <button class="inline-flex items-center w-auto py-4 mt-0 text-lg font-medium text-gray-500 transition-all duration-200 border-b-2 border-transparent dark:text-gray-200 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = false">
                 <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
                 {{ t('channel.info') }}
               </button>
 
-              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = true">
+              <button class="inline-flex items-center w-auto py-4 mt-0 text-lg font-medium text-gray-500 transition-all duration-200 border-b-2 border-transparent dark:text-gray-200 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = true">
                 <IconLog class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
                 {{ t('logs') }}
               </button>
@@ -485,7 +485,7 @@ watchEffect(async () => {
                 {{ t('custom-id') }}
               </dt>
               <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-                <input :value="device.custom_id" class="w-full max-w-xs input input-bordered text-white" @input="saveCustomId">
+                <input :value="device.custom_id" class="w-full max-w-xs text-white input input-bordered" @input="saveCustomId">
               </dd>
             </div>
             <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
@@ -573,7 +573,7 @@ watchEffect(async () => {
       </div>
       <div v-if="showLog" id="logs" class="flex flex-col h-full">
         <div class="h-full">
-          <input class="w-full mt-3 px-5 py-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="onSearchLog">
+          <input class="w-full px-5 py-3 mt-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="onSearchLog">
           <div v-if="logFiltered.length > 0" v-infinite-scroll="[loadStatsData, { distance: 10 }]" class="inline-block h-full min-w-full py-2 overflow-y-scroll align-middle">
             <div class="hidden md:block">
               <table class="w-full max-h-full lg:divide-y lg:divide-gray-200">
@@ -624,7 +624,7 @@ watchEffect(async () => {
                 </tbody>
               </table>
             </div>
-            <k-list class="md:hidden w-full my-0">
+            <k-list class="w-full my-0 md:hidden">
               <k-list-item v-if="isLoading || isLoadingSub">
                 <template #text>
                   <Spinner />
@@ -640,7 +640,7 @@ watchEffect(async () => {
               />
             </k-list>
           </div>
-          <div v-else class="text-center text-2xl mt-5">
+          <div v-else class="mt-5 text-2xl text-center">
             {{ t('no-logs') }}
           </div>
         </div>

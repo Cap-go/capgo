@@ -190,7 +190,7 @@ const presentActionSheet = async () => {
 </script>
 
 <template>
-  <TitleHead :title="t('account.heading')" no-back color="warning" />
+  <TitleHead :title="t('account.heading')" no-back />
   <div class="px-6 py-16">
     <div
       v-if="!main.user?.image_url"

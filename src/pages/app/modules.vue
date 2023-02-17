@@ -27,7 +27,7 @@ Object.keys(dependencies).forEach((dep) => {
 </script>
 
 <template>
-  <TitleHead :title="t('module.heading')" default-back="/app/home" color="warning" />
+  <TitleHead :title="t('module.heading')" default-back="/app/home" />
   <k-list strong-ios outline-ios>
     <k-list-item
       link :title="t('discover-module-in-a')" href="https://github.com/riderx/awesome-capacitor" rel="noopener"
