@@ -9,15 +9,18 @@ import { useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
+  ids?: string[]
   versionId?: number | undefined
 }>()
+
+const element: Database['public']['Tables']['devices']['Row'] = {} as any
 
 const { t } = useI18n()
 const supabase = useSupabase()
 const router = useRouter()
 const total = ref(0)
 const search = ref('')
-const elements = ref<Database['public']['Tables']['devices']['Row'][]>([])
+const elements = ref<typeof element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
@@ -40,7 +43,7 @@ const columns = ref<TableColumn[]>([
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
-    displayFunction: (elem: Database['public']['Tables']['devices']['Row']) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
     label: 'Platform',
@@ -48,7 +51,7 @@ const columns = ref<TableColumn[]>([
     mobile: 'header',
     sortable: true,
     head: true,
-    displayFunction: (elem: Database['public']['Tables']['devices']['Row']) => `${elem.platform} ${elem.os_version}`,
+    displayFunction: (elem: typeof element) => `${elem.platform} ${elem.os_version}`,
   },
   {
     label: 'Bundle',
@@ -56,7 +59,7 @@ const columns = ref<TableColumn[]>([
     mobile: 'footer',
     sortable: true,
     head: true,
-    displayFunction: (elem: Database['public']['Tables']['devices']['Row']) => elem.version.name,
+    displayFunction: (elem: typeof element) => elem.version.name,
   },
 ])
 
@@ -71,6 +74,9 @@ const getData = async () => {
 
     if (props.versionId)
       req.eq('version', props.versionId)
+
+    if (props.ids)
+      req.in('device_id', props.ids)
 
     if (search.value)
       req.like('device_id', `%${search.value}%`)
@@ -116,7 +122,7 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const openOne = async (device: Database['public']['Tables']['devices']['Row']) => {
+const openOne = async (device: typeof element) => {
   router.push(`/app/p/${props.appId.replace(/\./g, '--')}/d/${device.device_id}`)
 }
 onMounted(async () => {

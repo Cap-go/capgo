@@ -18,7 +18,7 @@ const activeTabColor = (tab: string) => ({
       <li v-for="(tab, i) in tabs" :key="i" class="mr-2">
         <button class="inline-flex p-4 rounded-t-lg group" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
           <component :is="tab.icon" class="-ml-0.5 mr-2 text-gray-400 h-5 w-5 group-hover:text-gray-600 transition-all duration-100" />
-          {{ tab.label }}
+          <span class="hidden md:block">{{ tab.label }}</span>
         </button>
       </li>
     </ul>

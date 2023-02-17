@@ -2,50 +2,45 @@
 import type { Ref } from 'vue'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import {
+  kDialog,
+  kDialogButton,
+  kFab,
+} from 'konsta/vue'
 import type { TableColumn } from '../comp_def'
-// import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
-import { getST, useSupabase } from '~/services/supabase'
+import { existUser, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import IconTrash from '~icons/heroicons/trash'
+import type { Database } from '~/types/supabase.types'
+import IconPlus from '~icons/heroicons/plus'
+import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   appId: string
+  allowAdd?: boolean
   channelId?: number | undefined
 }>()
 
-// interface ChannelUsers {
-//   user_id: Database['public']['Tables']['users']['Row']
-// }
-
-// interface ChannelUsers extends Database['public']['Tables']['channel_users']['Row'] {
-
-// user_id: Database['public']['Tables']['users']['Row']
-
-// }
-
-// const select = `
-//           id,
-//           channel_id,
-//           users (
-//             id,
-//             email,
-//             first_name,
-//             last_name
-//           ),
-//           created_at
-//         `
-// getST('channel_users', select)
-// const element = await getST('channel_users', select)
+interface ChannelUsers {
+  users: Database['public']['Tables']['users']['Row']
+}
+const element: Database['public']['Tables']['channel_users']['Row'] & ChannelUsers = {} as any
 
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
+const main = useMainStore()
 const { t } = useI18n()
+const router = useRouter()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Element[]>([])
 const isLoading = ref(false)
+const addUserModal = ref(false)
+const newUser = ref<string>()
+const newUserModalOpen = ref(false)
 const currentPage = ref(1)
 const offset = 10
 const currentVersionsNumber = computed(() => {
@@ -78,7 +73,7 @@ const getData = async () => {
       .select(`
           id,
           channel_id,
-          users (
+          user_id (
             id,
             email,
             first_name,
@@ -103,8 +98,6 @@ const getData = async () => {
       })
     }
     const { data, count } = await req
-    data[0].
-
     if (!data)
       return
     elements.value.push(...data as any)
@@ -151,6 +144,113 @@ const deleteOne = async (usr: typeof element) => {
     await refreshData()
 }
 
+const addUser = async () => {
+  // console.log('newUser', newUser.value)
+  if (!props.channelId || !main.auth)
+    return
+  if (!main.canUseMore) {
+    // show alert for upgrade plan and return
+    displayStore.actionSheetOption = {
+      header: t('limit-reached'),
+      message: t('please-upgrade'),
+      buttons: [
+        {
+          text: t('button.cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('upgrade-now'),
+          id: 'confirm-button',
+          handler: () => {
+            router.push('/dashboard/settings/plans')
+          },
+        },
+      ],
+    }
+    displayStore.showActionSheet = true
+    return
+  }
+  // exist_user
+  const exist = await existUser(newUser.value || '')
+  if (!exist) {
+    newUserModalOpen.value = true
+    return
+  }
+
+  const { error } = await supabase
+    .from('channel_users')
+    .insert({
+      channel_id: props.channelId,
+      app_id: props.appId,
+      user_id: exist,
+      created_by: main.user?.id,
+    })
+  if (error) {
+    console.error(error)
+  }
+  else {
+    await refreshData()
+    newUser.value = ''
+  }
+}
+
+const inviteUser = async (userId: string) => {
+  if (!props.channelId)
+    return
+  const { error } = await supabase
+    .from('channel_users')
+    .insert({
+      channel_id: props.channelId,
+      app_id: props.appId,
+      created_by: main.user?.id,
+      user_id: userId,
+    })
+  if (error) {
+    console.error(error)
+  }
+  else {
+    newUser.value = ''
+    newUserModalOpen.value = false
+    await refreshData()
+  }
+}
+
+const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => {
+  if (await didCancel(t('channel.user')))
+    return
+  const { error } = await supabase
+    .from('channel_users')
+    .delete()
+    .eq('app_id', props.appId)
+    .eq('user_id', usr.id)
+  if (error)
+    console.error(error)
+  else
+    await refreshData()
+}
+
+const onClick = async (usr: Database['public']['Tables']['users']['Row']) => {
+  displayStore.actionSheetOption = {
+    buttons: [
+      {
+        text: t('button.delete'),
+        handler: () => {
+          displayStore.showActionSheet = false
+          deleteUser(usr)
+        },
+      },
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+        handler: () => {
+          // console.log('Cancel clicked')
+        },
+      },
+    ],
+  }
+  displayStore.showActionSheet = true
+}
+
 columns.value = [
   {
     label: 'Email',
@@ -172,7 +272,7 @@ columns.value = [
     mobile: 'header',
     sortable: true,
     head: true,
-    displayFunction: (elem: typeof element) => `${elem.user_id.first_name} ${elem.user_id.last_name}`,
+    displayFunction: (elem: typeof element) => `${elem.users.first_name} ${elem.users.last_name}`,
   },
   {
     label: 'Action',
@@ -190,12 +290,39 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Table
-    v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-    :total="total" row-click :element-list="elements"
-    filter-text="Filters"
-    :is-loading="isLoading"
-    :search-placeholder="t('search-user')"
-    @reload="reload()" @reset="refreshData()"
-  />
+  <div>
+    <Table
+      v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
+      :total="total" row-click :element-list="elements"
+      filter-text="Filters"
+      :is-loading="isLoading"
+      :search-placeholder="t('search-user')"
+      @row-click="onClick"
+      @reload="reload()" @reset="refreshData()"
+    />
+    <k-fab v-if="allowAdd && channelId" class="fixed z-20 right-4-safe bottom-4-safe" @click="addUserModal = true">
+      <template #icon>
+        <component :is="IconPlus" />
+      </template>
+    </k-fab>
+    <k-dialog
+      :opened="addUserModal"
+      class="text-lg"
+      @backdropclick="() => (addUserModal = false)"
+    >
+      <template #title>
+        {{ t('channel.invit') }}
+      </template>
+      <input v-model="newUser" type="email" placeholder="hello@yourcompany.com" class="w-full p-1 text-lg text-gray-200 rounded-lg k-input">
+      <template #buttons>
+        <k-dialog-button class="text-red-800" @click="() => (addUserModal = false)">
+          {{ t('button.cancel') }}
+        </k-dialog-button>
+        <k-dialog-button @click="addUser()">
+          {{ t('channel.add') }}
+        </k-dialog-button>
+      </template>
+    </k-dialog>
+    <NewUserModal :email-address="newUser" :opened="newUserModalOpen" @close="newUserModalOpen = false" @invite-user="inviteUser" />
+  </div>
 </template>
