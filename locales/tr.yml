@@ -126,7 +126,7 @@ channel:
   title: Kanal
   user: kullanıcı
   user_no_found: Kullanıcı bulunamadı, önce kayıt olmayı isteyin
-  users: kullanıcılarla paylaşıldı
+  users: Paylaşılan kullanıcılar
   v3: V3 ayarları
 channel-deleted: Kanal silindi
 checksum: sağlama toplamı
@@ -254,6 +254,7 @@ package:
   mobiles-stats: cep telefonu istatistikleri
   name: Uygulama
   not_available: paket bulunamadı
+  open: Kanalı Aç
   set: Paketi kanala ayarla
   stats: istatistikler
   test: Paketi başlat
@@ -344,7 +345,9 @@ register:
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
 search: Arama
+search-bundle: Paket Ara
 search-device: Cihaz ara
+search-user: Kullanıcı Ara
 see-usage: Kullanıma bakın
 session_key: IvSessionKey
 settings: Ayarlar

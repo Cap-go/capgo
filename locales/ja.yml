@@ -122,7 +122,7 @@ channel:
   title: チャネル
   user: ユーザー
   user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
-  users: ユーザーと共有
+  users: 共有ユーザー
   v3: V3設定
 channel-deleted: チャンネルが削除されました
 checksum: チェックサム
@@ -246,6 +246,7 @@ package:
   mobiles-stats: モバイル統計
   name: アプリ
   not_available: パッケージが見つかりません
+  open: チャネルを開く
   set: バージョンをチャネルに設定
   stats: 統計
   test: 起動バージョン
@@ -330,7 +331,9 @@ register:
 reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
 search: 探す
+search-bundle: バンドルを検索
 search-device: 検索デバイス
+search-user: ユーザーを検索
 see-usage: 使用法を見る
 session_key: IvSessionKey
 settings: 設定

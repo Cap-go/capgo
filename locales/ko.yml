@@ -122,7 +122,7 @@ channel:
   title: 채널
   user: 사용자
   user_no_found: 사용자를 찾을 수 없습니다. 먼저 등록을 요청하세요.
-  users: 사용자와 공유
+  users: 공유 사용자
   v3: V3 설정
 channel-deleted: 채널 삭제됨
 checksum: 체크섬
@@ -246,6 +246,7 @@ package:
   mobiles-stats: 모바일 통계
   name: 앱
   not_available: 패키지를 찾을 수 없음
+  open: 오픈 채널
   set: 버전을 채널로 설정
   stats: 통계
   test: 출시 버전
@@ -330,7 +331,9 @@ register:
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 search: 찾다
+search-bundle: 번들 검색
 search-device: 장치 검색
+search-user: 사용자 검색
 see-usage: 사용법 보기
 session_key: IvSessionKey
 settings: 설정

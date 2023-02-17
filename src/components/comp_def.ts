@@ -16,3 +16,9 @@ export interface TableColumn {
   icon?: FunctionalComponent
   onClick?: (elem: any) => void
 }
+
+export interface Tab {
+  label: string
+  icon?: FunctionalComponent
+  key: string
+}

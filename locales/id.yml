@@ -130,7 +130,7 @@ channel:
   title: Saluran
   user: Pengguna
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
-  users: Dibagikan dengan pengguna
+  users: Pengguna bersama
   v3: Pengaturan V3
 channel-deleted: Saluran dihapus
 checksum: Ceksum
@@ -258,6 +258,7 @@ package:
   mobiles-stats: Statistik ponsel
   name: Aplikasi
   not_available: Paket tidak ditemukan
+  open: Buka Saluran
   set: Setel versi ke saluran
   stats: statistik
   test: Luncurkan versi
@@ -342,7 +343,9 @@ register:
 reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 search: Mencari
+search-bundle: Bundel Pencarian
 search-device: Cari perangkat
+search-user: Cari Pengguna
 see-usage: Lihat penggunaan
 session_key: IvSessionKey
 settings: Pengaturan

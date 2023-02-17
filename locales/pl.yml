@@ -128,7 +128,7 @@ channel:
   title: Kanał
   user: Użytkownik
   user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
-  users: Udostępnione użytkownikom
+  users: Współdzieleni użytkownicy
   v3: Ustawienia V3
 channel-deleted: Kanał usunięty
 checksum: Suma kontrolna
@@ -254,6 +254,7 @@ package:
   mobiles-stats: Statystyki telefonów komórkowych
   name: Aplikacja
   not_available: Nie znaleziono pakietu
+  open: Otwórz kanał
   set: Ustaw wersję na kanał
   stats: statystyki
   test: Uruchom wersję
@@ -338,7 +339,9 @@ register:
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
 search: Szukaj
+search-bundle: Wyszukaj pakiet
 search-device: Wyszukaj urządzenie
+search-user: Wyszukaj użytkownika
 see-usage: Zobacz użycie
 session_key: IvSessionKey
 settings: Ustawienia

@@ -128,7 +128,7 @@ channel:
   title: Canal
   user: Do utilizador
   user_no_found: Usuário não encontrado, peça para se registrar primeiro
-  users: Compartilhado com usuários
+  users: usuários compartilhados
   v3: Configurações V3
 channel-deleted: Canal excluído
 checksum: Soma de verificação
@@ -254,6 +254,7 @@ package:
   mobiles-stats: Estatísticas de celulares
   name: Aplicativo
   not_available: Pacote não encontrado
+  open: canal aberto
   set: Definir versão para canal
   stats: Estatísticas
   test: Versão de lançamento
@@ -340,7 +341,9 @@ register:
 reset-password: Redefinir senha
 reset-your-password: Redefina sua senha
 search: Procurar
+search-bundle: Pacote de pesquisa
 search-device: dispositivo de pesquisa
+search-user: Pesquisar usuário
 see-usage: Ver uso
 session_key: IvSessionKey
 settings: Definições

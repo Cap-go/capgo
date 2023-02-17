@@ -10,6 +10,8 @@ import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
 const close = (item: ActionSheetOptionButton | undefined) => {
+  if (item?.selected)
+    return
   displayStore.showActionSheet = false
   if (item) {
     if (item.role === 'cancel')
@@ -28,7 +30,7 @@ const close = (item: ActionSheetOptionButton | undefined) => {
       <k-actions-label v-if="displayStore.actionSheetOption?.header">
         {{ displayStore.actionSheetOption.header }}
       </k-actions-label>
-      <k-actions-button v-for="(item, index) in displayStore.actionSheetOption?.buttons" :id="item.id" :key="index" @click="close(item)">
+      <k-actions-button v-for="(item, index) in displayStore.actionSheetOption?.buttons" :id="item.id" :key="index" :class="{ 'dark:!bg-white !bg-neutral-800': item.selected }" @click="close(item)">
         {{ item.text }}
       </k-actions-button>
     </k-actions-group>

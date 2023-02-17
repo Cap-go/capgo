@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
-import ellipsisHorizontalCircle from '~icons/heroicons/plus'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
 import TitleHead from '~/components/TitleHead.vue'
@@ -14,7 +13,8 @@ import type { Database } from '~/types/supabase.types'
 import { bytesToMbText } from '~/services/conversion'
 import { useDisplayStore } from '~/stores/display'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
-import IconInformations from '~icons/heroicons/information-circle'
+import IconInformations from '~icons/material-symbols/info-rounded'
+import type { Tab } from '~/components/comp_def'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -22,38 +22,33 @@ const router = useRouter()
 const displayStore = useDisplayStore()
 const main = useMainStore()
 const supabase = useSupabase()
+const ActiveTab = ref('info')
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
-const search = ref('')
-const devices = ref<Database['public']['Tables']['devices']['Row'][]>([])
-const showDevices = ref(false)
 
 const copyToast = async (text: string) => {
   copy(text)
   displayStore.messageToast.push(t('copied-to-clipboard'))
 }
-const getDevices = async () => {
-  if (!version.value)
-    return
-  try {
-    const { data: dataDevices } = await supabase
-      .from('devices')
-      .select()
-      .eq('version', id.value)
-      .eq('app_id', version.value.app_id)
-    if (dataDevices && dataDevices.length)
-      devices.value = dataDevices
-    else
-      devices.value = []
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
+
+const tabs: Tab[] = [
+  {
+    label: t('channel.info'),
+    icon: IconInformations,
+    key: 'info',
+  },
+  {
+    label: t('devices.title'),
+    icon: IconDevice,
+    key: 'devices',
+  },
+]
+
 const getChannels = async () => {
   if (!version.value)
     return
@@ -63,10 +58,18 @@ const getChannels = async () => {
     .eq('app_id', version.value.app_id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
+  // search if the bundle is used in a channel
+  channels.value.forEach((chan) => {
+    const v: number = chan.version as any
+    if (version.value && v === version.value.id)
+      channel.value = chan
+  })
 }
 
-const openDevice = async (device: Database['public']['Tables']['devices']['Row']) => {
-  router.push(`/app/p/${device.app_id.replace(/\./g, '--')}/d/${device.device_id}`)
+const openChannelLink = async () => {
+  if (!version.value || !channel.value)
+    return
+  router.push(`/app/p/${version.value.app_id.replace(/\./g, '--')}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -91,12 +94,14 @@ const ASChannelChooser = async () => {
   if (!version.value)
     return
   const buttons = []
-  for (const channel of channels.value) {
+  for (const chan of channels.value) {
+    const v: number = chan.version as any
     buttons.push({
-      text: channel.name,
+      text: chan.name,
+      selected: version.value.id === v,
       handler: async () => {
         try {
-          await setChannel(channel)
+          await setChannel(chan)
         }
         catch (error) {
           console.error(error)
@@ -118,7 +123,42 @@ const ASChannelChooser = async () => {
   }
   displayStore.showActionSheet = true
 }
-const openPannel = async () => {
+const openChannel = async () => {
+  if (!version.value || !main.auth)
+    return
+  if (!channel.value)
+    return ASChannelChooser()
+  displayStore.actionSheetOption = {
+    buttons: [
+      {
+        text: t('package.set'),
+        handler: () => {
+          displayStore.showActionSheet = false
+          ASChannelChooser()
+        },
+      },
+      {
+        text: t('button.cancel'),
+        role: 'cancel',
+        handler: () => {
+          // console.log('Cancel clicked')
+        },
+      },
+    ],
+  }
+  // push in button at index 1 if channel is set
+  if (channel.value && displayStore.actionSheetOption.buttons) {
+    displayStore.actionSheetOption.buttons.splice(1, 0, {
+      text: t('package.open'),
+      handler: () => {
+        displayStore.showActionSheet = false
+        openChannelLink()
+      },
+    })
+  }
+  displayStore.showActionSheet = true
+}
+const openDownload = async () => {
   if (!version.value || !main.auth)
     return
   displayStore.actionSheetOption = {
@@ -180,6 +220,7 @@ const getVersion = async () => {
     console.error(error)
   }
 }
+
 watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
@@ -188,7 +229,6 @@ watchEffect(async () => {
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
-    await getDevices()
     loading.value = false
   }
 })
@@ -198,111 +238,41 @@ const hideString = (str: string) => {
   const last = str.slice(-5)
   return `${first}...${last}`
 }
-
-const devicesFilter = computed(() => {
-  const value = search.value
-  if (value) {
-    const filtered = devices.value.filter(device => device.device_id.toLowerCase().includes(value.toLowerCase()))
-    return filtered
-  }
-  return devices.value
-})
 </script>
 
 <template>
-  <TitleHead :title="t('package.title')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-  <div v-if="version" class="h-full p-8 overflow-y-scroll">
-    <div class="">
-      <div class="mx-auto w-full px-6 lg:px-8 max-w-7xl">
-        <div class="flex items-center justify-center">
-          <div class="">
-            <nav class="flex md:flex-wrap -mb-px space-x-10">
-              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = false">
-                <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
-                {{ t('channel.info') }}
-              </button>
-
-              <button class="inline-flex items-center text-lg font-medium text-gray-500 dark:text-gray-200 transition-all duration-200 mt-0 w-auto border-transparent border-b-2 py-4 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showDevices ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showDevices = true">
-                <IconDevice class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
-                {{ t('devices.title') }}
-              </button>
-            </nav>
-          </div>
+  <div>
+    <TitleHead :title="t('package.title')" :default-back="`/app/package/${route.params.p}`" />
+    <div v-if="version" class="h-full overflow-y-scroll md:py-4">
+      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
+        <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+          <dl class="md:divide-y md:divide-gray-500">
+            <InfoRow :label="t('bundle-number')" :value="version.name" />
+            <InfoRow :label="t('id')" :value="version.id.toString()" />
+            <InfoRow v-if="version.created_at" :label="t('device.created_at')" :value="formatDate(version.created_at)" />
+            <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
+            <!-- Checksum -->
+            <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
+            <!-- meta devices -->
+            <InfoRow v-if="version_meta?.devices" :label="t('devices.title')" :value="version_meta.devices.toString()" />
+            <InfoRow :label="t('channel.title')" :value="channel ? channel.name : t('package.set')" :is-link="true" @click="openChannel()" />
+            <!-- session_key -->
+            <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
+            <!-- version.external_url -->
+            <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
+            <!-- size -->
+            <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
+          </dl>
         </div>
       </div>
-    </div>
-
-    <div v-if="!showDevices" id="informations" class="mt-5">
-      <InfoRow :label="t('bundle-number')" :value="version.name" />
-      <InfoRow :label="t('id')" :value="version.id.toString()" />
-      <InfoRow v-if="version.created_at" :label="t('device.created_at')" :value="formatDate(version.created_at)" />
-      <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
-      <!-- Checksum -->
-      <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
-      <!-- meta devices -->
-      <InfoRow v-if="version_meta?.devices" :label="t('devices.title')" :value="version_meta.devices.toString()" />
-      <!-- session_key -->
-      <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
-      <!-- version.external_url -->
-      <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
-      <!-- size -->
-      <InfoRow :label="t('size')" :value="showSize" />
-      <!-- settings -->
-      <InfoRow :label="t('settings')" :value="t('open-settings')" :is-link="true" @click="openPannel" />
-    </div>
-    <div v-else id="devices" class="flex flex-col">
-      <input v-model="search" class="w-full mt-3 px-5 py-3 border-2 border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search">
-      <div class="inline-block min-w-full overflow-y-scroll align-middle">
-        <div v-if="devicesFilter.length > 0" class="hidden md:block">
-          <table class="h-full w-full lg:divide-y lg:divide-gray-200 mb-5">
-            <thead class="sticky top-0 bg-white dark:bg-gray-900/90">
-              <tr>
-                <th class="py-3.5 pl-4 pr-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
-                  <div class="flex items-center">
-                    {{ t('device-id') }}
-                  </div>
-                </th>
-                <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                  <div class="flex items-center">
-                    {{ t('device.platform') }}
-                  </div>
-                </th>
-                <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                  <div class="flex items-center">
-                    {{ t('device.os_version') }}
-                  </div>
-                </th>
-                <th class="py-3.5 px-3 text-left text-xl whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                  <div class="flex items-center">
-                    {{ t('device.created_at') }}
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="w-full divide-y divide-gray-200 max-h-fit">
-              <tr v-for="(device, i) in devicesFilter" :key="i" class="w-full cursor-pointer" @click="openDevice(device)">
-                <td class="py-4 pl-4 pr-3 text-lg font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap sm:pl-6 md:pl-0">
-                  {{ device.device_id }}
-                </td>
-                <td class="px-4 py-4 text-lg font-bold text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                  {{ device.platform }}
-                </td>
-                <td class="px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                  {{ device.os_version || 'Unknown' }}
-                </td>
-                <td class="px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                  {{ formatDate(device.created_at || '') }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <k-list v-if="devicesFilter.length > 0" class="md:hidden w-full my-0 list-none">
-          <DeviceCard v-for="(device, i) in devicesFilter" :key="device.device_id + i" :device="device" />
-        </k-list>
-        <div v-else class="text-center text-2xl mt-3">
-          {{ t('no-devices') }}
+      <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
+        <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+          <DeviceTable
+            class="p-3"
+            :app-id="packageId"
+            :version-id="version.id"
+          />
         </div>
       </div>
     </div>

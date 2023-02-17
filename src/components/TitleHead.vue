@@ -6,10 +6,7 @@ import Searchbar from '~/components/Searchbar.vue'
 const props = defineProps({
   defaultBack: { type: String, default: '/app' },
   noBack: { type: Boolean, default: false },
-  color: { type: String, default: 'default' },
   title: { type: String, default: '' },
-  big: { type: Boolean, default: false },
-  plusIcon: { type: String as any, default: '' },
   search: { type: Boolean, default: false },
   searchPlaceholder: { type: String, default: '' },
   searchIcon: { type: String as any, default: '' },

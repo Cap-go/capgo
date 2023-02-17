@@ -130,7 +130,7 @@ channel:
   title: Канал
   user: Пользователь
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
-  users: Доступно пользователям
+  users: Общие пользователи
   v3: Настройки версии 3
 channel-deleted: Канал удален
 checksum: Контрольная сумма
@@ -256,6 +256,7 @@ package:
   mobiles-stats: Мобильная статистика
   name: Приложение
   not_available: Пакет не найден
+  open: Открытый канал
   set: Установить версию для канала
   stats: статистика
   test: Запустить версию
@@ -340,7 +341,9 @@ register:
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
 search: Поиск
+search-bundle: Пакет поиска
 search-device: Поиск устройства
+search-user: Поиск пользователя
 see-usage: См. использование
 session_key: IvSessionKey
 settings: Настройки

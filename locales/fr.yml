@@ -130,7 +130,7 @@ channel:
   title: Informations sur la chaîne
   user: Utilisateur
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
-  users: Partagé avec les utilisateurs
+  users: Utilisateurs partagés
   v3: Paramètres V3
 channel-deleted: Chaîne supprimée
 checksum: Somme de contrôle
@@ -260,6 +260,7 @@ package:
   mobiles-stats: Statistiques mobiles
   name: Application
   not_available: Colis introuvable
+  open: Canal ouvert
   set: Définir la version sur le canal
   stats: Statistiques
   test: Version de lancement
@@ -348,7 +349,9 @@ register:
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
 search: Rechercher
+search-bundle: Ensemble de recherche
 search-device: Appareil de recherche
+search-user: Rechercher un utilisateur
 see-usage: Voir l'utilisation
 session_key: IvSessionKey
 settings: Réglages

@@ -128,7 +128,7 @@ channel:
   title: Kênh truyền hình
   user: Người dùng
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
-  users: Được chia sẻ với người dùng
+  users: người dùng chung
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
 checksum: Checksum
@@ -256,6 +256,7 @@ package:
   mobiles-stats: Số liệu thống kê về điện thoại di động
   name: Ứng dụng
   not_available: Gói hàng không được tìm thấy
+  open: Mở kênh
   set: Đặt phiên bản cho kênh
   stats: số liệu thống kê
   test: Phiên bản khởi chạy
@@ -342,7 +343,9 @@ register:
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
 search: Tìm kiếm
+search-bundle: Gói tìm kiếm
 search-device: Tìm kiếm thiết bị
+search-user: Tìm kiếm người dùng
 see-usage: Xem mức sử dụng
 session_key: IvSessionKey
 settings: Cài đặt

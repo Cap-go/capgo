@@ -128,10 +128,10 @@ channel:
   title: Channel
   user: User
   user_no_found: User not found, ask to register first
-  users: Shared with users
+  users: Shared users
   v3: V3 settings
-channels: Channels
 channel-deleted: Channel deleted
+channels: Channels
 checksum: Checksum
 commands: commands
 copied-to-clipboard: Copied to clipboard
@@ -169,8 +169,6 @@ device-id: Device ID
 devices:
   title: Devices
 devices-using-this-b: Devices using this bundle
-no-devices: No devices
-no-logs: No logs
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 discover-module-in-a: Discover module in Awesome-capacitor
@@ -234,6 +232,8 @@ my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+no-devices: No devices
+no-logs: No logs
 not-found: Not found
 notificationSettings:
   heading: Notification settings
@@ -258,6 +258,7 @@ package:
   mobiles-stats: Mobiles stats
   name: App
   not_available: Package not found
+  open: Open Channel
   set: Set bundle to channel
   size_not_found: Not found
   stats: stats
@@ -345,7 +346,9 @@ register:
 reset-password: Reset Password
 reset-your-password: Reset your password
 search: Search
+search-bundle: Search Bundle
 search-device: Search device
+search-user: Search User
 see-usage: See usage
 session_key: IvSessionKey
 settings: Settings

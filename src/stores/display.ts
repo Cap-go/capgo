@@ -4,6 +4,7 @@ import { ref, watch } from 'vue'
 export interface ActionSheetOptionButton {
   text: string
   id?: string
+  selected?: boolean
   handler?: () => void
   role?: string
 }

@@ -5,7 +5,7 @@ import { initDropdowns } from 'flowbite'
 import {
   kList, kListItem,
 } from 'konsta/vue'
-import type { MobileColType, TableColumn } from './Table-def'
+import type { MobileColType, TableColumn } from './comp_def'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
@@ -24,6 +24,7 @@ interface Props {
   filterText?: string
   filters?: { [key: string]: boolean }
   searchPlaceholder?: string
+  search?: string
   total: number
   currentPage: number
   columns: TableColumn[]
@@ -32,12 +33,18 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits([
-  'reload', 'next', 'prev', 'fastForward', 'fastBackward',
-  'searchInput', 'update:filters', 'update:columns',
+  'reload', 'reset', 'next', 'prev', 'fastForward', 'fastBackward',
+  'update:search', 'update:filters', 'update:columns', 'update:currentPage',
   'filterClick', 'rowClick', 'sortClick'])
-const search = ref('')
+const search = ref(props.search || '')
 // const sorts = ref<TableSort>({})
 // get columns from elementList
+
+const offset = computed(() => {
+  if (!props.elementList)
+    return 0
+  return props.elementList.length
+})
 
 const filterList = computed(() => {
   if (!props.filters)
@@ -67,9 +74,18 @@ const sortClick = (key: number) => {
   emit('update:columns', newColumns)
 }
 
+watch(props.columns, () => {
+  emit('reload')
+})
+if (props.filters) {
+  watch(props.filters, () => {
+    emit('reload')
+  })
+}
+
 watch(search, debounce(() => {
-  if (search.value)
-    emit('searchInput', search.value)
+  emit('update:search', search.value)
+  emit('reload')
 }, 500))
 
 const displayValueKey = (elem: any, col: TableColumn | undefined) => {
@@ -87,6 +103,39 @@ const findMobileCol = (name: MobileColType) => {
   return props.columns ? props.columns.find(col => col.mobile === name) : undefined
 }
 
+const prev = async () => {
+  console.log('prev')
+  if (props.currentPage > 1) {
+    emit('prev')
+    emit('update:currentPage', props.currentPage - 1)
+    emit('reload')
+  }
+}
+const next = async () => {
+  console.log('next')
+  if (props.currentPage < Math.ceil(props.total / offset.value)) {
+    emit('next')
+    emit('update:currentPage', props.currentPage + 1)
+    emit('reload')
+  }
+}
+const fastForward = async () => {
+  console.log('fastForward')
+  if (props.currentPage < Math.ceil(props.total / offset.value)) {
+    emit('fastForward')
+    emit('update:currentPage', Math.ceil(props.total / offset.value))
+    emit('reload')
+  }
+}
+const fastBackward = async () => {
+  console.log('fastBackward')
+  if (props.currentPage > 1) {
+    emit('fastBackward')
+    emit('update:currentPage', 1)
+    emit('reload')
+  }
+}
+
 onMounted(() => {
   initDropdowns()
 })
@@ -94,9 +143,9 @@ onMounted(() => {
 
 <template>
   <div class="relative pb-4 pb-20 overflow-x-auto shadow-md sm:rounded-lg md:pb-0">
-    <div class="flex items-start justify-between md:items-center ">
+    <div class="flex items-start justify-between pb-4 md:items-center ">
       <div class="mb-2 md:mb-0">
-        <button class="inline-flex items-center mr-2 text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button" @click="emit('reload')">
+        <button class="inline-flex items-center mr-2 text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
           <IconReload class="m-1" />
         </button>
         <button v-if="filterText && filterList" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="relative inline-flex items-center text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button">
@@ -174,7 +223,6 @@ onMounted(() => {
     <kList class="block !my-0 md:hidden">
       <kListItem
         v-for="(elem, i) in elementList" :key="i"
-        :data-dropdown-toggle="`dropdownRadio_${i}`"
         :title="displayValueKey(elem, findMobileCol('title'))"
         :footer="displayValueKey(elem, findMobileCol('footer'))"
         :header="displayValueKey(elem, findMobileCol('header'))"
@@ -185,17 +233,17 @@ onMounted(() => {
         </template>
       </kListItem>
     </kList>
-    <nav class="fixed bottom-0 left-0 flex items-center justify-between w-full p-4 md:pt-4 bg-white/90 dark:bg-gray-900/90 md:bg-transparent md:dark:bg-transparent md:relative" aria-label="Table navigation">
+    <nav class="fixed bottom-0 left-0 z-50 flex items-center justify-between w-full p-4 bg-white md:pt-4 dark:bg-gray-900 md:bg-transparent dark:md:bg-transparent md:relative" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">Showing</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
-          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('fastBackward')">
+          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="fastBackward">
             <span class="sr-only">Fast Backward</span>
             <IconFastBackward />
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('prev')">
+          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="prev">
             <span class="sr-only">Previous</span>
             <IconPrev />
           </button>
@@ -206,13 +254,13 @@ onMounted(() => {
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('next')">
+          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="next">
             <span class="sr-only">Next</span>
             <IconNext />
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="emit('fastForward')">
+          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white" @click="fastForward">
             <span class="sr-only"> Fast Forward </span>
             <IconFastForward />
           </button>

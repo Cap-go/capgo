@@ -132,7 +132,7 @@ channel:
   title: Kanal
   user: Benutzer
   user_no_found: Benutzer nicht gefunden, zuerst um Registrierung bitten
-  users: Mit Benutzern geteilt
+  users: Gemeinsame Benutzer
   v3: V3-Einstellungen
 channel-deleted: Kanal gelöscht
 checksum: Prüfsumme
@@ -262,6 +262,7 @@ package:
   mobiles-stats: Mobile Statistiken
   name: App
   not_available: Paket nicht gefunden
+  open: Offener Kanal
   set: Bündel auf Kanal setzen
   stats: Statistiken
   test: Bündel starten
@@ -352,7 +353,9 @@ register:
 reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
 search: Suche
+search-bundle: Bündel suchen
 search-device: Gerät suchen
+search-user: Benutzer suchen
 see-usage: Siehe Verwendung
 session_key: IvSessionKey
 settings: Einstellungen

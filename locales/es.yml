@@ -1,2 +1,9 @@
+channel:
+  users: usuarios compartidos
+package:
+  open: Canal abierto
+search-bundle: Paquete de búsqueda
+search-device: Buscar dispositivo
+search-user: Usuario de búsqueda
 usage:
   title: ''
