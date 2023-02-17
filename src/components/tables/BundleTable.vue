@@ -202,8 +202,8 @@ const reload = async () => {
   }
 }
 
-const openOne = async (bundle: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/bundle/${bundle.id}`)
+const openOne = async (one: typeof element) => {
+  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/bundle/${one.id}`)
 }
 onMounted(async () => {
   await refreshData()

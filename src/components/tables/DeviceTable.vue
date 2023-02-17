@@ -122,8 +122,8 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const openOne = async (device: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/d/${device.device_id}`)
+const openOne = async (one: typeof element) => {
+  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/d/${one.device_id}`)
 }
 onMounted(async () => {
   await refreshData()
