@@ -402,7 +402,7 @@ const openPannel = async () => {
 <template>
   <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" />
   <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-  <div v-if="channel && ActiveTab === 'info'" id="devices" class="flex flex-col">
+  <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
     <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
       <dl class="md:divide-y md:divide-gray-500">
         <InfoRow :label="t('name')" :value="channel.name" />
@@ -415,7 +415,7 @@ const openPannel = async () => {
       </dl>
     </div>
   </div>
-  <div v-if="channel && ActiveTab === 'settings'" id="devices" class="flex flex-col">
+  <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
     <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
       <dl class="md:divide-y md:divide-gray-500">
         <k-list class="w-full mt-5 list-none border-t border-gray-200">
@@ -520,6 +520,11 @@ const openPannel = async () => {
           </div>
         </k-list>
       </dl>
+    </div>
+  </div>
+  <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
+    <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+      a
     </div>
   </div>
   <k-dialog
