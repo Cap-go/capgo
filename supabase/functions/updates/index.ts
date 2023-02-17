@@ -25,6 +25,18 @@ const getBundleUrl = async (platform: string, bucket_id: string, path: string) =
   return null
 }
 
+const resToVersion = (plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) => {
+  const res: any = {
+    version: version.name,
+    url: signedURL,
+  }
+  if (semver.lt(plugin_version, '4.13.0'))
+    res.session_key = version.session_key || ''
+  if (semver.lt(plugin_version, '4.4.0'))
+    res.checksum = version.checksum
+  return res
+}
+
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
   const id = cryptoRandomString({ length: 10 })
@@ -359,12 +371,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 200)
     }
     console.log(id, 'New version available', app_id, version.name, signedURL)
-    return sendRes({
-      version: version.name,
-      session_key: version.session_key || '',
-      checksum: version.checksum,
-      url: signedURL,
-    })
+    return sendRes(resToVersion(plugin_version, signedURL, version))
   }
   catch (e) {
     console.error('e', e)
