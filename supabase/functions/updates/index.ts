@@ -30,9 +30,9 @@ const resToVersion = (plugin_version: string, signedURL: string, version: Databa
     version: version.name,
     url: signedURL,
   }
-  if (semver.lt(plugin_version, '4.13.0'))
+  if (semver.gte(plugin_version, '4.13.0'))
     res.session_key = version.session_key || ''
-  if (semver.lt(plugin_version, '4.4.0'))
+  if (semver.gte(plugin_version, '4.4.0'))
     res.checksum = version.checksum
   return res
 }
