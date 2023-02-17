@@ -7,7 +7,6 @@ import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { bytesToMbText } from '~/services/conversion'
 import IconTrash from '~icons/heroicons/trash?raw'
 import { useDisplayStore } from '~/stores/display'
 
@@ -15,7 +14,13 @@ const props = defineProps<{
   appId: string
 }>()
 
-const element: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'] = {} as any
+interface Channel {
+  version: {
+    name: string
+    created_at: string
+  }
+}
+const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
 
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
@@ -28,9 +33,7 @@ const search = ref('')
 const elements = ref<(typeof element)[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const filters = ref({
-  'External storage': false,
-})
+const filters = ref()
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
@@ -52,32 +55,30 @@ const didCancel = async (name: string) => {
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
 }
-const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['app_versions']['Row'][]) => {
-  const { data: dataVersionsMeta } = await supabase
-    .from('app_versions_meta')
-    .select()
-    .in('id', dataVersions.map(({ id }) => id))
-  const newVersions = dataVersions.map(({ id, ...rest }) => {
-    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-    return { id, ...rest, ...version } as typeof element
-  })
-  return newVersions
-}
+
 const getData = async () => {
   isLoading.value = true
   try {
     const req = supabase
-      .from('app_versions')
-      .select('*', { count: 'exact' })
+      .from('channels')
+      .select(`
+          id,
+          name,
+          app_id,
+          public,
+          version (
+            name,
+            created_at
+          ),
+          created_at,
+          updated_at
+          `)
       .eq('app_id', props.appId)
-      .eq('deleted', false)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
       req.like('name', `%${search.value}%`)
 
-    if (filters.value['External storage'])
-      req.neq('external_url', null)
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
@@ -87,7 +88,7 @@ const getData = async () => {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
-    elements.value.push(...(await enhenceVersionElems(dataVersions)))
+    elements.value.push(...dataVersions as any)
     // console.log('count', count)
     total.value = count || 0
   }
@@ -109,46 +110,24 @@ const refreshData = async () => {
 }
 const deleteOne = async (one: typeof element) => {
   // console.log('deleteBundle', bundle)
-  if (await didCancel(t('device.version')))
+  if (await didCancel(t('channel.title')))
     return
   try {
-    const { data: channelFound, error: errorChannel } = await supabase
+    const { error: delChanError } = await supabase
       .from('channels')
-      .select()
-      .eq('app_id', one.app_id)
-      .eq('version', one.id)
-    if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.messageToast.push(`${t('device.version')} ${one.app_id}@${one.name} ${t('pckage.version.is-used-in-channel')}`)
-      return
-    }
-    const { data: deviceFound, error: errorDevice } = await supabase
-      .from('devices_override')
-      .select()
-      .eq('app_id', one.app_id)
-      .eq('version', one.id)
-    if ((deviceFound && deviceFound.length) || errorDevice) {
-      displayStore.messageToast.push(`${t('device.version')} ${one.app_id}@${one.name} ${t('package.version.is-used-in-device')}`)
-      return
-    }
-    const { error: delError } = await supabase
-      .storage
-      .from('apps')
-      .remove([`${one.user_id}/${one.app_id}/versions/${one.bucket_id}`])
-    const { error: delAppError } = await supabase
-      .from('app_versions')
-      .update({ deleted: true })
-      .eq('app_id', one.app_id)
+      .delete()
+      .eq('app_id', props.appId)
       .eq('id', one.id)
-    if (delAppError || delError) {
-      displayStore.messageToast.push(t('package.cannot-delete-version'))
+    if (delChanError) {
+      displayStore.messageToast.push(t('cannot-delete-channel'))
     }
     else {
-      displayStore.messageToast.push(t('package.version-deleted'))
       await refreshData()
+      displayStore.messageToast.push(t('channel-deleted'))
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('package.cannot-delete-version'))
+    displayStore.messageToast.push(t('cannot-delete-channel'))
   }
 }
 
@@ -161,25 +140,18 @@ columns.value = [
     head: true,
   },
   {
-    label: 'Created at',
-    key: 'created_at',
+    label: t('last-upload'),
+    key: 'updated_at',
     mobile: 'header',
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
   },
   {
-    label: 'Size',
+    label: t('last-version'),
+    key: 'created_at',
     mobile: 'footer',
-    key: 'size',
-    sortable: true,
-    displayFunction: (elem: typeof element) => {
-      if (elem.size)
-        return bytesToMbText(elem.size)
-      else if (elem.external_url)
-        return t('package.externally')
-      else
-        return t('package.size_not_found')
-    },
+    sortable: 'desc',
+    displayFunction: (elem: typeof element) => elem.version.name,
   },
   {
     label: 'Action',
@@ -202,8 +174,8 @@ const reload = async () => {
   }
 }
 
-const openOne = async (bundle: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/bundle/${bundle.id}`)
+const openOne = async (one: typeof element) => {
+  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/channel/${one.id}`)
 }
 onMounted(async () => {
   await refreshData()
@@ -219,7 +191,7 @@ watch(props, async () => {
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
-    :search-placeholder="t('search-bundle')"
+    :search-placeholder="t('search-by-name')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"
   />

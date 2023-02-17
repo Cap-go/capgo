@@ -130,14 +130,14 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const deleteOne = async (usr: typeof element) => {
+const deleteOne = async (one: typeof element) => {
   if (await didCancel(t('channel.user')))
     return
   const { error } = await supabase
     .from('channel_users')
     .delete()
     .eq('app_id', props.appId)
-    .eq('user_id', usr.id)
+    .eq('user_id', one.id)
   if (error)
     console.error(error)
   else

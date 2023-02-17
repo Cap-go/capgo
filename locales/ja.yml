@@ -332,6 +332,7 @@ reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
 search: 探す
 search-bundle: バンドルを検索
+search-by-name: 名前で検索
 search-device: 検索デバイス
 search-user: ユーザーを検索
 see-usage: 使用法を見る

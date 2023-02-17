@@ -332,6 +332,7 @@ reset-password: 重设密码
 reset-your-password: 重置你的密码
 search: 搜索
 search-bundle: 搜索包
+search-by-name: 按名称搜索
 search-device: 搜索设备
 search-user: 搜索用户
 see-usage: 查看用法

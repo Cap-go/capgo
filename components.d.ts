@@ -15,6 +15,7 @@ declare module '@vue/runtime-core' {
     BundleTable: typeof import('./src/components/tables/BundleTable.vue')['default']
     ChannelCard: typeof import('./src/components/package/ChannelCard.vue')['default']
     Channels: typeof import('./src/components/package/Channels.vue')['default']
+    ChannelTable: typeof import('./src/components/tables/ChannelTable.vue')['default']
     copy: typeof import('./src/components/tables/DeviceTable copy.vue')['default']
     DeviceCard: typeof import('./src/components/package/DeviceCard.vue')['default']
     Devices: typeof import('./src/components/package/Devices.vue')['default']
