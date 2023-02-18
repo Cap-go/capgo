@@ -148,7 +148,7 @@ columns.value = [
     displayFunction: (elem: typeof element) => elem.version.name,
   },
   {
-    label: 'Action',
+    label: t('action'),
     key: 'action',
     mobile: 'after',
     icon: IconTrash,

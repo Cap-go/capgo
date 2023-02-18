@@ -253,7 +253,7 @@ const onClick = async (usr: Database['public']['Tables']['users']['Row']) => {
 
 columns.value = [
   {
-    label: 'Email',
+    label: t('accountProfile.email'),
     key: 'email',
     mobile: 'title',
     sortable: true,
@@ -261,14 +261,14 @@ columns.value = [
     head: true,
   },
   {
-    label: 'Created at',
+    label: t('device.created_at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
-    label: 'Name',
+    label: t('name'),
     key: 'platform',
     mobile: 'header',
     sortable: true,
@@ -276,7 +276,7 @@ columns.value = [
     displayFunction: (elem: typeof element) => `${elem.user_id.first_name} ${elem.user_id.last_name}`,
   },
   {
-    label: 'Action',
+    label: t('action'),
     key: 'action',
     mobile: 'after',
     icon: IconTrash,

@@ -32,21 +32,21 @@ const currentVersionsNumber = computed(() => {
 })
 const columns = ref<TableColumn[]>([
   {
-    label: 'Device Id',
+    label: t('device-id'),
     key: 'device_id',
     mobile: 'title',
     sortable: true,
     head: true,
   },
   {
-    label: 'Created at',
+    label: t('device.created_at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
-    label: 'Platform',
+    label: t('device.platform'),
     key: 'platform',
     mobile: 'header',
     sortable: true,
@@ -54,7 +54,7 @@ const columns = ref<TableColumn[]>([
     displayFunction: (elem: typeof element) => `${elem.platform} ${elem.os_version}`,
   },
   {
-    label: 'Bundle',
+    label: t('package.title'),
     key: 'version',
     mobile: 'footer',
     sortable: true,

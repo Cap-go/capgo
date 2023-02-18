@@ -119,6 +119,15 @@ columns.value = [
   },
 ]
 
+if (!props.deviceId) {
+  columns.value.push({
+    label: t('device.platform'),
+    key: 'platform',
+    mobile: 'after',
+    sortable: false,
+  })
+}
+
 const reload = async () => {
   console.log('reload')
   try {

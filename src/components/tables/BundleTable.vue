@@ -161,14 +161,14 @@ columns.value = [
     head: true,
   },
   {
-    label: 'Created at',
+    label: t('device.created_at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
-    label: 'Size',
+    label: t('size'),
     mobile: 'footer',
     key: 'size',
     sortable: true,
@@ -182,7 +182,7 @@ columns.value = [
     },
   },
   {
-    label: 'Action',
+    label: t('action'),
     key: 'action',
     mobile: 'after',
     icon: IconTrash,
