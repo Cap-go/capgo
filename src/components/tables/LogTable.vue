@@ -9,6 +9,7 @@ import { useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   deviceId?: string
+  appId?: string
 }>()
 
 interface Channel {
@@ -49,6 +50,7 @@ const getData = async () => {
         created_at,
         updated_at
       `)
+      .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (props.deviceId)
@@ -139,7 +141,7 @@ watch(props, async () => {
 <template>
   <Table
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-    :total="total" row-click :element-list="elements"
+    :total="total" :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
     :search-placeholder="t('search-by-action')"

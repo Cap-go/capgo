@@ -402,6 +402,7 @@ watchEffect(async () => {
           <LogTable
             class="p-3"
             :device-id="id"
+            :app-id="packageId"
           />
         </div>
       </div>

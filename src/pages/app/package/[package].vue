@@ -93,10 +93,11 @@ watchEffect(async () => {
       <Usage :app-id="id" />
       <section class="py-12">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-20">
+          <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-4 lg:gap-x-12 xl:gap-x-20">
             <AppStat :number="channelsNb" label="Channels" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
             <AppStat :number="bundlesNb" label="Bundles" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
             <AppStat :number="devicesNb" label="Devices" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
+            <AppStat :number="devicesNb" label="Logs" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
           </div>
         </div>
       </section>
