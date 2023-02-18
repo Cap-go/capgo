@@ -65,7 +65,6 @@ const konstaColors = ref({
   <k-navbar
     v-if="bannerText"
     :title="bannerText"
-    class="sticky top-0 md:hidden"
     :colors="konstaColors"
   >
     <template #right>
@@ -77,19 +76,6 @@ const konstaColors = ref({
       </router-link>
     </template>
   </k-navbar>
-  <div class="hidden navbar md:flex" :class="bannerColor">
-    <div class="flex-1">
-      <a class="text-xl normal-case btn btn-ghost">{{ bannerText }}</a>
-    </div>
-    <div class="navbar-end">
-      <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
-        {{ t('upgrade') }}
-      </router-link>
-      <router-link v-else id="banner" slot="end" navbar to="/app/home" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
-        {{ t('see-usage') }}
-      </router-link>
-    </div>
-  </div>
 </template>
 
 <style scoped>
