@@ -27,36 +27,38 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="border-b bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-slate-200">
-    <div class="px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16 -mb-px">
-        <!-- Header: Left side -->
-        <div class="flex">
-          <div v-if="displayStore.NavTitle" class="pr-2">
-            <k-navbar-back-link :text="t('button-back')" @click="back()" />
+  <div>
+    <header class="border-b bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-slate-200">
+      <div class="px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 -mb-px">
+          <!-- Header: Left side -->
+          <div class="flex">
+            <div v-if="displayStore.NavTitle" class="pr-2">
+              <k-navbar-back-link :text="t('button-back')" @click="back()" />
+            </div>
+            <!-- Hamburger button -->
+            <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
+              <span class="sr-only">{{ t('open-sidebar') }}</span>
+              <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <rect x="4" y="5" width="16" height="2" />
+                <rect x="4" y="11" width="16" height="2" />
+                <rect x="4" y="17" width="16" height="2" />
+              </svg>
+            </button>
           </div>
-          <!-- Hamburger button -->
-          <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
-            <span class="sr-only">{{ t('open-sidebar') }}</span>
-            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <rect x="4" y="5" width="16" height="2" />
-              <rect x="4" y="11" width="16" height="2" />
-              <rect x="4" y="17" width="16" height="2" />
-            </svg>
-          </button>
-        </div>
 
-        <div class="lg:absolute lg:-translate-x-1/2 lg:inset-y-5 lg:left-1/2">
-          <div class="flex-shrink-0">
-            {{ displayStore.NavTitle }}
+          <div class="lg:absolute lg:-translate-x-1/2 lg:inset-y-5 lg:left-1/2">
+            <div class="flex-shrink-0">
+              {{ displayStore.NavTitle }}
+            </div>
           </div>
-        </div>
-        <!-- Header: Right side -->
-        <div class="flex items-center space-x-3">
-          <UserMenu align="right" />
+          <!-- Header: Right side -->
+          <div class="flex items-center space-x-3">
+            <UserMenu align="right" />
+          </div>
         </div>
       </div>
-    </div>
+    </header>
     <Banner />
-  </header>
+  </div>
 </template>

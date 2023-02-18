@@ -62,6 +62,8 @@ const bannerColor = computed(() => {
 const konstaColors = ref({
   bgIos: bannerColor,
   bgMaterial: bannerColor,
+  textIos: 'text-black',
+  textMaterial: 'text-black',
 })
 </script>
 
