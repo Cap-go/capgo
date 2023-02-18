@@ -116,8 +116,6 @@ channel:
   confirm-public-desc: >-
     Hacer que este canal sea el predeterminado hará que envíe actualizaciones a
     todos sus usuarios.
-
-
     Otros canales predeterminados ya no serán predeterminados.
   copy: Copiar URL
   device: Dispositivo
@@ -208,7 +206,7 @@ intro:
   aka: También conocido como
   desc: Plantilla de inicio de vite obstinado
   dynamic-route: Demostración de ruta dinámica
-  hi: Nombre Hola}!
+  hi: Nombre Hola!
   whats-your-name: ¿Cómo te llamas?
 invalid-auth: autenticación inválida
 is-emulator: es emulador
@@ -337,7 +335,7 @@ plan-member: miembro del plan.
 plans: planes
 please-choose-your-p: Por favor elige tus preferencias
 please-upgrade: Actualice su plan para agregar más usuarios
-pro-tip-you-can-copy: 'Consejo profesional: puedes copiar el'
+pro-tip-you-can-copy: "Consejo profesional: puedes copiar el"
 projection: Proyecciones
 projects:
   list: Tuyo
@@ -415,7 +413,7 @@ welcome-to: Bienvenido a
 welcome-to-your-capg: Bienvenido a tu panel de control de Capgo
 you-can-change-your-: Puede cambiar su información personal aquí.
 you-reached-the-limi: Límite alcanzado
-your-api-key: 'Su clave API:'
+your-api-key: "Su clave API:"
 your-are-a: Tu area
 your-current-plan-is: Su plan actual es
 your-current-suggested-plan-is: Su plan sugerido actual es
