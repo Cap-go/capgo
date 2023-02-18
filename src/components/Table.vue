@@ -236,7 +236,7 @@ onMounted(() => {
         </template>
       </kListItem>
     </kList>
-    <nav class="fixed bottom-0 left-0 z-50 flex items-center justify-between w-full p-4 bg-white md:pt-4 dark:bg-gray-900 md:bg-transparent dark:md:bg-transparent md:relative" aria-label="Table navigation">
+    <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:pt-4 dark:bg-gray-900 md:bg-transparent dark:md:bg-transparent md:relative" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">Showing</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
