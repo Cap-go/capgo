@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
 
 const route = useRoute()
+const { t } = useI18n()
 const supabase = useSupabase()
 const id = ref('')
 const isLoading = ref(false)
@@ -14,12 +16,10 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 const channelsNb = ref(0)
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
+const updatesNb = ref(0)
 
 const loadAppInfo = async () => {
   try {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     const { data: dataApp } = await supabase
       .from('apps')
       .select()
@@ -27,32 +27,19 @@ const loadAppInfo = async () => {
       .single()
     app.value = dataApp || app.value
 
-    // get channels count
-    const dataChannels = await supabase
-      .from('channels')
-      .select('id', { count: 'exact', head: true })
+    const date_id = new Date().toISOString().slice(0, 7)
+    const { data } = await supabase
+      .from('app_stats')
+      .select()
       .eq('app_id', id.value)
-      .then(res => res.count || 0)
-    channelsNb.value = dataChannels || 0
-    // get bundles count
-    const dataBundles = await supabase
-      .from('app_versions')
-      .select('id', { count: 'exact', head: true })
-      .eq('app_id', id.value)
-      .eq('deleted', false)
-      .then(res => res.count || 0)
-    bundlesNb.value = dataBundles || 0
-    // get devices count
-    const dataDevices = await supabase
-      .from('devices')
-      .select('device_id', { count: 'exact', head: true })
-      .eq('is_emulator', false)
-      .eq('is_prod', true)
-      .lte('updated_at', lastDay.toISOString())
-      .gte('updated_at', firstDay.toISOString())
-      .eq('app_id', id.value)
-      .then(res => res.count || 0)
-    devicesNb.value = dataDevices || 0
+      .eq('date_id', date_id)
+      .single()
+    if (data) {
+      updatesNb.value = Math.max(data.mlu, data.mlu_real)
+      devicesNb.value = data.devices
+      bundlesNb.value = data.versions
+      channelsNb.value = data.channels
+    }
   }
   catch (error) {
     console.error(error)
@@ -90,10 +77,10 @@ watchEffect(async () => {
       <section class="py-12">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-4 lg:gap-x-12 xl:gap-x-20">
-            <AppStat :number="channelsNb" label="Channels" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
-            <AppStat :number="bundlesNb" label="Bundles" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
-            <AppStat :number="devicesNb" label="Devices" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
-            <AppStat :number="devicesNb" label="Logs" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
+            <AppStat :number="channelsNb" :label="t('channels')" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
+            <AppStat :number="bundlesNb" :label="t('package.versions')" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
+            <AppStat :number="devicesNb" :label="t('devices.title')" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
+            <AppStat :number="updatesNb" :label="t('plan.updates')" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
           </div>
         </div>
       </section>

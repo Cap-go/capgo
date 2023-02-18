@@ -41,9 +41,15 @@ const lastDayEvolution = computed(() => {
 <template>
   <div class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <div class="px-5 pt-5">
-      <h2 class="mb-2 text-2xl font-semibold dark:text-white text-slate-800">
-        {{ props.title }}
-      </h2>
+      <div class="flex flex-row">
+        <h2 class="mb-2 mr-4 text-2xl font-semibold dark:text-white text-slate-800">
+          {{ props.title }}
+        </h2>
+        <div class="font-medium badge badge-primary">
+          beta
+        </div>
+      </div>
+
       <div class="mb-1 text-xs font-semibold uppercase dark:text-white text-slate-400">
         {{ t('usage.title') }}
       </div>

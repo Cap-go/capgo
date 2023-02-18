@@ -126,17 +126,10 @@ const loadData = async () => {
     await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
   isLoading.value = false
 }
-const openPlan = () => {
-  router.push('/dashboard/settings/plans')
-}
-
 loadData()
 </script>
 
 <template>
-  <!-- <div class="w-full p-3 text-xl font-semibold text-center transition-all ease-in-out bg-blue-200 rounded-t-lg cursor-pointer hover:bg-blue-300" @click="openPlan">
-    Beta Charts
-  </div> -->
   <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :title="t('MAU')" unit="Users" />
     <div v-else class="flex flex-col h-[460px] bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
