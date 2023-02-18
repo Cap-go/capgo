@@ -41,7 +41,7 @@ const menu = ref([
     to: '/dashboard/settings/notifications',
   },
   {
-    title: t('admin.title'),
+    title: t('admin'),
     icon: shallowRef(IconAdmin),
     to: '/dashboard/settings/admin',
     hidden: !isUserAdmin.value,

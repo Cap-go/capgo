@@ -28,7 +28,7 @@ watch(rowInput, debounce(() => {
         'text-gray-600 dark:text-gray-200': !props.isLink,
       }"
     >
-      <input v-if="editable" v-model="rowInput" class="w-full max-w-xs text-white input input-sm ">
+      <input v-if="editable" v-model="rowInput" class="block w-full p-1 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 sm:text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
       <span v-else> {{ props.value }} </span>
     </dd>
   </div>
