@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { kNavbarBackLink } from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 import Banner from './Banner.vue'
 import { useDisplayStore } from '~/stores/display'
+import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 
 const props = defineProps({
   sidebarOpen: {
@@ -34,7 +34,10 @@ const { t } = useI18n()
           <!-- Header: Left side -->
           <div class="flex">
             <div v-if="displayStore.NavTitle" class="pr-2">
-              <k-navbar-back-link :text="t('button-back')" @click="back()" />
+              <div class="flex" @click="back()">
+                <IconBack class="w-6 h-6 fill-current text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50" />
+                <span class="text-dark dark:text-white">{{ t('button-back') }}</span>
+              </div>
             </div>
             <!-- Hamburger button -->
             <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
@@ -48,7 +51,7 @@ const { t } = useI18n()
           </div>
 
           <div class="lg:absolute lg:-translate-x-1/2 lg:inset-y-5 lg:left-1/2">
-            <div class="flex-shrink-0">
+            <div class="flex-shrink-0 font-bold dark:text-white text-md text-dark">
               {{ displayStore.NavTitle }}
             </div>
           </div>
