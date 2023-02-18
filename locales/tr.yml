@@ -160,6 +160,7 @@ make-normal: normal yap
 making-this-channel-: >-
   Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
   veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
+mau: Aylık aktif kullanıcılar
 module-heading: Modüller
 monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar
@@ -199,7 +200,6 @@ plan-desc: >-
   Hesap planları ek özelliklerin kilidini açar.
 plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
-mau: Aylık aktif kullanıcılar
 plan-member: plan üyesi.
 plan-pricing-plans: Fiyatlandırma Planları
 plan-progressive-deploy: aşamalı dağıtım
@@ -277,6 +277,7 @@ version-linking: Paket bağlantısı
 versions: Versiyonlar
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
+yearly: Yıllık
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
 your-api-key: 'API anahtarınız:'

@@ -162,6 +162,7 @@ make-normal: làm cho bình thường
 making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
   một kênh khác hoặc để thiết bị tự chỉ định.
+mau: Người dùng hoạt động hàng tháng
 module-heading: mô-đun
 monthly: hàng tháng
 monthly-active-users: Người dùng hoạt động hàng tháng
@@ -199,7 +200,6 @@ plan-desc: |-
   Gói tài khoản mở khóa các tính năng bổ sung.
 plan-inactive: Kế hoạch không hoạt động
 plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
-mau: Người dùng hoạt động hàng tháng
 plan-member: thành viên kế hoạch.
 plan-pricing-plans: kế hoạch giá
 plan-progressive-deploy: triển khai lũy tiến
@@ -279,6 +279,7 @@ version-linking: Liên kết đến gói
 versions: phiên bản
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Bảng điều khiển Capgo của bạn
+yearly: hàng năm
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-reached-the-limi: Đạt tới giới hạn
 your-api-key: 'Khóa API của bạn:'

@@ -154,6 +154,7 @@ logs: 日志
 lowerCaseError: 应包含小写字母
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
+mau: 月活跃用户
 module-heading: 模块
 monthly: 每月
 monthly-active-users: 月活跃用户
@@ -191,7 +192,6 @@ plan-desc: |-
   帐户计划解锁附加功能。
 plan-inactive: 计划无效
 plan-is-the-best-pla: 计划是满足您需求的最佳计划。
-mau: 月活跃用户
 plan-member: 计划成员。
 plan-pricing-plans: 定价计划
 plan-progressive-deploy: 渐进式部署
@@ -269,6 +269,7 @@ version-linking: 捆绑包链接
 versions: 版本
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
+yearly: 每年
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到限制
 your-api-key: 您的 API 密钥：

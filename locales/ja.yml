@@ -154,6 +154,7 @@ logs: ログ
 lowerCaseError: 小文字を含める必要があります
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
+mau: 月間アクティブ ユーザー数
 module-heading: モジュール
 monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数
@@ -191,7 +192,6 @@ plan-desc: |-
   アカウント プランは、追加機能のロックを解除します。
 plan-inactive: プランの非アクティブ
 plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。
-mau: 月間アクティブ ユーザー数
 plan-member: 企画メンバー。
 plan-pricing-plans: 料金プラン
 plan-progressive-deploy: プログレッシブ デプロイ
@@ -269,6 +269,7 @@ version-linking: バンドルへのリンク
 versions: バージョン
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
+yearly: 毎年
 you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました
 your-api-key: 'API キー:'

@@ -162,6 +162,7 @@ make-normal: Jadikan normal
 making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
+mau: Pengguna aktif bulanan
 module-heading: Modul
 monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan
@@ -199,7 +200,6 @@ plan-desc: |-
   Paket akun membuka kunci fitur tambahan.
 plan-inactive: Rencana tidak aktif
 plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
-mau: Pengguna aktif bulanan
 plan-member: anggota rencana.
 plan-pricing-plans: Paket Harga
 plan-progressive-deploy: Penyebaran progresif
@@ -279,6 +279,7 @@ version-linking: Tautan ke bundel
 versions: Versi
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
+yearly: Tahunan
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai
 your-api-key: 'Kunci API Anda:'

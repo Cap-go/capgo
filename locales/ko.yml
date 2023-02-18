@@ -154,6 +154,7 @@ logs: 로그
 lowerCaseError: 소문자를 포함해야 합니다.
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
+mau: 월간 활성 사용자
 module-heading: 모듈
 monthly: 월간 간행물
 monthly-active-users: 월간 활성 사용자
@@ -191,7 +192,6 @@ plan-desc: |-
   계정 계획은 추가 기능을 잠금 해제합니다.
 plan-inactive: 비활성 계획
 plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.
-mau: 월간 활성 사용자
 plan-member: 계획 회원.
 plan-pricing-plans: 요금제
 plan-progressive-deploy: 점진적 배포
@@ -269,6 +269,7 @@ version-linking: 번들 링크
 versions: 버전
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
+yearly: 매년
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-reached-the-limi: 한도 도달
 your-api-key: '귀하의 API 키:'

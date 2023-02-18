@@ -166,6 +166,7 @@ make-normal: normalizar
 making-this-channel-: >-
   Para hacer que este canal sea "normal", deberá configurar otro canal
   predeterminado o dejar que el dispositivo se auto asigne.
+mau: Usuarios activos mensuales
 module-heading: Módulos
 monthly: Mensual
 monthly-active-users: Usuarios activos mensuales
@@ -207,7 +208,6 @@ plan-desc: >-
   Los planes de cuenta desbloquean funciones adicionales.
 plan-inactive: Plan inactivo
 plan-is-the-best-pla: plan es el mejor plan para sus necesidades.
-mau: Usuarios activos mensuales
 plan-member: miembro del plan.
 plan-pricing-plans: Planes de precios
 plan-progressive-deploy: Despliegue progresivo
@@ -285,6 +285,7 @@ version-linking: Enlace al paquete
 versions: Versiones
 welcome-to: Bienvenido a
 welcome-to-your-capg: Bienvenido a tu panel de control de Capgo
+yearly: Anual
 you-can-change-your-: Puede cambiar su información personal aquí.
 you-reached-the-limi: Límite alcanzado
 your-api-key: 'Su clave API:'

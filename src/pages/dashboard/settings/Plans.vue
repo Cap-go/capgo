@@ -42,11 +42,11 @@ const main = useMainStore()
 const displayStore = useDisplayStore()
 
 const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
-  `${plan - mau.toLocaleString()} ${t('mau')}`,
-  `${plan - storage.toLocaleString()} ${t('plan-storage')}`,
-  `${plan - bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
-  plan - abtest ? t('plan-abtest') : false,
-  plan - progressive - deploy ? t('plan-progressive-deploy') : false,
+  `${plan.mau.toLocaleString()} ${t('mau')}`,
+  `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
+  `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
+  plan.abtest ? t('plan-abtest') : false,
+  plan.progressive_deploy ? t('plan-progressive-deploy') : false,
 ].filter(Boolean)
 
 const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
@@ -160,7 +160,7 @@ watchEffect(async () => {
               :active="segmentVal === 'y'"
               @click="() => (segmentVal = 'y')"
             >
-              {{ t('plan-yearly-billing') }}
+              {{ t('yearly') }}
             </k-segmented-button>
           </k-segmented>
         </div>

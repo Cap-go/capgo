@@ -194,6 +194,7 @@ plan-desc: >-
   additional features.
 mau: Monthly active users
 monthly: Monthly
+yearly: Yearly
 plan-pricing-plans: Pricing Plans
 plan-progressive-deploy: Progressive deploy
 plan-storage: GB Storage
