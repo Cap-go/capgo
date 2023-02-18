@@ -14,13 +14,13 @@ import { existUser, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import IconTrash from '~icons/heroicons/trash?raw'
 import type { Database } from '~/types/supabase.types'
-import IconPlus from '~icons/heroicons/plus'
+import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   appId: string
   allowAdd?: boolean
-  channelId?: number | undefined
+  channelId?: number
 }>()
 
 interface ChannelUsers {
@@ -270,7 +270,7 @@ columns.value = [
   {
     label: t('name'),
     key: 'platform',
-    mobile: 'header',
+    mobile: 'footer',
     sortable: true,
     head: true,
     displayFunction: (elem: typeof element) => `${elem.user_id.first_name} ${elem.user_id.last_name}`,
@@ -301,7 +301,7 @@ onMounted(async () => {
       @row-click="onClick"
       @reload="reload()" @reset="refreshData()"
     />
-    <k-fab v-if="allowAdd && channelId" class="fixed z-20 right-4-safe bottom-4-safe" @click="addUserModal = true">
+    <k-fab v-if="allowAdd && channelId" class="fixed z-20 right-4-safe bottom-4-safe secondary" @click="addUserModal = true">
       <template #icon>
         <component :is="IconPlus" />
       </template>

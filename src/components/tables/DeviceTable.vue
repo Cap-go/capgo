@@ -48,7 +48,7 @@ const columns = ref<TableColumn[]>([
   {
     label: t('device.platform'),
     key: 'platform',
-    mobile: 'header',
+    mobile: 'footer',
     sortable: true,
     head: true,
     displayFunction: (elem: typeof element) => `${elem.platform} ${elem.os_version}`,
@@ -56,7 +56,7 @@ const columns = ref<TableColumn[]>([
   {
     label: t('package.title'),
     key: 'version',
-    mobile: 'footer',
+    mobile: 'after',
     sortable: true,
     head: true,
     displayFunction: (elem: typeof element) => elem.version.name,

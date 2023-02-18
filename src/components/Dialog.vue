@@ -23,13 +23,13 @@ const close = (item: ActionSheetOptionButton | undefined) => {
     @backdropclick="close(undefined)"
   >
     <template #title>
-      {{ displayStore.dialogOption?.header }}
+      <span class="text-black dark:text-white">{{ displayStore.dialogOption?.header }}</span>
     </template>
     {{ displayStore.dialogOption?.message }}
 
     <template #buttons>
       <k-dialog-button v-for="(item, i) in displayStore.dialogOption?.buttons" :key="i" @click="close(item)">
-        {{ item.text }}
+        <span :class="{ 'text-black dark:text-white': item.role !== 'cancel' }">{{ item.text }}</span>
       </k-dialog-button>
     </template>
   </k-dialog>

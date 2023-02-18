@@ -175,6 +175,9 @@ watchEffect(async () => {
     :subtitle="formatDate(props.app.updated_at || '')"
     @click="openPackage(app.app_id)"
   >
+    <template #media>
+      <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
+    </template>
     <template #after>
       <IconTrash class="text-lg text-red-600" @click.stop="deleteApp(app)" />
     </template>

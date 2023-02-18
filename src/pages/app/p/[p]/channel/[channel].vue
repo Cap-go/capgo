@@ -351,7 +351,7 @@ const openPannel = async () => {
     </div>
     <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
       <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-        <SharedUserTable class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
+        <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">

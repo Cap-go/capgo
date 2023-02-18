@@ -231,7 +231,8 @@ onMounted(() => {
         @click="emit('rowClick', elem)"
       >
         <template #after>
-          <div @click.stop="findMobileCol('after')?.onClick" v-html="findMobileCol('after')?.icon" />
+          <div v-if="findMobileCol('after')?.icon" @click.stop="findMobileCol('after')?.onClick" v-html="findMobileCol('after')?.icon" />
+          <span v-else>{{ displayValueKey(elem, findMobileCol('after')) }}</span>
         </template>
       </kListItem>
     </kList>

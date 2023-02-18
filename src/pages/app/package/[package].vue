@@ -84,12 +84,8 @@ watchEffect(async () => {
     <Spinner />
   </div>
   <div v-else class="w-full h-full">
-    <div class="w-full h-full px-4 py-8 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
-      <div class="pb-2 lg:max-w-xl lg:mx-auto sm:text-center">
-        <h2 class="text-3xl font-bold text-gray-900 dark:text-white sm:text-4xl xl:text-5xl font-pj">
-          {{ app?.name }}
-        </h2>
-      </div>
+    <TitleHead :title="app?.name || ''" :default-back="`/app/package/${route.params.p}/channels`" />
+    <div class="w-full h-full px-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
       <Usage :app-id="id" />
       <section class="py-12">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
