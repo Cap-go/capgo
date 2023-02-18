@@ -1,21 +1,17 @@
 <script setup lang="ts">
-import {
-  kList, kListItem,
-} from 'konsta/vue'
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { gt } from 'semver'
-import { vInfiniteScroll } from '@vueuse/components'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import TitleHead from '~/components/TitleHead.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
-import Spinner from '~/components/Spinner.vue'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
+import type { Tab } from '~/components/comp_def'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -32,34 +28,35 @@ interface Stat {
     name: string
   }
 }
-const fetchLimit = 40
-let fetchOffset = 0
-const isDisabled = ref(false)
 const displayStore = useDisplayStore()
 const { t } = useI18n()
 const main = useMainStore()
 const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
-const search = ref<string>('')
 const id = ref<string>()
-const showLog = ref(false)
 const isLoading = ref(true)
-const isLoadingSub = ref(true)
+const ActiveTab = ref('info')
+
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
 const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
-const filtered = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
 const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row'] & Device>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
 
-const logFiltered = computed(() => {
-  if (search.value)
-    return filtered.value
-
-  return logs.value
-})
+const tabs: Tab[] = [
+  {
+    label: t('channel.info'),
+    icon: IconInformations,
+    key: 'info',
+  },
+  {
+    label: t('logs'),
+    icon: IconLog,
+    key: 'logs',
+  },
+]
 
 const getVersion = async () => {
   try {
@@ -100,68 +97,7 @@ const getChannels = async () => {
     console.error(error)
   }
 }
-const onSearchLog = async (e: Event) => {
-  e.preventDefault()
-  const val = (e.target as HTMLInputElement).value
-  if (val == null) {
-    search.value = ''
-    return
-  }
-  search.value = val
-  isLoadingSub.value = true
-  const { data: dataStats } = await supabase
-    .from('stats')
-    .select(`
-        device_id,
-        action,
-        platform,
-        version_build,
-        version (
-            name
-        ),
-        created_at,
-        updated_at
-      `)
-    .eq('device_id', id.value)
-    .order('created_at', { ascending: false })
-    .like('action', `%${search.value}%`)
-  filtered.value = (dataStats || []) as (Database['public']['Tables']['stats']['Row'] & Stat)[]
-  isLoadingSub.value = false
-}
 
-const loadStatsData = async () => {
-  isLoadingSub.value = true
-  try {
-    // create a date object for the last day of the previous month with dayjs
-    const { data: dataStats } = await supabase
-      .from('stats')
-      .select(`
-        device_id,
-        action,
-        platform,
-        version_build,
-        version (
-            name
-        ),
-        created_at,
-        updated_at
-      `)
-      .eq('device_id', id.value)
-      .order('created_at', { ascending: false })
-      .range(fetchOffset, fetchOffset + fetchLimit - 1)
-    if (!dataStats)
-      return
-    logs.value.push(...dataStats as (Database['public']['Tables']['stats']['Row'] & Stat)[])
-    if (dataStats.length === fetchLimit)
-      fetchOffset += fetchLimit
-    else
-      isDisabled.value = true
-  }
-  catch (error) {
-    console.error(error)
-  }
-  isLoadingSub.value = false
-}
 const getChannelOverride = async () => {
   const { data, error } = await supabase
     .from('channel_devices')
@@ -252,14 +188,12 @@ const minVersion = (val: string, min = '4.6.99') => {
 const loadData = async () => {
   isLoading.value = true
   logs.value = []
-  fetchOffset = 0
   await Promise.all([
     getDevice(),
     getDeviceOverride(),
     getChannelOverride(),
     getChannels(),
     getVersion(),
-    loadStatsData(),
   ])
   isLoading.value = false
 }
@@ -292,11 +226,11 @@ const didCancel = async (name: string) => {
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
 }
-const saveCustomId = async (e: Event) => {
-  e.preventDefault()
+
+const saveCustomId = async () => {
+  console.log('saveCustomId', device.value?.custom_id)
   if (!device.value?.device_id)
     return
-  device.value.custom_id = (e.target as HTMLInputElement).value
   await supabase
     .from('devices')
     .update({
@@ -381,6 +315,7 @@ const delDevChannel = async (device: string) => {
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
+
 const updateChannel = async () => {
   const buttons = []
   if (channelDevice.value) {
@@ -438,211 +373,36 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <TitleHead :title="t('device.title')" />
-  <div class="flex flex-col h-full p-8 pb-12 overflow-y-scroll md:mx-24">
-    <div class="">
-      <div class="w-full px-6 mx-auto lg:px-8 max-w-7xl">
-        <div class="flex items-center justify-center">
-          <div class="">
-            <nav class="flex -mb-px space-x-10 md:flex-wrap">
-              <button class="inline-flex items-center w-auto py-4 mt-0 text-lg font-medium text-gray-500 transition-all duration-200 border-b-2 border-transparent dark:text-gray-200 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="!showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = false">
-                <IconInformations class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
-                {{ t('channel.info') }}
-              </button>
-
-              <button class="inline-flex items-center w-auto py-4 mt-0 text-lg font-medium text-gray-500 transition-all duration-200 border-b-2 border-transparent dark:text-gray-200 hover:text-gray-900 hover:border-gray-300 dark:hover:text-gray-500 dark:hover:border-gray-100 whitespace-nowrap group" :class="showLog ? 'bg-gray-200/70 dark:bg-gray-600/70 px-2 rounded-lg hover:border-0 duration-0' : ''" @click="showLog = true">
-                <IconLog class="-ml-0.5 mr-2 text-gray-400 group-hover:text-gray-600 h-5 w-5 transition-all duration-100" />
-                {{ t('logs') }}
-              </button>
-            </nav>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="device">
-      <div v-if="!showLog" id="informations">
-        <div class="mt-5 border-t border-gray-200">
-          <dl class="sm:divide-y sm:divide-gray-200">
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device-id') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-                {{ device.device_id }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.platform') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-                {{ device.platform }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('custom-id') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-200 sm:col-span-2 sm:mt-0">
-                <input :value="device.custom_id" class="w-full max-w-xs text-white input input-bordered" @input="saveCustomId">
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.plugin_version') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ device.plugin_version }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.version') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ device.version.name }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('version-builtin') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ device.version_build }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.os_version') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ device.os_version || 'Unknown' }}
-              </dd>
-            </div>
-            <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('is-emulator') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ device.is_emulator }}
-              </dd>
-            </div>
-            <div v-if="minVersion(device.plugin_version)" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('is-production-app') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ device.is_prod }}
-              </dd>
-            </div>
-            <div v-if="device.updated_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.last_update') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ formatDate(device.updated_at) }}
-              </dd>
-            </div>
-            <div v-if="device.created_at" class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.created_at') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ formatDate(device.created_at) }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.force_version') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateOverride">
-                {{ deviceOverride?.version?.name || t('device.no_override') }}
-              </dd>
-            </div>
-            <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-              <dt class="text-lg font-medium text-gray-700 dark:text-gray-200">
-                {{ t('device.channel') }}
-              </dt>
-              <dd class="mt-1 text-lg text-gray-600 dark:text-gray-300 sm:col-span-2 sm:mt-0" @click="updateChannel">
-                {{ channelDevice?.channel_id.name || t('device.no_channel') }}
-              </dd>
-            </div>
+  <div>
+    <TitleHead :title="t('device.title')" :default-back="`/app/package/${route.params.p}/devices`" />
+    <div v-if="device" class="h-full overflow-y-scroll md:py-4">
+      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
+        <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+          <dl class="divide-y divide-gray-500">
+            <InfoRow :label="t('device-id')" :value="device.device_id" />
+            <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
+            <InfoRow v-if="device.created_at" :label="t('device.created_at')" :value="formatDate(device.created_at)" />
+            <InfoRow v-if="device.updated_at" :label="t('device.last_update')" :value="formatDate(device.updated_at)" />
+            <InfoRow v-if="device.platform" :label="t('device.platform')" :value="device.platform" />
+            <InfoRow v-if="device.plugin_version" :label="t('device.plugin_version')" :value="device.plugin_version" />
+            <InfoRow v-if="device.version.name" :label="t('device.version')" :value="device.version.name" />
+            <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
+            <InfoRow v-if="device.os_version" :label="t('device.os_version')" :value="device.os_version" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.os_version" :label="t('is-emulator')" :value="device.os_version?.toString()" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
+            <InfoRow :label="t('device.force_version')" :value="deviceOverride?.version?.name || t('device.no_override')" :is-link="true" @click="updateOverride()" />
+            <InfoRow :label="t('device.channel')" :value="channelDevice?.channel_id.name || t('device.no_channel') " :is-link="true" @click="updateChannel()" />
           </dl>
         </div>
       </div>
-      <div v-if="showLog" id="logs" class="flex flex-col h-full">
-        <div class="h-full">
-          <input class="w-full px-5 py-3 mt-3 border-b border-slate-100 dark:bg-gray-800 dark:border-slate-900 dark:text-gray-400" type="text" placeholder="Search" @input="onSearchLog">
-          <div v-if="logFiltered.length > 0" v-infinite-scroll="[loadStatsData, { distance: 10 }]" class="inline-block h-full min-w-full py-2 overflow-y-scroll align-middle">
-            <div class="hidden md:block">
-              <table class="w-full max-h-full lg:divide-y lg:divide-gray-200">
-                <thead class="sticky top-0 hidden bg-white lg:table-header-group dark:bg-gray-900/90">
-                  <tr>
-                    <th class="py-3.5 pl-4 pr-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200 sm:pl-6 md:pl-0">
-                      <div class="flex items-center">
-                        {{ t('action') }}
-                      </div>
-                    </th>
-                    <th class="py-3.5 px-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                      <div class="flex items-center">
-                        {{ t('device.version') }}
-                      </div>
-                    </th>
-                    <th class="py-3.5 px-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                      <div class="flex items-center">
-                        {{ t('version-build') }}
-                      </div>
-                    </th>
-                    <th class="py-3.5 px-3 text-left text-lg whitespace-nowrap font-medium text-gray-700 dark:text-gray-200">
-                      <div class="flex items-center">
-                        {{ t('updated-at') }}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="w-full divide-y divide-gray-200 max-h-fit">
-                  <tr v-if="isLoading || isLoadingSub">
-                    <td align="center" colspan="5">
-                      <Spinner />
-                    </td>
-                  </tr>
-                  <tr v-for="(item, i) in logFiltered" v-else :key="i" class="w-full">
-                    <td class="hidden py-4 pl-4 pr-3 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap sm:pl-6 md:pl-0">
-                      {{ item.action }}
-                    </td>
-                    <td class="hidden px-4 py-4 text-lg font-bold text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
-                      {{ item.version.name }}
-                    </td>
-                    <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
-                      {{ item.version_build }}
-                    </td>
-                    <td class="hidden px-4 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 lg:table-cell whitespace-nowrap">
-                      {{ formatDate(item.updated_at || '') }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <k-list class="w-full my-0 md:hidden">
-              <k-list-item v-if="isLoading || isLoadingSub">
-                <template #text>
-                  <Spinner />
-                </template>
-              </k-list-item>
-              <k-list-item
-                v-for="s in logFiltered"
-                v-else
-                :key="s.id"
-                :title="`${s.action}`"
-                :footer="`${s.version.name}, builtin ${s.version_build}`"
-                :after="formatDate(s.updated_at || '')"
-              />
-            </k-list>
-          </div>
-          <div v-else class="mt-5 text-2xl text-center">
-            {{ t('no-logs') }}
-          </div>
+      <div v-else-if="ActiveTab === 'logs'" id="devices" class="flex flex-col">
+        <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+          <LogTable
+            class="p-3"
+            :device-id="id"
+          />
         </div>
       </div>
     </div>

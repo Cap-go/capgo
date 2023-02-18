@@ -135,7 +135,7 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
+  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
     <td class="p-2">
       <div class="flex flex-wrap items-center">
         <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
@@ -176,14 +176,7 @@ watchEffect(async () => {
     @click="openPackage(app.app_id)"
   >
     <template #after>
-      <IconTrash class="text-red-600 text-lg" @click.stop="deleteApp(app)" />
+      <IconTrash class="text-lg text-red-600" @click.stop="deleteApp(app)" />
     </template>
   </k-list-item>
 </template>
-
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

@@ -62,6 +62,8 @@ const filterActivated = computed(() => {
 })
 
 const sortClick = (key: number) => {
+  if (!props.columns[key].sortable)
+    return
   let sortable = props.columns[key].sortable
   if (sortable === 'asc')
     sortable = 'desc'

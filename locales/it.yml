@@ -1,6 +1,7 @@
 channel:
   users: Utenti condivisi
 search-bundle: Cerca pacchetto
+search-by-action: Cerca per azione
 search-by-name: Ricerca per nome
 search-device: Cerca dispositivo
 search-user: Cerca utente

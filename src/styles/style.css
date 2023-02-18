@@ -57,3 +57,8 @@ html {
   background-position: center;
   background-size: 150px 150px;
 }
+
+#confirm-button {
+  background-color: theme('colors.red.500');
+  color: theme('colors.white');
+}

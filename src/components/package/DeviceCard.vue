@@ -20,7 +20,7 @@ const openDevice = async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openDevice()">
+  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openDevice()">
     <td class="p-2">
       <div class="text-left">
         {{ props.device.device_id }}
@@ -56,10 +56,3 @@ const openDevice = async () => {
     @click="openDevice()"
   />
 </template>
-
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

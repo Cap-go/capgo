@@ -3,6 +3,7 @@ channel:
 package:
   open: Canal abierto
 search-bundle: Paquete de búsqueda
+search-by-action: Buscar por acción
 search-by-name: Buscar por nombre
 search-device: Buscar dispositivo
 search-user: Usuario de búsqueda

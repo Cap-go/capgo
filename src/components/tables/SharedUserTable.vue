@@ -12,7 +12,7 @@ import type { TableColumn } from '../comp_def'
 import { formatDate } from '~/services/date'
 import { existUser, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
-import IconTrash from '~icons/heroicons/trash'
+import IconTrash from '~icons/heroicons/trash?raw'
 import type { Database } from '~/types/supabase.types'
 import IconPlus from '~icons/heroicons/plus'
 import { useMainStore } from '~/stores/main'
@@ -24,7 +24,7 @@ const props = defineProps<{
 }>()
 
 interface ChannelUsers {
-  users: Database['public']['Tables']['users']['Row']
+  user_id: Database['public']['Tables']['users']['Row']
 }
 const element: Database['public']['Tables']['channel_users']['Row'] & ChannelUsers = {} as any
 
@@ -254,9 +254,10 @@ const onClick = async (usr: Database['public']['Tables']['users']['Row']) => {
 columns.value = [
   {
     label: 'Email',
-    key: 'device_id',
+    key: 'email',
     mobile: 'title',
     sortable: true,
+    displayFunction: (elem: typeof element) => elem.user_id.email,
     head: true,
   },
   {
@@ -272,7 +273,7 @@ columns.value = [
     mobile: 'header',
     sortable: true,
     head: true,
-    displayFunction: (elem: typeof element) => `${elem.users.first_name} ${elem.users.last_name}`,
+    displayFunction: (elem: typeof element) => `${elem.user_id.first_name} ${elem.user_id.last_name}`,
   },
   {
     label: 'Action',

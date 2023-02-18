@@ -242,12 +242,12 @@ const hideString = (str: string) => {
 
 <template>
   <div>
-    <TitleHead :title="t('package.title')" :default-back="`/app/package/${route.params.p}`" />
+    <TitleHead :title="t('package.title')" :default-back="`/app/package/${route.params.p}/bundles`" />
     <div v-if="version" class="h-full overflow-y-scroll md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
         <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-          <dl class="md:divide-y md:divide-gray-500">
+          <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
             <InfoRow v-if="version.created_at" :label="t('device.created_at')" :value="formatDate(version.created_at)" />
@@ -279,9 +279,3 @@ const hideString = (str: string) => {
   </div>
 </template>
 
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

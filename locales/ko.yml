@@ -332,6 +332,7 @@ reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 search: 찾다
 search-bundle: 번들 검색
+search-by-action: 액션으로 검색
 search-by-name: 이름으로 검색
 search-device: 장치 검색
 search-user: 사용자 검색

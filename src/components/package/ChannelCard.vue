@@ -108,7 +108,7 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden md:table-row cursor-pointer text-slate-800 dark:text-white" @click="openChannel(props.channel)">
+  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openChannel(props.channel)">
     <td class="p-2">
       <div class="text-left">
         {{ props.channel.name }}
@@ -127,7 +127,7 @@ watchEffect(async () => {
 
     <td class="" @click.stop="deleteChannel(props.channel)">
       <div class="text-left">
-        <IconTrash class="text-red-600 text-lg" />
+        <IconTrash class="text-lg text-red-600" />
       </div>
     </td>
   </tr>
@@ -139,14 +139,7 @@ watchEffect(async () => {
     @click="openChannel(props.channel)"
   >
     <template #after>
-      <IconTrash class="text-red-600 text-lg" @click.stop="deleteChannel(props.channel)" />
+      <IconTrash class="text-lg text-red-600" @click.stop="deleteChannel(props.channel)" />
     </template>
   </k-list-item>
 </template>
-
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

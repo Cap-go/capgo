@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import IconTrash from '~icons/heroicons/trash?raw'
-import { useDisplayStore } from '~/stores/display'
 
 const props = defineProps<{
-  appId: string
+  deviceId?: string
 }>()
 
 interface Channel {
@@ -20,14 +17,12 @@ interface Channel {
     created_at: string
   }
 }
-const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
+const element: Database['public']['Tables']['stats']['Row'] & Channel = {} as any
 
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
-const displayStore = useDisplayStore()
 const supabase = useSupabase()
-const router = useRouter()
 const total = ref(0)
 const search = ref('')
 const elements = ref<(typeof element)[]>([])
@@ -37,47 +32,30 @@ const filters = ref()
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-const didCancel = async (name: string) => {
-  displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-    buttons: [
-      {
-        text: t('button.cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button.delete'),
-        id: 'confirm-button',
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
-}
 
 const getData = async () => {
   isLoading.value = true
   try {
     const req = supabase
-      .from('channels')
+      .from('stats')
       .select(`
-          id,
-          name,
-          app_id,
-          public,
-          version (
-            name,
-            created_at
-          ),
-          created_at,
-          updated_at
-          `)
-      .eq('app_id', props.appId)
+        device_id,
+        action,
+        platform,
+        version_build,
+        version (
+            name
+        ),
+        created_at,
+        updated_at
+      `)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
+    if (props.deviceId)
+      req.eq('device_id', props.deviceId)
+
     if (search.value)
-      req.like('name', `%${search.value}%`)
+      req.like('action', `%${search.value}%`)
 
     if (columns.value.length) {
       columns.value.forEach((col) => {
@@ -108,58 +86,34 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const deleteOne = async (one: typeof element) => {
-  // console.log('deleteBundle', bundle)
-  if (await didCancel(t('channel.title')))
-    return
-  try {
-    const { error: delChanError } = await supabase
-      .from('channels')
-      .delete()
-      .eq('app_id', props.appId)
-      .eq('id', one.id)
-    if (delChanError) {
-      displayStore.messageToast.push(t('cannot-delete-channel'))
-    }
-    else {
-      await refreshData()
-      displayStore.messageToast.push(t('channel-deleted'))
-    }
-  }
-  catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-channel'))
-  }
-}
 
 columns.value = [
   {
-    label: t('name'),
-    key: 'name',
+    label: t('action'),
+    key: 'action',
     mobile: 'title',
     sortable: true,
     head: true,
   },
   {
-    label: t('last-upload'),
-    key: 'updated_at',
+    label: t('device.created_at'),
+    key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
-    label: t('last-version'),
+    label: t('device.version'),
     key: 'version',
     mobile: 'footer',
-    sortable: true,
+    sortable: false,
     displayFunction: (elem: typeof element) => elem.version.name,
   },
   {
-    label: 'Action',
-    key: 'action',
+    label: t('version-build'),
+    key: 'version_build',
     mobile: 'after',
-    icon: IconTrash,
-    class: 'text-red-500',
-    onClick: deleteOne,
+    sortable: false,
   },
 ]
 
@@ -174,9 +128,6 @@ const reload = async () => {
   }
 }
 
-const openOne = async (one: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/channel/${one.id}`)
-}
 onMounted(async () => {
   await refreshData()
 })
@@ -191,8 +142,7 @@ watch(props, async () => {
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
-    :search-placeholder="t('search-by-name')"
+    :search-placeholder="t('search-by-action')"
     @reload="reload()" @reset="refreshData()"
-    @row-click="openOne"
   />
 </template>
