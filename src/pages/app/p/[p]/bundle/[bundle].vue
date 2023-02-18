@@ -6,7 +6,6 @@ import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
-import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
@@ -230,6 +229,8 @@ watchEffect(async () => {
     await getVersion()
     await getChannels()
     loading.value = false
+    displayStore.NavTitle = t('bundle')
+    displayStore.defaultBack = `/app/package/${route.params.p}/bundles`
   }
 })
 
@@ -242,7 +243,6 @@ const hideString = (str: string) => {
 
 <template>
   <div>
-    <TitleHead :title="t('bundle')" :default-back="`/app/package/${route.params.p}/bundles`" />
     <div v-if="version" class="h-full overflow-y-scroll md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">

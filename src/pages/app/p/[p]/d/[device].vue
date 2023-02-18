@@ -5,7 +5,6 @@ import { useRoute } from 'vue-router'
 import { gt } from 'semver'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import TitleHead from '~/components/TitleHead.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
@@ -368,42 +367,41 @@ watchEffect(async () => {
     packageId.value = packageId.value.replace(/--/g, '.')
     id.value = route.params.device as string
     await loadData()
+    displayStore.NavTitle = t('device')
+    displayStore.defaultBack = `/app/package/${route.params.p}/devices`
   }
 })
 </script>
 
 <template>
-  <div>
-    <TitleHead :title="t('device')" :default-back="`/app/package/${route.params.p}/devices`" />
-    <div v-if="device" class="h-full overflow-y-scroll md:py-4">
-      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-          <dl class="divide-y divide-gray-500">
-            <InfoRow :label="t('device-id')" :value="device.device_id" />
-            <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
-            <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
-            <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
-            <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
-            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
-            <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
-            <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
-            <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-            <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
-            <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
-          </dl>
-        </div>
+  <div v-if="device" class="h-full overflow-y-scroll md:py-4">
+    <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+    <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <dl class="divide-y divide-gray-500">
+          <InfoRow :label="t('device-id')" :value="device.device_id" />
+          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
+          <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
+          <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
+          <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
+          <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
+          <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
+          <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
+          <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
+          <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
+          <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
+          <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
+          <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
+        </dl>
       </div>
-      <div v-else-if="ActiveTab === 'logs'" id="devices" class="flex flex-col">
-        <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-          <LogTable
-            class="p-3"
-            :device-id="id"
-            :app-id="packageId"
-          />
-        </div>
+    </div>
+    <div v-else-if="ActiveTab === 'logs'" id="devices" class="flex flex-col">
+      <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <LogTable
+          class="p-3"
+          :device-id="id"
+          :app-id="packageId"
+        />
       </div>
     </div>
   </div>

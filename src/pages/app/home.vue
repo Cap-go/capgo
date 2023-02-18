@@ -7,8 +7,10 @@ import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
+import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
+const displayStore = useDisplayStore()
 const route = useRoute()
 const main = useMainStore()
 const supabase = useSupabase()
@@ -72,6 +74,7 @@ watchEffect(async () => {
     await getMyApps()
     await getSharedWithMe()
     isLoading.value = false
+    displayStore.NavTitle = ''
   }
 })
 </script>

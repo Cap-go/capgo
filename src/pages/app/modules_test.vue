@@ -6,7 +6,6 @@ import { NativeMarket } from '@capgo/native-market'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
-import TitleHead from '~/components/TitleHead.vue'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
@@ -109,15 +108,18 @@ const runMethod = async (m: Module) => {
     }, 2000)
   })
 }
+displayStore.NavTitle = `${t('module-heading')} ${t('tests')}`
+displayStore.defaultBack = '/app/home'
 // console.log('modules', modules.value)
 </script>
 
 <template>
-  <TitleHead :title="`${t('module-heading')} ${t('tests')}`" default-back="/app/home" />
-  <k-block-title>{{ t('available-in-the-san') }}</k-block-title>
-  <k-list strong-ios outline-ios>
-    <k-list-item
-      v-for="(module, index) in modules" :key="index" link :footer="`with ${JSON.stringify(module.option)}`" :title="`${module.name}@${module.method}`" @click="runMethod(module)"
-    />
-  </k-list>
+  <div>
+    <k-block-title>{{ t('available-in-the-san') }}</k-block-title>
+    <k-list strong-ios outline-ios>
+      <k-list-item
+        v-for="(module, index) in modules" :key="index" link :footer="`with ${JSON.stringify(module.option)}`" :title="`${module.name}@${module.method}`" @click="runMethod(module)"
+      />
+    </k-list>
+  </div>
 </template>

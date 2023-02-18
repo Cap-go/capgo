@@ -8,7 +8,6 @@ import {
 } from 'konsta/vue'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
-import TitleHead from '~/components/TitleHead.vue'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
@@ -157,6 +156,8 @@ watchEffect(async () => {
     await getChannel()
     await getDeviceIds()
     loading.value = false
+    displayStore.NavTitle = t('channel')
+    displayStore.defaultBack = `/app/package/${route.params.p}/channels`
   }
 })
 
@@ -245,7 +246,6 @@ const openPannel = async () => {
 
 <template>
   <div>
-    <TitleHead :title="t('channel')" :default-back="`/app/package/${route.params.p}/channels`" />
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
       <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">

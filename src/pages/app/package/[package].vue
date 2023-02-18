@@ -6,10 +6,12 @@ import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 const route = useRoute()
 const { t } = useI18n()
 const supabase = useSupabase()
+const displayStore = useDisplayStore()
 const id = ref('')
 const isLoading = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
@@ -62,6 +64,8 @@ watchEffect(async () => {
     id.value = route.params.package as string
     id.value = id.value.replace(/--/g, '.')
     await refreshData()
+    displayStore.NavTitle = app.value?.name || ''
+    displayStore.defaultBack = `/app/package/${route.params.package}/channels`
   }
 })
 </script>
@@ -70,20 +74,17 @@ watchEffect(async () => {
   <div v-if="isLoading" class="flex justify-center chat-items">
     <Spinner />
   </div>
-  <div v-else class="w-full h-full">
-    <TitleHead :title="app?.name || ''" :default-back="`/app/package/${route.params.p}/channels`" />
-    <div class="w-full h-full px-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
-      <Usage :app-id="id" />
-      <section class="py-12">
-        <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-4 lg:gap-x-12 xl:gap-x-20">
-            <AppStat :number="channelsNb" :label="t('channels')" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
-            <AppStat :number="bundlesNb" :label="t('bundles')" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
-            <AppStat :number="devicesNb" :label="t('devices')" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
-            <AppStat :number="updatesNb" :label="t('plan-updates')" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
-          </div>
+  <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
+    <Usage :app-id="id" />
+    <section class="py-12">
+      <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-4 lg:gap-x-12 xl:gap-x-20">
+          <AppStat :number="channelsNb" :label="t('channels')" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
+          <AppStat :number="bundlesNb" :label="t('bundles')" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
+          <AppStat :number="devicesNb" :label="t('devices')" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
+          <AppStat :number="updatesNb" :label="t('plan-updates')" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   </div>
 </template>
