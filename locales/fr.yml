@@ -34,6 +34,7 @@ accountProfile:
   heading: Informations personnelles
   last-name: Nom de famille
   update: Mettre à jour
+action: Action
 activation:
   desc: Remplissez les champs suivants pour finaliser votre inscription
   doi: Consentement facultatif
@@ -92,12 +93,14 @@ button:
   delete: Supprimer
   go: Essayer
   home: Accueil
+  options: Choix
   remove: Éliminer
   tabs: Onglets
   toggle_dark: Basculer en mode sombre
   toggle_langs: Changer de langue
 by-clicking-on-them: en cliquant dessus.
 cannot-delete-app: Impossible de supprimer l'application
+cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
@@ -117,6 +120,7 @@ channel:
   copy: Copier le lien
   device: Appareil
   device-deleted: Appareil supprimé
+  info: Information
   invit: Tapez l'e-mail pour inviter
   is_public: Canal par défaut
   make-now: Faire défaut
@@ -127,12 +131,14 @@ channel:
   private_desc: Privé
   public: Liaison condensateur-updater
   public_desc: Publique
+  settings: Paramètres
   title: Informations sur la chaîne
   user: Utilisateur
   user_no_found: Utilisateur introuvable, demandez d'abord à vous inscrire
   users: Utilisateurs partagés
   v3: Paramètres V3
 channel-deleted: Chaîne supprimée
+channels: Canaux
 checksum: Somme de contrôle
 commands: commandes
 copied-to-clipboard: Copié dans le presse-papier
@@ -147,6 +153,7 @@ defined-as: Défini comme
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
 delete-account: Supprimer le compte
+details-and-logs: Détails et journaux
 device:
   channel: Lien de chaîne
   created_at: Créé à
@@ -222,6 +229,7 @@ login:
   password: Mot de passe
   withemail: Avec adresse e-mail
 login-to-your-accoun: Connectez-vous à votre compte
+logs: Journaux
 make-normal: Rendre normal
 making-this-channel-: >-
   Pour rendre ce canal "normal", vous devrez configurer un autre canal par
@@ -237,6 +245,8 @@ name: Nom
 need-more-contact-us: |-
   Besoin de plus ? 
   Contactez-nous pour un plan sur mesure
+no-devices: Aucun appareil
+no-logs: Aucun journal
 not-found: Page non trouvée
 notificationSettings:
   heading: Réglages des notifications
@@ -245,6 +255,7 @@ notifications: Avis
 onboarding:
   loading: Chargement
 one-day-left: Reste un jour
+open-settings: Cliquez pour ouvrir les paramètres
 open-sidebar: Ouvrir la barre latérale
 open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jour
 package:
@@ -262,6 +273,7 @@ package:
   not_available: Colis introuvable
   open: Canal ouvert
   set: Définir la version sur le canal
+  size_not_found: Pas trouvé
   stats: Statistiques
   test: Version de lancement
   title: Info
@@ -277,7 +289,9 @@ password:
   validate: Valider
 pckage:
   version:
+    created-at: Créé à
     is-used-in-channel: est utilisé dans un canal, dissociez-le d'abord
+    size: Taille
 personal-information: Informations personnelles
 plan:
   abtest: Test A/B
@@ -392,7 +406,8 @@ usage:
   success: >-
     Votre plan a été configuré, cette page sera mise à jour dans quelques
     minutes
-  title: ''
+  title: Total
+version-build: Version de construction
 version-builtin: Version intégrée
 welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo

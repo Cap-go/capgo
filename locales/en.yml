@@ -113,7 +113,7 @@ channel:
   copy: Copy URL
   device: Device
   device-deleted: Device deleted
-  info: Informations
+  info: Information
   invit: Type email to invite
   is_public: Channel default
   make-now: Make default

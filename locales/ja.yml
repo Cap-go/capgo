@@ -34,6 +34,7 @@ accountProfile:
   heading: 個人情報
   last-name: 苗字
   update: アップデート
+action: アクション
 activation:
   desc: 以下のフィールドに入力して登録を完了してください
   doi: オプションの同意
@@ -86,12 +87,14 @@ button:
   delete: 消去
   go: 進む
   home: ホーム
+  options: オプション
   remove: 削除する
   tabs: タブ
   toggle_dark: ダークモード切り替え
   toggle_langs: 言語切り替え
 by-clicking-on-them: それらをクリックして。
 cannot-delete-app: アプリを削除できません
+cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-channel: チャネルを削除できません
 cannot-save-custom-i: カスタム ID を保存できません
@@ -109,6 +112,7 @@ channel:
   copy: URLをコピー
   device: 端末
   device-deleted: デバイスが削除されました
+  info: 情報
   invit: 招待するメールアドレスを入力
   is_public: チャネルのデフォルト
   make-now: デフォルトにする
@@ -119,12 +123,14 @@ channel:
   private_desc: プライベート
   public: コンデンサ-アップデータリンク
   public_desc: 公衆
+  settings: 設定
   title: チャネル
   user: ユーザー
   user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
   users: 共有ユーザー
   v3: V3設定
 channel-deleted: チャンネルが削除されました
+channels: チャンネル
 checksum: チェックサム
 commands: コマンド
 copied-to-clipboard: クリップボードにコピーしました
@@ -139,6 +145,7 @@ defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
+details-and-logs: 詳細とログ
 device:
   channel: チャネルリンク
   created_at: で作成
@@ -210,6 +217,7 @@ login:
   password: パスワード
   withemail: メールアドレス付き
 login-to-your-accoun: あなたのアカウントにログイン
+logs: ログ
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 module:
@@ -223,6 +231,8 @@ name: 名前
 need-more-contact-us: |-
   もっといります ？
   オーダーメイドプランはお問い合わせください
+no-devices: デバイスがありません
+no-logs: ログなし
 not-found: 見つかりませんでした
 notificationSettings:
   heading: 通知設定
@@ -231,6 +241,7 @@ notifications: 通知
 onboarding:
   loading: 読み込み中
 one-day-left: 残り一日
+open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
 open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
 package:
@@ -248,6 +259,7 @@ package:
   not_available: パッケージが見つかりません
   open: チャネルを開く
   set: バージョンをチャネルに設定
+  size_not_found: 見つかりません
   stats: 統計
   test: 起動バージョン
   title: 情報
@@ -263,7 +275,9 @@ password:
   validate: 検証
 pckage:
   version:
+    created-at: で作成
     is-used-in-channel: チャネルで使用されている場合は、最初にリンクを解除してください
+    size: サイズ
 personal-information: 個人情報
 plan:
   abtest: A/Bテスト
@@ -374,7 +388,8 @@ upgrade-now: 今すぐアップグレード
 url: URL
 usage:
   success: プランが設定されましたこのページは数分で更新されます
-  title: ''
+  title: 合計
+version-build: バージョンビルド
 version-builtin: バージョン組み込み
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ

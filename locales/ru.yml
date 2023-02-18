@@ -34,6 +34,7 @@ accountProfile:
   heading: Личная информация
   last-name: Фамилия
   update: Обновлять
+action: Действие
 activation:
   desc: Заполните следующие поля, чтобы завершить регистрацию
   doi: Необязательное согласие
@@ -92,12 +93,14 @@ button:
   delete: Удалить
   go: Перейти
   home: Главная
+  options: Параметры
   remove: Удалять
   tabs: Вкладки
   toggle_dark: Включить темный режим
   toggle_langs: Сменить язык
 by-clicking-on-them: нажав на них.
 cannot-delete-app: Не могу удалить приложение
+cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-app-version: Не могу удалить версию приложения
 cannot-delete-channel: Не могу удалить канал
 cannot-save-custom-i: Не удается сохранить пользовательский идентификатор
@@ -117,6 +120,7 @@ channel:
   copy: Скопировать URL
   device: Устройство
   device-deleted: Устройство удалено
+  info: Информация
   invit: Введите адрес электронной почты, чтобы пригласить
   is_public: Канал по умолчанию
   make-now: Использовать по умолчанию
@@ -127,12 +131,14 @@ channel:
   private_desc: Частный
   public: Ссылка на конденсатор-апдейтер
   public_desc: Общественный
+  settings: Настройки
   title: Канал
   user: Пользователь
   user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
   users: Общие пользователи
   v3: Настройки версии 3
 channel-deleted: Канал удален
+channels: каналы
 checksum: Контрольная сумма
 commands: команды
 copied-to-clipboard: Скопировано в буфер обмена
@@ -147,6 +153,7 @@ defined-as: Определяется как
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
+details-and-logs: Детали и журналы
 device:
   channel: Ссылка на канал
   created_at: Создано на
@@ -218,6 +225,7 @@ login:
   password: Пароль
   withemail: С адресом электронной почты
 login-to-your-accoun: Вход в свой аккаунт
+logs: Журналы
 make-normal: Сделать нормальным
 making-this-channel-: >-
   Чтобы сделать этот канал «обычным», вам потребуется настроить другой канал по
@@ -233,6 +241,8 @@ name: Имя
 need-more-contact-us: |-
   Нужно больше ? 
   Свяжитесь с нами для индивидуального плана
+no-devices: Нет устройств
+no-logs: Нет журналов
 not-found: Не найден
 notificationSettings:
   heading: Настройки уведомлений
@@ -241,6 +251,7 @@ notifications: Уведомления
 onboarding:
   loading: Загрузка
 one-day-left: В один прекрасный день покинул
+open-settings: Нажмите, чтобы открыть настройки
 open-sidebar: Открыть боковую панель
 open-this-link-to-le: Откройте эту ссылку, чтобы узнать, как протестировать обновление
 package:
@@ -258,6 +269,7 @@ package:
   not_available: Пакет не найден
   open: Открытый канал
   set: Установить версию для канала
+  size_not_found: Не найдено
   stats: статистика
   test: Запустить версию
   title: Информация
@@ -273,7 +285,9 @@ password:
   validate: Подтвердить
 pckage:
   version:
+    created-at: Создан в
     is-used-in-channel: используется в канале, сначала отсоедините его
+    size: Размер
 personal-information: Персональная информация
 plan:
   abtest: А/Б тестирование
@@ -386,7 +400,8 @@ usage:
   success: >-
     Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
     минут.
-  title: ''
+  title: Общий
+version-build: Сборка версии
 version-builtin: Встроенная версия
 welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo

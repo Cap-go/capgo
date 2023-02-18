@@ -34,6 +34,7 @@ accountProfile:
   heading: Informasi pribadi
   last-name: nama keluarga
   update: Memperbarui
+action: Tindakan
 activation:
   desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
   doi: Persetujuan opsional
@@ -92,12 +93,14 @@ button:
   delete: Menghapus
   go: Pergi
   home: Beranda
+  options: Pilihan
   remove: Menghapus
   tabs: tab
   toggle_dark: Ubah ke mode gelap
   toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
 cannot-delete-app: Tidak dapat menghapus Aplikasi
+cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
@@ -117,6 +120,7 @@ channel:
   copy: Salin URL
   device: Perangkat
   device-deleted: Perangkat dihapus
+  info: Informasi
   invit: Ketik email untuk mengundang
   is_public: Standar saluran
   make-now: Jadikan default
@@ -127,12 +131,14 @@ channel:
   private_desc: Pribadi
   public: Tautan pemutakhiran kapasitor
   public_desc: Publik
+  settings: Pengaturan
   title: Saluran
   user: Pengguna
   user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
   users: Pengguna bersama
   v3: Pengaturan V3
 channel-deleted: Saluran dihapus
+channels: Saluran
 checksum: Ceksum
 commands: perintah
 copied-to-clipboard: Disalin ke papan klip
@@ -147,6 +153,7 @@ defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
+details-and-logs: Detail dan log
 device:
   channel: Tautan saluran
   created_at: Dibuat di
@@ -220,6 +227,7 @@ login:
   password: Kata sandi
   withemail: Dengan alamat email
 login-to-your-accoun: masuk ke akun Anda
+logs: Log
 make-normal: Jadikan normal
 making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
@@ -235,6 +243,8 @@ name: Nama
 need-more-contact-us: |-
   Butuh lebih? 
   Hubungi kami untuk paket yang disesuaikan
+no-devices: Tidak ada perangkat
+no-logs: Tidak ada log
 not-found: Tidak ditemukan
 notificationSettings:
   heading: Akun
@@ -243,6 +253,7 @@ notifications: Pemberitahuan
 onboarding:
   loading: Memuat
 one-day-left: Tinggal satu hari lagi
+open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
 package:
@@ -260,6 +271,7 @@ package:
   not_available: Paket tidak ditemukan
   open: Buka Saluran
   set: Setel versi ke saluran
+  size_not_found: Tidak ditemukan
   stats: statistik
   test: Luncurkan versi
   title: informasi
@@ -275,7 +287,9 @@ password:
   validate: Mengesahkan
 pckage:
   version:
+    created-at: Dibuat di
     is-used-in-channel: digunakan dalam saluran, batalkan tautannya terlebih dahulu
+    size: Ukuran
 personal-information: Informasi pribadi
 plan:
   abtest: Pengujian A/B
@@ -388,7 +402,8 @@ usage:
   success: >-
     Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
     menit
-  title: ''
+  title: Total
+version-build: Pembuatan versi
 version-builtin: Versi bawaan
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda

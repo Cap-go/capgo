@@ -34,6 +34,7 @@ accountProfile:
   heading: Thông tin cá nhân
   last-name: Họ
   update: Cập nhật
+action: Hoạt động
 activation:
   desc: Điền vào các trường sau để hoàn tất đăng ký của bạn
   doi: Sự đồng ý tùy chọn
@@ -90,12 +91,14 @@ button:
   delete: Xóa bỏ
   go: Đi
   home: Khởi đầu
+  options: Tùy chọn
   remove: Tẩy
   tabs: Các tab
   toggle_dark: Chuyển đổi chế độ tối
   toggle_langs: Thay đổi ngôn ngữ
 by-clicking-on-them: bằng cách nhấp vào chúng.
 cannot-delete-app: Không thể xóa ứng dụng
+cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-channel: Không thể xóa kênh
 cannot-save-custom-i: Không thể lưu ID tùy chỉnh
@@ -115,6 +118,7 @@ channel:
   copy: Sao chép URL
   device: Thiết bị
   device-deleted: Đã xóa thiết bị
+  info: Thông tin
   invit: Nhập email để mời
   is_public: Kênh mặc định
   make-now: Làm mặc định
@@ -125,12 +129,14 @@ channel:
   private_desc: Riêng tư
   public: Liên kết trình cập nhật tụ điện
   public_desc: Công cộng
+  settings: Cài đặt
   title: Kênh truyền hình
   user: Người dùng
   user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
   users: người dùng chung
   v3: Cài đặt V3
 channel-deleted: Kênh đã bị xóa
+channels: Kênh truyền hình
 checksum: Checksum
 commands: lệnh
 copied-to-clipboard: Sao chép vào clipboard
@@ -145,6 +151,7 @@ defined-as: Định nghĩa là
 defined-as-private: được định nghĩa là bình thường
 defined-as-public: được định nghĩa là mặc định
 delete-account: Xóa tài khoản
+details-and-logs: Chi tiết và nhật ký
 device:
   channel: Liên kết kênh
   created_at: Được tạo lúc
@@ -218,6 +225,7 @@ login:
   password: Mật khẩu
   withemail: Với địa chỉ email
 login-to-your-accoun: đăng nhập vào tài khoản của bạn
+logs: Nhật ký
 make-normal: làm cho bình thường
 making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
@@ -233,6 +241,8 @@ name: Tên
 need-more-contact-us: |-
   Cần thêm? 
   Liên hệ với chúng tôi để có kế hoạch phù hợp
+no-devices: Không có thiết bị
+no-logs: Không có nhật ký
 not-found: Không tìm thấy
 notificationSettings:
   heading: Thiết lập thông báo
@@ -241,6 +251,7 @@ notifications: Thông báo
 onboarding:
   loading: Đang tải
 one-day-left: Còn lại một ngày
+open-settings: Nhấp để mở cài đặt
 open-sidebar: Mở thanh bên
 open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn
 package:
@@ -258,6 +269,7 @@ package:
   not_available: Gói hàng không được tìm thấy
   open: Mở kênh
   set: Đặt phiên bản cho kênh
+  size_not_found: Không tìm thấy
   stats: số liệu thống kê
   test: Phiên bản khởi chạy
   title: thông tin
@@ -275,7 +287,9 @@ password:
   validate: Xác thực
 pckage:
   version:
+    created-at: tạo tại
     is-used-in-channel: được sử dụng trong một kênh, trước tiên hãy hủy liên kết kênh đó
+    size: Kích cỡ
 personal-information: Thông tin cá nhân
 plan:
   abtest: Thử nghiệm A / B
@@ -386,7 +400,8 @@ upgrade-now: Nâng cấp ngay bây giờ
 url: URL
 usage:
   success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
-  title: ''
+  title: Tổng cộng
+version-build: Phiên bản xây dựng
 version-builtin: Nội trang phiên bản
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn

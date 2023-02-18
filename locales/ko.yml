@@ -34,6 +34,7 @@ accountProfile:
   heading: 개인 정보
   last-name: 성
   update: 업데이트
+action: 행동
 activation:
   desc: 다음 필드를 작성하여 등록을 완료하십시오.
   doi: 선택적 동의
@@ -86,12 +87,14 @@ button:
   delete: 삭제
   go: 이동
   home: 홈
+  options: 옵션
   remove: 제거하다
   tabs: 탭
   toggle_dark: 다크모드 토글
   toggle_langs: 언어 변경
 by-clicking-on-them: 클릭하여.
 cannot-delete-app: 앱을 삭제할 수 없습니다
+cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다
 cannot-delete-channel: 채널을 삭제할 수 없습니다
 cannot-save-custom-i: 사용자 정의 ID를 저장할 수 없습니다
@@ -109,6 +112,7 @@ channel:
   copy: URL 복사
   device: 장치
   device-deleted: 기기가 삭제됨
+  info: 정보
   invit: 초대할 이메일 입력
   is_public: 채널 기본값
   make-now: 기본값으로 설정
@@ -119,12 +123,14 @@ channel:
   private_desc: 사적인
   public: 커패시터 업데이터 링크
   public_desc: 공공의
+  settings: 설정
   title: 채널
   user: 사용자
   user_no_found: 사용자를 찾을 수 없습니다. 먼저 등록을 요청하세요.
   users: 공유 사용자
   v3: V3 설정
 channel-deleted: 채널 삭제됨
+channels: 채널
 checksum: 체크섬
 commands: 명령
 copied-to-clipboard: 클립보드에 복사됨
@@ -139,6 +145,7 @@ defined-as: 로써 정의 된
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete-account: 계정 삭제
+details-and-logs: 세부 정보 및 로그
 device:
   channel: 채널 링크
   created_at: 만든 시간
@@ -210,6 +217,7 @@ login:
   password: 비밀번호
   withemail: 이메일 주소로
 login-to-your-accoun: 계정에 로그인
+logs: 로그
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 module:
@@ -223,6 +231,8 @@ name: 이름
 need-more-contact-us: |-
   더 필요하세요? 
   맞춤형 플랜 문의
+no-devices: 기기 없음
+no-logs: 로그 없음
 not-found: 찾을 수 없습니다
 notificationSettings:
   heading: 알림 설정
@@ -231,6 +241,7 @@ notifications: 알림
 onboarding:
   loading: 로딩 중
 one-day-left: 하루 남았다
+open-settings: 클릭하여 설정 열기
 open-sidebar: 사이드바 열기
 open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.
 package:
@@ -248,6 +259,7 @@ package:
   not_available: 패키지를 찾을 수 없음
   open: 오픈 채널
   set: 버전을 채널로 설정
+  size_not_found: 찾을 수 없음
   stats: 통계
   test: 출시 버전
   title: 정보
@@ -263,7 +275,9 @@ password:
   validate: 확인
 pckage:
   version:
+    created-at: 만든 시간
     is-used-in-channel: 채널에서 사용 중이면 먼저 연결을 해제하십시오.
+    size: 크기
 personal-information: 개인정보
 plan:
   abtest: A/B 테스트
@@ -374,7 +388,8 @@ upgrade-now: 지금 업그레이드
 url: URL
 usage:
   success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
-  title: ''
+  title: 총
+version-build: 버전 빌드
 version-builtin: 버전 내장
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.

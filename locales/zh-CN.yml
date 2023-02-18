@@ -34,6 +34,7 @@ accountProfile:
   heading: 个人信息
   last-name: 姓
   update: 更新
+action: 行动
 activation:
   desc: 填写以下字段以完成您的注册
   doi: 选择性同意
@@ -86,12 +87,14 @@ button:
   delete: 删除
   go: 确定
   home: 首页
+  options: 选项
   remove: 消除
   tabs: 标签
   toggle_dark: 切换深色模式
   toggle_langs: 切换语言
 by-clicking-on-them: 通过点击它们。
 cannot-delete-app: 无法删除应用
+cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-channel: 无法删除频道
 cannot-save-custom-i: 无法保存自定义 ID
@@ -109,6 +112,7 @@ channel:
   copy: 复制网址
   device: 设备
   device-deleted: 设备已删除
+  info: 信息
   invit: 输入电子邮件以邀请
   is_public: 频道默认
   make-now: 使默认
@@ -119,12 +123,14 @@ channel:
   private_desc: 私人的
   public: 电容器更新器链接
   public_desc: 民众
+  settings: 设置
   title: 渠道
   user: 用户
   user_no_found: 未找到用户，请先注册
   users: 共享用户
   v3: V3 设置
 channel-deleted: 频道已删除
+channels: 频道
 checksum: 校验和
 commands: 命令
 copied-to-clipboard: 已复制到剪贴板
@@ -139,6 +145,7 @@ defined-as: 定义为
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认值
 delete-account: 删除帐户
+details-and-logs: 详细信息和日志
 device:
   channel: 频道链接
   created_at: 创建于
@@ -210,6 +217,7 @@ login:
   password: 密码
   withemail: 有电子邮件地址
 login-to-your-accoun: 登录到您的帐户
+logs: 日志
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 module:
@@ -223,6 +231,8 @@ name: 姓名
 need-more-contact-us: |-
   需要更多 ？
   联系我们获取量身定制的计划
+no-devices: 没有设备
+no-logs: 没有日志
 not-found: 未找到页面
 notificationSettings:
   heading: 通知设置
@@ -231,6 +241,7 @@ notifications: 通知
 onboarding:
   loading: 正在加载
 one-day-left: 还剩一天
+open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新
 package:
@@ -248,6 +259,7 @@ package:
   not_available: 未找到包裹
   open: 开放通道
   set: 将版本设置为频道
+  size_not_found: 未找到
   stats: 统计数据
   test: 发布版本
   title: 信息
@@ -263,7 +275,9 @@ password:
   validate: 证实
 pckage:
   version:
+    created-at: 创建于
     is-used-in-channel: 在频道中使用，请先取消链接
+    size: 尺寸
 personal-information: 个人信息
 plan:
   abtest: A/B 测试
@@ -374,7 +388,8 @@ upgrade-now: 现在升级
 url: 网址
 usage:
   success: 您的计划已设置好此页面将在几分钟内更新
-  title: ''
+  title: 全部的
+version-build: 版本构建
 version-builtin: 内置版本
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
