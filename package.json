@@ -13,6 +13,7 @@
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
     "serve": "vite",
+    "test:e2e": "cypress open",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
