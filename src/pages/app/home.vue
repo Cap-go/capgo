@@ -80,9 +80,11 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
-  <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
-  <div v-else class="flex justify-center">
-    <Spinner />
+  <div>
+    <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
+    <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
+    <div v-else class="flex justify-center">
+      <Spinner />
+    </div>
   </div>
 </template>

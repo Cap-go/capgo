@@ -117,7 +117,7 @@ watchEffect(async () => {
   <div v-if="isLoading" class="flex justify-center chat-items">
     <Spinner />
   </div>
-  <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+  <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <div class="px-5 pt-5">
       <h2 class="mb-2 text-2xl font-semibold dark:text-white text-slate-800">
         {{ t('versions') }}
