@@ -148,6 +148,6 @@ const chartOptions = {
 
 <template>
   <div class="w-full p-6">
-    <Line class="" :chart-data="chartData" :chart-options="chartOptions" />
+    <Line :chart-data="chartData" :chart-options="chartOptions" />
   </div>
 </template>
