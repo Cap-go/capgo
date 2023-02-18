@@ -39,9 +39,9 @@ const allLimits = computed(() => {
     const newP = {
       ...p,
     }
-    newP.mau[plan.name] = plan.mau
-    newP.storage[plan.name] = plan.storage
-    newP.bandwidth[plan.name] = plan.bandwidth
+    newP.mau[plan.name] = plan-mau
+    newP.storage[plan.name] = plan-storage
+    newP.bandwidth[plan.name] = plan-bandwidth
     return newP
   }, {
     mau: {} as any,

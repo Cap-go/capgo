@@ -98,14 +98,14 @@ columns.value = [
     head: true,
   },
   {
-    label: t('device.created_at'),
+    label: t('created-at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
-    label: t('device.version'),
+    label: t('version'),
     key: 'version',
     mobile: 'footer',
     sortable: false,
@@ -121,7 +121,7 @@ columns.value = [
 
 if (!props.deviceId) {
   columns.value.push({
-    label: t('device.platform'),
+    label: t('platform'),
     key: 'platform',
     mobile: 'after',
     sortable: false,

@@ -38,9 +38,9 @@ const rules = computed(() => ({
   password: {
     required,
     minLength: minLength(6),
-    containsUppercase: helpers.withMessage(t('register.upperCaseError'), containsUppercase),
-    containsLowercase: helpers.withMessage(t('register.lowerCaseError'), containsLowercase),
-    containsSpecial: helpers.withMessage(t('register.specialError'), containsSpecial),
+    containsUppercase: helpers.withMessage(t('upperCaseError'), containsUppercase),
+    containsLowercase: helpers.withMessage(t('lowerCaseError'), containsLowercase),
+    containsSpecial: helpers.withMessage(t('specialError'), containsSpecial),
   },
   repeatPassword: {
     required,
@@ -97,7 +97,7 @@ const submit = async () => {
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
 
         <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
-          {{ t("register.heading") }}
+          {{ t("register-heading") }}
         </h1>
       </div>
 
@@ -122,13 +122,13 @@ const submit = async () => {
                       v-model="form.first_name"
                       required
                       type="text"
-                      :placeholder="t('register.first-name')"
+                      :placeholder="t('first-name')"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
                     >
                   </div>
                   <div v-for="(error, index) of v$.first_name.$errors" :key="index">
                     <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("register.first-name") }}: {{ error.$message }}
+                      {{ t("first-name") }}: {{ error.$message }}
                     </p>
                   </div>
                 </div>
@@ -146,13 +146,13 @@ const submit = async () => {
                       v-model="form.last_name"
                       required
                       type="text"
-                      :placeholder="t('register.last-name')"
+                      :placeholder="t('last-name')"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
                     >
                   </div>
                   <div v-for="(error, index) of v$.last_name.$errors" :key="index">
                     <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("register.last-name") }}: {{ error.$message }}
+                      {{ t("last-name") }}: {{ error.$message }}
                     </p>
                   </div>
                 </div>
@@ -170,14 +170,14 @@ const submit = async () => {
                       v-model="form.email"
                       required
                       inputmode="email"
-                      :placeholder="t('register.email')"
+                      :placeholder="t('email')"
                       type="email"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
                     >
                   </div>
                   <div v-for="(error, index) of v$.email.$errors" :key="index">
                     <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("register.email") }}: {{ error.$message }}
+                      {{ t("email") }}: {{ error.$message }}
                     </p>
                   </div>
                 </div>
@@ -199,14 +199,14 @@ const submit = async () => {
                     <input
                       v-model="form.password"
                       required
-                      :placeholder="t('register.password')"
+                      :placeholder="t('password')"
                       type="password"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
                     >
                   </div>
                   <div v-for="(error, index) of v$.password.$errors" :key="index">
                     <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("register.password") }}: {{ error.$message }}
+                      {{ t("password") }}: {{ error.$message }}
                     </p>
                   </div>
                 </div>
@@ -228,21 +228,21 @@ const submit = async () => {
                     <input
                       v-model="form.repeatPassword"
                       required
-                      :placeholder="t('register.confirm-password')"
+                      :placeholder="t('confirm-password')"
                       type="password"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
                     >
                   </div>
                   <div v-for="(error, index) of v$.repeatPassword.$errors" :key="index">
                     <p class="mt-2 mb-4 text-xs italic">
-                      {{ t("register.confirm-password") }}: {{ error.$message }}
+                      {{ t("confirm-password") }}: {{ error.$message }}
                     </p>
                   </div>
                 </div>
 
                 <div class="flex items-center col-span-2">
                   <span class="text-sm font-medium text-gray-500">
-                    {{ t("register.password-hint") }}
+                    {{ t("password-hint") }}
                   </span>
                 </div>
 
@@ -251,7 +251,7 @@ const submit = async () => {
                     :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:outline-none hover:bg-blue-700 focus:bg-blue-700"
                   >
                     <span v-if="!isLoading" class="rounded-4xl">
-                      {{ t("register.next") }}
+                      {{ t("register-next") }}
                     </span>
                     <k-preloader v-else size="w-16 h-16" />
                   </button>
@@ -259,7 +259,7 @@ const submit = async () => {
 
                 <div class="col-span-2 text-center">
                   <p class="text-base text-gray-600">
-                    <a href="/login" title="" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">{{ t("register.already-account") }}</a>
+                    <a href="/login" title="" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">{{ t("already-account") }}</a>
                   </p>
                 </div>
               </div>

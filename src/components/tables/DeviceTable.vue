@@ -39,14 +39,14 @@ const columns = ref<TableColumn[]>([
     head: true,
   },
   {
-    label: t('device.created_at'),
+    label: t('created-at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
-    label: t('device.platform'),
+    label: t('platform'),
     key: 'platform',
     mobile: 'footer',
     sortable: true,
@@ -54,7 +54,7 @@ const columns = ref<TableColumn[]>([
     displayFunction: (elem: typeof element) => `${elem.platform} ${elem.os_version}`,
   },
   {
-    label: t('package.title'),
+    label: t('bundle'),
     key: 'version',
     mobile: 'after',
     sortable: true,

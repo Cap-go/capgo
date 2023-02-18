@@ -36,22 +36,22 @@ const ActiveTab = ref('info')
 
 const tabs: Tab[] = [
   {
-    label: t('channel.info'),
+    label: t('info'),
     icon: IconInformations,
     key: 'info',
   },
   {
-    label: t('channel.users'),
+    label: t('users'),
     icon: IconUsers,
     key: 'users',
   },
   {
-    label: t('devices.title'),
+    label: t('devices'),
     icon: IconDevice,
     key: 'devices',
   },
   {
-    label: t('channel.settings'),
+    label: t('settings'),
     icon: IconSettings,
     key: 'settings',
   },
@@ -162,11 +162,11 @@ watchEffect(async () => {
 
 const makeDefault = async (val = true) => {
   displayStore.actionSheetOption = {
-    header: t('account.delete_sure'),
-    message: val ? t('channel.confirm-public-desc') : t('making-this-channel-'),
+    header: t('are-u-sure'),
+    message: val ? t('confirm-public-desc') : t('making-this-channel-'),
     buttons: [
       {
-        text: val ? t('channel.make-now') : t('make-normal'),
+        text: val ? t('channel-make-now') : t('make-normal'),
         id: 'confirm-button',
         handler: async () => {
           if (!channel.value || !id.value)
@@ -185,7 +185,7 @@ const makeDefault = async (val = true) => {
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
     ],
@@ -221,7 +221,7 @@ const openPannel = async () => {
   displayStore.actionSheetOption = {
     buttons: [
       {
-        text: t('package.unset'),
+        text: t('unlink-bundle'),
         handler: async () => {
           displayStore.showActionSheet = false
           const id = await getUnknownVersion()
@@ -231,7 +231,7 @@ const openPannel = async () => {
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
@@ -245,7 +245,7 @@ const openPannel = async () => {
 
 <template>
   <div>
-    <TitleHead :title="t('channel.title')" :default-back="`/app/package/${route.params.p}/channels`" />
+    <TitleHead :title="t('channel')" :default-back="`/app/package/${route.params.p}/channels`" />
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
       <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
@@ -254,9 +254,9 @@ const openPannel = async () => {
           <!-- Bundle Number -->
           <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle" />
           <!-- Created At -->
-          <InfoRow :label="t('device.created_at')" :value="formatDate(channel.created_at)" />
+          <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
           <!-- Last Update -->
-          <InfoRow :label="t('device.last_update')" :value="formatDate(channel.updated_at)" />
+          <InfoRow :label="t('last-update')" :value="formatDate(channel.updated_at)" />
         </dl>
       </div>
     </div>
@@ -264,7 +264,7 @@ const openPannel = async () => {
       <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
         <dl class="divide-y divide-gray-500">
           <k-list class="w-full mt-5 list-none border-t border-gray-200">
-            <k-list-item label :title="t('channel.is_public')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label :title="t('channel-is-public')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
                   class="-my-1 k-color-success"
@@ -344,7 +344,7 @@ const openPannel = async () => {
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('package.unset')" class="text-lg font-medium text-red-500" link @click="openPannel" />
+            <k-list-item label :title="t('unlink-bundle')" class="text-lg font-medium text-red-500" link @click="openPannel" />
           </k-list>
         </dl>
       </div>

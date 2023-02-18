@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { kNavbarBackLink } from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 import Banner from './Banner.vue'
+import { useDisplayStore } from '~/stores/display'
 
 const props = defineProps({
   sidebarOpen: {
@@ -11,7 +14,15 @@ const props = defineProps({
 })
 
 defineEmits(['toggleSidebar'])
+const router = useRouter()
 
+const displayStore = useDisplayStore()
+const back = () => {
+  if (window.history.length > 2)
+    router.back()
+  else
+    router.push(displayStore.defaultBack)
+}
 const { t } = useI18n()
 </script>
 
@@ -21,6 +32,9 @@ const { t } = useI18n()
       <div class="flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex">
+          <div v-if="displayStore.NavTitle" class="pr-2">
+            <k-navbar-back-link :text="t('button-back')" @click="back()" />
+          </div>
           <!-- Hamburger button -->
           <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
             <span class="sr-only">{{ t('open-sidebar') }}</span>
@@ -32,9 +46,14 @@ const { t } = useI18n()
           </button>
         </div>
 
+        <div class="lg:absolute lg:-translate-x-1/2 lg:inset-y-5 lg:left-1/2">
+          <div class="flex-shrink-0">
+            {{ displayStore.NavTitle }}
+          </div>
+        </div>
         <!-- Header: Right side -->
         <div class="flex items-center space-x-3">
-          <UserMenu show-name align="right" />
+          <UserMenu align="right" />
         </div>
       </div>
     </div>

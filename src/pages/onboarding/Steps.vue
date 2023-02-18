@@ -241,7 +241,7 @@ watchEffect(async () => {
             class="mx-auto font-bold text-pumpkin-orange-500"
             @click="main.logout().then(() => router.replace('/login'))"
           >
-            {{ t("account.logout") }}
+            {{ t("logout") }}
           </button>
         </div>
       </div>

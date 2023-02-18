@@ -25,15 +25,15 @@ const { t } = useI18n()
 
 const didCancel = async (name: string) => {
   displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -75,7 +75,7 @@ const refreshData = async () => {
 }
 
 const deleteChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
-  if (await didCancel(t('channel.title')))
+  if (await didCancel(t('channel')))
     return
   try {
     const { error: delChanError } = await supabase

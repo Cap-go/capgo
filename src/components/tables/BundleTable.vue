@@ -36,15 +36,15 @@ const currentVersionsNumber = computed(() => {
 })
 const didCancel = async (name: string) => {
   displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -109,7 +109,7 @@ const refreshData = async () => {
 }
 const deleteOne = async (one: typeof element) => {
   // console.log('deleteBundle', bundle)
-  if (await didCancel(t('device.version')))
+  if (await didCancel(t('version')))
     return
   try {
     const { data: channelFound, error: errorChannel } = await supabase
@@ -118,7 +118,7 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', one.app_id)
       .eq('version', one.id)
     if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.messageToast.push(`${t('device.version')} ${one.app_id}@${one.name} ${t('pckage.version.is-used-in-channel')}`)
+      displayStore.messageToast.push(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-channel')}`)
       return
     }
     const { data: deviceFound, error: errorDevice } = await supabase
@@ -127,7 +127,7 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', one.app_id)
       .eq('version', one.id)
     if ((deviceFound && deviceFound.length) || errorDevice) {
-      displayStore.messageToast.push(`${t('device.version')} ${one.app_id}@${one.name} ${t('package.version.is-used-in-device')}`)
+      displayStore.messageToast.push(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-device')}`)
       return
     }
     const { error: delError } = await supabase
@@ -140,15 +140,15 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', one.app_id)
       .eq('id', one.id)
     if (delAppError || delError) {
-      displayStore.messageToast.push(t('package.cannot-delete-version'))
+      displayStore.messageToast.push(t('cannot-delete-bundle'))
     }
     else {
-      displayStore.messageToast.push(t('package.version-deleted'))
+      displayStore.messageToast.push(t('bundle-deleted'))
       await refreshData()
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('package.cannot-delete-version'))
+    displayStore.messageToast.push(t('cannot-delete-bundle'))
   }
 }
 
@@ -161,7 +161,7 @@ columns.value = [
     head: true,
   },
   {
-    label: t('device.created_at'),
+    label: t('created-at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
@@ -176,9 +176,9 @@ columns.value = [
       if (elem.size)
         return bytesToMbText(elem.size)
       else if (elem.external_url)
-        return t('package.externally')
+        return t('stored-externally')
       else
-        return t('package.size_not_found')
+        return t('package.size-not-found')
     },
   },
   {

@@ -48,7 +48,7 @@ interface ChannelUserApp {
               </th>
               <th class="p-2">
                 <div class="font-semibold text-center">
-                  {{ t('channel.title') }}
+                  {{ t('channel') }}
                 </div>
               </th>
             </tr>

@@ -1,147 +1,106 @@
 Bandwidth: Larghezza di banda
 MAU: Utenti attivi mensili
 Storage: Magazzinaggio
-account:
-  backButton: Indietro
-  billing: Fatturazione
-  changePassword: Cambiare la password
-  delete-account: Cancella il mio account
-  delete_sure: Sei sicuro ?
-  discord: Discordia
-  error: Errore
-  heading: Account
-  keys: Chiavi API
-  legal: Termini di servizio
-  logout: Disconnettersi
-  personalInformation: Informazione personale
-  preferences: Notifiche
-  privacy: Politica sulla riservatezza
-  support: Supporto
-  usage: utilizzo
+account-password-error: Si è verificato un errore, riprova
+account-password-heading: Cambia la mia password
 account-settings: Impostazioni dell'account
-accountPassword:
-  confirmPassword: Conferma password
-  errorMsg: Si è verificato un errore, riprova
-  heading: Cambia la mia password
-  password: Nuova password
-  success: Password modificata con successo
-  validate: Convalidare
-accountProfile:
-  billing_email: E-mail di fatturazione
-  country: Paese
-  email: E-mail
-  first-name: Nome di battesimo
-  heading: Informazione personale
-  last-name: Cognome
-  update: Aggiornamento
 action: Azione
-activation:
-  desc: Compila i seguenti campi per completare la tua registrazione
-  doi: Consenso facoltativo
-  doi-desc: Accetto la newsletter via e-mail e le future offerte di marketing
-  heading: Attivazione
-  headline: Le mie impostazioni
-  legal: Termini di servizio
-  legal-desc: Accetto l'informativa sulla privacy e i termini di utilizzo dell'app Capgo
-  notification: Notifiche
-  notification-desc: >-
-    Accetto di ricevere una notifica quando sarà disponibile una nuova versione
-    dell'app
-  validate: Convalidare
+activation-desc: Compila i seguenti campi per completare la tua registrazione
+activation-doi: Consenso facoltativo
+activation-doi-desc: Accetto la newsletter via e-mail e le future offerte di marketing
+activation-heading: Attivazione
+activation-headline: Le mie impostazioni
+activation-legal: Termini di servizio
+activation-legal-desc: Accetto l'informativa sulla privacy e i termini di utilizzo dell'app Capgo
+activation-notification: Notifiche
+activation-notification-desc: >-
+  Accetto di ricevere una notifica quando sarà disponibile una nuova versione
+  dell'app
+activation-validate: Convalidare
+add: Aggiungere
 add-another-app: Aggiungi la tua app
 add-this-code-to-you: Aggiungi questo codice al tuo progetto
 add-your-app-to-your: Aggiungi la tua app al tuo account
 add-your-first-app-t: Aggiungi la tua prima app al tuo account e inviamo gli aggiornamenti!
+admin: Amministratore
 afternoon: pomeriggio
-alert:
-  confirm-delete: Conferma cancellazione
-  delete-message: Sei sicuro di voler cancellare questo
-  not-reverse-message: Questa azione non è reversibile
+alert-confirm-delete: Conferma cancellazione
+alert-delete-message: Sei sicuro di voler cancellare questo
+alert-not-reverse-message: Questa azione non è reversibile
 allow-develoment-bui: Consenti build di sviluppo
 allow-device-to-self: Consenti ai dispositivi di associarsi automaticamente
 allow-emulator: Consenti emulatori
+already-account: Hai già un account?
 api-key: Chiave dell'API
 api-keys: Chiavi API
-apikeys:
-  all: chiavi
-  checkbelow: controlla sotto il link per avere maggiori informazioni
-  cli: capgo CLI
-  explain: >-
-    Tutte queste chiavi API sono realizzate per essere utilizzate con lo
-    strumento Capgo CLI o il plug-in di aggiornamento del condensatore
-  keyCopied: Chiavi copiate negli appunti
-  links: Collegamenti
-  title: Chiavi API
-  updater: aggiornamento del condensatore
+api-keys-key-copied: Chiavi API
+app: App
 app-deleted: Applicazione eliminata
 app-id-example: Esempio di ID app
+app-not-found: App non trovata
+are-u-sure: Sei sicuro ?
 available-in-the-san: Disponibile nell'app sandbox
 back-to-login-page: Torna alla pagina di accesso
 bigger-app-size: Dimensioni dell'app maggiori
+billing: Fatturazione
 build-your-app-and-s: crea la tua app e sincronizza
 build-your-code-and-: Carica su Capgo il tuo codice
 bulk-upload: Caricamento collettivo
+bundle: Fascio
+bundle-deleted: Pacchetto eliminato
+bundle-is-linked-channel: Il pacchetto è collegato nel canale, prima scollegalo
+bundle-is-linked-device: Il pacchetto è collegato nel dispositivo, prima scollegalo
 bundle-number: Numero di pacco
-button:
-  about: Di
-  back: Indietro
-  browse: Navigare
-  camera: Telecamera
-  cancel: Annulla
-  delete: Eliminare
-  go: ANDARE
-  home: Casa
-  options: Opzioni
-  remove: Rimuovere
-  tabs: Schede
-  toggle_dark: Attiva/disattiva la modalità oscura
-  toggle_langs: Cambia lingua
+bundles: gruppi
+button-about: Di
+button-back: Indietro
+button-browse: Navigare
+button-camera: Telecamera
+button-cancel: Annulla
+button-delete: Eliminare
+button-go: ANDARE
+button-home: Casa
+button-options: Opzioni
+button-remove: Rimuovere
+button-tabs: Schede
+button-toggle_dark: Attiva/disattiva la modalità oscura
+button-toggle_langs: Cambia lingua
 by-clicking-on-them: cliccandoci sopra.
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
 cannot-delete-app-version: Impossibile eliminare la versione dell'app
+cannot-delete-bundle: Impossibile eliminare il gruppo
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-save-custom-i: Impossibile salvare l'ID personalizzato
 cannot-test-app-some: Impossibile testare l'app, è successo qualcosa di sbagliato
 change: Modifica
 changed-password-suc: password cambiata con successo
-channel:
-  add: Aggiungere
-  beta-channel: Canale beta
-  cannot-delete-device: Impossibile eliminare il dispositivo
-  confirm-public-desc: >-
-    Impostando questo canale come predefinito, invierà aggiornamenti a tutti i
-    tuoi utenti.
-
-
-    Altri canali predefiniti non saranno più predefiniti.
-  copy: Copia URL
-  device: Dispositivo
-  device-deleted: Dispositivo eliminato
-  info: Informazione
-  invit: Digita l'e-mail per invitare
-  is_public: Canale predefinito
-  make-now: Rendere predefinito
-  make_it: Fallo
-  makeprivate: Il tuo canale è pubblico, fai clic per renderlo privato
-  makepublic: Il tuo canale è privato, fai clic per renderlo pubblico
-  open: Aprire
-  private_desc: Privato
-  public: Collegamento condensatore-aggiornatore
-  public_desc: Pubblico
-  settings: Impostazioni
-  title: Canale
-  user: Utente
-  user_no_found: Utente non trovato, chiedi prima di registrarti
-  users: Utenti condivisi
-  v3: Impostazioni V3
+channel: Canale
 channel-deleted: Canale eliminato
+channel-invit: Digita l'e-mail per invitare
+channel-is-public: Il canale è pubblico
+channel-link: Collegamento al canale
+channel-link-fail: Impossibile collegare il canale è successo qualcosa di sbagliato
+channel-linked: Canale collegato
+channel-linking: Collegamento al canale
+channel-make-now: Rendere predefinito
 channels: Canali
+check-email: Controlla la tua email e verifica
 checksum: Somma di controllo
 commands: comandi
+confirm-email: conferma la tua email
+confirm-password: Conferma password
+confirm-public-desc: >-
+  Impostando questo canale come predefinito, invierà aggiornamenti a tutti i
+  tuoi utenti.
+
+
+  Altri canali predefiniti non saranno più predefiniti.
 copied-to-clipboard: Copiato negli appunti
 copy-your: Copia il tuo
+country: Paese
 create-a-free-accoun: Crea un account gratis
+created-at: Creato a
 custom-domain: Dominio personalizzato
 custom-id: ID personalizzato
 custom-id-saved: ID personalizzato salvato
@@ -152,86 +111,59 @@ defined-as-private: definita normale
 defined-as-public: definito come predefinito
 delete-account: Eliminare l'account
 details-and-logs: Dettagli e registri
-device:
-  channel: Collegamento al canale
-  created_at: Creato a
-  force_version: Versione forzata
-  info: Informazioni
-  last_update: Ultimo aggiornamento
-  link_channel: Canale collegato al dispositivo
-  link_fail: Impossibile collegare qualcosa che non va
-  link_version: versione collegata al dispositivo
-  no_channel: Nessun canale, fai clic per aggiungere
-  no_override: Nessuna sostituzione, fai clic per aggiungere
-  os_version: Versione del sistema operativo
-  platform: piattaforma
-  plugin_version: Versione plug-in
-  title: Dispositivo
-  unlink_channel: Canale scollegato dal dispositivo
-  unlink_version: Versione scollegata dal dispositivo
-  version: Versione
+device: Dispositivo
 device-id: ID del dispositivo
-devices:
-  title: Dispositivi
+devices: Dispositivi
 devices-using-this-b: Dispositivi che utilizzano questo pacchetto
 disable-auto-downgra: Disabilita il downgrade automatico in modalità nativa
 disable-auto-upgrade: Disabilita l'aggiornamento automatico sopra major
+discord: Discordia
 discover-module-in-a: Scopri il modulo in Awesome-condensatore
 discover-your-dashbo: Scopri la tua dashboard!
 documentation: Documentazione
 dont-have-an-account: Non hai un account?
+download: Scaricamento
+email: E-mail
 email-address: Indirizzo e-mail
 enter-your-email-add: >-
   Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la
   password.
 enter-your-new-passw: Inserisci la tua nuova password e conferma
-forgot:
-  check_email: Controlla la tua email per ottenere il link per reimpostare la password
-  email: E-mail
-  heading: Ha dimenticato la password
-  success: Password aggiornata con successo
+first-name: Nome di battesimo
+force-version: Versione forzata
+forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
+forgot-success: Password aggiornata con successo
 from-device: dal dispositivo
 good: Bene
 id: ID
 in-your-main-file: Nel tuo file principale
 in-your-project-fold: Nella cartella del tuo progetto
+info: Informazione
 informations: Informazioni
 install-the-capacito: Installa il plug-in Condensatore
 into-your-app-folder: Nella cartella dell'app.
-intro:
-  aka: Conosciuto anche come
-  desc: Modello iniziale di Vite supponente
-  dynamic-route: Demo del percorso dinamico
-  hi: Ciao, {nome}!
-  whats-your-name: Come ti chiami?
 invalid-auth: autenticazione non valida
 is-emulator: È emulatore
 is-production-app: È l'app di produzione
+last-name: Cognome
+last-update: Ultimo aggiornamento
 last-upload: Ultimo caricamento
 last-version: Ultima versione
+launch-bundle: Pacchetto di lancio
 limit-reached: Limite raggiunto
 loading-more-data: Caricamento di altri dati...
 log-in: Login
 log-to-the-capgo-cli: Accedere all'interfaccia a riga di comando di Capgo
-login:
-  andpass: E parola d'ordine
-  connexion: Login
-  create-new: Crea un nuovo account
-  email: E-mail
-  forgot: Dimenticato
-  hello: Ciao
-  login-in: Accedi
-  or: O
-  password: Parola d'ordine
-  withemail: Con indirizzo email
 login-to-your-accoun: Accedi al tuo account
+logout: Disconnettersi
 logs: Registri
+lowerCaseError: Dovrebbe contenere lettere minuscole
 make-normal: Rendi normale
 making-this-channel-: >-
   Per rendere questo canale "normale" dovrai configurare un altro canale
   predefinito o lasciare che il dispositivo si assegni automaticamente.
-module:
-  heading: Moduli
+module-heading: Moduli
+monthly: Mensile
 monthly-active-users: Utenti attivi mensili
 more-version-storage: Più versione Archiviazione
 morning: Mattina
@@ -241,121 +173,52 @@ name: Nome
 need-more-contact-us: |-
   Bisogno di piu ? 
   Contattaci per un piano su misura
+no-channel-linked: Nessun canale, fai clic per aggiungere
 no-devices: Nessun dispositivo
 no-logs: Nessun registro
+no-version-linked: Nessuna versione, fai clic per aggiungere
 not-found: Non trovato
-notificationSettings:
-  heading: Impostazioni di notifica
-  validate: Convalidare
 notifications: Notifiche
-onboarding:
-  loading: Caricamento
 one-day-left: Manca un giorno
+open-channel: Canale aperto
 open-settings: Fare clic per aprire le impostazioni
 open-sidebar: Apri la barra laterale
 open-this-link-to-le: Apri questo link per scoprire come testare il tuo aggiornamento
-package:
-  cannot-delete-version: Impossibile eliminare il gruppo
-  channels: Canali
-  device_list: Dispositivi
-  devices: Visualizza le statistiche dei dispositivi
-  devices-list: Dispositivi collegati
-  download: Scarica pacchetto
-  externally: memorizzati esternamente
-  link_channel: Collegamento al canale
-  link_version: Collegamento al pacchetto
-  mobiles-stats: Statistiche cellulari
-  name: App
-  not_available: Pacchetto non trovato
-  open: Canale aperto
-  set: Imposta il pacchetto sul canale
-  size_not_found: Non trovato
-  stats: statistiche
-  test: Pacchetto di lancio
-  title: Fascio
-  unset: Scollega il canale dal gruppo
-  version:
-    is-used-in-device: viene utilizzato in un override del dispositivo, scollegarlo prima
-  version-deleted: Pacchetto eliminato
-  versions: gruppi
+os-version: Versione del sistema operativo
 pages: Pagine
-password:
-  heading: Crea password
-  new: nuova password
-  validate: Convalidare
-pckage:
-  version:
-    created-at: Creato a
-    is-used-in-channel: viene utilizzato in un canale, prima scollegalo
-    size: Misurare
+password: Parola d'ordine
+password-heading: Crea password
+password-hint: >-
+  Inserisci una combinazione di almeno 6 numeri, lettere e segni di
+  punteggiatura.
+password-new: nuova password
 personal-information: Informazioni personali
-plan:
-  abtest: Test A/B
-  application: Applicazione
-  applications: Applicazioni
-  bandwidth: Larghezza di banda GB
-  buy: Acquistare
-  channel: Canale
-  channels: Canali
-  desc: >-
-    Inizia a creare gratuitamente, quindi aggiungi un piano per la
-    pubblicazione. 
-
-    I piani account sbloccano funzionalità aggiuntive.
-  free:
-    desc: Ideale per MVP e test
-  maker:
-    desc: Ideale per i proprietari di piccole imprese
-  mau: Utenti attivi mensili
-  monthly-billing: Fatturazione mensile
-  payasyougo:
-    desc: Ideale per le imprese in espansione
-  pricing-plans: Piani tariffari
-  progressive_deploy: Distribuzione progressiva
-  shared_channel: Canale condiviso
-  shared_channels: Canali condivisi
-  solo:
-    desc: Ideale per sviluppatori indipendenti
-  storage: Archiviazione GB
-  team:
-    desc: Il meglio per i grandi imprenditori
-  update: Aggiornamento
-  updates: Aggiornamenti
-  version: Versione
-  versions: Versioni
-  whats-included: Cosa è incluso
-  yearly-billing: Fatturazione annuale
+plan-abtest: Test A/B
+plan-bandwidth: Larghezza di banda GB
+plan-buy: Acquistare
+plan-desc: |-
+  Inizia a creare gratuitamente, quindi aggiungi un piano per la pubblicazione. 
+  I piani account sbloccano funzionalità aggiuntive.
 plan-inactive: Piano inattivo
 plan-is-the-best-pla: plan è il miglior piano per le tue esigenze.
+plan-mau: Utenti attivi mensili
 plan-member: membro del piano.
+plan-pricing-plans: Piani tariffari
+plan-progressive-deploy: Distribuzione progressiva
+plan-storage: Archiviazione GB
+plan-updates: Aggiornamenti
+plan-whats-included: Cosa è incluso
 plans: Piani
+platform: piattaforma
 please-choose-your-p: Scegli le tue preferenze
 please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
+plugin-version: Versione plug-in
 pro-tip-you-can-copy: 'Suggerimento pro: puoi copiare il file'
 projection: Proiezioni
-projects:
-  list: Il tuo
-  sharedlist: Condiviso con me
-  title: Progetti
 refresh-this-page: Aggiorna questa pagina
-register:
-  already-account: Hai già un account?
-  check-email: Controlla la tua email e verifica
-  confirm-email: conferma la tua email
-  confirm-password: Conferma password
-  desc: Compila i seguenti campi per completare la tua registrazione
-  email: E-mail
-  first-name: Nome di battesimo
-  heading: Registrazione
-  last-name: Cognome
-  lowerCaseError: Dovrebbe contenere lettere minuscole
-  next: Registrati
-  password: Parola d'ordine
-  password-hint: >-
-    Inserisci una combinazione di almeno 6 numeri, lettere e segni di
-    punteggiatura.
-  specialError: Deve contenere caratteri speciali
-  upperCaseError: Deve contenere lettere maiuscole
+register-desc: Compila i seguenti campi per completare la tua registrazione
+register-heading: Registrazione
+register-next: Registrati
 reset-password: Resetta la password
 reset-your-password: reimposta la tua password
 search: Ricerca
@@ -366,22 +229,21 @@ search-device: Cerca dispositivo
 search-user: Cerca utente
 see-usage: Vedi utilizzo
 session_key: IvSessionKey
+set-bundle: Imposta il pacchetto sul canale
 settings: Impostazioni
 shared-apps: App condivise
 sign-out: Disconnessione
 size: Misurare
+size-not-found: Non trovato
 something-went-wrong-try-again-later: |-
   Qualcosa è andato storto! 
   Riprovare più tardi.
 special-api-access: Accesso API speciale
+specialError: Deve contenere caratteri speciali
 start-using-capgo: Inizia a usare Capgo!
-stats:
-  devices: Dispositivi
-  downloads: Download
-  subtitle: Lo scorso mese
-  title: Statistiche
-  versions: Versioni
+stored-externally: memorizzati esternamente
 submit: Invia
+support: Supporto
 switch-to-all-device: Passa a tutti i dispositivi
 switch-to-only-devic: Passa al solo dispositivo collegato
 terms-of-use: Termini di utilizzo
@@ -396,17 +258,25 @@ trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
 unlimited-updates: Aggiornamenti illimitati
+unlink-bundle: Scollega gruppo
+unlink-channel: Scollega canale
+unlink-version: Scollega versione
+update: Aggiornamento
 updated-at: Aggiornato a
 upgrade: Aggiornamento
 upgrade-now: Aggiorna ora
+upperCaseError: Deve contenere lettere maiuscole
 url: URL
-usage:
-  success: >-
-    Il tuo piano è stato impostato questa pagina sarà aggiornata, in pochi
-    minuti
-  title: Totale
+usage-success: Il tuo piano è stato impostato questa pagina sarà aggiornata, in pochi minuti
+usage-title: Totale
+user: Utente
+validate: Convalidare
+version: Versione
 version-build: Costruzione della versione
 version-builtin: Versione incorporata
+version-linked: Collegamento versione
+version-linking: Collegamento al pacchetto
+versions: Versioni
 welcome-to: Benvenuto a
 welcome-to-your-capg: Benvenuto nella dashboard di Capgo
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.

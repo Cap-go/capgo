@@ -35,10 +35,14 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
+  const defaultColor = 'bg-neutral-focus'
   const warning = 'bg-warning'
   // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
   const success = 'bg-success'
-  if (main.canceled)
+  if (main.paying && main.canUseMore)
+    return defaultColor
+
+  else if (main.canceled)
     return warning
 
   else if (!main.paying && main.trialDaysLeft > 1 && main.trialDaysLeft <= 7)
@@ -66,6 +70,7 @@ const konstaColors = ref({
     v-if="bannerText"
     :title="bannerText"
     :colors="konstaColors"
+    :translucent="false"
   >
     <template #right>
       <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">

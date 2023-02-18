@@ -27,15 +27,15 @@ const { t } = useI18n()
 
 const didCancel = async (name: string) => {
   displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -46,7 +46,7 @@ const didCancel = async (name: string) => {
 
 const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
   // console.log('deleteApp', app)
-  if (await didCancel(t('package.name')))
+  if (await didCancel(t('app')))
     return
   try {
     const { error: errorIcon } = await supabase.storage

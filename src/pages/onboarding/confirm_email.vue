@@ -14,10 +14,10 @@ const { t } = useI18n()
               <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             <p class="mt-5 text-xl font-bold text-gray-900">
-              {{ t('register.confirm-email') }}
+              {{ t('confirm-email') }}
             </p>
             <p class="mt-3 text-sm font-medium text-gray-500">
-              {{ t('register.check-email') }}
+              {{ t('check-email') }}
             </p>
             <div class="mt-8">
               <span

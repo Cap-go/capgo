@@ -48,15 +48,15 @@ const currentVersionsNumber = computed(() => {
 })
 const didCancel = async (name: string) => {
   displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -131,7 +131,7 @@ const refreshData = async () => {
   }
 }
 const deleteOne = async (one: typeof element) => {
-  if (await didCancel(t('channel.user')))
+  if (await didCancel(t('user')))
     return
   const { error } = await supabase
     .from('channel_users')
@@ -155,7 +155,7 @@ const addUser = async () => {
       message: t('please-upgrade'),
       buttons: [
         {
-          text: t('button.cancel'),
+          text: t('button-cancel'),
           role: 'cancel',
         },
         {
@@ -216,7 +216,7 @@ const inviteUser = async (userId: string) => {
 }
 
 const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => {
-  if (await didCancel(t('channel.user')))
+  if (await didCancel(t('user')))
     return
   const { error } = await supabase
     .from('channel_users')
@@ -233,14 +233,14 @@ const onClick = async (usr: Database['public']['Tables']['users']['Row']) => {
   displayStore.actionSheetOption = {
     buttons: [
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         handler: () => {
           displayStore.showActionSheet = false
           deleteUser(usr)
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
@@ -253,7 +253,7 @@ const onClick = async (usr: Database['public']['Tables']['users']['Row']) => {
 
 columns.value = [
   {
-    label: t('accountProfile.email'),
+    label: t('email'),
     key: 'email',
     mobile: 'title',
     sortable: true,
@@ -261,7 +261,7 @@ columns.value = [
     head: true,
   },
   {
-    label: t('device.created_at'),
+    label: t('created-at'),
     key: 'created_at',
     mobile: 'header',
     sortable: 'desc',
@@ -312,15 +312,15 @@ onMounted(async () => {
       @backdropclick="() => (addUserModal = false)"
     >
       <template #title>
-        {{ t('channel.invit') }}
+        {{ t('channel-invit') }}
       </template>
       <input v-model="newUser" type="email" placeholder="hello@yourcompany.com" class="w-full p-1 text-lg text-gray-200 rounded-lg k-input">
       <template #buttons>
         <k-dialog-button class="text-red-800" @click="() => (addUserModal = false)">
-          {{ t('button.cancel') }}
+          {{ t('button-cancel') }}
         </k-dialog-button>
         <k-dialog-button @click="addUser()">
-          {{ t('channel.add') }}
+          {{ t('add') }}
         </k-dialog-button>
       </template>
     </k-dialog>

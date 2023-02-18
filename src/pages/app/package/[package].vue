@@ -78,9 +78,9 @@ watchEffect(async () => {
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-4 lg:gap-x-12 xl:gap-x-20">
             <AppStat :number="channelsNb" :label="t('channels')" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
-            <AppStat :number="bundlesNb" :label="t('package.versions')" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
-            <AppStat :number="devicesNb" :label="t('devices.title')" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
-            <AppStat :number="updatesNb" :label="t('plan.updates')" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
+            <AppStat :number="bundlesNb" :label="t('bundles')" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
+            <AppStat :number="devicesNb" :label="t('devices')" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
+            <AppStat :number="updatesNb" :label="t('plan-updates')" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
           </div>
         </div>
       </section>

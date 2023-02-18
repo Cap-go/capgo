@@ -49,7 +49,7 @@ const submit = async () => {
 </script>
 
 <template>
-  <TitleHead :big="true" :title="t('activation.heading')" />
+  <TitleHead :big="true" :title="t('activation-heading')" />
   <section class="flex w-full h-full py-10 my-auto sm:py-8 lg:py-16">
     <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="max-w-2xl mx-auto text-center">
@@ -68,7 +68,7 @@ const submit = async () => {
             <form @submit.prevent="submit">
               <div class="w-full mx-auto">
                 <div class="flex items-center justify-between mb-2">
-                  <label for="notification" class="text-lg font-medium justify-self-start">{{ t('activation.notification') }}</label>
+                  <label for="notification" class="text-lg font-medium justify-self-start">{{ t('activation-notification') }}</label>
                   <k-toggle
                     component="div"
                     class="k-color-success"
@@ -78,10 +78,10 @@ const submit = async () => {
                   />
                 </div>
                 <p class="col-span-2 text-sm text-left text-grey">
-                  {{ t('activation.notification-desc') }}
+                  {{ t('activation-notification-desc') }}
                 </p>
                 <div class="flex items-center justify-between mt-6 mb-2">
-                  <label for="legal" class="text-lg font-medium justify-self-start">{{ t('activation.legal') }}</label>
+                  <label for="legal" class="text-lg font-medium justify-self-start">{{ t('activation-legal') }}</label>
                   <k-toggle
                     component="div"
                     class="k-color-success"
@@ -91,10 +91,10 @@ const submit = async () => {
                   />
                 </div>
                 <p class="col-span-2 text-sm text-left text-grey">
-                  {{ t('activation.legal-desc') }}
+                  {{ t('activation-legal-desc') }}
                 </p>
                 <div class="flex items-center justify-between mt-6 mb-2">
-                  <label for="doi" class="text-lg font-medium justify-self-start">{{ t('activation.doi') }}</label>
+                  <label for="doi" class="text-lg font-medium justify-self-start">{{ t('activation-doi') }}</label>
                   <k-toggle
                     component="div"
                     class="k-color-success"
@@ -104,12 +104,12 @@ const submit = async () => {
                   />
                 </div>
                 <p class="col-span-2 text-sm text-left text-grey">
-                  {{ t('activation.doi-desc') }}
+                  {{ t('activation-doi-desc') }}
                 </p>
               </div>
               <button :disabled="isLoading || !form.legal" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 mt-10 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-700 focus:outline-none hover:bg-blue-700 focus:bg-blue-700 disabled:bg-muted-blue-50">
                 <span v-if="!isLoading">
-                  {{ t('activation.validate') }}
+                  {{ t('activation-validate') }}
                 </span>
                 <k-preloader size="w-16 h-16" />
               </button>

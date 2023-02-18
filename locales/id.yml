@@ -1,151 +1,106 @@
 Bandwidth: Bandwidth
 MAU: Pengguna aktif bulanan
 Storage: Penyimpanan
-account:
-  backButton: Kembali
-  billing: Penagihan
-  changePassword: Ganti kata sandi
-  delete-account: Hapus akun Saya
-  delete_sure: Apa kamu yakin ?
-  discord: Perselisihan
-  error: Kesalahan
-  heading: Akun
-  keys: kunci API
-  legal: Persyaratan layanan
-  logout: Keluar
-  personalInformation: Informasi pribadi
-  preferences: Pemberitahuan
-  privacy: Rahasia pribadi
-  support: Mendukung
-  usage: penggunaan
+account-password-error: Terjadi kesalahan, harap coba lagi
+account-password-heading: Ubah kata sandi saya
 account-settings: Pengaturan akun
-accountPassword:
-  confirmPassword: Setujui password
-  errorMsg: Terjadi kesalahan, silakan coba lagi
-  heading: Ubah kata sandi saya
-  password: Kata sandi baru
-  success: Berhasil mengubah kata sandi
-  validate: Mengesahkan
-accountProfile:
-  billing_email: Email penagihan
-  country: Negara
-  email: Surel
-  first-name: Nama depan
-  heading: Informasi pribadi
-  last-name: nama keluarga
-  update: Memperbarui
 action: Tindakan
-activation:
-  desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
-  doi: Persetujuan opsional
-  doi-desc: Saya menerima buletin Email dan penawaran pemasaran di masa mendatang
-  heading: pengaktifan
-  headline: Pengaturan saya
-  legal: Persyaratan layanan
-  legal-desc: >-
-    Saya menerima kebijakan privasi aplikasi kapasitor Go dan persyaratan
-    penggunaan
-  notification: Pemberitahuan
-  notification-desc: >-
-    Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru
-    tersedia
-  validate: Mengesahkan
+activation-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
+activation-doi: Persetujuan opsional
+activation-doi-desc: Saya menerima buletin Email dan penawaran pemasaran di masa mendatang
+activation-heading: pengaktifan
+activation-headline: Pengaturan saya
+activation-legal: Ketentuan layanan
+activation-legal-desc: Saya menerima kebijakan privasi dan ketentuan penggunaan aplikasi Capgo
+activation-notification: Notifikasi
+activation-notification-desc: Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru tersedia
+activation-validate: Mengesahkan
+add: Menambahkan
 add-another-app: Tambahkan aplikasi Anda
 add-this-code-to-you: Tambahkan kode ini ke proyek Anda
 add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
-add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan mari dorong pembaruan!
+add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
+admin: Admin
 afternoon: sore
-alert:
-  confirm-delete: Konfirmasi Hapus
-  delete-message: Apa kamu yakin ingin menghapus ini
-  not-reverse-message: Tindakan ini tidak dapat dibatalkan
+alert-confirm-delete: Konfirmasi Hapus
+alert-delete-message: Apa kamu yakin ingin menghapus ini
+alert-not-reverse-message: Tindakan ini tidak dapat dibatalkan
 allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 allow-emulator: Izinkan Emulator
+already-account: Anda sudah memiliki akun?
 api-key: Kunci API
 api-keys: Kunci API
-apikeys:
-  all: kunci
-  checkbelow: cek di bawah link untuk mendapatkan informasi lebih lanjut
-  cli: capgo CLI
-  explain: >-
-    Semua kunci api tersebut dibuat untuk digunakan dengan alat CLI kapasitor
-    Go, atau plugin pembaru kapasitor
-  keyCopied: Kunci disalin ke papan klip Anda
-  links: Tautan
-  title: kunci API
-  updater: kapasitor-pembaru
+api-keys-key-copied: Kunci API
+app: Aplikasi
 app-deleted: Aplikasi dihapus
-app-id-example: Contoh ID Aplikasi
+app-id-example: Contoh ID aplikasi
+app-not-found: Aplikasi tidak ditemukan
+are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
 bigger-app-size: Ukuran aplikasi lebih besar
+billing: Penagihan
 build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
 build-your-code-and-: Unggah ke Capgo kode Anda
-bulk-upload: Unggah massal
-bundle-number: Nomor paket
-button:
-  about: Tentang
-  back: Kembali
-  browse: Jelajahi
-  camera: Kamera
-  cancel: Membatalkan
-  delete: Menghapus
-  go: Pergi
-  home: Beranda
-  options: Pilihan
-  remove: Menghapus
-  tabs: tab
-  toggle_dark: Ubah ke mode gelap
-  toggle_langs: Ubah bahasa
+bulk-upload: Unggahan massal
+bundle: Bundel
+bundle-deleted: Bundel dihapus
+bundle-is-linked-channel: Bundel ditautkan dalam saluran, batalkan tautannya terlebih dahulu
+bundle-is-linked-device: Bundel ditautkan di perangkat, batalkan tautannya terlebih dahulu
+bundle-number: Nomor bundel
+bundles: bundel
+button-about: Tentang
+button-back: Kembali
+button-browse: Jelajahi
+button-camera: Kamera
+button-cancel: Membatalkan
+button-delete: Menghapus
+button-go: PERGI
+button-home: Rumah
+button-options: Pilihan
+button-remove: Menghapus
+button-tabs: Tab
+button-toggle_dark: Alihkan mode gelap
+button-toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
+cannot-delete-bundle: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
 change: Mengubah
 changed-password-suc: Kata sandi berhasil diubah
-channel:
-  add: Menambahkan
-  beta-channel: saluran beta
-  cannot-delete-device: Tidak dapat menghapus perangkat
-  confirm-public-desc: >-
-    Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
-    semua pengguna Anda.
-
-
-    Saluran default lainnya tidak akan menjadi default lagi.
-  copy: Salin URL
-  device: Perangkat
-  device-deleted: Perangkat dihapus
-  info: Informasi
-  invit: Ketik email untuk mengundang
-  is_public: Standar saluran
-  make-now: Jadikan default
-  make_it: Buat itu
-  makeprivate: Saluran Anda bersifat publik, klik untuk menjadikannya pribadi
-  makepublic: Saluran Anda bersifat pribadi, klik untuk menjadikannya publik
-  open: Membuka
-  private_desc: Pribadi
-  public: Tautan pemutakhiran kapasitor
-  public_desc: Publik
-  settings: Pengaturan
-  title: Saluran
-  user: Pengguna
-  user_no_found: Pengguna tidak ditemukan, minta untuk mendaftar terlebih dahulu
-  users: Pengguna bersama
-  v3: Pengaturan V3
+channel: Saluran
 channel-deleted: Saluran dihapus
+channel-invit: Ketik email untuk mengundang
+channel-is-public: Saluran bersifat publik
+channel-link: Tautan saluran
+channel-link-fail: Tidak dapat menautkan saluran terjadi kesalahan
+channel-linked: Saluran tertaut
+channel-linking: Tautkan ke saluran
+channel-make-now: Jadikan bawaan
 channels: Saluran
-checksum: Ceksum
+check-email: Silakan periksa email Anda dan verifikasi
+checksum: Checksum
 commands: perintah
+confirm-email: Konfirmasi email Anda
+confirm-password: Konfirmasi sandi
+confirm-public-desc: >-
+  Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
+  semua pengguna Anda.
+
+
+  Saluran default lainnya tidak akan menjadi default lagi.
 copied-to-clipboard: Disalin ke papan klip
 copy-your: Salin Anda
+country: Negara
 create-a-free-accoun: Buat Akun gratis
+created-at: Dibuat di
 custom-domain: Domain khusus
-custom-id: ID Khusus
+custom-id: ID khusus
 custom-id-saved: ID khusus disimpan
 dashboard: Dasbor
 days: hari
@@ -154,206 +109,114 @@ defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
 details-and-logs: Detail dan log
-device:
-  channel: Tautan saluran
-  created_at: Dibuat di
-  force_version: Versi paksa
-  info: informasi
-  last_update: Pembaharuan Terakhir
-  link_channel: Saluran tertaut ke perangkat
-  link_fail: Tidak dapat menghubungkan sesuatu yang salah terjadi
-  link_version: versi yang ditautkan ke perangkat
-  no_channel: Tidak ada saluran, klik untuk menambahkan
-  no_override: Tidak ada penggantian, klik untuk menambahkan
-  os_version: versi OS
-  platform: Platform
-  plugin_version: Versi plugin
-  title: Perangkat
-  unlink_channel: Putuskan tautan saluran ke perangkat
-  unlink_version: Versi batalkan tautan ke perangkat
-  version: 'Versi: kapan'
+device: Perangkat
 device-id: ID perangkat
-devices:
-  title: Perangkat
+devices: Perangkat
 devices-using-this-b: Perangkat yang menggunakan bundel ini
-disable-auto-downgra: Nonaktifkan penurunan versi otomatis di bawah asli
-disable-auto-upgrade: Nonaktifkan peningkatan otomatis di atas mayor
+disable-auto-downgra: Nonaktifkan downgrade otomatis di bawah native
+disable-auto-upgrade: Nonaktifkan pemutakhiran otomatis di atas mayor
+discord: Perselisihan
 discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
 dont-have-an-account: Belum punya akun?
+download: Unduh
+email: Surel
 email-address: Alamat email
 enter-your-email-add: >-
   Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
-forgot:
-  check_email: Periksa email Anda untuk mendapatkan tautan untuk mereset kata sandi Anda
-  email: Surel
-  heading: Tidak ingat kata sandi
-  success: Kata sandi berhasil diperbarui
+first-name: Nama depan
+force-version: Versi paksa
+forgot-check-email: >-
+  Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
+  Anda
+forgot-success: Kata sandi berhasil diperbarui
 from-device: dari perangkat
 good: Bagus
-id: Indo
+id: PENGENAL
 in-your-main-file: Di file utama Anda
 in-your-project-fold: Di folder proyek Anda
+info: Informasi
 informations: Informasi
 install-the-capacito: Instal plugin Kapasitor
-into-your-app-folder: Ke folder aplikasi Anda.
-intro:
-  aka: Juga diketahui sebagai
-  desc: Template awal vite
-  dynamic-route: Contoh rute dinamik
-  hi: Halo, {name}!
-  whats-your-name: Siapa nama anda?
-invalid-auth: autentik tidak valid
+into-your-app-folder: Ke dalam folder aplikasi Anda.
+invalid-auth: autentikasi tidak valid
 is-emulator: Apakah Emulator
 is-production-app: Apakah aplikasi Produksi
+last-name: nama keluarga
+last-update: Pembaharuan Terakhir
 last-upload: Unggahan terakhir
 last-version: Versi terakhir
+launch-bundle: Luncurkan bundel
 limit-reached: Batas tercapai
 loading-more-data: Memuat lebih banyak data...
 log-in: Gabung
 log-to-the-capgo-cli: Masuk ke Capgo CLI
-login:
-  andpass: Dan kata sandi
-  connexion: Gabung
-  create-new: Buat akun baru
-  email: Surel
-  forgot: lupa
-  hello: Halo
-  login-in: Masuk
-  or: atau
-  password: Kata sandi
-  withemail: Dengan alamat email
 login-to-your-accoun: masuk ke akun Anda
+logout: Keluar
 logs: Log
+lowerCaseError: Harus berisi huruf kecil
 make-normal: Jadikan normal
 making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
-module:
-  heading: Modul
+module-heading: Modul
+monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan
-more-version-storage: Penyimpanan versi lebih banyak
-morning: pagi
+more-version-storage: Lebih banyak versi Penyimpanan
+morning: Pagi
 my-account: Akun saya
 my-notifications: Notifikasi Saya
 name: Nama
 need-more-contact-us: |-
-  Butuh lebih? 
-  Hubungi kami untuk paket yang disesuaikan
+  Butuh lebih banyak? 
+  Hubungi kami untuk rencana yang disesuaikan
+no-channel-linked: Tidak ada saluran, klik untuk menambahkan
 no-devices: Tidak ada perangkat
 no-logs: Tidak ada log
+no-version-linked: Tidak ada versi, klik untuk menambahkan
 not-found: Tidak ditemukan
-notificationSettings:
-  heading: Akun
-  validate: Mengesahkan
-notifications: Pemberitahuan
-onboarding:
-  loading: Memuat
-one-day-left: Tinggal satu hari lagi
+notifications: Notifikasi
+one-day-left: Tinggal satu hari
+open-channel: Buka saluran
 open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
-package:
-  cannot-delete-version: Tidak dapat menghapus versi
-  channels: saluran
-  device_list: Daftar perangkat
-  devices: Lihat perangkat
-  devices-list: Perangkat tertaut
-  download: Unduh versi
-  externally: disimpan secara eksternal
-  link_channel: Tautan ke saluran
-  link_version: Tautan ke versi
-  mobiles-stats: Statistik ponsel
-  name: Aplikasi
-  not_available: Paket tidak ditemukan
-  open: Buka Saluran
-  set: Setel versi ke saluran
-  size_not_found: Tidak ditemukan
-  stats: statistik
-  test: Luncurkan versi
-  title: informasi
-  unset: Batalkan tautan saluran dari bundel
-  version:
-    is-used-in-device: digunakan dalam penggantian perangkat, batalkan tautannya terlebih dahulu
-  version-deleted: Versi dihapus
-  versions: Versi
-pages: halaman
-password:
-  heading: Buat Kata Sandi
-  new: kata sandi baru
-  validate: Mengesahkan
-pckage:
-  version:
-    created-at: Dibuat di
-    is-used-in-channel: digunakan dalam saluran, batalkan tautannya terlebih dahulu
-    size: Ukuran
+os-version: versi OS
+pages: Halaman
+password: Kata sandi
+password-heading: Buat Kata Sandi
+password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
+password-new: kata sandi baru
 personal-information: Informasi pribadi
-plan:
-  abtest: Pengujian A/B
-  application: Aplikasi
-  applications: Aplikasi
-  bandwidth: GB Bandwidth
-  buy: Membeli
-  channel: Saluran
-  channels: saluran
-  desc: |-
-    Mulai membangun secara gratis, lalu tambahkan rencana untuk ditayangkan. 
-    Paket akun membuka fitur tambahan.
-  free:
-    desc: Terbaik untuk MVP dan pengujian
-  maker:
-    desc: Terbaik untuk pemilik usaha kecil
-  mau: Pengguna aktif bulanan
-  monthly-billing: Penagihan bulanan
-  payasyougo:
-    desc: Terbaik untuk menskalakan perusahaan
-  pricing-plans: Paket Harga
-  progressive_deploy: Penyebaran progresif
-  shared_channel: Saluran Bersama
-  shared_channels: Saluran Bersama
-  solo:
-    desc: Terbaik untuk pengembang independen
-  storage: Penyimpanan GB
-  team:
-    desc: Terbaik untuk pemilik bisnis besar
-  update: Memperbarui
-  updates: Pembaruan
-  version: 'Versi: kapan'
-  versions: Versi
-  whats-included: Apa yang termasuk?
-  yearly-billing: Penagihan tahunan
+plan-abtest: Pengujian A/B
+plan-bandwidth: Bandwidth GB
+plan-buy: Membeli
+plan-desc: |-
+  Mulailah membangun secara gratis, lalu tambahkan rencana untuk ditayangkan. 
+  Paket akun membuka kunci fitur tambahan.
 plan-inactive: Rencana tidak aktif
 plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
+plan-mau: Pengguna aktif bulanan
 plan-member: anggota rencana.
+plan-pricing-plans: Paket Harga
+plan-progressive-deploy: Penyebaran progresif
+plan-storage: Penyimpanan GB
+plan-updates: Pembaruan
+plan-whats-included: Apa yang disertakan
 plans: Rencana
+platform: Platform
 please-choose-your-p: Silakan pilih preferensi Anda
-please-upgrade: Harap tingkatkan paket Anda untuk menambahkan lebih banyak pengguna
+please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
+plugin-version: Versi plugin
 pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
 projection: Proyeksi
-projects:
-  list: Milikmu
-  sharedlist: Dibagikan dengan saya
-  title: Proyek
 refresh-this-page: Segarkan halaman ini
-register:
-  already-account: Anda sudah memiliki akun?
-  check-email: Silakan periksa email Anda dan verifikasi
-  confirm-email: Konfirmasi email
-  confirm-password: Setujui password
-  desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
-  email: Surel
-  first-name: nama depan
-  heading: Registrasi
-  last-name: nama keluarga
-  lowerCaseError: Harus mengandung huruf kecil
-  next: Berikutnya
-  password: kata sandi
-  password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
-  specialError: Harus mengandung karakter khusus
-  upperCaseError: Harus mengandung huruf besar
+register-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
+register-heading: Registrasi
+register-next: Daftar
 reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 search: Mencari
@@ -364,22 +227,21 @@ search-device: Cari perangkat
 search-user: Cari Pengguna
 see-usage: Lihat penggunaan
 session_key: IvSessionKey
+set-bundle: Tetapkan bundel ke saluran
 settings: Pengaturan
-shared-apps: Aplikasi yang Dibagikan
+shared-apps: Aplikasi Bersama
 sign-out: Keluar
 size: Ukuran
+size-not-found: Tidak ditemukan
 something-went-wrong-try-again-later: |-
   Ada yang salah! 
   Coba lagi nanti.
 special-api-access: Akses API khusus
+specialError: Harus mengandung karakter khusus
 start-using-capgo: Mulai gunakan Capgo!
-stats:
-  devices: Perangkat
-  downloads: Unduhan
-  subtitle: Bulan lalu
-  title: Statistik
-  versions: Versi
+stored-externally: disimpan secara eksternal
 submit: Kirim
+support: Mendukung
 switch-to-all-device: Beralih ke semua perangkat
 switch-to-only-devic: Beralih ke hanya perangkat yang ditautkan
 terms-of-use: Syarat Penggunaan
@@ -387,24 +249,34 @@ test-your-update-in-: Uji pembaruan Anda di aplikasi Anda
 tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
-this-page-will-self-: Halaman ini akan menyegarkan diri sendiri
+this-page-will-self-: Halaman ini akan menyegarkan diri
 title: judul
 top-apps: Aplikasi saya
 trial-left: hari tersisa
-trial-plan-expired: Paket Uji Coba Kedaluwarsa
-trial-plan-expires-in: Rencana Percobaan berakhir dalam
+trial-plan-expired: Masa percobaan sudah habis
+trial-plan-expires-in: Uji coba berakhir
 unlimited-updates: Pembaruan tanpa batas
+unlink-bundle: Putuskan tautan bundel
+unlink-channel: Batalkan tautan saluran
+unlink-version: Batalkan tautan versi
+update: Memperbarui
 updated-at: Diperbarui pada
 upgrade: Meningkatkan
 upgrade-now: Tingkatkan sekarang
+upperCaseError: Harus berisi huruf besar
 url: URL
-usage:
-  success: >-
-    Rencana Anda telah disiapkan halaman ini akan diperbarui, dalam beberapa
-    menit
-  title: Total
+usage-success: >-
+  Rencana Anda telah disiapkan, halaman ini akan diperbarui, dalam beberapa
+  menit
+usage-title: Total
+user: Pengguna
+validate: Mengesahkan
+version: 'Versi: kapan'
 version-build: Pembuatan versi
 version-builtin: Versi bawaan
+version-linked: Tautan versi
+version-linking: Tautan ke bundel
+versions: Versi
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.

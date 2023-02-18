@@ -38,12 +38,12 @@ const copyToast = async (text: string) => {
 
 const tabs: Tab[] = [
   {
-    label: t('channel.info'),
+    label: t('info'),
     icon: IconInformations,
     key: 'info',
   },
   {
-    label: t('devices.title'),
+    label: t('devices'),
     icon: IconDevice,
     key: 'devices',
   },
@@ -76,9 +76,9 @@ const showSize = computed(() => {
   if (version_meta.value?.size)
     return bytesToMbText(version_meta.value.size)
   else if (version.value?.external_url)
-    return t('package.externally')
+    return t('stored-externally')
   else
-    return t('package.not_available')
+    return t('app-not-found')
 })
 const setChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
   if (!version.value)
@@ -111,14 +111,14 @@ const ASChannelChooser = async () => {
     })
   }
   buttons.push({
-    text: t('button.cancel'),
+    text: t('button-cancel'),
     role: 'cancel',
     handler: () => {
       // console.log('Cancel clicked')
     },
   })
   displayStore.actionSheetOption = {
-    header: t('package.link_channel'),
+    header: t('channel-linking'),
     buttons,
   }
   displayStore.showActionSheet = true
@@ -131,14 +131,14 @@ const openChannel = async () => {
   displayStore.actionSheetOption = {
     buttons: [
       {
-        text: t('package.set'),
+        text: t('set-bundle'),
         handler: () => {
           displayStore.showActionSheet = false
           ASChannelChooser()
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
@@ -149,7 +149,7 @@ const openChannel = async () => {
   // push in button at index 1 if channel is set
   if (channel.value && displayStore.actionSheetOption.buttons) {
     displayStore.actionSheetOption.buttons.splice(1, 0, {
-      text: t('package.open'),
+      text: t('open-channel'),
       handler: () => {
         displayStore.showActionSheet = false
         openChannelLink()
@@ -164,7 +164,7 @@ const openDownload = async () => {
   displayStore.actionSheetOption = {
     buttons: [
       {
-        text: Capacitor.isNativePlatform() ? t('package.test') : t('package.download'),
+        text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
         handler: () => {
           displayStore.showActionSheet = false
           if (!version.value)
@@ -173,14 +173,14 @@ const openDownload = async () => {
         },
       },
       {
-        text: t('package.set'),
+        text: t('set-bundle'),
         handler: () => {
           displayStore.showActionSheet = false
           ASChannelChooser()
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
@@ -242,7 +242,7 @@ const hideString = (str: string) => {
 
 <template>
   <div>
-    <TitleHead :title="t('package.title')" :default-back="`/app/package/${route.params.p}/bundles`" />
+    <TitleHead :title="t('bundle')" :default-back="`/app/package/${route.params.p}/bundles`" />
     <div v-if="version" class="h-full overflow-y-scroll md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
@@ -250,13 +250,13 @@ const hideString = (str: string) => {
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
-            <InfoRow v-if="version.created_at" :label="t('device.created_at')" :value="formatDate(version.created_at)" />
+            <InfoRow v-if="version.created_at" :label="t('created-at')" :value="formatDate(version.created_at)" />
             <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- meta devices -->
-            <InfoRow v-if="version_meta?.devices" :label="t('devices.title')" :value="version_meta.devices.toString()" />
-            <InfoRow :label="t('channel.title')" :value="channel ? channel.name : t('package.set')" :is-link="true" @click="openChannel()" />
+            <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toString()" />
+            <InfoRow :label="t('channel')" :value="channel ? channel.name : t('set-bundle')" :is-link="true" @click="openChannel()" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
             <!-- version.external_url -->

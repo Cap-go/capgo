@@ -47,7 +47,7 @@ const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row']
 
 const tabs: Tab[] = [
   {
-    label: t('channel.info'),
+    label: t('info'),
     icon: IconInformations,
     key: 'info',
   },
@@ -210,15 +210,15 @@ const upsertDevVersion = async (device: string, v: Database['public']['Tables'][
 }
 const didCancel = async (name: string) => {
   displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.delete-message')} ${name} ${t('from-device')} ?`,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
     buttons: [
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -241,7 +241,7 @@ const saveCustomId = async () => {
 }
 
 const delDevVersion = async (device: string) => {
-  if (await didCancel(t('channel.device')))
+  if (await didCancel(t('device')))
     return
   return supabase
     .from('devices_override')
@@ -253,10 +253,10 @@ const updateOverride = async () => {
   const buttons = []
   if (deviceOverride.value) {
     buttons.push({
-      text: t('button.remove'),
+      text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && delDevVersion(device.value?.device_id)
-        displayStore.messageToast.push(t('device.unlink_version'))
+        displayStore.messageToast.push(t('unlink-version'))
         await loadData()
       },
     })
@@ -270,26 +270,26 @@ const updateOverride = async () => {
         isLoading.value = true
         try {
           await upsertDevVersion(device.value?.device_id, version)
-          displayStore.messageToast.push(t('device.link_version'))
+          displayStore.messageToast.push(t('version-linked'))
           await loadData()
         }
         catch (error) {
           console.error(error)
-          displayStore.messageToast.push(t('device.link_fail'))
+          displayStore.messageToast.push(t('channel-link-fail'))
         }
         isLoading.value = false
       },
     })
   }
   buttons.push({
-    text: t('button.cancel'),
+    text: t('button-cancel'),
     role: 'cancel',
     handler: () => {
       // console.log('Cancel clicked')
     },
   })
   displayStore.actionSheetOption = {
-    header: t('package.link_version'),
+    header: t('version-linking'),
     buttons,
   }
   displayStore.showActionSheet = true
@@ -307,7 +307,7 @@ const upsertDevChannel = async (device: string, channel: Database['public']['Tab
     })
 }
 const delDevChannel = async (device: string) => {
-  if (await didCancel(t('channel.title')))
+  if (await didCancel(t('channel')))
     return
   return supabase
     .from('channel_devices')
@@ -320,10 +320,10 @@ const updateChannel = async () => {
   const buttons = []
   if (channelDevice.value) {
     buttons.push({
-      text: t('button.remove'),
+      text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && delDevChannel(device.value?.device_id)
-        displayStore.messageToast.push(t('device.unlink_channel'))
+        displayStore.messageToast.push(t('unlink-channel'))
         await loadData()
       },
     })
@@ -337,26 +337,26 @@ const updateChannel = async () => {
         isLoading.value = true
         try {
           await upsertDevChannel(device.value?.device_id, channel)
-          displayStore.messageToast.push(t('device.link_channel'))
+          displayStore.messageToast.push(t('channel-linked'))
           await loadData()
         }
         catch (error) {
           console.error(error)
-          displayStore.messageToast.push(t('device.link_fail'))
+          displayStore.messageToast.push(t('channel-link-fail'))
         }
         isLoading.value = false
       },
     })
   }
   buttons.push({
-    text: t('button.cancel'),
+    text: t('button-cancel'),
     role: 'cancel',
     handler: () => {
       // console.log('Cancel clicked')
     },
   })
   displayStore.actionSheetOption = {
-    header: t('package.link_channel'),
+    header: t('channel-linking'),
     buttons,
   }
   displayStore.showActionSheet = true
@@ -374,7 +374,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <TitleHead :title="t('device.title')" :default-back="`/app/package/${route.params.p}/devices`" />
+    <TitleHead :title="t('device')" :default-back="`/app/package/${route.params.p}/devices`" />
     <div v-if="device" class="h-full overflow-y-scroll md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
@@ -382,18 +382,18 @@ watchEffect(async () => {
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('device-id')" :value="device.device_id" />
             <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
-            <InfoRow v-if="device.created_at" :label="t('device.created_at')" :value="formatDate(device.created_at)" />
-            <InfoRow v-if="device.updated_at" :label="t('device.last_update')" :value="formatDate(device.updated_at)" />
-            <InfoRow v-if="device.platform" :label="t('device.platform')" :value="device.platform" />
-            <InfoRow v-if="device.plugin_version" :label="t('device.plugin_version')" :value="device.plugin_version" />
-            <InfoRow v-if="device.version.name" :label="t('device.version')" :value="device.version.name" />
+            <InfoRow v-if="created-at" :label="t('created-at')" :value="formatDate(created-at)" />
+            <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
+            <InfoRow v-if="platform" :label="t('platform')" :value="platform" />
+            <InfoRow v-if="plugin-version" :label="t('plugin-version')" :value="plugin-version" />
+            <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
             <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
-            <InfoRow v-if="device.os_version" :label="t('device.os_version')" :value="device.os_version" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.os_version" :label="t('is-emulator')" :value="device.os_version?.toString()" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-            <InfoRow :label="t('device.force_version')" :value="deviceOverride?.version?.name || t('device.no_override')" :is-link="true" @click="updateOverride()" />
-            <InfoRow :label="t('device.channel')" :value="channelDevice?.channel_id.name || t('device.no_channel') " :is-link="true" @click="updateChannel()" />
+            <InfoRow v-if="os-version" :label="t('os-version')" :value="os-version" />
+            <InfoRow v-if="minVersion(plugin-version) && os-version" :label="t('is-emulator')" :value="os-version?.toString()" />
+            <InfoRow v-if="minVersion(plugin-version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
+            <InfoRow v-if="minVersion(plugin-version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
+            <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
+            <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
           </dl>
         </div>
       </div>

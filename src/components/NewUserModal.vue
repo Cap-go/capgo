@@ -103,35 +103,35 @@ const submit = async () => {
     @backdropclick="() => (emit('close'))"
   >
     <template #title>
-      {{ t('channel.add') }}
+      {{ t('add') }}
     </template>
     <input
       v-model="form.first_name"
       autofocus
       required
-      class="k-input w-full rounded-lg text-lg text-gray-200 p-1 mb-2"
-      :placeholder="t('register.first-name')"
+      class="w-full p-1 mb-2 text-lg text-gray-200 rounded-lg k-input"
+      :placeholder="t('first-name')"
       type="text"
     >
     <div v-for="(error, index) of v$.first_name.$errors" :key="index">
       <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
-        {{ t('register.first-name') }}: {{ error.$message }}
+        {{ t('first-name') }}: {{ error.$message }}
       </p>
     </div>
-    <input v-model="form.last_name" required type="text" :placeholder="t('register.last-name')" class="k-input w-full rounded-lg text-lg text-gray-200 p-1 mb-2">
+    <input v-model="form.last_name" required type="text" :placeholder="t('last-name')" class="w-full p-1 mb-2 text-lg text-gray-200 rounded-lg k-input">
     <div v-for="(error, index) of v$.last_name.$errors" :key="index">
       <p class="mt-2 mb-4 text-xs italic text-sweet-pink-900">
-        {{ t('register.last-name') }}: {{ error.$message }}
+        {{ t('last-name') }}: {{ error.$message }}
       </p>
     </div>
-    <input v-model="userEmail" required type="email" :placeholder="t('register.email')" class="k-input w-full rounded-lg text-lg text-gray-200 p-1 mb-2">
+    <input v-model="userEmail" required type="email" :placeholder="t('email')" class="w-full p-1 mb-2 text-lg text-gray-200 rounded-lg k-input">
 
     <template #buttons>
       <k-dialog-button class="text-red-800" @click="() => (emit('close'))">
-        {{ t('button.cancel') }}
+        {{ t('button-cancel') }}
       </k-dialog-button>
       <k-dialog-button @click="() => (submit)">
-        {{ t('channel.add') }}
+        {{ t('add') }}
       </k-dialog-button>
     </template>
   </k-dialog>

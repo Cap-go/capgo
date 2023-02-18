@@ -113,7 +113,7 @@ const runMethod = async (m: Module) => {
 </script>
 
 <template>
-  <TitleHead :title="`${t('module.heading')} ${t('tests')}`" default-back="/app/home" />
+  <TitleHead :title="`${t('module-heading')} ${t('tests')}`" default-back="/app/home" />
   <k-block-title>{{ t('available-in-the-san') }}</k-block-title>
   <k-list strong-ios outline-ios>
     <k-list-item

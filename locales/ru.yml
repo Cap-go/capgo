@@ -1,237 +1,167 @@
 Bandwidth: Пропускная способность
 MAU: Ежемесячные активные пользователи
 Storage: Хранилище
-account:
-  backButton: Назад
-  billing: Выставление счетов
-  changePassword: Изменить пароль
-  delete-account: Удалите мой аккаунт
-  delete_sure: Ты уверен ?
-  discord: Раздор
-  error: Ошибка
-  heading: Счет
-  keys: ключи API
-  legal: Условия предоставления услуг
-  logout: Выйти
-  personalInformation: Личная информация
-  preferences: Уведомления
-  privacy: Политика конфиденциальности
-  support: Служба поддержки
-  usage: использование
+account-password-error: Произошла ошибка, попробуйте еще раз
+account-password-heading: Изменить пароль
 account-settings: Настройки учетной записи
-accountPassword:
-  confirmPassword: Подтвердить Пароль
-  errorMsg: Произошла ошибка, попробуйте еще раз
-  heading: Изменить свой пароль
-  password: Новый пароль
-  success: Пароль успешно изменен
-  validate: Подтвердить
-accountProfile:
-  billing_email: Электронная почта для выставления счетов
-  country: Страна
-  email: Эл. адрес
-  first-name: Имя
-  heading: Личная информация
-  last-name: Фамилия
-  update: Обновлять
 action: Действие
-activation:
-  desc: Заполните следующие поля, чтобы завершить регистрацию
-  doi: Необязательное согласие
-  doi-desc: Я принимаю рассылку по электронной почте и будущие маркетинговые предложения
-  heading: активация
-  headline: Мои настройки
-  legal: Условия предоставления услуг
-  legal-desc: >-
-    Я принимаю политику конфиденциальности и условия использования приложения
-    Capgo
-  notification: Уведомления
-  notification-desc: Я согласен получать уведомления о появлении новой версии приложения
-  validate: Подтвердить
+activation-desc: Заполните следующие поля, чтобы завершить регистрацию
+activation-doi: Необязательное согласие
+activation-doi-desc: Я принимаю рассылку по электронной почте и будущие маркетинговые предложения
+activation-heading: активация
+activation-headline: Мои настройки
+activation-legal: Условия предоставления услуг
+activation-legal-desc: >-
+  Я принимаю политику конфиденциальности и условия использования приложения
+  Capgo
+activation-notification: Уведомления
+activation-notification-desc: Я согласен получать уведомления о появлении новой версии приложения
+activation-validate: Подтвердить
+add: Добавлять
 add-another-app: Добавьте свое приложение
 add-this-code-to-you: Добавьте этот код в свой проект
 add-your-app-to-your: Добавьте свое приложение в свой аккаунт
 add-your-first-app-t: >-
   Добавьте свое первое приложение в свою учетную запись и давайте получать
   обновления!
+admin: Администратор
 afternoon: после полудня
-alert:
-  confirm-delete: Подтвердите удаление
-  delete-message: Вы уверены, что хотите удалить это
-  not-reverse-message: Это действие необратимо
+alert-confirm-delete: Подтвердите удаление
+alert-delete-message: Вы уверены, что хотите удалить это
+alert-not-reverse-message: Это действие необратимо
 allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
 allow-emulator: Разрешить эмуляторы
+already-account: У вас уже есть аккаунт?
 api-key: ключ API
 api-keys: Ключи API
-apikeys:
-  all: ключи
-  checkbelow: проверьте ссылку ниже, чтобы получить больше информации
-  cli: командная строка Capgo
-  explain: >-
-    Все эти API-ключи предназначены для использования с инструментом Capgo CLI
-    или плагином для обновления конденсаторов.
-  keyCopied: Ключи скопированы в буфер обмена
-  links: Ссылки
-  title: ключи API
-  updater: конденсатор-обновитель
+api-keys-key-copied: Ключи API
+app: Приложение
 app-deleted: Приложение удалено
 app-id-example: Пример идентификатора приложения
+app-not-found: Приложение не найдено
+are-u-sure: Вы уверены ?
 available-in-the-san: Доступно в приложении песочницы
 back-to-login-page: Назад на страницу входа
 bigger-app-size: Большой размер приложения
+billing: Выставление счетов
 build-your-app-and-s: создайте свое приложение и синхронизируйте
 build-your-code-and-: Загрузите в Capgo свой код
 bulk-upload: Массовая загрузка
+bundle: Пучок
+bundle-deleted: Группа удалена
+bundle-is-linked-channel: Пакет привязан к каналу, сначала отсоедините его.
+bundle-is-linked-device: Пакет привязан к устройству, сначала отсоедините его.
 bundle-number: Номер пакета
-button:
-  about: О шаблоне
-  back: Назад
-  browse: Просматривать
-  camera: Камера
-  cancel: Отмена
-  delete: Удалить
-  go: Перейти
-  home: Главная
-  options: Параметры
-  remove: Удалять
-  tabs: Вкладки
-  toggle_dark: Включить темный режим
-  toggle_langs: Сменить язык
+bundles: Пакеты
+button-about: О
+button-back: Назад
+button-browse: Просматривать
+button-camera: Камера
+button-cancel: Отмена
+button-delete: Удалить
+button-go: ИДТИ
+button-home: Дом
+button-options: Параметры
+button-remove: Удалять
+button-tabs: Вкладки
+button-toggle_dark: Переключить темный режим
+button-toggle_langs: Изменить языки
 by-clicking-on-them: нажав на них.
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-app-version: Не могу удалить версию приложения
+cannot-delete-bundle: Невозможно удалить пакет
 cannot-delete-channel: Не могу удалить канал
 cannot-save-custom-i: Не удается сохранить пользовательский идентификатор
-cannot-test-app-some: Невозможно протестировать приложение, что-то случилось
+cannot-test-app-some: Не могу протестировать приложение, что-то случилось
 change: Изменять
 changed-password-suc: Пароль успешно изменен
-channel:
-  add: Добавлять
-  beta-channel: Бета-канал
-  cannot-delete-device: Невозможно удалить устройство
-  confirm-public-desc: >-
-    Установка этого канала по умолчанию заставит его отправлять обновления всем
-    вашим пользователям.
-
-
-    Другие каналы по умолчанию больше не будут использоваться по умолчанию.
-  copy: Скопировать URL
-  device: Устройство
-  device-deleted: Устройство удалено
-  info: Информация
-  invit: Введите адрес электронной почты, чтобы пригласить
-  is_public: Канал по умолчанию
-  make-now: Использовать по умолчанию
-  make_it: Сделай это
-  makeprivate: Ваш канал общедоступен. Нажмите, чтобы сделать его закрытым.
-  makepublic: Ваш канал является закрытым, нажмите, чтобы сделать его общедоступным
-  open: Открыть
-  private_desc: Частный
-  public: Ссылка на конденсатор-апдейтер
-  public_desc: Общественный
-  settings: Настройки
-  title: Канал
-  user: Пользователь
-  user_no_found: Пользователь не найден, сначала попросите зарегистрироваться
-  users: Общие пользователи
-  v3: Настройки версии 3
+channel: Канал
 channel-deleted: Канал удален
+channel-invit: Введите адрес электронной почты, чтобы пригласить
+channel-is-public: Канал общедоступен
+channel-link: Ссылка на канал
+channel-link-fail: Не удается связать канал. Произошла ошибка.
+channel-linked: Канал связан
+channel-linking: Ссылка на канал
+channel-make-now: Использовать по умолчанию
 channels: каналы
+check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
 checksum: Контрольная сумма
 commands: команды
+confirm-email: Подтвердите ваш адрес электронной почты
+confirm-password: Подтвердите пароль
+confirm-public-desc: >-
+  Установка этого канала по умолчанию заставит его отправлять обновления всем
+  вашим пользователям.
+  Другие каналы по умолчанию больше не будут использоваться по умолчанию.
 copied-to-clipboard: Скопировано в буфер обмена
 copy-your: Скопируйте свой
+country: Страна
 create-a-free-accoun: Создать бесплатный аккаунт
+created-at: Создан в
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
 custom-id-saved: Пользовательский идентификатор сохранен
-dashboard: Приборная доска
+dashboard: Панель приборов
 days: дни
 defined-as: Определяется как
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
 details-and-logs: Детали и журналы
-device:
-  channel: Ссылка на канал
-  created_at: Создано на
-  force_version: Принудительная версия
-  info: информация
-  last_update: Последнее обновление
-  link_channel: Канал связан с устройством
-  link_fail: Не могу связать что-то не так
-  link_version: версия привязана к устройству
-  no_channel: Нет канала, нажмите, чтобы добавить
-  no_override: Нет переопределения, нажмите, чтобы добавить
-  os_version: версия ОС
-  platform: Платформа
-  plugin_version: Версия плагина
-  title: Устройство
-  unlink_channel: Отменить связь канала с устройством
-  unlink_version: Отвязать версию от устройства
-  version: Версия
+device: Устройство
 device-id: Идентификатор устройства
-devices:
-  title: Устройства
+devices: Устройства
 devices-using-this-b: Устройства, использующие этот пакет
 disable-auto-downgra: Отключить автоматическое понижение версии под нативным
 disable-auto-upgrade: Отключить автоматическое обновление выше основного
+discord: Раздор
 discover-module-in-a: Откройте для себя модуль в Awesome-capacitor
 discover-your-dashbo: Откройте для себя панель инструментов!
 documentation: Документация
 dont-have-an-account: У вас нет аккаунта?
+download: Скачать
+email: Электронная почта
 email-address: Адрес электронной почты
 enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
 enter-your-new-passw: Введите новый пароль и подтвердите
-forgot:
-  check_email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
-  email: Эл. адрес
-  heading: Забыл пароль
-  success: Пароль успешно обновлен
+first-name: Имя
+force-version: Принудительная версия
+forgot-check-email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
+forgot-success: Пароль успешно обновлен
 from-device: с устройства
 good: Хороший
-id: я бы
+id: ИДЕНТИФИКАТОР
 in-your-main-file: В вашем основном файле
 in-your-project-fold: В папке вашего проекта
+info: Информация
 informations: Информация
 install-the-capacito: Установите плагин конденсатора
 into-your-app-folder: В папку вашего приложения.
-intro:
-  aka: Также известен как
-  desc: Самостоятельный начальный шаблон Vite
-  dynamic-route: Демо динамического маршрута
-  hi: Привет, {name}!
-  whats-your-name: Как тебя зовут?
 invalid-auth: недействительная авторизация
 is-emulator: Эмулятор
 is-production-app: Является производственным приложением
+last-name: Фамилия
+last-update: Последнее обновление
 last-upload: Последняя загрузка
 last-version: Последняя версия
+launch-bundle: Пакет запуска
 limit-reached: Достигнут предел
 loading-more-data: Загрузка дополнительных данных...
 log-in: Авторизоваться
 log-to-the-capgo-cli: Войдите в интерфейс командной строки Capgo
-login:
-  andpass: И пароль
-  connexion: Авторизоваться
-  create-new: Создать новый аккаунт
-  email: Эл. адрес
-  forgot: забыли
-  hello: Привет
-  login-in: Войти в систему
-  or: или
-  password: Пароль
-  withemail: С адресом электронной почты
-login-to-your-accoun: Вход в свой аккаунт
+login-to-your-accoun: Войдите в свой аккаунт
+logout: Выйти
 logs: Журналы
+lowerCaseError: Должен содержать строчные буквы
 make-normal: Сделать нормальным
 making-this-channel-: >-
   Чтобы сделать этот канал «обычным», вам потребуется настроить другой канал по
   умолчанию или позволить устройству назначать его самостоятельно.
-module:
-  heading: Модули
+module-heading: Модули
+monthly: Ежемесячно
 monthly-active-users: Ежемесячные активные пользователи
 more-version-storage: Дополнительная версия Хранение
 morning: утро
@@ -241,117 +171,50 @@ name: Имя
 need-more-contact-us: |-
   Нужно больше ? 
   Свяжитесь с нами для индивидуального плана
+no-channel-linked: Нет канала, нажмите, чтобы добавить
 no-devices: Нет устройств
 no-logs: Нет журналов
-not-found: Не найден
-notificationSettings:
-  heading: Настройки уведомлений
-  validate: Подтвердить
+no-version-linked: Нет версии, нажмите, чтобы добавить
+not-found: Не найдено
 notifications: Уведомления
-onboarding:
-  loading: Загрузка
 one-day-left: В один прекрасный день покинул
+open-channel: Открытый канал
 open-settings: Нажмите, чтобы открыть настройки
 open-sidebar: Открыть боковую панель
 open-this-link-to-le: Откройте эту ссылку, чтобы узнать, как протестировать обновление
-package:
-  cannot-delete-version: Не могу удалить версию
-  channels: каналы
-  device_list: Список устройств
-  devices: Посмотреть устройства
-  devices-list: Устройства связаны
-  download: Скачать версию
-  externally: хранится снаружи
-  link_channel: Ссылка на канал
-  link_version: Ссылка на версию
-  mobiles-stats: Мобильная статистика
-  name: Приложение
-  not_available: Пакет не найден
-  open: Открытый канал
-  set: Установить версию для канала
-  size_not_found: Не найдено
-  stats: статистика
-  test: Запустить версию
-  title: Информация
-  unset: Отвязать канал от группы
-  version:
-    is-used-in-device: используется в переопределении устройства, сначала отсоедините его
-  version-deleted: Версия удалена
-  versions: Версии
+os-version: версия ОС
 pages: Страницы
-password:
-  heading: Придумайте пароль
-  new: Новый пароль
-  validate: Подтвердить
-pckage:
-  version:
-    created-at: Создан в
-    is-used-in-channel: используется в канале, сначала отсоедините его
-    size: Размер
-personal-information: Персональная информация
-plan:
-  abtest: А/Б тестирование
-  application: Заявление
-  applications: Приложения
-  bandwidth: Пропускная способность в ГБ
-  buy: Купить
-  channel: Канал
-  channels: каналы
-  desc: |-
-    Начните строить бесплатно, а затем добавьте план, чтобы начать работу. 
-    Планы учетной записи открывают дополнительные функции.
-  free:
-    desc: Лучший для MVP и тестирования
-  maker:
-    desc: Лучшее для владельцев малого бизнеса
-  mau: Ежемесячные активные пользователи
-  monthly-billing: Ежемесячная оплата
-  payasyougo:
-    desc: Лучше всего подходит для масштабирования предприятий
-  pricing-plans: Тарифные планы
-  progressive_deploy: Прогрессивное развертывание
-  shared_channel: Общий канал
-  shared_channels: Общие каналы
-  solo:
-    desc: Лучшее для независимых разработчиков
-  storage: ГБ хранения
-  team:
-    desc: Лучшее для владельцев крупного бизнеса
-  update: Обновлять
-  updates: Обновления
-  version: Версия
-  versions: Версии
-  whats-included: Что включено
-  yearly-billing: Годовой биллинг
+password: Пароль
+password-heading: Придумайте пароль
+password-hint: Введите комбинацию не менее 6 цифр, букв и знаков препинания.
+password-new: Новый пароль
+personal-information: Личные сведения
+plan-abtest: А/Б тестирование
+plan-bandwidth: Пропускная способность в ГБ
+plan-buy: Купить
+plan-desc: |-
+  Начните строить бесплатно, а затем добавьте план, чтобы начать работу. 
+  Планы учетной записи открывают дополнительные функции.
 plan-inactive: План неактивен
 plan-is-the-best-pla: план - лучший план для ваших нужд.
+plan-mau: Ежемесячные активные пользователи
 plan-member: член плана.
+plan-pricing-plans: Тарифные планы
+plan-progressive-deploy: Прогрессивное развертывание
+plan-storage: ГБ хранения
+plan-updates: Обновления
+plan-whats-included: Что включено
 plans: Планы
+platform: Платформа
 please-choose-your-p: Пожалуйста, выберите ваши предпочтения
-please-upgrade: Обновите план, чтобы добавить больше пользователей
+please-upgrade: Обновите свой план, чтобы добавить больше пользователей
+plugin-version: Версия плагина
 pro-tip-you-can-copy: 'Совет: вы можете скопировать'
 projection: Прогнозы
-projects:
-  list: Ваш
-  sharedlist: Поделился со мной
-  title: Проекты
 refresh-this-page: Обновить эту страницу
-register:
-  already-account: У вас уже есть аккаунт?
-  check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
-  confirm-email: Подтвердите адрес электронной почты
-  confirm-password: Подтвердить Пароль
-  desc: Заполните следующие поля, чтобы завершить регистрацию
-  email: Эл. адрес
-  first-name: имя
-  heading: Регистрация
-  last-name: Фамилия
-  lowerCaseError: Должен содержать строчные буквы
-  next: Следующий
-  password: пароль
-  password-hint: Введите комбинацию не менее 6 цифр, букв и знаков препинания.
-  specialError: Должен содержать специальные символы
-  upperCaseError: Должен содержать заглавные буквы
+register-desc: Заполните следующие поля, чтобы завершить регистрацию
+register-heading: Постановка на учет
+register-next: регистр
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
 search: Поиск
@@ -361,53 +224,62 @@ search-by-name: Поиск по имени
 search-device: Поиск устройства
 search-user: Поиск пользователя
 see-usage: См. использование
-session_key: IvSessionKey
+session_key: ИвсессионКлюч
+set-bundle: Установить пакет на канал
 settings: Настройки
 shared-apps: Общие приложения
 sign-out: Выход
 size: Размер
+size-not-found: Не найдено
 something-went-wrong-try-again-later: |-
   Что-то пошло не так! 
   Попробуйте позже.
 special-api-access: Специальный доступ к API
+specialError: Должен содержать специальные символы
 start-using-capgo: Начните использовать Capgo!
-stats:
-  devices: Устройства
-  downloads: Загрузки
-  subtitle: Прошлый месяц
-  title: Статистика
-  versions: Версии
+stored-externally: хранится снаружи
 submit: Представлять на рассмотрение
+support: Поддерживать
 switch-to-all-device: Переключиться на все устройства
 switch-to-only-devic: Переключиться только на связанное устройство
 terms-of-use: Условия эксплуатации
 test-your-update-in-: Протестируйте обновление в своем приложении
 tests: тесты
 thank-you-for-choosi: Спасибо, что выбрали Капго!
-the: ''
 this-page-will-self-: Эта страница будет автоматически обновляться
-title: заглавие
+title: заголовок
 top-apps: Мои приложения
 trial-left: дней осталось
-trial-plan-expired: Срок действия пробного плана истек
-trial-plan-expires-in: Срок действия пробного плана истекает через
+trial-plan-expired: Пробная версия истекла
+trial-plan-expires-in: Испытание заканчивается через
 unlimited-updates: Неограниченные обновления
+unlink-bundle: Отключить группу
+unlink-channel: Отключить канал
+unlink-version: Отключить версию
+update: Обновлять
 updated-at: Обновлено в
 upgrade: Обновление
 upgrade-now: Обнови сейчас
+upperCaseError: Должен содержать заглавные буквы
 url: URL-адрес
-usage:
-  success: >-
-    Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
-    минут.
-  title: Общий
+usage-success: >-
+  Ваш тарифный план настроен, эта страница будет обновлена ​​через несколько
+  минут.
+usage-title: Общий
+user: Пользователь
+validate: Подтвердить
+version: Версия
 version-build: Сборка версии
 version-builtin: Встроенная версия
+version-linked: Ссылка на версию
+version-linking: Ссылка на комплект
+versions: Версии
 welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.
-you-reached-the-limi: Достигнуто ограничение
+you-reached-the-limi: Достигнут предел
 your-api-key: 'Ваш ключ API:'
 your-are-a: Вы
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'
+the: ''

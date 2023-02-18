@@ -22,6 +22,8 @@ export const useDisplayStore = defineStore('display', () => {
   const actionSheetCanceled = ref<boolean>(false)
   const showActionSheet = ref<boolean>(false)
   const showDialog = ref<boolean>(false)
+  const NavTitle = ref<string>('')
+  const defaultBack = ref<string>('')
   const messageToast = ref<string[]>([])
   const messageLoader = ref<string>('')
   const durationToast = ref<number>(2000)
@@ -65,6 +67,8 @@ export const useDisplayStore = defineStore('display', () => {
     showDialog,
     showActionSheet,
     showLoader,
+    NavTitle,
+    defaultBack,
   }
 })
 

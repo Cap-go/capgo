@@ -25,9 +25,9 @@ const rules = computed(() => ({
   password: {
     required,
     minLength: minLength(6),
-    containsUppercase: helpers.withMessage(t('register.upperCaseError'), containsUppercase),
-    containsLowercase: helpers.withMessage(t('register.lowerCaseError'), containsLowercase),
-    containsSpecial: helpers.withMessage(t('register.specialError'), containsSpecial),
+    containsUppercase: helpers.withMessage(t('upperCaseError'), containsUppercase),
+    containsLowercase: helpers.withMessage(t('lowerCaseError'), containsLowercase),
+    containsSpecial: helpers.withMessage(t('specialError'), containsSpecial),
   },
   confirmPassword: {
     required,
@@ -84,7 +84,7 @@ watchEffect(async () => {
 <template>
   <div class="w-full px-6 py-16 mx-auto lg:w-1/2">
     <h1 class="text-2xl font-bold">
-      {{ t('password.heading') }}
+      {{ t('password-heading') }}
     </h1>
     <form @submit.prevent="submit">
       <div v-if="errorMessage" class="text-center">
@@ -94,7 +94,7 @@ watchEffect(async () => {
       </div>
       <div class="ion-padding">
         <div>
-          <input v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password.new')" :required="true">
+          <input v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password-new')" :required="true">
           <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
           <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
         </div>
@@ -106,7 +106,7 @@ watchEffect(async () => {
       </div>
       <div class="ion-padding">
         <div class="ion-no-padding">
-          <input v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('register.confirm-password')" :required="true">
+          <input v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('confirm-password')" :required="true">
           <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
           <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
         </div>
@@ -134,7 +134,7 @@ watchEffect(async () => {
           />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <span v-if="!isLoading">{{ t('password.validate') }}</span>
+        <span v-if="!isLoading">{{ t('validate') }}</span>
       </button>
     </form>
   </div>

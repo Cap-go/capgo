@@ -26,15 +26,15 @@ const { t } = useI18n()
 
 const didCancel = async (name: string) => {
   displayStore.dialogOption = {
-    header: t('alert.confirm-delete'),
-    message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('button.delete'),
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -79,13 +79,13 @@ const showSize = () => {
   if (props.version.size)
     return bytesToMbText(props.version.size)
   else if (props.version.external_url)
-    return t('package.externally')
+    return t('stored-externally')
   else
-    return t('package.size_not_found')
+    return t('package.size-not-found')
 }
 
 const deleteVersion = async (version: Database['public']['Tables']['app_versions']['Row']) => {
-  if (await didCancel(t('device.version')))
+  if (await didCancel(t('version')))
     return
   try {
     const { data: channelFound, error: errorChannel } = await supabase
@@ -94,7 +94,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('version', version.id)
     if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.messageToast.push(`${t('device.version')} ${version.app_id}@${version.name} ${t('pckage.version.is-used-in-channel')}`)
+      displayStore.messageToast.push(`${t('version')} ${version.app_id}@${version.name} ${t('bundle-is-linked-channel')}`)
       return
     }
     const { data: deviceFound, error: errorDevice } = await supabase
@@ -103,7 +103,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('version', version.id)
     if ((deviceFound && deviceFound.length) || errorDevice) {
-      displayStore.messageToast.push(`${t('device.version')} ${version.app_id}@${version.name} ${t('package.version.is-used-in-device')}`)
+      displayStore.messageToast.push(`${t('version')} ${version.app_id}@${version.name} ${t('bundle-is-linked-device')}`)
       return
     }
     const { error: delError } = await supabase
@@ -116,15 +116,15 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('id', version.id)
     if (delAppError || delError) {
-      displayStore.messageToast.push(t('package.cannot-delete-version'))
+      displayStore.messageToast.push(t('cannot-delete-bundle'))
     }
     else {
-      displayStore.messageToast.push(t('package.version-deleted'))
+      displayStore.messageToast.push(t('bundle-deleted'))
       await refreshData()
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('package.cannot-delete-version'))
+    displayStore.messageToast.push(t('cannot-delete-bundle'))
   }
 }
 

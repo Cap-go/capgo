@@ -16,7 +16,7 @@ const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
 const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
   console.log('displayStore.messageToast', displayStore.messageToast)
-  displayStore.messageToast.push(t('apikeys.keyCopied'))
+  displayStore.messageToast.push(t('api-keys-key-copied'))
 }
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true

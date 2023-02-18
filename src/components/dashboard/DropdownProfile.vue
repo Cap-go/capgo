@@ -12,10 +12,6 @@ const props = defineProps({
     type: String,
     default: 'left',
   },
-  showName: {
-    type: Boolean,
-    default: false,
-  },
 })
 const { t } = useI18n()
 
@@ -67,7 +63,7 @@ onUnmounted(() => {
       <div v-else class="flex items-center justify-center w-8 h-8 border border-white rounded-full">
         <p>{{ acronym }}</p>
       </div>
-      <div v-if="showName" class="flex items-center truncate">
+      <div class="items-center hidden truncate md:flex">
         <span class="ml-2 text-sm font-medium truncate group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
         <svg class="w-3 h-3 ml-1 fill-current shrink-0 text-slate-400" viewBox="0 0 12 12">
           <path d="M5.9 11.4L.5 6l1.4-1.4 4 4 4-4L11.3 6z" />
@@ -104,18 +100,18 @@ onUnmounted(() => {
           </li>
           <li v-if="isMobile">
             <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/app/modules" @click="dropdownOpen = false">
-              {{ t('module.heading') }}
+              {{ t('module-heading') }}
             </router-link>
           </li>
           <li v-if="isMobile">
             <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/app/modules_test" @click="dropdownOpen = false">
-              {{ t('module.heading') }} {{ t('tests') }}
+              {{ t('module-heading') }} {{ t('tests') }}
             </router-link>
           </li>
           <hr>
           <li>
             <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="openChat">
-              {{ t('account.support') }}
+              {{ t('support') }}
             </button>
           </li>
           <hr>

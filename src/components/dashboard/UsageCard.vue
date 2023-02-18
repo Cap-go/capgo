@@ -51,7 +51,7 @@ const lastDayEvolution = computed(() => {
       </div>
 
       <div class="mb-1 text-xs font-semibold uppercase dark:text-white text-slate-400">
-        {{ t('usage.title') }}
+        {{ t('usage-title') }}
       </div>
       <div class="flex items-start">
         <div class="mr-2 text-3xl font-bold dark:text-white text-slate-800">

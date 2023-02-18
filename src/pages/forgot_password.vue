@@ -59,7 +59,7 @@ const submit = async () => {
     }, 5000)
     if (error)
       showToastMessage(error.message)
-    else showToastMessage(t('forgot.check_email'))
+    else showToastMessage(t('forgot-check-email'))
   }
   else if (step.value === 2 && route.hash) {
     const queryString = route.hash.replace('#', '')
@@ -83,7 +83,7 @@ const submit = async () => {
       showToastMessage(error.message)
     }
     else {
-      showToastMessage(t('forgot.success'))
+      showToastMessage(t('forgot-success'))
       await supabase.auth.signOut()
       router.push('/login')
     }
@@ -145,13 +145,13 @@ watchEffect(() => {
                         name="email"
                         type="email"
                         :disabled="isLoading"
-                        :placeholder="t('login.email')"
+                        :placeholder="t('email')"
                         :required="true"
                         class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                       >
                       <div v-for="(error, index) of v$.email?.$errors" :key="index">
                         <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                          {{ t('login.email') }}: {{ error.$message }}
+                          {{ t('email') }}: {{ error.$message }}
                         </p>
                       </div>
                     </div>
@@ -171,14 +171,14 @@ watchEffect(() => {
                       </div>
 
                       <input
-                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " :required="true"
+                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('password') " :required="true"
                         class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                       >
                     </div>
                     <div>
                       <div v-for="(error, index) of v$.password?.$errors" :key="index">
                         <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                          {{ t('login.password') }}: {{ error.$message }}
+                          {{ t('password') }}: {{ error.$message }}
                         </p>
                       </div>
                     </div>
@@ -198,14 +198,14 @@ watchEffect(() => {
                       </div>
 
                       <input
-                        id="passwordInput2" v-model="form.repeatPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" :type="showPassword2 ? 'text' : 'password'" :placeholder="t('register.confirm-password') " :required="true"
+                        id="passwordInput2" v-model="form.repeatPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" :type="showPassword2 ? 'text' : 'password'" :placeholder="t('confirm-password') " :required="true"
                         class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                       >
                     </div>
                     <div>
                       <div v-for="(error, index) of v$.password?.$errors" :key="index">
                         <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                          {{ t('login.password') }}: {{ error.$message }}
+                          {{ t('password') }}: {{ error.$message }}
                         </p>
                       </div>
                     </div>

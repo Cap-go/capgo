@@ -148,13 +148,13 @@ onMounted(checkLogin)
                       name="email"
                       type="email"
                       :disabled="isLoading"
-                      :placeholder="t('login.email')"
+                      :placeholder="t('email')"
                       :required="true"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                     >
                     <div v-for="(error, index) of v$.email.$errors" :key="index">
                       <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                        {{ t('login.email') }}: {{ error.$message }}
+                        {{ t('email') }}: {{ error.$message }}
                       </p>
                     </div>
                   </div>
@@ -162,12 +162,12 @@ onMounted(checkLogin)
 
                 <div>
                   <div class="flex items-center justify-between">
-                    <label for="" class="text-base font-medium text-gray-900"> {{ t('register.password') }} </label>
+                    <label for="" class="text-base font-medium text-gray-900"> {{ t('password') }} </label>
                     <router-link
                       to="/forgot_password"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 focus:text-orange-600 hover:underline"
                     >
-                      {{ t('login.forgot') }} {{ t('login.password') }} ?
+                      {{ t('forgot') }} {{ t('password') }} ?
                     </router-link>
                   </div>
                   <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
@@ -183,14 +183,14 @@ onMounted(checkLogin)
                     </div>
 
                     <input
-                      id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('login.password') " :required="true"
+                      id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('password') " :required="true"
                       class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                     >
                   </div>
                   <div>
                     <div v-for="(error, index) of v$.password.$errors" :key="index">
                       <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                        {{ t('login.password') }}: {{ error.$message }}
+                        {{ t('password') }}: {{ error.$message }}
                       </p>
                     </div>
                   </div>

@@ -115,7 +115,7 @@ watch(sidebarExpanded, () => {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <i-ion-logo-discord class="w-6 text-2xl text-slate-400" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100">{{ t('account.discord') }}</span>
+                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100">{{ t('discord') }}</span>
                   </div>
                 </div>
               </a>
