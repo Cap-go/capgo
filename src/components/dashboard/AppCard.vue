@@ -135,10 +135,10 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
+  <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
     <td class="p-2">
-      <div class="flex flex-wrap items-center">
-        <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
+      <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
+        <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
         <div class="max-w-max">
           {{ props.app.name }}
         </div>

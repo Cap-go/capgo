@@ -12,7 +12,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div id="my_apps" class="bg-white border rounded-sm shadow-lg col-span-full xl:col-span-16 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+  <div id="my_apps" class="bg-white border rounded-lg shadow-lg col-span-full xl:col-span-16 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <header class="px-5 py-4 border-b border-slate-100">
       <h2 class="font-semibold text-slate-800 dark:text-white">
         {{ t('top-apps') }}
@@ -20,7 +20,7 @@ const { t } = useI18n()
     </header>
     <div class="">
       <!-- Table -->
-      <div class="hidden md:block overflow-x-auto p-3">
+      <div class="hidden p-3 overflow-x-auto md:block">
         <table class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="text-xs uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
@@ -55,7 +55,7 @@ const { t } = useI18n()
           </tbody>
         </table>
       </div>
-      <k-list class="md:hidden w-full my-0">
+      <k-list class="w-full my-0 md:hidden">
         <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :app="app" channel="" @reload="emit('reload')" />
       </k-list>
     </div>
