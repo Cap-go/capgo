@@ -136,7 +136,7 @@ watchEffect(async () => {
 <template>
   <!-- Row -->
   <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
         <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
         <div class="max-w-max">
@@ -144,17 +144,17 @@ watchEffect(async () => {
         </div>
       </div>
     </td>
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div class="text-center">
         {{ props.app.last_version }}
       </div>
     </td>
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div class="text-center">
         {{ formatDate(props.app.updated_at || "") }}
       </div>
     </td>
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div v-if="!isLoading && !props.channel" class="text-center">
         {{ devicesNb }}
       </div>
@@ -162,9 +162,9 @@ watchEffect(async () => {
         {{ props.channel }}
       </div>
     </td>
-    <td v-if="!channel" class="p-2" @click.stop="deleteApp(app)">
+    <td class="w-1/4 p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
-        <IconTrash class="text-lg text-red-600" />
+        <IconTrash v-if="!channel" class="mr-4 text-lg text-red-600" />
       </div>
     </td>
   </tr>

@@ -25,27 +25,27 @@ const { t } = useI18n()
           <!-- Table header -->
           <thead class="text-xs uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
             <tr>
-              <th class="p-2">
+              <th class="w-1/4 p-2">
                 <div class="font-semibold text-left">
                   {{ t('name') }}
                 </div>
               </th>
-              <th class="p-2">
+              <th class="w-1/4 p-2">
                 <div class="font-semibold text-center">
                   {{ t('last-version') }}
                 </div>
               </th>
-              <th class="p-2">
+              <th class="w-1/4 p-2">
                 <div class="font-semibold text-center">
                   {{ t('last-upload') }}
                 </div>
               </th>
-              <th class="p-2">
+              <th class="w-1/4 p-2">
                 <div class="font-semibold text-center">
                   {{ t('MAU') }}
                 </div>
               </th>
-              <th class="p-2" />
+              <th class="w-1/4 p-2" />
             </tr>
           </thead>
           <!-- Table body -->
