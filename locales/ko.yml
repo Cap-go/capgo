@@ -139,6 +139,7 @@ into-your-app-folder: 앱 폴더에.
 invalid-auth: 유효하지 않은 인증
 is-emulator: 에뮬레이터임
 is-production-app: 프로덕션 앱
+key-copied: 클립보드에 복사된 키
 last-name: 성
 last-update: 마지막 업데이트
 last-upload: 마지막 업로드

@@ -139,6 +139,7 @@ into-your-app-folder: アプリ フォルダーに移動します。
 invalid-auth: 無効な認証
 is-emulator: エミュレータです
 is-production-app: 本番アプリです
+key-copied: クリップボードにコピーされたキー
 last-name: 苗字
 last-update: 最後の更新
 last-upload: 最後のアップロード

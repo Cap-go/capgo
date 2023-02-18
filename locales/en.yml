@@ -1,16 +1,9 @@
 Bandwidth: Bandwidth
 MAU: Monthly active users
 Storage: Storage
-are-u-sure: Are you sure ?
-discord: Discord
-billing: Billing
-logout: Logout
-support: Support
-account-settings: Account Settings
-account-password-heading: Change my password
 account-password-error: Error happened, please try again
-country: Country
-update: Update
+account-password-heading: Change my password
+account-settings: Account Settings
 action: Action
 activation-desc: Fill the following fields to complete your registration
 activation-doi: Optional consent
@@ -22,6 +15,7 @@ activation-legal-desc: I accept Capgo app privacy policy and terms of use
 activation-notification: Notifications
 activation-notification-desc: I accept to receive notification when new app version are available
 activation-validate: Validate
+add: Add
 add-another-app: Add your app
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
@@ -34,18 +28,28 @@ alert-not-reverse-message: This action is not reversible
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
+already-account: You already have an account?
 api-key: API key
 api-keys: API Keys
 api-keys-key-copied: API Keys
+app: App
 app-deleted: App deleted
 app-id-example: App ID example
+app-not-found: App not found
+are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
 bigger-app-size: Bigger app size
+billing: Billing
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
+bundle: Bundle
+bundle-deleted: Bundle deleted
+bundle-is-linked-channel: Bundle is linked in channel, unlink it first
+bundle-is-linked-device: Bundle is linked in device, unlink it first
 bundle-number: Bundle number
+bundles: Bundles
 button-about: About
 button-back: Back
 button-browse: Browse
@@ -63,29 +67,35 @@ by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
+cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
 cannot-save-custom-i: Cannot save custom ID
 cannot-test-app-some: Cannot test app something wrong happened
 change: Change
 changed-password-suc: Password changed successfully
-add: Add
+channel: Channel
+channel-deleted: Channel deleted
+channel-invit: Type email to invite
+channel-is-public: Channel is public
+channel-link: Channel link
+channel-link-fail: Cannot link channel something wrong happened
+channel-linked: Channel linked
+channel-linking: Link to channel
+channel-make-now: Make default
+channels: Channels
+check-email: Please check your email and verify
+checksum: Checksum
+commands: commands
+confirm-email: Confirm your email
+confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
   Others default channels will not be default anymore.
-# device: Device
-info: Information
-channel-invit: Type email to invite
-channel-is-public: Channel is public
-channel-make-now: Make default
-user: User
-channel: Channel
-channel-deleted: Channel deleted
-channels: Channels
-checksum: Checksum
-commands: commands
 copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
+country: Country
 create-a-free-accoun: Create a free account
+created-at: Created at
 custom-domain: Custom domain
 custom-id: Custom ID
 custom-id-saved: Custom ID saved
@@ -96,33 +106,24 @@ defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
 details-and-logs: Details and logs
-channel-link: Channel link
-version-linked: Version link
-channel-linked: Channel linked
-no-channel-linked: No channel, click to add
-no-version-linked: No version, click to add
-channel-link-fail: Cannot link channel something wrong happened
-created-at: Created at
-force-version: Force version
-last-update: Last update
-os-version: OS version
-platform: Platform
-plugin-version: Plugin version
-unlink-channel: Unlink channel
-unlink-version: Unlink version
 device: Device
 device-id: Device ID
 devices: Devices
 devices-using-this-b: Devices using this bundle
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
+discord: Discord
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
 dont-have-an-account: Don’t have an account?
+download: Download
+email: Email
 email-address: Email address
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
+first-name: First name
+force-version: Force version
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from-device: from device
@@ -130,25 +131,34 @@ good: Good
 id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
+info: Information
 informations: Informations
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: invalid auth
 is-emulator: Is Emulator
 is-production-app: Is Production app
+key-copied: Key copied in your clipboard
+last-name: Last name
+last-update: Last update
 last-upload: Last upload
 last-version: Last version
+launch-bundle: Launch bundle
 limit-reached: Limit reached
 loading-more-data: Loading more data...
 log-in: Log in
 log-to-the-capgo-cli: Log to the Capgo CLI
 login-to-your-accoun: Login to your account
+logout: Logout
 logs: Logs
+lowerCaseError: Should contain lowercase letters
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
+mau: Monthly active users
 module-heading: Modules
+monthly: Monthly
 monthly-active-users: Monthly active users
 more-version-storage: More version Storage
 morning: morning
@@ -156,35 +166,23 @@ my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+no-channel-linked: No channel, click to add
 no-devices: No devices
 no-logs: No logs
+no-version-linked: No version, click to add
 not-found: Not found
 notifications: Notifications
 one-day-left: One day left
+open-channel: Open channel
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
-cannot-delete-bundle: Cannot delete bundle
-download: Download
-stored-externally: stored externally
-channel-linking: Link to channel
-version-linking: Link to bundle
-app: App
-app-not-found: App not found
-open-channel: Open channel
-set-bundle: Set bundle to channel
-size-not-found: Not found
-launch-bundle: Launch bundle
-bundle: Bundle
-unlink-bundle: Unlink bundle
-bundle-is-linked-channel: Bundle is linked in channel, unlink it first
-bundle-is-linked-device: Bundle is linked in device, unlink it first
-bundle-deleted: Bundle deleted
-bundles: Bundles
+os-version: OS version
 pages: Pages
+password: Password
 password-heading: Create Password
+password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
-validate: Validate
 personal-information: Personal Informations
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
@@ -192,37 +190,24 @@ plan-buy: Buy
 plan-desc: >-
   Start building for free, then add a plan to go live. Account plans unlock
   additional features.
-mau: Monthly active users
-monthly: Monthly
-yearly: Yearly
+plan-inactive: Plan inactive
+plan-is-the-best-pla: plan is the best plan for your needs.
+plan-member: plan member.
 plan-pricing-plans: Pricing Plans
 plan-progressive-deploy: Progressive deploy
 plan-storage: GB Storage
 plan-updates: Updates
 plan-whats-included: What's included
-plan-inactive: Plan inactive
-plan-is-the-best-pla: plan is the best plan for your needs.
-plan-member: plan member.
 plans: Plans
+platform: Platform
 please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
+plugin-version: Plugin version
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 projection: Projections
 refresh-this-page: Refresh this page
-already-account: You already have an account?
-check-email: Please check your email and verify
-confirm-email: Confirm your email
-confirm-password: Confirm password
-password: Password
-password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
-specialError: Should contain special characters
-upperCaseError: Should contain uppercase letters
-email: Email
-last-name: Last name
-first-name: First name
 register-desc: Fill the following fields to complete your registration
 register-heading: Registration
-lowerCaseError: Should contain lowercase letters
 register-next: Register
 reset-password: Reset Password
 reset-your-password: Reset your password
@@ -234,14 +219,19 @@ search-device: Search device
 search-user: Search User
 see-usage: See usage
 session_key: IvSessionKey
+set-bundle: Set bundle to channel
 settings: Settings
 shared-apps: Shared Apps
 sign-out: Sign Out
 size: Size
+size-not-found: Not found
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
+specialError: Should contain special characters
 start-using-capgo: Start using Capgo !
+stored-externally: stored externally
 submit: Submit
+support: Support
 switch-to-all-device: Switch to all devices
 switch-to-only-devic: Switch to only device linked
 terms-of-use: Terms of Use
@@ -256,18 +246,28 @@ trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
 unlimited-updates: Unlimited updates
+unlink-bundle: Unlink bundle
+unlink-channel: Unlink channel
+unlink-version: Unlink version
+update: Update
 updated-at: Updated at
 upgrade: Upgrade
 upgrade-now: Upgrade now
+upperCaseError: Should contain uppercase letters
 url: URL
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
+user: User
+validate: Validate
 version: Version
 version-build: Version build
 version-builtin: Version builtin
+version-linked: Version link
+version-linking: Link to bundle
 versions: Versions
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
+yearly: Yearly
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-api-key: 'Your API key:'

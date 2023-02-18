@@ -139,6 +139,7 @@ into-your-app-folder: 进入您的应用程序文件夹。
 invalid-auth: 无效授权
 is-emulator: 是模拟器
 is-production-app: 是生产应用
+key-copied: 复制到剪贴板的密钥
 last-name: 姓
 last-update: 最后更新
 last-upload: 最后上传

@@ -143,6 +143,7 @@ into-your-app-folder: В папку вашего приложения.
 invalid-auth: недействительная авторизация
 is-emulator: Эмулятор
 is-production-app: Является производственным приложением
+key-copied: Ключ скопирован в буфер обмена
 last-name: Фамилия
 last-update: Последнее обновление
 last-upload: Последняя загрузка

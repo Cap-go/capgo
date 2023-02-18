@@ -23,7 +23,7 @@ const sidebarOpen = ref(false)
           <div class="mb-8">
             <!-- Title -->
             <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
-              {{ t('settings') }} ⚙️
+              {{ t('settings') }}
             </h1>
           </div>
 

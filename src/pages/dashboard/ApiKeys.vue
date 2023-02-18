@@ -16,7 +16,7 @@ const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
 const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
   console.log('displayStore.messageToast', displayStore.messageToast)
-  displayStore.messageToast.push(t('api-keys-key-copied'))
+  displayStore.messageToast.push(t('key-copied'))
 }
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true
@@ -41,30 +41,14 @@ geKeys()
     <div class="mb-8">
       <!-- Title -->
       <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
-        {{ t('api-keys') }} 🔑
+        {{ t('api-keys') }}
       </h1>
     </div>
-
-    <!-- Content -->
-    <div class="h-full mb-8 overflow-y-scroll bg-white rounded-sm shadow-lg dark:bg-gray-800 dark:text-white max-h-fit">
-      <div class="flex flex-col md:flex-row md:-mr-px">
-        <div class="grow">
-          <!-- Panel body -->
-          <div class="p-6 space-y-6">
-            <!-- API Keys -->
-            <section>
-              <div v-for="app in apps" :key="app.id" class="mb-2 space-y-2 cursor-pointer" @click="copyKey(app)">
-                <div>
-                  <label class="block mb-1 text-lg font-medium" for="location">{{ app.mode.toUpperCase() }} :</label>
-                  <p class="font-bold">
-                    {{ app.key }}
-                  </p>
-                </div>
-                <hr class="border-muted-blue-600 dark:border-white">
-              </div>
-            </section>
-          </div>
-        </div>
+    <div class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <dl class="divide-y divide-gray-500">
+          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="copyKey(app)" />
+        </dl>
       </div>
     </div>
   </div>
