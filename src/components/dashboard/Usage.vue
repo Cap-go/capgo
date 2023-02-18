@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase } from '~/services/supabase'
@@ -14,8 +13,6 @@ import { bytesToGb } from '~/services/conversion'
 const props = defineProps({
   appId: { type: String, default: '' },
 })
-
-const router = useRouter()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
