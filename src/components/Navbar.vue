@@ -61,7 +61,7 @@ const { t } = useI18n()
           </div>
         </div>
       </div>
+      <Banner />
     </header>
-    <Banner />
   </div>
 </template>
