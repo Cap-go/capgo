@@ -191,7 +191,7 @@ plan-desc: |-
   アカウント プランは、追加機能のロックを解除します。
 plan-inactive: プランの非アクティブ
 plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。
-plan-mau: 月間アクティブ ユーザー数
+mau: 月間アクティブ ユーザー数
 plan-member: 企画メンバー。
 plan-pricing-plans: 料金プラン
 plan-progressive-deploy: プログレッシブ デプロイ

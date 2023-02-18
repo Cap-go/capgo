@@ -192,7 +192,7 @@ plan-buy: Buy
 plan-desc: >-
   Start building for free, then add a plan to go live. Account plans unlock
   additional features.
-plan-mau: Monthly active users
+mau: Monthly active users
 monthly: Monthly
 plan-pricing-plans: Pricing Plans
 plan-progressive-deploy: Progressive deploy

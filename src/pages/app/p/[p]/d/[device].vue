@@ -382,16 +382,15 @@ watchEffect(async () => {
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('device-id')" :value="device.device_id" />
             <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
-            <InfoRow v-if="created-at" :label="t('created-at')" :value="formatDate(created-at)" />
+            <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
             <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
-            <InfoRow v-if="platform" :label="t('platform')" :value="platform" />
-            <InfoRow v-if="plugin-version" :label="t('plugin-version')" :value="plugin-version" />
+            <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
+            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
             <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
             <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
-            <InfoRow v-if="os-version" :label="t('os-version')" :value="os-version" />
-            <InfoRow v-if="minVersion(plugin-version) && os-version" :label="t('is-emulator')" :value="os-version?.toString()" />
-            <InfoRow v-if="minVersion(plugin-version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
-            <InfoRow v-if="minVersion(plugin-version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
+            <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
             <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
             <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
           </dl>

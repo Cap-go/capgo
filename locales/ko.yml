@@ -191,7 +191,7 @@ plan-desc: |-
   계정 계획은 추가 기능을 잠금 해제합니다.
 plan-inactive: 비활성 계획
 plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.
-plan-mau: 월간 활성 사용자
+mau: 월간 활성 사용자
 plan-member: 계획 회원.
 plan-pricing-plans: 요금제
 plan-progressive-deploy: 점진적 배포

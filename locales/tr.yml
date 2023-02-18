@@ -199,7 +199,7 @@ plan-desc: >-
   Hesap planları ek özelliklerin kilidini açar.
 plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
-plan-mau: Aylık aktif kullanıcılar
+mau: Aylık aktif kullanıcılar
 plan-member: plan üyesi.
 plan-pricing-plans: Fiyatlandırma Planları
 plan-progressive-deploy: aşamalı dağıtım

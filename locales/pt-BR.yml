@@ -197,7 +197,7 @@ plan-desc: |-
   Os planos de conta desbloqueiam recursos adicionais.
 plan-inactive: Plano inativo
 plan-is-the-best-pla: plan é o melhor plano para as suas necessidades.
-plan-mau: Usuários ativos mensais
+mau: Usuários ativos mensais
 plan-member: membro do plano.
 plan-pricing-plans: Planos de preços
 plan-progressive-deploy: implantação progressiva

@@ -42,7 +42,7 @@ const main = useMainStore()
 const displayStore = useDisplayStore()
 
 const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
-  `${plan - mau.toLocaleString()} ${t('plan-mau')}`,
+  `${plan - mau.toLocaleString()} ${t('mau')}`,
   `${plan - storage.toLocaleString()} ${t('plan-storage')}`,
   `${plan - bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
   plan - abtest ? t('plan-abtest') : false,

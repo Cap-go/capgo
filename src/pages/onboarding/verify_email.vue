@@ -2,7 +2,6 @@
 import type { User } from '@supabase/gotrue-js'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { kPage } from 'konsta/vue'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { useMainStore } from '~/stores/main'

@@ -28,7 +28,7 @@ const openDevice = async () => {
     </td>
     <td class="p-2">
       <div class="text-left">
-        {{ props.platform }}
+        {{ props.device.platform }}
       </div>
     </td>
     <td class="p-2">
@@ -52,7 +52,7 @@ const openDevice = async () => {
     link
     class="md:hidden"
     :title="props.device.device_id"
-    :subtitle="props.platform || ''"
+    :subtitle="props.device.platform || ''"
     @click="openDevice()"
   />
 </template>

@@ -205,7 +205,7 @@ plan-desc: |-
   Les plans de compte débloquent des fonctionnalités supplémentaires.
 plan-inactive: Forfait inactif
 plan-is-the-best-pla: plan est le meilleur plan pour vos besoins.
-plan-mau: Utilisateurs actifs mensuels
+mau: Utilisateurs actifs mensuels
 plan-member: membre du régime.
 plan-pricing-plans: Forfaits tarifaires
 plan-progressive-deploy: Déploiement progressif

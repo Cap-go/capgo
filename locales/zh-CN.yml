@@ -191,7 +191,7 @@ plan-desc: |-
   帐户计划解锁附加功能。
 plan-inactive: 计划无效
 plan-is-the-best-pla: 计划是满足您需求的最佳计划。
-plan-mau: 月活跃用户
+mau: 月活跃用户
 plan-member: 计划成员。
 plan-pricing-plans: 定价计划
 plan-progressive-deploy: 渐进式部署
