@@ -35,7 +35,7 @@ const planCurrrent = ref('')
 const planPercent = ref(0)
 const snag = useLogSnag()
 const isLoading = ref(false)
-const segmentVal = ref<'m' | 'y'>('m')
+const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
@@ -63,6 +63,10 @@ const showToastMessage = async (message: string) => {
 
 const getPrice = (plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number => {
   return plan[t === 'm' ? 'price_m' : 'price_y']
+}
+
+const getSale = (plan: Database['public']['Tables']['plans']['Row']): string => {
+  return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 }
 
 const getUsages = async () => {
@@ -178,6 +182,7 @@ watchEffect(async () => {
               <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ isYearly ? 'yr' : 'mo' }}</span>
             </p>
+            <span v-if="isYearly" class="ml-3 text-md font-semibold text-white px-1.5 bg-emerald-500 rounded-full"> {{ getSale(p) }} </span>
             <button v-if="p.stripe_id !== 'free'" class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white bg-gray-800 border border-gray-800 rounded-md dark:bg-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:dark:bg-gray-400" :disabled="currentPlan?.name === p.name" @click="openChangePlan(p.stripe_id)">
               {{ t('plan-buy') }} {{ p.name }}
             </button>
