@@ -35,10 +35,10 @@ const { t } = useI18n()
           <!-- Header: Left side -->
           <div class="flex">
             <div v-if="displayStore.NavTitle" class="pr-2">
-              <div class="flex" @click="back()">
+              <button class="flex" @click="back()">
                 <IconBack class="w-6 h-6 fill-current text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50" />
                 <span class="text-dark dark:text-white">{{ t('button-back') }}</span>
-              </div>
+              </button>
             </div>
             <!-- Hamburger button -->
             <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
