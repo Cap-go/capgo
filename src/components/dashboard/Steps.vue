@@ -190,22 +190,22 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-scroll bg-gray-50 sm:py-16 lg:py-20 max-h-fit">
+  <section class="h-full py-12 overflow-y-scroll bg-gray-50 dark:bg-gray-900 sm:py-16 lg:py-20 max-h-fit">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div v-if="props.onboarding" class="text-center">
-        <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-50 sm:text-4xl xl:text-5xl font-pj">
           {{ t('start-using-capgo') }}
         </h2>
-        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
+        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 dark:text-gray-200 font-pj">
           {{ t('add-your-first-app-t') }}
         </p>
-        <p class="mx-auto mt-2 font-normal text-md text-muted-blue-300 font-pj">
+        <p class="mx-auto mt-2 font-normal text-md text-muted-blue-300 dark:text-muted-blue-50 font-pj">
           {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
         </p>
       </div>
 
       <div v-else class="text-center">
-        <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-50 sm:text-4xl xl:text-5xl font-pj">
           {{ t('add-another-app') }}
         </h2>
       </div>
