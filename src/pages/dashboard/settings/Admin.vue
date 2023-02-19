@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { kPreloader } from 'konsta/vue'
 import useVuelidate from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import { useRoute } from 'vue-router'
@@ -31,6 +30,8 @@ const setLogAs = (id: string) => {
   }, 1000)
 }
 const submit = async () => {
+  if (!isLoading.value)
+    return
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect)
@@ -49,6 +50,8 @@ if (route.path.includes('/admin')) {
   }
 }
 const reset = () => {
+  if (isLoading.value)
+    return
   isLoading.value = true
   if (!unspoofUser()) {
     isLoading.value = false
@@ -103,7 +106,6 @@ const reset = () => {
           <div class="flex self-end">
             <button
               class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
-              :disabled="isLoading"
               type="submit"
               color="secondary"
               shape="round"
@@ -111,12 +113,11 @@ const reset = () => {
               <span v-if="!isLoading" class="rounded-4xl">
                 Spoof
               </span>
-              <k-preloader v-else size="w-16 h-16" />
+              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>
             <button
               v-if="oldId"
               class="p-2 ml-3 text-white bg-red-500 rounded btn hover:bg-red-600"
-              :disabled="isLoading"
               color="secondary"
               shape="round"
               @click="reset()"
@@ -124,7 +125,7 @@ const reset = () => {
               <span v-if="!isLoading" class="rounded-4xl">
                 Reset
               </span>
-              <k-preloader v-else size="w-16 h-16" />
+              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>
           </div>
         </div>

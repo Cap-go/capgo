@@ -39,6 +39,8 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 
 const submit = async () => {
+  if (!isLoading.value)
+    return
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect)
@@ -106,7 +108,6 @@ const submit = async () => {
           <div class="flex self-end">
             <button
               class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
-              :disabled="isLoading"
               type="submit"
               color="secondary"
               shape="round"
@@ -114,7 +115,7 @@ const submit = async () => {
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('update') }}
               </span>
-              <k-preloader v-else size="w-16 h-16" />
+              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>
           </div>
         </div>

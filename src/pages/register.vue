@@ -1,8 +1,4 @@
 <script setup lang="ts">
-import {
-  kPreloader,
-} from 'konsta/vue'
-
 import { useVuelidate } from '@vuelidate/core'
 import { email, helpers, minLength, required, sameAs } from '@vuelidate/validators'
 import { useRouter } from 'vue-router'
@@ -52,6 +48,8 @@ const rules = computed(() => ({
 const v$ = useVuelidate(rules, form)
 
 const submit = async () => {
+  if (!isLoading.value)
+    return
   // console.log('submit')
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
@@ -253,7 +251,7 @@ const submit = async () => {
                     <span v-if="!isLoading" class="rounded-4xl">
                       {{ t("register-next") }}
                     </span>
-                    <k-preloader v-else size="w-16 h-16" />
+                    <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
                   </button>
                 </div>
 

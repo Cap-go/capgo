@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
-import {
-  kPreloader,
-} from 'konsta/vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -212,6 +209,8 @@ const rules = computed(() => ({
 const v$ = useVuelidate(rules, form)
 
 const submit = async () => {
+  if (!isLoading.value)
+    return
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect || !main.user?.id || !form.email) {
@@ -370,7 +369,6 @@ watchEffect(async () => {
             </button>
             <button
               class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
-              :disabled="isLoading"
               type="submit"
               color="secondary"
               shape="round"
@@ -378,7 +376,7 @@ watchEffect(async () => {
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('update') }}
               </span>
-              <k-preloader v-else size="w-16 h-16" />
+              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>
           </div>
         </div>

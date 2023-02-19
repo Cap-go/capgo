@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  kPreloader,
   kToggle,
 } from 'konsta/vue'
 import { PushNotifications } from '@capacitor/push-notifications'
@@ -26,6 +25,8 @@ const router = useRouter()
 const { t } = useI18n()
 
 const submit = async () => {
+  if (!isLoading.value)
+    return
   isLoading.value = true
   if (Capacitor.isNativePlatform() && form.enableNotifications)
     await PushNotifications.requestPermissions()
@@ -111,7 +112,7 @@ const submit = async () => {
                 <span v-if="!isLoading">
                   {{ t('activation-validate') }}
                 </span>
-                <k-preloader size="w-16 h-16" />
+                <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
               </button>
             </form>
           </div>
