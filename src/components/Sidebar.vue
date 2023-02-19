@@ -7,6 +7,7 @@ import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconApiKey from '~icons/mdi/shield-key'
 import IconDiscord from '~icons/ic/round-discord'
 import IconDoc from '~icons/gg/loadbar-doc'
+import IconExpand from '~icons/mdi/arrow-expand-right'
 
 const props = defineProps < {
   sidebarOpen: boolean
@@ -43,11 +44,11 @@ const isTabActive = (tab: string) => {
     <div
       id="sidebar"
       ref="sidebar"
-      class="flex flex-col absolute z-40 left-0-safe top-0-safe lg:static lg:left-auto lg:top-auto lg:translate-x-0 min-h-screen h-full overflow-y-scroll lg:overflow-y-auto no-scrollbar w-64 lg:w-20 lg:sidebar-expanded:!w-64 2xl:!w-64 shrink-0 bg-slate-800 transition-all duration-200 ease-in-out"
+      class="flex flex-col absolute z-40 left-0-safe top-0-safe lg:static lg:left-auto lg:top-auto lg:translate-x-0 min-h-screen h-full overflow-y-scroll lg:overflow-y-auto no-scrollbar w-64 lg:w-14 lg:sidebar-expanded:!w-64 2xl:!w-64 shrink-0 bg-slate-800 transition-all duration-200 ease-in-out"
       :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between pr-3 mx-10 mt-4 mb-10 sm:px-2">
+      <div class="flex justify-between pr-3 mt-4 mb-10 sidebar-expanded:mx-10 sm:px-2">
         <!-- Close button -->
         <button
           ref="trigger"
@@ -131,10 +132,7 @@ const isTabActive = (tab: string) => {
         <div class="px-3 py-2">
           <button @click.prevent="sidebarExpanded = !sidebarExpanded">
             <span class="sr-only">Expand / collapse sidebar</span>
-            <svg class="w-6 h-6 fill-current sidebar-expanded:rotate-180" viewBox="0 0 24 24">
-              <path class="text-slate-400" d="M19.586 11l-5-5L16 4.586 23.414 12 16 19.414 14.586 18l5-5H7v-2z" />
-              <path class="text-slate-600" d="M3 23H1V1h2z" />
-            </svg>
+            <IconExpand class="w-6 h-6 fill-current sidebar-expanded:rotate-180" />
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import UserMenu from '../components/dashboard/DropdownProfile.vue'
 import Banner from './Banner.vue'
 import { useDisplayStore } from '~/stores/display'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
+import IconMenu from '~icons/material-symbols/menu-rounded'
 
 const props = defineProps({
   sidebarOpen: {
@@ -42,11 +43,7 @@ const { t } = useI18n()
             <!-- Hamburger button -->
             <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
               <span class="sr-only">{{ t('open-sidebar') }}</span>
-              <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <rect x="4" y="5" width="16" height="2" />
-                <rect x="4" y="11" width="16" height="2" />
-                <rect x="4" y="17" width="16" height="2" />
-              </svg>
+              <IconMenu class="w-6 h-6 fill-current" />
             </button>
           </div>
 
