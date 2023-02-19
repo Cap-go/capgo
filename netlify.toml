@@ -22,6 +22,16 @@
   status = 200
 
 [[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Referrer-Policy = "strict-origin"
+
+[[headers]]
   for = "/api/*"
   [headers.values]
     cache-control = "public, s-max-age=60"
