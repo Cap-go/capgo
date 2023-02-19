@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
@@ -58,7 +58,7 @@ const refreshData = async () => {
   }
   isLoading.value = false
 }
-const stats = [
+const stats = computed(() => ([
   {
     label: t('channels'),
     value: channelsNb,
@@ -79,7 +79,7 @@ const stats = [
     value: updatesNb,
     link: `/app/p/${id.value.replace(/\./g, '--')}/logs`,
   },
-]
+]))
 
 watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
@@ -110,13 +110,15 @@ watchEffect(async () => {
         <template v-for="s, i in stats" :key="i">
           <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
 
-          <a :href="s.link" class="flex flex-col items-center w-full p-10 hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14">
-            <p class="text-5xl font-bold text-white lg:mt-3 lg:order-2 font-pj">
-              {{ s.value }}
-            </p>
-            <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-1 font-pj">
-              {{ s.label }}
-            </h3>
+          <a :href="s.link" class="flex flex-col items-center w-full p-10 group hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14 ">
+            <span class="text-center duration-100 ease-in scale-100 group-hover:scale-150">
+              <p class="text-5xl font-bold text-white lg:mt-3 lg:order-2 font-pj">
+                {{ s.value }}
+              </p>
+              <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-1 font-pj">
+                {{ s.label }}
+              </h3>
+            </span>
           </a>
         </template>
       </div>
