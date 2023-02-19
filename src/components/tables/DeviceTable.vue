@@ -63,6 +63,32 @@ const columns = ref<TableColumn[]>([
   },
 ])
 
+const getDevicesID = async (elem: typeof element) => {
+  const req = supabase
+    .from('channel_devices')
+    .select('device_id')
+    .eq('app_id', props.appId)
+
+  if (props.ids)
+    req.in('device_id', props.ids)
+
+  const { data } = await req
+
+  const reqq = supabase
+    .from('devices_override')
+    .select('device_id')
+    .eq('app_id', props.appId)
+
+  if (props.ids)
+    reqq.eq('device_id', props.ids)
+
+  const { data: dataOverride } = await reqq
+
+  const channelDev = data?.map(d => d.device_id) || []
+  const overrideDev = dataOverride?.map(d => d.device_id) || []
+  return [...channelDev, ...overrideDev]
+}
+
 const getData = async () => {
   isLoading.value = true
   try {
@@ -81,8 +107,10 @@ const getData = async () => {
     if (search.value)
       req.like('device_id', `%${search.value}%`)
 
-    if (filters.value.Override)
-      req.neq('external_url', null)
+    if (filters.value.Override) {
+      const ids = await getDevicesID(element)
+      req.in('device_id', ids)
+    }
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
