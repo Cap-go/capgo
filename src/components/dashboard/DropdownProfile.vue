@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
 import { openChat } from '~/services/crips'
+import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
 const props = defineProps({
   align: {
@@ -65,9 +66,7 @@ onUnmounted(() => {
       </div>
       <div class="items-center hidden truncate md:flex">
         <span class="ml-2 text-sm font-medium truncate group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
-        <svg class="w-3 h-3 ml-1 fill-current shrink-0 text-slate-400" viewBox="0 0 12 12">
-          <path d="M5.9 11.4L.5 6l1.4-1.4 4 4 4-4L11.3 6z" />
-        </svg>
+        <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
       </div>
     </button>
     <transition
@@ -78,7 +77,7 @@ onUnmounted(() => {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-show="dropdownOpen" class="origin-top-right z-30 absolute top-full min-w-44 bg-white border border-slate-200 py-1.5 rounded shadow-lg overflow-hidden mt-1" :class="props.align === 'right' ? 'right-0' : 'left-0'">
+      <div v-show="dropdownOpen" class="origin-top-right z-30 absolute top-full min-w-44 bg-gray-100 border border-slate-200 py-1.5 rounded shadow-lg overflow-hidden mt-1" :class="props.align === 'right' ? 'right-0' : 'left-0'">
         <div class="pt-0.5 pb-2 px-3 mb-1 border-b border-slate-200">
           <div class="font-medium text-slate-800">
             {{ `${main.user?.first_name} ${main.user?.last_name}` }}

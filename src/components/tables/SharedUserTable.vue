@@ -301,7 +301,7 @@ onMounted(async () => {
       @row-click="onClick"
       @reload="reload()" @reset="refreshData()"
     />
-    <k-fab v-if="allowAdd && channelId" class="fixed z-20 right-4-safe bottom-4-safe secondary" @click="addUserModal = true">
+    <k-fab v-if="allowAdd && channelId" class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="addUserModal = true">
       <template #icon>
         <component :is="IconPlus" />
       </template>
