@@ -157,7 +157,7 @@ onMounted(() => {
           </div>
           <IconFilter class="m-1 mr-2" />
           <span class="hidden md:block">{{ filterText }}</span>
-          <IconDown class="m-1 ml-2" />
+          <IconDown class="hidden m-1 ml-2 md:block" />
         </button>
         <!-- Dropdown menu -->
         <div id="dropdownRadio" class="z-50 hidden w-48 pl-4 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">

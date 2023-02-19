@@ -112,10 +112,10 @@ watchEffect(async () => {
 
           <a :href="s.link" class="flex flex-col items-center w-full p-10 group hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14 ">
             <span class="text-center duration-100 ease-in scale-100 group-hover:scale-150">
-              <p class="text-5xl font-bold text-white lg:mt-3 lg:order-2 font-pj">
+              <p class="text-5xl font-bold text-white lg:mt-3 lg:order-1 font-pj">
                 {{ s.value }}
               </p>
-              <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-1 font-pj">
+              <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-2 font-pj">
                 {{ s.label }}
               </h3>
             </span>
