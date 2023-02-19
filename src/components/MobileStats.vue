@@ -114,8 +114,8 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex justify-center chat-items">
-    <Spinner />
+  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+    <Spinner size="w-40 h-40" />
   </div>
   <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <div class="px-5 pt-5">
