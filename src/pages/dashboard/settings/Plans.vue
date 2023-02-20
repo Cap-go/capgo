@@ -131,6 +131,20 @@ watchEffect(async () => {
     }
   }
 })
+const hightLights = computed(() => ([
+  {
+    label: 'Current',
+    value: currentPlan.value?.name,
+  },
+  {
+    label: 'Usage',
+    value: `${planPercent.value.toLocaleString()} %`,
+  },
+  {
+    label: 'Best plan',
+    value: currentPlanSuggest.value?.name,
+  },
+]))
 </script>
 
 <template>
@@ -142,9 +156,27 @@ watchEffect(async () => {
         </h1>
         <p class="mt-5 text-xl text-gray-700 dark:text-white sm:text-center">
           {{ t('plan-desc') }}<br>
-          {{ t('your-are-a') }} <span class="font-bold underline">{{ currentPlan?.name }}</span> {{ t('plan-member') }} You use {{ planPercent }}% of this plan.<br>
-          {{ t('the') }} <span class="font-bold underline">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
+      </div>
+      <div class="relative mt-6 mb-12 lg:mt-12 lg:max-w-5xl lg:mx-auto">
+        <div class="absolute -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl" />
+
+        <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-black md:flex-row md:text-left rounded-xl bg-opacity-90">
+          <template v-for="s, i in hightLights" :key="i">
+            <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
+
+            <div class="flex flex-col items-center w-full p-5 group hover:bg-gray-800 sm:px-7 lg:px-6 lg:py-4 ">
+              <span class="text-center">
+                <p class="text-3xl font-bold text-white lg:mt-3 lg:order-2 font-pj">
+                  {{ s.value }}
+                </p>
+                <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-1 font-pj">
+                  {{ s.label }}
+                </h3>
+              </span>
+            </div>
+          </template>
+        </div>
       </div>
       <div class="mx-auto mt-4 md:w-1/4">
         <k-segmented outline class="dark:text-gray-300 dark:bg-black">
