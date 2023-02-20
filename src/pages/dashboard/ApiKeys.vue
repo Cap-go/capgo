@@ -32,6 +32,7 @@ const geKeys = async (retry = true): Promise<void> => {
 
   isLoading.value = false
 }
+displayStore.NavTitle = ''
 geKeys()
 </script>
 
