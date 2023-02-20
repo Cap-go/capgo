@@ -12,7 +12,9 @@ import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import IconVersion from '~icons/radix-icons/update'
 
+const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
@@ -359,6 +361,9 @@ watchEffect(async () => {
             </div>
           </div>
         </section>
+        <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
+          <IconVersion /> <span class="pl-2"> {{ version }}</span>
+        </div>
       </div>
       <!-- Panel footer -->
       <footer>

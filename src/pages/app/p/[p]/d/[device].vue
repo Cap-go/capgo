@@ -395,7 +395,7 @@ watchEffect(async () => {
         </dl>
       </div>
     </div>
-    <div v-else-if="ActiveTab === 'logs'" id="devices" class="flex flex-col">
+    <div v-else-if="ActiveTab === 'logs'" id="devices" class="h-full overflow-y-scroll md:py-4">
       <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
         <LogTable
           class="p-3"

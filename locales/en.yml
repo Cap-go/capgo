@@ -1,6 +1,12 @@
 Bandwidth: Bandwidth
 MAU: Monthly active users
 Storage: Storage
+account: Account
+plan-free: Best for MVP and testing
+plan-solo: Best for independent developers
+plan-maker: Best for small business owners
+plan-team: Best for big business owners
+plan-payasyougo: Best for scalling enterprises
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
 account-settings: Account Settings

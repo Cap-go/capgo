@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import Dashboard from '../dashboard/Dashboard.vue'
-import Steps from '../onboarding/Steps.vue'
+import Dashboard from '../../components/dashboard/Dashboard.vue'
+import Steps from '../../components/dashboard/Steps.vue'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'

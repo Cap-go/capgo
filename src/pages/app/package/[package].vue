@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
@@ -58,6 +58,28 @@ const refreshData = async () => {
   }
   isLoading.value = false
 }
+const stats = computed(() => ([
+  {
+    label: t('channels'),
+    value: channelsNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/channels`,
+  },
+  {
+    label: t('bundles'),
+    value: bundlesNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/bundles`,
+  },
+  {
+    label: t('devices'),
+    value: devicesNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/devices`,
+  },
+  {
+    label: t('plan-updates'),
+    value: updatesNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/logs`,
+  },
+]))
 
 watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
@@ -76,15 +98,30 @@ watchEffect(async () => {
   </div>
   <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
     <Usage :app-id="id" />
-    <section class="py-12">
-      <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-        <div class="grid max-w-6xl grid-cols-1 gap-6 mx-auto mt-8 sm:grid-cols-4 lg:gap-x-12 xl:gap-x-20">
-          <AppStat :number="channelsNb" :label="t('channels')" :link="`/app/p/${id.replace(/\./g, '--')}/channels`" />
-          <AppStat :number="bundlesNb" :label="t('bundles')" :link="`/app/p/${id.replace(/\./g, '--')}/bundles`" />
-          <AppStat :number="devicesNb" :label="t('devices')" :link="`/app/p/${id.replace(/\./g, '--')}/devices`" />
-          <AppStat :number="updatesNb" :label="t('plan-updates')" :link="`/app/p/${id.replace(/\./g, '--')}/logs`" />
-        </div>
+
+    <div class="relative mt-12 mb-12 lg:mt-20 lg:max-w-5xl lg:mx-auto">
+      <div class="absolute -inset-2">
+        <div class="w-full h-full mx-auto opacity-30 blur-lg filter" style="background: linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" />
       </div>
-    </section>
+
+      <div class="absolute -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl" />
+
+      <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-black md:flex-row md:text-left rounded-xl bg-opacity-90">
+        <template v-for="s, i in stats" :key="i">
+          <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
+
+          <a :href="s.link" class="flex flex-col items-center w-full p-10 group hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14 ">
+            <span class="text-center duration-100 ease-in scale-100 group-hover:scale-150">
+              <p class="text-5xl font-bold text-white lg:mt-3 lg:order-1 font-pj">
+                {{ s.value }}
+              </p>
+              <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-2 font-pj">
+                {{ s.label }}
+              </h3>
+            </span>
+          </a>
+        </template>
+      </div>
+    </div>
   </div>
 </template>

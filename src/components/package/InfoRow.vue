@@ -17,7 +17,7 @@ watch(rowInput, debounce(() => {
 </script>
 
 <template>
-  <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
+  <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
     <dt class="text-sm font-medium text-gray-700 dark:text-gray-200">
       {{ props.label }}
     </dt>
