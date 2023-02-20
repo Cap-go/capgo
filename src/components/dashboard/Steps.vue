@@ -40,12 +40,12 @@ const steps = ref([
   },
   {
     title: t('add-your-app-to-your'),
-    command: 'npx --yes @capgo/cli@latest add',
+    command: 'npx --yes @capgo/cli@latest app add',
     subtitle: `${t('into-your-app-folder')}`,
   },
   {
     title: t('install-the-capacito'),
-    command: 'npm i @capgo/capacitor-updater',
+    command: 'npm i @capgo/capacitor-updater@latest',
     subtitle: t('in-your-project-fold'),
   },
   {
@@ -61,7 +61,7 @@ CapacitorUpdater.notifyAppReady()`,
   },
   {
     title: t('build-your-code-and-'),
-    command: 'npx --yes @capgo/cli@latest upload',
+    command: 'npx --yes @capgo/cli@latest app upload',
     subtitle: '',
   },
   {

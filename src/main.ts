@@ -1,5 +1,6 @@
 // register vue composition api globally
 import { createApp } from 'vue'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 // Cannot use official router here because of the IonTab hack
 import { createRouter, createWebHistory } from 'vue-router'
 import generatedRoutes from 'virtual:generated-pages'
@@ -13,6 +14,7 @@ import './styles/style.css'
 import { initPlausible } from './services/plausible'
 
 const app = createApp(App)
+CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
 const routes = [...setupLayouts(generatedRoutes), { path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }]
