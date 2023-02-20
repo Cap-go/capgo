@@ -3,6 +3,7 @@ const colors = require('tailwindcss/colors')
 const defaultTheme = require('tailwindcss/defaultTheme')
 const konstaConfig = require('konsta/config')
 
+// https://icon-sets.iconify.design/
 const primary = '#515271'
 const secondary = '#119eff'
 const tertiary = '#6876e1'
