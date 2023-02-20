@@ -164,7 +164,7 @@ onMounted(async () => {
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
-    :search-placeholder="t('search-device')"
+    :search-placeholder="t('search-by-device-id')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"
   />

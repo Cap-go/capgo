@@ -221,7 +221,9 @@ reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
 search: Поиск
 search-bundle: Пакет поиска
+search-bundle-id: Поиск по идентификатору пакета
 search-by-action: Поиск по действию
+search-by-device-id: Поиск по идентификатору устройства
 search-by-name: Поиск по имени
 search-device: Поиск устройства
 search-user: Поиск пользователя

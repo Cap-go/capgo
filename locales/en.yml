@@ -2,11 +2,6 @@ Bandwidth: Bandwidth
 MAU: Monthly active users
 Storage: Storage
 account: Account
-plan-free: Best for MVP and testing
-plan-solo: Best for independent developers
-plan-maker: Best for small business owners
-plan-team: Best for big business owners
-plan-payasyougo: Best for scalling enterprises
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
 account-settings: Account Settings
@@ -196,12 +191,17 @@ plan-buy: Buy
 plan-desc: >-
   Start building for free, then add a plan to go live. Account plans unlock
   additional features.
+plan-free: Best for MVP and testing
 plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.
+plan-maker: Best for small business owners
 plan-member: plan member.
+plan-payasyougo: Best for scalling enterprises
 plan-pricing-plans: Pricing Plans
 plan-progressive-deploy: Progressive deploy
+plan-solo: Best for independent developers
 plan-storage: GB Storage
+plan-team: Best for big business owners
 plan-updates: Updates
 plan-whats-included: What's included
 plans: Plans
@@ -219,7 +219,9 @@ reset-password: Reset Password
 reset-your-password: Reset your password
 search: Search
 search-bundle: Search Bundle
+search-bundle-id: Search by bundle ID
 search-by-action: Search by action
+search-by-device-id: Search by device ID
 search-by-name: Search by name
 search-device: Search device
 search-user: Search User
