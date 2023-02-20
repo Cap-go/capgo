@@ -1,5 +1,4 @@
 Bandwidth: Bandwidth
-MAU: Pengguna aktif bulanan
 Storage: Penyimpanan
 account: Akun
 account-password-error: Terjadi kesalahan, harap coba lagi
@@ -75,6 +74,7 @@ cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
 change: Mengubah
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
+channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-invit: Ketik email untuk mengundang
 channel-is-public: Saluran bersifat publik
@@ -168,6 +168,7 @@ mau: Pengguna aktif bulanan
 module-heading: Modul
 monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan
+montly-active: Aktif bulanan
 more-version-storage: Lebih banyak versi Penyimpanan
 morning: Pagi
 my-account: Akun saya

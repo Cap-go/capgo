@@ -1,5 +1,4 @@
 Bandwidth: 帯域幅
-MAU: 月間アクティブ ユーザー数
 Storage: 保管所
 account: アカウント
 account-password-error: エラーが発生しました。もう一度お試しください
@@ -75,6 +74,7 @@ cannot-test-app-some: アプリをテストできません
 change: 変化
 changed-password-suc: パスワードは正常に変更されました
 channel: チャネル
+channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
 channel-invit: 招待するメールを入力
 channel-is-public: チャンネルは公開されています
@@ -160,6 +160,7 @@ mau: 月間アクティブ ユーザー数
 module-heading: モジュール
 monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数
+montly-active: 月間アクティブ
 more-version-storage: より多くのバージョン ストレージ
 morning: 朝
 my-account: マイアカウント

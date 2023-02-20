@@ -1,5 +1,4 @@
 Bandwidth: largura de banda
-MAU: Usuários ativos mensais
 Storage: Armazenar
 account: Conta
 account-password-error: Ocorreu um erro, tente novamente
@@ -77,6 +76,7 @@ cannot-test-app-some: Não é possível testar o aplicativo, algo errado acontec
 change: Mudar
 changed-password-suc: Senha alterada com sucesso
 channel: Canal
+channel-create: Criar canal
 channel-deleted: Canal deletado
 channel-invit: Digite o e-mail para convidar
 channel-is-public: O canal é público
@@ -166,6 +166,7 @@ mau: Usuários ativos mensais
 module-heading: Módulos
 monthly: Por mês
 monthly-active-users: Usuários ativos mensais
+montly-active: Ativo mensalmente
 more-version-storage: Mais armazenamento de versões
 morning: manhã
 my-account: Minha conta

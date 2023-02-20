@@ -1,5 +1,4 @@
 Bandwidth: Bande passante
-MAU: Utilisateurs actifs mensuels
 Storage: Stockage
 account: Compte
 account-password-error: Une erreur s'est produite, veuillez réessayer
@@ -79,6 +78,7 @@ cannot-test-app-some: Impossible de tester l'application, quelque chose de mal s
 change: Changement
 changed-password-suc: Le mot de passe a été changé avec succès
 channel: Canaliser
+channel-create: Créer une chaîne
 channel-deleted: Chaîne supprimée
 channel-invit: Tapez l'e-mail pour inviter
 channel-is-public: La chaîne est publique
@@ -172,6 +172,7 @@ mau: Utilisateurs actifs mensuels
 module-heading: Modules
 monthly: Mensuel
 monthly-active-users: Utilisateurs actifs mensuels
+montly-active: Actif mensuel
 more-version-storage: Plus de version Stockage
 morning: matin
 my-account: Mon compte

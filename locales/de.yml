@@ -1,5 +1,4 @@
 Bandwidth: Bandbreite
-MAU: Monatlich aktive Benutzer
 Storage: Lagerung
 account: Konto
 account-password-error: Fehler aufgetreten, bitte versuchen Sie es erneut
@@ -81,6 +80,7 @@ cannot-test-app-some: App kann nicht getestet werden, es ist ein Fehler aufgetre
 change: Ändern
 changed-password-suc: das Passwort wurde erfolgreich geändert
 channel: Kanal
+channel-create: Kanal erstellen
 channel-deleted: Kanal gelöscht
 channel-invit: Geben Sie die einzuladende E-Mail-Adresse ein
 channel-is-public: Kanal ist öffentlich
@@ -174,6 +174,7 @@ mau: Monatlich aktive Benutzer
 module-heading: Module
 monthly: Monatlich
 monthly-active-users: Monatlich aktive Benutzer
+montly-active: Monatlich aktiv
 more-version-storage: Mehr Versionsspeicher
 morning: Morgen
 my-account: Mein Konto

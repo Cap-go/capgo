@@ -39,7 +39,7 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 
 const submit = async () => {
-  if (!isLoading.value)
+  if (isLoading.value)
     return
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()

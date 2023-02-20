@@ -1,5 +1,4 @@
 Bandwidth: 대역폭
-MAU: 월간 활성 사용자
 Storage: 저장
 account: 계정
 account-password-error: 오류가 발생했습니다. 다시 시도해 주세요.
@@ -75,6 +74,7 @@ cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했�
 change: 변화
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel: 채널
+channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-invit: 초대할 이메일 입력
 channel-is-public: 채널이 공개됨
@@ -160,6 +160,7 @@ mau: 월간 활성 사용자
 module-heading: 모듈
 monthly: 월간 간행물
 monthly-active-users: 월간 활성 사용자
+montly-active: 월간 활성
 more-version-storage: 더 많은 버전 저장
 morning: 아침
 my-account: 내 계정

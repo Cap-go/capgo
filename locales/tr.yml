@@ -1,5 +1,4 @@
 Bandwidth: Bant genişliği
-MAU: Aylık aktif kullanıcılar
 Storage: Depolamak
 account: Hesap
 account-password-error: Hata oluştu, lütfen tekrar deneyin
@@ -75,6 +74,7 @@ cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 change: Değiştirmek
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
+channel-create: Kanal oluştur
 channel-deleted: kanal silindi
 channel-invit: Davet etmek için e-posta yazın
 channel-is-public: Kanal herkese açık
@@ -166,6 +166,7 @@ mau: Aylık aktif kullanıcılar
 module-heading: Modüller
 monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar
+montly-active: Aylık aktif
 more-version-storage: Daha fazla sürüm Depolama
 morning: Sabah
 my-account: Hesabım

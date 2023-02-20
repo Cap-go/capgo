@@ -14,7 +14,7 @@ export interface TableColumn {
   head?: boolean
   class?: string
   icon?: FunctionalComponent
-  onClick?: (elem: any) => void
+  onClick?: (elem: any | undefined) => void
 }
 
 export interface Tab {

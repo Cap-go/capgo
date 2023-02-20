@@ -1,5 +1,4 @@
 Bandwidth: Băng thông
-MAU: Người dùng hoạt động hàng tháng
 Storage: Kho
 account: Tài khoản
 account-password-error: Đã xảy ra lỗi, vui lòng thử lại
@@ -79,6 +78,7 @@ cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự c�
 change: Thay đổi
 changed-password-suc: Đã đổi mật khẩu thành công
 channel: Kênh
+channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
 channel-invit: Nhập email để mời
 channel-is-public: Kênh là công khai
@@ -168,6 +168,7 @@ mau: Người dùng hoạt động hàng tháng
 module-heading: mô-đun
 monthly: hàng tháng
 monthly-active-users: Người dùng hoạt động hàng tháng
+montly-active: hoạt động hàng tháng
 more-version-storage: Phiên bản khác
 morning: buổi sáng
 my-account: Tài khoản của tôi

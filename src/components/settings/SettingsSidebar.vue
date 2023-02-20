@@ -15,15 +15,8 @@ import { openPortal } from '~/services/stripe'
 
 const router = useRouter()
 const main = useMainStore()
-const isMobile = ref(Capacitor.isNativePlatform())
 const { t } = useI18n()
 const isUserAdmin = ref(false)
-
-if (main.user?.id) {
-  isAdmin(main.user?.id).then((res) => {
-    isUserAdmin.value = !!res || isSpoofed()
-  })
-}
 
 const openLink = (link: string) => {
   console.log('openLink', link)
@@ -46,28 +39,35 @@ const menu = ref([
     to: '/dashboard/settings/changepassword',
   },
   {
-    title: t('plans'),
-    icon: shallowRef(IconPlans),
-    to: '/dashboard/settings/plans',
-  },
-  {
-    title: t('billing'),
-    icon: shallowRef(IconBilling),
-    to: '/billing',
-    hidden: isMobile.value,
-  },
-  {
     title: t('notifications'),
     icon: shallowRef(IconNotification),
     to: '/dashboard/settings/notifications',
   },
   {
-    title: t('admin'),
-    icon: shallowRef(IconAdmin),
-    to: '/dashboard/settings/admin',
-    hidden: !isUserAdmin.value,
+    title: t('plans'),
+    icon: shallowRef(IconPlans),
+    to: '/dashboard/settings/plans',
   },
 ])
+if (!Capacitor.isNativePlatform()) {
+  menu.value.push({
+    title: t('billing'),
+    icon: shallowRef(IconBilling) as any,
+    to: '/billing',
+  })
+}
+if (main.user?.id) {
+  isAdmin(main.user?.id).then((res) => {
+    isUserAdmin.value = !!res || isSpoofed()
+    if (isUserAdmin.value) {
+      menu.value.push({
+        title: t('admin'),
+        icon: shallowRef(IconAdmin) as any,
+        to: '/dashboard/settings/admin',
+      })
+    }
+  })
+}
 </script>
 
 <template>
@@ -75,7 +75,7 @@ const menu = ref([
     <!-- Group 1 -->
     <div>
       <ul class="flex mr-3 flex-nowrap md:block md:mr-0">
-        <li v-for="(m, i) in menu" :key="i" class="mr-0.5 md:mr-0 md:mb-0.5" :class="{ hidden: m.hidden }" @click="openLink(m.to)">
+        <li v-for="(m, i) in menu" :key="i" class="mr-0.5 md:mr-0 md:mb-0.5" @click="openLink(m.to)">
           <button class="flex items-center px-2.5 py-2 rounded whitespace-nowrap">
             <component :is="m.icon" class="w-4 h-4 mr-2 fill-current shrink-0" :class="{ 'text-blue-600': isActive(m.to), 'text-slate-400': !isActive(m.to) }" />
             <span class="hidden text-sm font-medium md:block" :class="{ 'text-blue-600': isActive(m.to), 'text-slate-400': !isActive(m.to) }">{{ m.title }}</span>
