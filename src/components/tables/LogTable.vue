@@ -124,7 +124,7 @@ columns.value = [
 
 if (!props.deviceId) {
   columns.value.push({
-    label: t('platform'),
+    label: t('device'),
     key: 'platform',
     mobile: 'after',
     sortable: false,
