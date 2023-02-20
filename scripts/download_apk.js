@@ -32,7 +32,7 @@ const isCapacitor = async (id) => {
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
       // console.log('zipEntry', zipEntry.entryName)
-      if (zipEntry.entryName == 'assets/capacitor.config.json') {
+      if (zipEntry.entryName === 'assets/capacitor.config.json') {
         console.log(zipEntry.getData().toString('utf8'))
         found = true
       }

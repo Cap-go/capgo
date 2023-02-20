@@ -86,11 +86,10 @@ const chartData = computed<ChartData<'doughnut'>>(() => ({
 const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
   plugins: {
     legend: {
-      position: 'left',
+      display: false,
     },
     title: {
-      display: true,
-      text: 'Devices breakdown',
+      display: false,
     },
   },
 }))
@@ -115,16 +114,16 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex justify-center chat-items">
-    <Spinner />
+  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+    <Spinner size="w-40 h-40" />
   </div>
-  <div v-else class="flex flex-col bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+  <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
     <div class="px-5 pt-5">
       <h2 class="mb-2 text-2xl font-semibold dark:text-white text-slate-800">
-        {{ t('stats.versions') }}
+        {{ t('versions') }}
       </h2>
       <div class="mb-1 text-xs font-semibold uppercase dark:text-white text-slate-400">
-        {{ t('usage.title') }}
+        {{ t('usage-title') }}
       </div>
       <div class="flex items-start">
         <div class="mr-2 text-3xl font-bold dark:text-white text-slate-800">
@@ -132,6 +131,8 @@ watchEffect(async () => {
         </div>
       </div>
     </div>
-    <Doughnut class="w-full px-3 mx-auto my-3 h-max" :chart-data="chartData" :chart-options="chartOptions" />
+    <div class="w-full p-6">
+      <Doughnut :chart-data="chartData" :chart-options="chartOptions" />
+    </div>
   </div>
 </template>

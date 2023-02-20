@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { alertController, toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  kListItem,
+} from 'konsta/vue'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
   channel: string
 }>()
 const emit = defineEmits(['reload'])
+const displayStore = useDisplayStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
@@ -22,30 +26,35 @@ const devicesNb = ref(0)
 const { t } = useI18n()
 
 const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
   // console.log('deleteApp', app)
-  if (await didCancel(t('package.name')))
+  if (await didCancel(t('app')))
     return
   try {
+    const { error: errorIcon } = await supabase.storage
+      .from(`images/${app.user_id}`)
+      .remove([app.app_id])
+    if (errorIcon)
+      displayStore.messageToast.push(t('cannot-delete-app-icon'))
+
     const { data, error: vError } = await supabase
       .from('app_versions')
       .select()
@@ -59,12 +68,7 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
         .from('apps')
         .remove(filesToRemove)
       if (delError) {
-        const toast = await toastController
-          .create({
-            message: t('cannot-delete-app-version'),
-            duration: 2000,
-          })
-        await toast.present()
+        displayStore.messageToast.push(t('cannot-delete-app-version'))
         return
       }
     }
@@ -75,30 +79,15 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
     if (vError || dbAppError) {
-      const toast = await toastController
-        .create({
-          message: t('cannot-delete-app'),
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('cannot-delete-app'))
     }
     else {
-      const toast = await toastController
-        .create({
-          message: 'App deleted',
-          duration: 2000,
-        })
-      await toast.present()
+      displayStore.messageToast.push(t('app-deleted'))
       await emit('reload')
     }
   }
   catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('cannot-delete-app'),
-        duration: 2000,
-      })
-    await toast.present()
+    displayStore.messageToast.push(t('cannot-delete-app'))
   }
 }
 
@@ -146,26 +135,26 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="cursor-pointer text-slate-800 dark:text-white" @click="openPackage(app.app_id)">
-    <td class="p-2">
-      <div class="flex flex-wrap items-center">
-        <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 shrink-0 sm:mr-3" width="36" height="36">
+  <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
+    <td class="w-1/4 p-2">
+      <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
+        <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
         <div class="max-w-max">
           {{ props.app.name }}
         </div>
       </div>
     </td>
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div class="text-center">
         {{ props.app.last_version }}
       </div>
     </td>
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div class="text-center">
         {{ formatDate(props.app.updated_at || "") }}
       </div>
     </td>
-    <td class="p-2">
+    <td class="w-1/4 p-2">
       <div v-if="!isLoading && !props.channel" class="text-center">
         {{ devicesNb }}
       </div>
@@ -173,17 +162,24 @@ watchEffect(async () => {
         {{ props.channel }}
       </div>
     </td>
-    <td v-if="!channel" class="p-2" @click.stop="deleteApp(app)">
+    <td class="w-1/4 p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
-        <IconTrash />
+        <IconTrash v-if="!channel" class="mr-4 text-lg text-red-600" />
       </div>
     </td>
   </tr>
+  <!-- Mobile -->
+  <k-list-item
+    class="md:hidden"
+    :title="props.app.name || ''"
+    :subtitle="formatDate(props.app.updated_at || '')"
+    @click="openPackage(app.app_id)"
+  >
+    <template #media>
+      <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
+    </template>
+    <template #after>
+      <IconTrash class="text-lg text-red-600" @click.stop="deleteApp(app)" />
+    </template>
+  </k-list-item>
 </template>
-
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

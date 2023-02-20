@@ -1,30 +1,22 @@
 <script setup lang="ts">
-import { toastController } from '@ionic/vue'
-// import { IonIcon, toastController } from '@ionic/vue'
 import { ref } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
-// import { addOutline } from 'ionicons/icons'
 import { useSupabase } from '~/services/supabase'
-import Sidebar from '~/components/Sidebar.vue'
-import Navbar from '~/components/Navbar.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
+const displayStore = useDisplayStore()
 const main = useMainStore()
 const isLoading = ref(false)
-const sidebarOpen = ref(false)
 const supabase = useSupabase()
 const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
 const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
-  const toast = await toastController
-    .create({
-      message: t('apikeys.keyCopied'),
-      duration: 2000,
-    })
-  await toast.present()
+  console.log('displayStore.messageToast', displayStore.messageToast)
+  displayStore.messageToast.push(t('key-copied'))
 }
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true
@@ -40,58 +32,25 @@ const geKeys = async (retry = true): Promise<void> => {
 
   isLoading.value = false
 }
+displayStore.NavTitle = ''
 geKeys()
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-white safe-zone dark:bg-gray-900/90">
-    <!-- Sidebar -->
-    <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
-
-    <!-- Content area -->
-    <div class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
-      <!-- Site header -->
-      <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-
-      <main>
-        <div class="w-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
-          <!-- Page header -->
-          <div class="mb-8">
-            <!-- Title -->
-            <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
-              {{ t('api-keys') }} 🔑
-            </h1>
-          </div>
-
-          <!-- Content -->
-          <div class="mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800 dark:text-white">
-            <div class="flex flex-col md:flex-row md:-mr-px">
-              <div class="grow">
-                <!-- Panel body -->
-                <div class="p-6 space-y-6">
-                  <!-- API Keys -->
-                  <section>
-                    <div v-for="app in apps" :key="app.id" class="mb-2 space-y-2 cursor-pointer" @click="copyKey(app)">
-                      <div>
-                        <label class="block mb-1 text-lg font-medium" for="location">{{ app.mode.toUpperCase() }} :</label>
-                        <p class="font-bold">
-                          {{ app.key }}
-                        </p>
-                      </div>
-                      <hr class="border-muted-blue-600 dark:border-white">
-                    </div>
-                  </section>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+  <div class="w-full h-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
+    <!-- Page header -->
+    <div class="mb-8">
+      <!-- Title -->
+      <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
+        {{ t('api-keys') }}
+      </h1>
+    </div>
+    <div class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <dl class="divide-y divide-gray-500">
+          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="copyKey(app)" />
+        </dl>
+      </div>
     </div>
   </div>
-  <!-- <button
-    class="fixed flex items-center justify-center w-16 h-16 text-3xl text-white bg-blue-600 rounded-full z-90 bottom-10 right-8 drop-shadow-lg hover:bg-muted-blue-700 hover:drop-shadow-2xl focus:border-muted-blue-100 focus:border-2"
-  >
-    <IonIcon :icon="addOutline" />
-  </button> -->
 </template>

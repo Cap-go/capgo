@@ -1,44 +1,397 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import mime from 'mime'
+import { decode } from 'base64-arraybuffer'
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
+import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Sidebar from '../../../components/Sidebar.vue'
-import Navbar from '../../../components/Navbar.vue'
-import SettingsSidebar from '../../../components/settings/SettingsSidebar.vue'
-import AccountPanel from '../../../components/settings/AccountPanel.vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Filesystem } from '@capacitor/filesystem'
+import { useVuelidate } from '@vuelidate/core'
+import { required } from '@vuelidate/validators'
+import { useMainStore } from '~/stores/main'
+import { useSupabase } from '~/services/supabase'
+import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
+import IconVersion from '~icons/radix-icons/update'
 
+const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
-const sidebarOpen = ref(false)
+const supabase = useSupabase()
+const displayStore = useDisplayStore()
+const router = useRouter()
+const main = useMainStore()
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
+  const { error } = await supabase.storage
+    .from('images')
+    .upload(`${main.user?.id}/${fileName}`, decode(data), {
+      contentType,
+    })
+
+  const { data: res } = supabase.storage
+    .from('images')
+    .getPublicUrl(`${main.user?.id}/${fileName}`)
+
+  const { data: usr, error: dbError } = await supabase
+    .from('users')
+    .update({ image_url: res.publicUrl })
+    .eq('id', main.user?.id)
+    .select()
+    .single()
+  isLoading.value = false
+
+  if (error || dbError || !res.publicUrl || !usr) {
+    errorMessage.value = t('something-went-wrong-try-again-later')
+    console.error('upload error', error, dbError)
+    return
+  }
+  main.user = usr
+}
+
+const takePhoto = async () => {
+  const cameraPhoto = await Camera.getPhoto({
+    resultType: CameraResultType.DataUrl,
+    source: CameraSource.Camera,
+    quality: 100,
+  })
+
+  isLoading.value = true
+
+  const fileName = `${new Date().getTime()}.${cameraPhoto.format}`
+
+  if (!cameraPhoto.dataUrl)
+    return
+
+  const contentType = mime.getType(cameraPhoto.format)
+
+  if (!contentType)
+    return
+  try {
+    await updloadPhoto(cameraPhoto.dataUrl.split('base64,')[1], fileName, contentType)
+  }
+  catch (e) {
+    console.error(e)
+    isLoading.value = false
+  }
+}
+const blobToData = (blob: Blob) => {
+  return new Promise<string>((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.readAsDataURL(blob)
+  })
+}
+const pickPhoto = async () => {
+  const { photos } = await Camera.pickImages({
+    limit: 1,
+    quality: 100,
+  })
+  isLoading.value = true
+  if (photos.length === 0)
+    return
+  try {
+    let contents
+    if (photos[0].path) {
+      contents = await Filesystem.readFile({
+        path: photos[0].path || photos[0].webPath,
+      })
+    }
+    else {
+      const blob = await blobToData(await fetch(photos[0].webPath).then(r => r.blob()))
+      contents = { data: blob.split('base64,')[1] }
+    }
+    const contentType = mime.getType(photos[0].format)
+    if (!contentType)
+      return
+    await updloadPhoto(
+      contents.data,
+      `${new Date().getTime()}.${photos[0].format}`,
+      contentType,
+    )
+  }
+  catch (e) {
+    console.error(e)
+    isLoading.value = false
+  }
+}
+
+const deleteAccount = async () => {
+  displayStore.showActionSheet = true
+  displayStore.actionSheetOption = {
+    header: t('are-u-sure'),
+    buttons: [
+      {
+        text: t('button-remove'),
+        handler: async () => {
+          if (!main.auth || main.auth?.email == null)
+            return
+          const { error } = await supabase
+            .from('deleted_account')
+            .insert({
+              email: main.auth.email,
+            })
+          if (error) {
+            console.error(error)
+            errorMessage.value = t('something-went-wrong-try-again-later')
+          }
+          else {
+            await main.logout()
+            router.replace('/login')
+          }
+        },
+      },
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+    ],
+  }
+}
+
+const acronym = computed(() => {
+  if (main.user?.first_name && main.user.last_name)
+    return main.user?.first_name[0] + main.user?.last_name[0]
+  else if (main.user?.first_name)
+    return main.user?.first_name[0]
+  else if (main.user?.last_name)
+    return main.user?.last_name[0]
+  return '??'
+})
+
+const presentActionSheet = async () => {
+  displayStore.showActionSheet = true
+  displayStore.actionSheetOption = {
+    header: '',
+    buttons: [
+      {
+        text: t('button-camera'),
+        handler: () => {
+          displayStore.showActionSheet = false
+          takePhoto()
+        },
+      },
+      {
+        text: t('button-browse'),
+        handler: () => {
+          displayStore.showActionSheet = false
+          pickPhoto()
+        },
+      },
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+    ],
+  }
+}
+
+const route = useRoute()
+
+const form = reactive({
+  first_name: '',
+  last_name: '',
+  email: main.auth?.email,
+  country: '',
+})
+
+const rules = computed(() => ({
+  first_name: { required },
+  last_name: { required },
+  email: { required },
+}))
+
+const v$ = useVuelidate(rules, form)
+
+const submit = async () => {
+  if (isLoading.value)
+    return
+  isLoading.value = true
+  const isFormCorrect = await v$.value.$validate()
+  if (!isFormCorrect || !main.user?.id || !form.email) {
+    isLoading.value = false
+    return
+  }
+
+  const updateData: Database['public']['Tables']['users']['Insert'] = {
+    id: main.user?.id,
+    first_name: form.first_name,
+    last_name: form.last_name,
+    email: form.email,
+    country: form.country,
+  }
+
+  const { data: usr, error: dbError } = await supabase
+    .from('users')
+    .upsert(updateData)
+    .select()
+    .single()
+
+  if (dbError || !usr) {
+    errorMessage.value = dbError?.message || 'Unknow'
+    isLoading.value = false
+    return
+  }
+  main.user = usr
+  isLoading.value = false
+}
+watchEffect(async () => {
+  if (route.path === '/dashboard/settings/account') {
+    const { data: usr } = await supabase
+      .from('users')
+      .select(`
+        id,
+        first_name,
+        last_name,
+        country,
+        email,
+        billing_email
+      `)
+      .eq('id', main.user?.id)
+      .single()
+    if (usr) {
+      console.log('usr', usr)
+      form.email = usr.email || ''
+      form.country = usr.country || ''
+      form.first_name = usr.first_name || ''
+      form.last_name = usr.last_name || ''
+    }
+  }
+})
 </script>
 
 <template>
-  <div class="safe-zone flex h-screen overflow-hidden bg-white dark:bg-gray-900/90">
-    <!-- Sidebar -->
-    <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
-
-    <!-- Content area -->
-    <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-      <!-- Site header -->
-      <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-
-      <main>
-        <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
-          <!-- Page header -->
-          <div class="mb-8">
-            <!-- Title -->
-            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold dark:text-white">
-              {{ t('settings') }} ⚙️
-            </h1>
+  <div class="h-full pb-8 overflow-y-scroll md:pb-0 grow max-h-fit">
+    <form
+      @submit.prevent="submit"
+    >
+      <!-- Panel body -->
+      <div class="p-6 space-y-6">
+        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('my-account') }}
+        </h2>
+        <!-- Picture -->
+        <section>
+          <div class="flex items-center">
+            <div class="mr-4">
+              <img
+                v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
+                width="80" height="80" alt="User upload"
+              >
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-white rounded-full">
+                <p>{{ acronym }}</p>
+              </div>
+            </div>
+            <button class="p-2 text-white bg-blue-500 rounded hover:bg-blue-600" @click="presentActionSheet">
+              {{ t('change') }}
+            </button>
+          </div>
+        </section>
+        <!-- Personal Info -->
+        <section>
+          <h3 class="mb-1 text-xl font-bold leading-snug text-slate-800 dark:text-white">
+            {{ t('personal-information') }}
+          </h3>
+          <div class="text-sm dark:text-gray-100">
+            {{ t('you-can-change-your-') }}
           </div>
 
-          <!-- Content -->
-          <div class="bg-white dark:bg-gray-800 shadow-lg rounded-sm mb-8">
-            <div class="flex flex-col md:flex-row md:-mr-px">
-              <SettingsSidebar />
-              <AccountPanel />
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+            <div class="sm:w-1/2">
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">{{ t('first-name') }}</label>
+              <input
+                v-model="form.first_name" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                :disabled="isLoading"
+                autofocus
+                required
+                :placeholder="t('first-name')"
+                type="text"
+              >
+              <div v-for="(error, index) of v$.last_name.$errors" :key="index">
+                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
+                  {{ t('first-name') }}: {{ error.$message }}
+                </p>
+              </div>
+            </div>
+            <div class="sm:w-1/2">
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="business-id">{{ t('last-name') }}</label>
+              <input
+                v-model="form.last_name" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                :disabled="isLoading"
+                required
+                :placeholder="t('last-name')"
+                type="text"
+              >
+              <div v-for="(error, index) of v$.last_name.$errors" :key="index">
+                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
+                  {{ t('last-name') }}: {{ error.$message }}
+                </p>
+              </div>
             </div>
           </div>
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+            <div class="sm:w-1/2">
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('email') }}</label>
+              <input
+                v-model="form.email" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
+                required
+                disabled
+                inputmode="email"
+                :placeholder="t('email')"
+                type="email"
+              >
+            </div>
+            <div class="sm:w-1/2">
+              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('country') }}</label>
+              <input
+                v-model="form.country"
+                class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                :disabled="isLoading"
+                required
+                :placeholder="t('country')"
+                type="text"
+              >
+            </div>
+          </div>
+        </section>
+        <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
+          <IconVersion /> <span class="pl-2"> {{ version }}</span>
         </div>
-      </main>
-    </div>
+      </div>
+      <!-- Panel footer -->
+      <footer>
+        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+          <div class="flex self-end">
+            <button class="p-2 text-white bg-red-400 border-red-200 rounded btn hover:bg-red-600" @click="deleteAccount()">
+              {{ t('delete-account') }}
+            </button>
+            <button
+              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
+              type="submit"
+              color="secondary"
+              shape="round"
+            >
+              <span v-if="!isLoading" class="rounded-4xl">
+                {{ t('update') }}
+              </span>
+              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+            </button>
+          </div>
+        </div>
+      </footer>
+    </form>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: settings
+    </route>
+

@@ -5,30 +5,30 @@ specifiers:
   '@capacitor-community/http': ^1.4.1
   '@capacitor-community/keep-awake': ^3.0.0
   '@capacitor/action-sheet': ^4.1.0
-  '@capacitor/android': ~4.6.2
+  '@capacitor/android': ~4.6.3
   '@capacitor/app': ^4.1.1
   '@capacitor/app-launcher': ^4.1.0
   '@capacitor/assets': 2.0.4
   '@capacitor/browser': ^4.1.1
   '@capacitor/camera': ^4.1.4
-  '@capacitor/cli': ^4.6.2
+  '@capacitor/cli': ^4.6.3
   '@capacitor/clipboard': ^4.1.0
-  '@capacitor/core': ~4.6.2
+  '@capacitor/core': ~4.6.3
   '@capacitor/device': ^4.1.0
   '@capacitor/dialog': ^4.1.0
   '@capacitor/filesystem': ^4.1.4
   '@capacitor/geolocation': ^4.1.0
   '@capacitor/haptics': ^4.1.0
-  '@capacitor/ios': ~4.6.2
+  '@capacitor/ios': ~4.6.3
   '@capacitor/keyboard': ^4.1.1
-  '@capacitor/local-notifications': ^4.1.4
+  '@capacitor/local-notifications': ^4.1.5
   '@capacitor/motion': ^4.0.2
   '@capacitor/network': ^4.1.0
   '@capacitor/preferences': ^4.0.2
   '@capacitor/push-notifications': ^4.1.2
   '@capacitor/screen-reader': ^4.1.2
-  '@capacitor/share': ^4.1.0
-  '@capacitor/splash-screen': ^4.1.3
+  '@capacitor/share': ^4.1.1
+  '@capacitor/splash-screen': ^4.1.4
   '@capacitor/status-bar': ^4.1.1
   '@capacitor/text-zoom': ^4.1.0
   '@capacitor/toast': ^4.1.0
@@ -36,24 +36,29 @@ specifiers:
   '@capawesome/capacitor-screen-orientation': ^2.0.2
   '@capgo/capacitor-crisp': ^1.1.21
   '@capgo/capacitor-flash': ^1.2.27
-  '@capgo/capacitor-mute': ^1.1.36
+  '@capgo/capacitor-mute': ^1.1.37
   '@capgo/capacitor-purchases': ^1.3.49
-  '@capgo/capacitor-screen-recorder': ^1.2.35
+  '@capgo/capacitor-screen-recorder': ^1.2.37
   '@capgo/capacitor-updater': 4.17.31
   '@capgo/inappbrowser': ^0.3.7
   '@capgo/native-audio': ^5.0.7
-  '@capgo/native-market': ^1.1.18
+  '@capgo/native-market': ^1.1.19
   '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': ^1.1.8
   '@iconify-json/ion': 1.1.5
   '@iconify-json/ls': 1.1.3
+  '@iconify/json': ^2.2.16
   '@intlify/vite-plugin-vue-i18n': 6.0.3
-  '@ionic/vue': 6.4.0
   '@netlify/functions': ^1.4.0
   '@supabase/supabase-js': 2.1.3
+  '@tailwindcss/aspect-ratio': ^0.4.2
+  '@tailwindcss/container-queries': ^0.1.0
   '@tailwindcss/forms': ^0.5.3
+  '@tailwindcss/line-clamp': ^0.4.2
+  '@tailwindcss/typography': ^0.5.9
   '@types/adm-zip': ^0.5.0
   '@types/fs-extra': ^9.0.13
+  '@types/lodash.debounce': ^4.0.7
   '@types/mime': ^3.0.1
   '@types/minio': ^7.0.15
   '@types/node': 18.11.17
@@ -65,10 +70,12 @@ specifiers:
   '@vue/server-renderer': 3.2.45
   '@vuelidate/core': 2.0.0
   '@vuelidate/validators': 2.0.0
+  '@vueuse/components': ^9.12.0
   '@vueuse/core': 9.6.0
   adm-zip: ^0.5.10
+  atropos: ^1.0.2
   autoprefixer: ^10.4.13
-  axios: ^1.2.5
+  axios: ^1.3.2
   base64-arraybuffer: 1.0.2
   capacitor-native-biometric: 4.1.3
   capacitor-rate-app: 3.1.0-beta.1
@@ -81,15 +88,19 @@ specifiers:
   cross-env: ^7.0.3
   crypto-random-string: ^5.0.0
   cypress: 11.2.0
+  daisyui: ^2.50.0
   dayjs: 1.11.7
   eslint: 8.29.0
   eslint-plugin-cypress: ^2.12.1
   firebase: 9.15.0
+  flowbite: ^1.6.3
   generate-password-browser: ^1.1.0
   google-play-scraper: ^9.1.1
   https-localhost: 4.7.1
   json2csv: ^5.0.7
+  konsta: ^1.0.2
   lauqe: ^1.5.0
+  lodash.debounce: ^4.0.8
   logsnag: ^0.1.6
   mime: ^3.0.0
   minio: ^7.0.32
@@ -105,6 +116,7 @@ specifiers:
   tailwindcss: ^3.2.4
   typescript: 4.9.4
   unplugin-icons: 0.15.0
+  unplugin-vue-components: ^0.22.12
   vite: 3.2.5
   vite-plugin-environment: 1.1.3
   vite-plugin-inspect: 0.7.9
@@ -122,68 +134,73 @@ specifiers:
 
 dependencies:
   '@capacitor-community/http': 1.4.1
-  '@capacitor-community/keep-awake': 3.0.0_@capacitor+core@4.6.2
-  '@capacitor/action-sheet': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/android': 4.6.2_@capacitor+core@4.6.2
-  '@capacitor/app': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/app-launcher': 4.1.0_@capacitor+core@4.6.2
+  '@capacitor-community/keep-awake': 3.0.0_@capacitor+core@4.6.3
+  '@capacitor/action-sheet': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/android': 4.6.3_@capacitor+core@4.6.3
+  '@capacitor/app': 4.1.1_@capacitor+core@4.6.3
+  '@capacitor/app-launcher': 4.1.0_@capacitor+core@4.6.3
   '@capacitor/assets': 2.0.4_moeqx3xmzxqxagf2sz6mqkbb7m
-  '@capacitor/browser': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/camera': 4.1.4_@capacitor+core@4.6.2
-  '@capacitor/clipboard': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/device': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/dialog': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/filesystem': 4.1.4_@capacitor+core@4.6.2
-  '@capacitor/geolocation': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/haptics': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/ios': 4.6.2_@capacitor+core@4.6.2
-  '@capacitor/keyboard': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/local-notifications': 4.1.4_@capacitor+core@4.6.2
-  '@capacitor/motion': 4.0.2_@capacitor+core@4.6.2
-  '@capacitor/network': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/preferences': 4.0.2_@capacitor+core@4.6.2
-  '@capacitor/push-notifications': 4.1.2_@capacitor+core@4.6.2
-  '@capacitor/screen-reader': 4.1.2_@capacitor+core@4.6.2
-  '@capacitor/share': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/splash-screen': 4.1.3_@capacitor+core@4.6.2
-  '@capacitor/status-bar': 4.1.1_@capacitor+core@4.6.2
-  '@capacitor/text-zoom': 4.1.0_@capacitor+core@4.6.2
-  '@capacitor/toast': 4.1.0_@capacitor+core@4.6.2
-  '@capawesome/capacitor-file-picker': 0.5.9_@capacitor+core@4.6.2
-  '@capawesome/capacitor-screen-orientation': 2.0.2_@capacitor+core@4.6.2
-  '@capgo/capacitor-crisp': 1.1.21_@capacitor+core@4.6.2
-  '@capgo/capacitor-flash': 1.2.27_@capacitor+core@4.6.2
-  '@capgo/capacitor-mute': 1.1.36_@capacitor+core@4.6.2
-  '@capgo/capacitor-purchases': 1.3.49_@capacitor+core@4.6.2
-  '@capgo/capacitor-screen-recorder': 1.2.35_@capacitor+core@4.6.2
-  '@capgo/capacitor-updater': 4.17.31_@capacitor+core@4.6.2
-  '@capgo/inappbrowser': 0.3.7_@capacitor+core@4.6.2
-  '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.2
-  '@capgo/native-market': 1.1.18
-  '@ionic/vue': 6.4.0
+  '@capacitor/browser': 4.1.1_@capacitor+core@4.6.3
+  '@capacitor/camera': 4.1.4_@capacitor+core@4.6.3
+  '@capacitor/clipboard': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/device': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/dialog': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/filesystem': 4.1.4_@capacitor+core@4.6.3
+  '@capacitor/geolocation': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/haptics': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/ios': 4.6.3_@capacitor+core@4.6.3
+  '@capacitor/keyboard': 4.1.1_@capacitor+core@4.6.3
+  '@capacitor/local-notifications': 4.1.5_@capacitor+core@4.6.3
+  '@capacitor/motion': 4.0.2_@capacitor+core@4.6.3
+  '@capacitor/network': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/preferences': 4.0.2_@capacitor+core@4.6.3
+  '@capacitor/push-notifications': 4.1.2_@capacitor+core@4.6.3
+  '@capacitor/screen-reader': 4.1.2_@capacitor+core@4.6.3
+  '@capacitor/share': 4.1.1_@capacitor+core@4.6.3
+  '@capacitor/splash-screen': 4.1.4_@capacitor+core@4.6.3
+  '@capacitor/status-bar': 4.1.1_@capacitor+core@4.6.3
+  '@capacitor/text-zoom': 4.1.0_@capacitor+core@4.6.3
+  '@capacitor/toast': 4.1.0_@capacitor+core@4.6.3
+  '@capawesome/capacitor-file-picker': 0.5.9_@capacitor+core@4.6.3
+  '@capawesome/capacitor-screen-orientation': 2.0.2_@capacitor+core@4.6.3
+  '@capgo/capacitor-crisp': 1.1.21_@capacitor+core@4.6.3
+  '@capgo/capacitor-flash': 1.2.27_@capacitor+core@4.6.3
+  '@capgo/capacitor-mute': 1.1.37_@capacitor+core@4.6.3
+  '@capgo/capacitor-purchases': 1.3.49_@capacitor+core@4.6.3
+  '@capgo/capacitor-screen-recorder': 1.2.37_@capacitor+core@4.6.3
+  '@capgo/capacitor-updater': 4.17.31_@capacitor+core@4.6.3
+  '@capgo/inappbrowser': 0.3.7_@capacitor+core@4.6.3
+  '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.3
+  '@capgo/native-market': 1.1.20
   '@netlify/functions': 1.4.0
   '@supabase/supabase-js': 2.1.3
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.4
   '@vuelidate/core': 2.0.0_vue@3.2.45
   '@vuelidate/validators': 2.0.0_vue@3.2.45
+  '@vueuse/components': 9.12.0_vue@3.2.45
   '@vueuse/core': 9.6.0_vue@3.2.45
   adm-zip: 0.5.10
-  axios: 1.2.5
+  atropos: 1.0.2
+  axios: 1.3.2
   base64-arraybuffer: 1.0.2
   capacitor-native-biometric: 4.1.3
-  capacitor-rate-app: 3.1.0-beta.1_@capacitor+core@4.6.2
+  capacitor-rate-app: 3.1.0-beta.1_@capacitor+core@4.6.3
   chart.js: 4.2.0
   chartjs-adapter-dayjs: 1.0.0_flnltp4hrdaxgqj344pxv5mfdi
   chartjs-plugin-annotation: 2.1.2_chart.js@4.2.0
   copy-text-to-clipboard: 3.0.1
   cron-schedule: 3.0.6
   crypto-random-string: 5.0.0
+  daisyui: 2.50.0_gbtt6ss3tbiz4yjtvdr6fbrj44
   dayjs: 1.11.7
   firebase: 9.15.0
+  flowbite: 1.6.3
   generate-password-browser: 1.1.0
   google-play-scraper: 9.1.1
   json2csv: 5.0.7
+  konsta: 1.0.2
   lauqe: 1.5.0
+  lodash.debounce: 4.0.8
   logsnag: 0.1.6
   mime: 3.0.0
   minio: 7.0.32
@@ -201,15 +218,21 @@ dependencies:
 
 devDependencies:
   '@antfu/eslint-config': 0.33.1_ha6vam6werchizxrnqvarmz2zu
-  '@capacitor/cli': 4.6.2
-  '@capacitor/core': 4.6.2
+  '@capacitor/cli': 4.6.3
+  '@capacitor/core': 4.6.3
   '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': 1.1.8
   '@iconify-json/ion': 1.1.5
   '@iconify-json/ls': 1.1.3
+  '@iconify/json': 2.2.20
   '@intlify/vite-plugin-vue-i18n': 6.0.3_vite@3.2.5+vue-i18n@9.2.2
+  '@tailwindcss/aspect-ratio': 0.4.2_tailwindcss@3.2.4
+  '@tailwindcss/container-queries': 0.1.0_tailwindcss@3.2.4
+  '@tailwindcss/line-clamp': 0.4.2_tailwindcss@3.2.4
+  '@tailwindcss/typography': 0.5.9_tailwindcss@3.2.4
   '@types/adm-zip': 0.5.0
   '@types/fs-extra': 9.0.13
+  '@types/lodash.debounce': 4.0.7
   '@types/mime': 3.0.1
   '@types/minio': 7.0.15
   '@types/node': 18.11.17
@@ -233,6 +256,7 @@ devDependencies:
   tailwindcss: 3.2.4_postcss@8.4.21
   typescript: 4.9.4
   unplugin-icons: 0.15.0_@vue+compiler-sfc@3.2.45
+  unplugin-vue-components: 0.22.12_vue@3.2.45
   vite: 3.2.5_lsvry4w5nj6evwofoi5nudk2oa
   vite-plugin-inspect: 0.7.9_vite@3.2.5
   vite-plugin-pages: 0.27.1_ddag3muocym7uexovvmjvx6a4q
@@ -1584,20 +1608,20 @@ packages:
       '@capacitor/ios': 3.9.0_@capacitor+core@3.9.0
     dev: false
 
-  /@capacitor-community/keep-awake/3.0.0_@capacitor+core@4.6.2:
+  /@capacitor-community/keep-awake/3.0.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-amK9qcQOtsLNBEQ+THXLtNRgHds6SmJUsZ5ZrxGfcqBK8NKzalljejqLUkx2wIbB4ixsKKlrtzlwByyuRGAK+w==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/action-sheet/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/action-sheet/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-q3gRV3iTOHMuN+ihvNgk0G2dJNNnjkBBXS1tdf1rn9tMdX6BUE9Hi2GmXLI9otKkmJ5JIiURnJURtrn3bp8a+Q==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@capacitor/android/3.9.0_@capacitor+core@3.9.0:
@@ -1608,28 +1632,28 @@ packages:
       '@capacitor/core': 3.9.0
     dev: false
 
-  /@capacitor/android/4.6.2_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-PQpOJnMi0i/d4UrT8bPdfkwlKAlQLgsyo2YKj+iUYjEIu8sKQvqDirLYnpeKhj4cflIG2u9mh/eFncooA+u2gw==}
+  /@capacitor/android/4.6.3_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-jYND6OTsvIihxQiox6KARNKzlCHSGnMedXg5DGPZdREM+5F2SIvxBLQxC4/JpFBig2yJCVGsJMmhRkmz12S4FA==}
     peerDependencies:
       '@capacitor/core': ^4.6.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/app-launcher/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/app-launcher/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-0Gv2AOwj5L4uohi384aOSMcfwdVFVuIN9BROxPRC0Ir1sg9Fv60Mu9yBzjVQ0ijLXoZw/nfrFEPSHBWxHmS6Pg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/app/4.1.1_@capacitor+core@4.6.2:
+  /@capacitor/app/4.1.1_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-SJcJA1rhFQyeH6eLfUEbdKkHzAwzahJNVPNXmU88fdmXpMgM2dJGzZj1vrm6e21aQq+Z4aBVLJ2RCdj92zD7wg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@capacitor/assets/2.0.4_moeqx3xmzxqxagf2sz6mqkbb7m:
@@ -1658,20 +1682,20 @@ packages:
       - typescript
     dev: false
 
-  /@capacitor/browser/4.1.1_@capacitor+core@4.6.2:
+  /@capacitor/browser/4.1.1_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-RJKNeRiLm6X668X75YiPN/9t3z1pxVEPjIhLM/AtWAEsHUb8bjroQQ3WGdW/30Wa60a7ywiw3YLqWctfRaYyFw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/camera/4.1.4_@capacitor+core@4.6.2:
+  /@capacitor/camera/4.1.4_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-7f4n7PlnstYsdGyxc0Kc4hIyS6csFLOjXvffm7pJsuy9pSo+kfdOPdYgGg360QwbUAmA+Yv+J1ZW1eFIwgvWrQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@capacitor/cli/3.9.0:
@@ -1699,8 +1723,8 @@ packages:
       - supports-color
     dev: false
 
-  /@capacitor/cli/4.6.2:
-    resolution: {integrity: sha512-035RIynwnmusv9Z/1jPDP+i7Z54ZY3qxNtf6cA69TxZlnozAqBkjPyHGuaAugxSn+4jzCobSLE3456VHhHMx1g==}
+  /@capacitor/cli/4.6.3:
+    resolution: {integrity: sha512-3BLti5iAo8lzkwUeWoZCMBGKxkY2aAlGR0SCmVzok3c2LXJwYNhrlrsoKFRjUHsiO4CmhmtR1ee2gsjvIzkOqQ==}
     engines: {node: '>=12.4.0'}
     hasBin: true
     dependencies:
@@ -1725,12 +1749,12 @@ packages:
       - supports-color
     dev: true
 
-  /@capacitor/clipboard/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/clipboard/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-lfUwDqZces3mQcBOyfxpBCsRWWSfLuPzekA1N3RaMgYVhD6/rdzFnzfRiksj1hm4It+lnULK0y+N5nxVnTt+0Q==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@capacitor/core/3.9.0:
@@ -1739,25 +1763,25 @@ packages:
       tslib: 2.5.0
     dev: false
 
-  /@capacitor/core/4.6.2:
-    resolution: {integrity: sha512-M/KpAg+peft/HTb7svLiKHxjbll67ybs1vEqhZuvjXlwro53NxNXR4YJS7+wNXZSiA4Kxjtf+a754xGgZcMarA==}
+  /@capacitor/core/4.6.3:
+    resolution: {integrity: sha512-VJTUoZWUCVrp1cV1S4rqAwcV1/bF7KSVI4+/YUdVIBoHwnNxVweX15k5/etIeUZYaWxM6jwS2iIK9I86+G7ccQ==}
     dependencies:
       tslib: 2.5.0
 
-  /@capacitor/device/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/device/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-BlcYb6e6m+vC1SxeyUDIUGfuNXdKEcpFPDCs/kxk2SByFc/BkvXeoy4NjY4qmTderGELofX9bta5Iy9JV7rGUg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/dialog/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/dialog/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-Uej4+WE6Ec445iTzLVD22fmsPfu8nW+IJyiixtzP5+ZLNhdJ5mjbMUUTUrZTbDUK8hViFRsfLo90qbeGzgMTVA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@capacitor/filesystem/1.1.0_@capacitor+core@3.9.0:
@@ -1768,28 +1792,28 @@ packages:
       '@capacitor/core': 3.9.0
     dev: false
 
-  /@capacitor/filesystem/4.1.4_@capacitor+core@4.6.2:
+  /@capacitor/filesystem/4.1.4_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-ivko1RNK4hq63xhMacq8D6D97N5/SAafTsrmY/pghYrG6Cl2SEY0+IgRu7V9/VWeN3FSplyUPucjUTAFQxXN5g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/geolocation/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/geolocation/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-hfI4MUcu1zcJPTvm0g6V3telTGwq9sCU8EnY4hFJpLedbIQeWPthCOSbFtNHAU5mVaAP1Zls3x6TsXL8TX08EA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/haptics/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/haptics/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-gAIFy50e1VZPdokRFLkl8Y+yZYB3e4brd5yu9DRShbWbheruwU34TxtG5C1NANvq4mbXd3tMXzBi59Q5JFyTHA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@capacitor/ios/3.9.0_@capacitor+core@3.9.0:
@@ -1800,194 +1824,194 @@ packages:
       '@capacitor/core': 3.9.0
     dev: false
 
-  /@capacitor/ios/4.6.2_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-3hQzbAOk+drCLyFjnytvkc20Mr077/9tQrv6iTghDXESDGR6EgcaYUXzKdVwuJscb0R459+5UQ2mYtkx6ES4TQ==}
+  /@capacitor/ios/4.6.3_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-sjvyIx/7U376YnTWIXjIBspzf0e1ZKocVjpTeqtM9AbUg4XtPQZa1Lje/lT6EFQ71bGTcxmq0wylnPRB7LzHNg==}
     peerDependencies:
       '@capacitor/core': ^4.6.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/keyboard/4.1.1_@capacitor+core@4.6.2:
+  /@capacitor/keyboard/4.1.1_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-fdC7u2TeG4BqwC0LnPnhOdya31C4QKdhk/8pc5lxI9X5jyYAetMCN1kEkKa7KREw4DdzXotJt27B9BXxAza6og==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/local-notifications/4.1.4_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-nEs0SYkOQG7xT8FiKH7CG6BFOJ7jZkWiYt+JbM38s8sSxsAw1D2qfocNIyXstTUxhrJvKBtbl7oTuKg7mGUeuQ==}
+  /@capacitor/local-notifications/4.1.5_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-zUU4WvXxweALIDp9gBjurpwF9drLeMNe+O5tVKiUr/8PsaxB9dlv2ciuN5Seq4b+9LftOfTuzEX2PY7JkOJy1g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/motion/4.0.2_@capacitor+core@4.6.2:
+  /@capacitor/motion/4.0.2_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-reLCkCwyM6ntGrd5jWL98kQi5wlUqkh/HpYIWpAis6qXIL9rIEvkFNG5oAG5B7Jepz3kO2WIFoou+OgfPHF8aw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/network/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/network/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-GMJ6LmxmrFA55rAaYxgm4tKSZyUmuLRreQz5Gdu0P09Ja8abSjmXa/DX16gOu1I1+wqHWm2rRI6nPkeUH55Ibw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/preferences/4.0.2_@capacitor+core@4.6.2:
+  /@capacitor/preferences/4.0.2_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-HgcRkMdVHSIV3TeQLZFmCaCeMWQ25wLyZZ7dA2f8Rw81Q1Nroxsi7HxTEGNqrWKSN9PNKBJD8vChr6eB2GNtZg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/push-notifications/4.1.2_@capacitor+core@4.6.2:
+  /@capacitor/push-notifications/4.1.2_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-ok6CGvedwK1azmf8VWhrNlg6jhi4PFz3HoyS0GNE2ew7+JGnxN77sgK5q1TVzdkge+vkqipO6uu5bD1xfj/pWQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/screen-reader/4.1.2_@capacitor+core@4.6.2:
+  /@capacitor/screen-reader/4.1.2_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-v2ITQdhJMkUr51QzMU4Fp0sYuB8vYBuSsb0aAH2DyCrHpQWG87hycbt8E4QJmU6XJMQp3f74W0SlY/SueRtmhQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/share/4.1.0_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-Gh/cgy7Ee+9fkhw+Q4+9s2S4HiC34/eLoaohqRg1ahtpqvTQ3qdInoEJ23FdILq5cLj2ZPpx2VuEXjpLKX1Z5A==}
+  /@capacitor/share/4.1.1_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-srk1/8mz9U84Eyz7R0Wh76IhTAl+CaU5Q43rbwwDhjp5Q/NhNl9yNLGRZBRmV8qlyVMH7K5R2Se/VozM8CKJ/g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/splash-screen/4.1.3_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-WkQQHFVK9kST+D8B0Z0jRGzZRQhtSKPhCkGez9dbOM+ggjCSjaXf90DK0nABbuNuO/99XAY6cJFkrZzw6erTBw==}
+  /@capacitor/splash-screen/4.1.4_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-ETCxsJa94H4vYOXWLd0KKEmMwme4jrJddfieU0wXhhkRq3Fohv6CxTiG07vYbVzdMkzmWyq17yM5o3TKa3AQCA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/status-bar/4.1.1_@capacitor+core@4.6.2:
+  /@capacitor/status-bar/4.1.1_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-3wosxMD1XuIFz88+c2GdVEHSJV6u7suOeKQjyWf3zf9eFr622Sg+udZqDbC0dtTWXw97BWyCjv3r1EYJw7XnIA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/text-zoom/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/text-zoom/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-eFKG3psotvvZz+A1XeGG+4vjJ0Q3Y3iMaxV9fhueYj4APLGP1enVI1b2EvCMg6tPDeX1WHtRMp/8k9phQkDDFw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capacitor/toast/4.1.0_@capacitor+core@4.6.2:
+  /@capacitor/toast/4.1.0_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-hU3GoA1dT+dsMuDOlEeiaU2mdd4VCLvIzgbp7Vk0Mqy9tbg++W4t7hcewlawzJGs6FxH59rIekf2lz7m4ir33w==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capawesome/capacitor-file-picker/0.5.9_@capacitor+core@4.6.2:
+  /@capawesome/capacitor-file-picker/0.5.9_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-uiVkjtFHZ1NyRjGAMaRSP1Eq/3a56oPCQ/XNWqmOkHAqj9ekIO8SP7eRh/StM+S9DEotH3irq1e6Bbrc/I486A==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capawesome/capacitor-screen-orientation/2.0.2_@capacitor+core@4.6.2:
+  /@capawesome/capacitor-screen-orientation/2.0.2_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-DZTev7UNVmp4a7g89MG0Austpsssgub0kGH2Z+KCfIP3aKoxjBGk9+UrFdT0FkS+20odToPXMyDxLoaDIX29aw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/capacitor-crisp/1.1.21_@capacitor+core@4.6.2:
+  /@capgo/capacitor-crisp/1.1.21_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-MMsqMPU2lZYXkgzhqAjjbAa06yiB8yhdYeWrnF13ydtBZlf81JhA3lZIJ4NSGfcVn8xxF4mfGTy4zlrhZ0peoA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/capacitor-flash/1.2.27_@capacitor+core@4.6.2:
+  /@capgo/capacitor-flash/1.2.27_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-4Unm51Vm78SmQHiHL+Vop9wJv9fmexSok6DA9TTJ6HXW2JNphF9jXeYN9ZAcWFX3fonbUA0VhtJqHohx7mqH8g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/capacitor-mute/1.1.36_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-QANbJJRoJT6DxQrmjCShRIeLc67CD9IcxqeNXmYNpcHmaPoE3C4FPuNGOjmMD2NoGPFrtJeigEPYDFXub9jVBQ==}
+  /@capgo/capacitor-mute/1.1.37_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-IXzA4uJ9GG8SPFiA+117/7xsl7b02TWofoTpmqblkanxLqZyS9iJjXrb6ggbj0c3w4HlnzhBzfidMC6rOVWV9g==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/capacitor-purchases/1.3.49_@capacitor+core@4.6.2:
+  /@capgo/capacitor-purchases/1.3.49_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-ZY6Hmibumls+7Hw8l0Fzgu3D6HPEbb6W1Qme7G2SyI8De0unLFWLX6mVat0rn+T8XJkpo6ozY3FeWj6deP4nfQ==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/capacitor-screen-recorder/1.2.35_@capacitor+core@4.6.2:
-    resolution: {integrity: sha512-2055tuF7HwlczIbRUw6FUZ7NKGtfViHykdmRLDfbHUT21q7CgZetzIyQglvrzRRM1+wPyn5OE8d8dJuhDEHh6A==}
+  /@capgo/capacitor-screen-recorder/1.2.37_@capacitor+core@4.6.3:
+    resolution: {integrity: sha512-pXDtTxDdJ6dKZgoqe+m0BM8fTU78qy0aGHSag4ww9ma8p8/wOdH0ZYg3+seG8h/ok2uo/T5EXH2R2LLpHG81TA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/capacitor-updater/4.17.31_@capacitor+core@4.6.2:
+  /@capgo/capacitor-updater/4.17.31_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-n0mgu7oyqOXr2sY81RcNWPuxm1WTQRwq9OYP4w8jwdWpXh4URzem3YwpPwyLjUcoB52LYoMiwJ2HaDOJkXsQmA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/inappbrowser/0.3.7_@capacitor+core@4.6.2:
+  /@capgo/inappbrowser/0.3.7_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-KC0B6Il6lOKxHnUprOZScHXIb2UBwItEVzOXHWqfHFqAJ1CDv6TEjviqda9xRDfMCQW0lXBHxPCdaP51JDrdDw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/native-audio/5.0.7_@capacitor+core@4.6.2:
+  /@capgo/native-audio/5.0.7_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-sSDNYt9xE+7ICJ6AVfqJJoxKdTMCArIIjyeTsOnggbrIc5+m7EeBIdOnyglPgr3rVQOS7tliKEq2T5K+gC6iEw==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
-  /@capgo/native-market/1.1.18:
-    resolution: {integrity: sha512-bbAQtxKq4RMRNmd+mdwwnDdrQnmU1xXepoV+807IVLFhIg9/9AX8JlH8mQJXWcEHCQWPJ4/X12hu8vfH7LBAsA==}
+  /@capgo/native-market/1.1.20:
+    resolution: {integrity: sha512-JsF7xwzmM3MaDhd8f/s+SBAF9WwdoN6D8QMNl0bEe05zPqDo+srVeMDnelJ8EfWmLNBf4gV+MwriCz30h/2BaQ==}
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /@colors/colors/1.5.0:
@@ -2642,6 +2666,13 @@ packages:
       '@iconify/types': 2.0.0
     dev: true
 
+  /@iconify/json/2.2.20:
+    resolution: {integrity: sha512-mi7rXIc+/un3+GuIZkHJrfgLL5jjrfG0UidRybYj8LLh2bdUV3P5mz0+a2O+bwE9V5hvbFGBekgt5rvSnQYGHQ==}
+    dependencies:
+      '@iconify/types': 2.0.0
+      pathe: 1.1.0
+    dev: true
+
   /@iconify/types/2.0.0:
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
     dev: true
@@ -2766,14 +2797,6 @@ packages:
     transitivePeerDependencies:
       - supports-color
 
-  /@ionic/core/6.4.0:
-    resolution: {integrity: sha512-rWqXX67bWDD5r5Kleacy4dTBIXcB1gX+2Q5AK7LAtmtHUUuJPqGw/bAWE8hGKlF7ehJTyzb5CYV9XDzb8/00Zw==}
-    dependencies:
-      '@stencil/core': 2.22.2
-      ionicons: 6.1.1
-      tslib: 2.5.0
-    dev: false
-
   /@ionic/utils-array/2.1.5:
     resolution: {integrity: sha512-HD72a71IQVBmQckDwmA8RxNVMTbxnaLbgFOl+dO5tbvW9CkkSFCv41h6fUuNsSEVgngfkn0i98HDuZC8mk+lTA==}
     engines: {node: '>=10.3.0'}
@@ -2855,13 +2878,6 @@ packages:
       wrap-ansi: 7.0.0
     transitivePeerDependencies:
       - supports-color
-
-  /@ionic/vue/6.4.0:
-    resolution: {integrity: sha512-dMFf9h4K4UK5IKR/F5FbCpPsthJDkt99YbgacyS/Zl/tXxd4ZsQ2ViBB9wUf56lDbx3GdJMe+XmElqWxvrOg7w==}
-    dependencies:
-      '@ionic/core': 6.4.0
-      ionicons: 6.1.1
-    dev: false
 
   /@jest/types/25.5.0:
     resolution: {integrity: sha512-OXD0RgQ86Tu3MazKo8bnrkDRaDXXMGUqd+kTtLtK1Zb7CRzQcaSRPPPV37SvYTdevXEBVxe0HXylEjs8ibkmCw==}
@@ -3838,6 +3854,10 @@ packages:
     resolution: {integrity: sha512-a5Sab1C4/icpTZVzZc5Ghpz88yQtGOyNqYXcZgOssB2uuAr+wF/MvN6bgtW32q7HHrvBki+BsZ0OuNv6EV3K9g==}
     dev: true
 
+  /@popperjs/core/2.11.6:
+    resolution: {integrity: sha512-50/17A98tWUfQ176raKiOGXuYpLyyVMkxxG6oylzL3BPOlA6ADGdK7EYunSa4I064xerltq9TGXs8HmOk5E+vw==}
+    dev: false
+
   /@prettier/plugin-xml/2.2.0:
     resolution: {integrity: sha512-UWRmygBsyj4bVXvDiqSccwT1kmsorcwQwaIy30yVh8T+Gspx4OlC0shX1y+ZuwXZvgnafmpRYKks0bAu9urJew==}
     dependencies:
@@ -4063,12 +4083,6 @@ packages:
     resolution: {integrity: sha512-T7VNNlYVM1SgQ+VsMYhnDkcGmWhQdL0bDyGm5TlQ3GBXnJscEClUUOKduWTmm2zCnvNLC1hc3JpuXjs/nFOc5w==}
     dev: true
 
-  /@stencil/core/2.22.2:
-    resolution: {integrity: sha512-r+vbxsGNcBaV1VDOYW25lv4QfXTlNoIb5GpUX7rZ+cr59yqYCZC5tlV+IzX6YgHKW62ulCc9M3RYtTfHtNbNNw==}
-    engines: {node: '>=12.10.0', npm: '>=6.0.0'}
-    hasBin: true
-    dev: false
-
   /@supabase/functions-js/2.0.0:
     resolution: {integrity: sha512-ozb7bds2yvf5k7NM2ZzUkxvsx4S4i2eRKFSJetdTADV91T65g4gCzEs9L3LUXSrghcGIkUaon03VPzOrFredqg==}
     dependencies:
@@ -4153,6 +4167,22 @@ packages:
       defer-to-connect: 2.0.1
     dev: true
 
+  /@tailwindcss/aspect-ratio/0.4.2_tailwindcss@3.2.4:
+    resolution: {integrity: sha512-8QPrypskfBa7QIMuKHg2TA7BqES6vhBrDLOv8Unb6FcFyd3TjKbc6lcmb9UPQHxfl24sXoJ41ux/H7qQQvfaSQ==}
+    peerDependencies:
+      tailwindcss: '>=2.0.0 || >=3.0.0 || >=3.0.0-alpha.1'
+    dependencies:
+      tailwindcss: 3.2.4_postcss@8.4.21
+    dev: true
+
+  /@tailwindcss/container-queries/0.1.0_tailwindcss@3.2.4:
+    resolution: {integrity: sha512-t1GeJ9P8ual160BvKy6Y1sG7bjChArMaK6iRXm3ZYjZGN2FTzmqb5ztsTDb9AsTSJD4NMHtsnaI2ielrXEk+hw==}
+    peerDependencies:
+      tailwindcss: '>=3.2.0'
+    dependencies:
+      tailwindcss: 3.2.4_postcss@8.4.21
+    dev: true
+
   /@tailwindcss/forms/0.5.3_tailwindcss@3.2.4:
     resolution: {integrity: sha512-y5mb86JUoiUgBjY/o6FJSFZSEttfb3Q5gllE4xoKjAAD+vBrnIhE4dViwUuow3va8mpH4s9jyUbUbrRGoRdc2Q==}
     peerDependencies:
@@ -4161,6 +4191,26 @@ packages:
       mini-svg-data-uri: 1.4.4
       tailwindcss: 3.2.4_postcss@8.4.21
     dev: false
+
+  /@tailwindcss/line-clamp/0.4.2_tailwindcss@3.2.4:
+    resolution: {integrity: sha512-HFzAQuqYCjyy/SX9sLGB1lroPzmcnWv1FHkIpmypte10hptf4oPUfucryMKovZh2u0uiS9U5Ty3GghWfEJGwVw==}
+    peerDependencies:
+      tailwindcss: '>=2.0.0 || >=3.0.0 || >=3.0.0-alpha.1'
+    dependencies:
+      tailwindcss: 3.2.4_postcss@8.4.21
+    dev: true
+
+  /@tailwindcss/typography/0.5.9_tailwindcss@3.2.4:
+    resolution: {integrity: sha512-t8Sg3DyynFysV9f4JDOVISGsjazNb48AeIYQwcL+Bsq5uf4RYL75C1giZ43KISjeDGBaTN3Kxh7Xj/vRSMJUUg==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || insiders'
+    dependencies:
+      lodash.castarray: 4.4.0
+      lodash.isplainobject: 4.0.6
+      lodash.merge: 4.6.2
+      postcss-selector-parser: 6.0.10
+      tailwindcss: 3.2.4_postcss@8.4.21
+    dev: true
 
   /@trapezedev/gradle-parse/5.0.10:
     resolution: {integrity: sha512-yriBEyOkJ8K4mHCgoyUKQCyVI8tP4S513Wp6/9SCx6Ub8ZvSQUonqU3/OZB2G8FRfL4aijpFfMWtiVFJbX6V/w==}
@@ -4313,13 +4363,13 @@ packages:
     resolution: {integrity: sha512-9K4zoImiZc3HlIp6AVUDE4CWYx22a+lhSZMYNpbjW04+YF0KWj4pJXnEMjdnFTiQibFFmElcsasJXDbdI/EPhA==}
     dependencies:
       '@types/eslint': 8.4.10
-      '@types/estree': 0.0.51
+      '@types/estree': 1.0.0
     dev: true
 
   /@types/eslint/8.4.10:
     resolution: {integrity: sha512-Sl/HOqN8NKPmhWo2VBEPm0nvHnu2LL3v9vKo8MEq0EtbJ4eVzGPl41VNPvn5E1i5poMk4/XD8UriLHpJvEP/Nw==}
     dependencies:
-      '@types/estree': 0.0.51
+      '@types/estree': 1.0.0
       '@types/json-schema': 7.0.11
     dev: true
 
@@ -4437,9 +4487,14 @@ packages:
     dependencies:
       '@types/node': 18.11.17
 
+  /@types/lodash.debounce/4.0.7:
+    resolution: {integrity: sha512-X1T4wMZ+gT000M2/91SYj0d/7JfeNZ9PeeOldSNoE/lunLeQXKvkmIumI29IaKMotU/ln/McOIvgzZcQ/3TrSA==}
+    dependencies:
+      '@types/lodash': 4.14.191
+    dev: true
+
   /@types/lodash/4.14.191:
     resolution: {integrity: sha512-BdZ5BCCvho3EIXw6wUCXHe7rS53AIDPLE+JzwgT+OsJk53oBfbSmZZ7CX4VaRoN78N+TJpFi9QPlfIVNmJYWxQ==}
-    dev: false
 
   /@types/long/4.0.2:
     resolution: {integrity: sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA==}
@@ -5239,6 +5294,29 @@ packages:
       vue-demi: 0.13.11_vue@3.2.45
     dev: false
 
+  /@vueuse/components/9.12.0_vue@3.2.45:
+    resolution: {integrity: sha512-U468xbr2PISuWepeOU4J8zkVj0aDhiFe230oDhnIm8mHtcS9gM2vSKTB32InxTs6kVma60yAGdqBySkyFNX/+w==}
+    dependencies:
+      '@vueuse/core': 9.12.0_vue@3.2.45
+      '@vueuse/shared': 9.12.0_vue@3.2.45
+      vue-demi: 0.13.11_vue@3.2.45
+    transitivePeerDependencies:
+      - '@vue/composition-api'
+      - vue
+    dev: false
+
+  /@vueuse/core/9.12.0_vue@3.2.45:
+    resolution: {integrity: sha512-h/Di8Bvf6xRcvS/PvUVheiMYYz3U0tH3X25YxONSaAUBa841ayMwxkuzx/DGUMCW/wHWzD8tRy2zYmOC36r4sg==}
+    dependencies:
+      '@types/web-bluetooth': 0.0.16
+      '@vueuse/metadata': 9.12.0
+      '@vueuse/shared': 9.12.0_vue@3.2.45
+      vue-demi: 0.13.11_vue@3.2.45
+    transitivePeerDependencies:
+      - '@vue/composition-api'
+      - vue
+    dev: false
+
   /@vueuse/core/9.6.0_vue@3.2.45:
     resolution: {integrity: sha512-qGUcjKQXHgN+jqXEgpeZGoxdCbIDCdVPz3QiF1uyecVGbMuM63o96I1GjYx5zskKgRI0FKSNsVWM7rwrRMTf6A==}
     dependencies:
@@ -5251,8 +5329,21 @@ packages:
       - vue
     dev: false
 
+  /@vueuse/metadata/9.12.0:
+    resolution: {integrity: sha512-9oJ9MM9lFLlmvxXUqsR1wLt1uF7EVbP5iYaHJYqk+G2PbMjY6EXvZeTjbdO89HgoF5cI6z49o2zT/jD9SVoNpQ==}
+    dev: false
+
   /@vueuse/metadata/9.6.0:
     resolution: {integrity: sha512-sIC8R+kWkIdpi5X2z2Gk8TRYzmczDwHRhEFfCu2P+XW2JdPoXrziqsGpDDsN7ykBx4ilwieS7JUIweVGhvZ93w==}
+    dev: false
+
+  /@vueuse/shared/9.12.0_vue@3.2.45:
+    resolution: {integrity: sha512-TWuJLACQ0BVithVTRbex4Wf1a1VaRuSpVeyEd4vMUWl54PzlE0ciFUshKCXnlLuD0lxIaLK4Ypj3NXYzZh4+SQ==}
+    dependencies:
+      vue-demi: 0.13.11_vue@3.2.45
+    transitivePeerDependencies:
+      - '@vue/composition-api'
+      - vue
     dev: false
 
   /@vueuse/shared/9.6.0_vue@3.2.45:
@@ -5957,6 +6048,11 @@ packages:
     hasBin: true
     dev: true
 
+  /atropos/1.0.2:
+    resolution: {integrity: sha512-0RqyHfMyIhRXgnHuSQz2LVOE81jtAQ7EZTrF75ngiipklIsxajZ2vD042EXdiIEDs6eEAzfE10k+YhIbNl4/eg==}
+    engines: {node: '>= 12.0.0'}
+    dev: false
+
   /autoprefixer/10.4.13_postcss@8.4.21:
     resolution: {integrity: sha512-49vKpMqcZYsJjwotvt4+h/BCjJVnhGwcLpDt5xkcaOG3eLrG/HUYLagrihYsQ+qrIBgIzX1Rw7a6L8I/ZA1Atg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -5971,7 +6067,6 @@ packages:
       picocolors: 1.0.0
       postcss: 8.4.21
       postcss-value-parser: 4.2.0
-    dev: true
 
   /available-typed-arrays/1.0.5:
     resolution: {integrity: sha512-DMD0KiN46eipeziST1LPP/STfDU0sufISXmjSgvVsoU2tqxctQeASejWcfNtxYKqETM1UxQ8sp2OrSBWpHY6sw==}
@@ -5985,8 +6080,8 @@ packages:
     resolution: {integrity: sha512-NmWvPnx0F1SfrQbYwOi7OeaNGokp9XhzNioJ/CSBs8Qa4vxug81mhJEAVZwxXuBmYB5KDRfMq/F3RR0BIU7sWg==}
     dev: true
 
-  /axios/1.2.5:
-    resolution: {integrity: sha512-9pU/8mmjSSOb4CXVsvGIevN+MlO/t9OWtKadTaLuN85Gge3HGorUckgp8A/2FH4V4hJ7JuQ3LIeI7KAV9ITZrQ==}
+  /axios/1.3.2:
+    resolution: {integrity: sha512-1M3O703bYqYuPhbHeya5bnhpYVsDDRyQSabNja04mZtboLNSuZ4YrltestrLXfHgmzua4TpUqRiVKbiQuo2epw==}
     dependencies:
       follow-redirects: 1.15.2
       form-data: 4.0.0
@@ -6354,7 +6449,6 @@ packages:
       electron-to-chromium: 1.4.284
       node-releases: 2.0.8
       update-browserslist-db: 1.0.10_browserslist@4.21.4
-    dev: true
 
   /buffer-alloc-unsafe/1.1.0:
     resolution: {integrity: sha512-TEM2iMIEQdJ2yjPJoSIsldnleVaAk1oW3DBVUykyOLsEsFmEc9kn+SFFPz+gl54KQNxlDnAwCXosOS9Okx2xAg==}
@@ -6585,7 +6679,6 @@ packages:
 
   /caniuse-lite/1.0.30001449:
     resolution: {integrity: sha512-CPB+UL9XMT/Av+pJxCKGhdx+yg1hzplvFJQlJ2n68PyQGMz9L/E2zCyLdOL8uasbouTUgnPl+y0tccI/se+BEw==}
-    dev: true
 
   /capacitor-native-biometric/4.1.3:
     resolution: {integrity: sha512-I2DcDE7Nydz2gthJgoecdJD5g6ugvKM5qgGuwoniDA6+pwgMLnwPzBwBYdbRaVdUD9K6xZKO4VojFbsDdwqjvw==}
@@ -6593,12 +6686,12 @@ packages:
       '@capacitor/core': 3.9.0
     dev: false
 
-  /capacitor-rate-app/3.1.0-beta.1_@capacitor+core@4.6.2:
+  /capacitor-rate-app/3.1.0-beta.1_@capacitor+core@4.6.3:
     resolution: {integrity: sha512-86MxZFldb6kG5Kz4C6NrMAmILodVHnkwVwOTs5aeteQ5z3gBSnk/IQO54+rGcWImnwGaZACkn1EFmb4gckBQfA==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:
-      '@capacitor/core': 4.6.2
+      '@capacitor/core': 4.6.3
     dev: false
 
   /case-sensitive-paths-webpack-plugin/2.4.0:
@@ -7877,6 +7970,13 @@ packages:
       nth-check: 2.1.1
     dev: false
 
+  /css-selector-tokenizer/0.8.0:
+    resolution: {integrity: sha512-Jd6Ig3/pe62/qe5SBPTN8h8LeUg/pT4lLgtavPf7updwwHpvFzxvOQBHYj2LZDMjUnBzgvIUSjRcf6oT5HzHFg==}
+    dependencies:
+      cssesc: 3.0.0
+      fastparse: 1.1.2
+    dev: false
+
   /css-tree/1.1.3:
     resolution: {integrity: sha512-tRpdppF7TRazZrjJ6v3stzv93qxRcSsFmW6cX0Zm2NVKpxE1WV1HblnghVv9TreireHkqI/VDEsfolRF1p6y7Q==}
     engines: {node: '>=8.0.0'}
@@ -8026,6 +8126,22 @@ packages:
     dependencies:
       es5-ext: 0.10.62
       type: 1.2.0
+    dev: false
+
+  /daisyui/2.50.0_gbtt6ss3tbiz4yjtvdr6fbrj44:
+    resolution: {integrity: sha512-KiqRvqMXi9rgoH84M8D69gXPg6x+cbdiaHqm8pFHOsXXN1rTl/+OcCKkSnkEwTtIge9VJVDGU6l4B8/n+Juc5g==}
+    peerDependencies:
+      autoprefixer: ^10.0.2
+      postcss: ^8.1.6
+    dependencies:
+      autoprefixer: 10.4.13_postcss@8.4.21
+      color: 4.2.3
+      css-selector-tokenizer: 0.8.0
+      postcss: 8.4.21
+      postcss-js: 4.0.0_postcss@8.4.21
+      tailwindcss: 3.2.4_postcss@8.4.21
+    transitivePeerDependencies:
+      - ts-node
     dev: false
 
   /dargs/7.0.0:
@@ -8760,7 +8876,6 @@ packages:
 
   /electron-to-chromium/1.4.284:
     resolution: {integrity: sha512-M8WEXFuKXMYMVr45fo8mq0wUrrJHheiKZf6BArTKk9ZBYCKJEOU5H8cdWgDT+qCVZf7Na4lVUaZsA+h6uA9+PA==}
-    dev: true
 
   /elegant-spinner/1.0.1:
     resolution: {integrity: sha512-B+ZM+RXvRqQaAmkMlO/oSe5nMUOaUnyfGYCEHoR8wrXsZR2mA0XVibsxV1bvTwxdRWah1PkQqso2EzhILGHtEQ==}
@@ -9960,6 +10075,10 @@ packages:
       strnum: 1.0.5
     dev: false
 
+  /fastparse/1.1.2:
+    resolution: {integrity: sha512-483XLLxTVIwWK3QTrMGRqUfUpoOs/0hbQrl2oz4J0pAcm3A3bu84wxTFqGqkJzewCLdME38xJLJAxBABfQT8sQ==}
+    dev: false
+
   /fastq/1.15.0:
     resolution: {integrity: sha512-wBrocU2LCXXa+lWBt8RoIRD89Fi8OdABODa/kEnyeyjS5aZO5/GNvI5sEINADqP/h8M29UHTHUb53sUu5Ihqdw==}
     dependencies:
@@ -10216,6 +10335,13 @@ packages:
     resolution: {integrity: sha512-5nqDSxl8nn5BSNxyR3n4I6eDmbolI6WT+QqR547RwxQapgjQBmtktdP+HTBb/a/zLsbzERTONyUB5pefh5TtjQ==}
     dev: true
 
+  /flowbite/1.6.3:
+    resolution: {integrity: sha512-wTtAzZBLrUYqUBoTSNcMAeJrZNAcdx04EDgXWnkQ7gkKoAPFvLaq/H/Zw0JKZLVKFpKxqJ7PlvocfDApSHjhvw==}
+    dependencies:
+      '@popperjs/core': 2.11.6
+      mini-svg-data-uri: 1.4.4
+    dev: false
+
   /flush-write-stream/2.0.0:
     resolution: {integrity: sha512-uXClqPxT4xW0lcdSBheb2ObVU+kuqUk3Jk64EwieirEXZx9XUrVwp/JuBfKAWaM4T5Td/VL7QLDWPXp/MvGm/g==}
     dependencies:
@@ -10335,7 +10461,6 @@ packages:
 
   /fraction.js/4.2.0:
     resolution: {integrity: sha512-MhLuK+2gUcnZe8ZHlaaINnQLl0xRIGRfcGk2yl8xoQAfHrSsL3rYu6FCmBdkdbhc9EPlwyGHewaRsvwRMJtAlA==}
-    dev: true
 
   /fragment-cache/0.2.1:
     resolution: {integrity: sha512-GMBAbW9antB8iZRHLoGw0b3HANt57diZYFO/HL1JGIC1MjKrdmhxvrJbupnVvpys0zsz7yBApXdQyfepKly2kA==}
@@ -11473,12 +11598,6 @@ packages:
       p-is-promise: 1.1.0
     dev: true
 
-  /ionicons/6.1.1:
-    resolution: {integrity: sha512-Qe6mx25DFNwA9UL1rhewI5StI3uD4+BqB2KdvLjyWhtvoUXwyAsmfHLZuDANAHQowIKtTt6BZCt5/g5NIQ635Q==}
-    dependencies:
-      '@stencil/core': 2.22.2
-    dev: false
-
   /ipaddr.js/1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
@@ -12384,6 +12503,11 @@ packages:
     resolution: {integrity: sha512-dLkz37Ab97HWMx9KTes3Tbi3D1ln9fCAy2zr2YVExJasDRPGRaKcoE4fycWNtnCAJfjFqe0cnY+f8KT2JePEXQ==}
     dev: true
 
+  /konsta/1.0.2:
+    resolution: {integrity: sha512-EIi/u6HDgGy9Vbi0a2AUtsQo4qN8l1ZZWyJs/D18MjVUnVxqX7Od9O8odO+XCIzZd1djeUmxfH6frDW71UvyhQ==}
+    engines: {node: '>= 4.7.0'}
+    dev: false
+
   /kuler/2.0.0:
     resolution: {integrity: sha512-Xq9nH7KlWZmXAtodXDDRE7vs6DU1gTU8zYDHDiWLSip45Egwq3plLHzPn27NgvzL2r1LMPC1vdqh98sQxtqj4A==}
     dev: true
@@ -12615,9 +12739,12 @@ packages:
     resolution: {integrity: sha512-TwuEnCnxbc3rAvhf/LbG7tJUDzhqXyFnv3dtzLOPgCG/hODL7WFnsbwktkD7yUV0RrreP/l1PALq/YSg6VvjlA==}
     dev: false
 
+  /lodash.castarray/4.4.0:
+    resolution: {integrity: sha512-aVx8ztPv7/2ULbArGJ2Y42bG1mEQ5mGjpdvrbJcJFU3TbYybe+QlLS4pst9zV52ymy2in1KpFPiZnAOATxD4+Q==}
+    dev: true
+
   /lodash.debounce/4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
-    dev: true
 
   /lodash.defaults/4.2.0:
     resolution: {integrity: sha512-qjxPLHd3r5DnsdGacqOMU6pb/avJzdh9tFX2ymgoZE27BmjXrNy/y4LoaiTeAb+O3gL8AfpJGtqfX/ae2leYYQ==}
@@ -12865,6 +12992,13 @@ packages:
     engines: {node: '>=12'}
     dependencies:
       sourcemap-codec: 1.4.8
+    dev: true
+
+  /magic-string/0.27.0:
+    resolution: {integrity: sha512-8UnnX2PeRAPZuN12svgR9j7M1uWMovg/CEnIwIG0LFkXSJJe4PdfUGiTGl8V9bsBHFUtfVINcSyYxd7q+kx9fA==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.4.14
     dev: true
 
   /make-dir/1.3.0:
@@ -13727,7 +13861,6 @@ packages:
 
   /node-releases/2.0.8:
     resolution: {integrity: sha512-dFSmB8fFHEH/s81Xi+Y/15DQY6VHW81nXRj86EMSL3lmuTmK1e+aT4wrFCkTbm+gSwkw4KpX+rT/pMM2c1mF+A==}
-    dev: true
 
   /node-source-walk/4.3.0:
     resolution: {integrity: sha512-8Q1hXew6ETzqKRAs3jjLioSxNfT1cx74ooiF8RlAONwVMcfq+UdzLC2eB5qcPldUxaE5w3ytLkrmV1TGddhZTA==}
@@ -13837,7 +13970,6 @@ packages:
   /normalize-range/0.1.2:
     resolution: {integrity: sha512-bdok/XvKII3nUpklnV6P2hxtMNrCboOjAcyBuQnWEhO665FwrSNRxU+AqpsyvO6LgGYPspN+lu5CLtw4jPRKNA==}
     engines: {node: '>=0.10.0'}
-    dev: true
 
   /normalize-url/2.0.1:
     resolution: {integrity: sha512-D6MUW4K/VzoJ4rJ01JFKxDrtY1v9wrgzCX5f2qj/lzH1m/lW6MhUZFKerVsnyjOhOsYzI9Kqqak+10l4LvLpMw==}
@@ -14546,6 +14678,10 @@ packages:
     engines: {node: '>=12'}
     dev: true
 
+  /pathe/1.1.0:
+    resolution: {integrity: sha512-ODbEPR0KKHqECXW1GoxdDb+AZvULmXjVPy4rt+pGo2+TnjJTIPJQSVS6N63n8T2Ip+syHhbn52OewKicV0373w==}
+    dev: true
+
   /pathval/1.1.1:
     resolution: {integrity: sha512-Dp6zGqpTdETdR63lehJYPeIOqpiNBNtc7BpWSLrOje7UaIsE5aY92r/AunQA7rsXvet3lrJ3JnZX29UPTKXyKQ==}
     dev: true
@@ -15027,6 +15163,14 @@ packages:
     dependencies:
       postcss: 8.4.21
       postcss-value-parser: 4.2.0
+    dev: true
+
+  /postcss-selector-parser/6.0.10:
+    resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
+    engines: {node: '>=4'}
+    dependencies:
+      cssesc: 3.0.0
+      util-deprecate: 1.0.2
     dev: true
 
   /postcss-selector-parser/6.0.11:
@@ -17585,6 +17729,32 @@ packages:
       - supports-color
     dev: true
 
+  /unplugin-vue-components/0.22.12_vue@3.2.45:
+    resolution: {integrity: sha512-FxyzsuBvMCYPIk+8cgscGBQ345tvwVu+qY5IhE++eorkyvA4Z1TiD/HCiim+Kbqozl10i4K+z+NCa2WO2jexRA==}
+    engines: {node: '>=14'}
+    peerDependencies:
+      '@babel/parser': ^7.15.8
+      vue: 2 || 3
+    peerDependenciesMeta:
+      '@babel/parser':
+        optional: true
+    dependencies:
+      '@antfu/utils': 0.7.2
+      '@rollup/pluginutils': 5.0.2
+      chokidar: 3.5.3
+      debug: 4.3.4
+      fast-glob: 3.2.12
+      local-pkg: 0.4.3
+      magic-string: 0.27.0
+      minimatch: 5.1.6
+      resolve: 1.22.1
+      unplugin: 1.0.1
+      vue: 3.2.45
+    transitivePeerDependencies:
+      - rollup
+      - supports-color
+    dev: true
+
   /unplugin/1.0.1:
     resolution: {integrity: sha512-aqrHaVBWW1JVKBHmGo33T5TxeL0qWzfvjWokObHA9bYmN7eNDkwOxmLjhioHl9878qDFMAaT51XNroRyuz7WxA==}
     dependencies:
@@ -17625,7 +17795,6 @@ packages:
       browserslist: 4.21.4
       escalade: 3.1.1
       picocolors: 1.0.0
-    dev: true
 
   /update-notifier/5.1.0:
     resolution: {integrity: sha512-ItnICHbeMh9GqUy31hFPrD1kcuZ3rpxDZbf4KUDavXwS0bW5m7SLbDQpGX3UYr072cbrF5hFUs3r5tUsPwjfHw==}

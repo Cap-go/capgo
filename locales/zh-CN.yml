@@ -1,374 +1,282 @@
 Bandwidth: 带宽
-MAU: 月活跃用户
 Storage: 贮存
-account:
-  backButton: 后退
-  billing: 计费
-  changePassword: 更改密码
-  delete-account: 删除我的账户
-  delete_sure: 你确定吗 ？
-  discord: 不和谐
-  error: 错误
-  heading: 帐户
-  keys: API 密钥
-  legal: 服务条款
-  logout: 登出
-  personalInformation: 个人信息
-  preferences: 通知
-  privacy: 隐私政策
-  support: 支持
-  usage: 用法
+account: 帐户
+account-password-error: 发生错误，请重试
+account-password-heading: 修改我的密码
 account-settings: 帐号设定
-accountPassword:
-  confirmPassword: 确认密码
-  errorMsg: 发生错误，请重试
-  heading: 修改我的密码
-  password: 新密码
-  success: 修改密码成功
-  validate: 证实
-accountProfile:
-  billing_email: 帐单电子邮件
-  country: 国家
-  email: 电子邮件
-  first-name: 名
-  heading: 个人信息
-  last-name: 姓
-  update: 更新
-activation:
-  desc: 填写以下字段以完成您的注册
-  doi: 选择性同意
-  doi-desc: 我接受电子邮件通讯和未来的营销优惠
-  heading: 激活
-  headline: 我的设置
-  legal: 服务条款
-  legal-desc: 我接受 Capgo 应用程序的隐私政策和使用条款
-  notification: 通知
-  notification-desc: 我接受在有新应用版本可用时接收通知
-  validate: 证实
+action: 行动
+activation-desc: 填写以下字段以完成您的注册
+activation-doi: 选择性同意
+activation-doi-desc: 我接受电子邮件通讯和未来的营销优惠
+activation-heading: 激活
+activation-headline: 我的设置
+activation-legal: 服务条款
+activation-legal-desc: 我接受 Capgo 应用隐私政策和使用条款
+activation-notification: 通知
+activation-notification-desc: 我同意在新应用版本可用时收到通知
+activation-validate: 证实
+add: 添加
 add-another-app: 添加您的应用
 add-this-code-to-you: 将此代码添加到您的项目中
-add-your-app-to-your: 将您的应用添加到您的帐户
+add-your-app-to-your: 将您的应用程序添加到您的帐户
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
+admin: 行政
 afternoon: 下午
-alert:
-  confirm-delete: 确认删除
-  delete-message: 你确定要删除这个吗
-  not-reverse-message: 此操作不可逆
+alert-confirm-delete: 确认删除
+alert-delete-message: 你确定要删除这个吗
+alert-not-reverse-message: 此操作不可逆
 allow-develoment-bui: 允许开发构建
-allow-device-to-self: 允许设备自我关联
+allow-device-to-self: 允许设备自关联
 allow-emulator: 允许模拟器
-api-key: API 密钥
+already-account: 你已经有一个账户了吗？
+api-key: API密钥
 api-keys: API 密钥
-apikeys:
-  all: 钥匙
-  checkbelow: 检查下面的链接以获取更多信息
-  cli: 卡哥 CLI
-  explain: 所有这些 api 密钥都与 Capgo CLI 工具或电容器更新器插件一起使用
-  keyCopied: 复制到剪贴板的键
-  links: 链接
-  title: API 密钥
-  updater: 电容更新器
+api-keys-key-copied: API 密钥
+app: 应用程序
+app-deleted: 应用已删除
 app-id-example: 应用 ID 示例
+app-not-found: 找不到应用
+are-u-sure: 你确定吗 ？
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
 bigger-app-size: 更大的应用程序大小
+billing: 计费
 build-your-app-and-s: 构建您的应用程序并同步
 build-your-code-and-: 将您的代码上传到 Capgo
 bulk-upload: 批量上传
+bundle: 捆
+bundle-deleted: 捆绑包已删除
+bundle-is-linked-channel: 捆绑包已链接到频道，请先取消链接
+bundle-is-linked-device: 捆绑包已链接到设备，请先取消链接
 bundle-number: 捆绑号
-button:
-  about: 关于
-  back: 返回
-  browse: 浏览
-  camera: 相机
-  cancel: 取消
-  delete: 删除
-  go: 确定
-  home: 首页
-  remove: 消除
-  tabs: 标签
-  toggle_dark: 切换深色模式
-  toggle_langs: 切换语言
+bundles: 捆绑
+button-about: 关于
+button-back: 后退
+button-browse: 浏览
+button-camera: 相机
+button-cancel: 取消
+button-delete: 删除
+button-go: 去
+button-home: 家
+button-options: 选项
+button-remove: 消除
+button-tabs: 选项卡
+button-toggle_dark: 切换深色模式
+button-toggle_langs: 更改语言
 by-clicking-on-them: 通过点击它们。
 cannot-delete-app: 无法删除应用
+cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-app-version: 无法删除应用版本
+cannot-delete-bundle: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-save-custom-i: 无法保存自定义 ID
+cannot-test-app-some: 无法测试应用程序发生错误
 change: 改变
-channel:
-  add: 添加
-  beta-channel: 测试通道
-  cannot-delete-device: 无法删除设备
-  confirm-public-desc: |-
-    将此频道设为默认将使其向您的所有用户发送更新。
-
-    其他默认频道将不再默认。
-  copy: 复制网址
-  device: 设备
-  device-deleted: 设备已删除
-  invit: 输入电子邮件以邀请
-  is_public: 频道默认
-  make-now: 使默认
-  make_it: 做了
-  makeprivate: 您的频道是公开的，点击将其设为私密
-  makepublic: 您的频道是私人频道，点击将其设为公开
-  open: 打开
-  private_desc: 私人的
-  public: 电容器更新器链接
-  public_desc: 民众
-  title: 渠道
-  user: 用户
-  user_no_found: 未找到用户，请先注册
-  users: 与用户共享
-  v3: V3 设置
+changed-password-suc: 密码修改成功
+channel: 渠道
+channel-create: 创建频道
 channel-deleted: 频道已删除
+channel-invit: 输入要邀请的电子邮件
+channel-is-public: 频道是公开的
+channel-link: 频道链接
+channel-link-fail: 无法链接频道发生错误
+channel-linked: 频道链接
+channel-linking: 链接到频道
+channel-make-now: 使默认
+channels: 频道
+check-email: 请检查您的电子邮件并验证
 checksum: 校验和
 commands: 命令
-copied-to-clipboard: 已复制到剪贴板
+confirm-email: 确认您的电子邮件
+confirm-password: 确认密码
+confirm-public-desc: |-
+  将此频道设置为默认频道将使其向您的所有用户发送更新。
+
+  其他默认频道将不再默认。
+copied-to-clipboard: 复制到剪贴板
 copy-your: 复制你的
+country: 国家
 create-a-free-accoun: 创建一个免费帐户
+created-at: 创建于
 custom-domain: 自定义域
-custom-id: 自定义 ID
+custom-id: 自定义编号
 custom-id-saved: 自定义 ID 已保存
 dashboard: 仪表板
 days: 天
 defined-as: 定义为
 defined-as-private: 定义为正常
-defined-as-public: 定义为默认值
+defined-as-public: 定义为默认
 delete-account: 删除帐户
-device:
-  channel: 频道链接
-  created_at: 创建于
-  force_version: 强制版本
-  info: 信息
-  last_update: 最后更新
-  link_channel: 与设备关联的频道
-  link_fail: 无法链接发生错误
-  link_version: 链接到设备的版本
-  no_channel: 没有频道，点击添加
-  no_override: 无覆盖，点击添加
-  os_version: 操作系统版本
-  platform: 平台
-  plugin_version: 插件版本
-  title: 设备
-  unlink_channel: 频道取消与设备的关联
-  unlink_version: 版本取消链接到设备
-  version: 版本
-devices:
-  title: 设备
+details-and-logs: 详细信息和日志
+device: 设备
+device-id: 设备ID
+devices: 设备
 devices-using-this-b: 使用此捆绑包的设备
-disable-auto-downgra: 在 native 下禁用自动降级
+disable-auto-downgra: 在本机下禁用自动降级
 disable-auto-upgrade: 禁用主要以上的自动升级
+discord: 不和谐
 discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
 dont-have-an-account: 没有帐户？
+download: 下载
+email: 电子邮件
 email-address: 电子邮件地址
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
 enter-your-new-passw: 输入您的新密码并确认
-forgot:
-  check_email: 检查您的电子邮件以获取重置密码的链接
-  email: 电子邮件
-  heading: 忘记密码
-  success: 密码更新成功
+first-name: 名
+force-version: 强制版本
+forgot-check-email: 检查您的电子邮件以获取重置密码的链接
+forgot-success: 密码更新成功
 from-device: 从设备
 good: 好的
 id: ID
 in-your-main-file: 在你的主文件中
 in-your-project-fold: 在您的项目文件夹中
+info: 信息
 informations: 资讯
 install-the-capacito: 安装电容器插件
 into-your-app-folder: 进入您的应用程序文件夹。
-intro:
-  aka: 也叫
-  desc: 固执己见的 Vite 项目模板
-  dynamic-route: 动态路由演示
-  hi: 你好，{name}
-  whats-your-name: 输入你的名字
-invalid-auth: 无效的身份验证
+invalid-auth: 无效授权
 is-emulator: 是模拟器
 is-production-app: 是生产应用
-last-upload: 上次上传
+key-copied: 复制到剪贴板的密钥
+last-name: 姓
+last-update: 最后更新
+last-upload: 最后上传
 last-version: 最新版本
-limit-reached: 达到上限
-loading-more-data: 正在加载更多数据...
+launch-bundle: 启动包
+limit-reached: 达到限制
+loading-more-data: 加载更多数据...
 log-in: 登录
-log-to-the-capgo-cli: 登录 Capgo CLI
-login:
-  andpass: 和密码
-  connexion: 登录
-  create-new: 建立新帐户
-  email: 电子邮件
-  forgot: 忘记
-  hello: 你好
-  login-in: 登录
-  or: 要么
-  password: 密码
-  withemail: 有电子邮件地址
+log-to-the-capgo-cli: 登录到 Capgo CLI
 login-to-your-accoun: 登录到您的帐户
+logout: 登出
+logs: 日志
+lowerCaseError: 应包含小写字母
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
-module:
-  heading: 模块
+mau: 月活跃用户
+module-heading: 模块
+monthly: 每月
 monthly-active-users: 月活跃用户
+montly-active: 每月活跃
 more-version-storage: 更多版本存储
 morning: 早晨
-my-account: 我的帐户
+my-account: 我的账户
 my-notifications: 我的通知
 name: 姓名
 need-more-contact-us: |-
   需要更多 ？
   联系我们获取量身定制的计划
-not-found: 未找到页面
-notificationSettings:
-  heading: 通知设置
-  validate: 证实
+no-channel-linked: 暂无频道，点击添加
+no-devices: 没有设备
+no-logs: 没有日志
+no-version-linked: 暂无版本，点击添加
+not-found: 未找到
 notifications: 通知
-onboarding:
-  loading: 正在加载
 one-day-left: 还剩一天
+open-channel: 打开通道
+open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新
-package:
-  cannot-delete-version: 无法删除版本
-  channels: 频道
-  device_list: 设备列表
-  devices: 查看设备
-  devices-list: 关联的设备
-  download: 下载版本
-  externally: 存储在外部
-  link_channel: 链接到频道
-  link_version: 链接到版本
-  mobiles-stats: 手机数据
-  name: 应用程序
-  not_available: 未找到包裹
-  set: 将版本设置为频道
-  stats: 统计数据
-  test: 发布版本
-  title: 信息
-  unset: 取消频道与捆绑包的链接
-  version:
-    is-used-in-device: 在设备覆盖中使用，请先取消链接
-  version-deleted: 版本已删除
-  versions: 版本
-pages: 页面
-password:
-  heading: 创建密码
-  new: 新密码
-  validate: 证实
-pckage:
-  version:
-    is-used-in-channel: 在频道中使用，请先取消链接
+os-version: 操作系统版本
+pages: 页数
+password: 密码
+password-heading: 创建密码
+password-hint: 输入至少 6 个数字、字母和标点符号的组合。
+password-new: 新密码
 personal-information: 个人信息
-plan:
-  abtest: A/B 测试
-  application: 应用
-  applications: 应用
-  bandwidth: 国标带宽
-  buy: 买
-  channel: 渠道
-  channels: 频道
-  desc: |-
-    开始免费构建，然后添加上线计划。
-    帐户计划解锁其他功能。
-  free:
-    desc: 最适合 MVP 和测试
-  maker:
-    desc: 最适合小企业主
-  mau: 月活跃用户
-  monthly-billing: 每月计费
-  payasyougo:
-    desc: 最适合规模化企业
-  pricing-plans: 定价计划
-  progressive_deploy: 渐进式部署
-  shared_channel: 共享频道
-  shared_channels: 共享频道
-  solo:
-    desc: 最适合独立开发者
-  storage: GB 存储
-  team:
-    desc: 最适合大企业主
-  update: 更新
-  updates: 更新
-  version: 版本
-  versions: 版本
-  whats-included: 包括什么
-  yearly-billing: 每年计费
+plan-abtest: A / B测试
+plan-bandwidth: 国标带宽
+plan-buy: 买
+plan-desc: |-
+  开始免费构建，然后添加上线计划。
+  帐户计划解锁附加功能。
 plan-inactive: 计划无效
 plan-is-the-best-pla: 计划是满足您需求的最佳计划。
 plan-member: 计划成员。
+plan-pricing-plans: 定价计划
+plan-progressive-deploy: 渐进式部署
+plan-storage: GB 存储
+plan-updates: 更新
+plan-whats-included: 包括什么
 plans: 计划
+platform: 平台
 please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
+plugin-version: 插件版本
 pro-tip-you-can-copy: 专业提示：您可以复制
 projection: 预测
-projects:
-  list: 你的
-  sharedlist: 与我分享
-  title: 项目
 refresh-this-page: 刷新此页面
-register:
-  already-account: 你已经有一个账户吗？
-  check-email: 请检查您的电子邮件并验证
-  confirm-email: 确认电子邮件
-  confirm-password: 确认密码
-  desc: 填写以下字段以完成您的注册
-  email: 电子邮件
-  first-name: 名
-  heading: 登记
-  last-name: 姓
-  lowerCaseError: 应包含小写字母
-  next: 下一个
-  password: 密码
-  password-hint: 输入至少 6 个数字、字母和标点符号的组合。
-  specialError: 应包含特殊字符
-  upperCaseError: 应包含大写字母
+register-desc: 填写以下字段以完成您的注册
+register-heading: 登记
+register-next: 登记
 reset-password: 重设密码
 reset-your-password: 重置你的密码
+search: 搜索
+search-bundle: 搜索包
+search-bundle-id: 按包 ID 搜索
+search-by-action: 按动作搜索
+search-by-device-id: 按设备 ID 搜索
+search-by-name: 按名称搜索
+search-device: 搜索设备
+search-user: 搜索用户
 see-usage: 查看用法
 session_key: Iv会话密钥
+set-bundle: 将捆绑包设置为频道
 settings: 设置
-shared-apps: 共享应用程序
+shared-apps: 共享应用
 sign-out: 登出
 size: 尺寸
+size-not-found: 未找到
 something-went-wrong-try-again-later: |-
-  有些不对劲！
+  出了些问题！
   稍后再试。
-special-api-access: 特殊 API 访问
-start-using-capgo: 开始使用 Capgo！
-stats:
-  devices: 设备
-  downloads: 下载
-  subtitle: 上个月
-  title: 统计数据
-  versions: 版本
+special-api-access: 特殊API访问
+specialError: 应包含特殊字符
+start-using-capgo: 开始使用凯普果！
+stored-externally: 外部存储
 submit: 提交
+support: 支持
 switch-to-all-device: 切换到所有设备
 switch-to-only-devic: 切换到仅链接的设备
 terms-of-use: 使用条款
 test-your-update-in-: 在您的应用程序中测试您的更新
 tests: 测试
-thank-you-for-choosi: 感谢您选择 Capgo！
+thank-you-for-choosi: 感谢您选择凯普高！
 the: 这
-this-page-will-self-: 此页面将自动刷新
+this-page-will-self-: 此页面会自动刷新
 title: 标题
 top-apps: 我的应用
 trial-left: 剩余天数
-trial-plan-expired: 试用计划已过期
-trial-plan-expires-in: 试用计划将于
+trial-plan-expired: 试用期满
+trial-plan-expires-in: 审判结束于
 unlimited-updates: 无限更新
+unlink-bundle: 取消链接包
+unlink-channel: 取消链接频道
+unlink-version: 取消链接版本
+update: 更新
 updated-at: 更新于
 upgrade: 升级
 upgrade-now: 现在升级
+upperCaseError: 应包含大写字母
 url: 网址
-usage:
-  success: 您的计划已设置好此页面将在几分钟内更新
-  title: 用法
-version-builtin: 内置版本
+usage-success: 您的计划已设置此页面将在几分钟内更新
+usage-title: 全部的
+user: 用户
+validate: 证实
+version: 版本
+version-build: 版本构建
+version-builtin: 版本内置
+version-linked: 版本链接
+version-linking: 捆绑包链接
+versions: 版本
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
+yearly: 每年
 you-can-change-your-: 您可以在此处更改您的个人信息。
-you-reached-the-limi: 达到上限
+you-reached-the-limi: 达到限制
 your-api-key: 您的 API 密钥：
 your-are-a: 你是一个
 your-current-plan-is: 你目前的计划是

@@ -1,4 +1,3 @@
-
 context('Basic', () => {
   beforeEach(() => {
     cy.visit('/')
@@ -6,7 +5,7 @@ context('Basic', () => {
 
   it('basic nav', () => {
     cy.url()
-      .should('eq', 'http://localhost:3333/')
+      .should('eq', 'http://localhost:5173/')
 
     cy.contains('[Home Layout]')
       .should('exist')
@@ -14,7 +13,7 @@ context('Basic', () => {
     cy.get('#input')
       .type('Vitesse{Enter}')
       .url()
-      .should('eq', 'http://localhost:3333/hi/Vitesse')
+      .should('eq', 'http://localhost:5173/hi/Vitesse')
 
     cy.contains('[Default Layout]')
       .should('exist')
@@ -22,14 +21,14 @@ context('Basic', () => {
     cy.get('.btn')
       .click()
       .url()
-      .should('eq', 'http://localhost:3333/')
+      .should('eq', 'http://localhost:5173/')
   })
 
   it('markdown', () => {
     cy.get('[title="About"]')
       .click()
       .url()
-      .should('eq', 'http://localhost:3333/about')
+      .should('eq', 'http://localhost:5173/about')
 
     cy.get('pre.language-js')
       .should('exist')

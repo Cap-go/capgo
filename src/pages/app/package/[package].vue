@@ -1,55 +1,25 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonIcon,
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
-  IonItem,
-  IonItemDivider,
-  IonItemOption,
-  IonItemOptions, IonItemSliding,
-  IonLabel, IonList,
-  IonNote, IonPage, IonRefresher, IonRefresherContent, IonSearchbar,
-  alertController, toastController,
-} from '@ionic/vue'
-import { chevronForwardOutline } from 'ionicons/icons'
 import { computed, ref, watchEffect } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import TitleHead from '~/components/TitleHead.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { bytesToMbText } from '~/services/conversion'
+import { useDisplayStore } from '~/stores/display'
 
-interface InfiniteScrollCustomEvent extends CustomEvent {
-  target: HTMLIonInfiniteScrollElement
-}
-
-const fetchLimit = 10
-let fetchOffset = 0
-const isDisabled = ref(false)
-const listRef = ref()
-const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const supabase = useSupabase()
+const displayStore = useDisplayStore()
 const id = ref('')
-const search = ref('')
 const isLoading = ref(false)
-const isLoadingSub = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
-const versions = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
-const filtered = ref<(Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])[]>([])
+const channelsNb = ref(0)
+const bundlesNb = ref(0)
+const devicesNb = ref(0)
+const updatesNb = ref(0)
 
-const versionFilter = computed(() => {
-  if (search.value)
-    return filtered.value
-  return versions.value
-})
 const loadAppInfo = async () => {
   try {
     const { data: dataApp } = await supabase
@@ -57,374 +27,101 @@ const loadAppInfo = async () => {
       .select()
       .eq('app_id', id.value)
       .single()
-    const { data: dataChannel } = await supabase
-      .from('channels')
-      .select(`
-          id,
-          name,
-          app_id,
-          public,
-          version (
-            name,
-            created_at
-          ),
-          created_at,
-          updated_at
-          `)
-      .eq('app_id', id.value)
-      .order('updated_at', { ascending: false })
     app.value = dataApp || app.value
-    channels.value = (dataChannel || channels.value) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
 
-const showSize = (version: (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])) => {
-  if (version.size)
-    return bytesToMbText(version.size)
-  else if (version.external_url)
-    return t('package.externally')
-  else
-    return t('package.not_available')
-}
-
-const enhenceVersionElems = async (dataVersions: Database['public']['Tables']['app_versions']['Row'][]) => {
-  const { data: dataVersionsMeta } = await supabase
-    .from('app_versions_meta')
-    .select()
-    .in('id', dataVersions.map(({ id }) => id))
-  const newVersions = dataVersions.map(({ id, ...rest }) => {
-    const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-    return { id, ...rest, ...version } as (Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'])
-  })
-  return newVersions
-}
-
-const searchVersion = async () => {
-  isLoadingSub.value = true
-  const { data: dataVersions } = await supabase
-    .from('app_versions')
-    .select()
-    .eq('app_id', id.value)
-    .eq('deleted', false)
-    .order('created_at', { ascending: false })
-    .like('name', `%${search.value}%`)
-  if (!dataVersions) {
-    filtered.value = []
-    isLoadingSub.value = false
-    return
-  }
-  filtered.value = await enhenceVersionElems(dataVersions)
-  isLoadingSub.value = false
-}
-const loadData = async (event?: InfiniteScrollCustomEvent) => {
-  try {
-    const { data: dataVersions } = await supabase
-      .from('app_versions')
+    const date_id = new Date().toISOString().slice(0, 7)
+    const { data } = await supabase
+      .from('app_stats')
       .select()
       .eq('app_id', id.value)
-      .eq('deleted', false)
-      .order('created_at', { ascending: false })
-      .range(fetchOffset, fetchOffset + fetchLimit - 1)
-    if (!dataVersions)
-      return
-    versions.value.push(...(await enhenceVersionElems(dataVersions)))
-
-    if (dataVersions.length === fetchLimit)
-      fetchOffset += fetchLimit
-    else
-      isDisabled.value = true
+      .eq('date_id', date_id)
+      .single()
+    if (data) {
+      updatesNb.value = Math.max(data.mlu, data.mlu_real)
+      devicesNb.value = data.devices
+      bundlesNb.value = data.versions
+      channelsNb.value = data.channels
+    }
   }
   catch (error) {
     console.error(error)
   }
-  if (event)
-    event.target.complete()
 }
 
-const refreshData = async (evt: RefresherCustomEvent | null = null) => {
+const refreshData = async () => {
   isLoading.value = true
   try {
     await loadAppInfo()
-    versions.value = []
-    fetchOffset = 0
-    await loadData()
   }
   catch (error) {
     console.error(error)
   }
   isLoading.value = false
-  evt?.target?.complete()
 }
-
-const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
-}
-
-const deleteChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
-  // console.log('deleteChannel', channel)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('channel.title')))
-    return
-  try {
-    const { error: delChanError } = await supabase
-      .from('channels')
-      .delete()
-      .eq('app_id', channel.app_id)
-      .eq('id', channel.id)
-    if (delChanError) {
-      const toast = await toastController
-        .create({
-          message: t('cannot-delete-channel'),
-          duration: 2000,
-        })
-      await toast.present()
-    }
-    else {
-      await refreshData()
-      const toast = await toastController
-        .create({
-          message: t('channel-deleted'),
-          duration: 2000,
-        })
-      await toast.present()
-    }
-  }
-  catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('cannot-delete-channel'),
-        duration: 2000,
-      })
-    await toast.present()
-  }
-}
-
-const deleteVersion = async (version: Database['public']['Tables']['app_versions']['Row']) => {
-  // console.log('deleteVersion', version)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('device.version')))
-    return
-  try {
-    const { data: channelFound, error: errorChannel } = await supabase
-      .from('channels')
-      .select()
-      .eq('app_id', version.app_id)
-      .eq('version', version.id)
-    if ((channelFound && channelFound.length) || errorChannel) {
-      const toast = await toastController
-        .create({
-          message: `${t('device.version')} ${version.app_id}@${version.name} ${t('pckage.version.is-used-in-channel')}`,
-          duration: 2000,
-        })
-      await toast.present()
-      return
-    }
-    const { data: deviceFound, error: errorDevice } = await supabase
-      .from('devices_override')
-      .select()
-      .eq('app_id', version.app_id)
-      .eq('version', version.id)
-    if ((deviceFound && deviceFound.length) || errorDevice) {
-      const toast = await toastController
-        .create({
-          message: `${t('device.version')} ${version.app_id}@${version.name} ${t('package.version.is-used-in-device')}`,
-          duration: 2000,
-        })
-      await toast.present()
-      return
-    }
-    const { error: delError } = await supabase
-      .storage
-      .from('apps')
-      .remove([`${version.user_id}/${version.app_id}/versions/${version.bucket_id}`])
-    const { error: delAppError } = await supabase
-      .from('app_versions')
-      .update({ deleted: true })
-      .eq('app_id', version.app_id)
-      .eq('id', version.id)
-    if (delAppError || delError) {
-      const toast = await toastController
-        .create({
-          message: t('package.cannot-delete-version'),
-          duration: 2000,
-        })
-      await toast.present()
-    }
-    else {
-      const toast = await toastController
-        .create({
-          message: t('package.version-deleted'),
-          duration: 2000,
-        })
-      await toast.present()
-      await refreshData()
-    }
-  }
-  catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('package.cannot-delete-version'),
-        duration: 2000,
-      })
-    await toast.present()
-  }
-}
-
-const openChannel = (channel: Database['public']['Tables']['channels']['Row']) => {
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/channel/${channel.id}`)
-}
-const openVersion = (version: Database['public']['Tables']['app_versions']['Row']) => {
-  console.log('openVersion', version)
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/bundle/${version.id}`)
-}
-const openDevices = () => {
-  router.push(`/app/p/${id.value.replace(/\./g, '--')}/devices`)
-}
-interface Channel {
-  id: string
-  version: {
-    name: string
-    created_at: string
-  }
-}
-interface RefresherEventDetail {
-  complete(): void
-}
-interface RefresherCustomEvent extends CustomEvent {
-  detail: RefresherEventDetail
-  target: HTMLIonRefresherElement
-}
+const stats = computed(() => ([
+  {
+    label: t('channels'),
+    value: channelsNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/channels`,
+  },
+  {
+    label: t('bundles'),
+    value: bundlesNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/bundles`,
+  },
+  {
+    label: t('devices'),
+    value: devicesNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/devices`,
+  },
+  {
+    label: t('plan-updates'),
+    value: updatesNb,
+    link: `/app/p/${id.value.replace(/\./g, '--')}/logs`,
+  },
+]))
 
 watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
     id.value = id.value.replace(/--/g, '.')
     await refreshData()
+    displayStore.NavTitle = app.value?.name || ''
+    displayStore.defaultBack = `/app/package/${route.params.package}/channels`
   }
 })
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="app?.name || ''" default-back="/app" color="warning" />
-    <IonContent :fullscreen="true">
-      <IonRefresher slot="fixed" @ion-refresh="refreshData($event)">
-        <IonRefresherContent />
-      </IonRefresher>
-      <div v-if="isLoading" class="flex justify-center chat-items">
-        <Spinner />
-      </div>
-      <div v-else>
-        <div class="grid gap-6 grid-cols-16 md:mx-10">
-          <Usage :app-id="id" />
-        </div>
-        <IonList ref="listRef">
-          <IonItem class="cursor-pointer" @click="openDevices()">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('package.device_list') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </IonNote>
-          </IonItem>
-          <IonItemDivider v-if="channels?.length">
-            <IonLabel>
-              {{ t('package.channels') }}
-            </IonLabel>
-          </IonItemDivider>
-          <template v-for="ch in channels" :key="ch.name">
-            <IonItemSliding>
-              <IonItem button :detail="true" :color="ch.public ? 'primary' : ''" @click="openChannel(ch)">
-                <IonLabel>
-                  <h2 class="text-sm text-azure-500">
-                    {{ ch.name }}
-                  </h2>
-                </IonLabel>
-                <IonNote slot="end">
-                  <p>{{ ch.version.name }}</p>
-                  {{ formatDate(ch.updated_at) }}
-                </IonNote>
-              </IonItem>
-              <IonItemOptions side="end">
-                <IonItemOption color="warning" @click="deleteChannel(ch)">
-                  Delete
-                </IonItemOption>
-              </IonItemOptions>
-            </IonItemSliding>
-          </template>
-          <IonItemDivider v-if="versions?.length">
-            <IonLabel>
-              {{ t('package.versions') }}
-            </IonLabel>
-          </IonItemDivider>
-          <!-- add item with searchbar -->
-          <IonItem>
-            <IonSearchbar @ion-change="search = ($event.detail.value || '').toLowerCase(); searchVersion()" />
-          </IonItem>
-          <template v-for="v in versionFilter" :key="v.name">
-            <IonItemSliding>
-              <IonItem button :detail="true" @click="openVersion(v)">
-                <IonLabel>
-                  <h2 class="text-sm text-azure-500">
-                    {{ v.name }} ( {{ showSize(v) }} )
-                  </h2>
-                </IonLabel>
-                <IonNote slot="end">
-                  {{ formatDate(v.created_at || '') }}
-                </IonNote>
-              </IonItem>
-              <IonItemOptions side="end">
-                <IonItemOption color="warning" @click="deleteVersion(v)">
-                  Delete
-                </IonItemOption>
-              </IonItemOptions>
-            </IonItemSliding>
-          </template>
-          <div v-if="isLoadingSub" class="flex justify-center chat-items">
-            <Spinner />
-          </div>
-          <IonInfiniteScroll
-            threshold="100px"
-            :disabled="isDisabled || !!search"
-            @ion-infinite="loadData($event)"
-          >
-            <IonInfiniteScrollContent
-              loading-spinner="bubbles"
-              :loading-text="t('loading-more-data')"
-            />
-          </IonInfiniteScroll>
-        </IonList>
-      </div>
-    </IonContent>
-  </IonPage>
-</template>
+  <div v-if="isLoading" class="flex justify-center chat-items">
+    <Spinner />
+  </div>
+  <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
+    <Usage :app-id="id" />
 
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>
+    <div class="relative mt-12 mb-12 lg:mt-20 lg:max-w-5xl lg:mx-auto">
+      <div class="absolute -inset-2">
+        <div class="w-full h-full mx-auto opacity-30 blur-lg filter" style="background: linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" />
+      </div>
+
+      <div class="absolute -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl" />
+
+      <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-black md:flex-row md:text-left rounded-xl bg-opacity-90">
+        <template v-for="s, i in stats" :key="i">
+          <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
+
+          <a :href="s.link" class="flex flex-col items-center w-full p-10 group hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14 ">
+            <span class="text-center duration-100 ease-in scale-100 group-hover:scale-150">
+              <p class="text-5xl font-bold text-white lg:mt-3 lg:order-1 font-pj">
+                {{ s.value }}
+              </p>
+              <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-2 font-pj">
+                {{ s.label }}
+              </h3>
+            </span>
+          </a>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>

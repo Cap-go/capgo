@@ -1,227 +1,175 @@
 Bandwidth: Băng thông
-MAU: Người dùng hoạt động hàng tháng
 Storage: Kho
-account:
-  backButton: Trở lại
-  billing: Thanh toán
-  changePassword: Đổi mật khẩu
-  delete-account: Xóa tài khoản của tôi đi
-  delete_sure: Bạn có chắc không ?
-  discord: Bất hòa
-  error: Lỗi
-  heading: Tài khoản
-  keys: Khóa API
-  legal: Điều khoản dịch vụ
-  logout: Đăng xuất
-  personalInformation: Thông tin cá nhân
-  preferences: Thông báo
-  privacy: Chính sách bảo mật
-  support: Hỗ trợ
-  usage: cách sử dụng
+account: Tài khoản
+account-password-error: Đã xảy ra lỗi, vui lòng thử lại
+account-password-heading: Thay đổi mật khẩu của tôi
 account-settings: Cài đặt tài khoản
-accountPassword:
-  confirmPassword: Xác nhận mật khẩu
-  errorMsg: Đã xảy ra lỗi, vui lòng thử lại
-  heading: Thay đổi mật khẩu của tôi
-  password: Mật khẩu mới
-  success: Đã thay đổi mật khẩu thành công
-  validate: Xác thực
-accountProfile:
-  billing_email: Thanh toán bằng thư điện tử
-  country: Quốc gia
-  email: E-mail
-  first-name: Tên đầu tiên
-  heading: Thông tin cá nhân
-  last-name: Họ
-  update: Cập nhật
-activation:
-  desc: Điền vào các trường sau để hoàn tất đăng ký của bạn
-  doi: Sự đồng ý tùy chọn
-  doi-desc: Tôi chấp nhận bản tin Email và các đề nghị tiếp thị trong tương lai
-  heading: sự kích hoạt
-  headline: Cài đặt của tôi
-  legal: Điều khoản dịch vụ
-  legal-desc: >-
-    Tôi chấp nhận chính sách bảo mật của ứng dụng Capgo và các điều khoản sử
-    dụng
-  notification: Thông báo
-  notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
-  validate: Xác thực
+action: Hoạt động
+activation-desc: Điền vào các trường sau để hoàn thành đăng ký của bạn
+activation-doi: đồng ý tùy chọn
+activation-doi-desc: Tôi chấp nhận bản tin Email và các ưu đãi tiếp thị trong tương lai
+activation-heading: kích hoạt
+activation-headline: Cài đặt của tôi
+activation-legal: Điều khoản dịch vụ
+activation-legal-desc: >-
+  Tôi chấp nhận chính sách quyền riêng tư và điều khoản sử dụng của ứng dụng
+  Capgo
+activation-notification: thông báo
+activation-notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
+activation-validate: xác thực
+add: Thêm vào
 add-another-app: Thêm ứng dụng của bạn
 add-this-code-to-you: Thêm mã này vào dự án của bạn
 add-your-app-to-your: Thêm ứng dụng của bạn vào tài khoản của bạn
-add-your-first-app-t: Thêm ứng dụng đầu tiên vào tài khoản của bạn và hãy cập nhật!
+add-your-first-app-t: >-
+  Thêm ứng dụng đầu tiên của bạn vào tài khoản của bạn và hãy đẩy các bản cập
+  nhật!
+admin: Quản trị viên
 afternoon: buổi chiều
-alert:
-  confirm-delete: Xác nhận Xóa
-  delete-message: Bạn có chắc chắn muốn xóa cái này
-  not-reverse-message: Hành động này là không thể đảo ngược
+alert-confirm-delete: Xác nhận Xóa
+alert-delete-message: Bạn có chắc chắn muốn xóa cái này
+alert-not-reverse-message: Hành động này là không thể đảo ngược
 allow-develoment-bui: Cho phép xây dựng phát triển
 allow-device-to-self: Cho phép các thiết bị tự liên kết
 allow-emulator: Cho phép giả lập
+already-account: Bạn đã có tài khoản?
 api-key: Mã API
 api-keys: Khóa API
-apikeys:
-  all: chìa khóa
-  checkbelow: kiểm tra bên dưới liên kết để nhận thêm thông tin
-  cli: capgo CLI
-  explain: >-
-    Tất cả các khóa api của thoses được tạo ra để sử dụng với công cụ Capgo CLI
-    hoặc plugin trình cập nhật tụ điện
-  keyCopied: Các phím đã được sao chép vào khay nhớ tạm của bạn
-  links: Liên kết
-  title: Khóa API
-  updater: trình cập nhật tụ điện
+api-keys-key-copied: Khóa API
+app: Ứng dụng
+app-deleted: Đã xóa ứng dụng
 app-id-example: Ví dụ về ID ứng dụng
+app-not-found: Không tìm thấy ứng dụng
+are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
 bigger-app-size: Kích thước ứng dụng lớn hơn
+billing: thanh toán
 build-your-app-and-s: xây dựng ứng dụng của bạn và đồng bộ hóa
 build-your-code-and-: Tải lên Capgo mã của bạn
 bulk-upload: Tải lên hàng loạt
-bundle-number: Số gói
-button:
-  about: Về
-  back: Quay lại
-  browse: Duyệt qua
-  camera: Máy ảnh
-  cancel: Hủy bỏ
-  delete: Xóa bỏ
-  go: Đi
-  home: Khởi đầu
-  remove: Tẩy
-  tabs: Các tab
-  toggle_dark: Chuyển đổi chế độ tối
-  toggle_langs: Thay đổi ngôn ngữ
+bundle: Bó
+bundle-deleted: Đã xóa gói
+bundle-is-linked-channel: Gói được liên kết trong kênh, trước tiên hãy hủy liên kết gói đó
+bundle-is-linked-device: Gói được liên kết trong thiết bị, trước tiên hãy hủy liên kết gói đó
+bundle-number: số gói
+bundles: Bó
+button-about: Về
+button-back: Mặt sau
+button-browse: duyệt
+button-camera: Máy ảnh
+button-cancel: Hủy bỏ
+button-delete: Xóa bỏ
+button-go: ĐI
+button-home: Trang chủ
+button-options: Tùy chọn
+button-remove: Di dời
+button-tabs: tab
+button-toggle_dark: Chuyển đổi chế độ tối
+button-toggle_langs: Thay đổi ngôn ngữ
 by-clicking-on-them: bằng cách nhấp vào chúng.
 cannot-delete-app: Không thể xóa ứng dụng
+cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
+cannot-delete-bundle: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-save-custom-i: Không thể lưu ID tùy chỉnh
-change: Biến đổi
-channel:
-  add: Thêm vào
-  beta-channel: Kênh beta
-  cannot-delete-device: Không thể xóa thiết bị
-  confirm-public-desc: >-
-    Đặt kênh này làm mặc định sẽ làm cho kênh gửi cập nhật cho tất cả người dùng
-    của bạn.
-
-
-    Các kênh mặc định khác sẽ không còn là mặc định nữa.
-  copy: Sao chép URL
-  device: Thiết bị
-  device-deleted: Đã xóa thiết bị
-  invit: Nhập email để mời
-  is_public: Kênh mặc định
-  make-now: Làm mặc định
-  make_it: Làm cho nó
-  makeprivate: Kênh của bạn ở chế độ công khai, hãy nhấp để đặt kênh đó ở chế độ riêng tư
-  makepublic: Kênh của bạn ở chế độ riêng tư, hãy nhấp để đặt kênh ở chế độ công khai
-  open: Mở
-  private_desc: Riêng tư
-  public: Liên kết trình cập nhật tụ điện
-  public_desc: Công cộng
-  title: Kênh truyền hình
-  user: Người dùng
-  user_no_found: Không tìm thấy người dùng, hãy yêu cầu đăng ký trước
-  users: Được chia sẻ với người dùng
-  v3: Cài đặt V3
+cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
+change: Thay đổi
+changed-password-suc: Đã đổi mật khẩu thành công
+channel: Kênh
+channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
-checksum: Checksum
-commands: lệnh
+channel-invit: Nhập email để mời
+channel-is-public: Kênh là công khai
+channel-link: liên kết kênh
+channel-link-fail: Không thể liên kết kênh đã xảy ra sự cố
+channel-linked: Kênh được liên kết
+channel-linking: Liên kết đến kênh
+channel-make-now: Làm mặc định
+channels: Kênh truyền hình
+check-email: Vui lòng kiểm tra email của bạn và xác minh
+checksum: tổng kiểm tra
+commands: mệnh lệnh
+confirm-email: Xác nhận email của bạn
+confirm-password: Xác nhận mật khẩu
+confirm-public-desc: |-
+  Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
+
+  Các kênh mặc định khác sẽ không còn mặc định nữa.
 copied-to-clipboard: Sao chép vào clipboard
 copy-your: Sao chép của bạn
+country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
+created-at: tạo tại
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
-custom-id-saved: ID tùy chỉnh đã được lưu
+custom-id-saved: Đã lưu ID tùy chỉnh
 dashboard: bảng điều khiển
 days: ngày
 defined-as: Định nghĩa là
-defined-as-private: được định nghĩa là bình thường
-defined-as-public: được định nghĩa là mặc định
+defined-as-private: định nghĩa là bình thường
+defined-as-public: định nghĩa là mặc định
 delete-account: Xóa tài khoản
-device:
-  channel: Liên kết kênh
-  created_at: Được tạo lúc
-  force_version: Phiên bản buộc
-  info: thông tin
-  last_update: Cập nhật cuối cùng
-  link_channel: Kênh được liên kết với thiết bị
-  link_fail: Không thể liên kết đã xảy ra sự cố
-  link_version: phiên bản được liên kết với thiết bị
-  no_channel: Không có kênh, nhấp để thêm
-  no_override: Không ghi đè, nhấp để thêm
-  os_version: phiên bản của hệ điều hành
-  platform: Nền tảng
-  plugin_version: Phiên bản plugin
-  title: Thiết bị
-  unlink_channel: Hủy liên kết kênh với thiết bị
-  unlink_version: Hủy liên kết phiên bản với thiết bị
-  version: Phiên bản
-devices:
-  title: Thiết bị
-devices-using-this-b: Các thiết bị sử dụng gói này
-disable-auto-downgra: Tắt tự động hạ cấp dưới gốc
-disable-auto-upgrade: Tắt nâng cấp tự động trên chính
+details-and-logs: Chi tiết và nhật ký
+device: Thiết bị
+device-id: ID thiết bị
+devices: thiết bị
+devices-using-this-b: Thiết bị sử dụng gói này
+disable-auto-downgra: Vô hiệu hóa tự động hạ cấp theo bản địa
+disable-auto-upgrade: Vô hiệu hóa nâng cấp tự động trên chính
+discord: bất hòa
 discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
-discover-your-dashbo: Khám phá trang tổng quan của bạn!
+discover-your-dashbo: Khám phá bảng điều khiển của bạn!
 documentation: Tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
+download: Tải xuống
+email: E-mail
 email-address: Địa chỉ email
 enter-your-email-add: >-
   Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
-forgot:
-  check_email: Kiểm tra email của bạn để lấy liên kết đặt lại mật khẩu của bạn
-  email: E-mail
-  heading: Quên mật khẩu
-  success: Đã cập nhật mật khẩu thành công
+first-name: Họ
+force-version: Phiên bản bắt buộc
+forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
+forgot-success: Đã cập nhật mật khẩu thành công
 from-device: từ thiết bị
 good: Tốt
-id: Tôi
-in-your-main-file: Trong tệp chính của bạn
+id: NHẬN DẠNG
+in-your-main-file: Trong tập tin chính của bạn
 in-your-project-fold: Trong thư mục dự án của bạn
-informations: Thông tin
+info: Thông tin
+informations: thông tin
 install-the-capacito: Cài đặt plugin Tụ điện
 into-your-app-folder: Vào thư mục ứng dụng của bạn.
-intro:
-  aka: Cũng được biết đến như là
-  desc: Ý kiến cá nhân Vite Template để bắt đầu
-  dynamic-route: Bản giới thiệu về dynamic route
-  hi: Hi, {name}!
-  whats-your-name: Tên bạn là gì?
 invalid-auth: xác thực không hợp lệ
 is-emulator: là giả lập
 is-production-app: Là ứng dụng sản xuất
-last-upload: Lần tải lên cuối cùng
+key-copied: Đã sao chép khóa vào khay nhớ tạm của bạn
+last-name: Họ
+last-update: Cập nhật cuối cùng
+last-upload: Tải lên lần cuối
 last-version: Phiên bản cuối cùng
+launch-bundle: Khởi chạy gói
 limit-reached: Đạt tới giới hạn
-loading-more-data: Đang tải thêm dữ liệu ...
+loading-more-data: Đang tải thêm dữ liệu...
 log-in: Đăng nhập
 log-to-the-capgo-cli: Đăng nhập vào Capgo CLI
-login:
-  andpass: Và mật khẩu
-  connexion: Đăng nhập
-  create-new: Tạo tài khoản mới
-  email: E-mail
-  forgot: quên mất
-  hello: xin chào
-  login-in: Đăng nhập
-  or: hoặc
-  password: Mật khẩu
-  withemail: Với địa chỉ email
 login-to-your-accoun: đăng nhập vào tài khoản của bạn
+logout: Đăng xuất
+logs: Nhật ký
+lowerCaseError: Nên chứa chữ thường
 make-normal: làm cho bình thường
 making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
   một kênh khác hoặc để thiết bị tự chỉ định.
-module:
-  heading: Mô-đun
+mau: Người dùng hoạt động hàng tháng
+module-heading: mô-đun
+monthly: hàng tháng
 monthly-active-users: Người dùng hoạt động hàng tháng
-more-version-storage: Thêm phiên bản Bộ nhớ
+montly-active: hoạt động hàng tháng
+more-version-storage: Phiên bản khác
 morning: buổi sáng
 my-account: Tài khoản của tôi
 my-notifications: Thông báo của tôi
@@ -229,132 +177,76 @@ name: Tên
 need-more-contact-us: |-
   Cần thêm? 
   Liên hệ với chúng tôi để có kế hoạch phù hợp
+no-channel-linked: Không có kênh, nhấp để thêm
+no-devices: Không có thiết bị
+no-logs: Không có nhật ký
+no-version-linked: Không có phiên bản, nhấp để thêm
 not-found: Không tìm thấy
-notificationSettings:
-  heading: Thiết lập thông báo
-  validate: Xác thực
-notifications: Thông báo
-onboarding:
-  loading: Đang tải
+notifications: thông báo
 one-day-left: Còn lại một ngày
+open-channel: mở kênh
+open-settings: Nhấp để mở cài đặt
 open-sidebar: Mở thanh bên
 open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn
-package:
-  cannot-delete-version: Không thể xóa phiên bản
-  channels: Kênh truyền hình
-  device_list: Danh sách thiết bị
-  devices: Xem các thiết bị
-  devices-list: Các thiết bị được liên kết
-  download: Tải xuống phiên bản
-  externally: được lưu trữ bên ngoài
-  link_channel: Liên kết với kênh
-  link_version: Liên kết đến phiên bản
-  mobiles-stats: Số liệu thống kê về điện thoại di động
-  name: Ứng dụng
-  not_available: Gói hàng không được tìm thấy
-  set: Đặt phiên bản cho kênh
-  stats: số liệu thống kê
-  test: Phiên bản khởi chạy
-  title: thông tin
-  unset: Hủy liên kết kênh khỏi gói
-  version:
-    is-used-in-device: >-
-      được sử dụng trong ghi đè thiết bị, trước tiên hãy hủy liên kết thiết bị
-      đó
-  version-deleted: Phiên bản đã bị xóa
-  versions: Phiên bản
-pages: Các trang
-password:
-  heading: Tạo mật khẩu
-  new: mật khẩu mới
-  validate: Xác thực
-pckage:
-  version:
-    is-used-in-channel: được sử dụng trong một kênh, trước tiên hãy hủy liên kết kênh đó
+os-version: phiên bản của hệ điều hành
+pages: trang
+password: Mật khẩu
+password-heading: Tạo mật khẩu
+password-hint: Nhập kết hợp ít nhất 6 số, chữ cái và dấu chấm câu.
+password-new: mật khẩu mới
 personal-information: Thông tin cá nhân
-plan:
-  abtest: Thử nghiệm A / B
-  application: Ứng dụng
-  applications: Các ứng dụng
-  bandwidth: Băng thông GB
-  buy: Mua
-  channel: Kênh
-  channels: Kênh truyền hình
-  desc: |-
-    Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để hoạt động. 
-    Gói tài khoản mở khóa các tính năng bổ sung.
-  free:
-    desc: Tốt nhất cho MVP và thử nghiệm
-  maker:
-    desc: Tốt nhất cho chủ doanh nghiệp nhỏ
-  mau: Người dùng hoạt động hàng tháng
-  monthly-billing: Thanh toán hàng tháng
-  payasyougo:
-    desc: Tốt nhất cho các doanh nghiệp đang khai thác
-  pricing-plans: Các gói định giá
-  progressive_deploy: Triển khai liên tục
-  shared_channel: Kênh chia sẻ
-  shared_channels: Các kênh được chia sẻ
-  solo:
-    desc: Tốt nhất cho các nhà phát triển độc lập
-  storage: Bộ nhớ GB
-  team:
-    desc: Tốt nhất cho các chủ doanh nghiệp lớn
-  update: Cập nhật
-  updates: Cập nhật
-  version: Phiên bản
-  versions: Phiên bản
-  whats-included: Bao gồm những gì
-  yearly-billing: Thanh toán hàng năm
+plan-abtest: Thử nghiệm A/B
+plan-bandwidth: Băng thông GB
+plan-buy: Mua
+plan-desc: |-
+  Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động. 
+  Gói tài khoản mở khóa các tính năng bổ sung.
 plan-inactive: Kế hoạch không hoạt động
 plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
 plan-member: thành viên kế hoạch.
+plan-pricing-plans: kế hoạch giá
+plan-progressive-deploy: triển khai lũy tiến
+plan-storage: Dung lượng GB
+plan-updates: cập nhật
+plan-whats-included: Bao gồm những gì
 plans: Các kế hoạch
+platform: Nền tảng
 please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
+plugin-version: phiên bản plugin
 pro-tip-you-can-copy: 'Mẹo chuyên nghiệp: bạn có thể sao chép'
 projection: dự đoán
-projects:
-  list: Của bạn
-  sharedlist: Chia sẻ với tôi
-  title: Dự án
 refresh-this-page: Làm mới trang này
-register:
-  already-account: Bạn đã có tài khoản?
-  check-email: Vui lòng kiểm tra email của bạn và xác minh
-  confirm-email: Xác nhận email
-  confirm-password: Xác nhận mật khẩu
-  desc: Điền vào các trường sau để hoàn tất đăng ký của bạn
-  email: E-mail
-  first-name: tên đầu tiên
-  heading: Sự đăng ký
-  last-name: họ
-  lowerCaseError: Phải chứa các chữ cái thường
-  next: Tiếp theo
-  password: mật khẩu mở khóa
-  password-hint: Nhập kết hợp của ít nhất 6 số, chữ cái và dấu chấm câu.
-  specialError: Phải chứa các ký tự đặc biệt
-  upperCaseError: Nên chứa các chữ cái in hoa
+register-desc: Điền vào các trường sau để hoàn thành đăng ký của bạn
+register-heading: Sự đăng ký
+register-next: Đăng ký
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
-see-usage: Xem mức sử dụng
+search: Tìm kiếm
+search-bundle: Gói tìm kiếm
+search-bundle-id: Tìm kiếm theo ID gói
+search-by-action: Tìm kiếm theo hành động
+search-by-device-id: Tìm kiếm theo ID thiết bị
+search-by-name: Tìm kiếm theo tên
+search-device: Tìm kiếm thiết bị
+search-user: Tìm kiếm người dùng
+see-usage: xem cách sử dụng
 session_key: IvSessionKey
+set-bundle: Đặt gói thành kênh
 settings: Cài đặt
 shared-apps: Ứng dụng được chia sẻ
 sign-out: Đăng xuất
-size: Kích thước
+size: Kích cỡ
+size-not-found: Không tìm thấy
 something-went-wrong-try-again-later: |-
-  Đã xảy ra lỗi! 
+  Đã xảy ra sự cố! 
   Thử lại sau.
 special-api-access: Quyền truy cập API đặc biệt
+specialError: Nên chứa các ký tự đặc biệt
 start-using-capgo: Bắt đầu sử dụng Capgo!
-stats:
-  devices: Thiết bị
-  downloads: Tải xuống
-  subtitle: Tháng trước
-  title: Số liệu thống kê
-  versions: Phiên bản
+stored-externally: được lưu trữ bên ngoài
 submit: Nộp
+support: Ủng hộ
 switch-to-all-device: Chuyển sang tất cả các thiết bị
 switch-to-only-devic: Chuyển sang thiết bị duy nhất được liên kết
 terms-of-use: Điều khoản sử dụng
@@ -363,25 +255,39 @@ tests: kiểm tra
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
-title: Tiêu đề
+title: tiêu đề
 top-apps: Những ứng dụng của tôi
 trial-left: ngày còn lại
-trial-plan-expired: Gói dùng thử đã hết hạn
-trial-plan-expires-in: Gói dùng thử sẽ hết hạn sau
-unlimited-updates: Cập nhật không giới hạn
+trial-plan-expired: Hết hạn dùng thử
+trial-plan-expires-in: Thử nghiệm kết thúc sau
+unlimited-updates: cập nhật không giới hạn
+unlink-bundle: Hủy liên kết gói
+unlink-channel: Hủy liên kết kênh
+unlink-version: Hủy liên kết phiên bản
+update: Cập nhật
 updated-at: Cập nhật tại
 upgrade: Nâng cấp
 upgrade-now: Nâng cấp ngay bây giờ
+upperCaseError: Nên chứa chữ in hoa
 url: URL
-usage:
-  success: Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
-  title: Cách sử dụng
-version-builtin: Nội trang phiên bản
+usage-success: >-
+  Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
+  nữa
+usage-title: Tổng cộng
+user: Người dùng
+validate: xác thực
+version: Phiên bản
+version-build: Phiên bản xây dựng
+version-builtin: Phiên bản dựng sẵn
+version-linked: liên kết phiên bản
+version-linking: Liên kết đến gói
+versions: phiên bản
 welcome-to: Chào mừng bạn đến
-welcome-to-your-capg: Chào mừng bạn đến với Trang tổng quan Capgo của bạn
-you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của bạn ở đây.
+welcome-to-your-capg: Chào mừng bạn đến với Bảng điều khiển Capgo của bạn
+yearly: hàng năm
+you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-reached-the-limi: Đạt tới giới hạn
 your-api-key: 'Khóa API của bạn:'
-your-are-a: Của bạn là một
+your-are-a: bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
-your-current-suggested-plan-is: Kế hoạch đề xuất hiện tại của bạn là
+your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là

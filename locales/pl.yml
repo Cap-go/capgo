@@ -1,356 +1,250 @@
-Bandwidth: Pasmo
-MAU: Aktywni użytkownicy miesięcznie
-Storage: Magazynowanie
-account:
-  backButton: Plecy
-  billing: Dane do faktury
-  changePassword: Zmień hasło
-  delete-account: Usuń moje konto
-  delete_sure: Jesteś pewny ?
-  discord: Niezgoda
-  error: Błąd
-  heading: Rachunek
-  keys: Klucze API
-  legal: Warunki korzystania z usług
-  logout: Wyloguj
-  personalInformation: Informacje osobiste
-  preferences: Powiadomienia
-  privacy: Polityka prywatności
-  support: Wsparcie
-  usage: stosowanie
+Bandwidth: Przepustowość łącza
+Storage: Składowanie
+account: Konto
+account-password-error: Wystąpił błąd, spróbuj ponownie
+account-password-heading: Zmień moje hasło
 account-settings: Ustawienia konta
-accountPassword:
-  confirmPassword: Potwierdź hasło
-  errorMsg: Wystąpił błąd, spróbuj ponownie
-  heading: Zmień moje hasło
-  password: Nowe hasło
-  success: Pomyślnie zmieniono hasło
-  validate: Uprawomocnić
-accountProfile:
-  billing_email: E-mail rozliczeniowy
-  country: Kraj
-  email: E-mail
-  first-name: Imię
-  heading: Informacje osobiste
-  last-name: Nazwisko
-  update: Aktualizacja
-activation:
-  desc: Wypełnij poniższe pola, aby zakończyć rejestrację
-  doi: Opcjonalna zgoda
-  doi-desc: Akceptuję biuletyn e-mailowy i przyszłe oferty marketingowe
-  heading: aktywacja
-  headline: Moje ustawienia
-  legal: Warunki korzystania z usług
-  legal-desc: Akceptuję politykę prywatności i warunki użytkowania aplikacji Capgo
-  notification: Powiadomienia
-  notification-desc: >-
-    Zgadzam się na otrzymywanie powiadomień, gdy nowa wersja aplikacji będzie
-    dostępna
-  validate: Uprawomocnić
+action: Działanie
+activation-desc: Wypełnij poniższe pola, aby zakończyć rejestrację
+activation-doi: Opcjonalna zgoda
+activation-doi-desc: Akceptuję biuletyn e-mailowy i przyszłe oferty marketingowe
+activation-heading: aktywacja
+activation-headline: Moje ustawienia
+activation-legal: Warunki korzystania z usług
+activation-legal-desc: Akceptuję politykę prywatności i warunki korzystania z aplikacji Capgo
+activation-notification: Powiadomienia
+activation-notification-desc: >-
+  Wyrażam zgodę na otrzymywanie powiadomień, gdy pojawi się nowa wersja
+  aplikacji
+activation-validate: Uprawomocnić
+add: Dodać
 add-another-app: Dodaj swoją aplikację
 add-this-code-to-you: Dodaj ten kod do swojego projektu
 add-your-app-to-your: Dodaj swoją aplikację do swojego konta
-add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i przesyłaj aktualizacje!
-afternoon: wieczór
-alert:
-  confirm-delete: Potwierdź usunięcie
-  delete-message: Czy na pewno chcesz to usunąć
-  not-reverse-message: Ta czynność nie jest odwracalna
+add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysyłajmy aktualizacje!
+admin: Admin
+afternoon: popołudnie
+alert-confirm-delete: Potwierdź usunięcie
+alert-delete-message: Czy na pewno chcesz to usunąć
+alert-not-reverse-message: Ta czynność nie jest odwracalna
 allow-develoment-bui: Zezwalaj na kompilację deweloperską
-allow-device-to-self: Zezwalaj urządzeniom na samodzielne kojarzenie
+allow-device-to-self: Zezwól urządzeniom na samopowiązanie
 allow-emulator: Zezwalaj na emulatory
+already-account: Posiadasz już konto?
 api-key: Klucz API
 api-keys: Klucze API
-apikeys:
-  all: Klucze
-  checkbelow: sprawdź poniższy link, aby uzyskać więcej informacji
-  cli: capgo CLI
-  explain: >-
-    Wszystkie te klucze API są przeznaczone do użytku z narzędziem Capgo CLI lub
-    wtyczką do aktualizacji kondensatorów
-  keyCopied: Klucze skopiowane do schowka
-  links: Spinki do mankietów
-  title: Klucze API
-  updater: aktualizacja kondensatorów
+api-keys-key-copied: Klucze API
+app: Aplikacja
+app-deleted: Usunięto aplikację
 app-id-example: Przykład identyfikatora aplikacji
+app-not-found: Nie znaleziono aplikacji
+are-u-sure: Jesteś pewny ?
 available-in-the-san: Dostępne w aplikacji piaskownicy
 back-to-login-page: Powrót do strony logowania
 bigger-app-size: Większy rozmiar aplikacji
+billing: Dane do faktury
 build-your-app-and-s: zbuduj swoją aplikację i zsynchronizuj
 build-your-code-and-: Prześlij do Capgo swój kod
 bulk-upload: Przesyłanie zbiorcze
+bundle: Pakiet
+bundle-deleted: Pakiet usunięty
+bundle-is-linked-channel: Pakiet jest połączony z kanałem, najpierw odłącz go
+bundle-is-linked-device: Pakiet jest połączony z urządzeniem, najpierw odłącz go
 bundle-number: Numer pakietu
-button:
-  about: O nas
-  back: Wróć
-  browse: Przeglądaj
-  camera: Kamera
-  cancel: Anulować
-  delete: Usunąć
-  go: WEJDŹ
-  home: Strona główna
-  remove: Usunąć
-  tabs: Karty
-  toggle_dark: Ustaw tryb nocny
-  toggle_langs: Zmień język
+bundles: Wiązki
+button-about: O
+button-back: Z powrotem
+button-browse: Przeglądać
+button-camera: Kamera
+button-cancel: Anulować
+button-delete: Usuwać
+button-go: IŚĆ
+button-home: Dom
+button-options: Opcje
+button-remove: Usunąć
+button-tabs: Zakładki
+button-toggle_dark: Przełącz tryb ciemny
+button-toggle_langs: Zmień języki
 by-clicking-on-them: klikając na nie.
 cannot-delete-app: Nie można usunąć aplikacji
+cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
+cannot-delete-bundle: Nie można usunąć pakietu
 cannot-delete-channel: Nie można usunąć kanału
 cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
+cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
 change: Zmiana
-channel:
-  add: Dodać
-  beta-channel: Kanał beta
-  cannot-delete-device: Nie można usunąć urządzenia
-  confirm-public-desc: >-
-    Ustawienie tego kanału jako domyślnego spowoduje, że będzie on wysyłać
-    aktualizacje do wszystkich Twoich użytkowników.
-
-
-    Inne domyślne kanały nie będą już domyślne.
-  copy: Kopiuj URL
-  device: Urządzenie
-  device-deleted: Urządzenie usunięte
-  invit: Wpisz e-mail, aby zaprosić
-  is_public: Domyślny kanał
-  make-now: Ustaw jako domyślne
-  make_it: Zrób to
-  makeprivate: Twój kanał jest publiczny, kliknij, aby ustawić go jako prywatny
-  makepublic: Twój kanał jest prywatny, kliknij, aby upublicznić
-  open: otwarty
-  private_desc: Prywatny
-  public: Łącze do aktualizacji kondensatorów
-  public_desc: Publiczny
-  title: Kanał
-  user: Użytkownik
-  user_no_found: Nie znaleziono użytkownika, najpierw poproś o rejestrację
-  users: Udostępnione użytkownikom
-  v3: Ustawienia V3
+changed-password-suc: Hasło zostało zmienione pomyślnie
+channel: Kanał
+channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
+channel-invit: Wpisz e-mail, aby zaprosić
+channel-is-public: Kanał jest publiczny
+channel-link: Link do kanału
+channel-link-fail: Nie można połączyć kanału. Wystąpił błąd
+channel-linked: Kanał połączony
+channel-linking: Link do kanału
+channel-make-now: Ustaw jako domyślne
+channels: Kanały
+check-email: Sprawdź swój e-mail i zweryfikuj
 checksum: Suma kontrolna
 commands: polecenia
+confirm-email: Potwierdź swój email
+confirm-password: Potwierdź hasło
+confirm-public-desc: >-
+  Ustawienie tego kanału jako domyślnego spowoduje wysyłanie aktualizacji do
+  wszystkich Twoich użytkowników.
+
+
+  Inne domyślne kanały nie będą już domyślne.
 copied-to-clipboard: Skopiowane do schowka
 copy-your: Skopiuj swój
-create-a-free-accoun: Utwórz darmowe konto
+country: Kraj
+create-a-free-accoun: Utwórz bezpłatne konto
+created-at: Utworzono o godz
 custom-domain: Domena niestandardowa
 custom-id: Identyfikator niestandardowy
-custom-id-saved: Zapisano niestandardowy identyfikator
+custom-id-saved: Niestandardowy identyfikator został zapisany
 dashboard: Panel
 days: dni
 defined-as: Zdefiniowana jako
-defined-as-private: zdefiniowany jako normalny
-defined-as-public: zdefiniowany jako domyślny
+defined-as-private: określone jako normalne
+defined-as-public: zdefiniowane jako domyślne
 delete-account: Usuń konto
-device:
-  channel: Link do kanału
-  created_at: Utworzono w
-  force_version: Wersja życie
-  info: informacje
-  last_update: Ostatnia aktualizacja
-  link_channel: Kanał połączony z urządzeniem
-  link_fail: Nie można połączyć, że stało się coś złego
-  link_version: wersja połączona z urządzeniem
-  no_channel: Brak kanału, kliknij, aby dodać
-  no_override: Brak zastąpienia, kliknij, aby dodać
-  os_version: Wersja systemu operacyjnego
-  platform: Platforma
-  plugin_version: Wersja wtyczki
-  title: Urządzenie
-  unlink_channel: Odłączenie kanału od urządzenia
-  unlink_version: Wersja odłącza się od urządzenia
-  version: Wersja
-devices:
-  title: Urządzenia
+details-and-logs: Szczegóły i logi
+device: Urządzenie
+device-id: Identyfikator urzadzenia
+devices: Urządzenia
 devices-using-this-b: Urządzenia korzystające z tego pakietu
-disable-auto-downgra: Wyłącz automatyczną zmianę wersji na wersję natywną
-disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej głównej
+disable-auto-downgra: Wyłącz automatyczne obniżanie wersji natywnej
+disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej wersji głównej
+discord: Niezgoda
 discover-module-in-a: Odkryj moduł w Awesome-capacitor
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: Dokumentacja
 dont-have-an-account: Nie masz konta?
+download: Pobierać
+email: E-mail
 email-address: Adres e-mail
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
-enter-your-new-passw: Wprowadź swoje nowe hasło i potwierdź
-forgot:
-  check_email: Sprawdź pocztę, aby uzyskać link do zresetowania hasła
-  email: E-mail
-  heading: Zapomniałeś hasła
-  success: Hasło zostało zmienione
+enter-your-new-passw: Wprowadź nowe hasło i potwierdź
+first-name: Imię
+force-version: Wersja na siłę
+forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
+forgot-success: Hasło zostało zmienione
 from-device: z urządzenia
-good: Dobrze
+good: Dobry
 id: ID
 in-your-main-file: W twoim głównym pliku
 in-your-project-fold: W twoim folderze projektu
+info: Informacja
 informations: Informacje
 install-the-capacito: Zainstaluj wtyczkę Kondensator
 into-your-app-folder: Do folderu aplikacji.
-intro:
-  aka: Znany też jako
-  desc: Opiniowany szablon startowy Vite
-  dynamic-route: Demonstracja dynamicznego route
-  hi: Cześć, {name}!
-  whats-your-name: Jak masz na imię?
-invalid-auth: nieprawidłowa autoryzacja
+invalid-auth: nieważne uwierzytelnienie
 is-emulator: jest emulatorem
 is-production-app: Czy aplikacja produkcyjna
-last-upload: Ostatnie przesłanie
+key-copied: Klucz skopiowany do schowka
+last-name: Nazwisko
+last-update: Ostatnia aktualizacja
+last-upload: Ostatnie przesyłanie
 last-version: Ostatnia wersja
+launch-bundle: Uruchom pakiet
 limit-reached: Limit osiągnięty
-loading-more-data: Ładuję więcej danych...
+loading-more-data: Wczytuję więcej danych...
 log-in: Zaloguj sie
 log-to-the-capgo-cli: Zaloguj się do Capgo CLI
-login:
-  andpass: I hasło
-  connexion: Zaloguj sie
-  create-new: Stwórz nowe konto
-  email: E-mail
-  forgot: zapomniałem
-  hello: cześć
-  login-in: Zaloguj się
-  or: lub
-  password: Hasło
-  withemail: Z adresem e-mail
 login-to-your-accoun: Zaloguj się na swoje konto
+logout: Wyloguj
+logs: Logi
+lowerCaseError: Powinien zawierać małe litery
 make-normal: Zrób normalne
 making-this-channel-: >-
   Ustawienie tego kanału jako „normalnego” będzie wymagało skonfigurowania
   innego domyślnego kanału lub umożliwienia samoprzypisania przez urządzenie.
-module:
-  heading: Moduły
-monthly-active-users: Aktywni użytkownicy miesięcznie
+mau: Miesięczna liczba aktywnych użytkowników
+module-heading: Moduły
+monthly: Miesięczny
+monthly-active-users: Miesięczna liczba aktywnych użytkowników
+montly-active: Miesięczny aktywny
 more-version-storage: Więcej wersji Przechowywanie
-morning: rano
+morning: Poranek
 my-account: Moje konto
 my-notifications: moje powiadomienia
 name: Nazwa
 need-more-contact-us: |-
   Potrzeba więcej ? 
   Skontaktuj się z nami, aby uzyskać dostosowany plan
+no-channel-linked: Brak kanału, kliknij, aby dodać
+no-devices: Brak urządzeń
+no-logs: Brak dzienników
+no-version-linked: Brak wersji, kliknij, aby dodać
 not-found: Nie znaleziono
-notificationSettings:
-  heading: Ustawienia powiadomień
-  validate: Uprawomocnić
 notifications: Powiadomienia
-onboarding:
-  loading: Ładowanie
 one-day-left: Został jeden dzień
+open-channel: Otwórz kanał
+open-settings: Kliknij, aby otworzyć ustawienia
 open-sidebar: Otwórz pasek boczny
 open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację
-package:
-  cannot-delete-version: Nie można usunąć wersji
-  channels: Kanały
-  device_list: Lista urządzeń
-  devices: Zobacz urządzenia
-  devices-list: Połączone urządzenia
-  download: Pobierz wersję
-  externally: przechowywane zewnętrznie
-  link_channel: Link do kanału
-  link_version: Link do wersji
-  mobiles-stats: Statystyki telefonów komórkowych
-  name: Aplikacja
-  not_available: Nie znaleziono pakietu
-  set: Ustaw wersję na kanał
-  stats: statystyki
-  test: Uruchom wersję
-  title: informacje
-  unset: Odłącz kanał od pakietu
-  version:
-    is-used-in-device: jest używany w nadpisaniu urządzenia, najpierw odłącz je
-  version-deleted: Wersja usunięta
-  versions: Wersje
+os-version: Wersja systemu operacyjnego
 pages: Strony
-password:
-  heading: Stwórz hasło
-  new: nowe hasło
-  validate: Uprawomocnić
-pckage:
-  version:
-    is-used-in-channel: jest używany w kanale, najpierw go odłącz
+password: Hasło
+password-heading: Stwórz hasło
+password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
+password-new: nowe hasło
 personal-information: Informacje osobiste
-plan:
-  abtest: Testy A/B
-  application: Podanie
-  applications: Aplikacje
-  bandwidth: Przepustowość GB
-  buy: Kupić
-  channel: Kanał
-  channels: Kanały
-  desc: |-
-    Zacznij tworzyć za darmo, a następnie dodaj plan, aby rozpocząć. 
-    Plany kont odblokowują dodatkowe funkcje.
-  free:
-    desc: Najlepsze dla MVP i testów
-  maker:
-    desc: Najlepsze dla właścicieli małych firm
-  mau: Aktywni użytkownicy miesięcznie
-  monthly-billing: Rozliczenie miesięczne
-  payasyougo:
-    desc: Najlepsze dla skalujących się przedsiębiorstw
-  pricing-plans: Plany cenowe
-  progressive_deploy: Wdrażanie progresywne
-  shared_channel: Wspólny kanał
-  shared_channels: Udostępnione kanały
-  solo:
-    desc: Najlepsze dla niezależnych programistów
-  storage: Pamięć GB
-  team:
-    desc: Najlepsze dla właścicieli dużych firm
-  update: Aktualizacja
-  updates: Aktualizacje
-  version: Wersja
-  versions: Wersje
-  whats-included: Co jest zawarte
-  yearly-billing: Rozliczenie roczne
+plan-abtest: Testy A/B
+plan-bandwidth: GB Przepustowość
+plan-buy: Kupić
+plan-desc: |-
+  Rozpocznij tworzenie za darmo, a następnie dodaj plan uruchomienia. 
+  Plany kont odblokowują dodatkowe funkcje.
 plan-inactive: Plan nieaktywny
-plan-is-the-best-pla: plan jest najlepszym planem dla Twoich potrzeb.
+plan-is-the-best-pla: plan to najlepszy plan dla Twoich potrzeb.
 plan-member: członek planu.
+plan-pricing-plans: Plany cenowe
+plan-progressive-deploy: Wdrażanie progresywne
+plan-storage: GB pamięci
+plan-updates: Aktualizacje
+plan-whats-included: Co jest zawarte
 plans: Plany
-please-choose-your-p: Proszę wybrać swoje preferencje
+platform: Platforma
+please-choose-your-p: Wybierz swoje preferencje
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
-pro-tip-you-can-copy: 'Pro wskazówka: możesz skopiować'
+plugin-version: Wersja wtyczki
+pro-tip-you-can-copy: 'Pro wskazówka: możesz skopiować plik'
 projection: projekcje
-projects:
-  list: Twój
-  sharedlist: Podziel sie ze mna
-  title: Projektowanie
 refresh-this-page: Odśwież tę stronę
-register:
-  already-account: Posiadasz już konto?
-  check-email: Sprawdź swoją pocztę e-mail i zweryfikuj
-  confirm-email: Potwierdź email
-  confirm-password: Potwierdź hasło
-  desc: Wypełnij poniższe pola, aby zakończyć rejestrację
-  email: E-mail
-  first-name: Imię
-  heading: Rejestracja
-  last-name: nazwisko
-  lowerCaseError: Powinien zawierać małe litery
-  next: Następny
-  password: hasło
-  password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
-  specialError: Powinien zawierać znaki specjalne
-  upperCaseError: Powinien zawierać wielkie litery
+register-desc: Wypełnij poniższe pola, aby zakończyć rejestrację
+register-heading: Rejestracja
+register-next: Rejestr
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
+search: Szukaj
+search-bundle: Wyszukaj pakiet
+search-bundle-id: Wyszukaj według identyfikatora pakietu
+search-by-action: Szukaj według akcji
+search-by-device-id: Szukaj według identyfikatora urządzenia
+search-by-name: Szukaj według nazwy
+search-device: Wyszukaj urządzenie
+search-user: Wyszukaj użytkownika
 see-usage: Zobacz użycie
-session_key: IvSessionKey
+session_key: Klucz IVSesji
+set-bundle: Ustaw pakiet na kanał
 settings: Ustawienia
 shared-apps: Udostępnione aplikacje
 sign-out: Wyloguj się
 size: Rozmiar
+size-not-found: Nie znaleziono
 something-went-wrong-try-again-later: |-
   Coś poszło nie tak! 
   Spróbuj ponownie później.
 special-api-access: Specjalny dostęp do API
-start-using-capgo: Zacznij korzystać z Capgo !
-stats:
-  devices: Urządzenia
-  downloads: Pliki do pobrania
-  subtitle: W zeszłym miesiącu
-  title: Statystyki
-  versions: Wersje
+specialError: Powinien zawierać znaki specjalne
+start-using-capgo: Zacznij korzystać z Capgo!
+stored-externally: przechowywane na zewnątrz
 submit: Składać
+support: Wsparcie
 switch-to-all-device: Przełącz na wszystkie urządzenia
 switch-to-only-devic: Przełącz na tylko połączone urządzenie
 terms-of-use: Warunki korzystania
@@ -358,28 +252,40 @@ test-your-update-in-: Przetestuj aktualizację w swojej aplikacji
 tests: testy
 thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 the: The
-this-page-will-self-: Ta strona odświeży się automatycznie
+this-page-will-self-: Ta strona odświeży się samoczynnie
 title: tytuł
 top-apps: Moje aplikacje
 trial-left: Pozostałe dni
-trial-plan-expired: Plan próbny wygasł
-trial-plan-expires-in: Plan próbny wygasa za
+trial-plan-expired: Wersja czasowa wygasła
+trial-plan-expires-in: Próba kończy się za
 unlimited-updates: Nieograniczone aktualizacje
-updated-at: Zaktualizowano w
-upgrade: Uaktualnić
+unlink-bundle: Odłącz pakiet
+unlink-channel: Odłącz kanał
+unlink-version: Odłącz wersję
+update: Aktualizacja
+updated-at: Zaktualizowano o godz
+upgrade: Aktualizacja
 upgrade-now: Ulepsz teraz
-url: URL
-usage:
-  success: >-
-    Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka
-    minut
-  title: Stosowanie
-version-builtin: Wbudowana wersja
+upperCaseError: Powinien zawierać wielkie litery
+url: Adres URL
+usage-success: >-
+  Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka
+  minut
+usage-title: Całkowity
+user: Użytkownik
+validate: Uprawomocnić
+version: Wersja
+version-build: Budowa wersji
+version-builtin: Wersja wbudowana
+version-linked: Link do wersji
+version-linking: Link do pakietu
+versions: Wersje
 welcome-to: Witamy w
-welcome-to-your-capg: Witamy w Twoim panelu Capgo
+welcome-to-your-capg: Witamy na pulpicie nawigacyjnym Capgo
+yearly: Rocznie
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-reached-the-limi: Limit osiągnięty
 your-api-key: 'Twój klucz API:'
-your-are-a: Twoja sfera
+your-are-a: Twoja okolica
 your-current-plan-is: Twój obecny plan to
-your-current-suggested-plan-is: Twój obecny sugerowany plan to
+your-current-suggested-plan-is: Twój aktualny sugerowany plan to

@@ -1,123 +1,86 @@
 <script setup lang="ts">
-import {
-  IonButton, IonButtons, IonContent, IonHeader,
-  IonInput, IonItem, IonItemDivider, IonItemOption, IonItemOptions, IonItemSliding,
-  IonLabel, IonList, IonListHeader, IonModal, IonNote,
-  IonPage, IonSearchbar, IonTitle, IonToggle, IonToolbar,
-  actionSheetController, alertController, toastController,
-} from '@ionic/vue'
-import { computed, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ellipsisHorizontalCircle } from 'ionicons/icons'
-import Spinner from '~/components/Spinner.vue'
-import { existUser, useSupabase } from '~/services/supabase'
-import { openVersion } from '~/services/versions'
-import NewUserModal from '~/components/NewUserModal.vue'
+import {
+  kList, kListItem,
+  kToggle,
+} from 'konsta/vue'
+import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
-import TitleHead from '~/components/TitleHead.vue'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
+import IconSettings from '~icons/heroicons/cog-6-tooth'
+import IconInformations from '~icons/heroicons/information-circle'
+import IconUsers from '~icons/heroicons/users-solid'
+import IconDevice from '~icons/heroicons/device-phone-mobile'
+import type { Tab } from '~/components/comp_def'
 
-interface ChannelUsers {
-  user_id: Database['public']['Tables']['users']['Row']
-}
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 const router = useRouter()
+const displayStore = useDisplayStore()
 const { t } = useI18n()
 const route = useRoute()
 const main = useMainStore()
-const listRef = ref()
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
+const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
-const users = ref<(Database['public']['Tables']['channel_users']['Row'] & ChannelUsers)[]>()
-const newUser = ref<string>()
-const newUserModalOpen = ref(false)
-const search = ref('')
-const devices = ref<Database['public']['Tables']['channel_devices']['Row'][]>([])
+const ActiveTab = ref('info')
 
+const tabs: Tab[] = [
+  {
+    label: t('info'),
+    icon: IconInformations,
+    key: 'info',
+  },
+  {
+    label: t('users'),
+    icon: IconUsers,
+    key: 'users',
+  },
+  {
+    label: t('devices'),
+    icon: IconDevice,
+    key: 'devices',
+  },
+  {
+    label: t('settings'),
+    icon: IconSettings,
+    key: 'settings',
+  },
+]
 const openBundle = () => {
   if (!channel.value)
     return
   console.log('openBundle', channel.value.version.id)
   router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
 }
-const openApp = () => {
-  if (!channel.value)
-    return
-  openVersion(channel.value.version, main.user?.id || '')
-}
-const getUsers = async () => {
-  if (!channel.value)
-    return
-  try {
-    const { data, error } = await supabase
-      .from('channel_users')
-      .select(`
-          id,
-          channel_id,
-          user_id (
-            id,
-            email,
-            first_name,
-            last_name
-          ),
-          created_at
-        `)
-      .eq('channel_id', id.value)
-      .eq('app_id', channel.value.version.app_id)
-    if (error) {
-      console.error('no channel users', error)
-      return
-    }
-    users.value = data as (Database['public']['Tables']['channel_users']['Row'] & ChannelUsers)[]
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
-const getDevices = async () => {
+
+const getDeviceIds = async () => {
   if (!channel.value)
     return
   try {
     const { data: dataDevices } = await supabase
       .from('channel_devices')
-      .select()
+      .select('device_id')
       .eq('channel_id', id.value)
       .eq('app_id', channel.value.version.app_id)
     if (dataDevices && dataDevices.length)
-      devices.value = dataDevices
+      deviceIds.value = dataDevices.map(d => d.device_id)
     else
-      devices.value = []
+      deviceIds.value = []
   }
   catch (error) {
     console.error(error)
   }
 }
 
-const saveChannelChange = async (key: string, val: any) => {
-  if (!id.value || !channel.value)
-    return
-  try {
-    const update = {
-      [key]: val,
-    }
-    const { error } = await supabase
-      .from('channels')
-      .update(update)
-      .eq('id', id.value)
-    if (error)
-      console.error('no channel update', error)
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
 const getChannel = async () => {
   if (!id.value)
     return
@@ -157,6 +120,33 @@ const getChannel = async () => {
     console.error(error)
   }
 }
+
+const reload = async () => {
+  await getChannel()
+  await getDeviceIds()
+}
+
+const saveChannelChange = async (key: string, val: any) => {
+  console.log('saveChannelChange', key, val)
+  if (!id.value || !channel.value)
+    return
+  try {
+    const update = {
+      [key]: val,
+    }
+    const { error } = await supabase
+      .from('channels')
+      .update(update)
+      .eq('id', id.value)
+    reload()
+    if (error)
+      console.error('no channel update', error)
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
@@ -164,72 +154,20 @@ watchEffect(async () => {
     packageId.value = packageId.value.replace(/--/g, '.')
     id.value = Number(route.params.channel as string)
     await getChannel()
-    await getUsers()
-    await getDevices()
+    await getDeviceIds()
     loading.value = false
+    displayStore.NavTitle = t('channel')
+    displayStore.defaultBack = `/app/package/${route.params.p}/channels`
   }
 })
 
-const addUser = async () => {
-  // console.log('newUser', newUser.value)
-  if (!channel.value || !main.auth || !id.value)
-    return
-  if (!main.canUseMore) {
-    // show alert for upgrade plan and return
-    const alert = await alertController.create({
-      header: t('limit-reached'),
-      message: t('please-upgrade'),
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('upgrade-now'),
-          id: 'confirm-button',
-          handler: () => {
-            router.push('/dashboard/settings/plans')
-          },
-        },
-      ],
-    })
-    await alert.present()
-    return
-  }
-  // exist_user
-  const exist = await existUser(newUser.value || '')
-  if (!exist) {
-    newUserModalOpen.value = false
-    return
-  }
-
-  const { error } = await supabase
-    .from('channel_users')
-    .insert({
-      channel_id: id.value,
-      app_id: channel.value.version.app_id,
-      user_id: exist,
-      created_by: main.user?.id,
-    })
-  if (error) {
-    console.error(error)
-  }
-  else {
-    await getUsers()
-    newUser.value = ''
-  }
-}
 const makeDefault = async (val = true) => {
-  const alert = await alertController.create({
-    header: t('account.delete_sure'),
-    message: val ? t('channel.confirm-public-desc') : t('making-this-channel-'),
+  displayStore.actionSheetOption = {
+    header: t('are-u-sure'),
+    message: val ? t('confirm-public-desc') : t('making-this-channel-'),
     buttons: [
       {
-        text: t('button.cancel'),
-        role: 'cancel',
-      },
-      {
-        text: val ? t('channel.make-now') : t('make-normal'),
+        text: val ? t('channel-make-now') : t('make-normal'),
         id: 'confirm-button',
         handler: async () => {
           if (!channel.value || !id.value)
@@ -243,140 +181,17 @@ const makeDefault = async (val = true) => {
           }
           else {
             channel.value.public = val
-            const toast = await toastController
-              .create({
-                message: t(val ? 'defined-as-public' : 'defined-as-private'),
-                duration: 2000,
-              })
-            await toast.present()
+            displayStore.messageToast.push(val ? t('defined-as-public') : t('defined-as-private'))
           }
         },
       },
-    ],
-  })
-  await alert.present()
-}
-const didCancel = async (name: string) => {
-  const alert = await alertController
-    .create({
-      header: t('alert.confirm-delete'),
-      message: `${t('alert.not-reverse-message')} ${t('alert.delete-message')} ${name}?`,
-      buttons: [
-        {
-          text: t('button.cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button.delete'),
-          id: 'confirm-button',
-        },
-      ],
-    })
-  await alert.present()
-  return alert.onDidDismiss().then(d => (d.role === 'cancel'))
-}
-const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => {
-  if (!channel.value || await didCancel(t('channel.user')))
-    return
-  const { error } = await supabase
-    .from('channel_users')
-    .delete()
-    .eq('app_id', channel.value.version.app_id)
-    .eq('user_id', usr.id)
-  if (error)
-    console.error(error)
-  else
-    await getUsers()
-}
-
-const presentActionSheet = async (usr: Database['public']['Tables']['users']['Row']) => {
-  const actionSheet = await actionSheetController.create({
-    buttons: [
       {
-        text: t('button.delete'),
-        handler: () => {
-          actionSheet.dismiss()
-          deleteUser(usr)
-        },
-      },
-      {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
-        handler: () => {
-          // console.log('Cancel clicked')
-        },
       },
     ],
-  })
-  await actionSheet.present()
-}
-
-const devicesFilter = computed(() => {
-  const value = search.value
-  if (value) {
-    const filtered = devices.value.filter(device => device.device_id.toLowerCase().includes(value.toLowerCase()))
-    return filtered
   }
-  return devices.value
-})
-const deleteDevice = async (device: Database['public']['Tables']['channel_devices']['Row']) => {
-  // console.log('deleteDevice', device)
-  if (listRef.value)
-    listRef.value.$el.closeSlidingItems()
-  if (await didCancel(t('channel.device')))
-    return
-  try {
-    const { error: delDevError } = await supabase
-      .from('channel_devices')
-      .delete()
-      .eq('app_id', device.app_id)
-      .eq('device_id', device.device_id)
-    if (delDevError) {
-      const toast = await toastController
-        .create({
-          message: t('channel.cannot-delete-device'),
-          duration: 2000,
-        })
-      await toast.present()
-    }
-    else {
-      await getDevices()
-      const toast = await toastController
-        .create({
-          message: t('channel.device-deleted'),
-          duration: 2000,
-        })
-      await toast.present()
-    }
-  }
-  catch (error) {
-    const toast = await toastController
-      .create({
-        message: t('channel.cannot-delete-device'),
-        duration: 2000,
-      })
-    await toast.present()
-  }
-}
-const inviteUser = async (userId: string) => {
-  if (!channel.value || !id.value)
-    return
-  const { error } = await supabase
-    .from('channel_users')
-    .insert({
-      channel_id: id.value,
-      created_by: main.user?.id,
-      app_id: channel.value?.version.app_id,
-      user_id: userId,
-    })
-  if (error) {
-    console.error(error)
-  }
-  else {
-    newUser.value = ''
-    newUserModalOpen.value = false
-    await getUsers()
-  }
+  displayStore.showActionSheet = true
 }
 
 const getUnknownVersion = async (): Promise<number> => {
@@ -404,12 +219,12 @@ const getUnknownVersion = async (): Promise<number> => {
 const openPannel = async () => {
   if (!channel.value || !main.auth)
     return
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     buttons: [
       {
-        text: t('package.unset'),
+        text: t('unlink-bundle'),
         handler: async () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           const id = await getUnknownVersion()
           if (!id)
             return
@@ -417,214 +232,132 @@ const openPannel = async () => {
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('channel.title')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-    <IonContent :fullscreen="true">
-      <IonHeader collapse="condense">
-        <IonToolbar mode="ios">
-          <IonTitle color="warning" size="large">
-            {{ t('channel.title') }}
-          </IonTitle>
-          <IonButtons v-if="channel" slot="end">
-            <IonButton color="danger" @click="openApp()">
-              {{ t('channel.open') }}
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
-      <IonList ref="listRef">
-        <template v-if="!loading">
-          <IonListHeader>
-            <span class="text-vista-blue-500">
-              {{ channel?.name }}
-            </span>
-          </IonListHeader>
-          <IonItemDivider>
-            <IonLabel>
-              {{ t('informations') }}
-            </IonLabel>
-          </IonItemDivider>
-          <IonItem class="cursor-pointer text-azure-500" @click="openBundle()">
-            <IonLabel class="my-6">
-              {{ t('package.versions') }}
-            </IonLabel>
-            <IonNote slot="end">
-              {{ channel?.version.name }}
-            </IonNote>
-          </IonItem>
-          <IonItem>
-            <IonLabel class="my-6">
-              {{ t('device.created_at') }}
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(channel?.created_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItem>
-            <IonLabel class="my-6">
-              {{ t('device.last_update') }}
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(channel?.updated_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItemDivider>
-            <IonLabel>
-              {{ t('settings') }}
-            </IonLabel>
-          </IonItemDivider>
-          <IonItem>
-            <IonLabel class="my-6 font-extrabold">
-              {{ t('channel.is_public') }}
-            </IonLabel>
-            <IonButtons slot="end">
-              <IonToggle
-                color="secondary"
-                :checked="channel?.public"
-                @ion-change="makeDefault($event.detail.checked)"
-              />
-            </IonButtons>
-          </IonItem>
-          <IonItem>
-            <IonLabel>{{ t('disable-auto-downgra') }}</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.disableAutoUpdateUnderNative"
-              @ion-change="saveChannelChange('disableAutoUpdateUnderNative', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel>{{ t('disable-auto-upgrade') }}</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.disableAutoUpdateToMajor"
-              @ion-change="saveChannelChange('disableAutoUpdateToMajor', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel>{{ t('allow-develoment-bui') }} ( min 4.7.0)</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.allow_dev"
-              @ion-change="saveChannelChange('allow_dev', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel>{{ t('allow-emulator') }} ( min 4.7.0)</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.allow_emulator"
-              @ion-change="saveChannelChange('allow_emulator', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel>IOS</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.ios"
-              @ion-change="saveChannelChange('ios', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel>Android</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.android"
-              @ion-change="saveChannelChange('android', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel>{{ t('allow-device-to-self') }} ( min 4.7.0)</IonLabel>
-            <IonToggle
-              color="secondary"
-              :checked="channel?.allow_device_self_set"
-              @ion-change="saveChannelChange('allow_device_self_set', $event.target.checked)"
-            />
-          </IonItem>
-          <IonItemDivider>
-            <IonLabel>
-              {{ t('channel.users') }}
-            </IonLabel>
-          </IonItemDivider>
-          <IonItem>
-            <IonLabel position="floating">
-              {{ t('channel.invit') }}
-            </IonLabel>
-            <IonInput v-model="newUser" type="email" placeholder="hello@yourcompany.com" />
-            <div slot="end" class="flex items-center justify-center h-full">
-              <IonButton color="secondary" @click="addUser()">
-                {{ t('channel.add') }}
-              </IonButton>
-            </div>
-          </IonItem>
-          <IonItem v-for="(usr, index) in users" :key="index" class="cursor-pointer" @click="presentActionSheet(usr.user_id)">
-            <IonLabel>
-              <div class="flex flex-col col-span-6">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-sm text-azure-500">
-                    {{ usr.user_id.first_name }}  {{ usr.user_id.last_name }}
-                  </h2>
-                  <p>{{ usr.user_id.email }}</p>
-                </div>
-              </div>
-            </IonLabel>
-          </IonItem>
-          <IonItemDivider v-if="devices?.length">
-            <IonLabel>
-              {{ t('package.devices-list') }}
-            </IonLabel>
-          </IonItemDivider>
-          <!-- add item with searchbar -->
-          <IonItem v-if="devices?.length">
-            <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
-          </IonItem>
-          <template v-for="d in devicesFilter" :key="d.device_id">
-            <IonItemSliding>
-              <IonItem class="cursor-pointer">
-                <IonLabel>
-                  <h2 class="text-sm text-azure-500">
-                    {{ d.device_id }}
-                  </h2>
-                </IonLabel>
-                <IonNote slot="end">
-                  {{ formatDate(d.created_at || '') }}
-                </IonNote>
-              </IonItem>
-              <IonItemOptions side="end">
-                <IonItemOption color="warning" @click="deleteDevice(d)">
-                  Delete
-                </IonItemOption>
-              </IonItemOptions>
-            </IonItemSliding>
-          </template>
-        </template>
-        <div v-else class="flex justify-center">
-          <Spinner />
-        </div>
-      </IonList>
-    </IonContent>
-    <IonModal :is-open="newUserModalOpen" :can-dismiss="true">
-      <NewUserModal :email-address="newUser" @close="newUserModalOpen = false" @invite-user="inviteUser" />
-    </IonModal>
-  </IonPage>
+  <div>
+    <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+    <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <dl class="divide-y divide-gray-500">
+          <InfoRow :label="t('name')" :value="channel.name" />
+          <!-- Bundle Number -->
+          <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle" />
+          <!-- Created At -->
+          <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
+          <!-- Last Update -->
+          <InfoRow :label="t('last-update')" :value="formatDate(channel.updated_at)" />
+        </dl>
+      </div>
+    </div>
+    <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <dl class="divide-y divide-gray-500">
+          <k-list class="w-full mt-5 list-none border-t border-gray-200">
+            <k-list-item label :title="t('channel-is-public')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.public"
+                  @change="() => (makeDefault(!channel?.public))"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label title="iOS" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.ios"
+                  @change="saveChannelChange('ios', !channel?.ios)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label title="Android" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.android"
+                  @change="saveChannelChange('android', !channel?.android)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('disable-auto-downgra')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.disableAutoUpdateUnderNative"
+                  @change="saveChannelChange('disable_auto_downgrade', !channel?.disableAutoUpdateUnderNative)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.disableAutoUpdateToMajor"
+                  @change="saveChannelChange('disable_auto_upgrade', !channel?.disableAutoUpdateToMajor)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('allow-develoment-bui')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.allow_dev"
+                  @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('allow-emulator')" class="text-xl font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.allow_emulator"
+                  @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('allow-device-to-self')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.allow_device_self_set"
+                  @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('unlink-bundle')" class="text-lg font-medium text-red-500" link @click="openPannel" />
+          </k-list>
+        </dl>
+      </div>
+    </div>
+    <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
+      </div>
+    </div>
+    <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">
+      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+        <DeviceTable class="p-3" :app-id="channel.version.app_id" :channel-id="id" :ids="deviceIds" />
+      </div>
+    </div>
+  </div>
 </template>
-
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

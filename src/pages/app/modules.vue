@@ -1,17 +1,11 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonIcon,
-  IonItemDivider,
-  IonLabel,
-  IonPage,
-} from '@ionic/vue'
-import { chevronForwardOutline } from 'ionicons/icons'
+import { kBlockTitle, kList, kListItem } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import TitleHead from '~/components/TitleHead.vue'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
+const displayStore = useDisplayStore()
 
 const dependencies = JSON.parse((import.meta.env.package_dependencies as string) || '{}')
 interface Module {
@@ -31,42 +25,24 @@ Object.keys(dependencies).forEach((dep) => {
   }
 })
 // console.log('modules', modules.value)
+displayStore.NavTitle = t('modules')
+displayStore.defaultBack = '/app/home'
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('module.heading')" default-back="/app/home" color="warning" />
-    <IonContent :fullscreen="true">
-      <div class="p-6">
-        <ul class="grid grid-rows-4 mb-6 gap-y-5">
-          <li>
-            <a
-              class="flex items-center justify-between"
-              href="https://github.com/riderx/awesome-capacitor"
-              rel="noopener"
-              target="_blank"
-            >
-              <span class="font-bold">{{ t('discover-module-in-a') }}</span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </a>
-          </li>
-          <IonItemDivider>
-            <IonLabel>
-              {{ t('available-in-the-san') }}
-            </IonLabel>
-          </IonItemDivider>
-          <li v-for="(module, index) in modules" :key="index">
-            <a
-              class="flex items-center justify-between"
-              :href="module.url"
-              target="_blank"
-            >
-              <span class="font-bold">{{ module.name }}@{{ module.version }}</span>
-              <IonIcon :icon="chevronForwardOutline" class="text-azure-500" />
-            </a>
-          </li>
-        </ul>
-      </div>
-    </IonContent>
-  </IonPage>
+  <div>
+    <k-list strong-ios outline-ios>
+      <k-list-item
+        link :title="t('discover-module-in-a')" href="https://github.com/riderx/awesome-capacitor" rel="noopener"
+        target="_blank"
+      />
+    </k-list>
+    <k-block-title>{{ t('available-in-the-san') }}</k-block-title>
+    <k-list strong-ios outline-ios>
+      <k-list-item
+        v-for="(module, index) in modules" :key="index" link :title="`${module.name}@${module.version}`" :href="module.url"
+        target="_blank"
+      />
+    </k-list>
+  </div>
 </template>

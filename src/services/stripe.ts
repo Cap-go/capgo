@@ -1,9 +1,11 @@
 import { Capacitor } from '@capacitor/core'
-import { actionSheetController, loadingController, toastController } from '@ionic/vue'
 import { useSupabase } from './supabase'
+import { useDisplayStore } from '~/stores/display'
+
+const displayStore = useDisplayStore()
 
 const presentActionSheetOpen = async (url: string) => {
-  const actionSheet = await actionSheetController.create({
+  displayStore.actionSheetOption = {
     buttons: [
       {
         text: 'Continue',
@@ -12,8 +14,8 @@ const presentActionSheetOpen = async (url: string) => {
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
 const openBlank = (link: string) => {
   console.log('openBlank', link)
@@ -28,39 +30,31 @@ export const openPortal = async () => {
   const session = await supabase.auth.getSession()
   if (!session)
     return
-  const loading = await loadingController.create({
-    message: 'Please wait...',
-  })
+  displayStore.messageLoader = 'Please wait...'
+  displayStore.showLoader = true
   try {
-    await loading.present()
     const resp = await supabase.functions.invoke('stripe_portal', {
       body: JSON.stringify({ callbackUrl: window.location.href }),
     })
     console.error('stripe_portal', resp)
-    await loading.dismiss()
+    displayStore.showLoader = false
     if (!resp.error && resp.data && resp.data.url) {
       console.error('resp.data.url', resp.data.url)
       openBlank(resp.data.url)
     }
     else {
-      const toast = await toastController.create({
-        message: 'Cannot open your portal',
-        duration: 2000,
-      })
-      await toast.present()
+      displayStore.messageToast.push('Cannot open your portal')
     }
   }
   catch (error) {
     console.error('Error unknow', error)
-    await loading.dismiss()
-    const toast = await toastController
-      .create({
-        message: 'Cannot get your portal',
-        duration: 2000,
-      })
-    await toast.present()
+    displayStore.showLoader = false
+    displayStore.messageToast.push('Cannot get your portal')
   }
   return null
+}
+const getClientReferenceId = () => {
+  return window.Rewardful && window.Rewardful.referral ? window.Rewardful.referral : (`checkout_${(new Date()).getTime()}`)
 }
 
 export const openCheckout = async (priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) => {
@@ -69,24 +63,17 @@ export const openCheckout = async (priceId: string, successUrl: string, cancelUr
   const session = await supabase.auth.getSession()
   if (!session)
     return
-  const loading = await loadingController.create({
-    message: 'Please wait...',
-  })
+  displayStore.messageLoader = 'Please wait...'
   try {
-    await loading.present()
-    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId, successUrl, cancelUrl, reccurence: isYear ? 'year' : 'month' }) })
-    await loading.dismiss()
+    displayStore.showLoader = true
+    const resp = await supabase.functions.invoke('stripe_checkout', { body: JSON.stringify({ priceId, successUrl, cancelUrl, reccurence: isYear ? 'year' : 'month', clientReferenceId: getClientReferenceId() }) })
+    displayStore.showLoader = false
     if (!resp.error && resp.data && resp.data.url)
       openBlank(resp.data.url)
   }
   catch (error) {
     console.error(error)
-    await loading.dismiss()
-    const toast = await toastController
-      .create({
-        message: 'Cannot get your checkout',
-        duration: 2000,
-      })
-    await toast.present()
+    displayStore.showLoader = false
+    displayStore.messageToast.push('Cannot get your checkout')
   }
 }

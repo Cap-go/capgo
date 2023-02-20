@@ -1,132 +1,103 @@
 Bandwidth: 帯域幅
-MAU: 月間アクティブ ユーザー数
 Storage: 保管所
-account:
-  backButton: 戻る
-  billing: 請求する
-  changePassword: パスワードを変更する
-  delete-account: アカウントを削除します
-  delete_sure: 本気ですか ？
-  discord: 不和
-  error: エラー
-  heading: アカウント
-  keys: APIキー
-  legal: 利用規約
-  logout: ログアウト
-  personalInformation: 個人情報
-  preferences: 通知
-  privacy: プライバシーポリシー
-  support: サポート
-  usage: 利用方法
+account: アカウント
+account-password-error: エラーが発生しました。もう一度お試しください
+account-password-heading: パスワードを変更する
 account-settings: アカウント設定
-accountPassword:
-  confirmPassword: パスワードを認証する
-  errorMsg: エラーが発生しました。再試行してください
-  heading: パスワードを変更する
-  password: 新しいパスワード
-  success: パスワードが正常に変更されました
-  validate: 検証
-accountProfile:
-  billing_email: 請求メール
-  country: 国
-  email: Eメール
-  first-name: ファーストネーム
-  heading: 個人情報
-  last-name: 苗字
-  update: アップデート
-activation:
-  desc: 以下のフィールドに入力して登録を完了してください
-  doi: オプションの同意
-  doi-desc: メールマガジンと将来のマーケティングオファーを受け入れます
-  heading: アクティベーション
-  headline: 私の設定
-  legal: 利用規約
-  legal-desc: Capgoアプリのプライバシーポリシーと利用規約に同意します
-  notification: 通知
-  notification-desc: 新しいアプリのバージョンが利用可能になったときに通知を受け取ることに同意します
-  validate: 検証
+action: アクション
+activation-desc: 次のフィールドに入力して、登録を完了します
+activation-doi: オプションの同意
+activation-doi-desc: メールニュースレターと今後のマーケティングオファーに同意します
+activation-heading: アクティベーション
+activation-headline: 私の設定
+activation-legal: 利用規約
+activation-legal-desc: Capgo アプリのプライバシー ポリシーと利用規約に同意します
+activation-notification: 通知
+activation-notification-desc: アプリの新しいバージョンが利用可能になったときに通知を受け取ることに同意します
+activation-validate: 検証
+add: 追加
 add-another-app: アプリを追加する
 add-this-code-to-you: このコードをプロジェクトに追加します
 add-your-app-to-your: アプリをアカウントに追加する
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
+admin: 管理者
 afternoon: 午後
-alert:
-  confirm-delete: 削除の確認
-  delete-message: これを削除してもよろしいですか
-  not-reverse-message: このアクションは元に戻せません
+alert-confirm-delete: 削除の確認
+alert-delete-message: これを削除してもよろしいですか
+alert-not-reverse-message: このアクションは元に戻せません
 allow-develoment-bui: 開発ビルドを許可
 allow-device-to-self: デバイスの自己関連付けを許可する
 allow-emulator: エミュレータを許可
+already-account: すでにアカウントをお持ちですか？
 api-key: API キー
 api-keys: API キー
-apikeys:
-  all: キー
-  checkbelow: 詳細については、リンクの下を確認してください
-  cli: capgo CLI
-  explain: これらのAPIキーはすべて、CapgoCLIツールまたはコンデンサーアップデータプラグインで使用できるように作成されています。
-  keyCopied: クリップボードにコピーされたキー
-  links: リンク
-  title: APIキー
-  updater: コンデンサアップデータ
+api-keys-key-copied: API キー
+app: アプリ
+app-deleted: アプリを削除しました
 app-id-example: アプリ ID の例
+app-not-found: アプリが見つかりません
+are-u-sure: 本気ですか ？
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
 bigger-app-size: アプリのサイズが大きい
+billing: 請求する
 build-your-app-and-s: アプリをビルドして同期する
 build-your-code-and-: コードを Capgo にアップロードする
 bulk-upload: 一括アップロード
+bundle: バンドル
+bundle-deleted: バンドルを削除しました
+bundle-is-linked-channel: バンドルはチャンネルにリンクされています。まずリンクを解除してください
+bundle-is-linked-device: バンドルはデバイスにリンクされています。最初にリンクを解除してください
 bundle-number: バンドル番号
-button:
-  about: これは？
-  back: 戻る
-  browse: ブラウズ
-  camera: カメラ
-  cancel: キャンセル
-  delete: 消去
-  go: 進む
-  home: ホーム
-  remove: 削除する
-  tabs: タブ
-  toggle_dark: ダークモード切り替え
-  toggle_langs: 言語切り替え
+bundles: バンドル
+button-about: だいたい
+button-back: 戻る
+button-browse: ブラウズ
+button-camera: カメラ
+button-cancel: キャンセル
+button-delete: 消去
+button-go: 行く
+button-home: 家
+button-options: オプション
+button-remove: 削除
+button-tabs: タブ
+button-toggle_dark: ダークモードの切り替え
+button-toggle_langs: 言語を変更
 by-clicking-on-them: それらをクリックして。
 cannot-delete-app: アプリを削除できません
+cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
-cannot-delete-channel: チャネルを削除できません
+cannot-delete-bundle: バンドルを削除できません
+cannot-delete-channel: チャンネルを削除できません
 cannot-save-custom-i: カスタム ID を保存できません
-change: 変化する
-channel:
-  add: 追加
-  beta-channel: ベータチャンネル
-  cannot-delete-device: デバイスを削除できません
-  confirm-public-desc: |-
-    このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
-
-    他のデフォルト チャネルはデフォルトではなくなります。
-  copy: URLをコピー
-  device: 端末
-  device-deleted: デバイスが削除されました
-  invit: 招待するメールアドレスを入力
-  is_public: チャネルのデフォルト
-  make-now: デフォルトにする
-  make_it: 成功する
-  makeprivate: あなたのチャンネルは公開されています。クリックして非公開にします
-  makepublic: チャンネルは非公開です。クリックして公開してください
-  open: 開ける
-  private_desc: プライベート
-  public: コンデンサ-アップデータリンク
-  public_desc: 公衆
-  title: チャネル
-  user: ユーザー
-  user_no_found: ユーザーが見つかりません。最初に登録を依頼してください
-  users: ユーザーと共有
-  v3: V3設定
-channel-deleted: チャンネルが削除されました
+cannot-test-app-some: アプリをテストできません
+change: 変化
+changed-password-suc: パスワードは正常に変更されました
+channel: チャネル
+channel-create: チャンネルを作成
+channel-deleted: チャンネルを削除しました
+channel-invit: 招待するメールを入力
+channel-is-public: チャンネルは公開されています
+channel-link: チャンネルリンク
+channel-link-fail: チャンネルをリンクできません
+channel-linked: リンクされたチャンネル
+channel-linking: チャンネルへのリンク
+channel-make-now: デフォルトにする
+channels: チャネル
+check-email: メールを確認して確認してください
 checksum: チェックサム
 commands: コマンド
+confirm-email: メールを確認する
+confirm-password: パスワードを認証する
+confirm-public-desc: |-
+  このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
+
+  他のデフォルト チャネルはデフォルトではなくなります。
 copied-to-clipboard: クリップボードにコピーしました
 copy-your: あなたのコピー
+country: 国
 create-a-free-accoun: 無料アカウントを作成
+created-at: で作成
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 custom-id-saved: カスタム ID を保存しました
@@ -136,81 +107,60 @@ defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
-device:
-  channel: チャネルリンク
-  created_at: で作成
-  force_version: 強制バージョン
-  info: 情報
-  last_update: 最後の更新
-  link_channel: デバイスにリンクされたチャネル
-  link_fail: 何か間違ったことが起こったリンクできません
-  link_version: デバイスにリンクされているバージョン
-  no_channel: チャネルがありません。クリックして追加してください
-  no_override: オーバーライドなし、クリックして追加
-  os_version: OSバージョン
-  platform: プラットホーム
-  plugin_version: プラグインバージョン
-  title: 端末
-  unlink_channel: デバイスへのチャネルリンク解除
-  unlink_version: バージョンはデバイスへのリンクを解除します
-  version: バージョン
-devices:
-  title: デバイス
+details-and-logs: 詳細とログ
+device: デバイス
+device-id: デバイスID
+devices: デバイス
 devices-using-this-b: このバンドルを使用するデバイス
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
 disable-auto-upgrade: メジャーを超える自動アップグレードを無効にする
+discord: 不和
 discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
 documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
+download: ダウンロード
+email: Eメール
 email-address: 電子メールアドレス
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
-forgot:
-  check_email: メールをチェックして、パスワードをリセットするためのリンクを取得してください
-  email: Eメール
-  heading: パスワードをお忘れですか
-  success: パスワードが正常に更新されました
+first-name: ファーストネーム
+force-version: 強制バージョン
+forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
+forgot-success: パスワードが正常に更新されました
 from-device: デバイスから
 good: 良い
 id: ID
 in-your-main-file: メインファイルで
 in-your-project-fold: プロジェクト フォルダー内
+info: 情報
 informations: インフォメーション
 install-the-capacito: Capacitor プラグインをインストールする
 into-your-app-folder: アプリ フォルダーに移動します。
-intro:
-  aka: としても知られている
-  desc: 固執された Vite スターターテンプレート
-  dynamic-route: 動的ルートのデモ
-  hi: こんにちは、{name}!
-  whats-your-name: 君の名は。
 invalid-auth: 無効な認証
 is-emulator: エミュレータです
 is-production-app: 本番アプリです
+key-copied: クリップボードにコピーされたキー
+last-name: 苗字
+last-update: 最後の更新
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
+launch-bundle: バンドルを起動
 limit-reached: 制限に達しました
-loading-more-data: より多くのデータを読み込んでいます...
+loading-more-data: さらにデータを読み込んでいます...
 log-in: ログイン
 log-to-the-capgo-cli: Capgo CLI にログインします。
-login:
-  andpass: そしてパスワード
-  connexion: ログイン
-  create-new: 新しいアカウントを作成する
-  email: Eメール
-  forgot: 忘れた
-  hello: こんにちは
-  login-in: ログイン
-  or: また
-  password: パスワード
-  withemail: メールアドレス付き
 login-to-your-accoun: あなたのアカウントにログイン
+logout: ログアウト
+logs: ログ
+lowerCaseError: 小文字を含める必要があります
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
-module:
-  heading: モジュール
+mau: 月間アクティブ ユーザー数
+module-heading: モジュール
+monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数
+montly-active: 月間アクティブ
 more-version-storage: より多くのバージョン ストレージ
 morning: 朝
 my-account: マイアカウント
@@ -219,130 +169,76 @@ name: 名前
 need-more-contact-us: |-
   もっといります ？
   オーダーメイドプランはお問い合わせください
-not-found: 見つかりませんでした
-notificationSettings:
-  heading: 通知設定
-  validate: 検証
+no-channel-linked: チャンネルがありません。クリックして追加してください
+no-devices: デバイスがありません
+no-logs: ログなし
+no-version-linked: バージョンなし、クリックして追加
+not-found: 見つかりません
 notifications: 通知
-onboarding:
-  loading: 読み込み中
 one-day-left: 残り一日
+open-channel: チャンネルを開く
+open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
 open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
-package:
-  cannot-delete-version: バージョンを削除できません
-  channels: チャネル
-  device_list: デバイスリスト
-  devices: デバイスを見る
-  devices-list: リンクされたデバイス
-  download: ダウンロード版
-  externally: 外部保存
-  link_channel: チャネルへのリンク
-  link_version: バージョンへのリンク
-  mobiles-stats: モバイル統計
-  name: アプリ
-  not_available: パッケージが見つかりません
-  set: バージョンをチャネルに設定
-  stats: 統計
-  test: 起動バージョン
-  title: 情報
-  unset: バンドルからチャンネルのリンクを解除
-  version:
-    is-used-in-device: デバイスオーバーライドで使用されている場合は、最初にリンクを解除してください
-  version-deleted: バージョンが削除されました
-  versions: バージョン
+os-version: OSバージョン
 pages: ページ
-password:
-  heading: パスワードの作成
-  new: 新しいパスワード
-  validate: 検証
-pckage:
-  version:
-    is-used-in-channel: チャネルで使用されている場合は、最初にリンクを解除してください
+password: パスワード
+password-heading: パスワードの作成
+password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入力してください。
+password-new: 新しいパスワード
 personal-information: 個人情報
-plan:
-  abtest: A/Bテスト
-  application: 応用
-  applications: アプリケーション
-  bandwidth: GB帯域幅
-  buy: 買う
-  channel: チャネル
-  channels: チャネル
-  desc: |-
-    無料で構築を開始してから、稼働する計画を追加します。
-    アカウントプランは、追加機能のロックを解除します。
-  free:
-    desc: MVPとテストに最適
-  maker:
-    desc: 中小企業の所有者に最適
-  mau: 月間アクティブ ユーザー数
-  monthly-billing: 毎月の請求
-  payasyougo:
-    desc: 企業のスケーリングに最適
-  pricing-plans: 料金プラン
-  progressive_deploy: プログレッシブデプロイ
-  shared_channel: 共有チャネル
-  shared_channels: 共有チャネル
-  solo:
-    desc: 独立した開発者に最適
-  storage: GB ストレージ
-  team:
-    desc: 大企業のオーナーに最適
-  update: アップデート
-  updates: 更新
-  version: バージョン
-  versions: バージョン
-  whats-included: 含まれているもの
-  yearly-billing: 年間請求
+plan-abtest: A / Bテスト
+plan-bandwidth: GB帯域幅
+plan-buy: 買う
+plan-desc: |-
+  無料で構築を開始し、ライブに移行するための計画を追加します。
+  アカウント プランは、追加機能のロックを解除します。
 plan-inactive: プランの非アクティブ
 plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。
 plan-member: 企画メンバー。
+plan-pricing-plans: 料金プラン
+plan-progressive-deploy: プログレッシブ デプロイ
+plan-storage: GB ストレージ
+plan-updates: アップデート
+plan-whats-included: 含まれるもの
 plans: 予定
+platform: プラットホーム
 please-choose-your-p: お好みを選択してください
-please-upgrade: プランをアップグレードして、ユーザーを追加してください
+please-upgrade: プランをアップグレードしてユーザーを追加してください
+plugin-version: プラグインのバージョン
 pro-tip-you-can-copy: 'プロのヒント: をコピーできます'
 projection: 予測
-projects:
-  list: あなたのもの
-  sharedlist: 私と共有
-  title: プロジェクト
 refresh-this-page: このページを更新する
-register:
-  already-account: すでにアカウントをお持ちですか？
-  check-email: メールをチェックして確認してください
-  confirm-email: Eメール確認
-  confirm-password: パスワードを認証する
-  desc: 以下のフィールドに入力して登録を完了してください
-  email: Eメール
-  first-name: ファーストネーム
-  heading: 登録
-  last-name: 苗字
-  lowerCaseError: 小文字を含める必要があります
-  next: 次
-  password: パスワード
-  password-hint: 少なくとも6つの数字、文字、句読点の組み合わせを入力してください。
-  specialError: 特殊文字を含める必要があります
-  upperCaseError: 大文字を含める必要があります
+register-desc: 次のフィールドに入力して、登録を完了します
+register-heading: 登録
+register-next: 登録
 reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
-see-usage: 使用法を見る
+search: 検索
+search-bundle: バンドルを検索
+search-bundle-id: バンドル ID で検索
+search-by-action: アクションで検索
+search-by-device-id: デバイス ID で検索
+search-by-name: 名前で検索
+search-device: 検索デバイス
+search-user: ユーザーを検索
+see-usage: 使い方を見る
 session_key: IvSessionKey
+set-bundle: バンドルをチャネルに設定
 settings: 設定
 shared-apps: 共有アプリ
 sign-out: サインアウト
 size: サイズ
+size-not-found: 見つかりません
 something-went-wrong-try-again-later: |-
-  何かがうまくいかなかった！
+  エラーが発生しました。
   あとでもう一度試してみてください。
 special-api-access: 特別な API アクセス
+specialError: 特殊文字を含める必要があります
 start-using-capgo: カプゴを使い始めましょう！
-stats:
-  devices: デバイス
-  downloads: ダウンロード
-  subtitle: 先月
-  title: 統計
-  versions: バージョン
+stored-externally: 外部保存
 submit: 送信
+support: サポート
 switch-to-all-device: すべてのデバイスに切り替える
 switch-to-only-devic: リンクされているデバイスのみに切り替える
 terms-of-use: 利用規約
@@ -351,25 +247,37 @@ tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 the: の
 this-page-will-self-: このページは自動的に更新されます
-title: 題名
+title: タイトル
 top-apps: 私のアプリ
 trial-left: 残りの日数
-trial-plan-expired: 試用プランの有効期限が切れました
-trial-plan-expires-in: 試用プランの有効期限は
+trial-plan-expired: 試用期限切れ
+trial-plan-expires-in: トライアル終了まで
 unlimited-updates: 無制限のアップデート
+unlink-bundle: バンドルのリンクを解除
+unlink-channel: チャンネルのリンクを解除
+unlink-version: バージョンのリンクを解除
+update: アップデート
 updated-at: に更新
 upgrade: アップグレード
 upgrade-now: 今すぐアップグレード
+upperCaseError: 大文字を含める必要があります
 url: URL
-usage:
-  success: プランが設定されましたこのページは数分で更新されます
-  title: 使用法
+usage-success: プランが設定されました。このページは数分後に更新されます
+usage-title: 合計
+user: ユーザー
+validate: 検証
+version: バージョン
+version-build: バージョンビルド
 version-builtin: バージョン組み込み
+version-linked: バージョンリンク
+version-linking: バンドルへのリンク
+versions: バージョン
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
+yearly: 毎年
 you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました
 your-api-key: 'API キー:'
 your-are-a: あなたは
-your-current-plan-is: あなたの現在の計画は
-your-current-suggested-plan-is: 現在提案されている計画は
+your-current-plan-is: 現在のプランは
+your-current-suggested-plan-is: 現在お勧めのプランは

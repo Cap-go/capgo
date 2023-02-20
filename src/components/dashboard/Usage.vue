@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase } from '~/services/supabase'
@@ -14,8 +13,6 @@ import { bytesToGb } from '~/services/conversion'
 const props = defineProps({
   appId: { type: String, default: '' },
 })
-
-const router = useRouter()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
@@ -126,29 +123,23 @@ const loadData = async () => {
     await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
   isLoading.value = false
 }
-const openPlan = () => {
-  router.push('/dashboard/settings/plans')
-}
-
 loadData()
 </script>
 
 <template>
-  <span class="absolute cursor-pointer right-0 inline-flex items-center rounded-full bg-blue-100 px-3 py-0.5 text-sm font-medium text-blue-800" @click="openPlan()">Beta charts</span>
-  <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :title="t('MAU')" unit="Users" />
-  <div v-else class="flex flex-col h-[505px] bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="w-1/2 mx-auto my-auto border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
-  </div>
-  <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
-  <div v-else class="flex flex-col h-[505px] bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="w-1/2 mx-auto my-auto border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
-  </div>
-  <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
-  <div v-else class="flex flex-col h-[505px] bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="w-1/2 mx-auto my-auto border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
-  </div>
-  <MobileStats v-if="!isLoading && appId" />
-  <div v-else-if="appId" class="flex flex-col h-[505px] bg-white border rounded-sm shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <div class="w-1/2 mx-auto my-auto border-b-2 rounded-full animate-spin aspect-square border-cornflower-600" />
+  <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
+    <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :title="t('montly-active')" unit="Users" />
+    <div v-else class="flex flex-col h-[460px] items-center justify-center bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+      <Spinner size="w-40 h-40" />
+    </div>
+    <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
+    <div v-else class="flex flex-col h-[460px] items-center justify-center bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+      <Spinner size="w-40 h-40" />
+    </div>
+    <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
+    <div v-else class="flex flex-col h-[460px] items-center justify-center bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+      <Spinner size="w-40 h-40" />
+    </div>
+    <MobileStats v-if="appId" />
   </div>
 </template>

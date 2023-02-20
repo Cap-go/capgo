@@ -70,7 +70,7 @@ export const parsePriceIds = (prices: any): { priceId: string | null; productId:
   return { priceId, productId, meteredData }
 }
 
-export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string) => {
+export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) => {
   const prices = await getPriceIds(planId, reccurence)
   console.log('prices', prices)
   if (!prices.priceId)
@@ -84,6 +84,8 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
   }
   const data = new URLSearchParams(checkoutData as any)
   data.append('automatic_tax[enabled]', 'true')
+  if (clientReferenceId)
+    data.append('client_reference_id', clientReferenceId)
   data.append('billing_address_collection', 'auto')
   data.append('customer_update[address]', 'auto')
   data.append('customer_update[name]', 'auto')

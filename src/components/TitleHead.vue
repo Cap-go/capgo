@@ -1,71 +1,45 @@
 <script setup lang="ts">
-import {
-  IonButton,
-  IonButtons,
-  IonHeader,
-  IonIcon,
-  IonSearchbar,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/vue'
-import { chevronBackOutline } from 'ionicons/icons'
+import { kNavbar, kNavbarBackLink } from 'konsta/vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import Banner from '~/components/Banner.vue'
 
 const props = defineProps({
   defaultBack: { type: String, default: '/app' },
   noBack: { type: Boolean, default: false },
-  color: { type: String, default: 'default' },
   title: { type: String, default: '' },
-  big: { type: Boolean, default: false },
-  plusIcon: { type: String, default: '' },
-  search: { type: Boolean, default: false },
-  searchIcon: { type: String, default: '' },
 })
-const emit = defineEmits(['searchInput', 'plusClick', 'searchButtonClick'])
 const router = useRouter()
 const { t } = useI18n()
-const onSearch = (val: string | undefined) => {
-  emit('searchInput', val)
-}
-const onSearchButtonClick = (val: string | undefined) => {
-  emit('searchButtonClick', null)
-}
+
 const back = () => {
   if (window.history.length > 2)
     router.back()
   else
     router.push(props.defaultBack)
 }
+const defaultColor = 'bg-neutral-focus'
+const konstaColors = ref({
+  bgIos: defaultColor,
+  bgMaterial: defaultColor,
+})
 </script>
 
 <template>
-  <IonHeader :collapse="big ? 'condense' : undefined">
-    <IonToolbar mode="ios">
-      <IonButtons v-if="!noBack && !big" slot="start">
-        <IonButton @click="back">
-          <IonIcon slot="start" :icon="chevronBackOutline" />
-          {{ t('button.back') }}
-        </IonButton>
-      </IonButtons>
-      <IonTitle :color="color" :size="big ? 'large' : undefined">
-        {{ title }}
-      </IonTitle>
-      <IonButtons v-if="plusIcon" slot="end">
-        <IonButton @click="emit('plusClick')">
-          <IonIcon :icon="plusIcon" />
-        </IonButton>
-      </IonButtons>
-    </IonToolbar>
-    <IonToolbar v-if="search">
-      <IonSearchbar @ion-change="onSearch($event.detail.value)" />
-      <IonButtons v-if="searchIcon" slot="end">
-        <IonButton @click="onSearchButtonClick">
-          <IonIcon :icon="searchIcon" />
-        </IonButton>
-      </IonButtons>
-    </IonToolbar>
-    <Banner />
-  </IonHeader>
+  <div>
+    <k-navbar
+      class="no-safe-areas"
+      :colors="konstaColors"
+      :translucent="false"
+    >
+      <template #left>
+        <div v-if="!noBack">
+          <k-navbar-back-link class="text-neutral-content" :text="t('button-back')" @click="back()" />
+        </div>
+      </template>
+      <template #title>
+        <span class="text-neutral-content">{{ title }}</span>
+      </template>
+    </k-navbar>
+  </div>
 </template>

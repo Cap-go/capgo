@@ -1,136 +1,105 @@
 Bandwidth: Bant genişliği
-MAU: Aylık aktif kullanıcılar
 Storage: Depolamak
-account:
-  backButton: Geri
-  billing: Faturalandırma
-  changePassword: Şifre değiştir
-  delete-account: Hesabımı sil
-  delete_sure: Emin misin ?
-  discord: anlaşmazlık
-  error: Hata
-  heading: Hesap
-  keys: API anahtarları
-  legal: Hizmet şartları
-  logout: Çıkış Yap
-  personalInformation: Kişisel bilgi
-  preferences: Bildirimler
-  privacy: Gizlilik Politikası
-  support: Destek
-  usage: kullanım
+account: Hesap
+account-password-error: Hata oluştu, lütfen tekrar deneyin
+account-password-heading: Şifremi Değiştir
 account-settings: Hesap ayarları
-accountPassword:
-  confirmPassword: Şifreyi Onayla
-  errorMsg: Hata oluştu, lütfen tekrar deneyin
-  heading: Şifremi Değiştir
-  password: Yeni Şifre
-  success: Şifre başarıyla değiştirildi
-  validate: Doğrula
-accountProfile:
-  billing_email: Faturalandırma e-postası
-  country: Ülke
-  email: E-posta
-  first-name: İlk adı
-  heading: Kişisel bilgi
-  last-name: Soyadı
-  update: Güncelleme
-activation:
-  desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
-  doi: İsteğe bağlı izin
-  doi-desc: E-posta bültenini ve gelecekteki pazarlama tekliflerini kabul ediyorum
-  heading: aktivasyon
-  headline: Ayarlarım
-  legal: Hizmet şartları
-  legal-desc: Capgo uygulaması gizlilik politikasını ve kullanım şartlarını kabul ediyorum
-  notification: Bildirimler
-  notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
-  validate: Doğrula
+action: Aksiyon
+activation-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
+activation-doi: İsteğe bağlı onay
+activation-doi-desc: E-posta bültenini ve gelecekteki pazarlama tekliflerini kabul ediyorum
+activation-heading: aktivasyon
+activation-headline: Ayarlarım
+activation-legal: Hizmet şartları
+activation-legal-desc: Capgo uygulaması gizlilik politikasını ve kullanım şartlarını kabul ediyorum
+activation-notification: Bildirimler
+activation-notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
+activation-validate: Doğrula
+add: Eklemek
 add-another-app: uygulamanızı ekleyin
 add-this-code-to-you: Bu kodu projenize ekleyin
 add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
+admin: yönetici
 afternoon: öğleden sonra
-alert:
-  confirm-delete: Silmeyi Onayla
-  delete-message: Bunu silmek istediğinizden emin misiniz
-  not-reverse-message: Bu eylem geri alınamaz
+alert-confirm-delete: Silmeyi Onayla
+alert-delete-message: Bunu silmek istediğinizden emin misiniz
+alert-not-reverse-message: Bu eylem geri alınamaz
 allow-develoment-bui: Geliştirme derlemesine izin ver
 allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
 allow-emulator: Öykünücülere İzin Ver
+already-account: Zaten bir hesabınız var mı?
 api-key: API anahtarı
 api-keys: API Anahtarları
-apikeys:
-  all: anahtarlar
-  checkbelow: daha fazla bilgi almak için aşağıdaki bağlantıyı kontrol edin
-  cli: capgo CLI'sı
-  explain: >-
-    Tüm bu api anahtarları, Capgo CLI aracı veya kapasitör güncelleyici
-    eklentisi ile kullanılmak üzere yapılmıştır.
-  keyCopied: Anahtarlar panonuza kopyalandı
-  links: Bağlantılar
-  title: API anahtarları
-  updater: kondansatör güncelleyici
+api-keys-key-copied: API Anahtarları
+app: Uygulama
+app-deleted: Uygulama silindi
 app-id-example: Uygulama kimliği örneği
+app-not-found: Uygulama bulunamadı
+are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
 bigger-app-size: Daha büyük uygulama boyutu
+billing: Faturalandırma
 build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
 build-your-code-and-: Kodunuzu Capgo'ya yükleyin
 bulk-upload: toplu yükleme
+bundle: paket
+bundle-deleted: Paket silindi
+bundle-is-linked-channel: Paket kanala bağlı, önce bağlantıyı kaldırın
+bundle-is-linked-device: Paket cihaza bağlı, önce bağlantısını kaldırın
 bundle-number: paket numarası
-button:
-  about: Hakkında
-  back: Geri
-  browse: Araştır
-  camera: Kamera
-  cancel: İptal
-  delete: Silmek
-  go: GİT
-  home: Ev
-  remove: Kaldırmak
-  tabs: Sekmeler
-  toggle_dark: Karanlık modu değiştir
-  toggle_langs: Dilleri değiştir
+bundles: Paketler
+button-about: Hakkında
+button-back: Geri
+button-browse: Araştır
+button-camera: Kamera
+button-cancel: İptal etmek
+button-delete: Silmek
+button-go: GİTMEK
+button-home: Ev
+button-options: Seçenekler
+button-remove: Kaldırmak
+button-tabs: Sekmeler
+button-toggle_dark: Karanlık modu değiştir
+button-toggle_langs: Dilleri değiştir
 by-clicking-on-them: üzerlerine tıklayarak.
 cannot-delete-app: Uygulama silinemiyor
+cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
+cannot-delete-bundle: Paket silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-save-custom-i: Özel kimlik kaydedilemiyor
+cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 change: Değiştirmek
-channel:
-  add: Ekle
-  beta-channel: beta kanalı
-  cannot-delete-device: Cihaz silinemiyor
-  confirm-public-desc: >-
-    Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler
-    göndermesini sağlar.
-
-
-    Diğer varsayılan kanallar artık varsayılan olmayacaktır.
-  copy: Url'yi kopyala
-  device: Cihaz
-  device-deleted: Cihaz silindi
-  invit: Davet etmek için e-posta yazın
-  is_public: kanal varsayılanı
-  make-now: Varsayılan yap
-  make_it: Bunu yapmak
-  makeprivate: Kanalınız herkese açık, gizli yapmak için tıklayın
-  makepublic: Kanalınız gizli, herkese açık hale getirmek için tıklayın
-  open: Açık
-  private_desc: Özel
-  public: Kondansatör güncelleyici bağlantısı
-  public_desc: Halk
-  title: Kanal
-  user: kullanıcı
-  user_no_found: Kullanıcı bulunamadı, önce kayıt olmayı isteyin
-  users: kullanıcılarla paylaşıldı
-  v3: V3 ayarları
-channel-deleted: Kanal silindi
+changed-password-suc: parola başarıyla değiştirildi
+channel: Kanal
+channel-create: Kanal oluştur
+channel-deleted: kanal silindi
+channel-invit: Davet etmek için e-posta yazın
+channel-is-public: Kanal herkese açık
+channel-link: kanal bağlantısı
+channel-link-fail: Kanal bağlanamıyor yanlış bir şey oldu
+channel-linked: Kanal bağlantılı
+channel-linking: kanala bağlantı
+channel-make-now: Varsayılan yap
+channels: Kanallar
+check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
 checksum: sağlama toplamı
 commands: komutlar
+confirm-email: e-postanızı onaylayın
+confirm-password: Şifreyi Onayla
+confirm-public-desc: >-
+  Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler göndermesini
+  sağlar.
+
+
+  Diğer varsayılan kanallar artık varsayılan olmayacak.
 copied-to-clipboard: Panoya kopyalandı
 copy-your: kopyala
+country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
+created-at: oluşturuldu
 custom-domain: Özel alan
 custom-id: özel kimlik
 custom-id-saved: Özel kimlik kaydedildi
@@ -140,223 +109,144 @@ defined-as: olarak tanımlandı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete-account: Hesabı sil
-device:
-  channel: kanal bağlantısı
-  created_at: oluşturuldu
-  force_version: Kuvvet versiyonu
-  info: bilgiler
-  last_update: Son Güncelleme
-  link_channel: Cihaza bağlı kanal
-  link_fail: Bağlantı kurulamıyor yanlış bir şey oldu
-  link_version: cihaza bağlı sürüm
-  no_channel: Kanal yok, eklemek için tıklayın
-  no_override: Geçersiz kılma yok, eklemek için tıklayın
-  os_version: OS sürümü
-  platform: platformu
-  plugin_version: Eklenti sürümü
-  title: Cihaz
-  unlink_channel: Kanalın cihaz bağlantısını kaldırma
-  unlink_version: Sürümün cihaz bağlantısını kaldırma
-  version: Sürüm
-devices:
-  title: Cihazlar
+details-and-logs: Ayrıntılar ve günlükler
+device: Cihaz
+device-id: Cihaz Kimliği
+devices: Cihazlar
 devices-using-this-b: Bu paketi kullanan cihazlar
 disable-auto-downgra: Yerel altında otomatik düşürmeyi devre dışı bırak
 disable-auto-upgrade: Binbaşının üzerinde otomatik yükseltmeyi devre dışı bırak
+discord: Anlaşmazlık
 discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
 documentation: Belgeler
 dont-have-an-account: Hesabınız yok mu?
+download: İndirmek
+email: E-posta
 email-address: E-posta adresi
 enter-your-email-add: >-
   E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
-forgot:
-  check_email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
-  email: E-posta
-  heading: Parolanızı mı unuttunuz
-  success: şifre başarıyla güncellendi
+first-name: İlk adı
+force-version: Kuvvet versiyonu
+forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
+forgot-success: şifre başarıyla güncellendi
 from-device: cihazdan
 good: İyi
 id: İD
 in-your-main-file: ana dosyanızda
 in-your-project-fold: proje klasörünüzde
+info: Bilgi
 informations: bilgiler
 install-the-capacito: Kapasitör eklentisini kurun
 into-your-app-folder: Uygulama klasörünüze.
-intro:
-  aka: Ayrıca şöyle bilinir
-  desc: Görüşlü Vite Başlangıç ​​Şablonu
-  dynamic-route: Dinamik rota demosu
-  hi: Merhaba {isim}!
-  whats-your-name: Adınız ne?
 invalid-auth: geçersiz kimlik doğrulama
 is-emulator: Emülatör mü
 is-production-app: Üretim uygulaması mı
+key-copied: Anahtar panonuza kopyalandı
+last-name: Soy isim
+last-update: Son Güncelleme
 last-upload: Son yükleme
 last-version: Son sürüm
+launch-bundle: Paketi başlat
 limit-reached: Sınıra ulaşıldı
 loading-more-data: Daha fazla veri yükleniyor...
 log-in: Giriş yapmak
 log-to-the-capgo-cli: Capgo CLI'da oturum açın
-login:
-  andpass: Ve şifre
-  connexion: Giriş yapmak
-  create-new: Yeni hesap oluştur
-  email: E-posta
-  forgot: Unutmuş olmak
-  hello: Merhaba
-  login-in: Giriş yap
-  or: veya
-  password: Şifre
-  withemail: e-posta adresi ile
 login-to-your-accoun: hesabınıza giriş yapın
+logout: Çıkış Yap
+logs: Kütükler
+lowerCaseError: Küçük harf içermelidir
 make-normal: normal yap
 making-this-channel-: >-
   Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
   veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
-module:
-  heading: Modüller
+mau: Aylık aktif kullanıcılar
+module-heading: Modüller
+monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar
+montly-active: Aylık aktif
 more-version-storage: Daha fazla sürüm Depolama
-morning: sabah
+morning: Sabah
 my-account: Hesabım
 my-notifications: Bildirimlerim
 name: İsim
 need-more-contact-us: |-
   Daha fazlasına ihtiyaç var ? 
   Size özel plan için bize ulaşın
+no-channel-linked: Kanal yok, eklemek için tıklayın
+no-devices: Cihaz yok
+no-logs: günlük yok
+no-version-linked: Sürüm yok, eklemek için tıklayın
 not-found: Bulunamadı
-notificationSettings:
-  heading: Bildirim ayarları
-  validate: Doğrula
 notifications: Bildirimler
-onboarding:
-  loading: Yükleniyor
 one-day-left: Bir gün kaldı
+open-channel: kanalı aç
+open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
 open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
-package:
-  cannot-delete-version: Paket silinemiyor
-  channels: Kanallar
-  device_list: Cihaz listesi
-  devices: Cihaz istatistiklerini görün
-  devices-list: Bağlı cihazlar
-  download: Paketi indir
-  externally: harici olarak depolanır
-  link_channel: kanala bağlantı
-  link_version: Paket bağlantısı
-  mobiles-stats: cep telefonu istatistikleri
-  name: Uygulama
-  not_available: paket bulunamadı
-  set: Paketi kanala ayarla
-  stats: istatistikler
-  test: Paketi başlat
-  title: bilgi
-  unset: Kanalın paketle bağlantısını kaldır
-  version:
-    is-used-in-device: >-
-      bir cihaz geçersiz kılma işleminde kullanılıyorsa önce bağlantısını
-      kaldırın
-  version-deleted: Paket silindi
-  versions: paket
+os-version: OS sürümü
 pages: Sayfalar
-password:
-  heading: Şifre oluştur
-  new: Yeni Şifre
-  validate: Doğrula
-pckage:
-  version:
-    is-used-in-channel: bir kanalda kullanılıyor, önce bağlantısını kaldırın
+password: Şifre
+password-heading: Şifre oluştur
+password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon girin.
+password-new: Yeni Şifre
 personal-information: Kişisel bilgiler
-plan:
-  abtest: A / B testi
-  application: Başvuru
-  applications: Uygulamalar
-  bandwidth: GB Bant Genişliği
-  buy: Satın almak
-  channel: Kanal
-  channels: Kanallar
-  desc: >-
-    Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
-    ekleyin. 
+plan-abtest: A / B testi
+plan-bandwidth: GB Bant Genişliği
+plan-buy: Satın almak
+plan-desc: >-
+  Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
+  ekleyin. 
 
-    Hesap planları ek özelliklerin kilidini açar.
-  free:
-    desc: MVP ve test için en iyisi
-  maker:
-    desc: Küçük işletme sahipleri için en iyisi
-  mau: Aylık aktif kullanıcılar
-  monthly-billing: Aylık faturalandırma
-  payasyougo:
-    desc: İşletmeleri ölçeklendirmek için en iyisi
-  pricing-plans: Fiyatlandırma Planları
-  progressive_deploy: aşamalı dağıtım
-  shared_channel: Paylaşılan Kanal
-  shared_channels: Paylaşılan Kanallar
-  solo:
-    desc: Bağımsız geliştiriciler için en iyisi
-  storage: GB Depolama
-  team:
-    desc: Büyük işletme sahipleri için en iyisi
-  update: Güncelleme
-  updates: Güncellemeler
-  version: Sürüm
-  versions: Versiyonlar
-  whats-included: Neler dahil
-  yearly-billing: yıllık faturalandırma
+  Hesap planları ek özelliklerin kilidini açar.
 plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
 plan-member: plan üyesi.
+plan-pricing-plans: Fiyatlandırma Planları
+plan-progressive-deploy: aşamalı dağıtım
+plan-storage: GB Depolama
+plan-updates: Güncellemeler
+plan-whats-included: Neler dahil
 plans: planlar
+platform: platformu
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
+plugin-version: Eklenti sürümü
 pro-tip-you-can-copy: 'Profesyonel ipucu: kopyalayabilirsiniz'
 projection: Projeksiyonlar
-projects:
-  list: seninki
-  sharedlist: Benimle paylaştı
-  title: Projeler
 refresh-this-page: bu sayfayı yenile
-register:
-  already-account: Zaten bir hesabınız var mı?
-  check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
-  confirm-email: e-postanızı onaylayın
-  confirm-password: Şifreyi Onayla
-  desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
-  email: E-posta
-  first-name: İlk adı
-  heading: Kayıt
-  last-name: Soyadı
-  lowerCaseError: Küçük harfler içermelidir
-  next: Kayıt ol
-  password: Şifre
-  password-hint: >-
-    En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon
-    girin.
-  specialError: Özel karakterler içermelidir
-  upperCaseError: Büyük harfler içermelidir
+register-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
+register-heading: Kayıt
+register-next: Kayıt olmak
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
+search: Aramak
+search-bundle: Paket Ara
+search-bundle-id: Paket kimliğine göre ara
+search-by-action: İşleme göre ara
+search-by-device-id: Cihaz kimliğine göre ara
+search-by-name: Ada göre ara
+search-device: Cihaz ara
+search-user: Kullanıcı Ara
 see-usage: Kullanıma bakın
 session_key: IvSessionKey
+set-bundle: Paketi kanala ayarla
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
 sign-out: Oturumu Kapat
 size: Boyut
+size-not-found: Bulunamadı
 something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
+specialError: Özel karakterler içermelidir
 start-using-capgo: Capgo'yu kullanmaya başlayın!
-stats:
-  devices: Cihazlar
-  downloads: İndirilenler
-  subtitle: Geçen ay
-  title: İstatistikler
-  versions: Versiyonlar
+stored-externally: harici olarak depolanır
 submit: Göndermek
+support: Destek
 switch-to-all-device: Tüm cihazlara geç
 switch-to-only-devic: Yalnızca bağlı cihaza geç
 terms-of-use: Kullanım Şartları
@@ -365,22 +255,34 @@ tests: testler
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
-title: Başlık
+title: başlık
 top-apps: Benim uygulamalarım
 trial-left: Kalan günler
-trial-plan-expired: Deneme sürümünün süresi doldu
+trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
 unlimited-updates: Sınırsız güncelleme
+unlink-bundle: Paketin bağlantısını kaldır
+unlink-channel: Kanalın bağlantısını kaldır
+unlink-version: Sürümün bağlantısını kaldır
+update: Güncelleme
 updated-at: 'Şurada güncellendi:'
 upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
+upperCaseError: Büyük harfler içermelidir
 url: URL
-usage:
-  success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
-  title: kullanım
+usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
+usage-title: Toplam
+user: kullanıcı
+validate: Doğrula
+version: Sürüm
+version-build: Sürüm oluşturma
 version-builtin: Sürüm yerleşik
+version-linked: Sürüm bağlantısı
+version-linking: Paket bağlantısı
+versions: Versiyonlar
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
+yearly: Yıllık
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
 your-api-key: 'API anahtarınız:'

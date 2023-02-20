@@ -5,11 +5,13 @@ import Vue from '@vitejs/plugin-vue'
 import Pages from 'vite-plugin-pages'
 import Layouts from 'vite-plugin-vue-layouts'
 import Icons from 'unplugin-icons/vite'
-import WindiCSS from 'vite-plugin-windicss'
+import IconsResolver from 'unplugin-icons/resolver'
+import Components from 'unplugin-vue-components/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import VueI18n from '@intlify/vite-plugin-vue-i18n'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
@@ -20,7 +22,7 @@ const getUrl = (): string => {
     return `https://${getRightKey('base_domain')}`
 }
 
-const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
+// const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
 const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
 export default defineConfig({
@@ -33,7 +35,14 @@ export default defineConfig({
     Vue({
       include: [/\.vue$/, /\.md$/],
     }),
-
+    Components({
+      resolvers: [
+        IconsResolver(),
+        ElementPlusResolver({
+          importStyle: 'sass',
+        }),
+      ],
+    }),
     EnvironmentPlugin({
       VITE_APP_VERSION: pack.version,
       VITE_SUPABASE_ANON_KEY: getRightKey('supa_anon'),
@@ -54,8 +63,12 @@ export default defineConfig({
       //   console.log('routes', routes)
       // },
       extendRoute: (route) => {
-        if (guestPath.includes(route.path))
-          return route
+        if (guestPath.includes(route.path)) {
+          return {
+            ...route,
+            meta: { ...route.meta, layout: 'auth' },
+          }
+        }
         // Augment the route with meta that indicates that the route requires authentication.
         return {
           ...route,
@@ -69,11 +82,6 @@ export default defineConfig({
     // https://github.com/antfu/unplugin-icons
     Icons({
       autoInstall: true,
-    }),
-
-    // https://github.com/antfu/vite-plugin-windicss
-    WindiCSS({
-      safelist: markdownWrapperClasses,
     }),
 
     // https://github.com/antfu/vite-plugin-pwa

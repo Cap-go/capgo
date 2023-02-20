@@ -1,133 +1,102 @@
 Bandwidth: Bandwidth
-MAU: Monthly active users
 Storage: Storage
-account:
-  backButton: Back
-  billing: Billing
-  changePassword: Change password
-  delete-account: Delete my account
-  delete_sure: Are you sure ?
-  discord: Discord
-  error: Error
-  heading: Account
-  keys: API keys
-  legal: Terms of services
-  logout: Logout
-  personalInformation: Personal information
-  preferences: Notifications
-  privacy: Privacy policy
-  support: Support
-  usage: usage
+account: Account
+account-password-error: Error happened, please try again
+account-password-heading: Change my password
 account-settings: Account Settings
-accountPassword:
-  confirmPassword: Confirm password
-  errorMsg: Error happened, please try again
-  heading: Change my password
-  password: New password
-  success: Changed password successfully
-  validate: Validate
-accountProfile:
-  billing_email: Billing email
-  country: Country
-  email: Email
-  first-name: First name
-  heading: Personal information
-  last-name: Last name
-  update: Update
-activation:
-  desc: Fill the following fields to complete your registration
-  doi: Optional consent
-  doi-desc: I accept Email newsletter and future marketing offers
-  heading: activation
-  headline: My settings
-  legal: Terms of services
-  legal-desc: I accept Capgo app privacy policy and terms of use
-  notification: Notifications
-  notification-desc: I accept to receive notification when new app version are available
-  validate: Validate
+action: Action
+activation-desc: Fill the following fields to complete your registration
+activation-doi: Optional consent
+activation-doi-desc: I accept Email newsletter and future marketing offers
+activation-heading: activation
+activation-headline: My settings
+activation-legal: Terms of services
+activation-legal-desc: I accept Capgo app privacy policy and terms of use
+activation-notification: Notifications
+activation-notification-desc: I accept to receive notification when new app version are available
+activation-validate: Validate
+add: Add
 add-another-app: Add your app
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
+admin: Admin
 afternoon: afternoon
-alert:
-  confirm-delete: Confirm Delete
-  delete-message: Are you sure you want to delete this
-  not-reverse-message: This action is not reversible
+alert-confirm-delete: Confirm Delete
+alert-delete-message: Are you sure you want to delete this
+alert-not-reverse-message: This action is not reversible
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
+already-account: You already have an account?
 api-key: API key
 api-keys: API Keys
-apikeys:
-  all: keys
-  checkbelow: check below the link to get more informations
-  cli: capgo CLI
-  explain: >-
-    All thoses api keys are made to be use with the Capgo CLI tool, or
-    capacitor-updater plugin
-  keyCopied: Keys copied to your clipboard
-  links: Links
-  title: API keys
-  updater: capacitor-updater
+api-keys-key-copied: API Keys
+app: App
+app-deleted: App deleted
 app-id-example: App ID example
+app-not-found: App not found
+are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
 bigger-app-size: Bigger app size
+billing: Billing
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
+bundle: Bundle
+bundle-deleted: Bundle deleted
+bundle-is-linked-channel: Bundle is linked in channel, unlink it first
+bundle-is-linked-device: Bundle is linked in device, unlink it first
 bundle-number: Bundle number
-button:
-  about: About
-  back: Back
-  browse: Browse
-  camera: Camera
-  cancel: Cancel
-  delete: Delete
-  go: GO
-  home: Home
-  remove: Remove
-  tabs: Tabs
-  toggle_dark: Toggle dark mode
-  toggle_langs: Change languages
+bundles: Bundles
+button-about: About
+button-back: Back
+button-browse: Browse
+button-camera: Camera
+button-cancel: Cancel
+button-delete: Delete
+button-go: GO
+button-home: Home
+button-options: Options
+button-remove: Remove
+button-tabs: Tabs
+button-toggle_dark: Toggle dark mode
+button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cannot-delete-app: Cannot delete App
+cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
+cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
 cannot-save-custom-i: Cannot save custom ID
+cannot-test-app-some: Cannot test app something wrong happened
 change: Change
-channel:
-  add: Add
-  beta-channel: Beta channel
-  cannot-delete-device: Cannot delete device
-  confirm-public-desc: |-
-    Making this channel default will make it send updates to all yours users. 
-    Others default channels will not be default anymore.
-  copy: Copy URL
-  device: Device
-  device-deleted: Device deleted
-  invit: Type email to invite
-  is_public: Channel default
-  make-now: Make default
-  make_it: Make it
-  makeprivate: Your channel is public, click to make it private
-  makepublic: Your channel is private, click to make it public
-  open: Open
-  private_desc: Private
-  public: Capacitor-updater link
-  public_desc: Public
-  title: Channel
-  user: User
-  user_no_found: User not found, ask to register first
-  users: Shared with users
-  v3: V3 settings
+changed-password-suc: Password changed successfully
+channel: Channel
+channel-create: Create channel
 channel-deleted: Channel deleted
+channel-invit: Type email to invite
+channel-is-public: Channel is public
+channel-link: Channel link
+channel-link-fail: Cannot link channel something wrong happened
+channel-linked: Channel linked
+channel-linking: Link to channel
+channel-make-now: Make default
+channels: Channels
+check-email: Please check your email and verify
 checksum: Checksum
 commands: commands
+confirm-email: Confirm your email
+confirm-password: Confirm password
+confirm-public-desc: |-
+  Making this channel default will make it send updates to all yours users. 
+  Others default channels will not be default anymore.
 copied-to-clipboard: Copied to clipboard
 copy-your: Copy your
+country: Country
 create-a-free-accoun: Create a free account
+created-at: Created at
 custom-domain: Custom domain
 custom-id: Custom ID
 custom-id-saved: Custom ID saved
@@ -137,211 +106,141 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
-device:
-  channel: Channel link
-  created_at: Created at
-  force_version: Force version
-  info: informations
-  last_update: Last update
-  link_channel: Channel linked to device
-  link_fail: Cannot link something wrong happened
-  link_version: version linked to device
-  no_channel: No channel, click to add
-  no_override: No override, click to add
-  os_version: OS version
-  platform: Platform
-  plugin_version: Plugin version
-  title: Device
-  unlink_channel: Channel unlink to device
-  unlink_version: Version unlink to device
-  version: Version
-devices:
-  title: Devices
+details-and-logs: Details and logs
+device: Device
+device-id: Device ID
+devices: Devices
 devices-using-this-b: Devices using this bundle
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
+discord: Discord
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
 dont-have-an-account: Don’t have an account?
+download: Download
+email: Email
 email-address: Email address
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
-forgot:
-  check_email: Check your email to get the link to reset your password
-  email: Email
-  heading: Forgot password
-  success: Password updated successfully
+first-name: First name
+force-version: Force version
+forgot-check-email: Check your email to get the link to reset your password
+forgot-success: Password updated successfully
 from-device: from device
 good: Good
-id: id
+id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
+info: Information
 informations: Informations
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
-intro:
-  aka: Also known as
-  desc: Opinionated Vite Starter Template
-  dynamic-route: Demo of dynamic route
-  hi: Hi, {name}!
-  whats-your-name: What's your name?
 invalid-auth: invalid auth
 is-emulator: Is Emulator
 is-production-app: Is Production app
+key-copied: Key copied in your clipboard
+last-name: Last name
+last-update: Last update
 last-upload: Last upload
 last-version: Last version
+launch-bundle: Launch bundle
 limit-reached: Limit reached
 loading-more-data: Loading more data...
 log-in: Log in
 log-to-the-capgo-cli: Log to the Capgo CLI
-login:
-  andpass: And password
-  connexion: Login
-  create-new: Create new account
-  email: Email
-  forgot: Forgot
-  hello: Hello
-  login-in: Login in
-  or: or
-  password: Password
-  withemail: With email adress
 login-to-your-accoun: Login to your account
+logout: Logout
+logs: Logs
+lowerCaseError: Should contain lowercase letters
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
-module:
-  heading: Modules
+mau: Monthly active users
+module-heading: Modules
+monthly: Monthly
 monthly-active-users: Monthly active users
+montly-active: Monthly active
 more-version-storage: More version Storage
 morning: morning
 my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+no-channel-linked: No channel, click to add
+no-devices: No devices
+no-logs: No logs
+no-version-linked: No version, click to add
 not-found: Not found
-notificationSettings:
-  heading: Notification settings
-  validate: Validate
 notifications: Notifications
-onboarding:
-  loading: Loading
 one-day-left: One day left
+open-channel: Open channel
+open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
-package:
-  cannot-delete-version: Cannot delete bundle
-  channels: Channels
-  device_list: Devices list
-  devices: See devices statistics
-  devices-list: Devices linked
-  download: Download bundle
-  externally: stored externally
-  link_channel: Link to channel
-  link_version: Link to bundle
-  mobiles-stats: Mobiles stats
-  name: App
-  not_available: Package not found
-  set: Set bundle to channel
-  stats: stats
-  test: Launch bundle
-  title: info
-  unset: Unlink channel from bundle
-  version:
-    is-used-in-device: is used in a device override, unlink it first
-  version-deleted: Bundle deleted
-  versions: Bundle
+os-version: OS version
 pages: Pages
-password:
-  heading: Create Password
-  new: New Password
-  validate: Validate
-pckage:
-  version:
-    is-used-in-channel: is used in a channel, unlink it first
+password: Password
+password-heading: Create Password
+password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
+password-new: New Password
 personal-information: Personal Informations
-plan:
-  abtest: A / B testing
-  application: Application
-  applications: Applications
-  bandwidth: GB Bandwidth
-  buy: Buy
-  channel: Channel
-  channels: Channels
-  desc: >-
-    Start building for free, then add a plan to go live. Account plans unlock
-    additional features.
-  free:
-    desc: Best for MVP and testing
-  maker:
-    desc: Best for small business owners
-  mau: Monthly active users
-  monthly-billing: Monthly billing
-  payasyougo:
-    desc: Best for scalling enterprises
-  pricing-plans: Pricing Plans
-  progressive_deploy: Progressive deploy
-  shared_channel: Shared Channel
-  shared_channels: Shared Channels
-  solo:
-    desc: Best for independent developers
-  storage: GB Storage
-  team:
-    desc: Best for big business owners
-  update: Update
-  updates: Updates
-  version: Version
-  versions: Versions
-  whats-included: What's included
-  yearly-billing: Yearly billing
+plan-abtest: A / B testing
+plan-bandwidth: GB Bandwidth
+plan-buy: Buy
+plan-desc: >-
+  Start building for free, then add a plan to go live. Account plans unlock
+  additional features.
+plan-free: Best for MVP and testing
 plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.
+plan-maker: Best for small business owners
 plan-member: plan member.
+plan-payasyougo: Best for scalling enterprises
+plan-pricing-plans: Pricing Plans
+plan-progressive-deploy: Progressive deploy
+plan-solo: Best for independent developers
+plan-storage: GB Storage
+plan-team: Best for big business owners
+plan-updates: Updates
+plan-whats-included: What's included
 plans: Plans
+platform: Platform
 please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
+plugin-version: Plugin version
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 projection: Projections
-projects:
-  list: Yours
-  sharedlist: Shared with me
-  title: Projects
 refresh-this-page: Refresh this page
-register:
-  already-account: You already have an account?
-  check-email: Please check your email and verify
-  confirm-email: Confirm your email
-  confirm-password: Confirm password
-  desc: Fill the following fields to complete your registration
-  email: Email
-  first-name: First name
-  heading: Registration
-  last-name: Last name
-  lowerCaseError: Should contain lowercase letters
-  next: Register
-  password: Password
-  password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
-  specialError: Should contain special characters
-  upperCaseError: Should contain uppercase letters
+register-desc: Fill the following fields to complete your registration
+register-heading: Registration
+register-next: Register
 reset-password: Reset Password
 reset-your-password: Reset your password
+search: Search
+search-bundle: Search Bundle
+search-bundle-id: Search by bundle ID
+search-by-action: Search by action
+search-by-device-id: Search by device ID
+search-by-name: Search by name
+search-device: Search device
+search-user: Search User
 see-usage: See usage
 session_key: IvSessionKey
+set-bundle: Set bundle to channel
 settings: Settings
 shared-apps: Shared Apps
 sign-out: Sign Out
 size: Size
+size-not-found: Not found
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
+specialError: Should contain special characters
 start-using-capgo: Start using Capgo !
-stats:
-  devices: Devices
-  downloads: Downloads
-  subtitle: Last month
-  title: Stats
-  versions: Versions
+stored-externally: stored externally
 submit: Submit
+support: Support
 switch-to-all-device: Switch to all devices
 switch-to-only-devic: Switch to only device linked
 terms-of-use: Terms of Use
@@ -356,16 +255,28 @@ trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
 unlimited-updates: Unlimited updates
+unlink-bundle: Unlink bundle
+unlink-channel: Unlink channel
+unlink-version: Unlink version
+update: Update
 updated-at: Updated at
 upgrade: Upgrade
 upgrade-now: Upgrade now
+upperCaseError: Should contain uppercase letters
 url: URL
-usage:
-  success: Your plan has been setup this page will be update, in few minutes
-  title: Usage
+usage-success: Your plan has been setup this page will be update, in few minutes
+usage-title: Total
+user: User
+validate: Validate
+version: Version
+version-build: Version build
 version-builtin: Version builtin
+version-linked: Version link
+version-linking: Link to bundle
+versions: Versions
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
+yearly: Yearly
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-api-key: 'Your API key:'

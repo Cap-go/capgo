@@ -1,68 +1,53 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonHeader, IonItem,
-  IonItemDivider, IonLabel,
-  IonList, IonListHeader, IonNote, IonPage,
-  IonSearchbar, IonTitle, IonToolbar, actionSheetController, toastController,
-} from '@ionic/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ellipsisHorizontalCircle } from 'ionicons/icons'
 import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
-import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
-import TitleHead from '~/components/TitleHead.vue'
 import { openVersion } from '~/services/versions'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
 import { bytesToMbText } from '~/services/conversion'
+import { useDisplayStore } from '~/stores/display'
+import IconDevice from '~icons/heroicons/device-phone-mobile'
+import IconInformations from '~icons/material-symbols/info-rounded'
+import type { Tab } from '~/components/comp_def'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const listRef = ref()
+const displayStore = useDisplayStore()
 const main = useMainStore()
 const supabase = useSupabase()
+const ActiveTab = ref('info')
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
-const search = ref('')
-const devices = ref<Database['public']['Tables']['devices']['Row'][]>([])
 
 const copyToast = async (text: string) => {
   copy(text)
-  const toast = await toastController
-    .create({
-      message: t('copied-to-clipboard'),
-      duration: 2000,
-    })
-  await toast.present()
+  displayStore.messageToast.push(t('copied-to-clipboard'))
 }
-const getDevices = async () => {
-  if (!version.value)
-    return
-  try {
-    const { data: dataDevices } = await supabase
-      .from('devices')
-      .select()
-      .eq('version', id.value)
-      .eq('app_id', version.value.app_id)
-    if (dataDevices && dataDevices.length)
-      devices.value = dataDevices
-    else
-      devices.value = []
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
+
+const tabs: Tab[] = [
+  {
+    label: t('info'),
+    icon: IconInformations,
+    key: 'info',
+  },
+  {
+    label: t('devices'),
+    icon: IconDevice,
+    key: 'devices',
+  },
+]
+
 const getChannels = async () => {
   if (!version.value)
     return
@@ -72,15 +57,27 @@ const getChannels = async () => {
     .eq('app_id', version.value.app_id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
+  // search if the bundle is used in a channel
+  channels.value.forEach((chan) => {
+    const v: number = chan.version as any
+    if (version.value && v === version.value.id)
+      channel.value = chan
+  })
+}
+
+const openChannelLink = async () => {
+  if (!version.value || !channel.value)
+    return
+  router.push(`/app/p/${version.value.app_id.replace(/\./g, '--')}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
   if (version_meta.value?.size)
     return bytesToMbText(version_meta.value.size)
   else if (version.value?.external_url)
-    return t('package.externally')
+    return t('stored-externally')
   else
-    return t('package.not_available')
+    return t('app-not-found')
 })
 const setChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
   if (!version.value)
@@ -96,69 +93,101 @@ const ASChannelChooser = async () => {
   if (!version.value)
     return
   const buttons = []
-  for (const channel of channels.value) {
+  for (const chan of channels.value) {
+    const v: number = chan.version as any
     buttons.push({
-      text: channel.name,
+      text: chan.name,
+      selected: version.value.id === v,
       handler: async () => {
         try {
-          await setChannel(channel)
+          await setChannel(chan)
         }
         catch (error) {
           console.error(error)
-          const toast = await toastController
-            .create({
-              message: 'Cannot test app something wrong happened',
-              duration: 2000,
-            })
-          await toast.present()
+          displayStore.messageToast.push(t('cannot-test-app-some'))
         }
       },
     })
   }
   buttons.push({
-    text: t('button.cancel'),
+    text: t('button-cancel'),
     role: 'cancel',
     handler: () => {
       // console.log('Cancel clicked')
     },
   })
-  const actionSheet = await actionSheetController.create({
-    header: t('package.link_channel'),
+  displayStore.actionSheetOption = {
+    header: t('channel-linking'),
     buttons,
-  })
-  await actionSheet.present()
+  }
+  displayStore.showActionSheet = true
 }
-const openPannel = async () => {
+const openChannel = async () => {
   if (!version.value || !main.auth)
     return
-  const actionSheet = await actionSheetController.create({
+  if (!channel.value)
+    return ASChannelChooser()
+  displayStore.actionSheetOption = {
     buttons: [
       {
-        text: Capacitor.isNativePlatform() ? t('package.test') : t('package.download'),
+        text: t('set-bundle'),
         handler: () => {
-          actionSheet.dismiss()
-          if (!version.value)
-            return
-          openVersion(version.value, main.user?.id || '')
-        },
-      },
-      {
-        text: t('package.set'),
-        handler: () => {
-          actionSheet.dismiss()
+          displayStore.showActionSheet = false
           ASChannelChooser()
         },
       },
       {
-        text: t('button.cancel'),
+        text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
         },
       },
     ],
-  })
-  await actionSheet.present()
+  }
+  // push in button at index 1 if channel is set
+  if (channel.value && displayStore.actionSheetOption.buttons) {
+    displayStore.actionSheetOption.buttons.splice(1, 0, {
+      text: t('open-channel'),
+      handler: () => {
+        displayStore.showActionSheet = false
+        openChannelLink()
+      },
+    })
+  }
+  displayStore.showActionSheet = true
+}
+const openDownload = async () => {
+  if (!version.value || !main.auth)
+    return
+  displayStore.actionSheetOption = {
+    buttons: [
+      {
+        text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
+        handler: () => {
+          displayStore.showActionSheet = false
+          if (!version.value)
+            return
+          openVersion(version.value, main.user?.id || '')
+        },
+      },
+      {
+        text: t('set-bundle'),
+        handler: () => {
+          displayStore.showActionSheet = false
+          ASChannelChooser()
+        },
+      },
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          // console.log('Cancel clicked')
+        },
+      },
+    ],
+  }
+  displayStore.showActionSheet = true
 }
 
 const getVersion = async () => {
@@ -190,6 +219,7 @@ const getVersion = async () => {
     console.error(error)
   }
 }
+
 watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
@@ -198,8 +228,9 @@ watchEffect(async () => {
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
-    await getDevices()
     loading.value = false
+    displayStore.NavTitle = t('bundle')
+    displayStore.defaultBack = `/app/package/${route.params.p}/bundles`
   }
 })
 
@@ -208,158 +239,43 @@ const hideString = (str: string) => {
   const last = str.slice(-5)
   return `${first}...${last}`
 }
-
-const devicesFilter = computed(() => {
-  const value = search.value
-  if (value) {
-    const filtered = devices.value.filter(device => device.device_id.toLowerCase().includes(value.toLowerCase()))
-    return filtered
-  }
-  return devices.value
-})
 </script>
 
 <template>
-  <IonPage>
-    <TitleHead :title="t('package.versions')" color="warning" :default-back="`/app/package/${route.params.p}`" :plus-icon="ellipsisHorizontalCircle" @plus-click="openPannel" />
-    <IonContent :fullscreen="true">
-      <IonHeader collapse="condense">
-        <IonToolbar mode="ios">
-          <IonTitle color="warning" size="large">
-            {{ t('package.versions') }}
-          </IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonList ref="listRef">
-        <template v-if="!loading">
-          <IonListHeader>
-            <span class="text-vista-blue-500">
-              {{ t('informations') }}
-            </span>
-          </IonListHeader>
-          <IonItem>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('bundle-number') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version?.name }}
-            </IonNote>
-          </IonItem>
-          <IonItem>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('id') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version?.id }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.created_at">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('device.created_at') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(version?.created_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.updated_at">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('updated-at') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ formatDate(version?.updated_at) }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.checksum">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('checksum') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version.checksum }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version_meta?.devices">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('devices.title') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version_meta.devices }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.session_key">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('session_key') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end" @click="copyToast(version?.session_key || '')">
-              {{ hideString(version.session_key) }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-if="version?.external_url">
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('url') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ version.external_url }}
-            </IonNote>
-          </IonItem>
-          <IonItem v-else>
-            <IonLabel>
-              <h2 class="text-sm text-azure-500">
-                {{ t('size') }}
-              </h2>
-            </IonLabel>
-            <IonNote slot="end">
-              {{ showSize }}
-            </IonNote>
-          </IonItem>
-          <IonItemDivider v-if="devices?.length">
-            <IonLabel>
-              {{ t('devices-using-this-b') }}
-            </IonLabel>
-          </IonItemDivider>
-          <!-- add item with searchbar -->
-          <IonItem v-if="devices?.length">
-            <IonSearchbar @ion-change="search = ($event.detail.value || '')" />
-          </IonItem>
-          <template v-for="d in devicesFilter" :key="d.device_id">
-            <IonItem class="cursor-pointer">
-              <IonLabel>
-                <h2 class="text-sm text-azure-500">
-                  {{ d.device_id }}
-                </h2>
-              </IonLabel>
-              <IonNote slot="end">
-                {{ formatDate(d.created_at || '') }}
-              </IonNote>
-            </IonItem>
-          </template>
-        </template>
-        <div v-else class="flex justify-center">
-          <Spinner />
+  <div>
+    <div v-if="version" class="h-full overflow-y-scroll md:py-4">
+      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
+        <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+          <dl class="divide-y divide-gray-500">
+            <InfoRow :label="t('bundle-number')" :value="version.name" />
+            <InfoRow :label="t('id')" :value="version.id.toString()" />
+            <InfoRow v-if="version.created_at" :label="t('created-at')" :value="formatDate(version.created_at)" />
+            <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
+            <!-- Checksum -->
+            <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
+            <!-- meta devices -->
+            <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toString()" />
+            <InfoRow :label="t('channel')" :value="channel ? channel.name : t('set-bundle')" :is-link="true" @click="openChannel()" />
+            <!-- session_key -->
+            <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
+            <!-- version.external_url -->
+            <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
+            <!-- size -->
+            <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
+          </dl>
         </div>
-      </IonList>
-    </IonContent>
-  </IonPage>
+      </div>
+      <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
+        <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+          <DeviceTable
+            class="p-3"
+            :app-id="packageId"
+            :version-id="version.id"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
-<style>
-  #confirm-button {
-    background-color: theme('colors.red.500');
-    color: theme('colors.white');
-  }
-</style>

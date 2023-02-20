@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { IonFab, IonFabButton, IonIcon, toastController } from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useRoute, useRouter } from 'vue-router'
-import { arrowBack, copyOutline } from 'ionicons/icons'
 import { useI18n } from 'vue-i18n'
+import {
+  kFab,
+} from 'konsta/vue'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/crips'
+import { useDisplayStore } from '~/stores/display'
+import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done'])
 
+const displayStore = useDisplayStore()
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
@@ -102,11 +106,7 @@ const copyToast = async (text: string, allowed: boolean, id: string) => {
   if (!allowed)
     return
   copy(text)
-  const toast = await toastController
-    .create({
-      message: t('copied-to-clipboard'),
-      duration: 2000,
-    })
+  displayStore.messageToast.push(t('copied-to-clipboard'))
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
     setLog()
@@ -117,7 +117,6 @@ const copyToast = async (text: string, allowed: boolean, id: string) => {
       mySubscription.value.unsubscribe()
     scrollToElement(id)
   }
-  await toast.present()
 }
 const getKey = async (retry = true): Promise<void> => {
   isLoading.value = true
@@ -191,22 +190,22 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <section class="py-12 bg-gray-50 sm:py-16 lg:py-20">
+  <section class="h-full py-12 overflow-y-scroll bg-gray-50 dark:bg-gray-900 sm:py-16 lg:py-20 max-h-fit">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div v-if="props.onboarding" class="text-center">
-        <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-50 sm:text-4xl xl:text-5xl font-pj">
           {{ t('start-using-capgo') }}
         </h2>
-        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj">
+        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 dark:text-gray-200 font-pj">
           {{ t('add-your-first-app-t') }}
         </p>
-        <p class="mx-auto mt-2 font-normal text-md text-muted-blue-300 font-pj">
+        <p class="mx-auto mt-2 font-normal text-md text-muted-blue-300 dark:text-muted-blue-50 font-pj">
           {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
         </p>
       </div>
 
       <div v-else class="text-center">
-        <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl font-pj">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-50 sm:text-4xl xl:text-5xl font-pj">
           {{ t('add-another-app') }}
         </h2>
       </div>
@@ -227,7 +226,10 @@ watchEffect(async () => {
               </div>
               <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
-                <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">{{ s.command }} <IonIcon :icon="copyOutline" class="text-muted-blue-800" /></code>
+                <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">
+                  {{ s.command }}
+                  <i-ion-copy-outline class="text-muted-blue-800" />
+                </code>
                 <br v-if="s.command">
                 <span class="text-sm">{{ s.subtitle }}</span>
               </p>
@@ -239,15 +241,15 @@ watchEffect(async () => {
             class="mx-auto font-bold text-pumpkin-orange-500"
             @click="main.logout().then(() => router.replace('/login'))"
           >
-            {{ t("account.logout") }}
+            {{ t("logout") }}
           </button>
         </div>
       </div>
     </div>
   </section>
-  <IonFab slot="fixed" vertical="bottom" horizontal="end">
-    <IonFabButton color="secondary" @click="emit('done')">
-      <IonIcon :icon="arrowBack" />
-    </IonFabButton>
-  </IonFab>
+  <k-fab class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
+    <template #icon>
+      <component :is="arrowBack" />
+    </template>
+  </k-fab>
 </template>

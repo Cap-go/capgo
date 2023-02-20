@@ -1,9 +1,22 @@
 <script setup lang="ts">
-import { IonPage } from '@ionic/vue'
+import { ref } from 'vue'
+import Sidebar from '../components/Sidebar.vue'
+import Navbar from '../components/Navbar.vue'
+
+const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <IonPage>
-    <RouterView />
-  </IonPage>
+  <div class="flex h-full overflow-hidden bg-white pt-safe dark:bg-gray-900/90 safe-areas">
+    <!-- Sidebar -->
+    <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
+    <!-- Content area -->
+    <div class="flex flex-col flex-1 h-full overflow-hidden">
+      <!-- Site header -->
+      <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+      <main class="w-full h-full overflow-hidden">
+        <RouterView class="h-full overflow-y-scroll" />
+      </main>
+    </div>
+  </div>
 </template>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { IonContent, IonPage } from '@ionic/vue'
 import type { User } from '@supabase/gotrue-js'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -71,11 +70,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <IonPage>
-    <IonContent :fullscreen="true">
-      <section class="flex justify-center">
-        <Spinner />
-      </section>
-    </IonContent>
-  </IonPage>
+  <section class="flex justify-center">
+    <Spinner />
+  </section>
 </template>

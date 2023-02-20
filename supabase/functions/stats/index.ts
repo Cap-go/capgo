@@ -10,7 +10,6 @@ const actionsNotif = [
   'set_fail',
   'update_fail',
   'download_fail',
-  'update_fail',
 ]
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppStats) => {
   try {

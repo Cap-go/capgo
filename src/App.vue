@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { IonApp } from '@ionic/vue'
+import { kProvider } from 'konsta/vue'
+import ActionSheet from '~/components/ActionSheet.vue'
+import Toast from '~/components/Toast.vue'
+import Dialog from '~/components/Dialog.vue'
 </script>
 
 <template>
-  <IonApp class="bg-white/90 dark:bg-gray-900/90">
-    <RouterView />
-  </IonApp>
+  <kProvider theme="ios">
+    <div class="h-full overflow-hidden k-ios bg-white/90 dark:bg-gray-900/90">
+      <RouterView class="h-full overflow-hidden" />
+      <ActionSheet />
+      <Toast />
+      <Dialog />
+    </div>
+  </kProvider>
 </template>

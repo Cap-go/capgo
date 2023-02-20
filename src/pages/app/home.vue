@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import {
-  IonContent,
-  IonPage,
-} from '@ionic/vue'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import Dashboard from '../dashboard/Dashboard.vue'
-import Steps from '../onboarding/Steps.vue'
+import Dashboard from '../../components/dashboard/Dashboard.vue'
+import Steps from '../../components/dashboard/Steps.vue'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
+import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
+const displayStore = useDisplayStore()
 const route = useRoute()
 const main = useMainStore()
 const supabase = useSupabase()
@@ -76,18 +74,17 @@ watchEffect(async () => {
     await getMyApps()
     await getSharedWithMe()
     isLoading.value = false
+    displayStore.NavTitle = ''
   }
 })
 </script>
 
 <template>
-  <IonPage>
-    <IonContent :fullscreen="true">
-      <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
-      <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
-      <div v-else class="flex justify-center">
-        <Spinner />
-      </div>
-    </IonContent>
-  </IonPage>
+  <div>
+    <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" @reload-shared="getSharedWithMe()" />
+    <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
+    <div v-else class="flex justify-center">
+      <Spinner />
+    </div>
+  </div>
 </template>
