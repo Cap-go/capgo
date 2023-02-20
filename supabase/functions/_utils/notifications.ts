@@ -33,6 +33,21 @@ const sendNow = async (eventName: string,
   }
 }
 
+const isDeleted = async (email: string) => {
+  try {
+    await supabaseAdmin()
+      .from('deleted_account')
+      .select()
+      .eq('email', email)
+      .throwOnError()
+      .single()
+    return true
+  }
+  catch (_e) {
+    return false
+  }
+}
+
 const isSendable = (last: string, cron: string) => {
   const interval = parseCronExpression(cron)
   const last_send_at = new Date(last)
@@ -57,6 +72,11 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
 
   if (!user) {
     console.log('user not found', userId)
+    return Promise.resolve()
+  }
+  const isDeletedUser = await isDeleted(user.email)
+  if (isDeletedUser) {
+    console.log('user is deleted', userId)
     return Promise.resolve()
   }
   // check if notif has already been send in notifications table
