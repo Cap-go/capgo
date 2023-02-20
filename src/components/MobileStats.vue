@@ -35,6 +35,8 @@ const buildGraph = () => {
 }
 
 const loadData = async () => {
+  // const dateLimit = new Date()
+  // dateLimit.setMonth(dateLimit.getMonth() - 1)
   try {
     const { data: dataVersions } = await supabase
       .from('app_versions_meta')
@@ -48,6 +50,7 @@ const loadData = async () => {
       `)
       .eq('app_id', id.value)
       .order('created_at', { ascending: false })
+      // .gte('created_at', dateLimit.toISOString())
     versions.value = (dataVersions || versions.value) as (Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]
     buildGraph()
   }
