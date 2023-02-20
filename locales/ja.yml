@@ -1,5 +1,4 @@
 Bandwidth: 帯域幅
-MAU: 月間アクティブ ユーザー数
 Storage: 保管所
 account: アカウント
 account-password-error: エラーが発生しました。もう一度お試しください
@@ -160,6 +159,7 @@ mau: 月間アクティブ ユーザー数
 module-heading: モジュール
 monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数
+montly-active: 月間アクティブ
 more-version-storage: より多くのバージョン ストレージ
 morning: 朝
 my-account: マイアカウント

@@ -1,5 +1,4 @@
 Bandwidth: Пропускная способность
-MAU: Ежемесячные активные пользователи
 Storage: Хранилище
 account: Счет
 account-password-error: Произошла ошибка, попробуйте еще раз
@@ -166,6 +165,7 @@ mau: Ежемесячные активные пользователи
 module-heading: Модули
 monthly: Ежемесячно
 monthly-active-users: Ежемесячные активные пользователи
+montly-active: Ежемесячно активно
 more-version-storage: Дополнительная версия Хранение
 morning: утро
 my-account: Мой счет

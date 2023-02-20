@@ -1,5 +1,4 @@
 Bandwidth: Băng thông
-MAU: Người dùng hoạt động hàng tháng
 Storage: Kho
 account: Tài khoản
 account-password-error: Đã xảy ra lỗi, vui lòng thử lại
@@ -168,6 +167,7 @@ mau: Người dùng hoạt động hàng tháng
 module-heading: mô-đun
 monthly: hàng tháng
 monthly-active-users: Người dùng hoạt động hàng tháng
+montly-active: hoạt động hàng tháng
 more-version-storage: Phiên bản khác
 morning: buổi sáng
 my-account: Tài khoản của tôi

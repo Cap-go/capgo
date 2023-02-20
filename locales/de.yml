@@ -1,5 +1,4 @@
 Bandwidth: Bandbreite
-MAU: Monatlich aktive Benutzer
 Storage: Lagerung
 account: Konto
 account-password-error: Fehler aufgetreten, bitte versuchen Sie es erneut
@@ -174,6 +173,7 @@ mau: Monatlich aktive Benutzer
 module-heading: Module
 monthly: Monatlich
 monthly-active-users: Monatlich aktive Benutzer
+montly-active: Monatlich aktiv
 more-version-storage: Mehr Versionsspeicher
 morning: Morgen
 my-account: Mein Konto

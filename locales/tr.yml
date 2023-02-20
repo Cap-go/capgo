@@ -1,5 +1,4 @@
 Bandwidth: Bant genişliği
-MAU: Aylık aktif kullanıcılar
 Storage: Depolamak
 account: Hesap
 account-password-error: Hata oluştu, lütfen tekrar deneyin
@@ -166,6 +165,7 @@ mau: Aylık aktif kullanıcılar
 module-heading: Modüller
 monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar
+montly-active: Aylık aktif
 more-version-storage: Daha fazla sürüm Depolama
 morning: Sabah
 my-account: Hesabım

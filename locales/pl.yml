@@ -1,5 +1,4 @@
 Bandwidth: Przepustowość łącza
-MAU: Miesięczna liczba aktywnych użytkowników
 Storage: Składowanie
 account: Konto
 account-password-error: Wystąpił błąd, spróbuj ponownie
@@ -166,6 +165,7 @@ mau: Miesięczna liczba aktywnych użytkowników
 module-heading: Moduły
 monthly: Miesięczny
 monthly-active-users: Miesięczna liczba aktywnych użytkowników
+montly-active: Miesięczny aktywny
 more-version-storage: Więcej wersji Przechowywanie
 morning: Poranek
 my-account: Moje konto

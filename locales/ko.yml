@@ -1,5 +1,4 @@
 Bandwidth: 대역폭
-MAU: 월간 활성 사용자
 Storage: 저장
 account: 계정
 account-password-error: 오류가 발생했습니다. 다시 시도해 주세요.
@@ -160,6 +159,7 @@ mau: 월간 활성 사용자
 module-heading: 모듈
 monthly: 월간 간행물
 monthly-active-users: 월간 활성 사용자
+montly-active: 월간 활성
 more-version-storage: 더 많은 버전 저장
 morning: 아침
 my-account: 내 계정

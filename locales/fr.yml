@@ -1,5 +1,4 @@
 Bandwidth: Bande passante
-MAU: Utilisateurs actifs mensuels
 Storage: Stockage
 account: Compte
 account-password-error: Une erreur s'est produite, veuillez réessayer
@@ -172,6 +171,7 @@ mau: Utilisateurs actifs mensuels
 module-heading: Modules
 monthly: Mensuel
 monthly-active-users: Utilisateurs actifs mensuels
+montly-active: Actif mensuel
 more-version-storage: Plus de version Stockage
 morning: matin
 my-account: Mon compte

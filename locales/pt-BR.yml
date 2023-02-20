@@ -1,5 +1,4 @@
 Bandwidth: largura de banda
-MAU: Usuários ativos mensais
 Storage: Armazenar
 account: Conta
 account-password-error: Ocorreu um erro, tente novamente
@@ -166,6 +165,7 @@ mau: Usuários ativos mensais
 module-heading: Módulos
 monthly: Por mês
 monthly-active-users: Usuários ativos mensais
+montly-active: Ativo mensalmente
 more-version-storage: Mais armazenamento de versões
 morning: manhã
 my-account: Minha conta

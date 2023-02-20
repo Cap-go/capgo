@@ -1,5 +1,4 @@
 Bandwidth: 带宽
-MAU: 月活跃用户
 Storage: 贮存
 account: 帐户
 account-password-error: 发生错误，请重试
@@ -160,6 +159,7 @@ mau: 月活跃用户
 module-heading: 模块
 monthly: 每月
 monthly-active-users: 月活跃用户
+montly-active: 每月活跃
 more-version-storage: 更多版本存储
 morning: 早晨
 my-account: 我的账户

@@ -42,7 +42,7 @@ const { t } = useI18n()
               </th>
               <th class="w-1/4 p-2">
                 <div class="font-semibold text-center">
-                  {{ t('MAU') }}
+                  {{ t('mau') }}
                 </div>
               </th>
               <th class="w-1/4 p-2" />

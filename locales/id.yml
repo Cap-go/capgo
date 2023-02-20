@@ -1,5 +1,4 @@
 Bandwidth: Bandwidth
-MAU: Pengguna aktif bulanan
 Storage: Penyimpanan
 account: Akun
 account-password-error: Terjadi kesalahan, harap coba lagi
@@ -168,6 +167,7 @@ mau: Pengguna aktif bulanan
 module-heading: Modul
 monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan
+montly-active: Aktif bulanan
 more-version-storage: Lebih banyak versi Penyimpanan
 morning: Pagi
 my-account: Akun saya
