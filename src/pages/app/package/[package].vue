@@ -111,7 +111,7 @@ watchEffect(async () => {
           <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
 
           <a :href="s.link" class="flex flex-col items-center w-full p-10 group hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14 ">
-            <span class="text-center duration-100 ease-in scale-100 group-hover:scale-150">
+            <span class="text-center duration-100 ease-in scale-100 group-hover:scale-125">
               <p class="text-5xl font-bold text-white lg:mt-3 lg:order-1 font-pj">
                 {{ s.value }}
               </p>
