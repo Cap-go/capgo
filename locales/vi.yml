@@ -78,6 +78,7 @@ cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự c�
 change: Thay đổi
 changed-password-suc: Đã đổi mật khẩu thành công
 channel: Kênh
+channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
 channel-invit: Nhập email để mời
 channel-is-public: Kênh là công khai

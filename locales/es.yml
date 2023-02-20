@@ -78,6 +78,7 @@ cannot-test-app-some: No se puede probar la aplicación. Ocurrió algo incorrect
 change: Cambiar
 changed-password-suc: Contraseña cambiada con éxito
 channel: Canal
+channel-create: Crear canal
 channel-deleted: Canal eliminado
 channel-invit: Escriba el correo electrónico para invitar
 channel-is-public: El canal es público

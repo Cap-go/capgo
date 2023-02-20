@@ -74,6 +74,7 @@ cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했�
 change: 변화
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel: 채널
+channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-invit: 초대할 이메일 입력
 channel-is-public: 채널이 공개됨

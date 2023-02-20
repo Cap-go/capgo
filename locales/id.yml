@@ -74,6 +74,7 @@ cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
 change: Mengubah
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
+channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-invit: Ketik email untuk mengundang
 channel-is-public: Saluran bersifat publik

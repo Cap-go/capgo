@@ -76,6 +76,7 @@ cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
 change: Zmiana
 changed-password-suc: Hasło zostało zmienione pomyślnie
 channel: Kanał
+channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
 channel-invit: Wpisz e-mail, aby zaprosić
 channel-is-public: Kanał jest publiczny

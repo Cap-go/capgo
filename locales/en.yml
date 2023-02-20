@@ -74,6 +74,7 @@ cannot-test-app-some: Cannot test app something wrong happened
 change: Change
 changed-password-suc: Password changed successfully
 channel: Channel
+channel-create: Create channel
 channel-deleted: Channel deleted
 channel-invit: Type email to invite
 channel-is-public: Channel is public

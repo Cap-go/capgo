@@ -3,12 +3,19 @@ import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  kDialog,
+  kDialogButton,
+  kFab,
+} from 'konsta/vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import IconTrash from '~icons/heroicons/trash?raw'
+import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
 import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   appId: string
@@ -21,18 +28,21 @@ interface Channel {
   }
 }
 const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
-
+const addChannelModal = ref(false)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const router = useRouter()
+const main = useMainStore()
 const total = ref(0)
 const search = ref('')
 const elements = ref<(typeof element)[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
+const newChannel = ref<string>()
+const versionId = ref<number>()
 const filters = ref()
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
@@ -54,6 +64,43 @@ const didCancel = async (name: string) => {
   }
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
+}
+
+const findUnknownVersion = () => supabase
+  .from('app_versions')
+  .select('id')
+  .eq('app_id', props.appId)
+  .eq('name', 'unknown')
+  .throwOnError()
+  .single()
+  .then(({ data }) => data?.id)
+
+const addChannel = async () => {
+  if (!newChannel.value || !versionId.value || !main.user)
+    return
+  try {
+    console.log('addChannel', newChannel.value, versionId.value, main.user)
+    // { name: channelId, app_id: appId, version: data.id, created_by: userId }
+    const { data: dataChannel } = await supabase
+      .from('channels')
+      .insert([
+        {
+          name: newChannel.value,
+          app_id: props.appId,
+          version: versionId.value,
+          created_by: main.user.id,
+        },
+      ])
+      .select()
+    if (!dataChannel)
+      return
+    elements.value.push(dataChannel[0] as any)
+    newChannel.value = ''
+    addChannelModal.value = false
+  }
+  catch (error) {
+    console.error(error)
+  }
 }
 
 const getData = async () => {
@@ -103,6 +150,7 @@ const refreshData = async () => {
     currentPage.value = 1
     elements.value.length = 0
     await getData()
+    versionId.value = await findUnknownVersion()
   }
   catch (error) {
     console.error(error)
@@ -186,13 +234,37 @@ watch(props, async () => {
 </script>
 
 <template>
-  <Table
-    v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-    :total="total" row-click :element-list="elements"
-    filter-text="Filters"
-    :is-loading="isLoading"
-    :search-placeholder="t('search-by-name')"
-    @reload="reload()" @reset="refreshData()"
-    @row-click="openOne"
-  />
+  <div>
+    <Table
+      v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
+      :total="total" row-click :element-list="elements"
+      filter-text="Filters"
+      :is-loading="isLoading"
+      :search-placeholder="t('search-by-name')"
+      @reload="reload()" @reset="refreshData()"
+      @row-click="openOne"
+    />
+    <k-fab class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="addChannelModal = true">
+      <template #icon>
+        <component :is="IconPlus" />
+      </template>
+    </k-fab>
+    <k-dialog
+      :opened="addChannelModal"
+      @backdropclick="() => (addChannelModal = false)"
+    >
+      <template #title>
+        {{ t('channel-create') }}
+      </template>
+      <input v-model="newChannel" type="text" placeholder="Production" class="w-full p-1 text-lg text-gray-900 rounded-lg">
+      <template #buttons>
+        <k-dialog-button class="text-red-800" @click="() => (addChannelModal = false)">
+          {{ t('button-cancel') }}
+        </k-dialog-button>
+        <k-dialog-button @click="addChannel()">
+          {{ t('add') }}
+        </k-dialog-button>
+      </template>
+    </k-dialog>
+  </div>
 </template>

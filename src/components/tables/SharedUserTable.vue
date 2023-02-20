@@ -190,6 +190,7 @@ const addUser = async () => {
   }
   else {
     await refreshData()
+    addUserModal.value = false
     newUser.value = ''
   }
 }
@@ -308,13 +309,12 @@ onMounted(async () => {
     </k-fab>
     <k-dialog
       :opened="addUserModal"
-      class="text-lg"
       @backdropclick="() => (addUserModal = false)"
     >
       <template #title>
         {{ t('channel-invit') }}
       </template>
-      <input v-model="newUser" type="email" placeholder="hello@yourcompany.com" class="w-full p-1 text-lg text-gray-200 rounded-lg k-input">
+      <input v-model="newUser" type="email" placeholder="hello@yourcompany.com" class="w-full p-1 text-lg text-gray-900 rounded-lg">
       <template #buttons>
         <k-dialog-button class="text-red-800" @click="() => (addUserModal = false)">
           {{ t('button-cancel') }}

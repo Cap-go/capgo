@@ -74,6 +74,7 @@ cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 change: Değiştirmek
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
+channel-create: Kanal oluştur
 channel-deleted: kanal silindi
 channel-invit: Davet etmek için e-posta yazın
 channel-is-public: Kanal herkese açık

@@ -74,6 +74,7 @@ cannot-test-app-some: 无法测试应用程序发生错误
 change: 改变
 changed-password-suc: 密码修改成功
 channel: 渠道
+channel-create: 创建频道
 channel-deleted: 频道已删除
 channel-invit: 输入要邀请的电子邮件
 channel-is-public: 频道是公开的

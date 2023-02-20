@@ -76,6 +76,7 @@ cannot-test-app-some: Impossibile testare l'app, è successo qualcosa di sbaglia
 change: Modifica
 changed-password-suc: password cambiata con successo
 channel: Canale
+channel-create: Crea canale
 channel-deleted: Canale eliminato
 channel-invit: Digita l'e-mail per invitare
 channel-is-public: Il canale è pubblico

@@ -80,6 +80,7 @@ cannot-test-app-some: App kann nicht getestet werden, es ist ein Fehler aufgetre
 change: Ändern
 changed-password-suc: das Passwort wurde erfolgreich geändert
 channel: Kanal
+channel-create: Kanal erstellen
 channel-deleted: Kanal gelöscht
 channel-invit: Geben Sie die einzuladende E-Mail-Adresse ein
 channel-is-public: Kanal ist öffentlich
