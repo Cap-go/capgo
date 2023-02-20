@@ -165,7 +165,7 @@ const hightLights = computed(() => ([
           <template v-for="s, i in hightLights" :key="i">
             <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
 
-            <div class="flex flex-col items-center w-full p-5 group hover:bg-gray-800 sm:px-7 lg:px-6 lg:py-4 ">
+            <div class="flex flex-col items-center w-full p-5 group sm:px-7 lg:px-6 lg:py-4 ">
               <span class="text-center">
                 <p class="text-3xl font-bold text-white lg:mt-3 lg:order-2 font-pj">
                   {{ s.value }}
