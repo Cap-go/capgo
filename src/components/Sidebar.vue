@@ -48,7 +48,7 @@ const isTabActive = (tab: string) => {
       :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between pr-3 mt-4 mb-10 sidebar-expanded:mx-10 sm:px-2">
+      <div class="flex justify-between px-3 mt-4 mb-10 sidebar-expanded:mx-10 sm:px-2">
         <!-- Close button -->
         <button
           ref="trigger"

@@ -1,4 +1,4 @@
-import type { FunctionalComponent } from 'vue'
+import type { FunctionalComponent, ShallowRef } from 'vue'
 
 export type MobileColType = 'header' | 'title' | 'footer' | 'after'
 
@@ -19,6 +19,7 @@ export interface TableColumn {
 
 export interface Tab {
   label: string
-  icon?: FunctionalComponent
+  icon?: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
   key: string
+  onClick?: (elem: any | undefined) => void
 }

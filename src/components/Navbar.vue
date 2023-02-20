@@ -37,7 +37,7 @@ const { t } = useI18n()
             <div v-if="displayStore.NavTitle" class="pr-2">
               <button class="flex" @click="back()">
                 <IconBack class="w-6 h-6 fill-current text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50" />
-                <span class="text-dark dark:text-white">{{ t('button-back') }}</span>
+                <span class="hidden text-dark dark:text-white md:block">{{ t('button-back') }}</span>
               </button>
             </div>
             <!-- Hamburger button -->

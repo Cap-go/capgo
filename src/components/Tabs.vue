@@ -4,6 +4,7 @@ import type { Tab } from './comp_def'
 const props = defineProps<{
   tabs: Tab[]
   activeTab: string
+  noWrap?: boolean
 }>()
 const emit = defineEmits(['update:activeTab'])
 const activeTabColor = (tab: string) => ({
@@ -14,11 +15,11 @@ const activeTabColor = (tab: string) => ({
 
 <template>
   <div class="border-b border-gray-200 dark:border-gray-700">
-    <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400">
+    <ul class="flex -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400" :class="{ 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar': noWrap }">
       <li v-for="(tab, i) in tabs" :key="i" class="mr-2">
-        <button class="inline-flex p-4 rounded-t-lg group" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
-          <component :is="tab.icon" class="-ml-0.5 mr-2 text-gray-400 h-5 w-5 group-hover:text-gray-600 transition-all duration-100" />
-          <span class="hidden md:block">{{ tab.label }}</span>
+        <button class="block p-2 rounded-t-lg md:p-4 md:inline-flex group" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
+          <component :is="tab.icon" class="mx-auto md:-ml-0.5 md:mr-2 text-gray-400 h-5 w-5 group-hover:text-gray-600 transition-all duration-100" />
+          <span class="text-xs md:font-md">{{ tab.label }}</span>
         </button>
       </li>
     </ul>
