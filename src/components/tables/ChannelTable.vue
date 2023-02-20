@@ -72,7 +72,7 @@ const getData = async () => {
           ),
           created_at,
           updated_at
-          `)
+          `, { count: 'exact' })
       .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 

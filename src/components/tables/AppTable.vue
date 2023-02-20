@@ -68,7 +68,7 @@ const getData = async () => {
           ),
           created_at,
           updated_at
-          `)
+          `, { count: 'exact' })
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
