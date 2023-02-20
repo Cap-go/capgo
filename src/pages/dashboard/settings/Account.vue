@@ -211,7 +211,7 @@ const rules = computed(() => ({
 const v$ = useVuelidate(rules, form)
 
 const submit = async () => {
-  if (!isLoading.value)
+  if (isLoading.value)
     return
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()

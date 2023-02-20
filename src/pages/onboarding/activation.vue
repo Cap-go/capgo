@@ -25,7 +25,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 const submit = async () => {
-  if (!isLoading.value)
+  if (isLoading.value)
     return
   isLoading.value = true
   if (Capacitor.isNativePlatform() && form.enableNotifications)

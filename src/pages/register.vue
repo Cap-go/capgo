@@ -48,7 +48,7 @@ const rules = computed(() => ({
 const v$ = useVuelidate(rules, form)
 
 const submit = async () => {
-  if (!isLoading.value)
+  if (isLoading.value)
     return
   // console.log('submit')
   isLoading.value = true
