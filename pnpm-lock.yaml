@@ -115,7 +115,7 @@ specifiers:
   semver: ^7.3.8
   tailwindcss: ^3.2.4
   typescript: 4.9.4
-  unplugin-icons: 0.15.0
+  unplugin-icons: 0.15.3
   unplugin-vue-components: ^0.22.12
   vite: 3.2.5
   vite-plugin-environment: 1.1.3
@@ -255,7 +255,7 @@ devDependencies:
   sass: 1.56.1
   tailwindcss: 3.2.4_postcss@8.4.21
   typescript: 4.9.4
-  unplugin-icons: 0.15.0_@vue+compiler-sfc@3.2.45
+  unplugin-icons: 0.15.3_@vue+compiler-sfc@3.2.45
   unplugin-vue-components: 0.22.12_vue@3.2.45
   vite: 3.2.5_lsvry4w5nj6evwofoi5nudk2oa
   vite-plugin-inspect: 0.7.9_vite@3.2.5
@@ -2677,14 +2677,14 @@ packages:
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
     dev: true
 
-  /@iconify/utils/2.1.0:
-    resolution: {integrity: sha512-ouXv1hQfOKq4k3wxQ2OJBYQ2gXBMeFoUCIiORmuUVUNlSq9oOTzQBF3jpFRb0+/P0bnV+RIoHcbZKufZTlJ16g==}
+  /@iconify/utils/2.1.4:
+    resolution: {integrity: sha512-7vzsYIvxv5Hng0MNEtSSnyMBD/+zqnORqmKiYsSgpMBGSz1r93URgBZHPYCZ1/gpoaVstYW4/SVLGCMJBNMCLQ==}
     dependencies:
       '@antfu/install-pkg': 0.1.1
       '@antfu/utils': 0.7.2
       '@iconify/types': 2.0.0
       debug: 4.3.4
-      kolorist: 1.6.0
+      kolorist: 1.7.0
       local-pkg: 0.4.3
     transitivePeerDependencies:
       - supports-color
@@ -12503,6 +12503,10 @@ packages:
     resolution: {integrity: sha512-dLkz37Ab97HWMx9KTes3Tbi3D1ln9fCAy2zr2YVExJasDRPGRaKcoE4fycWNtnCAJfjFqe0cnY+f8KT2JePEXQ==}
     dev: true
 
+  /kolorist/1.7.0:
+    resolution: {integrity: sha512-ymToLHqL02udwVdbkowNpzjFd6UzozMtshPQKVi5k1EjKRqKqBrOnE9QbLEb0/pV76SAiIT13hdL8R6suc+f3g==}
+    dev: true
+
   /konsta/1.0.2:
     resolution: {integrity: sha512-EIi/u6HDgGy9Vbi0a2AUtsQo4qN8l1ZZWyJs/D18MjVUnVxqX7Od9O8odO+XCIzZd1djeUmxfH6frDW71UvyhQ==}
     engines: {node: '>= 4.7.0'}
@@ -17700,11 +17704,11 @@ packages:
     engines: {node: '>= 0.8'}
     dev: true
 
-  /unplugin-icons/0.15.0_@vue+compiler-sfc@3.2.45:
-    resolution: {integrity: sha512-/BGtBL8y/2wjey4GLyb0w90mhc9d7XKlewWGMxBPROHS7mR84AV1Y0zDapYK0Q/cc/+u4WUcloreev5cABDa5w==}
+  /unplugin-icons/0.15.3_@vue+compiler-sfc@3.2.45:
+    resolution: {integrity: sha512-YWgJqv5AahrokeOnta8uX/m1damZA6Rf6zPClgHg2Fa/45iyOe3Lj+Wn/Ba+CSsq9yBffn17YfKfJNyWCNZPvw==}
     peerDependencies:
       '@svgr/core': '>=5.5.0'
-      '@vue/compiler-sfc': ^3.0.2
+      '@vue/compiler-sfc': ^3.0.2 || ^2.7.0
       vue-template-compiler: ^2.6.12
       vue-template-es2015-compiler: ^1.9.0
     peerDependenciesMeta:
@@ -17719,10 +17723,10 @@ packages:
     dependencies:
       '@antfu/install-pkg': 0.1.1
       '@antfu/utils': 0.7.2
-      '@iconify/utils': 2.1.0
+      '@iconify/utils': 2.1.4
       '@vue/compiler-sfc': 3.2.45
       debug: 4.3.4
-      kolorist: 1.6.0
+      kolorist: 1.7.0
       local-pkg: 0.4.3
       unplugin: 1.0.1
     transitivePeerDependencies:
