@@ -101,7 +101,7 @@ watchEffect(async () => {
 
     <div class="relative mt-12 mb-12 lg:mt-20 lg:max-w-5xl lg:mx-auto">
       <div class="absolute -inset-2">
-        <div class="w-full h-full mx-auto opacity-30 blur-lg filter" style="background: linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" />
+        <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg filter" style="background: linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" />
       </div>
 
       <div class="absolute -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl" />

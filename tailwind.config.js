@@ -44,9 +44,9 @@ module.exports = konstaConfig({
     ],
   },
   content: [
-    './node_modules/flowbite/**/*.js',
     './index.html',
     './src/**/*.{vue,js,ts,jsx,tsx}',
+    './node_modules/flowbite/**/*.js',
   ],
   theme: {
     extend: {
@@ -276,12 +276,12 @@ module.exports = konstaConfig({
     },
   },
   plugins: [
-    require('flowbite/plugin'),
     require('@tailwindcss/typography'),
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/line-clamp'),
     require('@tailwindcss/container-queries'),
     require('daisyui'),
+    require('flowbite/plugin'),
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {
       addVariant('sidebar-expanded', ({ modifySelectors, separator }) => {
