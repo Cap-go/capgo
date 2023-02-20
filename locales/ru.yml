@@ -199,12 +199,17 @@ plan-buy: Купить
 plan-desc: |-
   Начните строить бесплатно, а затем добавьте план, чтобы начать работу. 
   Планы учетной записи открывают дополнительные функции.
+plan-free: Лучший для MVP и тестирования
 plan-inactive: План неактивен
 plan-is-the-best-pla: план - лучший план для ваших нужд.
+plan-maker: Лучшее для владельцев малого бизнеса
 plan-member: член плана.
+plan-payasyougo: Лучше всего подходит для масштабирования предприятий
 plan-pricing-plans: Тарифные планы
 plan-progressive-deploy: Прогрессивное развертывание
+plan-solo: Лучшее для независимых разработчиков
 plan-storage: ГБ хранения
+plan-team: Лучшее для владельцев крупного бизнеса
 plan-updates: Обновления
 plan-whats-included: Что включено
 plans: Планы
@@ -218,6 +223,7 @@ refresh-this-page: Обновить эту страницу
 register-desc: Заполните следующие поля, чтобы завершить регистрацию
 register-heading: Постановка на учет
 register-next: регистр
+reload: Перезагрузить
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
 search: Поиск

@@ -201,12 +201,17 @@ plan-buy: Membeli
 plan-desc: |-
   Mulailah membangun secara gratis, lalu tambahkan rencana untuk ditayangkan. 
   Paket akun membuka kunci fitur tambahan.
+plan-free: Terbaik untuk MVP dan pengujian
 plan-inactive: Rencana tidak aktif
 plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
+plan-maker: Terbaik untuk pemilik usaha kecil
 plan-member: anggota rencana.
+plan-payasyougo: Terbaik untuk perusahaan skala
 plan-pricing-plans: Paket Harga
 plan-progressive-deploy: Penyebaran progresif
+plan-solo: Terbaik untuk pengembang independen
 plan-storage: Penyimpanan GB
+plan-team: Terbaik untuk pemilik bisnis besar
 plan-updates: Pembaruan
 plan-whats-included: Apa yang disertakan
 plans: Rencana
@@ -220,6 +225,7 @@ refresh-this-page: Segarkan halaman ini
 register-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
 register-heading: Registrasi
 register-next: Daftar
+reload: Muat ulang
 reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 search: Mencari

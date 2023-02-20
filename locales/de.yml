@@ -211,12 +211,17 @@ plan-desc: >-
   um live zu gehen. 
 
   Kontopläne schalten zusätzliche Funktionen frei.
+plan-free: Am besten für MVP und Tests
 plan-inactive: Planen Sie inaktiv
 plan-is-the-best-pla: Plan ist der beste Plan für Ihre Bedürfnisse.
+plan-maker: Am besten für Kleinunternehmer
 plan-member: Planmitglied.
+plan-payasyougo: Am besten für Scaling-Unternehmen
 plan-pricing-plans: Preispläne
 plan-progressive-deploy: Progressive Bereitstellung
+plan-solo: Am besten für unabhängige Entwickler
 plan-storage: GB Speicher
+plan-team: Am besten für Großunternehmer
 plan-updates: Aktualisierung
 plan-whats-included: Was ist inbegriffen
 plans: Pläne
@@ -230,6 +235,7 @@ refresh-this-page: Aktualisieren Sie diese Seite
 register-desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
 register-heading: Anmeldung
 register-next: Registrieren
+reload: Neu laden
 reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
 search: Suchen

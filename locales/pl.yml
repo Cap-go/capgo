@@ -199,12 +199,17 @@ plan-buy: Kupić
 plan-desc: |-
   Rozpocznij tworzenie za darmo, a następnie dodaj plan uruchomienia. 
   Plany kont odblokowują dodatkowe funkcje.
+plan-free: Najlepsze do MVP i testów
 plan-inactive: Plan nieaktywny
 plan-is-the-best-pla: plan to najlepszy plan dla Twoich potrzeb.
+plan-maker: Najlepsze dla właścicieli małych firm
 plan-member: członek planu.
+plan-payasyougo: Najlepsze do skalowania przedsiębiorstw
 plan-pricing-plans: Plany cenowe
 plan-progressive-deploy: Wdrażanie progresywne
+plan-solo: Najlepsze dla niezależnych programistów
 plan-storage: GB pamięci
+plan-team: Najlepsze dla właścicieli dużych firm
 plan-updates: Aktualizacje
 plan-whats-included: Co jest zawarte
 plans: Plany
@@ -218,6 +223,7 @@ refresh-this-page: Odśwież tę stronę
 register-desc: Wypełnij poniższe pola, aby zakończyć rejestrację
 register-heading: Rejestracja
 register-next: Rejestr
+reload: Przeładować
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
 search: Szukaj

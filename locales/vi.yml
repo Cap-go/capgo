@@ -201,12 +201,17 @@ plan-buy: Mua
 plan-desc: |-
   Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động. 
   Gói tài khoản mở khóa các tính năng bổ sung.
+plan-free: Tốt nhất cho MVP và thử nghiệm
 plan-inactive: Kế hoạch không hoạt động
 plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
+plan-maker: Tốt nhất cho các chủ doanh nghiệp nhỏ
 plan-member: thành viên kế hoạch.
+plan-payasyougo: Tốt nhất cho các doanh nghiệp kêu gọi
 plan-pricing-plans: kế hoạch giá
 plan-progressive-deploy: triển khai lũy tiến
+plan-solo: Tốt nhất cho các nhà phát triển độc lập
 plan-storage: Dung lượng GB
+plan-team: Tốt nhất cho các chủ doanh nghiệp lớn
 plan-updates: cập nhật
 plan-whats-included: Bao gồm những gì
 plans: Các kế hoạch
@@ -220,6 +225,7 @@ refresh-this-page: Làm mới trang này
 register-desc: Điền vào các trường sau để hoàn thành đăng ký của bạn
 register-heading: Sự đăng ký
 register-next: Đăng ký
+reload: tải lại
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
 search: Tìm kiếm

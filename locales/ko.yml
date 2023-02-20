@@ -193,12 +193,17 @@ plan-buy: 구입하다
 plan-desc: |-
   무료로 구축을 시작한 다음 실행 계획을 추가하세요. 
   계정 계획은 추가 기능을 잠금 해제합니다.
+plan-free: MVP 및 테스트에 가장 적합
 plan-inactive: 비활성 계획
 plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.
+plan-maker: 소기업 소유주에게 가장 적합
 plan-member: 계획 회원.
+plan-payasyougo: 기업 확장에 가장 적합
 plan-pricing-plans: 요금제
 plan-progressive-deploy: 점진적 배포
+plan-solo: 독립 개발자에게 적합
 plan-storage: GB 스토리지
+plan-team: 대기업 소유주에게 가장 적합
 plan-updates: 업데이트
 plan-whats-included: 포함된 것
 plans: 계획
@@ -212,6 +217,7 @@ refresh-this-page: 이 페이지 새로 고침
 register-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 register-heading: 등록
 register-next: 등록하다
+reload: 새로고침
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 search: 찾다

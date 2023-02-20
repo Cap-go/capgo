@@ -203,12 +203,17 @@ plan-buy: Acquistare
 plan-desc: |-
   Inizia a creare gratuitamente, quindi aggiungi un piano per la pubblicazione. 
   I piani account sbloccano funzionalità aggiuntive.
+plan-free: Ideale per MVP e test
 plan-inactive: Piano inattivo
 plan-is-the-best-pla: plan è il miglior piano per le tue esigenze.
+plan-maker: Ideale per i proprietari di piccole imprese
 plan-member: membro del piano.
+plan-payasyougo: Ideale per le imprese in espansione
 plan-pricing-plans: Piani tariffari
 plan-progressive-deploy: Distribuzione progressiva
+plan-solo: Ideale per sviluppatori indipendenti
 plan-storage: Archiviazione GB
+plan-team: Il meglio per i grandi imprenditori
 plan-updates: Aggiornamenti
 plan-whats-included: Cosa è incluso
 plans: Piani
@@ -222,6 +227,7 @@ refresh-this-page: Aggiorna questa pagina
 register-desc: Compila i seguenti campi per completare la tua registrazione
 register-heading: Registrazione
 register-next: Registrati
+reload: Ricaricare
 reset-password: Resetta la password
 reset-your-password: reimposta la tua password
 search: Ricerca

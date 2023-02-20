@@ -5,13 +5,14 @@ import { initDropdowns } from 'flowbite'
 import {
   kList, kListItem,
 } from 'konsta/vue'
+import { useI18n } from 'vue-i18n'
 import type { MobileColType, TableColumn } from './comp_def'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSortDown from '~icons/lucide/chevron-down'
 import IconSearch from '~icons/ic/round-search'
-import IconReload from '~icons/uiw/reload'
+import IconReload from '~icons/tabler/reload'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
@@ -36,6 +37,7 @@ const emit = defineEmits([
   'reload', 'reset', 'next', 'prev', 'fastForward', 'fastBackward',
   'update:search', 'update:filters', 'update:columns', 'update:currentPage',
   'filterClick', 'rowClick', 'sortClick'])
+const { t } = useI18n()
 const search = ref(props.search || '')
 // const sorts = ref<TableSort>({})
 // get columns from elementList
@@ -146,10 +148,11 @@ onMounted(() => {
 <template>
   <div class="relative pb-4 pb-20 overflow-x-auto shadow-md sm:rounded-lg md:pb-0">
     <div class="flex items-start justify-between pb-4 md:items-center ">
-      <div class="mb-2 md:mb-0">
-        <button class="inline-flex items-center mr-2 text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
-          <IconReload v-if="!isLoading" class="m-1" />
-          <Spinner v-else size="w-3 h-3 m-1" />
+      <div class="flex mb-2 md:mb-0">
+        <button class="relative inline-flex mr-2 items-center text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
+          <IconReload v-if="!isLoading" class="m-1 mr-2" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+          <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
         <button v-if="filterText && filterList.length" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="relative inline-flex items-center text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" type="button">
           <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -top-2 -right-2 dark:border-gray-900">
@@ -160,7 +163,10 @@ onMounted(() => {
           <IconDown class="hidden m-1 ml-2 md:block" />
         </button>
         <!-- Dropdown menu -->
-        <div id="dropdownRadio" class="z-50 hidden w-48 pl-4 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
+        <div id="dropdownRadio" class="z-50 hidden w-48 bg-white border divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
+          <div class="block px-4 py-3 text-sm text-gray-900 dark:text-white md:hidden">
+            <div>{{ filterText }}</div>
+          </div>
           <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">

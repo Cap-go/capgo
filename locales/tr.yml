@@ -201,12 +201,17 @@ plan-desc: >-
   ekleyin. 
 
   Hesap planları ek özelliklerin kilidini açar.
+plan-free: MVP ve test için en iyisi
 plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
+plan-maker: Küçük işletme sahipleri için en iyisi
 plan-member: plan üyesi.
+plan-payasyougo: İşletmeleri ölçeklendirmek için en iyisi
 plan-pricing-plans: Fiyatlandırma Planları
 plan-progressive-deploy: aşamalı dağıtım
+plan-solo: Bağımsız geliştiriciler için en iyisi
 plan-storage: GB Depolama
+plan-team: Büyük işletme sahipleri için en iyisi
 plan-updates: Güncellemeler
 plan-whats-included: Neler dahil
 plans: planlar
@@ -220,6 +225,7 @@ refresh-this-page: bu sayfayı yenile
 register-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
 register-heading: Kayıt
 register-next: Kayıt olmak
+reload: Tekrar yükle
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
 search: Aramak

@@ -207,12 +207,17 @@ plan-buy: Acheter
 plan-desc: |-
   Commencez à créer gratuitement, puis ajoutez un plan pour le mettre en ligne. 
   Les plans de compte débloquent des fonctionnalités supplémentaires.
+plan-free: Idéal pour MVP et les tests
 plan-inactive: Forfait inactif
 plan-is-the-best-pla: plan est le meilleur plan pour vos besoins.
+plan-maker: Idéal pour les propriétaires de petites entreprises
 plan-member: membre du régime.
+plan-payasyougo: Idéal pour les entreprises évolutives
 plan-pricing-plans: Forfaits tarifaires
 plan-progressive-deploy: Déploiement progressif
+plan-solo: Idéal pour les développeurs indépendants
 plan-storage: Go de stockage
+plan-team: Idéal pour les propriétaires de grandes entreprises
 plan-updates: Mises à jour
 plan-whats-included: Ce qui est inclu
 plans: Des plans
@@ -226,6 +231,7 @@ refresh-this-page: Actualiser cette page
 register-desc: Remplissez les champs suivants pour finaliser votre inscription
 register-heading: Inscription
 register-next: Enregistrer
+reload: Recharger
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
 search: Recherche

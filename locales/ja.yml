@@ -193,12 +193,17 @@ plan-buy: 買う
 plan-desc: |-
   無料で構築を開始し、ライブに移行するための計画を追加します。
   アカウント プランは、追加機能のロックを解除します。
+plan-free: MVP とテストに最適
 plan-inactive: プランの非アクティブ
 plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。
+plan-maker: 中小企業のオーナーに最適
 plan-member: 企画メンバー。
+plan-payasyougo: 企業のスケーリングに最適
 plan-pricing-plans: 料金プラン
 plan-progressive-deploy: プログレッシブ デプロイ
+plan-solo: 個人開発者に最適
 plan-storage: GB ストレージ
+plan-team: 大企業のオーナーに最適
 plan-updates: アップデート
 plan-whats-included: 含まれるもの
 plans: 予定
@@ -212,6 +217,7 @@ refresh-this-page: このページを更新する
 register-desc: 次のフィールドに入力して、登録を完了します
 register-heading: 登録
 register-next: 登録
+reload: リロード
 reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
 search: 検索
