@@ -2,8 +2,8 @@
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { onClickOutside } from '@vueuse/core'
 import IconDashboard from '~icons/ic/round-space-dashboard'
-import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconApiKey from '~icons/mdi/shield-key'
 import IconDiscord from '~icons/ic/round-discord'
 import IconDoc from '~icons/gg/loadbar-doc'
@@ -13,12 +13,13 @@ const props = defineProps < {
   sidebarOpen: boolean
 }>()
 
-defineEmits(['closeSidebar'])
+const emit = defineEmits(['closeSidebar'])
 
 const { t } = useI18n()
-const trigger = ref(null)
 const sidebar = ref(null)
 const route = useRoute()
+
+onClickOutside(sidebar, event => emit('closeSidebar'))
 
 const storedSidebarExpanded = localStorage.getItem('sidebar-expanded')
 const sidebarExpanded = ref(storedSidebarExpanded === null ? false : storedSidebarExpanded === 'true')
@@ -49,17 +50,6 @@ const isTabActive = (tab: string) => {
     >
       <!-- Sidebar header -->
       <div class="flex justify-between px-3 mt-4 mb-10 sidebar-expanded:mx-10 sm:px-2">
-        <!-- Close button -->
-        <button
-          ref="trigger"
-          class="lg:hidden text-slate-500 hover:text-slate-400"
-          aria-controls="sidebar"
-          :aria-expanded="props.sidebarOpen"
-          @click.stop="$emit('closeSidebar')"
-        >
-          <span class="sr-only">Close sidebar</span>
-          <IconBack class="w-6 h-6 fill-current" />
-        </button>
         <!-- Logo -->
         <router-link class="flex flex-row items-center space-x-2" to="/app/home">
           <img src="/capgo.webp" alt="logo" class="h-[32px] w-[32px]">
