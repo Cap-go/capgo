@@ -221,7 +221,9 @@ reset-password: Redefinir senha
 reset-your-password: Redefina sua senha
 search: Procurar
 search-bundle: Pacote de pesquisa
+search-bundle-id: Pesquisar por ID do pacote
 search-by-action: Pesquisar por ação
+search-by-device-id: Pesquisar por ID do dispositivo
 search-by-name: Procura por nome
 search-device: dispositivo de pesquisa
 search-user: Pesquisar usuário

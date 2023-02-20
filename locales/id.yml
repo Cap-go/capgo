@@ -223,7 +223,9 @@ reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 search: Mencari
 search-bundle: Bundel Pencarian
+search-bundle-id: Cari berdasarkan bundel ID
 search-by-action: Cari berdasarkan tindakan
+search-by-device-id: Cari berdasarkan ID perangkat
 search-by-name: Cari berdasarkan nama
 search-device: Cari perangkat
 search-user: Cari Pengguna

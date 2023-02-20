@@ -56,7 +56,10 @@ const getData = async () => {
     if (props.deviceId)
       req.eq('device_id', props.deviceId)
 
-    if (search.value)
+    if (props.deviceId && search.value)
+      req.like('device_id', `%${search.value}%`)
+
+    else if (search.value)
       req.like('action', `%${search.value}%`)
 
     if (columns.value.length) {
@@ -125,6 +128,7 @@ if (!props.deviceId) {
     key: 'platform',
     mobile: 'after',
     sortable: false,
+    displayFunction: (elem: typeof element) => `${elem.device_id} ${elem.platform}`,
   })
 }
 
@@ -153,7 +157,7 @@ watch(props, async () => {
     :total="total" :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
-    :search-placeholder="t('search-by-action')"
+    :search-placeholder="deviceId ? t('search-by-device-id') : t('search-by-action')"
     @reload="reload()" @reset="refreshData()"
   />
 </template>

@@ -219,7 +219,7 @@ watch(props, async () => {
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
-    :search-placeholder="t('search-bundle')"
+    :search-placeholder="t('search-bundle-id')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"
   />

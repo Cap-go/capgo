@@ -233,7 +233,9 @@ reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
 search: Suchen
 search-bundle: Bündel suchen
+search-bundle-id: Suche nach Bündel-ID
 search-by-action: Suche nach Aktion
+search-by-device-id: Suche nach Geräte-ID
 search-by-name: Suche mit Name
 search-device: Gerät suchen
 search-user: Benutzer suchen
