@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
+import type { Tab } from './comp_def'
 import IconDashboard from '~icons/ic/round-space-dashboard'
 import IconApiKey from '~icons/mdi/shield-key'
 import IconDiscord from '~icons/ic/round-discord'
@@ -15,6 +16,7 @@ const props = defineProps < {
 
 const emit = defineEmits(['closeSidebar'])
 
+const router = useRouter()
 const { t } = useI18n()
 const sidebar = ref(null)
 const route = useRoute()
@@ -34,6 +36,36 @@ watch(sidebarExpanded, () => {
 const isTabActive = (tab: string) => {
   return route.path.includes(tab)
 }
+const openTab = (tab: Tab) => {
+  if (tab.onClick)
+    tab.onClick(tab.key)
+  else
+    router.push(tab.key)
+}
+const tabs = ref<Tab[]>([
+  {
+    label: t('dashboard'),
+    icon: shallowRef(IconDashboard),
+    key: '/app/home',
+  },
+  {
+    label: t('api-keys'),
+    icon: shallowRef(IconApiKey),
+    key: '/dashboard/apikeys',
+  },
+  {
+    label: t('documentation'),
+    icon: shallowRef(IconDoc),
+    key: '#',
+    onClick: () => window.open('https://docs.capgo.app', '_blank'),
+  },
+  {
+    label: t('discord'),
+    icon: shallowRef(IconDiscord),
+    key: '#',
+    onClick: () => window.open('https://discord.gg/VnYRvBfgA6', '_blank'),
+  },
+])
 </script>
 
 <template>
@@ -66,52 +98,15 @@ const isTabActive = (tab: string) => {
             <span class="lg:hidden lg:sidebar-expanded:block 2xl:block">{{ t('pages') }}</span>
           </h3>
           <ul class="mt-3">
-            <!-- Dashboard -->
-            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <router-link class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="{ 'hover:text-slate-200': isTabActive('app/home') }" to="/app/home">
+            <li v-for="tab, i in tabs" :key="i" class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
+              <button class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="{ 'hover:text-slate-200': isTabActive(tab.key) }" @click="openTab(tab)">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
-                    <IconDashboard class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive('app/home'), 'text-slate-400': !isTabActive('app/home') }" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100" :class="{ 'text-blue-600': isTabActive('app/home'), 'text-slate-400': !isTabActive('app/home') }">{{ t('dashboard') }}</span>
+                    <component :is="tab.icon" class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
+                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }">{{ tab.label }}</span>
                   </div>
                 </div>
-              </router-link>
-            </li>
-
-            <!-- API Keys -->
-            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <router-link class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="{ 'hover:text-slate-200': isTabActive('apikeys') }" to="/dashboard/apikeys">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <IconApiKey class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive('apikeys'), 'text-slate-400': !isTabActive('apikeys') }" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100" :class="{ 'text-blue-600': isTabActive('apikeys'), 'text-slate-400': !isTabActive('apikeys') }">{{ t('api-keys') }}</span>
-                  </div>
-                </div>
-              </router-link>
-            </li>
-
-            <!-- Documentation -->
-            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://docs.capgo.app/">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <IconDoc class="w-6 h-6 fill-current text-slate-400" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 text-slate-400">{{ t('documentation') }}</span>
-                  </div>
-                </div>
-              </a>
-            </li>
-
-            <!-- Discord -->
-            <li class="px-3 py-2 rounded-sm mb-0.5 last:mb-0">
-              <a class="block truncate transition duration-150 text-slate-200 hover:text-white" target="_blank" rel="noopener" href="https://discord.gg/VnYRvBfgA6">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <IconDiscord class="w-6 h-6 fill-current text-slate-400" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 text-slate-400">{{ t('discord') }}</span>
-                  </div>
-                </div>
-              </a>
+              </button>
             </li>
           </ul>
         </div>
