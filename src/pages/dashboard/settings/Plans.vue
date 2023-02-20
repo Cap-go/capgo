@@ -6,8 +6,7 @@ import {
 } from 'konsta/vue'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { Capacitor } from '@capacitor/core'
-import { openCheckout, openPortal } from '~/services/stripe'
+import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
@@ -20,7 +19,6 @@ const openSupport = () => {
 }
 
 const { t } = useI18n()
-const isMobile = ref(Capacitor.isNativePlatform())
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const displayPlans = computed(() => {
   return plans.value.filter(plan => plan.stripe_id !== 'free')
@@ -49,6 +47,12 @@ const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
   plan.progressive_deploy ? t('plan-progressive-deploy') : false,
 ].filter(Boolean)
 
+const convertKey = (key: string) => {
+  const keySplit = key.split('.')
+  if (keySplit.length === 3)
+    return `plan-${keySplit[1]}`
+  return key
+}
 const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
 const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
 
@@ -141,42 +145,33 @@ watchEffect(async () => {
           {{ t('your-are-a') }} <span class="font-bold underline">{{ currentPlan?.name }}</span> {{ t('plan-member') }} You use {{ planPercent }}% of this plan.<br>
           {{ t('the') }} <span class="font-bold underline">{{ currentPlanSuggest?.name }}</span> {{ t('plan-is-the-best-pla') }}
         </p>
-        <div class="w-1/2 mx-auto mt-4 text-center">
-          <button
-            v-if="!isMobile" type="button"
-            class="text-blue-700 hover:text-white border border-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:hover:bg-blue-600 dark:focus:ring-blue-800"
-            @click="openPortal"
-          >
-            {{ t('billing') }}
-          </button>
-        </div>
-        <div class="mx-auto mt-6 sm:mt-8 md:w-1/4">
-          <k-segmented strong rounded class="dark:text-gray-300 dark:bg-black">
-            <k-segmented-button
-              class="h-10"
-              :active="segmentVal === 'm'"
-              @click="() => (segmentVal = 'm')"
-            >
-              {{ t('monthly') }}
-            </k-segmented-button>
-            <k-segmented-button
-              class="h-10"
-              :active="segmentVal === 'y'"
-              @click="() => (segmentVal = 'y')"
-            >
-              {{ t('yearly') }}
-            </k-segmented-button>
-          </k-segmented>
-        </div>
       </div>
-      <div class="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
+      <div class="mx-auto mt-4 md:w-1/4">
+        <k-segmented outline class="dark:text-gray-300 dark:bg-black">
+          <k-segmented-button
+            class="h-10"
+            :active="segmentVal === 'm'"
+            @click="() => (segmentVal = 'm')"
+          >
+            {{ t('monthly') }}
+          </k-segmented-button>
+          <k-segmented-button
+            class="h-10"
+            :active="segmentVal === 'y'"
+            @click="() => (segmentVal = 'y')"
+          >
+            {{ t('yearly') }}
+          </k-segmented-button>
+        </k-segmented>
+      </div>
+      <div class="mt-6 space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
         <div v-for="p in displayPlans" :key="p.id" class="border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div class="p-6">
             <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
               {{ p.name }}
             </h2>
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">
-              {{ t(p.description) }}
+              {{ t(convertKey(p.description)) }}
             </p>
             <p class="mt-8">
               <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
