@@ -66,7 +66,7 @@ CapacitorUpdater.notifyAppReady()`,
   },
   {
     title: t('test-your-update-in-'),
-    command: 'https://capgo.app/blog/update-your-capacitor-apps-seamlessly-using-capacitor-updater/#receive-a-live-update-on-a-device',
+    link: 'https://capgo.app/blog/update-your-capacitor-apps-seamlessly-using-capacitor-updater/#receive-a-live-update-on-a-device',
     subtitle: t('open-this-link-to-le'),
   },
   {
@@ -91,6 +91,9 @@ const setLog = () => {
       pushEvent({ name: 'user:onboarding-done', color: 'green' })
     // TODO add emailing on onboarding done to send blog article versioning
   }
+}
+const openExt = (url: string) => {
+  window.open(url, '_blank')
 }
 const scrollToElement = (id: string) => {
   // Get the element with the id
@@ -224,15 +227,20 @@ watchEffect(async () => {
                   🚀
                 </template>
               </div>
-              <p class="ml-6 text-xl font-medium text-gray-900 font-pj">
+              <div class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
-                <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">
-                  {{ s.command }}
-                  <i-ion-copy-outline class="text-muted-blue-800" />
-                </code>
-                <br v-if="s.command">
                 <span class="text-sm">{{ s.subtitle }}</span>
-              </p>
+                <div class="p-3 rounded-lg" :class="{ 'bg-black': s.command }">
+                  <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">
+                    {{ s.command }}
+                    <i-ion-copy-outline class="text-muted-blue-300" />
+                  </code>
+                  <button v-else-if="s.link" class="relative inline-flex mr-2 items-center text-gray-500 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" @click="openExt(s.link)">
+                    {{ t('open') }}
+                  </button>
+                </div>
+                <br v-if="s.command">
+              </div>
             </div>
           </div>
         </template>
