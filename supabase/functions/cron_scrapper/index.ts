@@ -63,14 +63,6 @@ serve(async (event: Request) => {
         countries,
       }))
     }
-    const countriesBatch = countries.slice(i * 10, (i + 1) * 10)
-    console.log('countriesBatch', countriesBatch)
-    for (const category of categories) {
-      all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
-        categories: [category],
-        countries: countriesBatch,
-      }))
-    }
     // all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
     //   categories,
     //   countries,
