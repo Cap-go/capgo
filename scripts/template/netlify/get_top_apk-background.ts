@@ -99,8 +99,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (body.countries && body.categories) {
     // call getTop with all countries and categories
-    const countries = body.countries.split(',')
-    const categories = body.categories.split(',')
+    const countries = body.countries
+    const categories = body.categories
     const all = []
     for (const country of countries) {
       for (const category of categories)
