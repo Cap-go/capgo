@@ -90,6 +90,7 @@ const getTop = async (category = gplay.category.APPLICATION, country: string, co
     .upsert(list)
   if (error)
     console.log('error', error)
+  console.log('getTop', category, country, collection, list.length)
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {

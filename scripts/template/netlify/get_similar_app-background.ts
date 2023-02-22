@@ -35,7 +35,7 @@ const getAppsInfo = async (appId: string) => {
   })
 }
 
-const getInfo = async (appId: string) => {
+const getSimilar = async (appId: string) => {
   try {
     console.log('getInfo', appId)
     const res = await getAppsInfo(appId)
@@ -52,6 +52,7 @@ const getInfo = async (appId: string) => {
       .eq('app_id', appId)
     if (error2)
       console.log('error', error2)
+    console.log('getSimilar', appId, res.length)
   }
   catch (e) {
     console.log('error getAppInfo', e)
@@ -71,12 +72,12 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   console.log('main', method, body)
   // remove from list apps already in supabase
   if (body.appId) {
-    await getInfo(body.appId)
+    await getSimilar(body.appId)
   }
   else if (body.appIds) {
     const all = []
     for (const appId of body.appIds)
-      all.push(getInfo(appId))
+      all.push(getSimilar(appId))
     await Promise.all(all)
   }
   else {
