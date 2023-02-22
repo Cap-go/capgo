@@ -52,10 +52,28 @@ serve(async (event: Request) => {
     //   const randomCategory = categories[Math.floor(Math.random() * categories.length)]
     //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
     //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
-    all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
-      categories,
-      countries,
-    }))
+    // split countries by 10 to batch send to netlify
+    for (let i = 0; i < countries.length / 10; i++) {
+      const countriesBatch = countries.slice(i * 10, (i + 1) * 10)
+      console.log('countriesBatch', countriesBatch.length)
+      console.log('country * categories', countriesBatch.length * categories.length)
+      all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
+        categories,
+        countries,
+      }))
+    }
+    const countriesBatch = countries.slice(i * 10, (i + 1) * 10)
+    console.log('countriesBatch', countriesBatch)
+    for (const category of categories) {
+      all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
+        categories: [category],
+        countries: countriesBatch,
+      }))
+    }
+    // all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
+    //   categories,
+    //   countries,
+    // }))
     if (appsToGetFramework?.length) {
       all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
         appIds: appsToGetFramework.map(app => app.app_id),
