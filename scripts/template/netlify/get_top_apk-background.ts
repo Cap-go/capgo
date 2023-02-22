@@ -108,6 +108,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     }
     await Promise.all(all)
   }
+  else {
+    console.log('cannot get apps', body)
+  }
 }
 // upper is ignored during netlify generation phase
 // import from here

@@ -76,6 +76,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       all.push(getInfo(appId))
     await Promise.all(all)
   }
+  else {
+    console.log('cannot get apps', body)
+  }
 }
 // upper is ignored during netlify generation phase
 // import from here
