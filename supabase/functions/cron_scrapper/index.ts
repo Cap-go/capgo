@@ -53,8 +53,9 @@ serve(async (event: Request) => {
     //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
     //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
     // split countries by 10 to batch send to netlify
-    for (let i = 0; i < countries.length / 10; i++) {
-      const countriesBatch = countries.slice(i * 10, (i + 1) * 10)
+    const pageSize = Math.round(countries.length / 10)
+    for (let i = 0; i < pageSize; i++) {
+      const countriesBatch = countries.slice(i * pageSize, (i + 1) * pageSize)
       console.log('countriesBatch', countriesBatch.length)
       console.log('country * categories', countriesBatch.length * categories.length)
       all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
