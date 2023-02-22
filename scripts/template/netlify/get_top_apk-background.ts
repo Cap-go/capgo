@@ -84,13 +84,13 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
 
 const getTop = async (category = gplay.category.APPLICATION, country: string, collection = gplay.collection.TOP_FREE, limit = 1000) => {
   const list = await getList(category, collection, limit, country)
+  console.log('getTop', category, country, collection, list.length)
   // save in supabase
   const { error } = await supabaseClient()
     .from('store_apps')
     .upsert(list)
   if (error)
     console.log('error', error)
-  console.log('getTop', category, country, collection, list.length)
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
