@@ -43,6 +43,10 @@ serve(async (event: Request) => {
     console.log('appsToGetFramework', appsToGetFramework?.length || 0)
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
+    console.log('appsToGetTop categories', categories?.length || 0)
+    console.log('appsToGetTop countries', countries?.length || 0)
+    console.log('appsToGetTop total', (countries?.length || 0) * (categories?.length || 0))
+    console.log('appsToGetTop total result', (countries?.length || 0) * (categories?.length || 0) * 500)
     // loop 100 times to get more random apps
     // for (let i = 0; i < toGetTop; i++) {
     //   const randomCategory = categories[Math.floor(Math.random() * categories.length)]
