@@ -39,6 +39,29 @@ const resToVersion = (plugin_version: string, signedURL: string, version: Databa
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
   // create random id
+  if (method === 'GET') {
+    console.log('v3', headers)
+    // for v3 updates
+    const {
+      cap_version_name,
+      cap_version_build,
+      cap_plugin_version,
+      cap_platform,
+      cap_app_id,
+      cap_version_os,
+      cap_device_id,
+    } = headers
+    body = {
+      ...body,
+      version_name: cap_version_name || '',
+      version_build: cap_version_build || '',
+      plugin_version: cap_plugin_version || '',
+      platform: cap_platform || '',
+      app_id: cap_app_id || '',
+      version_os: cap_version_os || '',
+      device_id: cap_device_id || '',
+    }
+  }
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body)
@@ -387,34 +410,10 @@ serve(async (event: Request) => {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const method: string = event.method
-    let body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries() || {})
-    if (method === 'GET') {
-      console.log('v3', headers)
-      // for v3 updates
-      const {
-        cap_version_name,
-        cap_version_build,
-        cap_plugin_version,
-        cap_platform,
-        cap_app_id,
-        cap_version_os,
-        cap_device_id,
-      } = headers
-      body = {
-        ...body,
-        version_name: cap_version_name,
-        version_build: cap_version_build,
-        plugin_version: cap_plugin_version,
-        platform: cap_platform,
-        app_id: cap_app_id,
-        version_os: cap_version_os,
-        device_id: cap_device_id,
-      }
-    }
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }
   catch (e) {
-    console.log('e', e)
     return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 })
