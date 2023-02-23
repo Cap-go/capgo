@@ -227,7 +227,7 @@ export const checkPlan = async (userId: string): Promise<void> => {
       .from('stripe_info')
       .update({
         is_good_plan: is_good_plan || is_free_usage,
-        plan_usage: percentUsage,
+        plan_usage: Math.round(percentUsage),
       })
       .eq('customer_id', user.customer_id)
       .then()
