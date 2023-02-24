@@ -40,13 +40,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       .single()
 
     if (!appOwner) {
-      await supabaseAdmin()
-        .from('store_apps')
-        .upsert({
-          app_id,
-          onprem: true,
-          capacitor: true,
-        })
+      if (app_id) {
+        await supabaseAdmin()
+          .from('store_apps')
+          .upsert({
+            app_id,
+            onprem: true,
+            capacitor: true,
+            capgo: true,
+          })
+      }
       if (action === 'get') {
         await updateOnpremStats({
           app_id,

@@ -88,13 +88,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       .single()
 
     if (!appOwner) {
-      await supabaseAdmin()
-        .from('store_apps')
-        .upsert({
-          app_id,
-          onprem: true,
-          capacitor: true,
-        })
+      if (app_id) {
+        await supabaseAdmin()
+          .from('store_apps')
+          .upsert({
+            app_id,
+            onprem: true,
+            capacitor: true,
+            capgo: true,
+          })
+      }
       return sendRes({
         message: 'App not found',
         error: 'app_not_found',
