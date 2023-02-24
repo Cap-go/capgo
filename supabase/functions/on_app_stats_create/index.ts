@@ -35,7 +35,7 @@ serve(async (event: Request) => {
     // check if month_id exists
     const { data: monthData } = await supabaseAdmin()
       .from('app_stats')
-      .select('id')
+      .select('app_id')
       .eq('app_id', record.app_id)
       .eq('date_id', month_id)
       .single()
