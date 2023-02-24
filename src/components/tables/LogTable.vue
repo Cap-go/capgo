@@ -15,7 +15,7 @@ const props = defineProps<{
 interface Channel {
   version: {
     name: string
-    created_at: string
+    id: number
   }
 }
 const element: Database['public']['Tables']['stats']['Row'] & Channel = {} as any
@@ -34,6 +34,31 @@ const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
 
+const findVersion = (id: number, versions: { name: string; id: number }[]) => {
+  return versions.find(elem => elem.id === id)
+}
+
+const versionData = async () => {
+  try {
+    const versions = elements.value.map(elem => elem.version)
+    console.log('versions', versions)
+    const { data: res } = await supabase
+      .from('app_versions')
+      .select(`
+        name,
+        id
+      `)
+      .in('id', versions)
+
+    elements.value.forEach((elem, index) => {
+      elem.version = findVersion(elem.version, res || []) || { name: 'unknown', id: 0 } as any
+    })
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+
 const getData = async () => {
   isLoading.value = true
   try {
@@ -44,9 +69,7 @@ const getData = async () => {
         action,
         platform,
         version_build,
-        version (
-            name
-        ),
+        version,
         created_at,
         updated_at
       `, { count: 'exact' })
@@ -86,6 +109,7 @@ const refreshData = async () => {
     currentPage.value = 1
     elements.value.length = 0
     await getData()
+    await versionData()
   }
   catch (error) {
     console.error(error)

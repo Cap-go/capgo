@@ -314,6 +314,15 @@ export const sendStats = async (action: string, platform: string, device_id: str
     version: versionId,
   }
   try {
+    const { error: errorDev } = await supabaseAdmin()
+      .from('devices')
+      .upsert({
+        app_id,
+        device_id,
+        version: versionId,
+      })
+    if (errorDev)
+      console.log('Cannot upsert device', app_id, version_build, errorDev)
     const { error } = await supabaseAdmin()
       .from('stats')
       .insert(stat)

@@ -129,10 +129,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     }
     all.push(supabaseAdmin()
       .from('devices')
-      .upsert(device))
-    all.push(supabaseAdmin()
-      .from('stats')
-      .insert(stat))
+      .upsert(device)
+      .then(() => supabaseAdmin()
+        .from('stats')
+        .insert(stat)))
     await Promise.all(all)
     return sendRes()
   }
