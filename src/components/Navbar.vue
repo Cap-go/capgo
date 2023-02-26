@@ -31,7 +31,7 @@ const { t } = useI18n()
   <div>
     <header class="border-b bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-slate-200">
       <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16 -mb-px">
+        <div class="relative flex items-center justify-between h-16 -mb-px">
           <!-- Header: Left side -->
           <div class="flex">
             <div v-if="displayStore.NavTitle" class="pr-2">
