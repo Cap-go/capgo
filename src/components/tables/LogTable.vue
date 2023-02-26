@@ -27,6 +27,7 @@ const supabase = useSupabase()
 const total = ref(0)
 const search = ref('')
 const elements = ref<(typeof element)[]>([])
+const versions = ref<Channel['version'][]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref()
@@ -40,18 +41,25 @@ const findVersion = (id: number, versions: { name: string; id: number }[]) => {
 
 const versionData = async () => {
   try {
-    const versions = elements.value.map(elem => elem.version)
-    console.log('versions', versions)
+    const versionsIdAlreadyFetch = versions.value.map(elem => elem.id)
+    const versionsIds = elements.value
+      .map(elem => elem.version)
+      .filter(e => !versionsIdAlreadyFetch.includes(e))
+    console.log('versionsIds', versionsIds)
+    if (!versionsIds.length)
+      return
     const { data: res } = await supabase
       .from('app_versions')
       .select(`
         name,
         id
       `)
-      .in('id', versions)
-
+      .in('id', versionsIds)
+    if (!res?.length)
+      return
+    versions.value.push(...res)
     elements.value.forEach((elem, index) => {
-      elem.version = findVersion(elem.version, res || []) || { name: 'unknown', id: 0 } as any
+      elem.version = findVersion(elem.version, versions.value) || { name: 'unknown', id: 0 } as any
     })
   }
   catch (error) {
@@ -62,6 +70,15 @@ const versionData = async () => {
 const getData = async () => {
   isLoading.value = true
   try {
+    const daysLimit = 7
+    const limitDate = new Date(new Date().getTime() - daysLimit * 24 * 60 * 60 * 1000).toISOString()
+    const reqCount = supabase
+      .from('stats')
+      .select('id', { count: 'exact', head: true })
+      .eq('app_id', props.appId)
+      // limit created_at to 7 days
+      .gte('created_at', limitDate)
+
     const req = supabase
       .from('stats')
       .select(`
@@ -72,31 +89,35 @@ const getData = async () => {
         version,
         created_at,
         updated_at
-      `, { count: 'exact' })
+      `)
       .eq('app_id', props.appId)
+      .gte('created_at', limitDate)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
-    if (props.deviceId)
+    if (props.deviceId) {
       req.eq('device_id', props.deviceId)
-
-    if (props.deviceId && search.value)
+      reqCount.eq('device_id', props.deviceId)
+    }
+    if (props.deviceId && search.value) {
       req.like('device_id', `%${search.value}%`)
-
-    else if (search.value)
+      reqCount.like('device_id', `%${search.value}%`)
+    }
+    else if (search.value) {
       req.like('action', `%${search.value}%`)
-
+      reqCount.like('action', `%${search.value}%`)
+    }
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
           req.order(col.key as any, { ascending: col.sortable === 'asc' })
       })
     }
-    const { data: dataVersions, count } = await req
+    const { data: dataVersions } = await req
+    reqCount.then(res => total.value = res.count || 0)
     if (!dataVersions)
       return
     elements.value.push(...dataVersions as any)
     // console.log('count', count)
-    total.value = count || 0
   }
   catch (error) {
     console.error(error)
@@ -108,6 +129,7 @@ const refreshData = async () => {
   try {
     currentPage.value = 1
     elements.value.length = 0
+    versions.value.length = 0
     await getData()
     await versionData()
   }
@@ -161,6 +183,7 @@ const reload = async () => {
   try {
     elements.value.length = 0
     await getData()
+    await versionData()
   }
   catch (error) {
     console.error(error)
