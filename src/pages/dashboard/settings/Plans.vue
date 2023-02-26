@@ -13,6 +13,7 @@ import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import type { Stat } from '~/components/comp_def'
 const openSupport = () => {
   sendMessage('I need a custom plan')
   openChat()
@@ -131,7 +132,7 @@ watchEffect(async () => {
     }
   }
 })
-const hightLights = computed(() => ([
+const hightLights = computed<Stat[]>(() => ([
   {
     label: 'Current',
     value: currentPlan.value?.name,
@@ -158,26 +159,11 @@ const hightLights = computed(() => ([
           {{ t('plan-desc') }}<br>
         </p>
       </div>
-      <div class="relative mt-6 mb-12 lg:mt-12 lg:max-w-5xl lg:mx-auto">
-        <div class="absolute -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl" />
-
-        <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-black md:flex-row md:text-left rounded-xl bg-opacity-90">
-          <template v-for="s, i in hightLights" :key="i">
-            <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
-
-            <div class="flex flex-col items-center w-full p-5 group sm:px-7 lg:px-6 lg:py-4 ">
-              <span class="text-center">
-                <p class="text-3xl font-bold text-white lg:mt-3 lg:order-2 font-pj">
-                  {{ s.value }}
-                </p>
-                <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-1 font-pj">
-                  {{ s.label }}
-                </h3>
-              </span>
-            </div>
-          </template>
-        </div>
-      </div>
+      <BlurBg :mini="true" background="">
+        <template #default>
+          <StatsBar :mini="true" :stats="hightLights" />
+        </template>
+      </BlurBg>
       <div class="mx-auto mt-4 md:w-1/4">
         <k-segmented outline class="dark:text-gray-300 dark:bg-black">
           <k-segmented-button
@@ -237,12 +223,8 @@ const hightLights = computed(() => ([
             </h2>
           </div>
 
-          <div class="relative max-w-5xl mx-auto mt-8 md:mt-16">
-            <div class="absolute -inset-4">
-              <div class="w-full h-full mx-auto opacity-30 blur-lg filter rounded-2xl" style="background: linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" />
-            </div>
-
-            <div class="relative overflow-hidden bg-gray-900 rounded-2xl">
+          <BlurBg>
+            <template #default>
               <div class="px-16 py-8 sm:px-8 lg:px-16 lg:py-14">
                 <div class="md:flex md:items-center md:space-x-4 lg:space-x-6">
                   <div class="grid grid-cols-1 gap-y-3 sm:grid-cols-2 gap-x-12 xl:gap-x-24">
@@ -363,8 +345,8 @@ const hightLights = computed(() => ([
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </BlurBg>
         </div>
       </section>
     </div>

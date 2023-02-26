@@ -7,6 +7,7 @@ import Spinner from '~/components/Spinner.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import type { Stat } from '~/components/comp_def'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -58,7 +59,7 @@ const refreshData = async () => {
   }
   isLoading.value = false
 }
-const stats = computed(() => ([
+const stats = computed<Stat[]>(() => ([
   {
     label: t('channels'),
     value: channelsNb,
@@ -99,29 +100,10 @@ watchEffect(async () => {
   <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
     <Usage :app-id="id" />
 
-    <div class="relative mt-12 mb-12 lg:mt-20 lg:max-w-5xl lg:mx-auto">
-      <div class="absolute -inset-2">
-        <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg filter" style="background: linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" />
-      </div>
-
-      <div class="absolute -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl" />
-
-      <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-black md:flex-row md:text-left rounded-xl bg-opacity-90">
-        <template v-for="s, i in stats" :key="i">
-          <div v-if="i > 0" class="w-full h-px md:h-auto md:w-px bg-gradient-to-r from-cyan-500 to-purple-500 shrink-0" />
-
-          <a :href="s.link" class="flex flex-col items-center w-full p-10 group hover:bg-gray-800 sm:px-12 lg:px-16 lg:py-14 ">
-            <span class="text-center duration-100 ease-in scale-100 group-hover:scale-125">
-              <p class="text-5xl font-bold text-white lg:mt-3 lg:order-1 font-pj">
-                {{ s.value }}
-              </p>
-              <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase lg:mt-0 lg:order-2 font-pj">
-                {{ s.label }}
-              </h3>
-            </span>
-          </a>
-        </template>
-      </div>
-    </div>
+    <BlurBg>
+      <template #default>
+        <StatsBar :stats="stats" />
+      </template>
+    </BlurBg>
   </div>
 </template>

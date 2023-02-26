@@ -1,7 +1,13 @@
-import type { FunctionalComponent, ShallowRef } from 'vue'
+import type { FunctionalComponent, Ref, ShallowRef } from 'vue'
+import type { ComposerTranslation } from 'vue-i18n'
 
 export type MobileColType = 'header' | 'title' | 'footer' | 'after'
 
+export interface Stat {
+  label: string | ComposerTranslation
+  value: string | number | Ref<number> | undefined
+  link?: string
+}
 export interface TableSort {
   [key: string]: 'asc' | 'desc' | null
 }
