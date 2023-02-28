@@ -8,7 +8,6 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
-const showPassword = ref(false)
 const supabase = useSupabase()
 const errorMessage = ref('')
 const form = reactive({
@@ -82,60 +81,119 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div class="w-full px-6 py-16 mx-auto lg:w-1/2">
-    <h1 class="text-2xl font-bold">
-      {{ t('password-heading') }}
-    </h1>
-    <form @submit.prevent="submit">
-      <div v-if="errorMessage" class="text-center">
-        <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
-          {{ errorMessage }}
-        </p>
-      </div>
-      <div class="ion-padding">
-        <div>
-          <input v-model="form.password" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('password-new')" :required="true">
-          <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
-          <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
-        </div>
-        <div v-for="(error, index) of v$.password.$errors" :key="index" class="text-center">
-          <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
-            {{ error.$message }}
+  <section v-if="isLoading" class="flex justify-center">
+    <Spinner size="w-40 h-40" class="my-auto" />
+  </section>
+  <div v-else>
+    <section class="flex w-full h-full py-10 my-auto sm:py-8 lg:py-2">
+      <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="max-w-2xl mx-auto text-center">
+          <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
+          <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
+            {{ t('password-heading') }}
+          </h1>
+          <p>
+            {{ t('enter-your-new-passw') }}
           </p>
         </div>
-      </div>
-      <div class="ion-padding">
-        <div class="ion-no-padding">
-          <input v-model="form.confirmPassword" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" class="mt-2 ml-2 border-b border-black-light" :placeholder="t('confirm-password')" :required="true">
-          <img v-if="showPassword" src="/eye-open.png" alt="password" @click="showPassword = !showPassword">
-          <img v-else src="/eye-close.png" alt="password" @click="showPassword = !showPassword">
+
+        <div class="relative max-w-md mx-auto mt-8 md:mt-4">
+          <div class="overflow-hidden bg-white rounded-md shadow-md">
+            <div class="px-4 py-6 sm:px-8 sm:py-7">
+              <form @submit.prevent="submit">
+                <div class="space-y-5">
+                  <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
+                    {{ errorMessage }}
+                  </p>
+
+                  <div>
+                    <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
+                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
+                          />
+                        </svg>
+                      </div>
+
+                      <input
+                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('password') " :required="true"
+                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                      >
+                    </div>
+                    <div>
+                      <div v-for="(error, index) of v$.password?.$errors" :key="index">
+                        <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
+                          {{ t('password') }}: {{ error.$message }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
+                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
+                          />
+                        </svg>
+                      </div>
+
+                      <input
+                        id="passwordInput2" v-model="form.confirmPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('confirm-password') " :required="true"
+                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                      >
+                    </div>
+                    <div>
+                      <div v-for="(error, index) of v$.confirmPassword?.$errors" :key="index">
+                        <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
+                          {{ t('password') }}: {{ error.$message }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button type="submit" class="inline-flex items-center justify-center w-full">
+                      <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle
+                          class="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          stroke-width="4"
+                        />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-700 focus:outline-none hover:bg-blue-700 focus:bg-blue-700">
+                        {{ t('validate') }}
+                      </button>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="flex flex-row justify-center w-full mt-5">
+            <router-link to="/login" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
+              {{ t('back-to-login-page') }}
+            </router-link>
+          </div>
         </div>
-        <div v-for="(error, index) of v$.confirmPassword.$errors" :key="index" class="text-center">
-          <p class="mt-2 mb-4 text-xs italic text-brink-pink-500">
-            {{ error.$message }}
-          </p>
-        </div>
       </div>
-      <button
-        color="secondary"
-        shape="round"
-        expand="block"
-        type="submit"
-        class="mx-auto mt-12 font-light ion-margin-top w-45"
-      >
-        <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        <span v-if="!isLoading">{{ t('validate') }}</span>
-      </button>
-    </form>
+    </section>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: naked
+</route>

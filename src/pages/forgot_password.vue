@@ -13,8 +13,6 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
-const showPassword = ref(false)
-const showPassword2 = ref(false)
 const step = ref(1)
 
 const form = reactive({
@@ -47,7 +45,7 @@ const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect) {
-    isLoading.value = false
+    isLoading.value = falseoo
     return
   }
   if (step.value === 1) {
@@ -102,9 +100,9 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div v-if="isLoadingMain" class="flex justify-center chat-items">
-    <Spinner />
-  </div>
+  <section v-if="isLoadingMain" class="flex justify-center">
+    <Spinner size="w-40 h-40" class="my-auto" />
+  </section>
   <div v-else>
     <section class="flex w-full h-full py-10 my-auto sm:py-8 lg:py-2">
       <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
@@ -171,7 +169,7 @@ watchEffect(() => {
                       </div>
 
                       <input
-                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('password') " :required="true"
+                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('password') " :required="true"
                         class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                       >
                     </div>
@@ -198,7 +196,7 @@ watchEffect(() => {
                       </div>
 
                       <input
-                        id="passwordInput2" v-model="form.repeatPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" :type="showPassword2 ? 'text' : 'password'" :placeholder="t('confirm-password') " :required="true"
+                        id="passwordInput2" v-model="form.repeatPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('confirm-password') " :required="true"
                         class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                       >
                     </div>
