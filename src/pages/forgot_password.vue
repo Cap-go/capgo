@@ -45,7 +45,7 @@ const submit = async () => {
   isLoading.value = true
   const isFormCorrect = await v$.value.$validate()
   if (!isFormCorrect) {
-    isLoading.value = falseoo
+    isLoading.value = false
     return
   }
   if (step.value === 1) {
