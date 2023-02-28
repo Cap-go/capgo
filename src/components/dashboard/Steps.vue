@@ -215,7 +215,7 @@ watchEffect(async () => {
 
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" />
+          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
