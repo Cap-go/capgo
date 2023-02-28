@@ -44,6 +44,7 @@ declare module '@vue/runtime-core' {
     TabSidebar: typeof import('./src/components/TabSidebar.vue')['default']
     TitleHead: typeof import('./src/components/TitleHead.vue')['default']
     Toast: typeof import('./src/components/Toast.vue')['default']
+    Toggle: typeof import('./src/components/Toggle.vue')['default']
     TopApps: typeof import('./src/components/dashboard/TopApps.vue')['default']
     Usage: typeof import('./src/components/dashboard/Usage.vue')['default']
     UsageCard: typeof import('./src/components/dashboard/UsageCard.vue')['default']

@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import {
-  kToggle,
-} from 'konsta/vue'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -55,7 +52,7 @@ const submit = async () => {
     <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
-        <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl">
+        <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
           {{ t('terms-of-use') }}
         </h1>
         <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
@@ -70,11 +67,9 @@ const submit = async () => {
               <div class="w-full mx-auto">
                 <div class="flex items-center justify-between mb-2">
                   <label for="notification" class="text-lg font-medium justify-self-start">{{ t('activation-notification') }}</label>
-                  <k-toggle
-                    component="div"
-                    class="k-color-success"
+                  <Toggle
                     :disabled="isLoading"
-                    :checked="form.enableNotifications"
+                    :value="form.enableNotifications"
                     @change="form.enableNotifications = !form.enableNotifications"
                   />
                 </div>
@@ -83,11 +78,9 @@ const submit = async () => {
                 </p>
                 <div class="flex items-center justify-between mt-6 mb-2">
                   <label for="legal" class="text-lg font-medium justify-self-start">{{ t('activation-legal') }}</label>
-                  <k-toggle
-                    component="div"
-                    class="k-color-success"
+                  <Toggle
                     :disabled="isLoading"
-                    :checked="form.legal"
+                    :value="form.legal"
                     @change="form.legal = !form.legal"
                   />
                 </div>
@@ -96,11 +89,9 @@ const submit = async () => {
                 </p>
                 <div class="flex items-center justify-between mt-6 mb-2">
                   <label for="doi" class="text-lg font-medium justify-self-start">{{ t('activation-doi') }}</label>
-                  <k-toggle
-                    component="div"
-                    class="k-color-success"
+                  <Toggle
                     :disabled="isLoading"
-                    :checked="form.optForNewsletters"
+                    :value="form.optForNewsletters"
                     @change="form.optForNewsletters = !form.optForNewsletters"
                   />
                 </div>
