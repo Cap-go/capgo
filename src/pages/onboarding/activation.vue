@@ -48,14 +48,14 @@ const submit = async () => {
 
 <template>
   <TitleHead :big="true" :title="t('activation-heading')" />
-  <section class="flex w-full h-full py-10 my-auto sm:py-8 lg:py-16">
+  <section class="flex w-full h-full py-10 my-auto overflow-y-scroll sm:py-8 lg:py-16">
     <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
         <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
           {{ t('terms-of-use') }}
         </h1>
-        <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
+        <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600 dark:text-gray-300">
           {{ t('please-choose-your-p') }}
         </p>
       </div>

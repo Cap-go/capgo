@@ -6,7 +6,7 @@ const { t } = useI18n()
 
 <template>
   <div class="h-screen">
-    <div class="flex items-center justify-center w-full h-full px-4 py-5 sm:p-6">
+    <div class="flex items-center justify-center w-full h-full px-4 py-5 overflow-y-scroll sm:p-6">
       <div class="w-full max-w-sm bg-white shadow-lg rounded-xl">
         <div class="px-4 py-5 sm:p-6">
           <div class="text-center">
