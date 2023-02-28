@@ -71,6 +71,6 @@ watchEffect(() => {
 
 <template>
   <section class="flex justify-center">
-    <Spinner />
+    <Spinner size="w-40 h-40" class="my-auto" />
   </section>
 </template>
