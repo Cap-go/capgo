@@ -14,6 +14,7 @@ import IconAdmin from '~icons/eos-icons/admin'
 import type { Tab } from '~/components/comp_def'
 import { isAdmin, isSpoofed } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import { openPortal } from '~/services/stripe'
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -48,6 +49,7 @@ if (!Capacitor.isNativePlatform()) {
     label: t('billing'),
     icon: shallowRef(IconBilling) as any,
     key: '/billing',
+    onClick: openPortal,
   })
 }
 if (main.user?.id) {
