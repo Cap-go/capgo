@@ -122,7 +122,7 @@ onMounted(checkLogin)
             Capgo
           </p> !
         </h1>
-        <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
+        <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600 dark:text-gray-300">
           {{ t('login-to-your-accoun') }}
         </p>
       </div>

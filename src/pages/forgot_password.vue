@@ -111,7 +111,7 @@ watchEffect(() => {
           <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
             {{ t('reset-your-password') }}
           </h1>
-          <p v-if="step === 1" class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600">
+          <p v-if="step === 1" class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600 dark:text-gray-300">
             {{ t('enter-your-email-add') }}
           </p>
           <p v-else>
