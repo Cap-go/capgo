@@ -104,7 +104,7 @@ watchEffect(() => {
     <Spinner size="w-40 h-40" class="my-auto" />
   </section>
   <div v-else>
-    <section class="flex w-full h-full py-10 my-auto sm:py-8 lg:py-2">
+    <section class="flex w-full h-full py-10 my-auto overflow-y-scroll sm:py-8 lg:py-2">
       <div class="px-4 mx-auto my-auto max-w-7xl sm:px-6 lg:px-8">
         <div class="max-w-2xl mx-auto text-center">
           <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">

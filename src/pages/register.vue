@@ -89,7 +89,7 @@ const submit = async () => {
 </script>
 
 <template>
-  <section class="flex w-full min-h-screen py-10 my-auto sm:py-8 lg:py-8">
+  <section class="flex w-full min-h-screen py-10 my-auto overflow-y-scroll sm:py-8 lg:py-8">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">

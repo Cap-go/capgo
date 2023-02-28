@@ -5,7 +5,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="h-screen bg-gray-100">
+  <div class="h-screen">
     <div class="flex items-center justify-center w-full h-full px-4 py-5 sm:p-6">
       <div class="w-full max-w-sm bg-white shadow-lg rounded-xl">
         <div class="px-4 py-5 sm:p-6">
@@ -21,7 +21,7 @@ const { t } = useI18n()
             </p>
             <div class="mt-8">
               <span
-                class="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold leading-5 text-blue-600 transition-all duration-200 bg-blue-100 border border-transparent rounded-md"
+                class="inline-flex items-center justify-center px-6 py-3 text-sm font-semibold leading-5 text-blue-600 transition-all duration-200 rounded-md"
               >
                 {{ t('thank-you-for-choosi') }}
               </span>
