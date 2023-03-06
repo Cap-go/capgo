@@ -101,14 +101,12 @@ const getUsages = async () => {
           datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
       else if (item.date_id.length === 7) {
-        currentStorage = item.version_size ? bytesToGb(item.version_size) : 0
+        currentStorage += item.version_size ? bytesToGb(item.version_size) : 0
       }
     })
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    console.log('storageVariance', storageVariance, currentStorage)
+    // console.log('storageVariance', storageVariance, currentStorage)
     datas.value.storage[0] = currentStorage - storageVariance
-    if (datas.value.storage[0] < 0)
-      datas.value.storage[0] = 0
   }
 }
 
