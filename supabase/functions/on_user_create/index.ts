@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import type { Person } from '../_utils/crisp.ts'
-import { addEventPerson, postPerson, updatePerson } from '../_utils/crisp.ts'
+import { addEventPerson, postPerson } from '../_utils/crisp.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -30,18 +29,10 @@ serve(async (event: Request) => {
     console.log('record', record)
     await createApiKey(record.id)
     await postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined)
-      .catch(() => {
-        const person: Person = {
-          nickname: `${record.first_name} ${record.last_name}`,
-          avatar: record.image_url ? record.image_url : undefined,
-          country: record.country ? record.country : undefined,
-        }
-        return updatePerson(record.email, person)
-      })
     console.log('createCustomer stripe')
     if (record.customer_id)
       return sendRes()
-    await createStripeCustomer(record.id, record.email, `${record.first_name || ''} ${record.last_name || ''}`)
+    await createStripeCustomer(record as any)
     await addEventPerson(record.email, {}, 'user:register', 'green').catch()
     await logsnag.publish({
       channel: 'user-register',

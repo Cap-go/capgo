@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import type { Person } from './crisp.ts'
 import { updatePerson } from './crisp.ts'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
@@ -268,6 +269,16 @@ export const isOnboardingNeeded = async (userId: string): Promise<boolean> => {
   return data || false
 }
 
+export const isCanceled = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabaseAdmin()
+    .rpc('is_canceled', { userid: userId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || false
+}
+
 export const isPaying = async (userId: string): Promise<boolean> => {
   const { data, error } = await supabaseAdmin()
     .rpc('is_paying', { userid: userId })
@@ -457,8 +468,62 @@ export const createApiKey = async (userId: string) => {
   return Promise.resolve()
 }
 
-export const createStripeCustomer = async (userId: string, email: string, name: string) => {
-  const customer = await createCustomer(email, userId, name)
+export const userToPerson = (user: Database['public']['Tables']['users']['Row'], customer: Database['public']['Tables']['stripe_info']['Row']): Person => {
+  const person: Person = {
+    id: user.id,
+    product_id: customer.product_id,
+    customer_id: customer.customer_id,
+    nickname: `${user.first_name} ${user.last_name}`,
+    avatar: user.image_url ? user.image_url : undefined,
+    country: user.country ? user.country : undefined,
+  }
+  return person
+}
+
+export const customerToSegment = async (userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
+  plan?: Database['public']['Tables']['plans']['Row']): Promise<string[]> => {
+  const isMonthly = plan?.price_m_id === customer.price_id
+  const segments = ['Capgo']
+  const trialDaysLeft = await isTrial(userId)
+  const paying = await isPaying(userId)
+  const canUseMore = await isGoodPlan(userId)
+  const onboarded = await isOnboarded(userId)
+  const canceled = await isCanceled(userId)
+
+  if (onboarded) {
+    segments.push('Onboarded')
+  }
+  else {
+    segments.push('NotOnboarded')
+    return segments
+  }
+
+  if (paying && canUseMore && plan)
+    segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly')
+
+  else if (canceled)
+    segments.push('Canceled')
+
+  else if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7)
+    segments.push('Trial', 'Trial7')
+
+  else if (!paying && trialDaysLeft === 1)
+    segments.push('Trial', 'Trial1')
+
+  else if (!paying && !canUseMore)
+    segments.push('Trial', 'Trial0')
+
+  else if (paying && !canUseMore && plan)
+    segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly', 'Overuse')
+
+  else
+    segments.push('Not_found')
+
+  return segments
+}
+
+export const createStripeCustomer = async (user: Database['public']['Tables']['users']['Row']) => {
+  const customer = await createCustomer(user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
@@ -476,14 +541,26 @@ export const createStripeCustomer = async (userId: string, email: string, name: 
     .update({
       customer_id: customer.id,
     })
-    .eq('id', userId)
+    .eq('id', user.id)
   if (updateUserError)
     console.log('updateUserError', updateUserError)
-  await updatePerson(email, {
-    id: userId,
+  const person: Person = {
+    id: user.id,
     customer_id: customer.id,
     product_id: 'free',
-  }).catch((e) => {
+    nickname: `${user.first_name} ${user.last_name}`,
+    avatar: user.image_url ? user.image_url : undefined,
+    country: user.country ? user.country : undefined,
+  }
+  const { data: plan } = await supabaseAdmin()
+    .from('plans')
+    .select()
+    .eq('stripe_id', customer.product_id)
+    .single()
+  let segment = ['Capgo']
+  if (plan)
+    segment = await customerToSegment(user.id, customer, plan)
+  await updatePerson(user.email, person, segment).catch((e) => {
     console.log('updatePerson error', e)
   })
   console.log('stripe_info done')

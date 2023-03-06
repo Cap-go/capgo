@@ -1,7 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { checkPlan } from '../_utils/plans.ts'
-import { updatePerson } from '../_utils/crisp.ts'
-import type { Person } from '../_utils/crisp.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
 import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
@@ -38,17 +36,8 @@ serve(async (event: Request) => {
       return sendRes()
     }
     await createApiKey(record.id)
-    console.log('updatePerson crisp')
-    const person: Person = {
-      nickname: `${record.first_name} ${record.last_name}`,
-      avatar: record.image_url ? record.image_url : undefined,
-      country: record.country ? record.country : undefined,
-    }
-    await updatePerson(record.email, person).catch((e) => {
-      console.log('updatePerson error', e)
-    })
     if (!record.customer_id)
-      await createStripeCustomer(record.id, record.email, `${record.first_name || ''} ${record.last_name || ''}`)
+      await createStripeCustomer(record as any)
     else
       await updateCustomer(record.customer_id, record.email, record.billing_email, record.id, `${record.first_name || ''} ${record.last_name || ''}`)
     await checkPlan(record.id)

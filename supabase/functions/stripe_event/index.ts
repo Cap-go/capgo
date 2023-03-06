@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
 import { logsnag } from '../_utils/logsnag.ts'
@@ -71,7 +71,8 @@ serve(async (event: Request) => {
           return sendRes({ error: JSON.stringify(dbError) }, 500)
 
         const isMonthly = plan.price_m_id === stripeData.price_id
-        await updatePerson(user.email, undefined, [plan.name, isMonthly ? 'Monthly' : 'Yearly'])
+        const segment = await customerToSegment(user.id, customer, plan)
+        await updatePerson(user.email, undefined, segment)
         await addEventPerson(user.email, {
           plan: plan.name,
         }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'green')
@@ -86,13 +87,17 @@ serve(async (event: Request) => {
           notify: status === 'succeeded',
         }).catch()
       }
-      else { await updatePerson(user.email, undefined, ['Not_found']) }
+      else {
+        const segment = await customerToSegment(user.id, customer)
+        await updatePerson(user.email, undefined, segment)
+      }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
         stripeData.subscription_anchor = new Date().toISOString()
-        await updatePerson(user.email, undefined, ['Canceled'])
+        const segment = await customerToSegment(user.id, customer)
+        await updatePerson(user.email, undefined, segment)
         await addEventPerson(user.email, {}, 'user:cancel', 'red')
         await logsnag.publish({
           channel: 'usage',
@@ -115,7 +120,8 @@ serve(async (event: Request) => {
       }
     }
     else {
-      await updatePerson(user.email, undefined, ['Free'])
+      const segment = await customerToSegment(user.id, customer)
+      await updatePerson(user.email, undefined, segment)
     }
 
     return sendRes({ received: true })
