@@ -29,8 +29,17 @@ const fixCrisp = async () => {
     return
   }
   // iterate users and send them to stripe
+  // let skip = true
   for (const record of users) {
     // cupdate crisp segment add Capgo one
+    // to skip already done
+    // if (record.email === 'unknow.unknow@unknow.com' && skip)
+    //   skip = false
+    // else if (skip)
+    //   continue
+    if (record.email === 'unknow.unknow@unknow.com')
+      continue
+
     const person: Person = {
       nickname: `${record.first_name} ${record.last_name}`,
       avatar: record.image_url ? record.image_url : undefined,
