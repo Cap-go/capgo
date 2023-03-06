@@ -107,6 +107,8 @@ const getUsages = async () => {
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
     // console.log('storageVariance', storageVariance, currentStorage)
     datas.value.storage[0] = currentStorage - storageVariance
+    if (datas.value.storage[0] < 0)
+      datas.value.storage[0] = 0
   }
 }
 
