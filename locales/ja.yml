@@ -135,6 +135,7 @@ in-your-main-file: メインファイルで
 in-your-project-fold: プロジェクト フォルダー内
 info: 情報
 informations: インフォメーション
+init-capgo-in-your-a: アプリで Capgo を初期化する
 install-the-capacito: Capacitor プラグインをインストールする
 into-your-app-folder: アプリ フォルダーに移動します。
 invalid-auth: 無効な認証
