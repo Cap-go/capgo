@@ -53,7 +53,7 @@ serve(async (event: Request) => {
     //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
     //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
     // split countries by 10 to batch send to netlify
-    const pageSize = Math.round(countries.length / 10)
+    const pageSize = Math.round(countries.length / 30)
     for (let i = 0; i < pageSize; i++) {
       const countriesBatch = countries.slice(i * pageSize, (i + 1) * pageSize)
       console.log('countriesBatch', countriesBatch.length)
