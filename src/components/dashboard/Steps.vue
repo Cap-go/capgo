@@ -32,7 +32,13 @@ const main = useMainStore()
 const { t } = useI18n()
 const snag = useLogSnag()
 
-const steps = ref([
+interface Step {
+  title: string
+  command?: string
+  subtitle: string
+  link?: string
+}
+const allSteps: Step[] = [
   {
     title: t('log-to-the-capgo-cli'),
     command: 'npx --yes @capgo/cli@latest login [APIKEY]',
@@ -74,11 +80,26 @@ CapacitorUpdater.notifyAppReady()`,
     command: '',
     subtitle: t('this-page-will-self-'),
   },
-])
+]
+const simpleStep: Step[] = [
+  {
+    title: t('init-capgo-in-your-a'),
+    command: 'npx --yes @capgo/cli@latest init [APIKEY]',
+    subtitle: '',
+    link: '',
+  },
+  {
+    title: t('discover-your-dashbo'),
+    command: '',
+    subtitle: t('this-page-will-self-'),
+  },
+]
+const steps = ref(simpleStep)
+const stepMode = ref('simple')
 const setLog = () => {
   if (props.onboarding && main.user?.id) {
     snag.publish({
-      channel: 'onboarding',
+      channel: stepMode.value === 'simple' ? 'onboarding-v2' : 'onboarding',
       event: `step-${step.value}`,
       icon: '👶',
       tags: {
@@ -92,8 +113,9 @@ const setLog = () => {
     // TODO add emailing on onboarding done to send blog article versioning
   }
 }
-const openExt = (url: string) => {
-  window.open(url, '_blank')
+const openExt = (url?: string) => {
+  if (url)
+    window.open(url, '_blank')
 }
 const scrollToElement = (id: string) => {
   // Get the element with the id
@@ -105,8 +127,8 @@ const scrollToElement = (id: string) => {
   }
 }
 
-const copyToast = async (text: string, allowed: boolean, id: string) => {
-  if (!allowed)
+const copyToast = async (allowed: boolean, id: string, text?: string) => {
+  if (!allowed || !text)
     return
   copy(text)
   displayStore.messageToast.push(t('copied-to-clipboard'))
@@ -128,7 +150,7 @@ const getKey = async (retry = true): Promise<void> => {
     .select()
     .eq('user_id', main.user?.id).eq('mode', 'all')
   if (data)
-    steps.value[0].command = `npx --yes @capgo/cli@latest login ${data[0].key}`
+    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key || '')
 
   else if (retry && main.user?.id)
     return getKey(false)
@@ -136,7 +158,7 @@ const getKey = async (retry = true): Promise<void> => {
   isLoading.value = false
 }
 watchEffect(async () => {
-  if (step.value === 1 && !realtimeListener.value) {
+  if (stepMode.value !== 'simple' && step.value === 1 && !realtimeListener.value) {
     // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
@@ -160,7 +182,7 @@ watchEffect(async () => {
       )
       .subscribe()
   }
-  else if (step.value === 4 && !realtimeListener.value) {
+  else if (stepMode.value !== 'simple' && step.value === 4 && !realtimeListener.value) {
     // console.log('watch app change step 4')
     realtimeListener.value = true
     mySubscription.value = supabase
@@ -184,6 +206,13 @@ watchEffect(async () => {
       )
       .subscribe()
   }
+})
+watchEffect(async () => {
+  if (stepMode.value === 'simple')
+    steps.value = simpleStep
+  else
+    steps.value = allSteps
+  await getKey()
 })
 
 watchEffect(async () => {
@@ -213,6 +242,16 @@ watchEffect(async () => {
         </h2>
       </div>
 
+      <!-- show toggle for simpleMode -->
+      <div class="flex flex-col items-center justify-center mt-4">
+        <label class="block mb-2 text-sm text-gray-900 capitalize dark:text-gray-50 font-pj">
+          {{ t('old-onboarding-mode') }}
+        </label>
+        <Toggle
+          :value="stepMode !== 'simple'"
+          @change="stepMode = stepMode === 'simple' ? 'all' : 'simple'"
+        />
+      </div>
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
@@ -231,7 +270,7 @@ watchEffect(async () => {
                 {{ s.title }}<br>
                 <span class="text-sm">{{ s.subtitle }}</span>
                 <div class="p-3 rounded-lg" :class="{ 'bg-black': s.command }">
-                  <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(s.command, step === i, `step_command_${i}`)">
+                  <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
