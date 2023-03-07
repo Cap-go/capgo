@@ -259,7 +259,7 @@ watchEffect(async () => {
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
               <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white bg-muted-blue-800 w-14 h-14 rounded-xl font-pj">
-                <template v-if="i < 7">
+                <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
                 <template v-else>
