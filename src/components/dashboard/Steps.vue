@@ -165,7 +165,7 @@ const changeMode = async () => {
       snag.publish({
         channel: 'onboarding-v2',
         event: 'change-mode',
-        icon: '👶',
+        icon: '🤨',
         tags: {
           'user-id': main.user.id,
         },
