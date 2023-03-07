@@ -157,6 +157,28 @@ const getKey = async (retry = true): Promise<void> => {
 
   isLoading.value = false
 }
+const changeMode = async () => {
+  if (stepMode.value === 'simple') {
+    stepMode.value = 'advanced'
+    steps.value = allSteps
+    if (main.user?.id) {
+      snag.publish({
+        channel: 'onboarding-v2',
+        event: 'change-mode',
+        icon: '👶',
+        tags: {
+          'user-id': main.user.id,
+        },
+        notify: false,
+      }).catch()
+    }
+  }
+  else {
+    stepMode.value = 'simple'
+    steps.value = simpleStep
+  }
+  await getKey()
+}
 watchEffect(async () => {
   if (stepMode.value !== 'simple' && step.value === 1 && !realtimeListener.value) {
     // console.log('watch app change step 1')
@@ -207,13 +229,6 @@ watchEffect(async () => {
       .subscribe()
   }
 })
-watchEffect(async () => {
-  if (stepMode.value === 'simple')
-    steps.value = simpleStep
-  else
-    steps.value = allSteps
-  await getKey()
-})
 
 watchEffect(async () => {
   if (route.path === '/app/home')
@@ -249,7 +264,7 @@ watchEffect(async () => {
         </label>
         <Toggle
           :value="stepMode !== 'simple'"
-          @change="stepMode = stepMode === 'simple' ? 'all' : 'simple'"
+          @change="changeMode()"
         />
       </div>
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
