@@ -27,7 +27,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   }))
   // remove the first skip
   const ids = res.map(item => item.appId)
-  console.log('ids', ids, ids.length)
+  // console.log('ids', ids.length, ids)
   const { data, error } = await supabaseClient()
     .from('store_apps')
     .select('app_id')
@@ -38,6 +38,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   }
   // use data to filter res
   const filtered = res.filter(item => !data?.find((row: { app_id: string }) => row.app_id === item.appId))
+  console.log('filtered', filtered.length, filtered)
   const upgraded = filtered.map((item) => {
     // console.log('item', item.appId)
     // check if already exist in db and skip
@@ -94,7 +95,7 @@ const getTop = async (category = gplay.category.APPLICATION, country: string, co
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  console.log('main', url, headers, method, body)
+  // console.log('main', url, headers, method, body)
   if (body.country && body.category) {
     await getTop(body.category, body.country, body.collection, body.limit)
   }
