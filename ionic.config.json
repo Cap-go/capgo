@@ -1,5 +1,7 @@
 {
   "name": "capgo",
-  "integrations": {},
+  "integrations": {
+    "capacitor": {}
+  },
   "type": "custom"
 }

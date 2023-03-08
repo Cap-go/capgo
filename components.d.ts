@@ -38,7 +38,6 @@ declare module '@vue/runtime-core' {
     Spinner: typeof import('./src/components/Spinner.vue')['default']
     StatsBar: typeof import('./src/components/StatsBar.vue')['default']
     Steps: typeof import('./src/components/dashboard/Steps.vue')['default']
-    StepsV2: typeof import('./src/components/dashboard/StepsV2.vue')['default']
     Table: typeof import('./src/components/Table.vue')['default']
     Tabs: typeof import('./src/components/Tabs.vue')['default']
     TabSidebar: typeof import('./src/components/TabSidebar.vue')['default']
