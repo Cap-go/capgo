@@ -50,7 +50,7 @@ specifiers:
   '@iconify/json': ^2.2.27
   '@intlify/vite-plugin-vue-i18n': 6.0.3
   '@netlify/functions': ^1.4.0
-  '@supabase/supabase-js': 2.1.3
+  '@supabase/supabase-js': 2.10.0
   '@tailwindcss/aspect-ratio': ^0.4.2
   '@tailwindcss/container-queries': ^0.1.0
   '@tailwindcss/forms': ^0.5.3
@@ -173,7 +173,7 @@ dependencies:
   '@capgo/native-audio': 5.0.7_@capacitor+core@4.6.3
   '@capgo/native-market': 1.1.22
   '@netlify/functions': 1.4.0
-  '@supabase/supabase-js': 2.1.3
+  '@supabase/supabase-js': 2.10.0
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.7
   '@vuelidate/core': 2.0.0_vue@3.2.45
   '@vuelidate/validators': 2.0.0_vue@3.2.45
@@ -4091,8 +4091,8 @@ packages:
     resolution: {integrity: sha512-T7VNNlYVM1SgQ+VsMYhnDkcGmWhQdL0bDyGm5TlQ3GBXnJscEClUUOKduWTmm2zCnvNLC1hc3JpuXjs/nFOc5w==}
     dev: true
 
-  /@supabase/functions-js/2.0.0:
-    resolution: {integrity: sha512-ozb7bds2yvf5k7NM2ZzUkxvsx4S4i2eRKFSJetdTADV91T65g4gCzEs9L3LUXSrghcGIkUaon03VPzOrFredqg==}
+  /@supabase/functions-js/2.1.0:
+    resolution: {integrity: sha512-vRziB+AqRXRaGHjEFHwBo0kuNDTuAxI7VUeqU24Fe86ISoD8YEQm0dGdpleJEcqgDGWaO6pxT1tfj1BRY5PwMg==}
     dependencies:
       cross-fetch: 3.1.5
     transitivePeerDependencies:
@@ -4124,22 +4124,22 @@ packages:
       - supports-color
     dev: false
 
-  /@supabase/storage-js/2.3.0:
-    resolution: {integrity: sha512-YGWVCEYYYF3+UiyL8O4xC78N9n9paLbT0hHl8dmYAtd3DqyWtu5Eph9JTu0PWm+/29Zhns5TbhUZW4xpWjJfPQ==}
+  /@supabase/storage-js/2.3.1:
+    resolution: {integrity: sha512-BaPIvyvjuZW1V0CnfGKUZyzpBUXnsh0XD8eqTOYd+MdiGPmIPI0vtwnT4fAoK8mipp1vpcN62EVQaqeUnWXPtQ==}
     dependencies:
       cross-fetch: 3.1.5
     transitivePeerDependencies:
       - encoding
     dev: false
 
-  /@supabase/supabase-js/2.1.3:
-    resolution: {integrity: sha512-40Bn1gAyVM/VAfyvvq/7iBf6xkNMMisgGeHQWFpP7/h+srNqXgqlPuINo/KKyeUz6sJMFTIE+28j00VnSkSkjA==}
+  /@supabase/supabase-js/2.10.0:
+    resolution: {integrity: sha512-/vkpPxGDyLfTASWnVHL8vdgQxn9SX/Cs+BotTxFhLSIeGFSazC6rpQSMKu6RqzO7gjBD1KqTv0h3auWfClWs+Q==}
     dependencies:
-      '@supabase/functions-js': 2.0.0
+      '@supabase/functions-js': 2.1.0
       '@supabase/gotrue-js': 2.12.1
       '@supabase/postgrest-js': 1.4.1
       '@supabase/realtime-js': 2.6.0
-      '@supabase/storage-js': 2.3.0
+      '@supabase/storage-js': 2.3.1
       cross-fetch: 3.1.5
     transitivePeerDependencies:
       - encoding
