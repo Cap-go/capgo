@@ -54,6 +54,7 @@ const isCapacitor = async (id: string) => {
     react_native: false,
     native_script: false,
     capgo: false,
+    onprem: false,
     kotlin: false,
     flutter: false,
   }
@@ -68,6 +69,10 @@ const isCapacitor = async (id: string) => {
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
         console.log('capacitor', 'assets/capacitor.config.json')
         found.capacitor = true
+        // check if updateUrl is set, means on-prem
+        const res = zipEntry.getData().toString('utf8')
+        if (res.includes('updateUrl'))
+          found.onprem = true
       }
       if (zipEntry.entryName === 'assets/capacitor.plugins.json') {
         const res = zipEntry.getData().toString('utf8')
@@ -80,20 +85,20 @@ const isCapacitor = async (id: string) => {
         console.log('cordova', 'res/xml/config.xml')
         found.cordova = true
       }
-      if (zipEntry.entryName === 'res/xml/rn_dev_preferences.xml') {
-        console.log('react_native', 'res/xml/rn_dev_preferences.xml')
+      if (zipEntry.entryName === 'lib/x86_64/libreactnativejni') {
+        console.log('react_native', 'lib/x86_64/libreactnativejni')
         found.react_native = true
       }
       if (zipEntry.entryName === 'kotlin/kotlin.kotlin_builtins') {
         console.log('kotlin', 'kotlin/kotlin.kotlin_builtins')
         found.kotlin = true
       }
-      if (zipEntry.entryName === 'assets/flutter_assets/AssetManifest.json') {
-        console.log('flutter', 'assets/flutter_assets/AssetManifest.json')
+      if (zipEntry.entryName === 'lib/x86_64/libflutter.so') {
+        console.log('flutter', 'lib/x86_64/libflutter.so')
         found.flutter = true
       }
-      if (zipEntry.entryName === 'resources.arsc') {
-        console.log('flutter', 'resources.arsc')
+      if (zipEntry.entryName === 'lib/x86_64/libNativeScript.so') {
+        console.log('native_script', 'lib/x86_64/libNativeScript.so')
         found.native_script = true
       }
     })
@@ -119,6 +124,7 @@ const getInfoCap = async (appId: string) => {
         cordova: res.cordova,
         react_native: res.react_native,
         capgo: res.capgo,
+        onprem: res.onprem,
         kotlin: res.kotlin,
         native_script: res.native_script,
         flutter: res.flutter,
