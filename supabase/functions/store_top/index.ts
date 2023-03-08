@@ -26,48 +26,24 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: TopSto
       .select('*', { count: 'exact', head: true })
 
     if (body.mode === 'cordova') {
-      req.eq('react_native', true)
-        .eq('flutter', false)
-        .eq('cordova', true)
-        .eq('capacitor', false)
+      req.eq('cordova', true)
       // get toal categ
-      reqTotal.eq('react_native', true)
-        .eq('flutter', false)
-        .eq('cordova', true)
-        .eq('capacitor', false)
+      reqTotal.eq('cordova', true)
     }
     else if (body.mode === 'flutter') {
-      req.eq('react_native', false)
-        .eq('flutter', true)
-        .eq('cordova', false)
-        .eq('capacitor', false)
+      req.eq('flutter', true)
       // get toal categ
-      reqTotal.eq('react_native', false)
-        .eq('flutter', true)
-        .eq('cordova', false)
-        .eq('capacitor', false)
+      reqTotal.eq('flutter', true)
     }
     else if (body.mode === 'reactNative') {
       req.eq('react_native', true)
-        .eq('flutter', false)
-        .eq('cordova', false)
-        .eq('capacitor', false)
       // get toal categ
       reqTotal.eq('react_native', true)
-        .eq('flutter', false)
-        .eq('cordova', false)
-        .eq('capacitor', false)
     }
     else {
-      req.eq('react_native', false)
-        .eq('flutter', false)
-        .eq('cordova', true)
-        .eq('capacitor', true)
+      req.eq('capacitor', true)
       // get toal categ
-      reqTotal.eq('react_native', false)
-        .eq('flutter', false)
-        .eq('cordova', true)
-        .eq('capacitor', true)
+      reqTotal.eq('capacitor', true)
     }
 
     const { data, error } = await req
