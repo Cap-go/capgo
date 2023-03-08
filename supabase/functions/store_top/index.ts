@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
 interface TopStore {
-  mode?: 'capacitor' | 'cordova' | 'flutter' | 'reactNative'
+  mode?: 'capacitor' | 'cordova' | 'flutter' | 'reactNative' | 'nativeScript'
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: TopStore) => {
@@ -41,6 +41,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: TopSto
       req.eq('react_native', true)
       // get toal categ
       reqTotal.eq('react_native', true)
+    }
+    else if (body.mode === 'nativeScript') {
+      req.eq('native_script', true)
+      // get toal categ
+      reqTotal.eq('native_script', true)
     }
     else {
       req.eq('capacitor', true)
