@@ -11,7 +11,7 @@ specifiers:
   '@capacitor/assets': 2.0.4
   '@capacitor/browser': ^4.1.1
   '@capacitor/camera': ^4.1.4
-  '@capacitor/cli': ^4.7.0
+  '@capacitor/cli': ^4.6.3
   '@capacitor/clipboard': ^4.1.0
   '@capacitor/core': ~4.6.3
   '@capacitor/device': ^4.1.0
@@ -218,7 +218,7 @@ dependencies:
 
 devDependencies:
   '@antfu/eslint-config': 0.33.1_ha6vam6werchizxrnqvarmz2zu
-  '@capacitor/cli': 4.7.0
+  '@capacitor/cli': 4.6.3
   '@capacitor/core': 4.6.3
   '@iconify-json/carbon': 1.1.12
   '@iconify-json/heroicons': 1.1.10
@@ -1728,8 +1728,8 @@ packages:
       - supports-color
     dev: false
 
-  /@capacitor/cli/4.7.0:
-    resolution: {integrity: sha512-yMbHpm3CegWcNoXp743W2raaUBm0EVnl61y14O8LO/IfUMSXGWOwrWMhUY4cXkkqzLbb6vv2ZIvO8ZzvUGml3w==}
+  /@capacitor/cli/4.6.3:
+    resolution: {integrity: sha512-3BLti5iAo8lzkwUeWoZCMBGKxkY2aAlGR0SCmVzok3c2LXJwYNhrlrsoKFRjUHsiO4CmhmtR1ee2gsjvIzkOqQ==}
     engines: {node: '>=12.4.0'}
     hasBin: true
     dependencies:
