@@ -10,49 +10,84 @@ interface TopStore {
 const main = async (url: URL, headers: BaseHeaders, method: string, body: TopStore) => {
   try {
     console.log('body', body)
+    // count allapps
+    const { count } = await supabaseAdmin()
+      .from('store_apps')
+      .select('*', { count: 'exact', head: true })
+    const total = count || 0
+
     const req = supabaseAdmin()
       .from('store_apps')
       .select('url, title, icon, summary, installs, category')
       .order('installs', { ascending: false })
       .limit(100)
+    const reqTotal = supabaseAdmin()
+      .from('store_apps')
+      .select('*', { count: 'exact', head: true })
 
     if (body.mode === 'cordova') {
       req.eq('react_native', true)
-      req.eq('flutter', false)
-      req.eq('cordova', true)
-      req.eq('capacitor', false)
+        .eq('flutter', false)
+        .eq('cordova', true)
+        .eq('capacitor', false)
+      // get toal categ
+      reqTotal.eq('react_native', true)
+        .eq('flutter', false)
+        .eq('cordova', true)
+        .eq('capacitor', false)
     }
     else if (body.mode === 'flutter') {
       req.eq('react_native', false)
-      req.eq('flutter', true)
-      req.eq('cordova', false)
-      req.eq('capacitor', false)
+        .eq('flutter', true)
+        .eq('cordova', false)
+        .eq('capacitor', false)
+      // get toal categ
+      reqTotal.eq('react_native', false)
+        .eq('flutter', true)
+        .eq('cordova', false)
+        .eq('capacitor', false)
     }
     else if (body.mode === 'reactNative') {
       req.eq('react_native', true)
-      req.eq('flutter', false)
-      req.eq('cordova', false)
-      req.eq('capacitor', false)
+        .eq('flutter', false)
+        .eq('cordova', false)
+        .eq('capacitor', false)
+      // get toal categ
+      reqTotal.eq('react_native', true)
+        .eq('flutter', false)
+        .eq('cordova', false)
+        .eq('capacitor', false)
     }
     else {
       req.eq('react_native', false)
-      req.eq('flutter', false)
-      req.eq('cordova', true)
-      req.eq('capacitor', true)
+        .eq('flutter', false)
+        .eq('cordova', true)
+        .eq('capacitor', true)
+      // get toal categ
+      reqTotal.eq('react_native', false)
+        .eq('flutter', false)
+        .eq('cordova', true)
+        .eq('capacitor', true)
     }
 
     const { data, error } = await req
+    const { count: countTotal } = await reqTotal
+    const totalCategory = countTotal || 0
 
-    if (data && !error)
-      return sendRes({ apps: data || [] })
+    if (data && !error) {
+      return sendRes({
+        apps: data || [],
+        // calculate percentage usage
+        usage: (totalCategory * 100) / total,
+      })
+    }
     console.log('Supabase error:', error)
     return sendRes({
-      apps: 190,
-      updates: 130000,
-      stars: 125,
-    })
+      status: 'Error unknow',
+    }, 500)
   }
   catch (e) {
+    console.log('Error:', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
