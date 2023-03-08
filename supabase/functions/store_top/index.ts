@@ -61,7 +61,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: TopSto
       return sendRes({
         apps: data || [],
         // calculate percentage usage
-        usage: Math.round((totalCategory * 100) / total),
+        usage: ((totalCategory * 100) / total).toFixed(2),
       })
     }
     console.log('Supabase error:', error)
