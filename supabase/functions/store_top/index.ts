@@ -27,8 +27,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: TopSto
 
     if (body.mode === 'cordova') {
       req.eq('cordova', true)
+        .eq('capacitor', false)
       // get toal categ
       reqTotal.eq('cordova', true)
+        .eq('capacitor', false)
     }
     else if (body.mode === 'flutter') {
       req.eq('flutter', true)
