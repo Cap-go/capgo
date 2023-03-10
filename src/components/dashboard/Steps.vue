@@ -100,7 +100,7 @@ const setLog = () => {
   if (props.onboarding && main.user?.id) {
     snag.publish({
       channel: stepMode.value === 'simple' ? 'onboarding-v2' : 'onboarding',
-      event: `step-${step.value}`,
+      event: `${stepMode.value === 'simple' ? 'onboarding-' : ''}step-${step.value}`,
       icon: '👶',
       tags: {
         'user-id': main.user.id,
