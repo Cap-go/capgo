@@ -41,6 +41,7 @@ serve(async (event: Request) => {
 
     const all = []
     const pageSize = 10
+    const pageSizeLittle = 5
     console.log('appsToGetFramework', appsToGetFramework?.length || 0)
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
@@ -54,7 +55,7 @@ serve(async (event: Request) => {
     //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
     //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
     // split countries by 10 to batch send to netlify
-    for (let i = 0; i < pageSize; i++) {
+    for (let i = 0; i < countries.length; i += pageSize) {
       const countriesBatch = countries.slice(i * pageSize, (i + 1) * pageSize)
       console.log('countriesBatch', countriesBatch.length)
       console.log('country * categories', countriesBatch.length * categories.length)
@@ -68,7 +69,7 @@ serve(async (event: Request) => {
     //   countries,
     // }))
     if (appsToGetFramework?.length) {
-      for (let i = 0; i < pageSize; i++) {
+      for (let i = 0; i < appsToGetFramework.length; i += pageSize) {
         const appsBatch = appsToGetFramework.slice(i * pageSize, (i + 1) * pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsBatch.map(app => app.app_id),
@@ -76,7 +77,7 @@ serve(async (event: Request) => {
       }
     }
     if (appsToGetInfo?.length) {
-      for (let i = 0; i < pageSize; i++) {
+      for (let i = 0; i < appsToGetInfo.length; i += pageSizeLittle) {
         const appsInfoBatch = appsToGetInfo.slice(i * pageSize, (i + 1) * pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_store_info-background', {
           appIds: appsInfoBatch.map(app => app.app_id),
@@ -84,7 +85,7 @@ serve(async (event: Request) => {
       }
     }
     if (appsToGetSimilar?.length) {
-      for (let i = 0; i < pageSize; i++) {
+      for (let i = 0; i < appsToGetSimilar.length; i += pageSizeLittle) {
         const appsSimilarBatch = appsToGetSimilar.slice(i * pageSize, (i + 1) * pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsSimilarBatch.map(app => app.app_id),
