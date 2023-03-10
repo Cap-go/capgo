@@ -69,15 +69,15 @@ serve(async (event: Request) => {
     //   countries,
     // }))
     if (appsToGetFramework?.length) {
-      for (let i = 0; i < appsToGetFramework.length; i += pageSize) {
-        const appsBatch = appsToGetFramework.slice(i * pageSize, (i + 1) * pageSize)
+      for (let i = 0; i < appsToGetFramework.length; i += pageSizeLittle) {
+        const appsBatch = appsToGetFramework.slice(i * pageSizeLittle, (i + 1) * pageSizeLittle)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsBatch.map(app => app.app_id),
         }))
       }
     }
     if (appsToGetInfo?.length) {
-      for (let i = 0; i < appsToGetInfo.length; i += pageSizeLittle) {
+      for (let i = 0; i < appsToGetInfo.length; i += pageSize) {
         const appsInfoBatch = appsToGetInfo.slice(i * pageSize, (i + 1) * pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_store_info-background', {
           appIds: appsInfoBatch.map(app => app.app_id),
@@ -85,7 +85,7 @@ serve(async (event: Request) => {
       }
     }
     if (appsToGetSimilar?.length) {
-      for (let i = 0; i < appsToGetSimilar.length; i += pageSizeLittle) {
+      for (let i = 0; i < appsToGetSimilar.length; i += pageSize) {
         const appsSimilarBatch = appsToGetSimilar.slice(i * pageSize, (i + 1) * pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsSimilarBatch.map(app => app.app_id),
