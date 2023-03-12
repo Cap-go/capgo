@@ -41,7 +41,7 @@ serve(async (event: Request) => {
 
     const all = []
     const pageSize = 10
-    const pageSizeLittle = 5
+    const pageSizeLittle = 2
     console.log('appsToGetFramework', appsToGetFramework?.length || 0)
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
