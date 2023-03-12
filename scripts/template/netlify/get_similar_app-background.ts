@@ -17,10 +17,10 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
 }
 
-const getAppsInfo = async (appId: string) => {
-  const { title } = await gplay.app({ appId })
-  const itemsSim = await gplay.similar({ appId, num: 250 })
-  const itemsSearch = await gplay.search({ term: title, num: 250 })
+const getAppsInfo = async (appId: string, country: string) => {
+  const { title } = await gplay.app({ appId }).catch(() => ({ title: '' }))
+  const itemsSim = await gplay.similar({ appId, num: 250, country }).catch(() => [])
+  const itemsSearch = title ? await gplay.search({ term: title, num: 250, country }).catch(() => []) : []
 
   return [...itemsSim, ...itemsSearch].map((item) => {
     const insert = {
@@ -37,10 +37,10 @@ const getAppsInfo = async (appId: string) => {
   })
 }
 
-const getSimilar = async (appId: string) => {
+const getSimilar = async (appId: string, country = 'us') => {
   try {
     console.log('getInfo', appId)
-    const res = await getAppsInfo(appId)
+    const res = await getAppsInfo(appId, country)
     // save in supabase
     const { error } = await supabaseClient()
       .from('store_apps')
@@ -75,6 +75,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   // remove from list apps already in supabase
   if (body.appId) {
     await getSimilar(body.appId)
+  }
+  else if (body.countries && body.appIds) {
+    // call getTop with all countries and categories
+    const countries = body.countries
+    const all = []
+    for (const appId of body.appIds) {
+      for (const country of countries)
+        all.push(getSimilar(appId, country))
+    }
+    await Promise.all(all)
   }
   else if (body.appIds) {
     const all = []

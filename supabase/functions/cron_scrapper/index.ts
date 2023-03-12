@@ -87,9 +87,18 @@ serve(async (event: Request) => {
     if (appsToGetSimilar?.length) {
       for (let i = 0; i < appsToGetSimilar.length; i += pageSize) {
         const appsSimilarBatch = appsToGetSimilar.slice(i, i + pageSize)
-        all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
-          appIds: appsSimilarBatch.map(app => app.app_id),
-        }))
+        // all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
+        //   appIds: appsSimilarBatch.map(app => app.app_id),
+        // }))
+        for (let i = 0; i < countries.length; i += pageSize) {
+          const countriesBatch = countries.slice(i, i + pageSize)
+          console.log('countriesBatch', countriesBatch.length)
+          console.log('country * categories', countriesBatch.length * categories.length)
+          all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
+            appIds: appsSimilarBatch.map(app => app.app_id),
+            countries: countriesBatch,
+          }))
+        }
       }
     }
     await Promise.all(all)
