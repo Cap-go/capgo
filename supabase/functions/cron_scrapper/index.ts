@@ -56,7 +56,7 @@ serve(async (event: Request) => {
     //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
     // split countries by 10 to batch send to netlify
     for (let i = 0; i < countries.length; i += pageSize) {
-      const countriesBatch = countries.slice(i * pageSize, (i + 1) * pageSize)
+      const countriesBatch = countries.slice(i, i + pageSize)
       console.log('countriesBatch', countriesBatch.length)
       console.log('country * categories', countriesBatch.length * categories.length)
       all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
@@ -70,7 +70,7 @@ serve(async (event: Request) => {
     // }))
     if (appsToGetFramework?.length) {
       for (let i = 0; i < appsToGetFramework.length; i += pageSizeLittle) {
-        const appsBatch = appsToGetFramework.slice(i * pageSizeLittle, (i + 1) * pageSizeLittle)
+        const appsBatch = appsToGetFramework.slice(i, i + pageSizeLittle)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsBatch.map(app => app.app_id),
         }))
@@ -78,7 +78,7 @@ serve(async (event: Request) => {
     }
     if (appsToGetInfo?.length) {
       for (let i = 0; i < appsToGetInfo.length; i += pageSize) {
-        const appsInfoBatch = appsToGetInfo.slice(i * pageSize, (i + 1) * pageSize)
+        const appsInfoBatch = appsToGetInfo.slice(i, i + pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_store_info-background', {
           appIds: appsInfoBatch.map(app => app.app_id),
         }))
@@ -86,7 +86,7 @@ serve(async (event: Request) => {
     }
     if (appsToGetSimilar?.length) {
       for (let i = 0; i < appsToGetSimilar.length; i += pageSize) {
-        const appsSimilarBatch = appsToGetSimilar.slice(i * pageSize, (i + 1) * pageSize)
+        const appsSimilarBatch = appsToGetSimilar.slice(i, i + pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsSimilarBatch.map(app => app.app_id),
         }))
