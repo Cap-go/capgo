@@ -18,9 +18,11 @@ export const supabaseClient = () => {
 }
 
 const getAppsInfo = async (appId: string) => {
-  const items = await gplay.similar({ appId })
+  const { title } = await gplay.app({ appId })
+  const itemsSim = await gplay.similar({ appId, num: 250 })
+  const itemsSearch = await gplay.search({ term: title, num: 250 })
 
-  return items.map((item) => {
+  return [...itemsSim, ...itemsSearch].map((item) => {
     const insert = {
       url: item.url,
       app_id: item.appId,
