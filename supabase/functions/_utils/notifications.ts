@@ -1,6 +1,6 @@
 import { parseCronExpression } from 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts'
 import dayjs from 'https://cdn.skypack.dev/dayjs@1.11.6?dts'
-import { addEventPerson, deleteDataPerson, setDataPerson } from './crisp.ts'
+import { addDataPerson, addEventPerson, deleteDataPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 
@@ -11,7 +11,7 @@ interface EventData {
 const sendNow = async (eventName: string, eventData: EventData,
   email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) => {
   console.log('send notif', eventName, email)
-  await setDataPerson(email, eventData)
+  await addDataPerson(email, eventData)
   await addEventPerson(email, {}, eventName, color)
   await deleteDataPerson(email, eventData)
   if (past != null) {
