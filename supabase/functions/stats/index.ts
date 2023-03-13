@@ -5,6 +5,7 @@ import { supabaseAdmin, updateOnpremStats, updateVersionStats } from '../_utils/
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
+import { appIdToUrl } from './../_utils/conversion.ts'
 
 const actionsNotif = [
   'set_fail',
@@ -120,7 +121,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
         }
       }
       else if (actionsNotif.includes(action)) {
-        await sendNotif('user:update_fail', { current_app_id: app_id }, data.user_id, '0 0 * * 1', 'orange')
+        await sendNotif('user:update_fail', { current_app_id: app_id, current_app_id_url: appIdToUrl(app_id) }, data.user_id, '0 0 * * 1', 'orange')
       }
     }
     else {

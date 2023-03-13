@@ -16,6 +16,7 @@ import IconTrash from '~icons/heroicons/trash?raw'
 import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   appId: string
@@ -223,7 +224,7 @@ const reload = async () => {
 }
 
 const openOne = async (one: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/channel/${one.id}`)
+  router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
 onMounted(async () => {
   await refreshData()

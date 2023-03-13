@@ -11,6 +11,7 @@ import { useDisplayStore } from '~/stores/display'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import type { Tab } from '~/components/comp_def'
+import { urlToAppId } from '~/services/conversion'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -364,7 +365,7 @@ const updateChannel = async () => {
 watchEffect(async () => {
   if (route.path.includes('/d/')) {
     packageId.value = route.params.p as string
-    packageId.value = packageId.value.replace(/--/g, '.')
+    packageId.value = urlToAppId(packageId.value)
     id.value = route.params.device as string
     await loadData()
     displayStore.NavTitle = t('device')

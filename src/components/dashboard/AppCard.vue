@@ -10,6 +10,7 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
@@ -124,7 +125,7 @@ const refreshData = async () => {
 }
 
 const openPackage = (appId: string) => {
-  router.push(`/app/package/${appId.replace(/\./g, '--')}`)
+  router.push(`/app/package/${appIdToUrl(appId)}`)
 }
 
 watchEffect(async () => {

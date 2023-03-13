@@ -76,4 +76,3 @@ export const makeHMACContent = (payload: string, details: Details) => {
 export const createHmac = (data: string, details: Details) => {
   return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
 }
-

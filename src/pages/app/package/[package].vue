@@ -8,6 +8,7 @@ import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import type { Stat } from '~/components/comp_def'
+import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -63,29 +64,29 @@ const stats = computed<Stat[]>(() => ([
   {
     label: t('channels'),
     value: channelsNb,
-    link: `/app/p/${id.value.replace(/\./g, '--')}/channels`,
+    link: `/app/p/${appIdToUrl(id.value)}/channels`,
   },
   {
     label: t('bundles'),
     value: bundlesNb,
-    link: `/app/p/${id.value.replace(/\./g, '--')}/bundles`,
+    link: `/app/p/${appIdToUrl(id.value)}/bundles`,
   },
   {
     label: t('devices'),
     value: devicesNb,
-    link: `/app/p/${id.value.replace(/\./g, '--')}/devices`,
+    link: `/app/p/${appIdToUrl(id.value)}/devices`,
   },
   {
     label: t('plan-updates'),
     value: updatesNb,
-    link: `/app/p/${id.value.replace(/\./g, '--')}/logs`,
+    link: `/app/p/${appIdToUrl(id.value)}/logs`,
   },
 ]))
 
 watchEffect(async () => {
   if (route.path.startsWith('/app/package')) {
     id.value = route.params.package as string
-    id.value = id.value.replace(/--/g, '.')
+    id.value = urlToAppId(id.value)
     await refreshData()
     displayStore.NavTitle = app.value?.name || ''
     displayStore.defaultBack = `/app/package/${route.params.package}/channels`

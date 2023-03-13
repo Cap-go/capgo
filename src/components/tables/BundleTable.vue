@@ -7,7 +7,7 @@ import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { bytesToMbText } from '~/services/conversion'
+import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import IconTrash from '~icons/heroicons/trash?raw'
 import { useDisplayStore } from '~/stores/display'
 
@@ -203,7 +203,7 @@ const reload = async () => {
 }
 
 const openOne = async (one: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/bundle/${one.id}`)
+  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)
 }
 onMounted(async () => {
   await refreshData()

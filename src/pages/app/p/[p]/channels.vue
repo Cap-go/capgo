@@ -3,6 +3,7 @@ import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDisplayStore } from '~/stores/display'
+import { urlToAppId } from '~/services/conversion'
 
 const route = useRoute()
 const displayStore = useDisplayStore()
@@ -12,7 +13,7 @@ const { t } = useI18n()
 watchEffect(async () => {
   if (route.path.endsWith('/channels')) {
     appId.value = route.params.p as string
-    appId.value = appId.value.replace(/--/g, '.')
+    appId.value = urlToAppId(appId.value)
     displayStore.NavTitle = t('channels')
     displayStore.defaultBack = `/app/package/${route.params.p}`
   }

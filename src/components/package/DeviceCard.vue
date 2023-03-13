@@ -5,6 +5,7 @@ import {
 } from 'konsta/vue'
 import { formatDate } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   device: Database['public']['Tables']['devices']['Row']
@@ -14,7 +15,7 @@ const router = useRouter()
 const openDevice = async () => {
   console.log('openDevice', props.device)
 
-  router.push(`/app/p/${props.device.app_id.replace(/\./g, '--')}/d/${props.device.device_id}`)
+  router.push(`/app/p/${appIdToUrl(props.device.app_id)}/d/${props.device.device_id}`)
 }
 </script>
 

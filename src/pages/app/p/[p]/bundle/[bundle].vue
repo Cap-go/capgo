@@ -9,7 +9,7 @@ import { formatDate } from '~/services/date'
 import { openVersion } from '~/services/versions'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
-import { bytesToMbText } from '~/services/conversion'
+import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { useDisplayStore } from '~/stores/display'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/material-symbols/info-rounded'
@@ -68,7 +68,7 @@ const getChannels = async () => {
 const openChannelLink = async () => {
   if (!version.value || !channel.value)
     return
-  router.push(`/app/p/${version.value.app_id.replace(/\./g, '--')}/channel/${channel.value?.id}`)
+  router.push(`/app/p/${appIdToUrl(version.value.app_id)}/channel/${channel.value?.id}`)
 }
 
 const showSize = computed(() => {
@@ -224,7 +224,7 @@ watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
     packageId.value = route.params.p as string
-    packageId.value = packageId.value.replace(/--/g, '.')
+    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()

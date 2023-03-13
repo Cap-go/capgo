@@ -10,7 +10,7 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
-import { bytesToMbText } from '~/services/conversion'
+import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 
 const props = defineProps<{
   version: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
@@ -130,7 +130,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
 
 const openVersion = (version: Database['public']['Tables']['app_versions']['Row']) => {
   console.log('openVersion', version)
-  router.push(`/app/p/${props.version.app_id.replace(/\./g, '--')}/bundle/${version.id}`)
+  router.push(`/app/p/${appIdToUrl(props.version.app_id)}/bundle/${version.id}`)
 }
 
 watchEffect(async () => {

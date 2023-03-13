@@ -16,6 +16,7 @@ import IconInformations from '~icons/heroicons/information-circle'
 import IconUsers from '~icons/heroicons/users-solid'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import type { Tab } from '~/components/comp_def'
+import { urlToAppId } from '~/services/conversion'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -151,7 +152,7 @@ watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
     packageId.value = route.params.p as string
-    packageId.value = packageId.value.replace(/--/g, '.')
+    packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()

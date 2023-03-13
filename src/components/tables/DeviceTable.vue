@@ -6,6 +6,7 @@ import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   appId: string
@@ -151,7 +152,7 @@ const refreshData = async () => {
   }
 }
 const openOne = async (one: typeof element) => {
-  router.push(`/app/p/${props.appId.replace(/\./g, '--')}/d/${one.device_id}`)
+  router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
 onMounted(async () => {
   await refreshData()

@@ -10,6 +10,7 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   channel: Database['public']['Tables']['channels']['Row']
@@ -97,7 +98,7 @@ const deleteChannel = async (channel: Database['public']['Tables']['channels']['
 }
 
 const openChannel = (channel: Database['public']['Tables']['channels']['Row']) => {
-  router.push(`/app/p/${channel.app_id.replace(/\./g, '--')}/channel/${channel.id}`)
+  router.push(`/app/p/${appIdToUrl(channel.app_id)}/channel/${channel.id}`)
 }
 
 watchEffect(async () => {

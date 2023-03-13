@@ -3,6 +3,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { urlToAppId } from '~/services/conversion'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
@@ -13,7 +14,7 @@ const displayStore = useDisplayStore()
 onMounted(async () => {
   if (route.path.endsWith('/bundles')) {
     appId.value = route.params.p as string
-    appId.value = appId.value.replace(/--/g, '.')
+    appId.value = urlToAppId(appId.value)
     displayStore.NavTitle = t('bundles')
     displayStore.defaultBack = `/app/package/${route.params.p}`
   }
