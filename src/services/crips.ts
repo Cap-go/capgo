@@ -18,7 +18,7 @@ export const pushEvent = (data: { name: string; color: eventColor }): void => {
 export const setUserId = (uuid: string): void => {
   if (isSpoofed())
     return
-  CapacitorCrisp.setString({ key: 'user-uuid', value: uuid })
+  CapacitorCrisp.setString({ key: 'id', value: uuid })
 }
 
 export const setUser = (data: {

@@ -1,9 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
 import 'https://deno.land/x/dotenv/load.ts'
-import { customerToSegment } from '../_utils/supabase.ts'
+import { customerToSegment, isTrial } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import type { Person } from '../_utils/crisp.ts'
-import { postPerson, updatePerson } from '../_utils/crisp.ts'
+import { addDataPerson, postPerson, updatePerson } from '../_utils/crisp.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***'
 const supabaseAnonKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***'
@@ -52,6 +52,8 @@ const fixCrisp = async () => {
       .eq('customer_id', record.customer_id)
       .single()
     if (customer) {
+      if (customer.product_id === 'free' && !(await isTrial(record.id)))
+        continue
       const { data: plan } = await useSupabase()
         .from('plans')
         .select()
@@ -63,11 +65,25 @@ const fixCrisp = async () => {
     console.log('record.email', record.email, segment)
     try {
       await updatePerson(record.email, person, segment)
+      await addDataPerson(record.email, {
+        status: customer?.status || 'failed',
+        id: record.id,
+        customer_id: record.customer_id || undefined,
+        product_id: customer?.product_id || undefined,
+        price_id: customer?.price_id || undefined,
+      })
     }
     catch (e) {
       console.log('missing person', record.email)
       await postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined)
       await updatePerson(record.email, person, segment)
+      await addDataPerson(record.email, {
+        status: customer?.status || 'failed',
+        id: record.id,
+        customer_id: record.customer_id || undefined,
+        product_id: customer?.product_id || undefined,
+        price_id: customer?.price_id || undefined,
+      })
     }
     // break
   }
