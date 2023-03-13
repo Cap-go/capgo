@@ -1,13 +1,19 @@
 import { parseCronExpression } from 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts'
 import dayjs from 'https://cdn.skypack.dev/dayjs@1.11.6?dts'
-import { addEventPerson } from './crisp.ts'
+import { addEventPerson, deleteDataPerson, setDataPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 
-const sendNow = async (eventName: string,
+interface EventData {
+  [key: string]: any
+}
+
+const sendNow = async (eventName: string, eventData: EventData,
   email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) => {
   console.log('send notif', eventName, email)
+  await setDataPerson(email, eventData)
   await addEventPerson(email, {}, eventName, color)
+  await deleteDataPerson(email, eventData)
   if (past != null) {
     const { error } = await supabaseAdmin()
       .from('notifications')
@@ -63,7 +69,7 @@ const isSendable = (last: string, cron: string) => {
   return (dayjs(now).isAfter(nextDate))
 }
 
-export const sendNotif = async (eventName: string, userId: string, cron: string, color: string) => {
+export const sendNotif = async (eventName: string, eventData: EventData, userId: string, cron: string, color: string) => {
   const { data: user } = await supabaseAdmin()
     .from('users')
     .select()
@@ -86,14 +92,18 @@ export const sendNotif = async (eventName: string, userId: string, cron: string,
     .eq('user_id', userId)
     .eq('id', `${eventName}__${userId}`)
     .single()
-  if (!notif)
-    return sendNow(eventName, user.email, userId, color, null)
+  // set user data in crisp
+  if (!notif) {
+    await sendNow(eventName, eventData, user.email, userId, color, null)
+    return deleteDataPerson(user.email, eventData)
+  }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
     console.log('notif already sent', eventName, userId)
     return Promise.resolve()
   }
-  return sendNow(eventName, user.email, userId, color, notif)
+  await sendNow(eventName, eventData, user.email, userId, color, notif)
+  return deleteDataPerson(user.email, eventData)
 }
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()

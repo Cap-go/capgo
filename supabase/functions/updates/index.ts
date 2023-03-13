@@ -109,7 +109,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     else {
       // get app owner with app_id
 
-      await sendNotif('user:semver_issue', appOwner.user_id, '0 0 * * 1', 'red')
+      await sendNotif('user:semver_issue', { current_app_id: app_id }, appOwner.user_id, '0 0 * * 1', 'red')
 
       return sendRes({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
@@ -118,7 +118,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
     // if plugin_version is < 4 send notif to alert
     if (semver.lt(plugin_version, '4.0.0'))
-      await sendNotif('user:plugin_issue', appOwner.user_id, '0 0 * * 1', 'red')
+      await sendNotif('user:plugin_issue', { current_app_id: app_id }, appOwner.user_id, '0 0 * * 1', 'red')
 
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
