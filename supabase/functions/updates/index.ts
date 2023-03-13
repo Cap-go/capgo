@@ -113,6 +113,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendNotif('user:semver_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
+        current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
 
@@ -126,6 +127,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendNotif('user:plugin_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
+        current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
     }
@@ -138,7 +140,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 400)
     }
 
-    console.log(id, 'Headers', platform,
+    console.log(id, 'vals', platform,
       app_id,
       device_id,
       custom_id,

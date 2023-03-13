@@ -7,7 +7,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
-const actionsNotif = [
+const failActions = [
   'set_fail',
   'update_fail',
   'download_fail',
@@ -120,10 +120,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
           }))
         }
       }
-      else if (actionsNotif.includes(action)) {
+      else if (failActions.includes(action)) {
         await sendNotif('user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
+          current_version_id: data.id,
           current_app_id_url: appIdToUrl(app_id),
         }, data.user_id, '0 0 * * 1', 'orange')
       }
