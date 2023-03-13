@@ -63,6 +63,7 @@ export const addDataPerson = async (email: string, data: Person) => {
 
 export const setDataPerson = async (email: string, data: Person) => {
   const url = `${baseUrl()}/people/data/${email}`
+  console.log('setDataPerson', data)
   const response = await axios.put(url, { data }, getConfig())
   return response.data
 }
@@ -70,6 +71,7 @@ export const setDataPerson = async (email: string, data: Person) => {
 export const getDataPerson = async (email: string): Promise<{ [key: string]: string }> => {
   const url = `${baseUrl()}/people/data/${email}`
   const response = await axios.get(url, getConfig())
+  console.log('getDataPerson', response?.data?.data?.data)
   return response?.data?.data?.data || {}
 }
 
