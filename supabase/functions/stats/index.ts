@@ -121,7 +121,11 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
         }
       }
       else if (actionsNotif.includes(action)) {
-        await sendNotif('user:update_fail', { current_app_id: app_id, current_app_id_url: appIdToUrl(app_id) }, data.user_id, '0 0 * * 1', 'orange')
+        await sendNotif('user:update_fail', {
+          current_app_id: app_id,
+          current_device_id: device_id,
+          current_app_id_url: appIdToUrl(app_id),
+        }, data.user_id, '0 0 * * 1', 'orange')
       }
     }
     else {
