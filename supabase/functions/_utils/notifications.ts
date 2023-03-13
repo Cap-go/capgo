@@ -93,17 +93,14 @@ export const sendNotif = async (eventName: string, eventData: EventData, userId:
     .eq('id', `${eventName}__${userId}`)
     .single()
   // set user data in crisp
-  if (!notif) {
-    await sendNow(eventName, eventData, user.email, userId, color, null)
-    return deleteDataPerson(user.email, eventData)
-  }
+  if (!notif)
+    return sendNow(eventName, eventData, user.email, userId, color, null)
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
     console.log('notif already sent', eventName, userId)
     return Promise.resolve()
   }
-  await sendNow(eventName, eventData, user.email, userId, color, notif)
-  return deleteDataPerson(user.email, eventData)
+  return sendNow(eventName, eventData, user.email, userId, color, notif)
 }
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
