@@ -42,6 +42,7 @@ export interface Person {
   customer_id?: string
   product_id?: string
   price_id?: string
+  [key: string]: string | undefined
 }
 
 export const updatePerson = async (email: string, person?: Person, segments: string[] = []) => {
@@ -58,6 +59,28 @@ export const addDataPerson = async (email: string, data: Person) => {
   const url = `${baseUrl()}/people/data/${email}`
   const response = await axios.patch(url, { data }, getConfig())
   return response.data
+}
+
+export const setDataPerson = async (email: string, data: Person) => {
+  const url = `${baseUrl()}/people/data/${email}`
+  const response = await axios.put(url, { data }, getConfig())
+  return response.data
+}
+
+export const getDataPerson = async (email: string): Promise<{ [key: string]: string }> => {
+  const url = `${baseUrl()}/people/data/${email}`
+  const response = await axios.get(url, getConfig())
+  return response?.data?.data?.data || {}
+}
+
+export const deleteDataPerson = async (email: string, key: string) => {
+  const current = await getDataPerson(email)
+  if (!current[key])
+    return
+  const data = { ...current }
+  delete data[key]
+  console.log('deleteDataPerson', data)
+  return setDataPerson(email, data)
 }
 
 export const addEventPerson = async (email: string, data: any, text: string, color: string) => {
