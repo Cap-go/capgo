@@ -75,13 +75,18 @@ export const getDataPerson = async (email: string): Promise<{ [key: string]: str
 
 export const deleteDataPerson = async (email: string, data: Person) => {
   const current = await getDataPerson(email)
-  const keys = Object.keys(data)
+  const curentKeys = Object.keys(data)
   // check if keys exist in current
-  const key = keys.find(key => current[key])
-  if (!key)
+  const newData: any = { }
+  let found = false
+  curentKeys.forEach((key) => {
+    if (!data[key])
+      newData[key] = current[key]
+    else
+      found = true
+  })
+  if (!found)
     return
-  const newData = { ...current }
-  keys.forEach(key => delete newData[key])
   console.log('deleteDataPerson', newData)
   return setDataPerson(email, newData)
 }
