@@ -86,7 +86,7 @@ const getStats = (): GlobalStats => {
             .single()
             .then((res) => {
               if (res.error)
-                console.error('stripe_info error', res.error)
+                console.error('stripe_info error', user.customer_id, res.error)
               if (!res.data)
                 console.error('stripe_info no body', user.customer_id)
               const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
@@ -225,6 +225,7 @@ serve(async (event: Request) => {
     return sendRes()
   }
   catch (e) {
+    console.error('global_stats error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

@@ -22,6 +22,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     })
   }
   catch (e) {
+    console.log('Error:', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
