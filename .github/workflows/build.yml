@@ -34,6 +34,8 @@ jobs:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
+        with:
+          version: 1.42.5
       # - name: Verify generated types match Postgres schema
       #   run: |
       #     pnpm types
