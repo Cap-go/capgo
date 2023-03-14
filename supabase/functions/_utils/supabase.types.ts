@@ -595,6 +595,7 @@ export interface Database {
           created_at: string | null
           developer: string
           developer_email: string
+          developer_id: string | null
           error_get_framework: string
           error_get_info: string
           error_get_similar: string
@@ -603,6 +604,7 @@ export interface Database {
           icon: string
           installs: number
           kotlin: boolean
+          lang: string | null
           native_script: boolean
           onprem: boolean
           react_native: boolean
@@ -625,6 +627,7 @@ export interface Database {
           created_at?: string | null
           developer?: string
           developer_email?: string
+          developer_id?: string | null
           error_get_framework?: string
           error_get_info?: string
           error_get_similar?: string
@@ -633,6 +636,7 @@ export interface Database {
           icon?: string
           installs?: number
           kotlin?: boolean
+          lang?: string | null
           native_script?: boolean
           onprem?: boolean
           react_native?: boolean
@@ -655,6 +659,7 @@ export interface Database {
           created_at?: string | null
           developer?: string
           developer_email?: string
+          developer_id?: string | null
           error_get_framework?: string
           error_get_info?: string
           error_get_similar?: string
@@ -663,6 +668,7 @@ export interface Database {
           icon?: string
           installs?: number
           kotlin?: boolean
+          lang?: string | null
           native_script?: boolean
           onprem?: boolean
           react_native?: boolean
@@ -864,6 +870,14 @@ export interface Database {
         Returns: {
           name: string
         }[]
+      }
+      get_app_versions: {
+        Args: {
+          appid: string
+          name_version: string
+          apikey: string
+        }
+        Returns: number
       }
       get_current_plan_max: {
         Args: {

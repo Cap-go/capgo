@@ -2,7 +2,8 @@ import type { BaseHeaders } from 'supabase/functions/_utils/types'
 import type { BackgroundHandler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import gplay from 'google-play-scraper'
-import type { Database } from '~/types/supabase.types'
+import { countries } from './../../../supabase/functions/_utils/gplay_categ'
+import type { Database } from './../../../supabase/functions/_utils/supabase.types'
 
 export const methodJson = ['POST', 'PUT', 'PATCH']
 
@@ -17,7 +18,7 @@ export const supabaseClient = () => {
   return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
 }
 
-const getAppInfo = async (appId: string) => {
+const getAppInfo = async (appId: string, country = 'en') => {
   const item = await gplay.app({ appId })
   // return upgraded
   const insert: Database['public']['Tables']['store_apps']['Insert'] = {
@@ -26,6 +27,8 @@ const getAppInfo = async (appId: string) => {
     title: item.title,
     summary: item.summary,
     developer: item.developer,
+    developer_id: item.developerId,
+    lang: country,
     icon: item.icon,
     score: item.score,
     free: item.free,
@@ -38,10 +41,33 @@ const getAppInfo = async (appId: string) => {
   return insert
 }
 
+const findLang = async (appId: string) => {
+  // loop on all countries with getAppInfo until answer
+  for (const country of countries) {
+    try {
+      const res = await getAppInfo(appId, country)
+      console.log('res', res)
+      return res
+    }
+    catch (e) {
+      // console.log('error getAppInfo', e)
+    }
+  }
+  return null
+}
+
 const getInfo = async (appId: string) => {
   try {
     console.log('getInfo', appId)
-    const res = await getAppInfo(appId)
+    const { data } = await supabaseClient()
+      .from('store_apps')
+      .select()
+      .eq('app_id', appId)
+      .single()
+
+    const res = !data || !data.lang ? await findLang(appId) : await getAppInfo(appId, data.lang)
+    if (!res)
+      throw new Error('no lang found')
     console.log('res', res)
     // save in supabase
     const { error } = await supabaseClient()

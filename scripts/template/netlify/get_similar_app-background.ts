@@ -29,6 +29,8 @@ const getAppsInfo = async (appId: string, country: string) => {
       title: item.title,
       summary: item.summary,
       developer: item.developer,
+      developer_id: item.developerId,
+      lang: country,
       icon: item.icon,
       score: item.score,
       free: item.free,
