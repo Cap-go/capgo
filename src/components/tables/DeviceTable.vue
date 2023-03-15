@@ -106,7 +106,7 @@ const getData = async () => {
       req.in('device_id', props.ids)
 
     if (search.value)
-      req.like('device_id', `%${search.value}%`)
+      req.or(`device_id.like.%${search.value}%,custom_id.like.%${search.value}%`)
 
     if (filters.value.Override) {
       const ids = await getDevicesID(element)

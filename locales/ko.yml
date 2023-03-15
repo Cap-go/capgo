@@ -227,7 +227,7 @@ search: 찾다
 search-bundle: 번들 검색
 search-bundle-id: 번들 ID로 검색
 search-by-action: 액션으로 검색
-search-by-device-id: 기기 ID로 검색
+search-by-device-id: 기기 ID 또는 맞춤 ID로 검색
 search-by-name: 이름으로 검색
 search-device: 장치 검색
 search-user: 사용자 검색

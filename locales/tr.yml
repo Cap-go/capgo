@@ -235,7 +235,7 @@ search: Aramak
 search-bundle: Paket Ara
 search-bundle-id: Paket kimliğine göre ara
 search-by-action: İşleme göre ara
-search-by-device-id: Cihaz kimliğine göre ara
+search-by-device-id: Cihaz kimliğine veya Özel Kimliğe göre arayın
 search-by-name: Ada göre ara
 search-device: Cihaz ara
 search-user: Kullanıcı Ara

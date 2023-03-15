@@ -226,7 +226,7 @@ search: Search
 search-bundle: Search Bundle
 search-bundle-id: Search by bundle ID
 search-by-action: Search by action
-search-by-device-id: Search by device ID
+search-by-device-id: Search by device ID or Custom ID
 search-by-name: Search by name
 search-device: Search device
 search-user: Search User
