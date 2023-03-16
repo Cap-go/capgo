@@ -70,7 +70,7 @@ const getInfo = async (appId: string) => {
 
     const res = !data || !data.lang ? await findLang(appId) : await getAppInfo(appId, data.lang)
     if (!res)
-      throw new Error('no lang found')
+      throw new Error(`no lang found ${appId}`)
     console.log('res', res)
     // save in supabase
     const { error } = await supabaseClient()
