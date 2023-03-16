@@ -229,6 +229,7 @@ search-bundle-id: バンドル ID で検索
 search-by-action: アクションで検索
 search-by-device-id: デバイス ID またはカスタム ID で検索
 search-by-device-id-: デバイス ID またはアクションで検索
+search-by-device-id-0: デバイス ID で検索
 search-by-name: 名前で検索
 search-device: 検索デバイス
 search-user: ユーザーを検索

@@ -243,6 +243,7 @@ search-bundle-id: Rechercher par ID de groupe
 search-by-action: Rechercher par actions
 search-by-device-id: Rechercher par ID d'appareil ou ID personnalisé
 search-by-device-id-: Rechercher par ID d'appareil ou action
+search-by-device-id-0: Rechercher par ID d'appareil
 search-by-name: Rechercher par nom
 search-device: Appareil de recherche
 search-user: Rechercher un utilisateur

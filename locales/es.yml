@@ -245,6 +245,7 @@ search-bundle-id: Buscar por ID de paquete
 search-by-action: Buscar por acción
 search-by-device-id: Buscar por ID de dispositivo o ID personalizado
 search-by-device-id-: Buscar por ID de dispositivo o acción
+search-by-device-id-0: Buscar por ID de dispositivo
 search-by-name: Buscar por nombre
 search-device: Buscar dispositivo
 search-user: Usuario de búsqueda

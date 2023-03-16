@@ -229,6 +229,7 @@ search-bundle-id: 按包 ID 搜索
 search-by-action: 按动作搜索
 search-by-device-id: 按设备 ID 或自定义 ID 搜索
 search-by-device-id-: 按设备 ID 或操作搜索
+search-by-device-id-0: 按设备 ID 搜索
 search-by-name: 按名称搜索
 search-device: 搜索设备
 search-user: 搜索用户

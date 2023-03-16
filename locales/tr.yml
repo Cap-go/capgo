@@ -237,6 +237,7 @@ search-bundle-id: Paket kimliğine göre ara
 search-by-action: İşleme göre ara
 search-by-device-id: Cihaz kimliğine veya Özel Kimliğe göre arayın
 search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
+search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 search-device: Cihaz ara
 search-user: Kullanıcı Ara

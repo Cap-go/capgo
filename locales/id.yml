@@ -237,6 +237,7 @@ search-bundle-id: Cari berdasarkan bundel ID
 search-by-action: Cari berdasarkan tindakan
 search-by-device-id: Telusuri berdasarkan ID perangkat atau ID Khusus
 search-by-device-id-: Cari berdasarkan ID perangkat atau tindakan
+search-by-device-id-0: Cari berdasarkan ID perangkat
 search-by-name: Cari berdasarkan nama
 search-device: Cari perangkat
 search-user: Cari Pengguna

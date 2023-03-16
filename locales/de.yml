@@ -247,6 +247,7 @@ search-bundle-id: Suche nach Bündel-ID
 search-by-action: Suche nach Aktion
 search-by-device-id: Suche nach Geräte-ID oder benutzerdefinierter ID
 search-by-device-id-: Suche nach Geräte-ID oder Aktion
+search-by-device-id-0: Suche nach Geräte-ID
 search-by-name: Suche mit Name
 search-device: Gerät suchen
 search-user: Benutzer suchen
