@@ -99,8 +99,8 @@ const getData = async () => {
       reqCount.eq('device_id', props.deviceId)
     }
     if (props.deviceId && search.value) {
-      req.like('device_id', `%${search.value}%`)
-      reqCount.like('device_id', `%${search.value}%`)
+      req.like('action', `%${search.value}%`)
+      reqCount.like('action', `%${search.value}%`)
     }
     else if (search.value) {
       req.or(`device_id.like.%${search.value}%,action.like.%${search.value}%`)
