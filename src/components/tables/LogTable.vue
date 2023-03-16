@@ -103,8 +103,8 @@ const getData = async () => {
       reqCount.like('device_id', `%${search.value}%`)
     }
     else if (search.value) {
-      req.like('action', `%${search.value}%`)
-      reqCount.like('action', `%${search.value}%`)
+      req.or(`device_id.like.%${search.value}%,action.like.%${search.value}%`)
+      reqCount.or(`device_id.like.%${search.value}%,action.like.%${search.value}%`)
     }
     if (columns.value.length) {
       columns.value.forEach((col) => {
