@@ -204,7 +204,7 @@ watch(props, async () => {
     :total="total" :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
-    :search-placeholder="deviceId ? t('search-by-device-id') : t('search-by-action')"
+    :search-placeholder="deviceId ? t('search-by-device-id-') : t('search-by-action')"
     @reload="reload()" @reset="refreshData()"
   />
 </template>

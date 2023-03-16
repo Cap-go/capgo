@@ -234,6 +234,7 @@ search-bundle: Wyszukaj pakiet
 search-bundle-id: Wyszukaj według identyfikatora pakietu
 search-by-action: Szukaj według akcji
 search-by-device-id: Szukaj według identyfikatora urządzenia lub identyfikatora niestandardowego
+search-by-device-id-: Szukaj według identyfikatora urządzenia lub akcji
 search-by-name: Szukaj według nazwy
 search-device: Wyszukaj urządzenie
 search-user: Wyszukaj użytkownika

@@ -234,6 +234,7 @@ search-bundle: Пакет поиска
 search-bundle-id: Поиск по идентификатору пакета
 search-by-action: Поиск по действию
 search-by-device-id: Поиск по идентификатору устройства или пользовательскому идентификатору
+search-by-device-id-: Поиск по идентификатору устройства или действию
 search-by-name: Поиск по имени
 search-device: Поиск устройства
 search-user: Поиск пользователя
