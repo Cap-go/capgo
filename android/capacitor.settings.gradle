@@ -87,7 +87,7 @@ include ':capgo-capacitor-flash'
 project(':capgo-capacitor-flash').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-flash@1.2.27_@capacitor+core@4.7.0/node_modules/@capgo/capacitor-flash/android')
 
 include ':capgo-capacitor-mute'
-project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.42_@capacitor+core@4.7.0/node_modules/@capgo/capacitor-mute/android')
+project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-mute@1.1.44_@capacitor+core@4.7.0/node_modules/@capgo/capacitor-mute/android')
 
 include ':capgo-capacitor-purchases'
 project(':capgo-capacitor-purchases').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-purchases@1.3.49_@capacitor+core@4.7.0/node_modules/@capgo/capacitor-purchases/android')
@@ -99,10 +99,10 @@ include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@4.17.42_@capacitor+core@4.7.0/node_modules/@capgo/capacitor-updater/android')
 
 include ':capgo-inappbrowser'
-project(':capgo-inappbrowser').projectDir = new File('../node_modules/.pnpm/@capgo+inappbrowser@0.3.7_@capacitor+core@4.7.0/node_modules/@capgo/inappbrowser/android')
+project(':capgo-inappbrowser').projectDir = new File('../node_modules/.pnpm/@capgo+inappbrowser@0.4.1_@capacitor+core@4.7.0/node_modules/@capgo/inappbrowser/android')
 
 include ':capgo-native-audio'
-project(':capgo-native-audio').projectDir = new File('../node_modules/.pnpm/@capgo+native-audio@5.0.13_@capacitor+core@4.7.0/node_modules/@capgo/native-audio/android')
+project(':capgo-native-audio').projectDir = new File('../node_modules/.pnpm/@capgo+native-audio@5.0.14_@capacitor+core@4.7.0/node_modules/@capgo/native-audio/android')
 
 include ':capgo-native-market'
 project(':capgo-native-market').projectDir = new File('../node_modules/.pnpm/@capgo+native-market@1.1.25/node_modules/@capgo/native-market/android')
