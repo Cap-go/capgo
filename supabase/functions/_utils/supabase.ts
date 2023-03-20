@@ -96,7 +96,7 @@ export const updateVersionStats = async (increment: Database['public']['Function
   const { error } = await supabaseAdmin()
     .rpc('increment_version_stats', increment)
   if (error)
-    console.error('increment_stats', error)
+    console.error('increment_version_stats', error)
 }
 
 export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats_v2']['Args'],

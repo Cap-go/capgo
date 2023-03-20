@@ -58,14 +58,16 @@ const isSendable = (last: string, cron: string) => {
   const last_send_at = new Date(last)
   const now = new Date()
   const nextDate = interval.getNextDate(last_send_at)
+  const sendable = dayjs(now).isAfter(nextDate)
   console.log(`
   cron ${cron}
   last_send_at ${last_send_at}
   nextDate ${nextDate}
   now ${now}
+  sendable ${sendable}
 `)
 
-  return (dayjs(now).isAfter(nextDate))
+  return sendable
 }
 
 export const sendNotif = async (eventName: string, eventData: EventData, userId: string, cron: string, color: string) => {
