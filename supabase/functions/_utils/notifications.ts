@@ -67,7 +67,8 @@ const isSendable = (last: string, cron: string) => {
   sendable ${sendable}
 `)
 
-  return sendable
+  // return sendable
+  return false
 }
 
 export const sendNotif = async (eventName: string, eventData: EventData, userId: string, cron: string, color: string) => {
