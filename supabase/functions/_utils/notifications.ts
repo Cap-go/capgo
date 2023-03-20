@@ -22,6 +22,7 @@ const sendNow = async (eventName: string, eventData: EventData,
         total_send: past.total_send + 1,
       })
       .eq('id', `${eventName}__${userId}`)
+      .eq('user_id', userId)
     if (error)
       console.log('update notif', error)
   }
@@ -95,13 +96,16 @@ export const sendNotif = async (eventName: string, eventData: EventData, userId:
     .eq('id', `${eventName}__${userId}`)
     .single()
   // set user data in crisp
-  if (!notif)
+  if (!notif) {
+    console.log('notif never sent', eventName, userId)
     return sendNow(eventName, eventData, user.email, userId, color, null)
+  }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
     console.log('notif already sent', eventName, userId)
     return Promise.resolve()
   }
+  console.log('notif ready to sent', eventName, userId)
   return sendNow(eventName, eventData, user.email, userId, color, notif)
 }
 // dayjs substract one week
