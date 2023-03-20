@@ -118,7 +118,7 @@ specifiers:
   unplugin-vue-components: ^0.22.12
   vite: 3.2.5
   vite-plugin-environment: 1.1.3
-  vite-plugin-inspect: 0.7.15
+  vite-plugin-inspect: 0.7.18
   vite-plugin-pages: 0.27.1
   vite-plugin-pwa: 0.13.3
   vite-plugin-vue-layouts: 0.7.0
@@ -256,7 +256,7 @@ devDependencies:
   unplugin-icons: 0.15.3_@vue+compiler-sfc@3.2.47
   unplugin-vue-components: 0.22.12_vue@3.2.47
   vite: 3.2.5_tbu6ibuzbmq2zng52hwcifltki
-  vite-plugin-inspect: 0.7.15_vite@3.2.5
+  vite-plugin-inspect: 0.7.18_vite@3.2.5
   vite-plugin-pages: 0.27.1_e5jgpkp7lf7gkqc3vonmebxrfm
   vite-plugin-pwa: 0.13.3_vite@3.2.5
   vite-plugin-vue-layouts: 0.7.0_rip2p6kwwd7m5kuchehllw2hzm
@@ -4331,13 +4331,13 @@ packages:
     resolution: {integrity: sha512-9K4zoImiZc3HlIp6AVUDE4CWYx22a+lhSZMYNpbjW04+YF0KWj4pJXnEMjdnFTiQibFFmElcsasJXDbdI/EPhA==}
     dependencies:
       '@types/eslint': 8.21.2
-      '@types/estree': 0.0.51
+      '@types/estree': 1.0.0
     dev: true
 
   /@types/eslint/8.21.2:
     resolution: {integrity: sha512-EMpxUyystd3uZVByZap1DACsMXvb82ypQnGn89e1Y0a+LYu3JJscUd/gqhRsVFDkaD2MIiWo0MT8EfXr3DGRKw==}
     dependencies:
-      '@types/estree': 0.0.51
+      '@types/estree': 1.0.0
       '@types/json-schema': 7.0.11
     dev: true
 
@@ -17859,8 +17859,8 @@ packages:
       vite: 3.2.5_tbu6ibuzbmq2zng52hwcifltki
     dev: false
 
-  /vite-plugin-inspect/0.7.15_vite@3.2.5:
-    resolution: {integrity: sha512-oxeZCljacA/slhGFbDNlBqdhDU9fgdHL84i7Nz7DnaAIE7DhTiW2djanw3d/BKuZtduKUY82vRUQ4iaG917t2A==}
+  /vite-plugin-inspect/0.7.18_vite@3.2.5:
+    resolution: {integrity: sha512-hyIxg2qJaRs0LoB3Tqy9ML8yEublIzTzFVXmNhgw2jsjETJUXeR6iQ4YPHk3Q6kTbbiwgoPPyXimlAfEwektnA==}
     engines: {node: '>=14'}
     peerDependencies:
       vite: ^3.1.0 || ^4.0.0
