@@ -127,6 +127,8 @@ Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along
 supabase start
 ```
 
+Use the demo account unknow.unknow@unknow.com and password adminadmin
+
 ### Start local Supabase Functions
 
 ```bash
