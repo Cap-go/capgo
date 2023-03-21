@@ -116,3 +116,19 @@ And you will see the generated file in `dist` that ready to be served.
 ### Deploy on Netlify
 
 Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along the way, and your App will be live in a minute.
+
+
+### Start local Supabase DB
+
+> You need to have [Docker](https://www.docker.com/) installed.
+> You need to have Supabase CLI (`npm install supabase --save-dev`) installed.
+
+```bash
+supabase start
+```
+
+### Start local Supabase Functions
+
+```bash
+supabase function serve
+```
