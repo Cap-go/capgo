@@ -95,14 +95,6 @@ All official plugin are install and preconfigured
 
 ## Usage
 
-### Development
-
-Just run and visit http://localhost:3334
-
-```bash
-pnpm dev
-```
-
 ### Build
 
 To build the App in mobile, run
@@ -118,7 +110,11 @@ And you will see the generated file in `dist` that ready to be served.
 Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along the way, and your App will be live in a minute.
 
 
-### Start local Supabase DB
+### Development
+
+Start each local server in a separate terminal.
+
+#### Start local Supabase DB
 
 > You need to have [Docker](https://www.docker.com/) installed.
 > You need to have Supabase CLI (`npm install supabase --save-dev`) installed.
@@ -126,11 +122,28 @@ Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along
 ```bash
 supabase start
 ```
+Replace in `configs.json`
+`supa_anon.local` the key by the one logged in the terminal `anon key`
+Run the front with 
 
-Use the demo account unknow.unknow@unknow.com and password adminadmin
-
-### Start local Supabase Functions
+#### Start local Supabase Functions
 
 ```bash
 supabase function serve
 ```
+
+#### Start local Front
+
+In the second terminal run
+
+```bash
+pnpm local-serve
+```
+
+#### Login
+
+Visit http://localhost:3334
+
+Use the demo credentials.
+Account: unknow.unknow@unknow.com
+Password: adminadmin
