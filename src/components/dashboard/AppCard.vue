@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -128,6 +128,16 @@ const openPackage = (appId: string) => {
   router.push(`/app/package/${appIdToUrl(appId)}`)
 }
 
+const acronym = computed(() => {
+  const words = props.app.name?.split(' ') || []
+  if (words?.length > 2)
+    return words[0][0] + words[1][0]
+  else if (words?.length > 1)
+    return words[0][0] + words[1][0]
+  else
+    return props.app.name?.slice(0, 2) || '??'
+})
+
 watchEffect(async () => {
   if (route.path.endsWith('/app/home'))
     await refreshData()
@@ -139,7 +149,10 @@ watchEffect(async () => {
   <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
     <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-        <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
+        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
+        <div v-else class="flex items-center justify-center w-8 h-8 border border-white rounded-lg sm:mr-3">
+          <p>{{ acronym }}</p>
+        </div>
         <div class="max-w-max">
           {{ props.app.name }}
         </div>
