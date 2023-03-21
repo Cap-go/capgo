@@ -24,10 +24,16 @@ INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "user_id", "nam
 ('2022-03-07 14:08:28.910887+00', 'com.demo.app', '', '6aa76066-55ef-4238-ade6-0b32334a4097', 'Demo app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792');
 
 INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "user_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider") VALUES
-(9654, '2023-03-20 00:46:31.472185+00', 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:35.187846+00', 'f', NULL, '3885ee49', NULL, 'r2');
+(9654, '2023-03-20 00:46:31.472185+00', 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:35.187846+00', 'f', NULL, '3885ee49', NULL, 'r2'),
+(9653, '2023-03-20 00:33:14.713947+00', 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:33:18.768949+00', 'f', NULL, '9d4f798a', NULL, 'r2'),
+(9652, '2023-03-20 00:29:31.718425+00', 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:37.044903+00', 'f', NULL, '44913a9f', NULL, 'r2'),
+(9601, '2023-03-16 16:28:42.562602+00', 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:46.505275+00', 'f', NULL, '9f74e70a', NULL, 'r2');
 
 INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-('2023-03-20 00:46:33.664139+00', 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:33.664139+00', '3885ee49', 1012506, 9654, 0);
+('2023-03-20 00:46:33.664139+00', 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:33.664139+00', '3885ee49', 1012506, 9654, 10),
+('2023-03-20 00:33:16.912242+00', 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:33:16.912242+00', '9d4f798a', 1012529, 9653, 20),
+('2023-03-20 00:29:35.189367+00', 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.189367+00', '44913a9f', 1012541, 9652, 30),
+('2023-03-16 16:28:44.815867+00', 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
 INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdateToMajor", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
 (22, '2022-03-14 03:41:27.403442+00', 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't');
@@ -39,9 +45,7 @@ INSERT INTO "public"."stats" ("id", "created_at", "platform", "action", "device_
 (11783621, '2023-03-20 00:46:33.664139+00', 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app', '2023-03-20 00:46:33.664139+00');
 
 INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at", "channels", "mlu", "versions", "shared", "mlu_real", "devices", "date_id", "version_size", "bandwidth", "devices_real") VALUES
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-01 01:18:54.034372+00', '2023-03-01 01:18:54.034372+00', 4, 65, 926, 0, 34, 356, '2023-03', 1099392048, 14761264, 367);
-
-INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at", "channels", "mlu", "versions", "shared", "mlu_real", "devices", "date_id", "version_size", "bandwidth", "devices_real") VALUES
+('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-01 01:18:54.034372+00', '2023-03-01 01:18:54.034372+00', 1, 65, 4, 0, 34, 1, '2023-03', 1099392048, 14761264, 1),
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.269652+00', '2023-03-20 00:29:35.269652+00', 0, 0, 3, 0, 5, 1, '2023-03-20', 3037576, 0, 0),
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-19 10:58:12.72939+00', '2023-03-19 10:58:12.72939+00', 0, 1, 0, 0, 1, 1, '2023-03-19', 0, 1186174, 0),
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-17 18:36:33.990542+00', '2023-03-17 18:36:33.990542+00', 0, 4, 0, 0, 3, 1, '2023-03-17', 0, 0, 0),

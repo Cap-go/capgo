@@ -34,7 +34,9 @@ const evolution = computed(() => {
   const arr = props.data as number[]
   const arrWithoutFirst = arr.slice(1)
   const arrWithoutUndefined = arrWithoutFirst.filter((val: any) => val !== undefined)
-  const median = arrWithoutUndefined.reduce((a, b) => a + b, 0) / arrWithoutUndefined.length
+  // keep only the 5 last values
+  const arrLastFive = arrWithoutUndefined.slice(-3)
+  const median = arrLastFive.reduce((a, b) => a + b, 0) / arrLastFive.length
   return median
 })
 const projectionData = computed(() => {

@@ -20,7 +20,6 @@ const route = useRoute()
 const supabase = useSupabase()
 const id = ref('')
 const isLoading = ref(true)
-const downloads = ref(0)
 const bundles = ref<(Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]>([])
 const dataDevValues = ref([] as number[])
 const dataDevLabels = ref([] as string[])
@@ -60,18 +59,6 @@ const loadData = async () => {
   }
 }
 
-const getLastDownload = async () => {
-  const date_id = new Date().toISOString().slice(0, 7)
-  const { data } = await supabase
-    .from('app_stats')
-    .select()
-    .eq('app_id', id.value)
-    .eq('date_id', date_id)
-    .single()
-  if (data)
-    downloads.value = Math.max(data.mlu, data.mlu_real)
-}
-
 const chartData = computed<ChartData<'doughnut'>>(() => ({
   labels: dataDevLabels.value,
   datasets: [
@@ -103,7 +90,6 @@ watchEffect(async () => {
     id.value = route.params.package as string
     id.value = urlToAppId(id.value)
     try {
-      await getLastDownload()
       await loadData()
       isLoading.value = false
     }
