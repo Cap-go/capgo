@@ -141,7 +141,7 @@
     "critters": "0.0.16",
     "cross-env": "^7.0.3",
     "cypress": "11.2.0",
-    "eslint": "8.35.0",
+    "eslint": "8.36.0",
     "eslint-plugin-cypress": "^2.12.1",
     "https-localhost": "4.7.1",
     "netlify-cli": "12.14.0",
