@@ -158,7 +158,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       .order('id', { ascending: false })
       .limit(1)
       .single()
-    const { data: channelData, error: dbError } = await supabaseAdmin()
+    const { data: channelData } = await supabaseAdmin()
       .from('channels')
       .select(`
           id,
@@ -241,27 +241,20 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       .eq('device_id', device_id)
       .eq('app_id', app_id)
       .single()
-    if (dbError || (!channelData && !channelOverride && !devicesOverride)) {
-      console.log(id, 'Cannot get channel or override', app_id, `no default channel ${JSON.stringify(dbError)}`)
+    if (!channelData && !channelOverride && !devicesOverride) {
+      console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
       if (versionData)
         await sendStats('NoChannelOrOverride', platform, device_id, app_id, version_build, versionData.id)
 
       return sendRes({
-        message: `no default channel or override ${JSON.stringify(dbError)}`,
+        message: 'no default channel or override',
         err: 'no_channel',
       }, 200)
     }
-    let channel = channelData
-    if (channelOverride && channelOverride.channel_id) {
-      const channelId = channelOverride.channel_id as Database['public']['Tables']['channels']['Row'] & {
-        version: Database['public']['Tables']['app_versions']['Row']
-      }
-      console.log(id, 'Set channel override', app_id, channelId.version.name)
-      channel = channelId
-    }
+    const version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
+
     const planValid = await isAllowedAction(appOwner.user_id)
     await checkPlan(appOwner.user_id)
-    let version = channel.version as Database['public']['Tables']['app_versions']['Row']
     const versionId = versionData ? versionData.id : version.id
 
     const xForwardedFor = headers['x-forwarded-for'] || ''
@@ -270,7 +263,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
     if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
-      await sendStats('invalidIP', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'invalid ip',
         err: 'invalid_ip',
@@ -299,14 +291,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 200)
     }
 
-    if (devicesOverride && devicesOverride.version) {
-      const deviceVersion = devicesOverride.version as Database['public']['Tables']['app_versions']['Row']
-      console.log(id, 'Set device override', app_id, deviceVersion.name)
-      version = deviceVersion
-    }
-
     if (!version.bucket_id && !version.external_url) {
-      console.log(id, 'Cannot get bundle', app_id)
+      console.log(id, 'Cannot get bundle', app_id, version)
+      await sendStats('missingBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot get bundle',
         err: 'no_bundle',
@@ -328,81 +315,84 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 200)
     }
 
+    if (!devicesOverride && channelData) {
     // console.log('check disableAutoUpdateToMajor', device_id)
-    if (!devicesOverride && !channel.ios && platform === 'ios') {
-      console.log(id, 'Cannot update, ios is disabled', device_id)
-      await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        major: true,
-        message: 'Cannot update, ios it\'s disabled',
-        error: 'disabled_platform_ios',
-        version: version.name,
-        old: version_name,
-      }, 200)
-    }
-    if (!devicesOverride && !channel.android && platform === 'android') {
-      console.log(id, 'Cannot update, android is disabled', device_id)
-      await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        major: true,
-        message: 'Cannot update, android is disabled',
-        error: 'disabled_platform_android',
-        version: version.name,
-        old: version_name,
-      }, 200)
-    }
-    if (!devicesOverride && channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
-      console.log(id, 'Cannot upgrade major version', device_id)
-      await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        major: true,
-        message: 'Cannot upgrade major version',
-        error: 'disable_auto_update_to_major',
-        version: version.name,
-        old: version_name,
-      }, 200)
-    }
+      if (!channelData.ios && platform === 'ios') {
+        console.log(id, 'Cannot update, ios is disabled', device_id)
+        await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
+        return sendRes({
+          major: true,
+          message: 'Cannot update, ios it\'s disabled',
+          error: 'disabled_platform_ios',
+          version: version.name,
+          old: version_name,
+        }, 200)
+      }
+      if (!channelData.android && platform === 'android') {
+        console.log(id, 'Cannot update, android is disabled', device_id)
+        await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, versionId)
+        return sendRes({
+          major: true,
+          message: 'Cannot update, android is disabled',
+          error: 'disabled_platform_android',
+          version: version.name,
+          old: version_name,
+        }, 200)
+      }
+      if (channelData.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
+        console.log(id, 'Cannot upgrade major version', device_id)
+        await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, versionId)
+        return sendRes({
+          major: true,
+          message: 'Cannot upgrade major version',
+          error: 'disable_auto_update_to_major',
+          version: version.name,
+          old: version_name,
+        }, 200)
+      }
 
-    // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
-    if (!devicesOverride && channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
-      console.log(id, 'Cannot revert under native version', device_id)
-      await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        message: 'Cannot revert under native version',
-        error: 'disable_auto_update_under_native',
-        version: version.name,
-        old: version_name,
-      }, 200)
-    }
+      // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
+      if (channelData.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+        console.log(id, 'Cannot revert under native version', device_id)
+        await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, versionId)
+        return sendRes({
+          message: 'Cannot revert under native version',
+          error: 'disable_auto_update_under_native',
+          version: version.name,
+          old: version_name,
+        }, 200)
+      }
 
-    if (!devicesOverride && !channel.allow_dev && !is_prod) {
-      console.log(id, 'Cannot update dev build is disabled', device_id)
-      await sendStats('disableDevBuild', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        major: true,
-        message: 'Cannot update, dev build is disabled',
-        error: 'disable_dev_build',
-        version: version.name,
-        old: version_name,
-      }, 200)
-    }
-    if (!devicesOverride && !channel.allow_emulator && is_emulator) {
-      console.log(id, 'Cannot update emulator is disabled', device_id)
-      await sendStats('disableEmulator', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        major: true,
-        message: 'Cannot update, emulator is disabled',
-        error: 'disable_emulator',
-        version: version.name,
-        old: version_name,
-      }, 200)
+      if (!channelData.allow_dev && !is_prod) {
+        console.log(id, 'Cannot update dev build is disabled', device_id)
+        await sendStats('disableDevBuild', platform, device_id, app_id, version_build, versionId)
+        return sendRes({
+          major: true,
+          message: 'Cannot update, dev build is disabled',
+          error: 'disable_dev_build',
+          version: version.name,
+          old: version_name,
+        }, 200)
+      }
+      if (!channelData.allow_emulator && is_emulator) {
+        console.log(id, 'Cannot update emulator is disabled', device_id)
+        await sendStats('disableEmulator', platform, device_id, app_id, version_build, versionId)
+        return sendRes({
+          major: true,
+          message: 'Cannot update, emulator is disabled',
+          error: 'disable_emulator',
+          version: version.name,
+          old: version_name,
+        }, 200)
+      }
     }
 
     // console.log(id, 'save stats', device_id)
     await sendStats('get', platform, device_id, app_id, version_build, versionId)
     //  check signedURL and if it's url
-    if (!signedURL || (!signedURL.startsWith('http') && !signedURL.startsWith('https'))) {
-      console.log(id, 'Wrong signedURL', app_id)
+    if (!signedURL || signedURL.startsWith('http://') || !signedURL.startsWith('https://')) {
+      console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
+      await sendStats('cannotGetBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot get bundle',
         err: 'no_bundle',
