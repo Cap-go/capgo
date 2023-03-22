@@ -8,6 +8,9 @@ INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description",
 ('2022-05-31 10:58:34+00', '2022-05-31 10:58:34+00', 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIzwwVu6oMmAz', 1, 2, 2500, 10, 0, 'f', 'f', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1KkIN4wh6eEoGHi97YKnWw1B', 'price_1KjnWwofmSNTGH46eYKXyBZn', 1, 25, 500, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
 ('2022-05-31 11:01:56+00', '2022-10-04 16:03:29.836516+00', 'Team', 'plan.team.desc', 99, 998, 'prod_LQIzm2NGzayzXi', 10, 50, 250000, 1000, 1000, 't', 't', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSNKYKnWw32bhGH46ez1xX', 'price_1KGH46eYKnKjSNWwx0pSkXE6', 6, 500, 10000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
 
+INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
+('apps', 'apps', NULL, '2021-12-27 23:51:01.568349+00', '2021-12-27 23:51:01.568349+00', 'f'),
+('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
 INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor") VALUES
 ('2022-06-03 05:54:46.000134+00', '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u5', NULL, 'free', '2022-07-03 05:54:46.000134+00', NULL, 't', 2, '{}', '2023-01-14 14:54:45.736228+00');
