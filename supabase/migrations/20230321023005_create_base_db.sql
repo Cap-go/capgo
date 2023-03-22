@@ -253,15 +253,6 @@ DROP TYPE IF EXISTS public.key_mode;
 DROP TYPE IF EXISTS public.app_mode;
 
 --
--- Name: supabase_functions; Type: SCHEMA; Schema: -; Owner: supabase_admin
---
-
-CREATE SCHEMA supabase_functions;
-
-
-ALTER SCHEMA supabase_functions OWNER TO supabase_admin;
-
---
 -- Name: supabase_migrations; Type: SCHEMA; Schema: -; Owner: postgres
 --
 
@@ -1587,89 +1578,6 @@ $$;
 
 ALTER FUNCTION public.is_version_shared(userid uuid, versionid bigint) OWNER TO supabase_admin;
 
---
--- Name: http_request(); Type: FUNCTION; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-CREATE FUNCTION supabase_functions.http_request() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'supabase_functions'
-    AS $$
-      DECLARE
-        request_id bigint;
-        payload jsonb;
-        url text := TG_ARGV[0]::text;
-        method text := TG_ARGV[1]::text;
-        headers jsonb DEFAULT '{}'::jsonb;
-        params jsonb DEFAULT '{}'::jsonb;
-        timeout_ms integer DEFAULT 1000;
-      BEGIN
-        IF url IS NULL OR url = 'null' THEN
-          RAISE EXCEPTION 'url argument is missing';
-        END IF;
-    
-        IF method IS NULL OR method = 'null' THEN
-          RAISE EXCEPTION 'method argument is missing';
-        END IF;
-    
-        IF TG_ARGV[2] IS NULL OR TG_ARGV[2] = 'null' THEN
-          headers = '{"Content-Type": "application/json"}'::jsonb;
-        ELSE
-          headers = TG_ARGV[2]::jsonb;
-        END IF;
-    
-        IF TG_ARGV[3] IS NULL OR TG_ARGV[3] = 'null' THEN
-          params = '{}'::jsonb;
-        ELSE
-          params = TG_ARGV[3]::jsonb;
-        END IF;
-    
-        IF TG_ARGV[4] IS NULL OR TG_ARGV[4] = 'null' THEN
-          timeout_ms = 1000;
-        ELSE
-          timeout_ms = TG_ARGV[4]::integer;
-        END IF;
-    
-        CASE
-          WHEN method = 'GET' THEN
-            SELECT http_get INTO request_id FROM net.http_get(
-              url,
-              params,
-              headers,
-              timeout_ms
-            );
-          WHEN method = 'POST' THEN
-            payload = jsonb_build_object(
-              'old_record', OLD, 
-              'record', NEW, 
-              'type', TG_OP,
-              'table', TG_TABLE_NAME,
-              'schema', TG_TABLE_SCHEMA
-            );
-    
-            SELECT http_post INTO request_id FROM net.http_post(
-              url,
-              payload,
-              params,
-              headers,
-              timeout_ms
-            );
-          ELSE
-            RAISE EXCEPTION 'method argument % is invalid', method;
-        END CASE;
-    
-        INSERT INTO supabase_functions.hooks
-          (hook_table_id, hook_name, request_id)
-        VALUES
-          (TG_RELID, TG_NAME, request_id);
-    
-        RETURN NEW;
-      END
-    $$;
-
-
-ALTER FUNCTION supabase_functions.http_request() OWNER TO supabase_functions_admin;
-
 
 CREATE TABLE public.apikeys (
     id bigint NOT NULL,
@@ -2164,85 +2072,6 @@ CREATE TABLE public.users (
 
 ALTER TABLE public.users OWNER TO supabase_admin;
 
---
--- Name: hooks; Type: TABLE; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-CREATE TABLE supabase_functions.hooks (
-    id bigint NOT NULL,
-    hook_table_id integer NOT NULL,
-    hook_name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    request_id bigint
-);
-
-
-ALTER TABLE supabase_functions.hooks OWNER TO supabase_functions_admin;
-
---
--- Name: TABLE hooks; Type: COMMENT; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-COMMENT ON TABLE supabase_functions.hooks IS 'Supabase Functions Hooks: Audit trail for triggered hooks.';
-
-
---
--- Name: hooks_id_seq; Type: SEQUENCE; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-CREATE SEQUENCE supabase_functions.hooks_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE supabase_functions.hooks_id_seq OWNER TO supabase_functions_admin;
-
---
--- Name: hooks_id_seq; Type: SEQUENCE OWNED BY; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-ALTER SEQUENCE supabase_functions.hooks_id_seq OWNED BY supabase_functions.hooks.id;
-
-
---
--- Name: migrations; Type: TABLE; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-CREATE TABLE supabase_functions.migrations (
-    version text NOT NULL,
-    inserted_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE supabase_functions.migrations OWNER TO supabase_functions_admin;
-
---
--- Name: schema_migrations; Type: TABLE; Schema: supabase_migrations; Owner: postgres
---
-
-CREATE TABLE supabase_migrations.schema_migrations (
-    version text NOT NULL
-);
-
-
-ALTER TABLE supabase_migrations.schema_migrations OWNER TO postgres;
-
---
--- Name: refresh_tokens id; Type: DEFAULT; Schema: auth; Owner: supabase_auth_admin
---
-
-ALTER TABLE ONLY auth.refresh_tokens ALTER COLUMN id SET DEFAULT nextval('auth.refresh_tokens_id_seq'::regclass);
-
-
---
--- Name: hooks id; Type: DEFAULT; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-ALTER TABLE ONLY supabase_functions.hooks ALTER COLUMN id SET DEFAULT nextval('supabase_functions.hooks_id_seq'::regclass);
-
 
 --
 -- Name: apikeys apikeys_pkey; Type: CONSTRAINT; Schema: public; Owner: supabase_admin
@@ -2418,29 +2247,6 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
---
--- Name: hooks hooks_pkey; Type: CONSTRAINT; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-ALTER TABLE ONLY supabase_functions.hooks
-    ADD CONSTRAINT hooks_pkey PRIMARY KEY (id);
-
-
---
--- Name: migrations migrations_pkey; Type: CONSTRAINT; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-ALTER TABLE ONLY supabase_functions.migrations
-    ADD CONSTRAINT migrations_pkey PRIMARY KEY (version);
-
-
---
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: supabase_migrations; Owner: postgres
---
-
-ALTER TABLE ONLY supabase_migrations.schema_migrations
-    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 
 --
@@ -2630,21 +2436,6 @@ CREATE INDEX idx_version_stats ON public.stats USING btree (version);
 --
 
 CREATE UNIQUE INDEX store_app_pkey ON public.store_apps USING btree (app_id);
-
-
---
--- Name: supabase_functions_hooks_h_table_id_h_name_idx; Type: INDEX; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-CREATE INDEX supabase_functions_hooks_h_table_id_h_name_idx ON supabase_functions.hooks USING btree (hook_table_id, hook_name);
-
-
---
--- Name: supabase_functions_hooks_request_id_idx; Type: INDEX; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-CREATE INDEX supabase_functions_hooks_request_id_idx ON supabase_functions.hooks USING btree (request_id);
-
 
 --
 -- Name: apikeys handle_updated_at; Type: TRIGGER; Schema: public; Owner: supabase_admin
