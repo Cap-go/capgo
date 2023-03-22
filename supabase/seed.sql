@@ -65,3 +65,29 @@ INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-05 07:13:11.220198+00', '2023-03-05 07:13:11.220198+00', 0, 2, 0, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-06'), 0, 2372348, 0),
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-04 11:15:39.563771+00', '2023-03-04 11:15:39.563771+00', 0, 2, 0, 0, 1, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-04'), 0, 0, 0),
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-03 08:40:15.224005+00', '2023-03-03 08:40:15.224005+00', 0, 2, 0, 0, 6, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-01'), 0, 6576705, 0);
+
+-- Create cron jobs
+INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport", "database", "username", "active", "jobname") VALUES
+(5, '0 1 * * *', '
+    select status
+    from
+      http((
+          ''POST'',
+          ''http://localhost:54321/cron_good_plan'',
+           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ''application/json'',
+           ''{}''
+        )::http_request)
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_plan'),
+(10, '5 0 * * *', '
+SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
+    SELECT *
+    FROM
+      http((
+          ''POST'',
+           ''http://localhost:54321/web_stats'',
+           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ''application/json'',
+           ''{}''
+        )::http_request)
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats');
