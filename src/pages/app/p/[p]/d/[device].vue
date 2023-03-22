@@ -60,25 +60,22 @@ const tabs: Tab[] = [
 
 const getVersion = async () => {
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
-    if (error) {
-      console.error('getVersion', error)
-      return
-    }
+      .throwOnError()
     versions.value = data || versions.value
   }
-  catch (error) {
-    console.error(error)
+  catch (_e) {
+    versions.value = []
   }
 }
 const getChannels = async () => {
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('channels')
       .select(`
         id,
@@ -87,45 +84,49 @@ const getChannels = async () => {
         updated_at
       `)
       .eq('app_id', packageId.value)
-    if (error) {
-      console.error('getChannels', error)
-      return
-    }
+      .throwOnError()
     channels.value = (data || []) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
   }
-  catch (error) {
-    console.error(error)
+  catch (_e) {
+    channels.value = []
   }
 }
 
 const getChannelOverride = async () => {
-  const { data, error } = await supabase
-    .from('channel_devices')
-    .select(`
-      device_id,
-      app_id,
-      channel_id (
-        name,
-        version (
-          name
-        )
-      ),
-      created_at,
-      updated_at
-    `)
-    .eq('app_id', packageId.value)
-    .eq('device_id', id.value)
-    .single()
-  if (error) {
-    console.error('getChannelOverride', error)
-    return
+  try {
+    const { data, error } = await supabase
+      .from('channel_devices')
+      .select(`
+        device_id,
+        app_id,
+        channel_id (
+          name,
+          version (
+            name
+          )
+        ),
+        created_at,
+        updated_at
+      `)
+      .eq('app_id', packageId.value)
+      .eq('device_id', id.value)
+      .single()
+      .throwOnError()
+    if (error) {
+      console.error('getChannelOverride', error)
+      return
+    }
+    channelDevice.value = (data || undefined) as Database['public']['Tables']['channel_devices']['Row'] & ChannelDev
   }
-  channelDevice.value = (data || undefined) as Database['public']['Tables']['channel_devices']['Row'] & ChannelDev
+  catch (_e) {
+    channelDevice.value = undefined
+  }
 }
 const getDeviceOverride = async () => {
-  const { data, error } = await supabase
-    .from('devices_override')
-    .select(`
+  try {
+    const { data } = await supabase
+      .from('devices_override')
+      .select(`
       device_id,
       app_id,
       version (
@@ -134,20 +135,21 @@ const getDeviceOverride = async () => {
       created_at,
       updated_at
     `)
-    .eq('app_id', packageId.value)
-    .eq('device_id', id.value)
-    .single()
-  if (error) {
-    console.error('getDeviceOverride', error)
-    return
+      .eq('app_id', packageId.value)
+      .eq('device_id', id.value)
+      .single()
+      .throwOnError()
+    deviceOverride.value = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
   }
-  deviceOverride.value = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
+  catch (_e) {
+    deviceOverride.value = undefined
+  }
 }
 const getDevice = async () => {
   if (!id.value)
     return
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('devices')
       .select(`
           device_id,
@@ -170,14 +172,12 @@ const getDevice = async () => {
         `)
       .eq('device_id', id.value)
       .single()
-    if (data && !error)
-      device.value = data as Database['public']['Tables']['devices']['Row'] & Device
-    else
-      console.error('no devices', error)
+      .throwOnError()
+    device.value = data as Database['public']['Tables']['devices']['Row'] & Device
     // console.log('device', device.value)
   }
   catch (error) {
-    console.error(error)
+    console.error('no devices', error)
   }
 }
 
@@ -255,7 +255,7 @@ const updateOverride = async () => {
     buttons.push({
       text: t('button-remove'),
       handler: async () => {
-        device.value?.device_id && delDevVersion(device.value?.device_id)
+        device.value?.device_id && await delDevVersion(device.value?.device_id)
         displayStore.messageToast.push(t('unlink-version'))
         await loadData()
       },
@@ -322,7 +322,7 @@ const updateChannel = async () => {
     buttons.push({
       text: t('button-remove'),
       handler: async () => {
-        device.value?.device_id && delDevChannel(device.value?.device_id)
+        device.value?.device_id && await delDevChannel(device.value?.device_id)
         displayStore.messageToast.push(t('unlink-channel'))
         await loadData()
       },

@@ -293,7 +293,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
 
     if (!version.bucket_id && !version.external_url) {
-      console.log(id, 'Cannot get bundle', app_id)
+      console.log(id, 'Cannot get bundle', app_id, version)
       await sendStats('missingBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot get bundle',
