@@ -2532,77 +2532,77 @@ CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXEC
 -- Name: app_stats on_app_stats_create; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
-CREATE TRIGGER on_app_stats_create AFTER INSERT ON public.app_stats FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_app_stats_create AFTER INSERT ON public.app_stats FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: app_stats on_app_stats_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
-CREATE TRIGGER on_app_stats_update AFTER UPDATE ON public.app_stats FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_app_stats_update AFTER UPDATE ON public.app_stats FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: channels on_channel_create; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_channel_create AFTER INSERT ON public.channels FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_channel_create AFTER INSERT ON public.channels FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: channels on_channel_update; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_channel_update AFTER UPDATE ON public.channels FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_channel_update AFTER UPDATE ON public.channels FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: stats on_log_create; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_log_create AFTER INSERT ON public.stats FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_log_create AFTER INSERT ON public.stats FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: channel_users on_shared_create; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_shared_create AFTER INSERT ON public.channel_users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_shared_create AFTER INSERT ON public.channel_users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: users on_user_create; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_user_create AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_user_create AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: users on_user_update; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_user_update AFTER UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_user_update AFTER UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: app_versions on_version_create; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_version_create AFTER INSERT ON public.app_versions FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_version_create AFTER INSERT ON public.app_versions FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: app_versions on_version_delete; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_version_delete AFTER DELETE ON public.app_versions FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_version_delete AFTER DELETE ON public.app_versions FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 
 --
 -- Name: app_versions on_version_update; Type: TRIGGER; Schema: public; Owner: supabase_admin
 --
 
-CREATE TRIGGER on_version_update AFTER UPDATE ON public.app_versions FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
+CREATE TRIGGER on_version_update AFTER UPDATE ON public.app_versions FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('http://localhost:54321/functions/v1/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"Y3p63TMDGNTHTze6MchBM7tPmB5"}', '{}', '1000');
 
 --
 -- Name: apikeys apikeys_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: supabase_admin

@@ -73,7 +73,7 @@ INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport"
     from
       http((
           ''POST'',
-          ''http://localhost:54321/cron_good_plan'',
+          ''http://localhost:54321/functions/v1/cron_good_plan'',
            ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
            ''application/json'',
            ''{}''
@@ -85,7 +85,7 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
     FROM
       http((
           ''POST'',
-           ''http://localhost:54321/web_stats'',
+           ''http://localhost:54321/functions/v1/web_stats'',
            ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
            ''application/json'',
            ''{}''
