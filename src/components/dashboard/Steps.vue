@@ -258,7 +258,7 @@ watchEffect(async () => {
       </div>
 
       <!-- show toggle for simpleMode -->
-      <div class="flex flex-col items-center justify-center mt-4">
+      <!-- <div class="flex flex-col items-center justify-center mt-4">
         <label class="block mb-2 text-sm text-gray-900 capitalize dark:text-gray-50 font-pj">
           {{ t('old-onboarding-mode') }}
         </label>
@@ -266,7 +266,7 @@ watchEffect(async () => {
           :value="stepMode !== 'simple'"
           @change="changeMode()"
         />
-      </div>
+      </div> -->
       <div class="max-w-2xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
