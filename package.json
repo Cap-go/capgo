@@ -56,7 +56,7 @@
     "@capacitor/status-bar": "^4.1.1",
     "@capacitor/text-zoom": "^4.1.0",
     "@capacitor/toast": "^4.1.0",
-    "@capawesome/capacitor-file-picker": "^0.5.10",
+    "@capawesome/capacitor-file-picker": "^0.6.1",
     "@capawesome/capacitor-screen-orientation": "^2.0.2",
     "@capgo/capacitor-crisp": "^1.1.21",
     "@capgo/capacitor-flash": "^1.2.27",
