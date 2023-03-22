@@ -145,5 +145,15 @@ pnpm local-serve
 Visit http://localhost:3334
 
 Use the demo credentials.
-Account: unknow.unknow@unknow.com
+Account: test@capgo.app
+Password: testtest
+
+This account has some demo data in it.
+If the data is not fresh just reset the db with `supabase db reset` the seed has been made in the way the data is always fresh.
+
+The admin account is
+Account: admin@capgo.app
 Password: adminadmin
+
+This user will be admin so he can impersonate other users.
+You can find the menu for that in the account section.
