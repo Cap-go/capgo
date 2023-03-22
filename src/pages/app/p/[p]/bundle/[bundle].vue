@@ -51,6 +51,7 @@ const tabs: Tab[] = [
 const getChannels = async () => {
   if (!version.value)
     return
+  channel.value = undefined
   const { data: dataChannel } = await supabase
     .from('channels')
     .select()
@@ -79,16 +80,28 @@ const showSize = computed(() => {
   else
     return t('app-not-found')
 })
-const setChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
+
+const getUnknowBundleId = async () => {
   if (!version.value)
     return
+  const { data } = await supabase
+    .from('app_versions')
+    .select()
+    .eq('app_id', version.value.app_id)
+    .eq('name', 'unknown')
+    .single()
+  return data?.id
+}
+
+const setChannel = async (channel: Database['public']['Tables']['channels']['Row'], id: number) => {
   return supabase
     .from('channels')
     .update({
-      version: version.value.id,
+      version: id,
     })
     .eq('id', channel.id)
 }
+
 const ASChannelChooser = async () => {
   if (!version.value)
     return
@@ -99,8 +112,11 @@ const ASChannelChooser = async () => {
       text: chan.name,
       selected: version.value.id === v,
       handler: async () => {
+        if (!version.value)
+          return
         try {
-          await setChannel(chan)
+          await setChannel(chan, version.value.id)
+          await getChannels()
         }
         catch (error) {
           console.error(error)
@@ -152,6 +168,25 @@ const openChannel = async () => {
       handler: () => {
         displayStore.showActionSheet = false
         openChannelLink()
+      },
+    })
+    displayStore.actionSheetOption.buttons.splice(2, 0, {
+      text: t('unlink-channel'),
+      handler: async () => {
+        displayStore.showActionSheet = false
+        try {
+          if (!channel.value)
+            return
+          const id = await getUnknowBundleId()
+          if (!id)
+            return
+          await setChannel(channel.value, id)
+          await getChannels()
+        }
+        catch (error) {
+          console.error(error)
+          displayStore.messageToast.push(t('cannot-test-app-some'))
+        }
       },
     })
   }
