@@ -27,10 +27,12 @@ INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "user_id", "nam
 ('2022-03-07 14:08:28.910887+00', 'com.demo.app', '', '6aa76066-55ef-4238-ade6-0b32334a4097', 'Demo app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792');
 
 INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "user_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider") VALUES
-(9654, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:35.187846+00', 'f', NULL, '3885ee49', NULL, 'r2'),
-(9653, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:33:18.768949+00', 'f', NULL, '9d4f798a', NULL, 'r2'),
-(9652, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:37.044903+00', 'f', NULL, '44913a9f', NULL, 'r2'),
-(9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:46.505275+00', 'f', NULL, '9f74e70a', NULL, 'r2');
+(9654, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '3885ee49', NULL, 'r2'),
+(9653, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '9d4f798a', NULL, 'r2'),
+(9652, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '44913a9f', NULL, 'r2'),
+(9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '9f74e70a', NULL, 'r2'),
+(1884, now(), 'com.demo.app', 'builtin', NULL, '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 't', NULL, NULL, NULL, 'supabase'),
+(1883, now(), 'com.demo.app', 'unknown', NULL, '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 't', NULL, NULL, NULL, 'supabase');
 
 INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "updated_at", "checksum", "size", "id", "devices") VALUES
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:33.664139+00', '3885ee49', 1012506, 9654, 10),
