@@ -19,10 +19,10 @@ export const useMainStore = defineStore('main', () => {
   const goodPlan = ref<boolean>(false)
   const canUseMore = ref<boolean>(false)
 
-  const logout = async () => {
+  const logout = () => {
     return new Promise<void>((resolve) => {
       const supabase = useSupabase()
-      supabase.auth.onAuthStateChange((event) => {
+      supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
           auth.value = undefined
           user.value = undefined
