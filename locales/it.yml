@@ -1,9 +1,11 @@
 Bandwidth: Larghezza di banda
 Storage: Magazzinaggio
 account: Account
+account-error: Errore durante l'aggiornamento del tuo account
 account-password-error: Si è verificato un errore, riprova
 account-password-heading: Cambia la mia password
 account-settings: Impostazioni dell'account
+account-updated-succ: Account aggiornato con successo
 action: Azione
 activation-desc: Compila i seguenti campi per completare la tua registrazione
 activation-doi: Consenso facoltativo
@@ -19,6 +21,7 @@ activation-notification-desc: >-
 activation-validate: Convalidare
 add: Aggiungere
 add-another-app: Aggiungi la tua app
+add-shared-user: Aggiungi utente condiviso
 add-this-code-to-you: Aggiungi questo codice al tuo progetto
 add-your-app-to-your: Aggiungi la tua app al tuo account
 add-your-first-app-t: Aggiungi la tua prima app al tuo account e inviamo gli aggiornamenti!
@@ -132,6 +135,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Inserisci la tua nuova password e conferma
 first-name: Nome di battesimo
 force-version: Versione forzata
+forgot: Dimenticato
 forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
 forgot-success: Password aggiornata con successo
 from-device: dal dispositivo

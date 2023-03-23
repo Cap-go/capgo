@@ -1,9 +1,12 @@
+6-characters-minimum: 6 characters minimum, 1 uppercase, 1 lowercase, 1 special character
 Bandwidth: Bandwidth
 Storage: Storage
 account: Account
+account-error: Error while updating your account
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
 account-settings: Account Settings
+account-updated-succ: Account updated successfully
 action: Action
 activation-desc: Fill the following fields to complete your registration
 activation-doi: Optional consent
@@ -17,6 +20,7 @@ activation-notification-desc: I accept to receive notification when new app vers
 activation-validate: Validate
 add: Add
 add-another-app: Add your app
+add-shared-user: Add shared user
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
@@ -125,6 +129,7 @@ enter-your-email-add: Enter your email address and we'll send you a link to rese
 enter-your-new-passw: Enter your new password and confirm
 first-name: First name
 force-version: Force version
+forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from-device: from device
@@ -185,6 +190,7 @@ open-this-link-to-le: Open this link to learn how to test your update
 os-version: OS version
 pages: Pages
 password: Password
+password-confirmatio: Password confirmation
 password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password

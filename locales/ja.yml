@@ -1,9 +1,11 @@
 Bandwidth: 帯域幅
 Storage: 保管所
 account: アカウント
+account-error: アカウントの更新中にエラーが発生しました
 account-password-error: エラーが発生しました。もう一度お試しください
 account-password-heading: パスワードを変更する
 account-settings: アカウント設定
+account-updated-succ: アカウントが正常に更新されました
 action: アクション
 activation-desc: 次のフィールドに入力して、登録を完了します
 activation-doi: オプションの同意
@@ -17,6 +19,7 @@ activation-notification-desc: アプリの新しいバージョンが利用可�
 activation-validate: 検証
 add: 追加
 add-another-app: アプリを追加する
+add-shared-user: 共有ユーザーを追加
 add-this-code-to-you: このコードをプロジェクトに追加します
 add-your-app-to-your: アプリをアカウントに追加する
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
@@ -126,6 +129,7 @@ enter-your-email-add: メールアドレスを入力すると、パスワード�
 enter-your-new-passw: 新しいパスワードを入力して確認します
 first-name: ファーストネーム
 force-version: 強制バージョン
+forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました
 from-device: デバイスから

@@ -1,21 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import useVuelidate from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { isSpoofed, saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
 
 const route = useRoute()
-const form = reactive({
-  uuid: '',
-})
+
 const isLoading = ref(false)
 const oldId = ref(isSpoofed())
-const rules = computed(() => ({
-  uuid: { required },
-}))
 
-const v$ = useVuelidate(rules, form)
 const setLogAs = (id: string) => {
   console.log('setLogAs', id)
   saveSpoof(id)
@@ -29,15 +21,13 @@ const setLogAs = (id: string) => {
     window.location.reload()
   }, 1000)
 }
-const submit = async () => {
+const submit = async (form: { uuid: string }) => {
   if (isLoading.value)
     return
   isLoading.value = true
-  const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect)
-    isLoading.value = false
   setLogAs(form.uuid)
 }
+
 if (route.path.includes('/admin')) {
   const id = route.query.uuid as string
   // remove query param
@@ -66,9 +56,8 @@ const reset = () => {
 
 <template>
   <div class="grow">
-    <form
-      @submit.prevent="submit"
-    >
+    <FormKit id="set-password" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
+      <FormKitMessages />
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
@@ -83,19 +72,17 @@ const reset = () => {
           <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
               <label class="block mb-1 text-sm font-medium dark:text-white" for="name">UUID</label>
-              <input
-                v-model="form.uuid" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-                :disabled="isLoading"
-                autofocus
-                required
-                placeholder="UUID"
+              <FormKit
                 type="text"
-              >
-              <div v-for="(error, index) of v$.uuid.$errors" :key="index">
-                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                  UUID: {{ error.$message }}
-                </p>
-              </div>
+                name="uuid"
+                :disabled="isLoading"
+                enterkeyhint="send"
+                autofocus
+                validation="required:trim"
+                placeholder="UUID"
+                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                message-class="text-red-500"
+              />
             </div>
           </div>
         </section>
@@ -130,7 +117,7 @@ const reset = () => {
           </div>
         </div>
       </footer>
-    </form>
+    </FormKit>
   </div>
 </template>
 

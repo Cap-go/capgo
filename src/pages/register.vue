@@ -1,62 +1,21 @@
 <script setup lang="ts">
-import { useVuelidate } from '@vuelidate/core'
-import { email, helpers, minLength, required, sameAs } from '@vuelidate/validators'
 import { useRouter } from 'vue-router'
-import { computed, reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { setErrors } from '@formkit/core'
+import { FormKitMessages } from '@formkit/vue'
 import { useSupabase } from '~/services/supabase'
 
 const router = useRouter()
 const supabase = useSupabase()
 const { t } = useI18n()
-const form = reactive({
-  first_name: '',
-  last_name: '',
-  countryCode: '+33',
-  phone: '',
-  email: '',
-  repeatPassword: '',
-  password: '',
-  parent: 'dad',
-})
 
 const isLoading = ref(false)
-const errorMessage = ref('')
 
-const containsUppercase = helpers.regex(/[A-Z]/)
-const containsLowercase = helpers.regex(/[a-z]/)
-const containsSpecial = helpers.regex(/[#?!@$%^&*-]/)
-
-const rules = computed(() => ({
-  first_name: { required, minLength: minLength(2) },
-  last_name: { required, minLength: minLength(2) },
-  email: { required, email },
-  password: {
-    required,
-    minLength: minLength(6),
-    containsUppercase: helpers.withMessage(t('upperCaseError'), containsUppercase),
-    containsLowercase: helpers.withMessage(t('lowerCaseError'), containsLowercase),
-    containsSpecial: helpers.withMessage(t('specialError'), containsSpecial),
-  },
-  repeatPassword: {
-    required,
-    minLength: minLength(6),
-    sameAsPassword: sameAs(form.password),
-  },
-}))
-
-const v$ = useVuelidate(rules, form)
-
-const submit = async () => {
+const submit = async (form: { first_name: string; last_name: string; password: string; email: string }) => {
   if (isLoading.value)
     return
-  // console.log('submit')
   isLoading.value = true
-  const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect) {
-    isLoading.value = false
-    return
-  }
   const { data: user, error } = await supabase.auth.signUp(
     {
       email: form.email,
@@ -65,7 +24,6 @@ const submit = async () => {
         data: {
           first_name: form.first_name,
           last_name: form.last_name,
-          phone: form.phone,
           activation: {
             formFilled: true,
             enableNotifications: false,
@@ -81,7 +39,7 @@ const submit = async () => {
   )
   isLoading.value = false
   if (error || !user) {
-    errorMessage.value = error?.message || 'user not found'
+    setErrors('register-account', [error?.message || 'user not found'], {})
     return
   }
   router.push('/onboarding/confirm_email')
@@ -102,13 +60,11 @@ const submit = async () => {
       <div class="relative max-w-2xl mx-auto mt-4 md:mt-8">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <form @submit.prevent="submit">
-              <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                {{ errorMessage }}
-              </p>
+            <FormKit id="register-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
+              <FormKitMessages />
               <div class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
                 <div>
-                  <label for="" class="text-base font-medium text-gray-900"> First name </label>
+                  <label for="" class="text-base font-medium text-gray-900"> {{ t('first-name') }} </label>
                   <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                       <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -116,23 +72,23 @@ const submit = async () => {
                       </svg>
                     </div>
 
-                    <input
-                      v-model="form.first_name"
-                      required
+                    <FormKit
                       type="text"
+                      name="first_name"
+                      :disabled="isLoading"
+                      autocomplete="given-name"
+                      validation="required:trim"
+                      enterkeyhint="next"
+                      autofocus
                       :placeholder="t('first-name')"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
-                    >
-                  </div>
-                  <div v-for="(error, index) of v$.first_name.$errors" :key="index">
-                    <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("first-name") }}: {{ error.$message }}
-                    </p>
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label for="" class="text-base font-medium text-gray-900"> Last name </label>
+                  <label for="" class="text-base font-medium text-gray-900"> {{ t('last-name') }} </label>
                   <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                       <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -140,23 +96,22 @@ const submit = async () => {
                       </svg>
                     </div>
 
-                    <input
-                      v-model="form.last_name"
-                      required
+                    <FormKit
                       type="text"
+                      name="first_name"
+                      autocomplete="family-name"
+                      :disabled="isLoading"
+                      validation="required:trim"
+                      enterkeyhint="next"
                       :placeholder="t('last-name')"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
-                    >
-                  </div>
-                  <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                    <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("last-name") }}: {{ error.$message }}
-                    </p>
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
 
                 <div class="col-span-2 ">
-                  <label for="" class="text-base font-medium text-gray-900"> Email address </label>
+                  <label for="" class="text-base font-medium text-gray-900"> {{ t('email') }} </label>
                   <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                       <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,24 +119,22 @@ const submit = async () => {
                       </svg>
                     </div>
 
-                    <input
-                      v-model="form.email"
-                      required
-                      inputmode="email"
-                      :placeholder="t('email')"
+                    <FormKit
                       type="email"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
-                    >
-                  </div>
-                  <div v-for="(error, index) of v$.email.$errors" :key="index">
-                    <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("email") }}: {{ error.$message }}
-                    </p>
+                      name="email"
+                      autocomplete="email"
+                      inputmode="email"
+                      enterkeyhint="next"
+                      validation="required:trim|email"
+                      :placeholder="t('email')"
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label for="" class="text-base font-medium text-gray-900"> Password </label>
+                  <label for="" class="text-base font-medium text-gray-900"> {{ t('password') }} </label>
                   <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                       <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -194,23 +147,22 @@ const submit = async () => {
                       </svg>
                     </div>
 
-                    <input
-                      v-model="form.password"
-                      required
-                      :placeholder="t('password')"
+                    <FormKit
                       type="password"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
-                    >
-                  </div>
-                  <div v-for="(error, index) of v$.password.$errors" :key="index">
-                    <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                      {{ t("password") }}: {{ error.$message }}
-                    </p>
+                      name="password"
+                      autocomplete="new-password"
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
+                      placeholder="******"
+                      :help="t('6-characters-minimum')"
+                      validation="required|length:6|matches:/(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[#?!@$%^&*-])/"
+                      validation-visibility="live"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label for="" class="text-base font-medium text-gray-900"> Confirm password </label>
+                  <label for="" class="text-base font-medium text-gray-900"> {{ t('confirm-password') }} </label>
                   <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                       <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -222,19 +174,17 @@ const submit = async () => {
                         />
                       </svg>
                     </div>
-
-                    <input
-                      v-model="form.repeatPassword"
-                      required
-                      :placeholder="t('confirm-password')"
+                    <FormKit
                       type="password"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
-                    >
-                  </div>
-                  <div v-for="(error, index) of v$.repeatPassword.$errors" :key="index">
-                    <p class="mt-2 mb-4 text-xs italic">
-                      {{ t("confirm-password") }}: {{ error.$message }}
-                    </p>
+                      name="password_confirm"
+                      :help="t('confirm-password')"
+                      autocomplete="new-password"
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600"
+                      validation="required|confirm"
+                      validation-visibility="live"
+                      :validation-label="t('password-confirmatio')"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
 
@@ -261,7 +211,7 @@ const submit = async () => {
                   </p>
                 </div>
               </div>
-            </form>
+            </FormKit>
           </div>
         </div>
       </div>

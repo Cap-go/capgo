@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useVuelidate } from '@vuelidate/core'
-import { email, minLength, required, sameAs } from '@vuelidate/validators'
-import { computed, reactive, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { setErrors } from '@formkit/core'
+import { FormKitMessages } from '@formkit/vue'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { useDisplayStore } from '~/stores/display'
@@ -15,39 +15,15 @@ const route = useRoute()
 const supabase = useSupabase()
 const step = ref(1)
 
-const form = reactive({
-  email: '',
-  repeatPassword: '',
-  password: '',
-})
-
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
-const errorMessage = ref('')
 
-const rules = computed(() => {
-  if (step.value === 1) {
-    return { email: { required, email } }
-  }
-  else {
-    return {
-      password: { required, minLength: minLength(6) },
-      repeatPassword: { required, minLength: minLength(6), sameAsPassword: sameAs(form.password) },
-    }
-  }
-})
-const v$ = useVuelidate(rules, form)
 const showToastMessage = async (message: string) => {
   displayStore.messageToast.push(message)
 }
 
-const submit = async () => {
+const submit = async (form: { email: string; password: string }) => {
   isLoading.value = true
-  const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect) {
-    isLoading.value = false
-    return
-  }
   if (step.value === 1) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
     // console.log('redirect', redirectTo)
@@ -56,7 +32,7 @@ const submit = async () => {
       isLoading.value = false
     }, 5000)
     if (error)
-      showToastMessage(error.message)
+      setErrors('forgot-password', [error.message], {})
     else showToastMessage(t('forgot-check-email'))
   }
   else if (step.value === 2 && route.hash) {
@@ -67,7 +43,7 @@ const submit = async () => {
     // login with access_token
     const res = await supabase.auth.setSession({ refresh_token, access_token })
     if (res.error) {
-      showToastMessage(res.error.message)
+      setErrors('forgot-password', [res.error.message], {})
       return
     }
     else {
@@ -78,7 +54,7 @@ const submit = async () => {
       isLoading.value = false
     }, 5000)
     if (error) {
-      showToastMessage(error.message)
+      setErrors('forgot-password', [error.message], {})
     }
     else {
       showToastMessage(t('forgot-success'))
@@ -122,11 +98,8 @@ watchEffect(() => {
         <div class="relative max-w-md mx-auto mt-8 md:mt-4">
           <div class="overflow-hidden bg-white rounded-md shadow-md">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
-              <form @submit.prevent="submit">
+              <FormKit id="forgot-pass" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5">
-                  <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                    {{ errorMessage }}
-                  </p>
                   <div v-if="step === 1">
                     <label for="" class="text-base font-medium text-gray-900"> {{ t('email-address') }} </label>
                     <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
@@ -135,23 +108,46 @@ watchEffect(() => {
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                         </svg>
                       </div>
-
-                      <input
-                        id="emailInput"
-                        v-model="form.email"
-                        inputmode="email" autocomplete="email"
-                        name="email"
+                      <FormKit
                         type="email"
+                        name="email"
                         :disabled="isLoading"
+                        inputmode="email"
+                        autocomplete="email"
+                        validation="required:trim"
                         :placeholder="t('email')"
-                        :required="true"
-                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                      >
-                      <div v-for="(error, index) of v$.email?.$errors" :key="index">
-                        <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                          {{ t('email') }}: {{ error.$message }}
-                        </p>
+                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        message-class="text-red-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div v-if="step === 2">
+                    <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
+                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
+                          />
+                        </svg>
                       </div>
+                      <FormKit
+                        type="password"
+                        name="password"
+                        autocomplete="new-password"
+                        enterkeyhint="send"
+                        :disabled="isLoading"
+                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        placeholder="******"
+                        :label="t('password')"
+                        :help="t('6-characters-minimum')"
+                        validation="required|length:6|matches:/(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[#?!@$%^&*-])/"
+                        validation-visibility="live"
+                        message-class="text-red-500"
+                      />
                     </div>
                   </div>
 
@@ -168,46 +164,22 @@ watchEffect(() => {
                         </svg>
                       </div>
 
-                      <input
-                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('password') " :required="true"
-                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                      >
-                    </div>
-                    <div>
-                      <div v-for="(error, index) of v$.password?.$errors" :key="index">
-                        <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                          {{ t('password') }}: {{ error.$message }}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div v-if="step === 2">
-                    <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
-                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
-                          />
-                        </svg>
-                      </div>
-
-                      <input
-                        id="passwordInput2" v-model="form.repeatPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('confirm-password') " :required="true"
-                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                      >
-                    </div>
-                    <div>
-                      <div v-for="(error, index) of v$.password?.$errors" :key="index">
-                        <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                          {{ t('password') }}: {{ error.$message }}
-                        </p>
-                      </div>
+                      <FormKit
+                        type="password"
+                        name="password_confirm"
+                        autocomplete="new-password"
+                        :disabled="isLoading"
+                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        :label="t('confirm-password')"
+                        :help="t('confirm-password')"
+                        validation="required|confirm"
+                        validation-visibility="live"
+                        :validation-label="t('password-confirmatio')"
+                        message-class="text-red-500"
+                      />
                     </div>
                   </div>
+                  <FormKitMessages />
 
                   <div>
                     <button type="submit" class="inline-flex items-center justify-center w-full">
@@ -228,7 +200,7 @@ watchEffect(() => {
                     </button>
                   </div>
                 </div>
-              </form>
+              </FormKit>
             </div>
           </div>
           <div class="flex flex-row justify-center w-full mt-5">

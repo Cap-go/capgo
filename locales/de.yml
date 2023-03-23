@@ -1,9 +1,11 @@
 Bandwidth: Bandbreite
 Storage: Lagerung
 account: Konto
+account-error: Fehler beim Aktualisieren Ihres Kontos
 account-password-error: Fehler aufgetreten, bitte versuchen Sie es erneut
 account-password-heading: Ändere mein Passwort
 account-settings: Account Einstellungen
+account-updated-succ: Konto erfolgreich aktualisiert
 action: Aktion
 activation-desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzuschließen
 activation-doi: Optionale Zustimmung
@@ -21,6 +23,7 @@ activation-notification-desc: >-
 activation-validate: Bestätigen
 add: Hinzufügen
 add-another-app: Fügen Sie Ihre Anwendung hinzu
+add-shared-user: Geteilten Benutzer hinzufügen
 add-this-code-to-you: Fügen Sie diesen Code Ihrem Projekt hinzu
 add-your-app-to-your: Fügen Sie Ihre App zu Ihrem Konto hinzu
 add-your-first-app-t: >-
@@ -136,6 +139,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 first-name: Vorname
 force-version: Force-Version
+forgot: Vergessen
 forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
   erhalten

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { useVuelidate } from '@vuelidate/core'
-import { email, required } from '@vuelidate/validators'
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { Capacitor } from '@capacitor/core'
+import { setErrors } from '@formkit/core'
+import { FormKitMessages } from '@formkit/vue'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
 import { useDisplayStore } from '~/stores/display'
@@ -18,19 +17,6 @@ const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
 
-const form = reactive({
-  email: '',
-  password: '',
-})
-
-const showPassword = ref(false)
-
-const rules = {
-  email: { required, email },
-  password: { required },
-
-}
-const v$ = useVuelidate(rules as any, form)
 const showToastMessage = async (message: string) => {
   displayStore.messageToast.push(message)
 }
@@ -42,44 +28,20 @@ const nextLogin = async () => {
   }, 500)
 }
 
-const submit = async () => {
-  v$.value.$touch()
-  if (!v$.value.$invalid) {
-    isLoading.value = true
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    })
-    isLoading.value = false
-    if (error) {
-      console.error('error', error)
-      showToastMessage(t('invalid-auth'))
-    }
-    else {
-      await nextLogin()
-    }
+const submit = async (form: { email: string; password: string }) => {
+  isLoading.value = true
+  const { error } = await supabase.auth.signInWithPassword({
+    email: form.email,
+    password: form.password,
+  })
+  isLoading.value = false
+  if (error) {
+    console.error('error', error)
+    setErrors('login-account', [error.message], {})
+    showToastMessage(t('invalid-auth'))
   }
-}
-
-const fixIOS = () => {
-  // fix: https://github.com/ionic-team/ionic-framework/issues/23335
-  if (Capacitor.getPlatform() === 'ios') {
-    const emailInput = document.getElementById('emailInput')
-    const passwordInput = document.getElementById('passwordInput')
-    if (emailInput) {
-      emailInput.addEventListener('change', (ev: Event) => {
-        requestAnimationFrame(() => {
-          form.email = (ev.target as HTMLInputElement).value
-        })
-      })
-    }
-    if (passwordInput) {
-      passwordInput.addEventListener('change', (ev: Event) => {
-        requestAnimationFrame(() => {
-          form.password = (ev.target as HTMLInputElement).value
-        })
-      })
-    }
+  else {
+    await nextLogin()
   }
 }
 
@@ -104,7 +66,6 @@ const checkLogin = async () => {
   else {
     isLoading.value = false
     hideLoader()
-    fixIOS()
   }
 }
 
@@ -130,7 +91,7 @@ onMounted(checkLogin)
       <div class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <form @submit.prevent="submit">
+            <FormKit id="login-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <div>
                   <label for="" class="text-base font-medium text-gray-900"> Email address </label>
@@ -140,23 +101,18 @@ onMounted(checkLogin)
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                       </svg>
                     </div>
-
-                    <input
-                      id="emailInput"
-                      v-model="form.email"
-                      inputmode="email" autocomplete="email"
-                      name="email"
+                    <FormKit
                       type="email"
+                      name="email"
                       :disabled="isLoading"
+                      enterkeyhint="next"
+                      inputmode="email"
+                      autocomplete="email"
+                      validation="required:trim"
                       :placeholder="t('email')"
-                      :required="true"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                    >
-                    <div v-for="(error, index) of v$.email.$errors" :key="index">
-                      <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                        {{ t('email') }}: {{ error.$message }}
-                      </p>
-                    </div>
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
 
@@ -181,21 +137,21 @@ onMounted(checkLogin)
                         />
                       </svg>
                     </div>
-
-                    <input
-                      id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" :type="showPassword ? 'text' : 'password'" :placeholder="t('password') " :required="true"
-                      class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                    >
-                  </div>
-                  <div>
-                    <div v-for="(error, index) of v$.password.$errors" :key="index">
-                      <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                        {{ t('password') }}: {{ error.$message }}
-                      </p>
-                    </div>
+                    <FormKit
+                      id="passwordInput"
+                      type="password"
+                      :placeholder="t('password')"
+                      name="password"
+                      :disabled="isLoading"
+                      validation="required:trim"
+                      enterkeyhint="send"
+                      autocomplete="current-password"
+                      input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                      message-class="text-red-500"
+                    />
                   </div>
                 </div>
-
+                <FormKitMessages />
                 <div>
                   <button type="submit" class="inline-flex items-center justify-center w-full">
                     <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -226,7 +182,7 @@ onMounted(checkLogin)
                   </p>
                 </div>
               </div>
-            </form>
+            </FormKit>
           </div>
         </div>
       </div>

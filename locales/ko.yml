@@ -1,9 +1,11 @@
 Bandwidth: 대역폭
 Storage: 저장
 account: 계정
+account-error: 계정을 업데이트하는 동안 오류가 발생했습니다.
 account-password-error: 오류가 발생했습니다. 다시 시도해 주세요.
 account-password-heading: 내 비밀번호 변경
 account-settings: 계정 설정
+account-updated-succ: 계정이 성공적으로 업데이트되었습니다.
 action: 행동
 activation-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 activation-doi: 선택적 동의
@@ -17,6 +19,7 @@ activation-notification-desc: 새 앱 버전을 사용할 수 있을 때 알림 
 activation-validate: 확인
 add: 추가하다
 add-another-app: 앱 추가
+add-shared-user: 공유 사용자 추가
 add-this-code-to-you: 이 코드를 프로젝트에 추가하십시오.
 add-your-app-to-your: 계정에 앱 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
@@ -126,6 +129,7 @@ enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설
 enter-your-new-passw: 새 비밀번호를 입력하고 확인
 first-name: 이름
 force-version: 포스 버전
+forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
 from-device: 장치에서

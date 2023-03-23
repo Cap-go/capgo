@@ -1,9 +1,11 @@
 Bandwidth: largura de banda
 Storage: Armazenar
 account: Conta
+account-error: Erro ao atualizar sua conta
 account-password-error: Ocorreu um erro, tente novamente
 account-password-heading: Mudar minha senha
 account-settings: Configurações de Conta
+account-updated-succ: Conta atualizada com sucesso
 action: Ação
 activation-desc: Preencha os campos a seguir para concluir seu cadastro
 activation-doi: Consentimento opcional
@@ -19,6 +21,7 @@ activation-notification-desc: >-
 activation-validate: Validar
 add: Adicionar
 add-another-app: Adicione seu aplicativo
+add-shared-user: Adicionar usuário compartilhado
 add-this-code-to-you: Adicione este código ao seu projeto
 add-your-app-to-your: Adicione seu aplicativo à sua conta
 add-your-first-app-t: Adicione seu primeiro aplicativo à sua conta e vamos enviar atualizações!
@@ -130,6 +133,7 @@ enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para r
 enter-your-new-passw: Digite sua nova senha e confirme
 first-name: Primeiro nome
 force-version: Forçar versão
+forgot: Esquecido
 forgot-check-email: Verifique seu e-mail para obter o link para redefinir sua senha
 forgot-success: Senha atualizada com sucesso
 from-device: do dispositivo

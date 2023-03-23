@@ -27,10 +27,10 @@ export const useMainStore = defineStore('main', () => {
           auth.value = undefined
           user.value = undefined
           reset()
+          unspoofUser()
           resolve()
         }
       })
-      unspoofUser()
       // deleteSupabaseToken()
       setTimeout(() => {
         supabase.auth.signOut()

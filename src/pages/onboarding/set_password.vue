@@ -1,41 +1,17 @@
 <script setup lang="ts">
-import { helpers, minLength, required, sameAs } from '@vuelidate/validators'
-import { useVuelidate } from '@vuelidate/core'
-import { computed, reactive, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { setErrors } from '@formkit/core'
+import { FormKitMessages } from '@formkit/vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
 const supabase = useSupabase()
-const errorMessage = ref('')
-const form = reactive({
-  password: '',
-  confirmPassword: '',
-})
-const containsUppercase = helpers.regex(/[A-Z]/)
-const containsLowercase = helpers.regex(/[a-z]/)
-const containsSpecial = helpers.regex(/[#?!@$%^&*-]/)
 
 const { t } = useI18n()
 
-const rules = computed(() => ({
-  password: {
-    required,
-    minLength: minLength(6),
-    containsUppercase: helpers.withMessage(t('upperCaseError'), containsUppercase),
-    containsLowercase: helpers.withMessage(t('lowerCaseError'), containsLowercase),
-    containsSpecial: helpers.withMessage(t('specialError'), containsSpecial),
-  },
-  confirmPassword: {
-    required,
-    minLength: minLength(6),
-    sameAsPassword: sameAs(form.password),
-  },
-}))
-
-const v$ = useVuelidate(rules, form)
 const displayStore = useDisplayStore()
 const router = useRouter()
 const route = useRoute()
@@ -57,18 +33,13 @@ const signInUser = async () => {
   })
 }
 
-const submit = async () => {
+const submit = async (form: { password: string }) => {
   isLoading.value = true
-  const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect) {
-    isLoading.value = false
-    return
-  }
 
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
   isLoading.value = false
   if (updateError)
-    errorMessage.value = updateError.message
+    setErrors('set-password', [updateError.message], {})
   else
     displayStore.messageToast.push(t('changed-password-suc'))
   router.push('/onboarding/activation')
@@ -100,12 +71,9 @@ watchEffect(async () => {
         <div class="relative max-w-md mx-auto mt-8 md:mt-4">
           <div class="overflow-hidden bg-white rounded-md shadow-md">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
-              <form @submit.prevent="submit">
+              <FormKit id="set-password" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5">
-                  <p v-if="errorMessage" class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                    {{ errorMessage }}
-                  </p>
-
+                  <FormKitMessages />
                   <div>
                     <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
                       <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -119,17 +87,20 @@ watchEffect(async () => {
                         </svg>
                       </div>
 
-                      <input
-                        id="passwordInput" v-model="form.password" autocomplete="current-password" name="password" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('password') " :required="true"
-                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                      >
-                    </div>
-                    <div>
-                      <div v-for="(error, index) of v$.password?.$errors" :key="index">
-                        <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                          {{ t('password') }}: {{ error.$message }}
-                        </p>
-                      </div>
+                      <FormKit
+                        type="password"
+                        name="password"
+                        autocomplete="new-password"
+                        enterkeyhint="send"
+                        :disabled="isLoading"
+                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        placeholder="******"
+                        :label="t('password')"
+                        :help="t('6-characters-minimum')"
+                        validation="required|length:6|matches:/(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[#?!@$%^&*-])/"
+                        validation-visibility="live"
+                        message-class="text-red-500"
+                      />
                     </div>
                   </div>
 
@@ -145,18 +116,19 @@ watchEffect(async () => {
                           />
                         </svg>
                       </div>
-
-                      <input
-                        id="passwordInput2" v-model="form.confirmPassword" autocomplete="current-password" name="password2" enterkeyhint="send" :disabled="isLoading" type="password" :placeholder="t('confirm-password') " :required="true"
-                        class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                      >
-                    </div>
-                    <div>
-                      <div v-for="(error, index) of v$.confirmPassword?.$errors" :key="index">
-                        <p class="mt-2 mb-4 text-xs italic text-muted-blue-500">
-                          {{ t('password') }}: {{ error.$message }}
-                        </p>
-                      </div>
+                      <FormKit
+                        type="password"
+                        name="password_confirm"
+                        autocomplete="new-password"
+                        :disabled="isLoading"
+                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
+                        :label="t('confirm-password')"
+                        :help="t('confirm-password')"
+                        validation="required|confirm"
+                        validation-visibility="live"
+                        :validation-label="t('password-confirmatio')"
+                        message-class="text-red-500"
+                      />
                     </div>
                   </div>
 
@@ -179,7 +151,7 @@ watchEffect(async () => {
                     </button>
                   </div>
                 </div>
-              </form>
+              </FormKit>
             </div>
           </div>
           <div class="flex flex-row justify-center w-full mt-5">

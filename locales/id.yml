@@ -1,9 +1,11 @@
 Bandwidth: Bandwidth
 Storage: Penyimpanan
 account: Akun
+account-error: Terjadi kesalahan saat memperbarui akun Anda
 account-password-error: Terjadi kesalahan, harap coba lagi
 account-password-heading: Ubah kata sandi saya
 account-settings: Pengaturan akun
+account-updated-succ: Akun berhasil diperbarui
 action: Tindakan
 activation-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
 activation-doi: Persetujuan opsional
@@ -17,6 +19,7 @@ activation-notification-desc: Saya menerima untuk menerima pemberitahuan ketika 
 activation-validate: Mengesahkan
 add: Menambahkan
 add-another-app: Tambahkan aplikasi Anda
+add-shared-user: Tambahkan pengguna bersama
 add-this-code-to-you: Tambahkan kode ini ke proyek Anda
 add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
@@ -130,6 +133,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 first-name: Nama depan
 force-version: Versi paksa
+forgot: Lupa
 forgot-check-email: >-
   Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
   Anda

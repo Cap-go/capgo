@@ -6,8 +6,8 @@ import { computed, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
-import { useVuelidate } from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
+import { setErrors } from '@formkit/core'
+import { FormKitMessages } from '@formkit/vue'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -21,7 +21,7 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
-const errorMessage = ref('')
+// const errorMessage = ref('')
 
 const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
   const { error } = await supabase.storage
@@ -43,7 +43,7 @@ const updloadPhoto = async (data: string, fileName: string, contentType: string)
   isLoading.value = false
 
   if (error || dbError || !res.publicUrl || !usr) {
-    errorMessage.value = t('something-went-wrong-try-again-later')
+    setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
     console.error('upload error', error, dbError)
     return
   }
@@ -134,7 +134,7 @@ const deleteAccount = async () => {
             })
           if (error) {
             console.error(error)
-            errorMessage.value = t('something-went-wrong-try-again-later')
+            setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
           else {
             await main.logout()
@@ -154,13 +154,14 @@ const deleteAccount = async () => {
 }
 
 const acronym = computed(() => {
+  let res = 'MD'
   if (main.user?.first_name && main.user.last_name)
-    return main.user?.first_name[0] + main.user?.last_name[0]
+    res = main.user?.first_name[0] + main.user?.last_name[0]
   else if (main.user?.first_name)
-    return main.user?.first_name[0]
+    res = main.user?.first_name[0]
   else if (main.user?.last_name)
-    return main.user?.last_name[0]
-  return '??'
+    res = main.user?.last_name[0]
+  return res.toUpperCase()
 })
 
 const presentActionSheet = async () => {
@@ -195,30 +196,17 @@ const presentActionSheet = async () => {
 
 const route = useRoute()
 
-const form = reactive({
+const user = reactive({
   first_name: '',
   last_name: '',
   email: main.auth?.email,
   country: '',
 })
 
-const rules = computed(() => ({
-  first_name: { required },
-  last_name: { required },
-  email: { required },
-}))
-
-const v$ = useVuelidate(rules, form)
-
-const submit = async () => {
-  if (isLoading.value)
+const submit = async (form: { first_name: string; last_name: string; email: string; country: string }) => {
+  if (isLoading.value || !main.user?.id)
     return
   isLoading.value = true
-  const isFormCorrect = await v$.value.$validate()
-  if (!isFormCorrect || !main.user?.id || !form.email) {
-    isLoading.value = false
-    return
-  }
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
     id: main.user?.id,
@@ -235,9 +223,12 @@ const submit = async () => {
     .single()
 
   if (dbError || !usr) {
-    errorMessage.value = dbError?.message || 'Unknow'
     isLoading.value = false
+    setErrors('update-account', [t('account-error')], {})
     return
+  }
+  else {
+    displayStore.messageToast.push(t('account-updated-succ'))
   }
   main.user = usr
   isLoading.value = false
@@ -258,10 +249,10 @@ watchEffect(async () => {
       .single()
     if (usr) {
       console.log('usr', usr)
-      form.email = usr.email || ''
-      form.country = usr.country || ''
-      form.first_name = usr.first_name || ''
-      form.last_name = usr.last_name || ''
+      user.email = usr.email || ''
+      user.country = usr.country || ''
+      user.first_name = usr.first_name || ''
+      user.last_name = usr.last_name || ''
     }
   }
 })
@@ -269,9 +260,7 @@ watchEffect(async () => {
 
 <template>
   <div class="h-full pb-8 overflow-y-scroll md:pb-0 grow max-h-fit">
-    <form
-      @submit.prevent="submit"
-    >
+    <FormKit id="update-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
@@ -303,63 +292,70 @@ watchEffect(async () => {
             {{ t('you-can-change-your-') }}
           </div>
 
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+          <div class="mt-5 space-y-4 sm:flex sm:items-stretch sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">{{ t('first-name') }}</label>
-              <input
-                v-model="form.first_name" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+              <FormKit
+                type="text"
+                name="first_name"
+                autocomplete="given-name"
                 :disabled="isLoading"
+                :value="user.first_name"
+                validation="required:trim"
+                enterkeyhint="next"
                 autofocus
-                required
+                :label="t('first-name')"
                 :placeholder="t('first-name')"
-                type="text"
-              >
-              <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                  {{ t('first-name') }}: {{ error.$message }}
-                </p>
-              </div>
+                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                message-class="text-red-500"
+              />
             </div>
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="business-id">{{ t('last-name') }}</label>
-              <input
-                v-model="form.last_name" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+              <FormKit
+                type="text"
+                name="first_name"
+                autocomplete="family-name"
                 :disabled="isLoading"
-                required
+                enterkeyhint="next"
+                :value="user.last_name"
+                validation="required:trim"
+                :label="t('last-name')"
                 :placeholder="t('last-name')"
-                type="text"
-              >
-              <div v-for="(error, index) of v$.last_name.$errors" :key="index">
-                <p class="mt-2 mb-4 text-xs italic text-pumpkin-orange-900">
-                  {{ t('last-name') }}: {{ error.$message }}
-                </p>
-              </div>
+                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                message-class="text-red-500"
+              />
             </div>
           </div>
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+          <div class="mt-5 space-y-4 sm:flex sm:items-stretch sm:items-center sm:space-y-0 sm:space-x-4">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('email') }}</label>
-              <input
-                v-model="form.email" class="w-full p-2 form-input dark:bg-gray-700 dark:text-white hover:cursor-not-allowed"
-                required
-                disabled
-                inputmode="email"
-                :placeholder="t('email')"
+              <FormKit
                 type="email"
-              >
+                name="email"
+                disabled
+                :value="user.email"
+                enterkeyhint="next"
+                validation="required:trim|email"
+                :label="t('email')"
+                :placeholder="t('email')"
+                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                message-class="text-red-500"
+              />
             </div>
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="location">{{ t('country') }}</label>
-              <input
-                v-model="form.country"
-                class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-                :disabled="isLoading"
-                required
-                :placeholder="t('country')"
+              <FormKit
                 type="text"
-              >
+                name="country"
+                :disabled="isLoading"
+                :value="user.country"
+                enterkeyhint="send"
+                validation="required:trim"
+                :label="t('country')"
+                :placeholder="t('country')"
+                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
+                message-class="text-red-500"
+              />
             </div>
           </div>
+          <FormKitMessages />
         </section>
         <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
           <IconVersion /> <span class="pl-2"> {{ version }}</span>
@@ -386,7 +382,7 @@ watchEffect(async () => {
           </div>
         </div>
       </footer>
-    </form>
+    </FormKit>
   </div>
 </template>
 

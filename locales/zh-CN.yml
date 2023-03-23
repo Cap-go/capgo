@@ -1,9 +1,11 @@
 Bandwidth: 带宽
 Storage: 贮存
 account: 帐户
+account-error: 更新您的帐户时出错
 account-password-error: 发生错误，请重试
 account-password-heading: 修改我的密码
 account-settings: 帐号设定
+account-updated-succ: 账户更新成功
 action: 行动
 activation-desc: 填写以下字段以完成您的注册
 activation-doi: 选择性同意
@@ -17,6 +19,7 @@ activation-notification-desc: 我同意在新应用版本可用时收到通知
 activation-validate: 证实
 add: 添加
 add-another-app: 添加您的应用
+add-shared-user: 添加共享用户
 add-this-code-to-you: 将此代码添加到您的项目中
 add-your-app-to-your: 将您的应用程序添加到您的帐户
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
@@ -126,6 +129,7 @@ enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一�
 enter-your-new-passw: 输入您的新密码并确认
 first-name: 名
 force-version: 强制版本
+forgot: 忘记
 forgot-check-email: 检查您的电子邮件以获取重置密码的链接
 forgot-success: 密码更新成功
 from-device: 从设备

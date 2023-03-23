@@ -1,9 +1,11 @@
 Bandwidth: Bant genişliği
 Storage: Depolamak
 account: Hesap
+account-error: Hesabınız güncellenirken hata oluştu
 account-password-error: Hata oluştu, lütfen tekrar deneyin
 account-password-heading: Şifremi Değiştir
 account-settings: Hesap ayarları
+account-updated-succ: Hesap başarıyla güncellendi
 action: Aksiyon
 activation-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
 activation-doi: İsteğe bağlı onay
@@ -17,6 +19,7 @@ activation-notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim
 activation-validate: Doğrula
 add: Eklemek
 add-another-app: uygulamanızı ekleyin
+add-shared-user: Paylaşılan kullanıcı ekle
 add-this-code-to-you: Bu kodu projenize ekleyin
 add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
@@ -130,6 +133,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 first-name: İlk adı
 force-version: Kuvvet versiyonu
+forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
 from-device: cihazdan

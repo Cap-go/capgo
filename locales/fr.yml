@@ -1,9 +1,11 @@
 Bandwidth: Bande passante
 Storage: Stockage
 account: Compte
+account-error: Erreur lors de la mise à jour de votre compte
 account-password-error: Une erreur s'est produite, veuillez réessayer
 account-password-heading: Changer mon mot de passe
 account-settings: Paramètres du compte
+account-updated-succ: Compte mis à jour avec succès
 action: Action
 activation-desc: Remplissez les champs suivants pour finaliser votre inscription
 activation-doi: Consentement facultatif
@@ -21,6 +23,7 @@ activation-notification-desc: >-
 activation-validate: Valider
 add: Ajouter
 add-another-app: Ajoutez votre application
+add-shared-user: Ajouter un utilisateur partagé
 add-this-code-to-you: Ajoutez ce code à votre projet
 add-your-app-to-your: Ajoutez votre application à votre compte
 add-your-first-app-t: "Ajoutez votre première application à votre compte et poussons les mises à jour\_!"
@@ -134,6 +137,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 first-name: Prénom
 force-version: Version forcée
+forgot: Oublié
 forgot-check-email: >-
   Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
   passe

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   kFab,
@@ -27,7 +27,6 @@ const appId = ref<string>()
 const realtimeListener = ref(false)
 const mySubscription = ref()
 const supabase = useSupabase()
-const router = useRouter()
 const main = useMainStore()
 const { t } = useI18n()
 const snag = useLogSnag()
@@ -38,49 +37,7 @@ interface Step {
   subtitle: string
   link?: string
 }
-const allSteps: Step[] = [
-  {
-    title: t('log-to-the-capgo-cli'),
-    command: 'npx --yes @capgo/cli@latest login [APIKEY]',
-    subtitle: '',
-  },
-  {
-    title: t('add-your-app-to-your'),
-    command: 'npx --yes @capgo/cli@latest app add',
-    subtitle: `${t('into-your-app-folder')}`,
-  },
-  {
-    title: t('install-the-capacito'),
-    command: 'npm i @capgo/capacitor-updater@latest',
-    subtitle: t('in-your-project-fold'),
-  },
-  {
-    title: t('add-this-code-to-you'),
-    command: `import { CapacitorUpdater } from '@capgo/capacitor-updater'
-CapacitorUpdater.notifyAppReady()`,
-    subtitle: t('in-your-main-file'),
-  },
-  {
-    title: t('build-your-app-and-s'),
-    command: 'npm run build && npx cap sync',
-    subtitle: '',
-  },
-  {
-    title: t('build-your-code-and-'),
-    command: 'npx --yes @capgo/cli@latest app upload',
-    subtitle: '',
-  },
-  {
-    title: t('test-your-update-in-'),
-    link: 'https://capgo.app/blog/update-your-capacitor-apps-seamlessly-using-capacitor-updater/#receive-a-live-update-on-a-device',
-    subtitle: t('open-this-link-to-le'),
-  },
-  {
-    title: t('discover-your-dashbo'),
-    command: '',
-    subtitle: t('this-page-will-self-'),
-  },
-]
+
 const simpleStep: Step[] = [
   {
     title: t('init-capgo-in-your-a'),
@@ -95,12 +52,11 @@ const simpleStep: Step[] = [
   },
 ]
 const steps = ref(simpleStep)
-const stepMode = ref('simple')
 const setLog = () => {
   if (props.onboarding && main.user?.id) {
     snag.publish({
-      channel: stepMode.value === 'simple' ? 'onboarding-v2' : 'onboarding',
-      event: `${stepMode.value === 'simple' ? 'onboarding-' : ''}step-${step.value}`,
+      channel: 'onboarding-v2',
+      event: `onboarding-step-${step.value}`,
       icon: '👶',
       tags: {
         'user-id': main.user.id,
@@ -157,30 +113,9 @@ const getKey = async (retry = true): Promise<void> => {
 
   isLoading.value = false
 }
-const changeMode = async () => {
-  if (stepMode.value === 'simple') {
-    stepMode.value = 'advanced'
-    steps.value = allSteps
-    if (main.user?.id) {
-      snag.publish({
-        channel: 'onboarding-v2',
-        event: 'change-mode',
-        icon: '🤨',
-        tags: {
-          'user-id': main.user.id,
-        },
-        notify: false,
-      }).catch()
-    }
-  }
-  else {
-    stepMode.value = 'simple'
-    steps.value = simpleStep
-  }
-  await getKey()
-}
+
 watchEffect(async () => {
-  if (stepMode.value !== 'simple' && step.value === 1 && !realtimeListener.value) {
+  if (step.value === 1 && !realtimeListener.value) {
     // console.log('watch app change step 1')
     realtimeListener.value = true
     mySubscription.value = supabase
@@ -200,30 +135,6 @@ watchEffect(async () => {
           appId.value = payload.new.id || ''
           realtimeListener.value = false
           mySubscription.value.unsubscribe()
-        },
-      )
-      .subscribe()
-  }
-  else if (stepMode.value !== 'simple' && step.value === 4 && !realtimeListener.value) {
-    // console.log('watch app change step 4')
-    realtimeListener.value = true
-    mySubscription.value = supabase
-      .channel('table-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'app_versions',
-          filter: `app_id=eq.${appId.value}`,
-        },
-        (payload) => {
-        // console.log('Change received step 1!', payload)
-          setLog()
-          step.value += 1
-          realtimeListener.value = false
-          mySubscription.value.unsubscribe()
-          emit('done')
         },
       )
       .subscribe()
@@ -298,14 +209,6 @@ watchEffect(async () => {
             </div>
           </div>
         </template>
-        <div v-if="onboarding" class="text-center">
-          <button
-            class="mx-auto font-bold text-pumpkin-orange-500"
-            @click="main.logout().then(() => router.replace('/login'))"
-          >
-            {{ t("logout") }}
-          </button>
-        </div>
       </div>
     </div>
   </section>

@@ -21,13 +21,14 @@ const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 const planCurrent = ref('')
 const acronym = computed(() => {
+  let res = 'MD'
   if (main.user?.first_name && main.user.last_name)
-    return main.user?.first_name[0] + main.user?.last_name[0]
+    res = main.user?.first_name[0] + main.user?.last_name[0]
   else if (main.user?.first_name)
-    return main.user?.first_name[0]
+    res = main.user?.first_name[0]
   else if (main.user?.last_name)
-    return main.user?.last_name[0]
-  return '??'
+    res = main.user?.last_name[0]
+  return res.toUpperCase()
 })
 
 if (main.user?.id)

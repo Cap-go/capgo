@@ -2,25 +2,21 @@
 import type { Ref } from 'vue'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import {
-  kDialog,
-  kDialogButton,
   kFab,
 } from 'konsta/vue'
 import type { TableColumn } from '../comp_def'
 import { formatDate } from '~/services/date'
-import { existUser, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import IconTrash from '~icons/heroicons/trash?raw'
 import type { Database } from '~/types/supabase.types'
 import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
-import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   appId: string
+  channelId: number
   allowAdd?: boolean
-  channelId?: number
 }>()
 
 interface ChannelUsers {
@@ -31,16 +27,12 @@ const element: Database['public']['Tables']['channel_users']['Row'] & ChannelUse
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
-const main = useMainStore()
 const { t } = useI18n()
-const router = useRouter()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Element[]>([])
 const isLoading = ref(false)
 const addUserModal = ref(false)
-const newUser = ref<string>()
-const newUserModalOpen = ref(false)
 const currentPage = ref(1)
 const offset = 10
 const currentVersionsNumber = computed(() => {
@@ -144,78 +136,6 @@ const deleteOne = async (one: typeof element) => {
     await refreshData()
 }
 
-const addUser = async () => {
-  // console.log('newUser', newUser.value)
-  if (!props.channelId || !main.auth)
-    return
-  if (!main.canUseMore) {
-    // show alert for upgrade plan and return
-    displayStore.actionSheetOption = {
-      header: t('limit-reached'),
-      message: t('please-upgrade'),
-      buttons: [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('upgrade-now'),
-          id: 'confirm-button',
-          handler: () => {
-            router.push('/dashboard/settings/plans')
-          },
-        },
-      ],
-    }
-    displayStore.showActionSheet = true
-    return
-  }
-  // exist_user
-  const exist = await existUser(newUser.value || '')
-  if (!exist) {
-    newUserModalOpen.value = true
-    return
-  }
-
-  const { error } = await supabase
-    .from('channel_users')
-    .insert({
-      channel_id: props.channelId,
-      app_id: props.appId,
-      user_id: exist,
-      created_by: main.user?.id,
-    })
-  if (error) {
-    console.error(error)
-  }
-  else {
-    await refreshData()
-    addUserModal.value = false
-    newUser.value = ''
-  }
-}
-
-const inviteUser = async (userId: string) => {
-  if (!props.channelId)
-    return
-  const { error } = await supabase
-    .from('channel_users')
-    .insert({
-      channel_id: props.channelId,
-      app_id: props.appId,
-      created_by: main.user?.id,
-      user_id: userId,
-    })
-  if (error) {
-    console.error(error)
-  }
-  else {
-    newUser.value = ''
-    newUserModalOpen.value = false
-    await refreshData()
-  }
-}
-
 const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => {
   if (await didCancel(t('user')))
     return
@@ -307,23 +227,6 @@ onMounted(async () => {
         <component :is="IconPlus" />
       </template>
     </k-fab>
-    <k-dialog
-      :opened="addUserModal"
-      @backdropclick="() => (addUserModal = false)"
-    >
-      <template #title>
-        {{ t('channel-invit') }}
-      </template>
-      <input v-model="newUser" type="email" placeholder="hello@yourcompany.com" class="w-full p-1 text-lg text-gray-900 rounded-lg">
-      <template #buttons>
-        <k-dialog-button class="text-red-800" @click="() => (addUserModal = false)">
-          {{ t('button-cancel') }}
-        </k-dialog-button>
-        <k-dialog-button @click="addUser()">
-          {{ t('add') }}
-        </k-dialog-button>
-      </template>
-    </k-dialog>
-    <NewUserModal :email-address="newUser" :opened="newUserModalOpen" @close="newUserModalOpen = false" @invite-user="inviteUser" />
+    <NewUserModal :opened="addUserModal" :app-id="appId" :channel-id="channelId" @close="addUserModal = false; refreshData()" />
   </div>
 </template>

@@ -1,9 +1,11 @@
 Bandwidth: Băng thông
 Storage: Kho
 account: Tài khoản
+account-error: Lỗi khi cập nhật tài khoản của bạn
 account-password-error: Đã xảy ra lỗi, vui lòng thử lại
 account-password-heading: Thay đổi mật khẩu của tôi
 account-settings: Cài đặt tài khoản
+account-updated-succ: Đã cập nhật tài khoản thành công
 action: Hoạt động
 activation-desc: Điền vào các trường sau để hoàn thành đăng ký của bạn
 activation-doi: đồng ý tùy chọn
@@ -19,6 +21,7 @@ activation-notification-desc: Tôi chấp nhận nhận thông báo khi có phi�
 activation-validate: xác thực
 add: Thêm vào
 add-another-app: Thêm ứng dụng của bạn
+add-shared-user: Thêm người dùng chung
 add-this-code-to-you: Thêm mã này vào dự án của bạn
 add-your-app-to-your: Thêm ứng dụng của bạn vào tài khoản của bạn
 add-your-first-app-t: >-
@@ -132,6 +135,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 first-name: Họ
 force-version: Phiên bản bắt buộc
+forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công
 from-device: từ thiết bị

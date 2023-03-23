@@ -43,6 +43,7 @@ specifiers:
   '@capgo/inappbrowser': ^0.4.1
   '@capgo/native-audio': ^5.0.14
   '@capgo/native-market': ^1.1.25
+  '@formkit/vue': ^0.16.4
   '@iconify-json/carbon': 1.1.16
   '@iconify-json/heroicons': ^1.1.10
   '@iconify-json/ion': 1.1.8
@@ -68,8 +69,6 @@ specifiers:
   '@vue/cli-service': 5.0.8
   '@vue/compiler-sfc': 3.2.47
   '@vue/server-renderer': 3.2.47
-  '@vuelidate/core': 2.0.0
-  '@vuelidate/validators': 2.0.0
   '@vueuse/components': ^9.13.0
   '@vueuse/core': 9.13.0
   adm-zip: ^0.5.10
@@ -171,11 +170,10 @@ dependencies:
   '@capgo/inappbrowser': 0.4.1_@capacitor+core@4.7.0
   '@capgo/native-audio': 5.0.14_@capacitor+core@4.7.0
   '@capgo/native-market': 1.1.25
+  '@formkit/vue': 0.16.4_oh3q7ucsj5a74whiinvjry2vwu
   '@netlify/functions': 1.4.0
   '@supabase/supabase-js': 2.10.0
   '@tailwindcss/forms': 0.5.3_tailwindcss@3.2.7
-  '@vuelidate/core': 2.0.0_vue@3.2.47
-  '@vuelidate/validators': 2.0.0_vue@3.2.47
   '@vueuse/components': 9.13.0_vue@3.2.47
   '@vueuse/core': 9.13.0_vue@3.2.47
   adm-zip: 0.5.10
@@ -2621,6 +2619,98 @@ packages:
     resolution: {integrity: sha512-BpiZLBWdLFw+qFel9p3Zs1jD6QmH7Ii4aTDu6+vx8ShdidChZUXqDhYJly4ZjSgQh54miXbBgBrk0S+jTIh/Qg==}
     dev: false
 
+  /@formkit/core/0.16.4:
+    resolution: {integrity: sha512-SJGadBfRx3L8VxbgIxV1tiDk8u8eisG1vaKUkFWxBRBfiDGYD25CVKz/k6JrxiPsxz96DgeycnRYSzLvZEeORQ==}
+    dependencies:
+      '@formkit/utils': 0.16.4
+    dev: false
+
+  /@formkit/dev/0.16.4:
+    resolution: {integrity: sha512-Caj2bsArHWQpXZXizTKFyYNk95yN5Ma8MUa6U+Ga/x5sEsPpdyAu7TgbU9UGakXKuYFlv/qn19RUnJcsqbQlPQ==}
+    dependencies:
+      '@formkit/core': 0.16.4
+      '@formkit/utils': 0.16.4
+    dev: false
+
+  /@formkit/i18n/0.16.4:
+    resolution: {integrity: sha512-Hp1Goohrzh4PNsDHrQwx7giF7l7mOddN5TJmtLUPUipUhyJIdWMp41sOIgNA5q4rPaRiRGW7knYACFqM8v85mg==}
+    dependencies:
+      '@formkit/core': 0.16.4
+      '@formkit/utils': 0.16.4
+      '@formkit/validation': 0.16.4
+    dev: false
+
+  /@formkit/inputs/0.16.4:
+    resolution: {integrity: sha512-Cqc1a0R9XSlvX1VuCH/w80p/wNoIWvKnE0g8q9aHdj2I7iuSCUKIkIcbkAPBJCRZGKNjZO/Wne7KslsIwHj2rQ==}
+    dependencies:
+      '@formkit/core': 0.16.4
+    dev: false
+
+  /@formkit/observer/0.16.4:
+    resolution: {integrity: sha512-75qhc+So88k1n9JpOspJPiIm3by7vFEjnsr4fCF8nw4NfMgqdVnhqkCc8hbiuDYtyOL3Np7xqhjqS9ElS0xDew==}
+    dependencies:
+      '@formkit/core': 0.16.4
+      '@formkit/utils': 0.16.4
+    dev: false
+
+  /@formkit/rules/0.16.4:
+    resolution: {integrity: sha512-l02P2ysDUM8fnwAHzzba0Xo4CmM1gmakkR3Gbpr5AsupWrxboiwEogUSNCn3hjod2yDyeWtSuDhD/ORJ8z3Nzw==}
+    dependencies:
+      '@formkit/core': 0.16.4
+      '@formkit/utils': 0.16.4
+      '@formkit/validation': 0.16.4
+    dev: false
+
+  /@formkit/themes/0.16.4_tailwindcss@3.2.7:
+    resolution: {integrity: sha512-EZxaD0G9qxM3m5e6ytuW2g/kOQvpIhRJCK0SVIdx0cFuIZv8KyZGQhqSuYIcAc+5M2MCg7eytdalzg0al+fzSg==}
+    peerDependencies:
+      tailwindcss: ^3.2.0
+      unocss: ^0.31.0
+      windicss: ^3.0.0
+    peerDependenciesMeta:
+      tailwindcss:
+        optional: true
+      unocss:
+        optional: true
+      windicss:
+        optional: true
+    dependencies:
+      '@formkit/core': 0.16.4
+      tailwindcss: 3.2.7_postcss@8.4.21
+    dev: false
+
+  /@formkit/utils/0.16.4:
+    resolution: {integrity: sha512-H36dF9r9oMUH719xn2pxMhV83YRmmZpxCYFz9tLDQWzFiqpOAZXDLjIRhG4w0s7/cy4eF+FgJp8EyGF1SFFJ5g==}
+    dev: false
+
+  /@formkit/validation/0.16.4:
+    resolution: {integrity: sha512-4ONVhT6NIUsfabcZLBvbUghRSmnf/zk4eabStxywpEuMENZTXWuZxGjIR7mkI9Zl2WC58l7rJoj/WfxlL0migg==}
+    dependencies:
+      '@formkit/core': 0.16.4
+      '@formkit/observer': 0.16.4
+    dev: false
+
+  /@formkit/vue/0.16.4_oh3q7ucsj5a74whiinvjry2vwu:
+    resolution: {integrity: sha512-RUOHep+BYSwcYZkFia0vEjBdHkWKnjoOSMBhzUi/IepqvF5G1PWYzRnuMAQcfLh+iXcwClVMjr9D9SOhSMe1MQ==}
+    peerDependencies:
+      vue: ^3.2.1
+    dependencies:
+      '@formkit/core': 0.16.4
+      '@formkit/dev': 0.16.4
+      '@formkit/i18n': 0.16.4
+      '@formkit/inputs': 0.16.4
+      '@formkit/observer': 0.16.4
+      '@formkit/rules': 0.16.4
+      '@formkit/themes': 0.16.4_tailwindcss@3.2.7
+      '@formkit/utils': 0.16.4
+      '@formkit/validation': 0.16.4
+      vue: 3.2.47
+    transitivePeerDependencies:
+      - tailwindcss
+      - unocss
+      - windicss
+    dev: false
+
   /@grpc/grpc-js/1.7.3:
     resolution: {integrity: sha512-H9l79u4kJ2PVSxUNA08HMYAnUBLj9v6KjYQ7SQ71hOZcEXhShE/y5iQCesP8+6/Ik/7i2O0a10bPquIcYfufog==}
     engines: {node: ^8.13.0 || >=10.10.0}
@@ -2757,8 +2847,8 @@ packages:
       vue-i18n:
         optional: true
     dependencies:
-      '@intlify/message-compiler': 9.3.0-beta.16
-      '@intlify/shared': 9.3.0-beta.16
+      '@intlify/message-compiler': 9.3.0-beta.17
+      '@intlify/shared': 9.3.0-beta.17
       jsonc-eslint-parser: 1.4.1
       source-map: 0.6.1
       vue-i18n: 9.2.2_vue@3.2.47
@@ -2787,11 +2877,11 @@ packages:
       '@intlify/shared': 9.2.2
       source-map: 0.6.1
 
-  /@intlify/message-compiler/9.3.0-beta.16:
-    resolution: {integrity: sha512-CGQI3xRcs1ET75eDQ0DUy3MRYOqTauRIIgaMoISKiF83gqRWg93FqN8lGMKcpBqaF4tI0JhsfosCaGiBL9+dnw==}
+  /@intlify/message-compiler/9.3.0-beta.17:
+    resolution: {integrity: sha512-i7hvVIRk1Ax2uKa9xLRJCT57to08OhFMhFXXjWN07rmx5pWQYQ23MfX1xgggv9drnWTNhqEiD+u4EJeHoS5+Ww==}
     engines: {node: '>= 14'}
     dependencies:
-      '@intlify/shared': 9.3.0-beta.16
+      '@intlify/shared': 9.3.0-beta.17
       source-map: 0.6.1
     dev: true
 
@@ -2799,8 +2889,8 @@ packages:
     resolution: {integrity: sha512-wRwTpsslgZS5HNyM7uDQYZtxnbI12aGiBZURX3BTR9RFIKKRWpllTsgzHWvj3HKm3Y2Sh5LPC1r0PDCKEhVn9Q==}
     engines: {node: '>= 14'}
 
-  /@intlify/shared/9.3.0-beta.16:
-    resolution: {integrity: sha512-kXbm4svALe3lX+EjdJxfnabOphqS4yQ1Ge/iIlR8tvUiYRCoNz3hig1M4336iY++Dfx5ytEQJPNjIcknNIuvig==}
+  /@intlify/shared/9.3.0-beta.17:
+    resolution: {integrity: sha512-mscf7RQsUTOil35jTij4KGW1RC9SWQjYScwLxP53Ns6g24iEd5HN7ksbt9O6FvTmlQuX77u+MXpBdfJsGqizLQ==}
     engines: {node: '>= 14'}
     dev: true
 
@@ -2820,7 +2910,7 @@ packages:
         optional: true
     dependencies:
       '@intlify/bundle-utils': 3.4.0_vue-i18n@9.2.2
-      '@intlify/shared': 9.3.0-beta.16
+      '@intlify/shared': 9.3.0-beta.17
       '@rollup/pluginutils': 4.2.1
       debug: 4.3.4
       fast-glob: 3.2.12
@@ -5226,32 +5316,6 @@ packages:
   /@vue/web-component-wrapper/1.3.0:
     resolution: {integrity: sha512-Iu8Tbg3f+emIIMmI2ycSI8QcEuAUgPTgHwesDU1eKMLE4YC/c/sFbGc70QgMq31ijRftV0R7vCm9co6rldCeOA==}
     dev: true
-
-  /@vuelidate/core/2.0.0_vue@3.2.47:
-    resolution: {integrity: sha512-xIFgdQlScO0aaSZ0wTGPJh8YcTMNAj5veI8yPgiAyxOT+GV7vNQFiU1vpYWCL4cklkkhYvRRSC2OEX7YOZNmPQ==}
-    peerDependencies:
-      '@vue/composition-api': ^1.0.0-rc.1
-      vue: ^2.0.0 || >=3.0.0
-    peerDependenciesMeta:
-      '@vue/composition-api':
-        optional: true
-    dependencies:
-      vue: 3.2.47
-      vue-demi: 0.13.11_vue@3.2.47
-    dev: false
-
-  /@vuelidate/validators/2.0.0_vue@3.2.47:
-    resolution: {integrity: sha512-fQQcmDWfz7pyH5/JPi0Ng2GEgNK1pUHn/Z/j5rG/Q+HwhgIXvJblTPcZwKOj1ABL7V4UVuGKECvZCDHNGOwdrg==}
-    peerDependencies:
-      '@vue/composition-api': ^1.0.0-rc.1
-      vue: ^2.0.0 || >=3.0.0
-    peerDependenciesMeta:
-      '@vue/composition-api':
-        optional: true
-    dependencies:
-      vue: 3.2.47
-      vue-demi: 0.13.11_vue@3.2.47
-    dev: false
 
   /@vueuse/components/9.13.0_vue@3.2.47:
     resolution: {integrity: sha512-UJ8PjQ4SGb2rsVIy9vhEc6aCu+3+2cc+xEfGNX8/M1NKIuL2Vo6c2Kc2fYFaRzWZkP8HWXu+IcwvnAzL44IEFA==}

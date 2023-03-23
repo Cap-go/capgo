@@ -1,9 +1,11 @@
 Bandwidth: Przepustowość łącza
 Storage: Składowanie
 account: Konto
+account-error: Błąd podczas aktualizowania konta
 account-password-error: Wystąpił błąd, spróbuj ponownie
 account-password-heading: Zmień moje hasło
 account-settings: Ustawienia konta
+account-updated-succ: Konto zostało pomyślnie zaktualizowane
 action: Działanie
 activation-desc: Wypełnij poniższe pola, aby zakończyć rejestrację
 activation-doi: Opcjonalna zgoda
@@ -19,6 +21,7 @@ activation-notification-desc: >-
 activation-validate: Uprawomocnić
 add: Dodać
 add-another-app: Dodaj swoją aplikację
+add-shared-user: Dodaj udostępnionego użytkownika
 add-this-code-to-you: Dodaj ten kod do swojego projektu
 add-your-app-to-your: Dodaj swoją aplikację do swojego konta
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysyłajmy aktualizacje!
@@ -130,6 +133,7 @@ enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowan
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
 first-name: Imię
 force-version: Wersja na siłę
+forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione
 from-device: z urządzenia
