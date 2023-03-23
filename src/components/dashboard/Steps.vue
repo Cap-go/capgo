@@ -212,7 +212,7 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <k-fab class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
+  <k-fab v-if="!onboarding" class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
     <template #icon>
       <component :is="arrowBack" />
     </template>

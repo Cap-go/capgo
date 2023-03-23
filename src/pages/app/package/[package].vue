@@ -95,8 +95,8 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex justify-center chat-items">
-    <Spinner />
+  <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
+    <Spinner size="w-40 h-40" />
   </div>
   <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
     <Usage :app-id="id" />
