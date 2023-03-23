@@ -1279,7 +1279,7 @@ CREATE FUNCTION public.is_admin(userid uuid) RETURNS boolean
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 Begin
-  RETURN userid = '6aa76066-55ef-4238-ade6-0b32334a4097';
+  RETURN userid = 'c591b04e-cf29-4945-b9a0-776d0672061a';
 End;  
 $$;
 
