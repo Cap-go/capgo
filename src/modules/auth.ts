@@ -74,7 +74,7 @@ const guard = async (next: any, to: string, from: string) => {
       next()
     hideLoader()
   }
-  else if (from !== 'login' && !auth && to !== '/home') {
+  else if (from !== 'login' && !auth.user) {
     main.auth = undefined
     next('/login')
   }
