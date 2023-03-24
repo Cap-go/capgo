@@ -522,6 +522,15 @@ export const customerToSegment = async (userId: string, customer: Database['publ
   return segments
 }
 
+export const getStripeCustomer = async (customerId: string) => {
+  const { data: stripeInfo } = await supabaseAdmin()
+    .from('stripe_info')
+    .select('*')
+    .eq('customer_id', customerId)
+    .single()
+  return stripeInfo
+}
+
 export const createStripeCustomer = async (user: Database['public']['Tables']['users']['Row']) => {
   const customer = await createCustomer(user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
   // create date + 15 days

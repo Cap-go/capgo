@@ -118,6 +118,17 @@ export const createCustomer = async (email: string, userId: string, name: string
   return response.data
 }
 
+export const setBillingPeriod = async (subscriptionId: string) => {
+  const config = getConfig(true)
+  const checkoutData = {
+    billing_cycle_anchor: 'now',
+    proration_behavior: 'create_prorations',
+  }
+  const data = new URLSearchParams(checkoutData as any)
+  const response = await axios.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, data, config)
+  return response.data
+}
+
 export const updateCustomer = async (customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) => {
   const config = getConfig(true)
   const customerData = {
