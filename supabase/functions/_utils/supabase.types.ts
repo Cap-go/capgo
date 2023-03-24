@@ -135,8 +135,11 @@ export interface Database {
           checksum: string
           created_at: string | null
           devices: number | null
+          fails: number | null
           id: number
+          installs: number | null
           size: number
+          uninstalls: number | null
           updated_at: string | null
           user_id: string
         }
@@ -145,8 +148,11 @@ export interface Database {
           checksum: string
           created_at?: string | null
           devices?: number | null
+          fails?: number | null
           id?: number
+          installs?: number | null
           size: number
+          uninstalls?: number | null
           updated_at?: string | null
           user_id: string
         }
@@ -155,8 +161,11 @@ export interface Database {
           checksum?: string
           created_at?: string | null
           devices?: number | null
+          fails?: number | null
           id?: number
+          installs?: number | null
           size?: number
+          uninstalls?: number | null
           updated_at?: string | null
           user_id?: string
         }
@@ -1159,6 +1168,16 @@ export interface Database {
           versionid: number
         }
         Returns: boolean
+      }
+      update_version_stats: {
+        Args: {
+          app_id: string
+          version_id: number
+          install: number
+          uninstall: number
+          fail: number
+        }
+        Returns: undefined
       }
     }
     Enums: {

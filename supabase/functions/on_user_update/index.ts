@@ -2,9 +2,11 @@ import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
-import { createApiKey, createStripeCustomer, getStripeCustomer } from '../_utils/supabase.ts'
+import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
+import { updateCustomer } from '../_utils/stripe.ts'
+// import { createApiKey, createStripeCustomer, getStripeCustomer } from '../_utils/supabase.ts'
+// import { setBillingPeriod, updateCustomer } from '../_utils/stripe.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { setBillingPeriod, updateCustomer } from '../_utils/stripe.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.

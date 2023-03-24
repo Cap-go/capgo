@@ -92,11 +92,11 @@ export const updateOnpremStats = async (increment: Database['public']['Functions
     console.error('increment_store', error)
 }
 
-export const updateVersionStats = async (increment: Database['public']['Functions']['increment_version_stats']['Args']) => {
+export const updateVersionStats = async (increment: Database['public']['Functions']['update_version_stats']['Args']) => {
   const { error } = await supabaseAdmin()
-    .rpc('increment_version_stats', increment)
+    .rpc('update_version_stats', increment)
   if (error)
-    console.error('increment_version_stats', error)
+    console.error('update_version_stats', error)
 }
 
 export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats_v2']['Args'],

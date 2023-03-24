@@ -87,7 +87,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       version: version || 0,
     }
     const all = []
-    const { data } = await supabaseAdmin()
+    const { data: appVersion } = await supabaseAdmin()
       .from('app_versions')
       .select('id, user_id')
       .eq('app_id', app_id)
@@ -95,9 +95,9 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
       .order('id', { ascending: false })
       .limit(1)
       .single()
-    if (data) {
-      stat.version = data.id
-      device.version = data.id
+    if (appVersion) {
+      stat.version = appVersion.id
+      device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
         const { data: deviceData } = await supabaseAdmin()
           .from('devices')
@@ -105,18 +105,22 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
           .eq('app_id', app_id)
           .eq('device_id', device_id)
           .single()
-        if (deviceData && deviceData.version !== data.id) {
+        if (deviceData && deviceData.version !== appVersion.id) {
           all.push(updateVersionStats({
             app_id,
             version_id: deviceData.version,
-            devices: -1,
+            install: 0,
+            uninstall: -1,
+            fail: 0,
           }))
         }
-        if (!deviceData || deviceData.version !== data.id) {
+        if (!deviceData || deviceData.version !== appVersion.id) {
           all.push(updateVersionStats({
             app_id,
-            version_id: data.id,
-            devices: 1,
+            version_id: appVersion.id,
+            install: 1,
+            uninstall: 0,
+            fail: 0,
           }))
         }
       }
@@ -124,9 +128,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
         await sendNotif('user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
-          current_version_id: data.id,
+          current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
-        }, data.user_id, '0 0 * * 1', 'orange')
+        }, appVersion.user_id, '0 0 * * 1', 'orange')
+        all.push(updateVersionStats({
+          app_id,
+          version_id: appVersion.id,
+          install: 0,
+          uninstall: 0,
+          fail: 1,
+        }))
       }
     }
     else {
