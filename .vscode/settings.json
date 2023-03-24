@@ -1,5 +1,4 @@
 {
-  "cSpell.words": ["Vitesse"],
   "i18n-ally.keystyle": "nested",
   "i18n-ally.localesPaths": "locales",
   "i18n-ally.sortKeys": true,
@@ -12,10 +11,6 @@
     "*.css": "css"
   },
   "editor.formatOnSave": false,
-  "vetur.grammar.customBlocks": {
-    "route": "json"
-  },
-  "vue3snippets.enable-compile-vue-file-on-did-save-code": false,
   "deno.enable": true,
   "deno.lint": true,
   "deno.unstable": true,
@@ -27,6 +22,4 @@
     "./scripts/template/supabase",
     "./scripts/template/netlify-edge"
   ],
-  "nuxt.isNuxtApp": false,
-  "java.configuration.updateBuildConfiguration": "disabled"
 }

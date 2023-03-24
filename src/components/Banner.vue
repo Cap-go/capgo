@@ -84,6 +84,3 @@ const konstaColors = ref({
     </template>
   </k-navbar>
 </template>
-
-<style scoped>
-</style>
