@@ -8,7 +8,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
     console.log('body', body)
     const { data: plans } = await supabaseAdmin()
       .from('plans')
-      .select().neq('name', 'Free')
+      .select()
+      // .neq('name', 'Free')
       .order('price_m')
     return sendRes(plans) || sendRes([])
   }
