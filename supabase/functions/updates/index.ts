@@ -264,7 +264,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
       return sendRes({
-        message: 'invalid ip',
+        message: `invalid ip ${xForwardedFor}`,
         err: 'invalid_ip',
       }, 400)
     }
