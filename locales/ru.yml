@@ -216,10 +216,11 @@ plan-member: член плана.
 plan-payasyougo: Лучше всего подходит для масштабирования предприятий
 plan-pricing-plans: Тарифные планы
 plan-progressive-deploy: Прогрессивное развертывание
-plan-solo: Лучшее для независимых разработчиков
+plan-solo: Лучшее для инди
 plan-storage: ГБ хранения
 plan-team: Лучшее для владельцев крупного бизнеса
 plan-updates: Обновления
+plan-upgrade: Подписки
 plan-whats-included: Что включено
 plans: Планы
 platform: Платформа
@@ -228,6 +229,8 @@ please-upgrade: Обновите свой план, чтобы добавить 
 plugin-version: Версия плагина
 pro-tip-you-can-copy: 'Совет: вы можете скопировать'
 projection: Прогнозы
+recommended: рекомендуемые
+recommended-for-you: Рекомендуется для вас
 refresh-this-page: Обновить эту страницу
 register-desc: Заполните следующие поля, чтобы завершить регистрацию
 register-heading: Постановка на учет
@@ -235,6 +238,7 @@ register-next: регистр
 reload: Перезагрузить
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
+save: Сохраняет
 search: Поиск
 search-bundle: Пакет поиска
 search-bundle-id: Поиск по идентификатору пакета

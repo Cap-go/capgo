@@ -212,10 +212,11 @@ plan-member: plan member.
 plan-payasyougo: Best for scalling enterprises
 plan-pricing-plans: Pricing Plans
 plan-progressive-deploy: Progressive deploy
-plan-solo: Best for independent developers
+plan-solo: Best for indies
 plan-storage: GB Storage
 plan-team: Best for big business owners
 plan-updates: Updates
+plan-upgrade: Subcribes
 plan-whats-included: What's included
 plans: Plans
 platform: Platform
@@ -224,6 +225,8 @@ please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 projection: Projections
+recommended: Recommended
+recommended-for-you: Recommended for you
 refresh-this-page: Refresh this page
 register-desc: Fill the following fields to complete your registration
 register-heading: Registration
@@ -231,6 +234,7 @@ register-next: Register
 reload: Reload
 reset-password: Reset Password
 reset-your-password: Reset your password
+save: Saves
 search: Search
 search-bundle: Search Bundle
 search-bundle-id: Search by bundle ID

@@ -214,6 +214,7 @@ plan-solo: 最适合独立开发者
 plan-storage: GB 存储
 plan-team: 最适合大企业主
 plan-updates: 更新
+plan-upgrade: 订阅
 plan-whats-included: 包括什么
 plans: 计划
 platform: 平台
@@ -222,6 +223,8 @@ please-upgrade: 请升级您的计划以添加更多用户
 plugin-version: 插件版本
 pro-tip-you-can-copy: 专业提示：您可以复制
 projection: 预测
+recommended: 受到推崇的
+recommended-for-you: 为你推荐
 refresh-this-page: 刷新此页面
 register-desc: 填写以下字段以完成您的注册
 register-heading: 登记
@@ -229,6 +232,7 @@ register-next: 登记
 reload: 重新加载
 reset-password: 重设密码
 reset-your-password: 重置你的密码
+save: 保存
 search: 搜索
 search-bundle: 搜索包
 search-bundle-id: 按包 ID 搜索

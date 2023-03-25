@@ -210,10 +210,11 @@ plan-member: 계획 회원.
 plan-payasyougo: 기업 확장에 가장 적합
 plan-pricing-plans: 요금제
 plan-progressive-deploy: 점진적 배포
-plan-solo: 독립 개발자에게 적합
+plan-solo: 인디에 가장 적합
 plan-storage: GB 스토리지
 plan-team: 대기업 소유주에게 가장 적합
 plan-updates: 업데이트
+plan-upgrade: 구독자
 plan-whats-included: 포함된 것
 plans: 계획
 platform: 플랫폼
@@ -222,6 +223,8 @@ please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레�
 plugin-version: 플러그인 버전
 pro-tip-you-can-copy: '전문가 팁:'
 projection: 예측
+recommended: 추천
+recommended-for-you: 당신을 위해 추천 된
 refresh-this-page: 이 페이지 새로 고침
 register-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 register-heading: 등록
@@ -229,6 +232,7 @@ register-next: 등록하다
 reload: 새로고침
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
+save: 저장
 search: 찾다
 search-bundle: 번들 검색
 search-bundle-id: 번들 ID로 검색

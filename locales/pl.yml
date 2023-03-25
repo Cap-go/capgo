@@ -216,10 +216,11 @@ plan-member: członek planu.
 plan-payasyougo: Najlepsze do skalowania przedsiębiorstw
 plan-pricing-plans: Plany cenowe
 plan-progressive-deploy: Wdrażanie progresywne
-plan-solo: Najlepsze dla niezależnych programistów
+plan-solo: Najlepsze dla indie
 plan-storage: GB pamięci
 plan-team: Najlepsze dla właścicieli dużych firm
 plan-updates: Aktualizacje
+plan-upgrade: Subskrybenci
 plan-whats-included: Co jest zawarte
 plans: Plany
 platform: Platforma
@@ -228,6 +229,8 @@ please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 plugin-version: Wersja wtyczki
 pro-tip-you-can-copy: 'Pro wskazówka: możesz skopiować plik'
 projection: projekcje
+recommended: Zalecana
+recommended-for-you: polecany dla Ciebie
 refresh-this-page: Odśwież tę stronę
 register-desc: Wypełnij poniższe pola, aby zakończyć rejestrację
 register-heading: Rejestracja
@@ -235,6 +238,7 @@ register-next: Rejestr
 reload: Przeładować
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
+save: Zapisuje
 search: Szukaj
 search-bundle: Wyszukaj pakiet
 search-bundle-id: Wyszukaj według identyfikatora pakietu

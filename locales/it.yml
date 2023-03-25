@@ -220,10 +220,11 @@ plan-member: membro del piano.
 plan-payasyougo: Ideale per le imprese in espansione
 plan-pricing-plans: Piani tariffari
 plan-progressive-deploy: Distribuzione progressiva
-plan-solo: Ideale per sviluppatori indipendenti
+plan-solo: Il meglio per le indie
 plan-storage: Archiviazione GB
 plan-team: Il meglio per i grandi imprenditori
 plan-updates: Aggiornamenti
+plan-upgrade: Sottoscrizioni
 plan-whats-included: Cosa è incluso
 plans: Piani
 platform: piattaforma
@@ -232,6 +233,8 @@ please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
 pro-tip-you-can-copy: 'Suggerimento pro: puoi copiare il file'
 projection: Proiezioni
+recommended: Consigliato
+recommended-for-you: raccomandato per te
 refresh-this-page: Aggiorna questa pagina
 register-desc: Compila i seguenti campi per completare la tua registrazione
 register-heading: Registrazione
@@ -239,6 +242,7 @@ register-next: Registrati
 reload: Ricaricare
 reset-password: Resetta la password
 reset-your-password: reimposta la tua password
+save: Salva
 search: Ricerca
 search-bundle: Cerca pacchetto
 search-bundle-id: Cerca per ID pacchetto
