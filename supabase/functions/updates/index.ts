@@ -3,11 +3,9 @@ import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
-import { invalidIp } from '../_utils/invalids_ip.ts'
 import { checkPlan } from '../_utils/plans.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { defaultDeviceID } from '../_tests/api.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { r2 } from '../_utils/r2.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
@@ -262,16 +260,17 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
 
+    // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
     // check if version is created_at more than 4 hours
-    const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
+    // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
-    if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
-      console.log('invalid ip', xForwardedFor, ip)
-      return sendRes({
-        message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
-        err: 'invalid_ip',
-      }, 400)
-    }
+    // if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
+    //   console.log('invalid ip', xForwardedFor, ip)
+    //   return sendRes({
+    //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
+    //     err: 'invalid_ip',
+    //   }, 400)
+    // }
     await updateOrCreateDevice({
       app_id,
       device_id,
