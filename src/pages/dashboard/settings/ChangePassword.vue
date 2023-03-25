@@ -99,4 +99,3 @@ const submit = async (form: { password: string; password_confirm: string }) => {
 meta:
   layout: settings
     </route>
-

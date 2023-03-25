@@ -44,7 +44,7 @@ const projectionData = computed(() => {
   const res = accumulateData.value.reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
     const lastAcc = accumulateData.value[i - 1] || 0
-    const newVal = val || i < monthDay ? undefined : lastAcc + last + evolution.value
+    const newVal = val || (i < monthDay ? undefined : lastAcc + last + evolution.value)
     return [...acc, newVal] as number[]
   }, [])
   return res

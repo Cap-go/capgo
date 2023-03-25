@@ -55,7 +55,6 @@ onUnmounted(() => {
 <template>
   <div class="relative inline-flex">
     <button
-      ref="trigger"
       class="inline-flex items-center justify-center group"
       aria-haspopup="true"
       :aria-expanded="dropdownOpen"
@@ -88,7 +87,6 @@ onUnmounted(() => {
           </div>
         </div>
         <ul
-          ref="dropdown"
           class="space-y-2"
           @focusin="dropdownOpen = true"
           @focusout="dropdownOpen = false"

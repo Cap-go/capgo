@@ -125,4 +125,3 @@ const reset = () => {
 meta:
   layout: settings
   </route>
-
