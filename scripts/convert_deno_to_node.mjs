@@ -1,7 +1,7 @@
 // create a node bundle from a deno bundle
 // netlify/functions/bundle.ts
 
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 
 const baseSupa = 'supabase'
 const baseNetlify = 'netlify'

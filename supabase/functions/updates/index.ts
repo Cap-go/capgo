@@ -7,22 +7,8 @@ import { checkPlan } from '../_utils/plans.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
-import { r2 } from '../_utils/r2.ts'
+import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
-
-const getBundleUrl = async (platform: string, bucket_id: string, path: string) => {
-  if (platform === 'supabase') {
-    const { data } = await supabaseAdmin()
-      .storage
-      .from(path)
-      .createSignedUrl(bucket_id, 120)
-    return data?.signedUrl
-  }
-  else if (platform === 'r2') {
-    return r2.getSignedUrl(bucket_id, 120)
-  }
-  return null
-}
 
 const resToVersion = (plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) => {
   const res: any = {
@@ -304,7 +290,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(version.storage_provider, version.bucket_id, `apps/${version.user_id}/${app_id}/versions`)
+      const res = await getBundleUrl(version.storage_provider, `apps/${version.user_id}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
     }
