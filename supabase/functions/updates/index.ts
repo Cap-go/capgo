@@ -258,13 +258,17 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
     const versionId = versionData ? versionData.id : version.id
 
     const xForwardedFor = headers['x-forwarded-for'] || ''
-    console.log('xForwardedFor', xForwardedFor)
+    // console.log('xForwardedFor', xForwardedFor)
+    const ip = xForwardedFor.split(',')[0]
+    console.log('IP', ip)
+
     // check if version is created_at more than 4 hours
     const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
-    if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(xForwardedFor.split(',')[0])) {
+    if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
+      console.log('invalid ip', xForwardedFor, ip)
       return sendRes({
-        message: `invalid ip ${xForwardedFor}`,
+        message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
         err: 'invalid_ip',
       }, 400)
     }

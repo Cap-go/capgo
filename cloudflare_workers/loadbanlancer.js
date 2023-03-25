@@ -1,7 +1,6 @@
 const HOSTS = [
-  'supabase.capgo.app',
-  'netlify.capgo.app',
-  'netlify-edge.capgo.app',
+  'xvwzpoazmxkqosrdewyv.functions.supabase.co',
+  'web.capgo.app',
 ]
 
 const getRandomInt = (max) => {

@@ -40,7 +40,6 @@ serve(async (event: Request) => {
     await createApiKey(record.id)
     if (!record.customer_id)
       await createStripeCustomer(record as any)
-
     else
       await updateCustomer(record.customer_id, record.email, record.billing_email, record.id, `${record.first_name || ''} ${record.last_name || ''}`)
       // TODO: send emailing to customer to tell them that their billing will change and set auto email to the new ones.
