@@ -105,6 +105,13 @@ serve(async (event: Request) => {
       .eq('id', record.id)
     if (errorUpdateStorage)
       console.log('errorUpdateStorage', errorUpdateStorage)
+    // remove from supabase storage after r2 upload
+    const { error: errorDelete } = await supabaseAdmin()
+      .storage
+      .from(`apps/${record.user_id}/${record.app_id}/versions`)
+      .remove([record.bucket_id])
+    if (errorDelete)
+      console.log('errorDelete', errorDelete)
     return sendRes()
   }
   catch (e) {
