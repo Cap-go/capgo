@@ -127,6 +127,7 @@ email: Eメール
 email-address: 電子メールアドレス
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
+fail: インストールに失敗しました
 first-name: ファーストネーム
 force-version: 強制バージョン
 forgot: 忘れた
@@ -140,6 +141,7 @@ in-your-project-fold: プロジェクト フォルダー内
 info: 情報
 informations: インフォメーション
 init-capgo-in-your-a: アプリで Capgo を初期化する
+install: インストール済み
 install-the-capacito: Capacitor プラグインをインストールする
 into-your-app-folder: アプリ フォルダーに移動します。
 invalid-auth: 無効な認証
@@ -267,6 +269,7 @@ top-apps: 私のアプリ
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
+uninstall: アンインストール済み
 unlimited-updates: 無制限のアップデート
 unlink-bundle: バンドルのリンクを解除
 unlink-channel: チャンネルのリンクを解除

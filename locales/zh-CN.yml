@@ -127,6 +127,7 @@ email: 电子邮件
 email-address: 电子邮件地址
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
 enter-your-new-passw: 输入您的新密码并确认
+fail: 安装失败
 first-name: 名
 force-version: 强制版本
 forgot: 忘记
@@ -140,6 +141,7 @@ in-your-project-fold: 在您的项目文件夹中
 info: 信息
 informations: 资讯
 init-capgo-in-your-a: 在您的应用中初始化 Capgo
+install: 已安装
 install-the-capacito: 安装电容器插件
 into-your-app-folder: 进入您的应用程序文件夹。
 invalid-auth: 无效授权
@@ -267,6 +269,7 @@ top-apps: 我的应用
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
+uninstall: 已卸载
 unlimited-updates: 无限更新
 unlink-bundle: 取消链接包
 unlink-channel: 取消链接频道

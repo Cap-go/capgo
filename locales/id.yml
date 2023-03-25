@@ -131,6 +131,7 @@ enter-your-email-add: >-
   Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
+fail: Instal gagal
 first-name: Nama depan
 force-version: Versi paksa
 forgot: Lupa
@@ -146,6 +147,7 @@ in-your-project-fold: Di folder proyek Anda
 info: Informasi
 informations: Informasi
 init-capgo-in-your-a: Init Capgo di aplikasi Anda
+install: Terpasang
 install-the-capacito: Instal plugin Kapasitor
 into-your-app-folder: Ke dalam folder aplikasi Anda.
 invalid-auth: autentikasi tidak valid
@@ -275,6 +277,7 @@ top-apps: Aplikasi saya
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
+uninstall: Tidak terinstal
 unlimited-updates: Pembaruan tanpa batas
 unlink-bundle: Putuskan tautan bundel
 unlink-channel: Batalkan tautan saluran

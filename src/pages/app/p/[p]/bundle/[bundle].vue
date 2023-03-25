@@ -203,7 +203,7 @@ const openDownload = async () => {
           displayStore.showActionSheet = false
           if (!version.value)
             return
-          openVersion(version.value, main.user?.id || '')
+          openVersion(version.value)
         },
       },
       {
@@ -274,6 +274,13 @@ const hideString = (str: string) => {
   const last = str.slice(-5)
   return `${first}...${last}`
 }
+// const failPercent = computed(() => {
+//   if (!version.value)
+//     return '0%'
+//   const total = version_meta.value?.installs || 1
+//   const fail = version_meta.value?.fails || 1
+//   return `${Math.round((fail / total) * 100).toLocaleString()}%`
+// })
 </script>
 
 <template>
@@ -291,6 +298,10 @@ const hideString = (str: string) => {
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- meta devices -->
             <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toString()" />
+            <!-- <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toString()" />
+            <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toString()" />
+            <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toString()" />
+            <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow :label="t('channel')" :value="channel ? channel.name : t('set-bundle')" :is-link="true" @click="openChannel()" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />

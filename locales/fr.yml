@@ -135,6 +135,7 @@ enter-your-email-add: >-
   Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
+fail: Échec de l'installation
 first-name: Prénom
 force-version: Version forcée
 forgot: Oublié
@@ -150,6 +151,7 @@ in-your-project-fold: Dans votre dossier de projet
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo dans votre application
+install: installée
 install-the-capacito: Installer le plugin Capacitor
 into-your-app-folder: Dans votre dossier d'application.
 invalid-auth: authentification invalide
@@ -279,6 +281,7 @@ top-apps: Mes applications
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: Le procès se termine dans
+uninstall: Désinstallé
 unlimited-updates: Mises à jour illimitées
 unlink-bundle: Dissocier le groupe
 unlink-channel: Dissocier la chaîne

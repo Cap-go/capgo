@@ -131,6 +131,7 @@ enter-your-email-add: >-
   E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
+fail: Yükleme başarısız
 first-name: İlk adı
 force-version: Kuvvet versiyonu
 forgot: Unutmuş olmak
@@ -144,6 +145,7 @@ in-your-project-fold: proje klasörünüzde
 info: Bilgi
 informations: bilgiler
 init-capgo-in-your-a: Uygulamanızda Capgo'yu Başlatın
+install: Kurulmuş
 install-the-capacito: Kapasitör eklentisini kurun
 into-your-app-folder: Uygulama klasörünüze.
 invalid-auth: geçersiz kimlik doğrulama
@@ -275,6 +277,7 @@ top-apps: Benim uygulamalarım
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
+uninstall: kaldırıldı
 unlimited-updates: Sınırsız güncelleme
 unlink-bundle: Paketin bağlantısını kaldır
 unlink-channel: Kanalın bağlantısını kaldır

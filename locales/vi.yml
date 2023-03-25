@@ -133,6 +133,7 @@ enter-your-email-add: >-
   Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
+fail: Cài đặt không thành công
 first-name: Họ
 force-version: Phiên bản bắt buộc
 forgot: Quên
@@ -146,6 +147,7 @@ in-your-project-fold: Trong thư mục dự án của bạn
 info: Thông tin
 informations: thông tin
 init-capgo-in-your-a: Khởi tạo Capgo trong ứng dụng của bạn
+install: Cài đặt
 install-the-capacito: Cài đặt plugin Tụ điện
 into-your-app-folder: Vào thư mục ứng dụng của bạn.
 invalid-auth: xác thực không hợp lệ
@@ -275,6 +277,7 @@ top-apps: Những ứng dụng của tôi
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
+uninstall: Gỡ cài đặt
 unlimited-updates: cập nhật không giới hạn
 unlink-bundle: Hủy liên kết gói
 unlink-channel: Hủy liên kết kênh

@@ -127,6 +127,7 @@ email: Email
 email-address: Email address
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
+fail: Install failed
 first-name: First name
 force-version: Force version
 forgot: Forgot
@@ -140,6 +141,7 @@ in-your-project-fold: In your project folder
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
+install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: invalid auth
@@ -194,6 +196,7 @@ password-confirmatio: Password confirmation
 password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
+percent-fail: Fail percentage
 personal-information: Personal Informations
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
@@ -266,6 +269,7 @@ top-apps: My Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
+uninstall: Uninstalled
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel

@@ -1,28 +1,20 @@
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
-import { useSupabase } from './supabase'
+import { downloadUrl } from './supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
 
-export const openVersion = async (app: Database['public']['Tables']['app_versions']['Row'], userId: string) => {
-  const supabase = useSupabase()
-
+export const openVersion = async (app: Database['public']['Tables']['app_versions']['Row']) => {
   displayStore.messageLoader = 'Opening version...'
   displayStore.showLoader = true
   let signedURL
-  if (app.bucket_id) {
-    const res = await supabase
-      .storage
-      .from(`apps/${userId}/${app.app_id}/versions`)
-      .createSignedUrl(app.bucket_id, 60)
-    signedURL = res.data?.signedUrl
-  }
-  else {
+  if (app.bucket_id)
+    signedURL = await downloadUrl(app.storage_provider, app.app_id, app.bucket_id)
+  else
     signedURL = app.external_url
-  }
 
   if (signedURL && Capacitor.isNativePlatform()) {
     try {

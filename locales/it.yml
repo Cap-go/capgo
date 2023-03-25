@@ -133,6 +133,7 @@ enter-your-email-add: >-
   Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la
   password.
 enter-your-new-passw: Inserisci la tua nuova password e conferma
+fail: Installazione non riuscita
 first-name: Nome di battesimo
 force-version: Versione forzata
 forgot: Dimenticato
@@ -146,6 +147,7 @@ in-your-project-fold: Nella cartella del tuo progetto
 info: Informazione
 informations: Informazioni
 init-capgo-in-your-a: Avvia Capgo nella tua app
+install: Installato
 install-the-capacito: Installa il plug-in Condensatore
 into-your-app-folder: Nella cartella dell'app.
 invalid-auth: autenticazione non valida
@@ -277,6 +279,7 @@ top-apps: Le mie applicazioni
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
+uninstall: Disinstallato
 unlimited-updates: Aggiornamenti illimitati
 unlink-bundle: Scollega gruppo
 unlink-channel: Scollega canale

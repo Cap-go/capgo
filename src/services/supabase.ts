@@ -69,6 +69,16 @@ export const unspoofUser = () => {
   return true
 }
 
+export const downloadUrl = async (provider: string, appId: string, bucketId: string): Promise<string> => {
+  const data = {
+    app_id: appId,
+    storage_provider: provider,
+    bucket_id: bucketId,
+  }
+  const res = await useSupabase().functions.invoke('download_link', { body: JSON.stringify(data) })
+  return res.data.url
+}
+
 export const existUser = async (email: string): Promise<string> => {
   const { data, error } = await useSupabase()
     .rpc('exist_user', { e_mail: email })

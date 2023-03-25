@@ -131,6 +131,7 @@ email: Электронная почта
 email-address: Адрес электронной почты
 enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
 enter-your-new-passw: Введите новый пароль и подтвердите
+fail: Установка не удалась
 first-name: Имя
 force-version: Принудительная версия
 forgot: Забыл
@@ -144,6 +145,7 @@ in-your-project-fold: В папке вашего проекта
 info: Информация
 informations: Информация
 init-capgo-in-your-a: Инициируйте Capgo в своем приложении
+install: Установлен
 install-the-capacito: Установите плагин конденсатора
 into-your-app-folder: В папку вашего приложения.
 invalid-auth: недействительная авторизация
@@ -273,6 +275,7 @@ top-apps: Мои приложения
 trial-left: дней осталось
 trial-plan-expired: Пробная версия истекла
 trial-plan-expires-in: Испытание заканчивается через
+uninstall: Удалено
 unlimited-updates: Неограниченные обновления
 unlink-bundle: Отключить группу
 unlink-channel: Отключить канал
