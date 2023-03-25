@@ -259,7 +259,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     const xForwardedFor = headers['x-forwarded-for'] || ''
     // console.log('xForwardedFor', xForwardedFor)
-    const ip = xForwardedFor.split(',')[0]
+    const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
 
     // check if version is created_at more than 4 hours
