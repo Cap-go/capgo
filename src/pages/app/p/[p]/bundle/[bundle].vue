@@ -297,11 +297,11 @@ const hideString = (str: string) => {
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- meta devices -->
-            <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toString()" />
-            <!-- <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toString()" />
-            <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toString()" />
-            <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toString()" />
-            <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
+            <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
+            <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toLocaleString()" />
+            <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
+            <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
+            <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow :label="t('channel')" :value="channel ? channel.name : t('set-bundle')" :is-link="true" @click="openChannel()" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
