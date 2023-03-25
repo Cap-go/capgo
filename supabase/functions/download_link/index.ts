@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import type { Database } from '../_utils/supabase.types.ts'
-import { checkKey, sendRes } from '../_utils/utils.ts'
+import { sendRes } from '../_utils/utils.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 
 interface dataDemo {
@@ -11,18 +10,21 @@ interface dataDemo {
 }
 
 serve(async (event: Request) => {
-  const apikey_string = event.headers.get('authorization')
-  if (!apikey_string)
-    return sendRes({ status: 'Missing apikey' }, 400)
-
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
-  if (!apikey)
-    return sendRes({ status: 'Missing apikey' }, 400)
+  const authorization = event.headers.get('authorization')
+  if (!authorization)
+    return sendRes({ status: 'Cannot find authorization' }, 400)
 
   try {
+    const { data: auth, error } = await supabaseAdmin().auth.getUser(
+      authorization?.split('Bearer ')[1],
+    )
+    // console.log('auth', auth)
+    if (error || !auth || !auth.user)
+      return sendRes({ status: 'not authorize' }, 400)
+
     const body = (await event.json()) as dataDemo
     console.log('body', body)
-    const url = await getBundleUrl(body.storage_provider, `apps/${apikey.user_id}/${body.app_id}/versions`, body.bucket_id)
+    const url = await getBundleUrl(body.storage_provider, `apps/${auth.user.id}/${body.app_id}/versions`, body.bucket_id)
     if (!url)
       return sendRes({ status: 'Error unknow' }, 500)
     return sendRes({ url })
