@@ -257,6 +257,10 @@ const newContentEdge = folders.map((name) => {
 [[edge_functions]]
   path = "/api-edge/${name}"
   function = "${name}"
+
+[[edge_functions]]
+  path = "/${name}"
+  function = "${name}"
 `
 })
 const newContent = `${before}${splitNetlifyConfig}
