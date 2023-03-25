@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 
 interface dataDemo {
@@ -10,6 +10,8 @@ interface dataDemo {
 }
 
 serve(async (event: Request) => {
+  if (event.method === 'OPTIONS')
+    return sendOptionsRes()
   const authorization = event.headers.get('authorization')
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)

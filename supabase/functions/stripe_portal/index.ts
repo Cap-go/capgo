@@ -8,7 +8,6 @@ interface PortalData {
 }
 
 serve(async (event: Request) => {
-  console.log('method', event.method)
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
   const authorization = event.headers.get('authorization')
