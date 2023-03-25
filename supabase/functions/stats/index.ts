@@ -110,7 +110,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: AppSta
             app_id,
             version_id: deviceData.version,
             install: 0,
-            uninstall: -1,
+            uninstall: 1,
             fail: 0,
           }))
         }
