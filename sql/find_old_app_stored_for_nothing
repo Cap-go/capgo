@@ -1,0 +1,51 @@
+-- find all auth.users with last_sign_in_at > 2 month ago find they public.users by id and they stripe_info found by public.users.customer_id to filter them by stripe_info.product_id = free
+-- and filter them by public.app_stats with devices = 0 and public.app_stats.user_id = public.users.id and date_id = now YYYY-MM
+
+select auth.users.id
+from auth.users
+inner join public.users on auth.users.id = public.users.id
+inner join public.stripe_info on public.users.customer_id = public.stripe_info.customer_id
+inner join public.app_stats on public.app_stats.user_id = public.users.id
+where auth.users.last_sign_in_at < now() - interval '2 month'
+and public.stripe_info.product_id = 'free'
+-- and public.app_stats.devices = 0
+and public.app_stats.date_id = to_char(now(), 'YYYY-MM')
+
+
+select auth.users.id
+from auth.users
+inner join public.users on auth.users.id = public.users.id
+inner join public.stripe_info on public.users.customer_id = public.stripe_info.customer_id
+where auth.users.last_sign_in_at < now() - interval '1 month'
+and public.stripe_info.product_id = 'free'
+
+--  find all public.app_versions who have storage_provider = 'supabase' and created at > 1 month ago and delete false with 0 public.app_versions_meta.devices
+select public.app_versions.id
+from public.app_versions
+inner join public.app_versions_meta on public.app_versions_meta.app_version_id = public.app_versions.id
+where public.app_versions.storage_provider = 'supabase'
+and public.app_versions.created_at < now() - interval '1 month'
+and public.app_versions_meta.devices = 0
+and public.app_versions.deleted = false
+
+-- find all auth.users with last_sign_in_at > 2 month ago find they public.users by id and they stripe_info found by public.users.customer_id to filter them by stripe_info.product_id = free
+-- and filter them by public.app_stats with devices = 0 and public.app_stats.user_id = public.users.id and date_id = now YYYY-MM
+
+select public.app_versions.id
+from public.app_versions
+inner join public.app_versions_meta on public.app_versions_meta.id = public.app_versions.id
+where public.app_versions.storage_provider = 'supabase'
+and public.app_versions_meta.updated_at < now() - interval '2 month'
+-- and public.app_versions_meta.devices = 0
+and public.app_versions.deleted = false
+
+--  find all public.app_versions who have storage_provider = 'supabase' and updated_at > 2 month ago and delete false find they public.users by id and they stripe_info found by public.users.customer_id to filter them by stripe_info.product_id = free
+select public.app_versions.id
+from public.app_versions
+inner join public.app_versions_meta on public.app_versions_meta.id = public.app_versions.id
+inner join public.users on public.users.id = public.app_versions.user_id
+inner join public.stripe_info on public.users.customer_id = public.stripe_info.customer_id
+where public.app_versions.storage_provider = 'supabase'
+and public.app_versions_meta.updated_at < now() - interval '2 month'
+and public.stripe_info.product_id = 'free'
+and public.app_versions.deleted = false

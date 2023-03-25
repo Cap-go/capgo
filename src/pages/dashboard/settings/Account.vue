@@ -2,9 +2,9 @@
 import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
-import { computed, reactive, ref, watchEffect } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
@@ -194,15 +194,6 @@ const presentActionSheet = async () => {
   }
 }
 
-const route = useRoute()
-
-const user = reactive({
-  first_name: '',
-  last_name: '',
-  email: main.auth?.email,
-  country: '',
-})
-
 const submit = async (form: { first_name: string; last_name: string; email: string; country: string }) => {
   if (isLoading.value || !main.user?.id)
     return
@@ -233,29 +224,6 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
   main.user = usr
   isLoading.value = false
 }
-watchEffect(async () => {
-  if (route.path === '/dashboard/settings/account') {
-    const { data: usr } = await supabase
-      .from('users')
-      .select(`
-        id,
-        first_name,
-        last_name,
-        country,
-        email,
-        billing_email
-      `)
-      .eq('id', main.user?.id)
-      .single()
-    if (usr) {
-      console.log('usr', usr)
-      user.email = usr.email || ''
-      user.country = usr.country || ''
-      user.first_name = usr.first_name || ''
-      user.last_name = usr.last_name || ''
-    }
-  }
-})
 </script>
 
 <template>
@@ -299,7 +267,7 @@ watchEffect(async () => {
                 name="first_name"
                 autocomplete="given-name"
                 :disabled="isLoading"
-                :value="user.first_name"
+                :value="main.user?.first_name"
                 validation="required:trim"
                 enterkeyhint="next"
                 autofocus
@@ -312,11 +280,11 @@ watchEffect(async () => {
             <div class="sm:w-1/2">
               <FormKit
                 type="text"
-                name="first_name"
+                name="last_name"
                 autocomplete="family-name"
                 :disabled="isLoading"
                 enterkeyhint="next"
-                :value="user.last_name"
+                :value="main.user?.last_name"
                 validation="required:trim"
                 :label="t('last-name')"
                 :placeholder="t('last-name')"
@@ -331,7 +299,7 @@ watchEffect(async () => {
                 type="email"
                 name="email"
                 disabled
-                :value="user.email"
+                :value="main.user?.email"
                 enterkeyhint="next"
                 validation="required:trim|email"
                 :label="t('email')"
@@ -345,7 +313,7 @@ watchEffect(async () => {
                 type="text"
                 name="country"
                 :disabled="isLoading"
-                :value="user.country"
+                :value="main.user?.country || ''"
                 enterkeyhint="send"
                 validation="required:trim"
                 :label="t('country')"

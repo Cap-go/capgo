@@ -29,32 +29,55 @@ const accumulateData = computed(() => {
     return [...acc, newVal] as number[]
   }, [])
 })
-// find median difference of evolution between each element of the array
+
 const evolution = computed(() => {
-  const arr = props.data as number[]
-  const arrWithoutFirst = arr.slice(1)
-  const arrWithoutUndefined = arrWithoutFirst.filter((val: any) => val !== undefined)
-  // keep only the 5 last values
-  const arrLastFive = arrWithoutUndefined.slice(-3)
-  const median = arrLastFive.reduce((a, b) => a + b, 0) / arrLastFive.length
-  return median
+  if (accumulateData.value.length === 0)
+    return [0, 0, 0]
+  const arrWithoutUndefined = accumulateData.value.filter((val: any) => val !== undefined)
+  // calculate evolution of all value except the first one
+  const res = arrWithoutUndefined.map((val: number, i: number) => {
+    const last = arrWithoutUndefined[i - 1] || 0
+    return i > 0 ? val - last : 0
+  })
+  const median = res.reduce((a, b) => a + b, 0.0) / accumulateData.value.length
+  const min = Math.min(...res)
+  const max = Math.max(...res)
+  return [min, max, median]
 })
+
+const getRandomArbitrary = (min: number, max: number) => {
+  return Math.random() * (max - min) + min
+}
+
 const projectionData = computed(() => {
+  if (accumulateData.value.length === 0)
+    return []
   const monthDay = getCurrentDayMonth()
-  const res = accumulateData.value.reduce((acc: number[], val: number, i: number) => {
+  const arrWithoutUndefined = accumulateData.value.filter((val: any) => val !== undefined)
+  const lastDay = arrWithoutUndefined[arrWithoutUndefined.length - 1]
+  // create a projection of the evolution, start after the last value of the array, put undefined for the beginning of the month
+  // each value is the previous value + the evolution, the first value is the last value of the array
+  const res = [...Array(getDaysInCurrentMonth()).fill(undefined)].reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
-    const lastAcc = accumulateData.value[i - 1] || 0
-    const newVal = val || (i < monthDay ? undefined : lastAcc + last + evolution.value)
+    let newVal
+    // randomize Evolution from (half evolutio) to full evolution
+    const randomizedEvolution = getRandomArbitrary((evolution.value[0] + evolution.value[2]) / 2, (evolution.value[1] + evolution.value[2]) / 2)
+    if (i === monthDay - 1)
+      newVal = lastDay
+    else if (i >= monthDay)
+      newVal = last + randomizedEvolution
     return [...acc, newVal] as number[]
   }, [])
   return res
 })
+
 const monthdays = () => {
   const keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
   keys.shift()
   const arr = [...keys]
   return arr
 }
+
 const createAnotation = (id: string, y: number, title: string, lineColor: string, bgColor: string) => {
   const obj: any = {}
   obj[`line_${id}`] = {
@@ -77,6 +100,7 @@ const createAnotation = (id: string, y: number, title: string, lineColor: string
   }
   return obj
 }
+
 const generateAnnotations = computed(() => {
   // find biggest value in data
   let annotations: any = {}
@@ -110,12 +134,11 @@ const chartData = ref<ChartData<'line'>>({
   {
     label: 'none',
     data: projectionData.value,
-    borderColor: props.colors[400],
-    borderDash: [2, 10],
-    pointRadius: 0,
-    pointBackgroundColor: 'transparent',
-    tension: 0.3,
-    // backgroundColor: props.colors[200],
+    borderColor: 'transparent',
+    backgroundColor: props.colors[200],
+    tension: 0.9,
+    pointRadius: 2,
+    pointBorderWidth: 0,
   },
   ],
 })

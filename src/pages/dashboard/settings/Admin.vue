@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { FormKitMessages } from '@formkit/vue'
 import { isSpoofed, saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
 
 const route = useRoute()
-
 const isLoading = ref(false)
 const oldId = ref(isSpoofed())
 
@@ -57,7 +57,6 @@ const reset = () => {
 <template>
   <div class="grow">
     <FormKit id="set-password" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
-      <FormKitMessages />
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
@@ -86,6 +85,7 @@ const reset = () => {
             </div>
           </div>
         </section>
+        <FormKitMessages />
       </div>
       <!-- Panel footer -->
       <footer>
