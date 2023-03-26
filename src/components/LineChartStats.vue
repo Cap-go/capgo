@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import type { ChartData } from 'chart.js'
+import {
+  CategoryScale,
+  Chart,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  // AnimationEvent,
+} from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
+import annotationPlugin from 'chartjs-plugin-annotation'
+import { useI18n } from 'vue-i18n'
 import { isDark } from '~/composables'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 
@@ -11,6 +22,21 @@ const props = defineProps({
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
 })
+
+const { t } = useI18n()
+
+Chart.register(
+  // Colors,
+  // BarController,
+  // BarElement,
+  Tooltip,
+  PointElement,
+  CategoryScale,
+  LinearScale,
+  LineElement,
+  annotationPlugin,
+  // Legend,
+)
 
 // console.log('title', props.title, props.data)
 const accumulateData = computed(() => {
@@ -132,7 +158,7 @@ const chartData = ref<ChartData<'line'>>({
     pointBorderWidth: 0,
   },
   {
-    label: 'none',
+    label: t('prediction'),
     data: projectionData.value,
     borderColor: 'transparent',
     backgroundColor: props.colors[200],

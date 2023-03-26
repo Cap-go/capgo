@@ -128,6 +128,7 @@ specifiers:
   vite-plugin-inspect: 0.7.18
   vite-plugin-pages: 0.29.0
   vite-plugin-pwa: 0.14.6
+  vite-plugin-vue-inspector: ^3.4.0
   vite-plugin-vue-layouts: 0.7.0
   vite-plugin-windicss: 1.8.10
   vitest: 0.1.25
@@ -273,6 +274,7 @@ devDependencies:
   vite-plugin-inspect: 0.7.18_vite@4.2.1
   vite-plugin-pages: 0.29.0_ctv5py3uerpxp5gfh3m7n5vpti
   vite-plugin-pwa: 0.14.6_vite@4.2.1
+  vite-plugin-vue-inspector: 3.4.0_vite@4.2.1
   vite-plugin-vue-layouts: 0.7.0_asesa6ksds7mbxqm7d5qamvm34
   vite-plugin-windicss: 1.8.10_vite@4.2.1
   vitest: 0.1.25_meshwkwkz7ekjedvk6ak5viixy
@@ -981,6 +983,15 @@ packages:
   /@babel/plugin-syntax-import-assertions/7.20.0_@babel+core@7.21.3:
     resolution: {integrity: sha512-IUh1vakzNoWalR8ch/areW7qFopR2AEw03JlG7BbrDqmQ4X3q9uuipQwSGrUn7oGiemKjtSLDhNtQHzMHr1JdQ==}
     engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+    dependencies:
+      '@babel/core': 7.21.3
+      '@babel/helper-plugin-utils': 7.20.2
+    dev: true
+
+  /@babel/plugin-syntax-import-meta/7.10.4_@babel+core@7.21.3:
+    resolution: {integrity: sha512-Yqfm+XDx0+Prh3VSeEQCPU81yC+JWZ2pDPFSS4ZdpfZhp4MkFMaDC1UqseovEKwSUpnIL7+vK+Clp7bfh0iD7g==}
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
@@ -2144,6 +2155,27 @@ packages:
   /@discoveryjs/json-ext/0.5.7:
     resolution: {integrity: sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==}
     engines: {node: '>=10.0.0'}
+    dev: true
+
+  /@esbuild-kit/cjs-loader/2.4.2:
+    resolution: {integrity: sha512-BDXFbYOJzT/NBEtp71cvsrGPwGAMGRB/349rwKuoxNSiKjPraNNnlK6MIIabViCjqZugu6j+xeMDlEkWdHHJSg==}
+    dependencies:
+      '@esbuild-kit/core-utils': 3.1.0
+      get-tsconfig: 4.4.0
+    dev: true
+
+  /@esbuild-kit/core-utils/3.1.0:
+    resolution: {integrity: sha512-Uuk8RpCg/7fdHSceR1M6XbSZFSuMrxcePFuGgyvsBn+u339dk5OeL4jv2EojwTN2st/unJGsVm4qHWjWNmJ/tw==}
+    dependencies:
+      esbuild: 0.17.13
+      source-map-support: 0.5.21
+    dev: true
+
+  /@esbuild-kit/esm-loader/2.5.5:
+    resolution: {integrity: sha512-Qwfvj/qoPbClxCRNuac1Du01r9gvNOT+pMYtJDapfB1eoGN1YlJ1BixLyL9WVENRx5RXgNLdfYdx/CuswlGhMw==}
+    dependencies:
+      '@esbuild-kit/core-utils': 3.1.0
+      get-tsconfig: 4.4.0
     dev: true
 
   /@esbuild/android-arm/0.17.13:
@@ -9905,6 +9937,13 @@ packages:
       - supports-color
     dev: true
 
+  /esno/0.16.3:
+    resolution: {integrity: sha512-6slSBEV1lMKcX13DBifvnDFpNno5WXhw4j/ff7RI0y51BZiDqEe5dNhhjhIQ3iCOQuzsm2MbVzmwqbN78BBhPg==}
+    hasBin: true
+    dependencies:
+      tsx: 3.12.6
+    dev: true
+
   /espree/6.2.1:
     resolution: {integrity: sha512-ysCxRQY3WaXJz9tdbWOwuWr5Y/XrPTGX9Kiz3yoUXwW0VZ4w30HTkQLaGx/+ttFjF8i+ACbArnB4ce68a9m5hw==}
     engines: {node: '>=6.0.0'}
@@ -10998,6 +11037,10 @@ packages:
     dependencies:
       call-bind: 1.0.2
       get-intrinsic: 1.2.0
+    dev: true
+
+  /get-tsconfig/4.4.0:
+    resolution: {integrity: sha512-0Gdjo/9+FzsYhXCEFueo2aY1z1tpXrxWZzP7k8ul9qt1U5o8rYJwTJYmaeHdrVosYIVYkOy2iwCJ9FdpocJhPQ==}
     dev: true
 
   /get-value/2.0.6:
@@ -17849,6 +17892,17 @@ packages:
       typescript: 5.0.2
     dev: true
 
+  /tsx/3.12.6:
+    resolution: {integrity: sha512-q93WgS3lBdHlPgS0h1i+87Pt6n9K/qULIMNYZo07nSeu2z5QE2CellcAZfofVXBo2tQg9av2ZcRMQ2S2i5oadQ==}
+    hasBin: true
+    dependencies:
+      '@esbuild-kit/cjs-loader': 2.4.2
+      '@esbuild-kit/core-utils': 3.1.0
+      '@esbuild-kit/esm-loader': 2.5.5
+    optionalDependencies:
+      fsevents: 2.3.2
+    dev: true
+
   /tunnel-agent/0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
     dependencies:
@@ -18386,6 +18440,25 @@ packages:
       workbox-window: 6.5.4
     transitivePeerDependencies:
       - '@types/babel__core'
+      - supports-color
+    dev: true
+
+  /vite-plugin-vue-inspector/3.4.0_vite@4.2.1:
+    resolution: {integrity: sha512-gAdJ6fCPO7+PcUZJexgdOz27yuzQfEviBSS4c+zLLsItHdUq79oYgoWpPZwIYcE0FDFcAtz8dfG6I1ugWuykrw==}
+    peerDependencies:
+      vite: ^3.0.0-0 || ^4.0.0-0
+    dependencies:
+      '@babel/core': 7.21.3
+      '@babel/plugin-syntax-import-meta': 7.10.4_@babel+core@7.21.3
+      '@babel/plugin-transform-typescript': 7.21.3_@babel+core@7.21.3
+      '@vue/babel-plugin-jsx': 1.1.1_@babel+core@7.21.3
+      '@vue/compiler-dom': 3.2.47
+      esno: 0.16.3
+      kolorist: 1.7.0
+      magic-string: 0.30.0
+      shell-quote: 1.8.0
+      vite: 4.2.1_meshwkwkz7ekjedvk6ak5viixy
+    transitivePeerDependencies:
       - supports-color
     dev: true
 

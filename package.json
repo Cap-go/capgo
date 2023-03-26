@@ -25,7 +25,8 @@
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit",
     "ionic:build": "vite build",
-    "ionic:serve": "vite"
+    "ionic:serve": "vite",
+    "size": "npx vite-bundle-visualizer"
   },
   "dependencies": {
     "@capacitor-community/http": "^1.4.1",
@@ -109,7 +110,6 @@
     "semver": "^7.3.8",
     "sonner": "^0.3.0",
     "veaury": "^2.3.12",
-    "vite-plugin-environment": "1.1.3",
     "vue": "3.2.47",
     "vue-chartjs": "^4.1.2",
     "vue-demi": "0.13.11",
@@ -159,9 +159,11 @@
     "unplugin-icons": "0.15.3",
     "unplugin-vue-components": "^0.24.1",
     "vite": "4.2.1",
+    "vite-plugin-environment": "1.1.3",
     "vite-plugin-inspect": "0.7.18",
     "vite-plugin-pages": "0.29.0",
     "vite-plugin-pwa": "0.14.6",
+    "vite-plugin-vue-inspector": "^3.4.0",
     "vite-plugin-vue-layouts": "0.7.0",
     "vite-plugin-windicss": "1.8.10",
     "vitest": "0.1.25",

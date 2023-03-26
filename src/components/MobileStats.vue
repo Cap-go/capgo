@@ -4,10 +4,34 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Doughnut } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
+import annotationPlugin from 'chartjs-plugin-annotation'
+import {
+// CategoryScale,
+  ArcElement,
+  Chart,
+  Tooltip,
+// LineElement,
+// LinearScale,
+// PointElement,
+} from 'chart.js'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import type { Database } from '~/types/supabase.types'
 import { urlToAppId } from '~/services/conversion'
+
+Chart.register(
+  ArcElement,
+  annotationPlugin,
+  Tooltip,
+  // Colors,
+  // BarController,
+  // BarElement,
+  // PointElement,
+  // CategoryScale,
+  // LinearScale,
+  // LineElement,
+  // Legend,
+)
 
 interface Version {
   id: {
