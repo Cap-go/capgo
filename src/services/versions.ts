@@ -1,11 +1,14 @@
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
+import { useI18n } from 'vue-i18n'
+import { toast } from 'sonner'
 import { downloadUrl } from './supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
+const { t } = useI18n()
 
 export const openVersion = async (app: Database['public']['Tables']['app_versions']['Row']) => {
   displayStore.messageLoader = 'Opening version...'
@@ -37,13 +40,13 @@ export const openVersion = async (app: Database['public']['Tables']['app_version
     }
     catch (error) {
       console.error('Error', error)
-      displayStore.messageToast.push('Cannot set this version')
+      toast.error(t('cannot-set-this-vers'))
     }
     displayStore.showLoader = false
   }
   else {
     if (!signedURL) {
-      displayStore.messageToast.push('Cannot get the test version')
+      toast.error(t('cannot-get-the-test-'))
       displayStore.showLoader = false
     }
     else {

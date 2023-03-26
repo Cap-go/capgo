@@ -6,6 +6,7 @@ import {
   kList, kListItem,
   kToggle,
 } from 'konsta/vue'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
 import { useMainStore } from '~/stores/main'
@@ -182,7 +183,7 @@ const makeDefault = async (val = true) => {
           }
           else {
             channel.value.public = val
-            displayStore.messageToast.push(val ? t('defined-as-public') : t('defined-as-private'))
+            toast.success(val ? t('defined-as-public') : t('defined-as-private'))
           }
         },
       },

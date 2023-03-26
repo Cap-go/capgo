@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import {
   kListItem,
 } from 'konsta/vue'
+import { toast } from 'sonner'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -94,7 +95,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('version', version.id)
     if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.messageToast.push(`${t('version')} ${version.app_id}@${version.name} ${t('bundle-is-linked-channel')}`)
+      toast.error(`${t('version')} ${version.app_id}@${version.name} ${t('bundle-is-linked-channel')}`)
       return
     }
     const { data: deviceFound, error: errorDevice } = await supabase
@@ -103,7 +104,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('version', version.id)
     if ((deviceFound && deviceFound.length) || errorDevice) {
-      displayStore.messageToast.push(`${t('version')} ${version.app_id}@${version.name} ${t('bundle-is-linked-device')}`)
+      toast.error(`${t('version')} ${version.app_id}@${version.name} ${t('bundle-is-linked-device')}`)
       return
     }
     const { error: delError } = await supabase
@@ -116,15 +117,15 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
       .eq('app_id', version.app_id)
       .eq('id', version.id)
     if (delAppError || delError) {
-      displayStore.messageToast.push(t('cannot-delete-bundle'))
+      toast.error(t('cannot-delete-bundle'))
     }
     else {
-      displayStore.messageToast.push(t('bundle-deleted'))
+      toast.success(t('bundle-deleted'))
       await refreshData()
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-bundle'))
+    toast.error(t('cannot-delete-bundle'))
   }
 }
 

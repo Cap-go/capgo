@@ -3,13 +3,13 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
+import { toast } from 'sonner'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
 import type { Stat } from '~/components/comp_def'
 const openSupport = () => {
   sendMessage('I need a custom plan')
@@ -35,7 +35,6 @@ const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
-const displayStore = useDisplayStore()
 
 const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
@@ -56,9 +55,6 @@ const openChangePlan = (planId: string) => {
   // get the current url
   if (planId)
     openCheckout(planId, window.location.href, window.location.href, isYearly.value)
-}
-const showToastMessage = async (message: string) => {
-  displayStore.messageToast.push(message)
 }
 
 const getPrice = (plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number => {
@@ -111,7 +107,7 @@ watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
-      showToastMessage(t('usage-success'))
+      toast.success(t('usage-success'))
     }
     else if (main.user?.id) {
       loadData()

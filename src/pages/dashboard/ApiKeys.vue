@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
@@ -16,7 +17,7 @@ const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
 const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
   copy(app.key)
   console.log('displayStore.messageToast', displayStore.messageToast)
-  displayStore.messageToast.push(t('key-copied'))
+  toast.success(t('key-copied'))
 }
 const geKeys = async (retry = true): Promise<void> => {
   isLoading.value = true

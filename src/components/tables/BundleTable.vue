@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'sonner'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
@@ -118,7 +119,7 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', one.app_id)
       .eq('version', one.id)
     if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.messageToast.push(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-channel')}`)
+      toast.error(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-channel')}`)
       return
     }
     const { data: deviceFound, error: errorDevice } = await supabase
@@ -127,7 +128,7 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', one.app_id)
       .eq('version', one.id)
     if ((deviceFound && deviceFound.length) || errorDevice) {
-      displayStore.messageToast.push(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-device')}`)
+      toast.error(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-device')}`)
       return
     }
     const { error: delError } = await supabase
@@ -140,15 +141,15 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', one.app_id)
       .eq('id', one.id)
     if (delAppError || delError) {
-      displayStore.messageToast.push(t('cannot-delete-bundle'))
+      toast.error(t('cannot-delete-bundle'))
     }
     else {
-      displayStore.messageToast.push(t('bundle-deleted'))
+      toast.success(t('bundle-deleted'))
       await refreshData()
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-bundle'))
+    toast.error(t('cannot-delete-bundle'))
   }
 }
 

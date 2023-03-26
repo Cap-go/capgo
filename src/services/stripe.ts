@@ -43,13 +43,13 @@ export const openPortal = async () => {
       openBlank(resp.data.url)
     }
     else {
-      displayStore.messageToast.push('Cannot open your portal')
+      toast.error('Cannot open your portal')
     }
   }
   catch (error) {
     console.error('Error unknow', error)
     displayStore.showLoader = false
-    displayStore.messageToast.push('Cannot get your portal')
+    toast.error('Cannot get your portal')
   }
   return null
 }
@@ -74,6 +74,6 @@ export const openCheckout = async (priceId: string, successUrl: string, cancelUr
   catch (error) {
     console.error(error)
     displayStore.showLoader = false
-    displayStore.messageToast.push('Cannot get your checkout')
+    toast.error('Cannot get your checkout')
   }
 }

@@ -6,6 +6,7 @@ import { NativeMarket } from '@capgo/native-market'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
+import { toast } from 'sonner'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
@@ -95,16 +96,16 @@ modules.value.push(...[
 Camera.requestPermissions()
 const runMethod = async (m: Module) => {
   console.log('runMethod', m)
-  displayStore.messageToast.push(`runMethod: ${JSON.stringify(m)}`);
+  toast.success(`runMethod: ${JSON.stringify(m)}`);
   (mods as any)[m.name][m.method]({ ...m.option }).then((res: any) => {
     console.log('resMethod', m, res)
     setTimeout(async () => {
-      displayStore.messageToast.push(`resMethod: ${JSON.stringify(res)}`)
+      toast.success(`resMethod: ${JSON.stringify(res)}`)
     }, 2000)
   }).catch((err: any) => {
     console.log('errMethod', m, err)
     setTimeout(async () => {
-      displayStore.messageToast.push(`errMethod: ${err}`)
+      toast.success(`errMethod: ${err}`)
     }, 2000)
   })
 }

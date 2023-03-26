@@ -8,6 +8,7 @@ import {
   kDialogButton,
   kFab,
 } from 'konsta/vue'
+import { toast } from 'sonner'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
@@ -168,15 +169,15 @@ const deleteOne = async (one: typeof element) => {
       .eq('app_id', props.appId)
       .eq('id', one.id)
     if (delChanError) {
-      displayStore.messageToast.push(t('cannot-delete-channel'))
+      toast.error(t('cannot-delete-channel'))
     }
     else {
       await refreshData()
-      displayStore.messageToast.push(t('channel-deleted'))
+      toast.success(t('channel-deleted'))
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-channel'))
+    toast.error(t('cannot-delete-channel'))
   }
 }
 

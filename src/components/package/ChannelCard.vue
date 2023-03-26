@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import {
   kListItem,
 } from 'konsta/vue'
+import { toast } from 'sonner'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -85,15 +86,15 @@ const deleteChannel = async (channel: Database['public']['Tables']['channels']['
       .eq('app_id', channel.app_id)
       .eq('id', channel.id)
     if (delChanError) {
-      displayStore.messageToast.push(t('cannot-delete-channel'))
+      toast.error(t('cannot-delete-channel'))
     }
     else {
       await refreshData()
-      displayStore.messageToast.push(t('channel-deleted'))
+      toast.success(t('channel-deleted'))
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-channel'))
+    toast.error(t('cannot-delete-channel'))
   }
 }
 

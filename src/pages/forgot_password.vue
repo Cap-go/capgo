@@ -4,12 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
-const displayStore = useDisplayStore()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
@@ -17,10 +16,6 @@ const step = ref(1)
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
-
-const showToastMessage = async (message: string) => {
-  displayStore.messageToast.push(message)
-}
 
 const submit = async (form: { email: string; password: string }) => {
   isLoading.value = true
@@ -33,7 +28,7 @@ const submit = async (form: { email: string; password: string }) => {
     }, 5000)
     if (error)
       setErrors('forgot-password', [error.message], {})
-    else showToastMessage(t('forgot-check-email'))
+    else toast.success(t('forgot-check-email'))
   }
   else if (step.value === 2 && route.hash) {
     const queryString = route.hash.replace('#', '')

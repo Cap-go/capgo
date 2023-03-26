@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'sonner'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -219,7 +220,7 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
     return
   }
   else {
-    displayStore.messageToast.push(t('account-updated-succ'))
+    toast.success(t('account-updated-succ'))
   }
   main.user = usr
   isLoading.value = false

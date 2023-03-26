@@ -237,7 +237,7 @@ const saveCustomId = async () => {
       custom_id: device.value?.custom_id,
     })
     .eq('device_id', id.value)
-  displayStore.messageToast.push(t('custom-id-saved'))
+  toast.error(t('custom-id-saved'))
 }
 
 const delDevVersion = async (device: string) => {
@@ -256,7 +256,7 @@ const updateOverride = async () => {
       text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && await delDevVersion(device.value?.device_id)
-        displayStore.messageToast.push(t('unlink-version'))
+        toast.error(t('unlink-version'))
         await loadData()
       },
     })
@@ -270,12 +270,12 @@ const updateOverride = async () => {
         isLoading.value = true
         try {
           await upsertDevVersion(device.value?.device_id, version)
-          displayStore.messageToast.push(t('version-linked'))
+          toast.error(t('version-linked'))
           await loadData()
         }
         catch (error) {
           console.error(error)
-          displayStore.messageToast.push(t('channel-link-fail'))
+          toast.error(t('channel-link-fail'))
         }
         isLoading.value = false
       },
@@ -323,7 +323,7 @@ const updateChannel = async () => {
       text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && await delDevChannel(device.value?.device_id)
-        displayStore.messageToast.push(t('unlink-channel'))
+        toast.error(t('unlink-channel'))
         await loadData()
       },
     })
@@ -337,12 +337,12 @@ const updateChannel = async () => {
         isLoading.value = true
         try {
           await upsertDevChannel(device.value?.device_id, channel)
-          displayStore.messageToast.push(t('channel-linked'))
+          toast.error(t('channel-linked'))
           await loadData()
         }
         catch (error) {
           console.error(error)
-          displayStore.messageToast.push(t('channel-link-fail'))
+          toast.error(t('channel-link-fail'))
         }
         isLoading.value = false
       },

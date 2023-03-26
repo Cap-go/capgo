@@ -4,15 +4,14 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
 const supabase = useSupabase()
 
 const { t } = useI18n()
 
-const displayStore = useDisplayStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -41,7 +40,7 @@ const submit = async (form: { password: string }) => {
   if (updateError)
     setErrors('set-password', [updateError.message], {})
   else
-    displayStore.messageToast.push(t('changed-password-suc'))
+    toast.success(t('changed-password-suc'))
   router.push('/onboarding/activation')
 }
 

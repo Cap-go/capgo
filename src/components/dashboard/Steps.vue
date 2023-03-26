@@ -6,11 +6,11 @@ import { useI18n } from 'vue-i18n'
 import {
   kFab,
 } from 'konsta/vue'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/crips'
-import { useDisplayStore } from '~/stores/display'
 import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
 
 const props = defineProps<{
@@ -18,7 +18,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits(['done'])
 
-const displayStore = useDisplayStore()
 const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
@@ -87,7 +86,7 @@ const copyToast = async (allowed: boolean, id: string, text?: string) => {
   if (!allowed || !text)
     return
   copy(text)
-  displayStore.messageToast.push(t('copied-to-clipboard'))
+  toast.success(t('copied-to-clipboard'))
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
     setLog()

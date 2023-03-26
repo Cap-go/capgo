@@ -4,22 +4,17 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'sonner'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
-import { useDisplayStore } from '~/stores/display'
 
 const route = useRoute()
-const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const isLoading = ref(false)
 const router = useRouter()
 const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
-
-const showToastMessage = async (message: string) => {
-  displayStore.messageToast.push(message)
-}
 
 const nextLogin = async () => {
   router.push('/app/home')
@@ -38,7 +33,7 @@ const submit = async (form: { email: string; password: string }) => {
   if (error) {
     console.error('error', error)
     setErrors('login-account', [error.message], {})
-    showToastMessage(t('invalid-auth'))
+    toast.error(t('invalid-auth'))
   }
   else {
     await nextLogin()

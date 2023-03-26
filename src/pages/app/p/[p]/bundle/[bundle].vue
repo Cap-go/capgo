@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
 import { openVersion } from '~/services/versions'
@@ -32,7 +33,7 @@ const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row'
 
 const copyToast = async (text: string) => {
   copy(text)
-  displayStore.messageToast.push(t('copied-to-clipboard'))
+  toast.success(t('copied-to-clipboard'))
 }
 
 const tabs: Tab[] = [
@@ -120,7 +121,7 @@ const ASChannelChooser = async () => {
         }
         catch (error) {
           console.error(error)
-          displayStore.messageToast.push(t('cannot-test-app-some'))
+          toast.error(t('cannot-test-app-some'))
         }
       },
     })
@@ -185,7 +186,7 @@ const openChannel = async () => {
         }
         catch (error) {
           console.error(error)
-          displayStore.messageToast.push(t('cannot-test-app-some'))
+          toast.error(t('cannot-test-app-some'))
         }
       },
     })

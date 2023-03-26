@@ -3,15 +3,13 @@ import { ref } from 'vue'
 import { setErrors } from '@formkit/core'
 import { useI18n } from 'vue-i18n'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'sonner'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
 
 const isLoading = ref(false)
 const supabase = useSupabase()
 
 const { t } = useI18n()
-
-const displayStore = useDisplayStore()
 
 const submit = async (form: { password: string; password_confirm: string }) => {
   console.log('submitting', form)
@@ -25,7 +23,7 @@ const submit = async (form: { password: string; password_confirm: string }) => {
   if (updateError)
     setErrors('change-pass', [t('account-password-error')], {})
   else
-    displayStore.messageToast.push(t('changed-password-suc'))
+    toast.success(t('changed-password-suc'))
 }
 </script>
 

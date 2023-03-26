@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import {
   kListItem,
 } from 'konsta/vue'
+import { toast } from 'sonner'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -54,7 +55,7 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
       .from(`images/${app.user_id}`)
       .remove([app.app_id])
     if (errorIcon)
-      displayStore.messageToast.push(t('cannot-delete-app-icon'))
+      toast.error(t('cannot-delete-app-icon'))
 
     const { data, error: vError } = await supabase
       .from('app_versions')
@@ -69,7 +70,7 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
         .from('apps')
         .remove(filesToRemove)
       if (delError) {
-        displayStore.messageToast.push(t('cannot-delete-app-version'))
+        toast.error(t('cannot-delete-app-version'))
         return
       }
     }
@@ -80,15 +81,15 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
     if (vError || dbAppError) {
-      displayStore.messageToast.push(t('cannot-delete-app'))
+      toast.error(t('cannot-delete-app'))
     }
     else {
-      displayStore.messageToast.push(t('app-deleted'))
+      toast.success(t('app-deleted'))
       await emit('reload')
     }
   }
   catch (error) {
-    displayStore.messageToast.push(t('cannot-delete-app'))
+    toast.error(t('cannot-delete-app'))
   }
 }
 

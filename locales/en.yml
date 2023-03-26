@@ -73,7 +73,9 @@ cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
+cannot-get-the-test-: Cannot get the test version
 cannot-save-custom-i: Cannot save custom ID
+cannot-set-this-vers: Cannot set this version
 cannot-test-app-some: Cannot test app something wrong happened
 change: Change
 changed-password-suc: Password changed successfully

@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { watch } from 'vue'
-import { useDisplayStore } from '~/stores/display'
+import { applyPureReactInVue } from 'veaury'
+import { Toaster } from 'sonner'
+// import Toaster from '~/components/sooner/toaster.vue'
+const ToasterVue = applyPureReactInVue(Toaster)
 
-const displayStore = useDisplayStore()
-watch(displayStore.messageToast, (val) => {
-  console.log('messageToast', val)
-  setTimeout(() => {
-    displayStore.messageToast.shift()
-  }, displayStore.durationToast)
-})
+// const displayStore = useDisplayStore()
+// watch(displayStore.messageToast, (val) => {
+//   // toast.success('hello')
+//   console.log('messageToast', val)
+//   setTimeout(() => {
+//     displayStore.messageToast.shift()
+//   }, displayStore.durationToast)
+// })
 </script>
 
 <template>
-  <div class="toast toast-end">
-    <div v-for="(item, i) in displayStore.messageToast" :key="i" class="alert alert-info">
-      <div>
-        <span>{{ item }}</span>
-      </div>
-    </div>
-  </div>
+  <ToasterVue />
 </template>
 
 <style scoped>
