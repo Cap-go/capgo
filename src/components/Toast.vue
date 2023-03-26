@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { applyPureReactInVue } from 'veaury'
 import { Toaster } from 'sonner'
-// import Toaster from '~/components/sooner/toaster.vue'
-const ToasterVue = applyPureReactInVue(Toaster)
-
-// const displayStore = useDisplayStore()
-// watch(displayStore.messageToast, (val) => {
-//   // toast.success('hello')
-//   console.log('messageToast', val)
-//   setTimeout(() => {
-//     displayStore.messageToast.shift()
-//   }, displayStore.durationToast)
-// })
+const ToasterVue = applyPureReactInVue(Toaster,
+  {
+    useInjectPropsFromWrapper(reactProps) {
+      return {
+        ...reactProps,
+        richColors: true,
+        closeButton: true,
+        position: 'top-right',
+      }
+    },
+  })
 </script>
 
 <template>
-  <ToasterVue rich-colors />
+  <ToasterVue />
 </template>
 
 <style scoped>
