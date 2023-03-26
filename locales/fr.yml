@@ -1,3 +1,4 @@
+6-characters-minimum: 6 caractères minimum, 1 majuscule, 1 minuscule, 1 caractère spécial
 Bandwidth: Bande passante
 Storage: Stockage
 account: Compte
@@ -76,7 +77,9 @@ cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-bundle: Impossible de supprimer le groupe
 cannot-delete-channel: Impossible de supprimer la chaîne
+cannot-get-the-test-: Impossible d'obtenir la version de test
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
+cannot-set-this-vers: Impossible de définir cette version
 cannot-test-app-some: Impossible de tester l'application, quelque chose de mal s'est produit
 change: Changement
 changed-password-suc: Le mot de passe a été changé avec succès
@@ -204,11 +207,13 @@ open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jo
 os-version: Version du système d'exploitation
 pages: pages
 password: Mot de passe
+password-confirmatio: Confirmation mot de passe
 password-heading: Créer un mot de passe
 password-hint: >-
   Entrez une combinaison d'au moins 6 chiffres, lettres et signes de
   ponctuation.
 password-new: nouveau mot de passe
+percent-fail: Pourcentage d'échec
 personal-information: Informations personnelles
 plan-abtest: Test A/B
 plan-bandwidth: Bande passante Go
@@ -235,6 +240,7 @@ platform: Plateforme
 please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 plugin-version: Version du plug-in
+prediction: Prédiction
 pro-tip-you-can-copy: "Conseil de pro\_: vous pouvez copier le"
 projection: Projections
 recommended: Recommandé

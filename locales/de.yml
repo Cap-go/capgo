@@ -1,3 +1,4 @@
+6-characters-minimum: Mindestens 6 Zeichen, 1 Großbuchstabe, 1 Kleinbuchstabe, 1 Sonderzeichen
 Bandwidth: Bandbreite
 Storage: Lagerung
 account: Konto
@@ -78,7 +79,9 @@ cannot-delete-app-icon: App-Symbol kann nicht gelöscht werden
 cannot-delete-app-version: App-Version kann nicht gelöscht werden
 cannot-delete-bundle: Paket kann nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
+cannot-get-the-test-: Die Testversion kann nicht abgerufen werden
 cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
+cannot-set-this-vers: Diese Version kann nicht eingestellt werden
 cannot-test-app-some: App kann nicht getestet werden, es ist ein Fehler aufgetreten
 change: Ändern
 changed-password-suc: das Passwort wurde erfolgreich geändert
@@ -206,11 +209,13 @@ open-this-link-to-le: Öffnen Sie diesen Link, um zu erfahren, wie Sie Ihr Updat
 os-version: OS Version
 pages: Seiten
 password: Passwort
+password-confirmatio: Passwort Bestätigung
 password-heading: Passwort erstellen
 password-hint: >-
   Geben Sie eine Kombination aus mindestens 6 Zahlen, Buchstaben und Satzzeichen
   ein.
 password-new: Neues Kennwort
+percent-fail: Fehlerprozentsatz
 personal-information: Persönliche Informationen
 plan-abtest: A / B-Tests
 plan-bandwidth: GB Bandbreite
@@ -239,6 +244,7 @@ platform: Plattform
 please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 plugin-version: Plugin-Version
+prediction: Vorhersage
 pro-tip-you-can-copy: 'Pro-Tipp: Sie können die'
 projection: Projektionen
 recommended: Empfohlen

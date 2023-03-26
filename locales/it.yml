@@ -1,3 +1,4 @@
+6-characters-minimum: Minimo 6 caratteri, 1 maiuscolo, 1 minuscolo, 1 carattere speciale
 Bandwidth: Larghezza di banda
 Storage: Magazzinaggio
 account: Account
@@ -74,7 +75,9 @@ cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
 cannot-delete-app-version: Impossibile eliminare la versione dell'app
 cannot-delete-bundle: Impossibile eliminare il gruppo
 cannot-delete-channel: Impossibile eliminare il canale
+cannot-get-the-test-: Impossibile ottenere la versione di prova
 cannot-save-custom-i: Impossibile salvare l'ID personalizzato
+cannot-set-this-vers: Impossibile impostare questa versione
 cannot-test-app-some: Impossibile testare l'app, è successo qualcosa di sbagliato
 change: Modifica
 changed-password-suc: password cambiata con successo
@@ -200,11 +203,13 @@ open-this-link-to-le: Apri questo link per scoprire come testare il tuo aggiorna
 os-version: Versione del sistema operativo
 pages: Pagine
 password: Parola d'ordine
+password-confirmatio: conferma password
 password-heading: Crea password
 password-hint: >-
   Inserisci una combinazione di almeno 6 numeri, lettere e segni di
   punteggiatura.
 password-new: nuova password
+percent-fail: Percentuale di fallimento
 personal-information: Informazioni personali
 plan-abtest: Test A/B
 plan-bandwidth: Larghezza di banda GB
@@ -231,6 +236,7 @@ platform: piattaforma
 please-choose-your-p: Scegli le tue preferenze
 please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
+prediction: Predizione
 pro-tip-you-can-copy: 'Suggerimento pro: puoi copiare il file'
 projection: Proiezioni
 recommended: Consigliato

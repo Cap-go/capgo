@@ -9,9 +9,11 @@ import IconsResolver from 'unplugin-icons/resolver'
 import Components from 'unplugin-vue-components/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import VueI18n from '@intlify/vite-plugin-vue-i18n'
+import Inspector from 'vite-plugin-vue-inspector'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import { readdirSync } from 'fs-extra'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
@@ -22,6 +24,12 @@ const getUrl = (): string => {
     return `https://${getRightKey('base_domain')}`
 }
 
+const locales: string[] = []
+readdirSync('./locales/')
+  .forEach((file) => {
+    if (file.split('.')[0] !== 'README')
+      locales.push(file.split('.')[0])
+  })
 // const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
 const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
@@ -38,9 +46,9 @@ export default defineConfig({
     veauryVitePlugins({
       type: 'vue',
       // Configuration of @vitejs/plugin-vue
-      // vueOptions: {
-      // include: [/\.vue$/, /\.md$/],
-      // },
+      vueOptions: {
+        include: [/\.vue$/, /\.md$/],
+      },
       // Configuration of @vitejs/plugin-react
       // reactOptions: {...},
       // Configuration of @vitejs/plugin-vue-jsx
@@ -55,6 +63,7 @@ export default defineConfig({
       ],
     }),
     EnvironmentPlugin({
+      locales: locales.join(','),
       VITE_APP_VERSION: pack.version,
       VITE_SUPABASE_ANON_KEY: getRightKey('supa_anon'),
       VITE_SUPABASE_URL: getRightKey('supa_url'),
@@ -129,13 +138,18 @@ export default defineConfig({
     VueI18n({
       runtimeOnly: true,
       compositionOnly: true,
+      fullInstall: true,
       include: [path.resolve(__dirname, 'locales/**')],
+      // availableLocales: [path.resolve(__dirname, 'locales/**')
     }),
 
     // https://github.com/antfu/vite-plugin-inspect
-    Inspect({
-      // change this to enable inspect for debugging
-      enabled: false,
+    // Visit http://localhost:3333/__inspect/ to see the inspector
+    Inspect(),
+
+    // https://github.com/webfansplz/vite-plugin-vue-inspector
+    Inspector({
+      toggleButtonVisibility: 'never',
     }),
     // ViteImagemin({
     //   gifsicle: {
@@ -183,6 +197,7 @@ export default defineConfig({
     ],
   },
 
+  // https://github.com/vitest-dev/vitest
   test: {
     include: ['test/**/*.test.ts'],
     environment: 'jsdom',

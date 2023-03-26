@@ -1,3 +1,4 @@
+6-characters-minimum: Minimal 6 karakter, 1 huruf besar, 1 huruf kecil, 1 karakter khusus
 Bandwidth: Bandwidth
 Storage: Penyimpanan
 account: Akun
@@ -72,7 +73,9 @@ cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
+cannot-get-the-test-: Tidak bisa mendapatkan versi uji
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
+cannot-set-this-vers: Tidak dapat menyetel versi ini
 cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
 change: Mengubah
 changed-password-suc: Kata sandi berhasil diubah
@@ -200,9 +203,11 @@ open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan A
 os-version: versi OS
 pages: Halaman
 password: Kata sandi
+password-confirmatio: konfirmasi kata kunci
 password-heading: Buat Kata Sandi
 password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
 password-new: kata sandi baru
+percent-fail: Persentase gagal
 personal-information: Informasi pribadi
 plan-abtest: Pengujian A/B
 plan-bandwidth: Bandwidth GB
@@ -229,6 +234,7 @@ platform: Platform
 please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
+prediction: Ramalan
 pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
 projection: Proyeksi
 recommended: Direkomendasikan

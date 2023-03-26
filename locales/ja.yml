@@ -1,3 +1,4 @@
+6-characters-minimum: 最小 6 文字、大文字 1 つ、小文字 1 つ、特殊文字 1 つ
 Bandwidth: 帯域幅
 Storage: 保管所
 account: アカウント
@@ -72,7 +73,9 @@ cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-bundle: バンドルを削除できません
 cannot-delete-channel: チャンネルを削除できません
+cannot-get-the-test-: テスト版を入手できません
 cannot-save-custom-i: カスタム ID を保存できません
+cannot-set-this-vers: このバージョンは設定できません
 cannot-test-app-some: アプリをテストできません
 change: 変化
 changed-password-suc: パスワードは正常に変更されました
@@ -192,9 +195,11 @@ open-this-link-to-le: このリンクを開いて、更新をテストする方�
 os-version: OSバージョン
 pages: ページ
 password: パスワード
+password-confirmatio: パスワードの確認
 password-heading: パスワードの作成
 password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入力してください。
 password-new: 新しいパスワード
+percent-fail: 失敗率
 personal-information: 個人情報
 plan-abtest: A / Bテスト
 plan-bandwidth: GB帯域幅
@@ -221,6 +226,7 @@ platform: プラットホーム
 please-choose-your-p: お好みを選択してください
 please-upgrade: プランをアップグレードしてユーザーを追加してください
 plugin-version: プラグインのバージョン
+prediction: 予測
 pro-tip-you-can-copy: 'プロのヒント: をコピーできます'
 projection: 予測
 recommended: おすすめされた

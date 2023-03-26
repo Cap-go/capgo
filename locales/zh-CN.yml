@@ -1,3 +1,4 @@
+6-characters-minimum: 最少 6 个字符，1 个大写字母，1 个小写字母，1 个特殊字符
 Bandwidth: 带宽
 Storage: 贮存
 account: 帐户
@@ -72,7 +73,9 @@ cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-bundle: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
+cannot-get-the-test-: 无法获取测试版
 cannot-save-custom-i: 无法保存自定义 ID
+cannot-set-this-vers: 无法设置此版本
 cannot-test-app-some: 无法测试应用程序发生错误
 change: 改变
 changed-password-suc: 密码修改成功
@@ -192,9 +195,11 @@ open-this-link-to-le: 打开此链接以了解如何测试您的更新
 os-version: 操作系统版本
 pages: 页数
 password: 密码
+password-confirmatio: 确认密码
 password-heading: 创建密码
 password-hint: 输入至少 6 个数字、字母和标点符号的组合。
 password-new: 新密码
+percent-fail: 失败百分比
 personal-information: 个人信息
 plan-abtest: A / B测试
 plan-bandwidth: 国标带宽
@@ -221,6 +226,7 @@ platform: 平台
 please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
 plugin-version: 插件版本
+prediction: 预言
 pro-tip-you-can-copy: 专业提示：您可以复制
 projection: 预测
 recommended: 受到推崇的

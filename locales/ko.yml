@@ -1,3 +1,4 @@
+6-characters-minimum: 최소 6자, 대문자 1개, 소문자 1개, 특수 문자 1개
 Bandwidth: 대역폭
 Storage: 저장
 account: 계정
@@ -72,7 +73,9 @@ cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
+cannot-get-the-test-: 테스트 버전을 받을 수 없습니다
 cannot-save-custom-i: 맞춤 ID를 저장할 수 없습니다.
+cannot-set-this-vers: 이 버전을 설정할 수 없습니다.
 cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했습니다.
 change: 변화
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
@@ -192,9 +195,11 @@ open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방�
 os-version: OS 버전
 pages: 페이지
 password: 비밀번호
+password-confirmatio: 비밀번호 확인
 password-heading: 비밀번호 만들기
 password-hint: 숫자, 문자, 구두점을 6개 이상 조합하여 입력하세요.
 password-new: 새 비밀번호
+percent-fail: 실패율
 personal-information: 개인 정보
 plan-abtest: A/B 테스트
 plan-bandwidth: GB 대역폭
@@ -221,6 +226,7 @@ platform: 플랫폼
 please-choose-your-p: 기본 설정을 선택하십시오
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
+prediction: 예측
 pro-tip-you-can-copy: '전문가 팁:'
 projection: 예측
 recommended: 추천

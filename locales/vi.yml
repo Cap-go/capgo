@@ -1,3 +1,4 @@
+6-characters-minimum: Tối thiểu 6 ký tự, 1 chữ hoa, 1 chữ thường, 1 ký tự đặc biệt
 Bandwidth: Băng thông
 Storage: Kho
 account: Tài khoản
@@ -76,7 +77,9 @@ cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-bundle: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
+cannot-get-the-test-: Không thể tải phiên bản thử nghiệm
 cannot-save-custom-i: Không thể lưu ID tùy chỉnh
+cannot-set-this-vers: Không thể đặt phiên bản này
 cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
 change: Thay đổi
 changed-password-suc: Đã đổi mật khẩu thành công
@@ -200,9 +203,11 @@ open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra b
 os-version: phiên bản của hệ điều hành
 pages: trang
 password: Mật khẩu
+password-confirmatio: xác nhận mật khẩu
 password-heading: Tạo mật khẩu
 password-hint: Nhập kết hợp ít nhất 6 số, chữ cái và dấu chấm câu.
 password-new: mật khẩu mới
+percent-fail: tỷ lệ thất bại
 personal-information: Thông tin cá nhân
 plan-abtest: Thử nghiệm A/B
 plan-bandwidth: Băng thông GB
@@ -229,6 +234,7 @@ platform: Nền tảng
 please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
+prediction: Sự dự đoán
 pro-tip-you-can-copy: 'Mẹo chuyên nghiệp: bạn có thể sao chép'
 projection: dự đoán
 recommended: Khuyến khích

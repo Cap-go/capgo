@@ -1,3 +1,4 @@
+6-characters-minimum: Minimum 6 znaków, 1 wielka litera, 1 mała litera, 1 znak specjalny
 Bandwidth: Przepustowość łącza
 Storage: Składowanie
 account: Konto
@@ -74,7 +75,9 @@ cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
 cannot-delete-bundle: Nie można usunąć pakietu
 cannot-delete-channel: Nie można usunąć kanału
+cannot-get-the-test-: Nie można pobrać wersji testowej
 cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
+cannot-set-this-vers: Nie można ustawić tej wersji
 cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
 change: Zmiana
 changed-password-suc: Hasło zostało zmienione pomyślnie
@@ -198,9 +201,11 @@ open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować 
 os-version: Wersja systemu operacyjnego
 pages: Strony
 password: Hasło
+password-confirmatio: Potwierdzenie hasła
 password-heading: Stwórz hasło
 password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
 password-new: nowe hasło
+percent-fail: Procent niepowodzeń
 personal-information: Informacje osobiste
 plan-abtest: Testy A/B
 plan-bandwidth: GB Przepustowość
@@ -227,6 +232,7 @@ platform: Platforma
 please-choose-your-p: Wybierz swoje preferencje
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 plugin-version: Wersja wtyczki
+prediction: Prognoza
 pro-tip-you-can-copy: 'Pro wskazówka: możesz skopiować plik'
 projection: projekcje
 recommended: Zalecana

@@ -1,3 +1,4 @@
+6-characters-minimum: Minimum 6 karakter, 1 büyük harf, 1 küçük harf, 1 özel karakter
 Bandwidth: Bant genişliği
 Storage: Depolamak
 account: Hesap
@@ -72,7 +73,9 @@ cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-bundle: Paket silinemiyor
 cannot-delete-channel: kanal silinemiyor
+cannot-get-the-test-: Test sürümü alınamıyor
 cannot-save-custom-i: Özel kimlik kaydedilemiyor
+cannot-set-this-vers: Bu sürüm ayarlanamıyor
 cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 change: Değiştirmek
 changed-password-suc: parola başarıyla değiştirildi
@@ -198,9 +201,11 @@ open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için 
 os-version: OS sürümü
 pages: Sayfalar
 password: Şifre
+password-confirmatio: Şifre onayı
 password-heading: Şifre oluştur
 password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon girin.
 password-new: Yeni Şifre
+percent-fail: Başarısız yüzde
 personal-information: Kişisel bilgiler
 plan-abtest: A / B testi
 plan-bandwidth: GB Bant Genişliği
@@ -229,6 +234,7 @@ platform: platformu
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
+prediction: Tahmin
 pro-tip-you-can-copy: 'Profesyonel ipucu: kopyalayabilirsiniz'
 projection: Projeksiyonlar
 recommended: Tavsiye edilen

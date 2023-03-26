@@ -1,3 +1,4 @@
+6-characters-minimum: Mínimo de 6 caracteres, 1 maiúsculo, 1 minúsculo, 1 caractere especial
 Bandwidth: largura de banda
 Storage: Armazenar
 account: Conta
@@ -74,7 +75,9 @@ cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-app-version: Não é possível excluir a versão do aplicativo
 cannot-delete-bundle: Não é possível excluir o pacote
 cannot-delete-channel: Não é possível excluir o canal
+cannot-get-the-test-: Não consigo obter a versão de teste
 cannot-save-custom-i: Não é possível salvar o ID personalizado
+cannot-set-this-vers: Não é possível definir esta versão
 cannot-test-app-some: Não é possível testar o aplicativo, algo errado aconteceu
 change: Mudar
 changed-password-suc: Senha alterada com sucesso
@@ -198,9 +201,11 @@ open-this-link-to-le: Abra este link para saber como testar sua atualização
 os-version: versão do sistema operacional
 pages: Páginas
 password: Senha
+password-confirmatio: ConfirmaÇão Da Senha
 password-heading: Criar senha
 password-hint: Digite uma combinação de pelo menos 6 números, letras e pontuações.
 password-new: Nova Senha
+percent-fail: Porcentagem de reprovação
 personal-information: Informações pessoais
 plan-abtest: teste A/B
 plan-bandwidth: GB de largura de banda
@@ -227,6 +232,7 @@ platform: Plataforma
 please-choose-your-p: Escolha suas preferências
 please-upgrade: Atualize seu plano para adicionar mais usuários
 plugin-version: Versão do plug-in
+prediction: Predição
 pro-tip-you-can-copy: 'Dica profissional: você pode copiar o'
 projection: Projeções
 recommended: Recomendado
