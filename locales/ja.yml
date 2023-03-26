@@ -144,7 +144,7 @@ init-capgo-in-your-a: アプリで Capgo を初期化する
 install: インストール済み
 install-the-capacito: Capacitor プラグインをインストールする
 into-your-app-folder: アプリ フォルダーに移動します。
-invalid-auth: 無効な認証
+invalid-auth: ログインが一致しません。もう一度お試しください。
 is-emulator: エミュレータです
 is-production-app: 本番アプリです
 key-copied: クリップボードにコピーされたキー

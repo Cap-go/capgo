@@ -146,7 +146,7 @@ init-capgo-in-your-a: Init Capgo in your app
 install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
-invalid-auth: invalid auth
+invalid-auth: Your login are not a match, try again.
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-copied: Key copied in your clipboard

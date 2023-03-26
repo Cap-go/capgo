@@ -150,7 +150,7 @@ init-capgo-in-your-a: Init Capgo di aplikasi Anda
 install: Terpasang
 install-the-capacito: Instal plugin Kapasitor
 into-your-app-folder: Ke dalam folder aplikasi Anda.
-invalid-auth: autentikasi tidak valid
+invalid-auth: Login Anda tidak cocok, coba lagi.
 is-emulator: Apakah Emulator
 is-production-app: Apakah aplikasi Produksi
 key-copied: Kunci disalin di papan klip Anda

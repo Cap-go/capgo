@@ -144,7 +144,7 @@ init-capgo-in-your-a: 在您的应用中初始化 Capgo
 install: 已安装
 install-the-capacito: 安装电容器插件
 into-your-app-folder: 进入您的应用程序文件夹。
-invalid-auth: 无效授权
+invalid-auth: 您的登录信息不匹配，请重试。
 is-emulator: 是模拟器
 is-production-app: 是生产应用
 key-copied: 复制到剪贴板的密钥

@@ -15,7 +15,7 @@ const ToasterVue = applyPureReactInVue(Toaster)
 </script>
 
 <template>
-  <ToasterVue />
+  <ToasterVue rich-colors />
 </template>
 
 <style scoped>

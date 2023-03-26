@@ -148,7 +148,7 @@ init-capgo-in-your-a: Zainicjuj Capgo w swojej aplikacji
 install: Zainstalowane
 install-the-capacito: Zainstaluj wtyczkę Kondensator
 into-your-app-folder: Do folderu aplikacji.
-invalid-auth: nieważne uwierzytelnienie
+invalid-auth: Twój login się nie zgadza, spróbuj ponownie.
 is-emulator: jest emulatorem
 is-production-app: Czy aplikacja produkcyjna
 key-copied: Klucz skopiowany do schowka

@@ -150,7 +150,7 @@ init-capgo-in-your-a: Khởi tạo Capgo trong ứng dụng của bạn
 install: Cài đặt
 install-the-capacito: Cài đặt plugin Tụ điện
 into-your-app-folder: Vào thư mục ứng dụng của bạn.
-invalid-auth: xác thực không hợp lệ
+invalid-auth: Thông tin đăng nhập của bạn không khớp, hãy thử lại.
 is-emulator: là giả lập
 is-production-app: Là ứng dụng sản xuất
 key-copied: Đã sao chép khóa vào khay nhớ tạm của bạn

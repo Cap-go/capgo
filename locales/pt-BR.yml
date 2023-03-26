@@ -148,7 +148,7 @@ init-capgo-in-your-a: Inicie o Capgo em seu aplicativo
 install: Instalado
 install-the-capacito: Instale o plug-in Capacitor
 into-your-app-folder: Na pasta do seu aplicativo.
-invalid-auth: autenticação inválida
+invalid-auth: Seu login não é compatível, tente novamente.
 is-emulator: é emulador
 is-production-app: É um aplicativo de produção
 key-copied: Chave copiada em sua área de transferência

@@ -148,7 +148,7 @@ init-capgo-in-your-a: Uygulamanızda Capgo'yu Başlatın
 install: Kurulmuş
 install-the-capacito: Kapasitör eklentisini kurun
 into-your-app-folder: Uygulama klasörünüze.
-invalid-auth: geçersiz kimlik doğrulama
+invalid-auth: Oturum açma bilgileriniz eşleşmedi, tekrar deneyin.
 is-emulator: Emülatör mü
 is-production-app: Üretim uygulaması mı
 key-copied: Anahtar panonuza kopyalandı

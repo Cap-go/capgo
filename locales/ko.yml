@@ -144,7 +144,7 @@ init-capgo-in-your-a: 앱에서 Capgo 초기화
 install: 설치됨
 install-the-capacito: Capacitor 플러그인 설치
 into-your-app-folder: 앱 폴더에.
-invalid-auth: 유효하지 않은 인증
+invalid-auth: 로그인이 일치하지 않습니다. 다시 시도하십시오.
 is-emulator: 에뮬레이터임
 is-production-app: 프로덕션 앱
 key-copied: 클립보드에 복사된 키

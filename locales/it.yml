@@ -150,7 +150,7 @@ init-capgo-in-your-a: Avvia Capgo nella tua app
 install: Installato
 install-the-capacito: Installa il plug-in Condensatore
 into-your-app-folder: Nella cartella dell'app.
-invalid-auth: autenticazione non valida
+invalid-auth: I tuoi dati di accesso non corrispondono, riprova.
 is-emulator: È emulatore
 is-production-app: È l'app di produzione
 key-copied: Chiave copiata negli appunti
