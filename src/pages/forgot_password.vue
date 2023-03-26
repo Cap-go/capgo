@@ -52,7 +52,7 @@ const submit = async (form: { email: string; password: string }) => {
       setErrors('forgot-password', [error.message], {})
     }
     else {
-      showToastMessage(t('forgot-success'))
+      toast.success(t('forgot-success'))
       await supabase.auth.signOut()
       router.push('/login')
     }
