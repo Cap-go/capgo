@@ -221,7 +221,6 @@ dependencies:
   semver: 7.3.8
   sonner: 0.3.0_biqbaboplfbrettd7655fr4n2y
   veaury: 2.3.12_biqbaboplfbrettd7655fr4n2y
-  vite-plugin-environment: 1.1.3_vite@4.2.1
   vue: 3.2.47
   vue-chartjs: 4.1.2_chart.js@4.2.1+vue@3.2.47
   vue-demi: 0.13.11_vue@3.2.47
@@ -271,6 +270,7 @@ devDependencies:
   unplugin-icons: 0.15.3_@vue+compiler-sfc@3.2.47
   unplugin-vue-components: 0.24.1_vue@3.2.47
   vite: 4.2.1_meshwkwkz7ekjedvk6ak5viixy
+  vite-plugin-environment: 1.1.3_vite@4.2.1
   vite-plugin-inspect: 0.7.18_vite@4.2.1
   vite-plugin-pages: 0.29.0_ctv5py3uerpxp5gfh3m7n5vpti
   vite-plugin-pwa: 0.14.6_vite@4.2.1
@@ -2184,6 +2184,7 @@ packages:
     cpu: [arm]
     os: [android]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/android-arm64/0.17.13:
@@ -2192,6 +2193,7 @@ packages:
     cpu: [arm64]
     os: [android]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/android-x64/0.17.13:
@@ -2200,6 +2202,7 @@ packages:
     cpu: [x64]
     os: [android]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/darwin-arm64/0.17.13:
@@ -2208,6 +2211,7 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/darwin-x64/0.17.13:
@@ -2216,6 +2220,7 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/freebsd-arm64/0.17.13:
@@ -2224,6 +2229,7 @@ packages:
     cpu: [arm64]
     os: [freebsd]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/freebsd-x64/0.17.13:
@@ -2232,6 +2238,7 @@ packages:
     cpu: [x64]
     os: [freebsd]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-arm/0.17.13:
@@ -2240,6 +2247,7 @@ packages:
     cpu: [arm]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-arm64/0.17.13:
@@ -2248,6 +2256,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-ia32/0.17.13:
@@ -2256,6 +2265,7 @@ packages:
     cpu: [ia32]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-loong64/0.17.13:
@@ -2264,6 +2274,7 @@ packages:
     cpu: [loong64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-mips64el/0.17.13:
@@ -2272,6 +2283,7 @@ packages:
     cpu: [mips64el]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-ppc64/0.17.13:
@@ -2280,6 +2292,7 @@ packages:
     cpu: [ppc64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-riscv64/0.17.13:
@@ -2288,6 +2301,7 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-s390x/0.17.13:
@@ -2296,6 +2310,7 @@ packages:
     cpu: [s390x]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/linux-x64/0.17.13:
@@ -2304,6 +2319,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/netbsd-x64/0.17.13:
@@ -2312,6 +2328,7 @@ packages:
     cpu: [x64]
     os: [netbsd]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/openbsd-x64/0.17.13:
@@ -2320,6 +2337,7 @@ packages:
     cpu: [x64]
     os: [openbsd]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/sunos-x64/0.17.13:
@@ -2328,6 +2346,7 @@ packages:
     cpu: [x64]
     os: [sunos]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/win32-arm64/0.17.13:
@@ -2336,6 +2355,7 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/win32-ia32/0.17.13:
@@ -2344,6 +2364,7 @@ packages:
     cpu: [ia32]
     os: [win32]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@esbuild/win32-x64/0.17.13:
@@ -2352,6 +2373,7 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@eslint-community/eslint-utils/4.2.0_eslint@8.36.0:
@@ -9526,6 +9548,7 @@ packages:
       '@esbuild/win32-arm64': 0.17.13
       '@esbuild/win32-ia32': 0.17.13
       '@esbuild/win32-x64': 0.17.13
+    dev: true
 
   /escalade/3.1.1:
     resolution: {integrity: sha512-k0er2gUkLf8O0zKJiAhmkTnJlTvINGv7ygDNPbeIsX/TJjGJZHuh9B2UxbsaEkmlEo9MfhrSzmhIlhRlI2GXnw==}
@@ -11826,6 +11849,7 @@ packages:
 
   /immutable/4.3.0:
     resolution: {integrity: sha512-0AOCmOip+xgJwEVTQj1EfiDDOkPmuyllDuTuEX+DDXUgapLAsBIfkg3sxCYyCEA8mQqZrrxPUGjcOQ2JS3WLkg==}
+    dev: true
 
   /import-fresh/3.3.0:
     resolution: {integrity: sha512-veYYhQa+D1QBKznvhUHxb8faxlrwUnxseDAbAp457E0wLNio2bOSKnjYDhMj+YiAq61xrMGhQk9iXVk5FzgQMw==}
@@ -16383,6 +16407,7 @@ packages:
     hasBin: true
     optionalDependencies:
       fsevents: 2.3.2
+    dev: true
 
   /run-async/2.4.1:
     resolution: {integrity: sha512-tvVnVv01b8c1RrA6Ep7JkStj85Guv/YrMcwqYQnwjsAS2cTmmPGBBjAjpCW7RrSodNSoE2/qg9O4bceNvUuDgQ==}
@@ -16463,6 +16488,7 @@ packages:
       chokidar: 3.5.3
       immutable: 4.3.0
       source-map-js: 1.0.2
+    dev: true
 
   /sax/1.1.4:
     resolution: {integrity: sha512-5f3k2PbGGp+YtKJjOItpg3P99IMD84E4HOvcfleTb5joCHNXYLsR9yWFPOYGgaeMPDubQILTCMdsFb2OMeOjtg==}
@@ -18380,7 +18406,7 @@ packages:
       vite: '>= 2.7'
     dependencies:
       vite: 4.2.1_meshwkwkz7ekjedvk6ak5viixy
-    dev: false
+    dev: true
 
   /vite-plugin-inspect/0.7.18_vite@4.2.1:
     resolution: {integrity: sha512-hyIxg2qJaRs0LoB3Tqy9ML8yEublIzTzFVXmNhgw2jsjETJUXeR6iQ4YPHk3Q6kTbbiwgoPPyXimlAfEwektnA==}
@@ -18526,6 +18552,7 @@ packages:
       sass: 1.58.3
     optionalDependencies:
       fsevents: 2.3.2
+    dev: true
 
   /vitest/0.1.25_meshwkwkz7ekjedvk6ak5viixy:
     resolution: {integrity: sha512-8GL4sQwGcPlnEwRKQXVFUu5lmmx6TxQq2Kt+7qBnr9oMaNZWTN4w118UazMKl+K9vcfg/BnJK5hdeOTdTeI78A==}
