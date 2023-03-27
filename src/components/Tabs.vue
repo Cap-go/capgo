@@ -15,17 +15,13 @@ const activeTabColor = (tab: string) => ({
 
 <template>
   <div class="border-b border-gray-200 dark:border-gray-700">
-    <ul class="flex text-center text-sm font-medium text-gray-500 -mb-px dark:text-gray-400" :class="{ 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar': noWrap }">
+    <ul class="flex -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400" :class="{ 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar': noWrap }">
       <li v-for="(tab, i) in tabs" :key="i" class="mr-2">
-        <button class="group block rounded-t-lg p-2 md:inline-flex md:p-4" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
+        <button class="block p-2 rounded-t-lg group md:inline-flex md:p-4" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
           <component :is="tab.icon" class="mx-auto h-5 w-5 text-gray-400 transition-all duration-100 md:mr-2 group-hover:text-gray-600 md:-ml-0.5" />
-          <span class="md:font-md text-xs">{{ tab.label }}</span>
+          <span class="text-xs md:font-md">{{ tab.label }}</span>
         </button>
       </li>
     </ul>
   </div>
 </template>
-
-<style scoped>
-
-</style>

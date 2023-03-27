@@ -17,7 +17,3 @@ const ToasterVue = applyPureReactInVue(Toaster,
 <template>
   <ToasterVue />
 </template>
-
-<style scoped>
-
-</style>

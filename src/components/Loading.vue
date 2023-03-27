@@ -24,7 +24,3 @@ const closeAToast = (i: number) => {
     </div>
   </k-toast>
 </template>
-
-<style scoped>
-
-</style>

@@ -36,7 +36,3 @@ const close = (item: ActionSheetOptionButton | undefined) => {
     </k-actions-group>
   </k-actions>
 </template>
-
-<style scoped>
-
-</style>
