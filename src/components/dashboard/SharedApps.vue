@@ -18,40 +18,40 @@ interface ChannelUserApp {
 </script>
 
 <template>
-  <div id="my_shared_apps" class="bg-white border rounded-lg shadow-lg col-span-full xl:col-span-16 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
-    <header class="px-5 py-4 border-b border-slate-100">
+  <div id="my_shared_apps" class="col-span-full border border-slate-200 rounded-lg bg-white shadow-lg xl:col-span-16 dark:border-slate-900 dark:bg-gray-800">
+    <header class="border-b border-slate-100 px-5 py-4">
       <h2 class="font-semibold text-slate-800 dark:text-white">
         {{ t('shared-apps') }}
       </h2>
     </header>
     <div class="">
       <!-- Table -->
-      <div class="hidden p-3 overflow-x-auto md:block">
+      <div class="hidden overflow-x-auto p-3 md:block">
         <table class="w-full table-auto" aria-label="Table with shared apps">
           <!-- Table header -->
-          <thead class="text-xs uppercase rounded-sm text-slate-400 dark:text-white bg-slate-50 dark:bg-gray-800">
+          <thead class="rounded-sm bg-slate-50 text-xs uppercase text-slate-400 dark:bg-gray-800 dark:text-white">
             <tr>
-              <th class="p-2 w-60">
-                <div class="font-semibold text-left">
+              <th class="w-60 p-2">
+                <div class="text-left font-semibold">
                   {{ t('name') }}
                 </div>
               </th>
-              <th class="p-2 w-60">
-                <div class="font-semibold text-center">
+              <th class="w-60 p-2">
+                <div class="text-center font-semibold">
                   {{ t('last-version') }}
                 </div>
               </th>
-              <th class="p-2 w-60">
-                <div class="font-semibold text-center">
+              <th class="w-60 p-2">
+                <div class="text-center font-semibold">
                   {{ t('last-upload') }}
                 </div>
               </th>
-              <th class="p-2 w-60">
-                <div class="font-semibold text-center">
+              <th class="w-60 p-2">
+                <div class="text-center font-semibold">
                   {{ t('channel') }}
                 </div>
               </th>
-              <th class="p-2 w-60" />
+              <th class="w-60 p-2" />
             </tr>
           </thead>
           <!-- Table body -->
@@ -61,7 +61,7 @@ interface ChannelUserApp {
           </tbody>
         </table>
       </div>
-      <k-list class="w-full my-0 md:hidden">
+      <k-list class="my-0 w-full md:hidden">
         <AppCard v-for="(app, i) in props.sharedApps" :key="app.app_id.app_id + i" :app="app.app_id" :channel="app.channel_id.name" @reload="emit('reload')" />
       </k-list>
     </div>

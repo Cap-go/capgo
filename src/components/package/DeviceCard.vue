@@ -21,7 +21,7 @@ const openDevice = async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openDevice()">
+  <tr class="hidden cursor-pointer text-slate-800 md:table-row dark:text-white" @click="openDevice()">
     <td class="p-2">
       <div class="text-left">
         {{ props.device.device_id }}

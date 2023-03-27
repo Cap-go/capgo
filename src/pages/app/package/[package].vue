@@ -95,10 +95,10 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
+  <div v-if="isLoading" class="h-full flex flex-col items-center justify-center">
     <Spinner size="w-40 h-40" />
   </div>
-  <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-h-fit">
+  <div v-else class="mb-8 h-full max-h-fit w-full overflow-y-scroll px-4 pt-4 lg:px-8 sm:px-6">
     <Usage :app-id="id" />
 
     <BlurBg>

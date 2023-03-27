@@ -55,18 +55,18 @@ onUnmounted(() => {
 <template>
   <div class="relative inline-flex">
     <button
-      class="inline-flex items-center justify-center group"
+      class="group inline-flex items-center justify-center"
       aria-haspopup="true"
       :aria-expanded="dropdownOpen"
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
-      <img v-if="main.user?.image_url" class="w-8 h-8 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
-      <div v-else class="flex items-center justify-center w-8 h-8 border border-white rounded-full">
+      <img v-if="main.user?.image_url" class="mask mask-squircle h-8 w-8" :src="main.user?.image_url" width="32" height="32" alt="User">
+      <div v-else class="h-8 w-8 flex items-center justify-center border border-white rounded-full">
         <p>{{ acronym }}</p>
       </div>
-      <div class="items-center hidden truncate md:flex">
-        <span class="ml-2 text-sm font-medium truncate group-hover:text-slate-800 dark:text-white dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
-        <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
+      <div class="hidden items-center truncate md:flex">
+        <span class="ml-2 truncate text-sm font-medium dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
+        <IconDown class="ml-1 h-6 w-6 fill-current text-slate-400" />
       </div>
     </button>
     <transition
@@ -77,8 +77,8 @@ onUnmounted(() => {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-show="dropdownOpen" class="origin-top-right z-30 absolute top-full min-w-44 bg-gray-100 border border-slate-200 py-1.5 rounded shadow-lg overflow-hidden mt-1" :class="props.align === 'right' ? 'right-0' : 'left-0'">
-        <div class="pt-0.5 pb-2 px-3 mb-1 border-b border-slate-200">
+      <div v-show="dropdownOpen" class="absolute top-full z-30 mt-1 min-w-44 origin-top-right overflow-hidden border border-slate-200 rounded bg-gray-100 py-1.5 shadow-lg" :class="props.align === 'right' ? 'right-0' : 'left-0'">
+        <div class="mb-1 border-b border-slate-200 px-3 pb-2 pt-0.5">
           <div class="font-medium text-slate-800">
             {{ `${main.user?.first_name} ${main.user?.last_name}` }}
           </div>

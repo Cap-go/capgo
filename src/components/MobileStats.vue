@@ -128,19 +128,19 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+  <div v-if="isLoading" class="col-span-full flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
     <Spinner size="w-40 h-40" />
   </div>
-  <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full sm:col-span-6 xl:col-span-4 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+  <div v-else class="col-span-full flex flex-col border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
     <div class="px-5 pt-5">
-      <h2 class="mb-2 text-2xl font-semibold dark:text-white text-slate-800">
+      <h2 class="mb-2 text-2xl font-semibold text-slate-800 dark:text-white">
         {{ t('bundles') }}
       </h2>
-      <div class="mb-1 text-xs font-semibold uppercase dark:text-white text-slate-400">
+      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
         {{ t('usage-title') }}
       </div>
       <div class="flex items-start">
-        <div class="mr-2 text-3xl font-bold dark:text-white text-slate-800">
+        <div class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
           {{ bundles.length.toLocaleString() }}
         </div>
       </div>

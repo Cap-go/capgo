@@ -43,7 +43,7 @@ watchEffect(async () => {
 <template>
   <Steps v-if="stepsOpen" :onboarding="false" @done="onboardingDone" />
   <div v-else class="h-full pb-4">
-    <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-scroll sm:px-6 lg:px-8 max-w-9xl max-h-fit">
+    <div class="max-w-9xl mx-auto mb-8 h-full max-h-fit w-full overflow-y-scroll px-4 pt-8 lg:px-8 sm:px-6">
       <!-- Welcome banner -->
       <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
       <!-- Cards -->
@@ -57,7 +57,7 @@ watchEffect(async () => {
         <SharedApps v-if="props.sharedApps.length" :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
       </div>
     </div>
-    <k-fab v-if="!stepsOpen && !isMobile" class="fixed z-20 right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
+    <k-fab v-if="!stepsOpen && !isMobile" class="right-4-safe bottom-4-safe secondary fixed z-20" @click="stepsOpen = true">
       <template #icon>
         <component :is="plusOutline" />
       </template>

@@ -38,16 +38,16 @@ geKeys()
 </script>
 
 <template>
-  <div class="w-full h-full px-4 py-8 mx-auto sm:px-6 lg:px-8 max-w-9xl">
+  <div class="max-w-9xl mx-auto h-full w-full px-4 py-8 lg:px-8 sm:px-6">
     <!-- Page header -->
     <div class="mb-8">
       <!-- Title -->
-      <h1 class="text-2xl font-bold md:text-3xl text-slate-800 dark:text-white">
+      <h1 class="text-2xl font-bold text-slate-800 md:text-3xl dark:text-white">
         {{ t('api-keys') }}
       </h1>
     </div>
     <div class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll shadow-lg md:mx-auto md:border md:rounded-lg md:mt-5 md:w-2/3 border-slate-200 dark:bg-gray-800 dark:border-slate-900">
+      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="copyKey(app)" />
         </dl>

@@ -110,7 +110,7 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden cursor-pointer md:table-row text-slate-800 dark:text-white" @click="openChannel(props.channel)">
+  <tr class="hidden cursor-pointer text-slate-800 md:table-row dark:text-white" @click="openChannel(props.channel)">
     <td class="p-2">
       <div class="text-left">
         {{ props.channel.name }}

@@ -75,10 +75,10 @@ const konstaColors = ref({
     :translucent="false"
   >
     <template #right>
-      <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
+      <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500">
         {{ t('upgrade') }}
       </router-link>
-      <router-link v-else id="banner" slot="end" navbar to="/app/home" class="px-2 py-1 text-white bg-blue-600 rounded hover:bg-blue-500">
+      <router-link v-else id="banner" slot="end" navbar to="/app/home" class="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500">
         {{ t('see-usage') }}
       </router-link>
     </template>

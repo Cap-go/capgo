@@ -68,9 +68,9 @@ const reset = () => {
             Use the UUID of user you want to spoof
           </h3>
 
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+          <div class="mt-5 sm:flex sm:items-center space-y-4 sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">UUID</label>
+              <label class="mb-1 block text-sm font-medium dark:text-white" for="name">UUID</label>
               <FormKit
                 type="text"
                 name="uuid"
@@ -89,10 +89,10 @@ const reset = () => {
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+        <div class="flex flex-col border-t border-slate-200 px-6 py-5">
           <div class="flex self-end">
             <button
-              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
+              class="btn ml-3 rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
               type="submit"
               color="secondary"
               shape="round"
@@ -104,7 +104,7 @@ const reset = () => {
             </button>
             <button
               v-if="oldId"
-              class="p-2 ml-3 text-white bg-red-500 rounded btn hover:bg-red-600"
+              class="btn ml-3 rounded bg-red-500 p-2 text-white hover:bg-red-600"
               color="secondary"
               shape="round"
               @click="reset()"

@@ -19,7 +19,7 @@ const click = () => {
 </script>
 
 <template>
-  <div class="pr-3 max-sm:w-full form-control">
+  <div class="max-sm:w-full form-control pr-3">
     <input v-model="searchInput" type="text" :placeholder="searchPlaceholder" class="input input-bordered">
   </div>
   <button v-if="searchIcon" class="btn" @click="click()">

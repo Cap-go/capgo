@@ -29,26 +29,26 @@ const { t } = useI18n()
 
 <template>
   <div>
-    <header class="border-b bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-slate-200">
-      <div class="px-4 sm:px-6 lg:px-8">
-        <div class="relative flex items-center justify-between h-16 -mb-px">
+    <header class="border-b border-slate-200 bg-white/90 backdrop-blur-xl dark:bg-gray-900/90">
+      <div class="px-4 lg:px-8 sm:px-6">
+        <div class="relative h-16 flex items-center justify-between -mb-px">
           <!-- Header: Left side -->
           <div class="flex">
             <div v-if="displayStore.NavTitle" class="pr-2">
               <button class="flex" @click="back()">
-                <IconBack class="w-6 h-6 fill-current text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50" />
-                <span class="hidden text-dark dark:text-white md:block">{{ t('button-back') }}</span>
+                <IconBack class="h-6 w-6 fill-current text-slate-500 dark:text-white hover:text-slate-600 dark:hover:text-slate-50" />
+                <span class="hidden text-dark md:block dark:text-white">{{ t('button-back') }}</span>
               </button>
             </div>
             <!-- Hamburger button -->
-            <button class="text-slate-500 hover:text-slate-600 dark:text-white dark:hover:text-slate-50 lg:hidden" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
+            <button class="text-slate-500 lg:hidden dark:text-white hover:text-slate-600 dark:hover:text-slate-50" aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')">
               <span class="sr-only">{{ t('open-sidebar') }}</span>
-              <IconMenu class="w-6 h-6 fill-current" />
+              <IconMenu class="h-6 w-6 fill-current" />
             </button>
           </div>
 
-          <div class="lg:absolute lg:-translate-x-1/2 lg:inset-y-5 lg:left-1/2">
-            <div class="flex-shrink-0 font-bold dark:text-white text-md text-dark">
+          <div class="lg:absolute lg:inset-y-5 lg:left-1/2 lg:-translate-x-1/2">
+            <div class="text-md flex-shrink-0 font-bold text-dark dark:text-white">
               {{ displayStore.NavTitle }}
             </div>
           </div>

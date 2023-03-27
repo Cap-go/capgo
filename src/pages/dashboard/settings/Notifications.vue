@@ -64,12 +64,12 @@ const submitDoi = async () => {
   <div class="grow">
     <!-- Panel body -->
     <div class="p-6 space-y-6">
-      <h2 class="text-2xl font-bold text-slate-800 dark:text-white ">
+      <h2 class="text-2xl font-bold text-slate-800 dark:text-white">
         {{ t('my-notifications') }}
       </h2>
 
-      <div class="w-full mx-auto dark:text-white">
-        <div class="px-6 py-4 list-none">
+      <div class="mx-auto w-full dark:text-white">
+        <div class="list-none px-6 py-4">
           <k-list-item label :title="t('activation-notification')" :subtitle="t('activation-notification-desc')">
             <template #after>
               <k-toggle

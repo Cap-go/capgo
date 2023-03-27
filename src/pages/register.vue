@@ -47,27 +47,27 @@ const submit = async (form: { first_name: string; last_name: string; password: s
 </script>
 
 <template>
-  <section class="flex w-full min-h-screen py-10 my-auto overflow-y-scroll sm:py-8 lg:py-8">
-    <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-      <div class="max-w-2xl mx-auto text-center">
-        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded">
+  <section class="my-auto min-h-screen w-full flex overflow-y-scroll py-10 lg:py-8 sm:py-8">
+    <div class="mx-auto max-w-7xl px-4 lg:px-8 sm:px-6">
+      <div class="mx-auto max-w-2xl text-center">
+        <img src="/capgo.webp" alt="logo" class="mx-auto mb-6 w-1/6 rounded">
 
-        <h1 class="text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl lg:text-5xl">
+        <h1 class="text-3xl font-bold leading-tight text-black lg:text-5xl sm:text-4xl dark:text-white">
           {{ t("register-heading") }}
         </h1>
       </div>
 
-      <div class="relative max-w-2xl mx-auto mt-4 md:mt-8">
-        <div class="overflow-hidden bg-white rounded-md shadow-md">
+      <div class="relative mx-auto mt-4 max-w-2xl md:mt-8">
+        <div class="overflow-hidden rounded-md bg-white shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="register-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
               <FormKitMessages />
-              <div class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
+              <div class="md:grid md:grid-cols-2 md:gap-4 space-y-2 md:space-y-0">
                 <div>
                   <label for="" class="text-base font-medium text-gray-900"> {{ t('first-name') }} </label>
-                  <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
-                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
@@ -89,9 +89,9 @@ const submit = async (form: { first_name: string; last_name: string; password: s
 
                 <div>
                   <label for="" class="text-base font-medium text-gray-900"> {{ t('last-name') }} </label>
-                  <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
-                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
@@ -110,11 +110,11 @@ const submit = async (form: { first_name: string; last_name: string; password: s
                   </div>
                 </div>
 
-                <div class="col-span-2 ">
+                <div class="col-span-2">
                   <label for="" class="text-base font-medium text-gray-900"> {{ t('email') }} </label>
-                  <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
-                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                       </svg>
                     </div>
@@ -135,9 +135,9 @@ const submit = async (form: { first_name: string; last_name: string; password: s
 
                 <div>
                   <label for="" class="text-base font-medium text-gray-900"> {{ t('password') }} </label>
-                  <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
-                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"
@@ -163,9 +163,9 @@ const submit = async (form: { first_name: string; last_name: string; password: s
 
                 <div>
                   <label for="" class="text-base font-medium text-gray-900"> {{ t('confirm-password') }} </label>
-                  <div class="mt-2.5 relative text-gray-400 focus-within:text-gray-600">
-                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"
@@ -188,15 +188,15 @@ const submit = async (form: { first_name: string; last_name: string; password: s
                   </div>
                 </div>
 
-                <div class="flex items-center col-span-2">
+                <div class="col-span-2 flex items-center">
                   <span class="text-sm font-medium text-gray-500">
                     {{ t("password-hint") }}
                   </span>
                 </div>
 
-                <div class="w-1/2 col-span-2 mx-auto">
+                <div class="col-span-2 mx-auto w-1/2">
                   <button
-                    :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:outline-none hover:bg-blue-700 focus:bg-blue-700"
+                    :disabled="isLoading" type="submit" class="w-full inline-flex items-center justify-center border border-transparent rounded-md bg-muted-blue-600 px-4 py-4 text-base font-semibold text-white transition-all duration-200 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
                   >
                     <span v-if="!isLoading" class="rounded-4xl">
                       {{ t("register-next") }}
