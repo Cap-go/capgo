@@ -161,6 +161,7 @@ invalid-auth: Su nombre de usuario no coincide, inténtelo de nuevo.
 is-emulator: es emulador
 is-production-app: es la aplicación de producción
 key-copied: Clave copiada en su portapapeles
+language: Idioma
 last-name: Apellido
 last-update: Última actualización
 last-upload: última carga

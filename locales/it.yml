@@ -157,6 +157,7 @@ invalid-auth: I tuoi dati di accesso non corrispondono, riprova.
 is-emulator: È emulatore
 is-production-app: È l'app di produzione
 key-copied: Chiave copiata negli appunti
+language: Lingua
 last-name: Cognome
 last-update: Ultimo aggiornamento
 last-upload: Ultimo caricamento

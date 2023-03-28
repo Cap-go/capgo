@@ -161,6 +161,7 @@ invalid-auth: Vos identifiants ne correspondent pas, réessayez.
 is-emulator: Est un émulateur
 is-production-app: Est-ce que l'application Production
 key-copied: Clé copiée dans votre presse-papiers
+language: Langue
 last-name: Nom de famille
 last-update: Dernière mise à jour
 last-upload: Dernier téléchargement

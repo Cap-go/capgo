@@ -151,6 +151,7 @@ invalid-auth: 로그인이 일치하지 않습니다. 다시 시도하십시오.
 is-emulator: 에뮬레이터임
 is-production-app: 프로덕션 앱
 key-copied: 클립보드에 복사된 키
+language: 언어
 last-name: 성
 last-update: 마지막 업데이트
 last-upload: 마지막 업로드

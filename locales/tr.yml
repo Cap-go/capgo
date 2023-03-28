@@ -155,6 +155,7 @@ invalid-auth: Oturum açma bilgileriniz eşleşmedi, tekrar deneyin.
 is-emulator: Emülatör mü
 is-production-app: Üretim uygulaması mı
 key-copied: Anahtar panonuza kopyalandı
+language: Dil
 last-name: Soy isim
 last-update: Son Güncelleme
 last-upload: Son yükleme

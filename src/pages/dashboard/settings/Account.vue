@@ -2,18 +2,21 @@
 import mime from 'mime'
 import { decode } from 'base64-arraybuffer'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
 import { toast } from 'sonner'
+import { initDropdowns } from 'flowbite'
+import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
+import { availableLocales, i18n, loadLanguageAsync } from '~/modules/i18n'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -194,6 +197,24 @@ const presentActionSheet = async () => {
     ],
   }
 }
+const getEmoji = (country: string) => {
+  // convert country code to emoji flag
+  let countryCode = country
+  switch (country) {
+    case 'en':
+      countryCode = 'US'
+      break
+    case 'ko':
+      countryCode = 'KR'
+      break
+    case 'ja':
+      countryCode = 'JP'
+      break
+    default:
+      break
+  }
+  return countryCodeToFlagEmoji(countryCode)
+}
 
 const submit = async (form: { first_name: string; last_name: string; email: string; country: string }) => {
   if (isLoading.value || !main.user?.id)
@@ -225,10 +246,13 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
   main.user = usr
   isLoading.value = false
 }
+onMounted(() => {
+  initDropdowns()
+})
 </script>
 
 <template>
-  <div class="h-full max-h-fit grow overflow-y-scroll pb-8 md:pb-0">
+  <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
     <FormKit id="update-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
@@ -240,18 +264,38 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="main.user?.image_url" class="mask mask-squircle h-20 w-20 object-cover" :src="main.user?.image_url"
+                v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="h-20 w-20 flex items-center justify-center border border-white rounded-full text-4xl">
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-white rounded-full">
                 <p>{{ acronym }}</p>
               </div>
             </div>
-            <button class="rounded bg-blue-500 p-2 text-white hover:bg-blue-600" @click="presentActionSheet">
+            <button class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="presentActionSheet">
               {{ t('change') }}
             </button>
           </div>
         </section>
+        <!-- Language Info -->
+        <section class="flex items-center">
+          <p class="text-slate-800 dark:text-white">
+            {{ t('language') }}
+          </p>
+          <div class="md:ml-6">
+            <button id="dropdownDefaultButton" data-dropdown-toggle="dropdown" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" type="button">
+              {{ getEmoji(i18n.global.locale.value) }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <!-- Dropdown menu -->
+            <div id="dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
+              <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+                <li v-for="locale in availableLocales" :key="locale" @click="loadLanguageAsync(locale)">
+                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <!-- Personal Info -->
         <section>
           <h3 class="mb-1 text-xl font-bold leading-snug text-slate-800 dark:text-white">
@@ -261,7 +305,7 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
             {{ t('you-can-change-your-') }}
           </div>
 
-          <div class="mt-5 sm:flex sm:items-center sm:items-stretch space-y-4 sm:space-x-4 sm:space-y-0">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
               <FormKit
                 type="text"
@@ -294,7 +338,7 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
               />
             </div>
           </div>
-          <div class="mt-5 sm:flex sm:items-center sm:items-stretch space-y-4 sm:space-x-4 sm:space-y-0">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
               <FormKit
                 type="email"
@@ -326,19 +370,19 @@ const submit = async (form: { first_name: string; last_name: string; email: stri
           </div>
           <FormKitMessages />
         </section>
-        <div class="mb-3 flex text-xs font-semibold uppercase text-slate-400 dark:text-white">
+        <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
           <IconVersion /> <span class="pl-2"> {{ version }}</span>
         </div>
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col border-t border-slate-200 px-6 py-5">
+        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button class="btn border-red-200 rounded bg-red-400 p-2 text-white hover:bg-red-600" @click="deleteAccount()">
+            <button class="p-2 text-white bg-red-400 border-red-200 rounded btn hover:bg-red-600" @click="deleteAccount()">
               {{ t('delete-account') }}
             </button>
             <button
-              class="btn ml-3 rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
+              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
               type="submit"
               color="secondary"
               shape="round"

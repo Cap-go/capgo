@@ -155,6 +155,7 @@ invalid-auth: Twój login się nie zgadza, spróbuj ponownie.
 is-emulator: jest emulatorem
 is-production-app: Czy aplikacja produkcyjna
 key-copied: Klucz skopiowany do schowka
+language: Język
 last-name: Nazwisko
 last-update: Ostatnia aktualizacja
 last-upload: Ostatnie przesyłanie

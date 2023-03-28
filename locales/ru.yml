@@ -155,6 +155,7 @@ invalid-auth: Ваш логин не совпадает, попробуйте е
 is-emulator: Эмулятор
 is-production-app: Является производственным приложением
 key-copied: Ключ скопирован в буфер обмена
+language: Язык
 last-name: Фамилия
 last-update: Последнее обновление
 last-upload: Последняя загрузка

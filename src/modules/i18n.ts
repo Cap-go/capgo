@@ -35,6 +35,7 @@ export function loadLanguageAsync(lang: string) {
     (messages) => {
       i18n.global.setLocaleMessage(lang, messages.default)
       loadedLanguages.push(lang)
+      localStorage.setItem('lang', lang)
       return setI18nLanguage(lang)
     },
   )
@@ -42,5 +43,6 @@ export function loadLanguageAsync(lang: string) {
 
 export const install: UserModule = ({ app }) => {
   app.use(i18n)
-  loadLanguageAsync('en')
+  const lang = localStorage.getItem('lang') || window.navigator.language.split('-')[0]
+  loadLanguageAsync(lang)
 }

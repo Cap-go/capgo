@@ -155,6 +155,7 @@ invalid-auth: Seu login não é compatível, tente novamente.
 is-emulator: é emulador
 is-production-app: É um aplicativo de produção
 key-copied: Chave copiada em sua área de transferência
+language: Linguagem
 last-name: Sobrenome
 last-update: Última atualização
 last-upload: último upload

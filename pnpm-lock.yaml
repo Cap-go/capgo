@@ -60,6 +60,7 @@ specifiers:
   '@tailwindcss/line-clamp': ^0.4.2
   '@tailwindcss/typography': ^0.5.9
   '@types/adm-zip': ^0.5.0
+  '@types/emoji-flags': ^1.3.0
   '@types/fs-extra': ^9.0.13
   '@types/lodash.debounce': ^4.0.7
   '@types/mime': ^3.0.1
@@ -86,6 +87,7 @@ specifiers:
   chartjs-adapter-dayjs: ^1.0.0
   chartjs-plugin-annotation: ^2.2.1
   copy-text-to-clipboard: ^3.1.0
+  country-code-to-flag-emoji: ^1.2.1
   critters: 0.0.16
   cron-schedule: ^3.0.6
   cross-env: ^7.0.3
@@ -197,6 +199,7 @@ dependencies:
   chartjs-adapter-dayjs: 1.0.0_byvuchnm7oemrshpxc6lg4uclq
   chartjs-plugin-annotation: 2.2.1_chart.js@4.2.1
   copy-text-to-clipboard: 3.1.0
+  country-code-to-flag-emoji: 1.2.1
   cron-schedule: 3.0.6
   crypto-random-string: 5.0.0
   daisyui: 2.51.5_j7yt3jd32cwenjqavrrga47yr4
@@ -242,6 +245,7 @@ devDependencies:
   '@tailwindcss/line-clamp': 0.4.2_tailwindcss@3.2.7
   '@tailwindcss/typography': 0.5.9_tailwindcss@3.2.7
   '@types/adm-zip': 0.5.0
+  '@types/emoji-flags': 1.3.0
   '@types/fs-extra': 9.0.13
   '@types/lodash.debounce': 4.0.7
   '@types/mime': 3.0.1
@@ -4761,6 +4765,10 @@ packages:
       '@types/node': 18.15.8
     dev: true
 
+  /@types/emoji-flags/1.3.0:
+    resolution: {integrity: sha512-w8wdyUqC2wED5Z4pJ2Sre4E/mNPwAC6cITpCZalQvOmA61reyHzse71l6POFzuVHiMQq9aA0maMrADs88lZEKQ==}
+    dev: true
+
   /@types/eslint-scope/3.7.4:
     resolution: {integrity: sha512-9K4zoImiZc3HlIp6AVUDE4CWYx22a+lhSZMYNpbjW04+YF0KWj4pJXnEMjdnFTiQibFFmElcsasJXDbdI/EPhA==}
     dependencies:
@@ -8154,6 +8162,10 @@ packages:
       path-type: 4.0.0
       yaml: 1.10.2
     dev: true
+
+  /country-code-to-flag-emoji/1.2.1:
+    resolution: {integrity: sha512-ppwftXwQubKUz4M3C15y5dgmimzcsHrJILbPaEgRfvhuwm7zaSidO4sFP4gSFSLj0En78y0L9FErZwZiUAYXog==}
+    dev: false
 
   /cp-file/10.0.0:
     resolution: {integrity: sha512-vy2Vi1r2epK5WqxOLnskeKeZkdZvTKfFZQCplE3XWsP+SUJyd5XAUFC9lFgTjjXJF2GMne/UML14iEmkAaDfFg==}

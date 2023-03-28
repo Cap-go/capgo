@@ -151,6 +151,7 @@ invalid-auth: ログインが一致しません。もう一度お試しくださ
 is-emulator: エミュレータです
 is-production-app: 本番アプリです
 key-copied: クリップボードにコピーされたキー
+language: 言語
 last-name: 苗字
 last-update: 最後の更新
 last-upload: 最後のアップロード

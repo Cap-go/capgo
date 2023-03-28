@@ -163,6 +163,7 @@ invalid-auth: Ihr Login stimmt nicht überein, versuchen Sie es erneut.
 is-emulator: Ist Emulator
 is-production-app: Ist die Produktions-App
 key-copied: Schlüssel in Ihre Zwischenablage kopiert
+language: Sprache
 last-name: Familienname, Nachname
 last-update: Letztes Update
 last-upload: Letzter Upload

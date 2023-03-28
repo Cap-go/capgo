@@ -151,6 +151,7 @@ invalid-auth: 您的登录信息不匹配，请重试。
 is-emulator: 是模拟器
 is-production-app: 是生产应用
 key-copied: 复制到剪贴板的密钥
+language: 语言
 last-name: 姓
 last-update: 最后更新
 last-upload: 最后上传
