@@ -277,7 +277,7 @@ onMounted(() => {
           </div>
         </section>
         <!-- Language Info -->
-        <section class="flex items-center">
+        <section class="flex flex-col md:flex-row md:items-center items-left">
           <p class="text-slate-800 dark:text-white">
             {{ t('language') }}
           </p>
