@@ -13,11 +13,11 @@ activation-doi: Consentement facultatif
 activation-doi-desc: J'accepte la newsletter par e-mail et les futures offres marketing
 activation-heading: Activation
 activation-headline: Mes paramètres
-activation-legal: Conditions de services
+activation-legal: Conditions d'utilisation
 activation-legal-desc: >-
   J'accepte la politique de confidentialité et les conditions d'utilisation de
   l'application Capgo
-activation-notification: Avis
+activation-notification: Notifications
 activation-notification-desc: >-
   J'accepte de recevoir une notification lorsqu'une nouvelle version de
   l'application est disponible
@@ -27,7 +27,7 @@ add-another-app: Ajoutez votre application
 add-shared-user: Ajouter un utilisateur partagé
 add-this-code-to-you: Ajoutez ce code à votre projet
 add-your-app-to-your: Ajoutez votre application à votre compte
-add-your-first-app-t: "Ajoutez votre première application à votre compte et poussons les mises à jour\_!"
+add-your-first-app-t: "Ajoutez votre première application à votre compte et poussez les mises à jour\_!"
 admin: Administrateur
 afternoon: après-midi
 alert-confirm-delete: Confirmation de la suppression
@@ -36,15 +36,15 @@ alert-not-reverse-message: Cette action n'est pas réversible
 allow-develoment-bui: Autoriser la compilation de développement
 allow-device-to-self: Autoriser les appareils à s'auto-associer
 allow-emulator: Autoriser les émulateurs
-already-account: Avez vous déjà un compte?
+already-account: Avez-vous déjà un compte?
 api-key: Clé API
 api-keys: Clés API
-api-keys-key-copied: Clés API
+api-keys-key-copied: Clés API copiées
 app: Application
 app-deleted: Application supprimée
 app-id-example: Exemple d'ID d'application
 app-not-found: Application introuvable
-are-u-sure: Es-tu sûr ?
+are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
 bigger-app-size: Taille d'application plus grande
@@ -54,18 +54,18 @@ build-your-code-and-: Télécharger sur Capgo votre code
 bulk-upload: Transfert groupé
 bundle: Empaqueter
 bundle-deleted: Groupe supprimé
-bundle-is-linked-channel: Le bundle est lié à la chaîne, dissociez-le d'abord
+bundle-is-linked-channel: Le bundle est lié à un canal, dissociez-le d'abord
 bundle-is-linked-device: Le bundle est lié à l'appareil, dissociez-le d'abord
-bundle-number: Numéro de forfait
-bundles: Liasses
+bundle-number: Numéro de version
+bundles: Canaux
 button-about: À propos
-button-back: Dos
+button-back: Retour
 button-browse: Parcourir
 button-camera: Caméra
 button-cancel: Annuler
 button-delete: Supprimer
 button-go: ALLER
-button-home: Maison
+button-home: Accueil
 button-options: Choix
 button-remove: Retirer
 button-tabs: Onglets
@@ -76,29 +76,29 @@ cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-bundle: Impossible de supprimer le groupe
-cannot-delete-channel: Impossible de supprimer la chaîne
+cannot-delete-channel: Impossible de supprimer le canal
 cannot-get-the-test-: Impossible d'obtenir la version de test
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
 cannot-set-this-vers: Impossible de définir cette version
-cannot-test-app-some: Impossible de tester l'application, quelque chose de mal s'est produit
+cannot-test-app-some: Impossible de tester l'application, une erreur s'est produite
 change: Changement
 changed-password-suc: Le mot de passe a été changé avec succès
-channel: Canaliser
-channel-create: Créer une chaîne
-channel-deleted: Chaîne supprimée
+channel: Canaux
+channel-create: Créer un canal
+channel-deleted: Canal supprimé
 channel-invit: Tapez l'e-mail pour inviter
-channel-is-public: La chaîne est publique
-channel-link: Lien de chaîne
-channel-link-fail: Impossible d'associer la chaîne, une erreur s'est produite
-channel-linked: Chaîne liée
-channel-linking: Lien vers la chaîne
-channel-make-now: Faire défaut
-channels: Chaînes
+channel-is-public: Le canal est publique
+channel-link: Lien du canal
+channel-link-fail: Impossible d'associer le canal, une erreur s'est produite
+channel-linked: Canal lié
+channel-linking: Lien vers le canal
+channel-make-now: Mettre par défaut
+channels: Canaux
 check-email: Veuillez vérifier votre e-mail et vérifier
 check-on-web: Vérifier sur le site Web
-checksum: Somme de contrôle
+checksum: checksum
 commands: commandes
-confirm-email: confirme ton email
+confirm-email: confirmez votre email
 confirm-password: Confirmez le mot de passe
 confirm-public-desc: >-
   Si vous définissez ce canal par défaut, il enverra des mises à jour à tous vos
@@ -122,12 +122,12 @@ defined-as-public: défini par défaut
 delete-account: Supprimer le compte
 details-and-logs: Détails et journaux
 device: Appareil
-device-id: Reference de l'appareil
-devices: Dispositifs
-devices-using-this-b: Appareils utilisant ce bundle
-disable-auto-downgra: Désactiver la rétrogradation automatique sous natif
-disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus du majeur
-discord: Discorde
+device-id: Identifiant de l'appareil
+devices: Appareils
+devices-using-this-b: Appareils utilisant cette version
+disable-auto-downgra: Désactiver la rétrogradation automatique en natif
+disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus d'une version majeure
+discord: Discord
 discover-module-in-a: Découvrir le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: Documentation
@@ -149,7 +149,7 @@ forgot-check-email: >-
 forgot-success: Mot de passe mis à jour avec succès
 from-device: depuis l'appareil
 good: Bien
-id: IDENTIFIANT
+id: Identifiant
 in-your-main-file: Dans votre fichier principal
 in-your-project-fold: Dans votre dossier de projet
 info: Information
@@ -159,17 +159,17 @@ install: installée
 install-the-capacito: Installer le plugin Capacitor
 into-your-app-folder: Dans votre dossier d'application.
 invalid-auth: Vos identifiants ne correspondent pas, réessayez.
-is-emulator: Est un émulateur
-is-production-app: Est-ce que l'application Production
+is-emulator: Est-ce un émulateur
+is-production-app: Est-ce l'application de Production
 key-copied: Clé copiée dans votre presse-papiers
 language: Langue
 last-name: Nom de famille
 last-update: Dernière mise à jour
 last-upload: Dernier téléchargement
 last-version: Dernière version
-launch-bundle: Lancer le lot
+launch-bundle: Lancer le bundle
 limit-reached: Limite atteinte
-loading-more-data: Chargement de plus de données...
+loading-more-data: Charger plus...
 log-in: Connexion
 log-to-the-capgo-cli: Connectez-vous à la CLI Capgo
 login-to-your-accoun: Connectez-vous à votre compte
@@ -185,7 +185,7 @@ module-heading: Modules
 monthly: Mensuel
 monthly-active-users: Utilisateurs actifs mensuels
 montly-active: Actif mensuel
-more-version-storage: Plus de version Stockage
+more-version-storage: Plus de version stockée
 morning: matin
 my-account: Mon compte
 my-notifications: mes notifications
@@ -193,7 +193,7 @@ name: Nom
 need-more-contact-us: |-
   Besoin de plus ? 
   Contactez-nous pour un plan sur mesure
-no-channel-linked: Aucune chaîne, cliquez pour ajouter
+no-channel-linked: Pas de canal, cliquez pour ajouter
 no-devices: Aucun appareil
 no-logs: Aucun journal
 no-version-linked: Pas de version, cliquez pour ajouter
@@ -227,17 +227,17 @@ plan-free: Idéal pour MVP et les tests
 plan-inactive: Forfait inactif
 plan-is-the-best-pla: plan est le meilleur plan pour vos besoins.
 plan-maker: Idéal pour les propriétaires de petites entreprises
-plan-member: membre du régime.
+plan-member: membre du plan.
 plan-payasyougo: Idéal pour les entreprises évolutives
 plan-pricing-plans: Forfaits tarifaires
 plan-progressive-deploy: Déploiement progressif
-plan-solo: Idéal pour les indies
+plan-solo: Idéal pour les indépendants
 plan-storage: Go de stockage
 plan-team: Idéal pour les propriétaires de grandes entreprises
 plan-updates: Mises à jour
 plan-upgrade: S'abonner
-plan-whats-included: Ce qui est inclu
-plans: Des plans
+plan-whats-included: Ce qui est inclus
+plans: Plans
 platform: Plateforme
 please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
@@ -254,32 +254,32 @@ register-next: Enregistrer
 reload: Recharger
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
-save: Économise
+save: Économisez
 search: Recherche
-search-bundle: Ensemble de recherche
+search-bundle: Recherche par version
 search-bundle-id: Rechercher par ID de groupe
-search-by-action: Rechercher par actions
+search-by-action: Rechercher par action
 search-by-device-id: Rechercher par ID d'appareil ou ID personnalisé
 search-by-device-id-: Rechercher par ID d'appareil ou action
 search-by-device-id-0: Rechercher par ID d'appareil
 search-by-name: Rechercher par nom
-search-device: Appareil de recherche
+search-device: Rechercher un appareil
 search-user: Rechercher un utilisateur
 see-usage: Voir l'utilisation
-session_key: IvSessionKey
+session_key: Session ID
 set-bundle: Définir le groupe sur le canal
 settings: Paramètres
 shared-apps: Applications partagées
 sign-out: Se déconnecter
 size: Taille
-size-not-found: Pas trouvé
+size-not-found: Introuvable
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
-special-api-access: Accès API spécial
+special-api-access: Accès API privilégié
 specialError: Doit contenir des caractères spéciaux
 start-using-capgo: Commencez à utiliser Capgo !
 stored-externally: stocké en externe
 submit: Soumettre
-support: Soutien
+support: Support
 switch-to-all-device: Passer à tous les appareils
 switch-to-only-devic: Basculer vers le seul appareil lié
 terms-of-use: Conditions d'utilisation
@@ -292,11 +292,11 @@ title: titre
 top-apps: Mes applications
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
-trial-plan-expires-in: Le procès se termine dans
-uninstall: Désinstallé
+trial-plan-expires-in: La période d'essai se termine dans
+uninstall: Désinstaller
 unlimited-updates: Mises à jour illimitées
 unlink-bundle: Dissocier le groupe
-unlink-channel: Dissocier la chaîne
+unlink-channel: Dissocier le canal
 unlink-version: Dissocier la version
 update: Mise à jour
 updated-at: Mis à jour à
@@ -322,4 +322,4 @@ you-reached-the-limi: Limite atteinte
 your-api-key: "Votre clé API\_:"
 your-are-a: Vous êtes un
 your-current-plan-is: Votre plan actuel est
-your-current-suggested-plan-is: Votre plan suggéré actuel est
+your-current-suggested-plan-is: Votre plan suggéré est

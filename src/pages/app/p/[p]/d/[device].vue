@@ -389,7 +389,7 @@ watchEffect(async () => {
           <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
           <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
-          <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-production-app')" :value="device.is_emulator?.toString()" />
+          <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
           <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
           <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
