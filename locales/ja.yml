@@ -91,6 +91,7 @@ channel-linking: チャンネルへのリンク
 channel-make-now: デフォルトにする
 channels: チャネル
 check-email: メールを確認して確認してください
+check-on-web: ウェブサイトでチェック
 checksum: チェックサム
 commands: コマンド
 confirm-email: メールを確認する

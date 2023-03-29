@@ -91,6 +91,7 @@ channel-linking: 채널 링크
 channel-make-now: 기본값으로 설정
 channels: 채널
 check-email: 이메일을 확인하고 확인하십시오
+check-on-web: 웹사이트에서 확인
 checksum: 체크섬
 commands: 명령
 confirm-email: 이메일 확인
