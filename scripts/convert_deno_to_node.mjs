@@ -1,5 +1,6 @@
 // create a node bundle from a deno bundle
 // netlify/functions/bundle.ts
+// this script is run on netlify to create netlify function, background function and egde function from supabase functions
 
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 
