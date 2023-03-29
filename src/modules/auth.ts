@@ -5,6 +5,7 @@ import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase
 import { setUser, setUserId } from '~/services/crips'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
+import { initStunning } from '~/services/stunning'
 
 const guard = async (next: any, to: string, from: string) => {
   const supabase = useSupabase()
@@ -36,6 +37,7 @@ const guard = async (next: any, to: string, from: string) => {
         return next('/onboarding/verify_email')
       }
     }
+    initStunning(main.user?.customer_id)
     isTrial(main.user?.id).then((res) => {
       // console.log('isTrial', res)
       main.trialDaysLeft = res
