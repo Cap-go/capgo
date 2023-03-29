@@ -62,3 +62,7 @@ html {
   background-color: theme('colors.red.500');
   color: theme('colors.white');
 }
+
+#the-stunning-bar p {
+  padding: 20px;
+}
