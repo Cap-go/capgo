@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import {
-  kNavbar,
-} from 'konsta/vue'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
@@ -59,28 +56,16 @@ const bannerColor = computed(() => {
 
   return success
 })
-const konstaColors = ref({
-  bgIos: bannerColor,
-  bgMaterial: bannerColor,
-  textIos: 'text-black',
-  textMaterial: 'text-black',
-})
 </script>
 
 <template>
-  <k-navbar
-    v-if="bannerText"
-    :title="bannerText"
-    :colors="konstaColors"
-    :translucent="false"
-  >
-    <template #right>
-      <router-link v-if="!isMobile" id="banner" slot="end" navbar to="/dashboard/settings/plans" class="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500">
-        {{ t('upgrade') }}
-      </router-link>
-      <router-link v-else id="banner" slot="end" navbar to="/app/home" class="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500">
-        {{ t('see-usage') }}
-      </router-link>
-    </template>
-  </k-navbar>
+  <div v-if="bannerText" class="navbar" :class="bannerColor">
+    <div class="navbar-start" />
+    <div class="navbar-center lg:flex">
+      <a class="text-xl normal-case btn btn-ghost">{{ bannerText }}</a>
+    </div>
+    <div class="navbar-end">
+      <a href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+    </div>
+  </div>
 </template>
