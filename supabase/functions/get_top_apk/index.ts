@@ -1,21 +1,9 @@
-import type { BaseHeaders } from 'supabase/functions/_utils/types'
-import type { BackgroundHandler } from '@netlify/functions'
-import gplay from 'google-play-scraper'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '~/types/supabase.types'
-
-export const methodJson = ['POST', 'PUT', 'PATCH']
-
-export const supabaseClient = () => {
-  const options = {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  }
-  return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
-}
+import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
+import gplay from 'npm:google-play-scraper'
+import { supabaseAdmin } from '../_utils/supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
+import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
 
 const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, country = 'us') => {
   const res = (await gplay.list({
@@ -26,9 +14,9 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     num: limit,
   }))
   // remove the first skip
-  const ids = res.map(item => item.appId)
+  const ids = res.map((item: any) => item.appId)
   // console.log('ids', ids.length, ids)
-  const { data, error } = await supabaseClient()
+  const { data, error } = await supabaseAdmin()
     .from('store_apps')
     .select('app_id')
     .in('app_id', ids)
@@ -37,13 +25,13 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     return []
   }
   // use data to filter res
-  const filtered = res.filter(item => !data?.find((row: { app_id: string }) => row.app_id === item.appId))
+  const filtered = res.filter((item: any) => !data?.find((row: { app_id: string }) => row.app_id === item.appId))
   console.log('filtered', filtered.length, filtered)
-  const upgraded = filtered.map((item) => {
+  const upgraded = filtered.map((item: any) => {
     // console.log('item', item.appId)
     // check if already exist in db and skip
     return gplay.app({ appId: item.appId, country })
-      .then((res) => {
+      .then((res: any) => {
         const row: Database['public']['Tables']['store_apps']['Insert'] = {
           url: item.url,
           app_id: item.appId,
@@ -62,7 +50,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
         }
         return row
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.log('err', err)
         const row: Database['public']['Tables']['store_apps']['Insert'] = {
           url: item.url,
@@ -91,7 +79,7 @@ const getTop = async (category = gplay.category.APPLICATION, country: string, co
   const list = await getList(category, collection, limit, country)
   console.log('getTop', category, country, collection, list.length)
   // save in supabase
-  const { error } = await supabaseClient()
+  const { error } = await supabaseAdmin()
     .from('store_apps')
     .upsert(list)
   if (error)
@@ -99,6 +87,14 @@ const getTop = async (category = gplay.category.APPLICATION, country: string, co
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  const API_SECRET = getEnv('API_SECRET')
+  const authorizationSecret = headers.apisecret
+  if (!authorizationSecret)
+    return sendRes({ status: 'Cannot find authorization secret' }, 400)
+
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
+    return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
+
   // console.log('main', url, headers, method, body)
   if (body.country && body.category) {
     await getTop(body.category, body.country, body.collection, body.limit)
@@ -116,20 +112,20 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else {
     console.log('cannot get apps', body)
+    return sendRes({ status: 'Error', error: 'cannot get apps' }, 500)
   }
+  return sendRes()
 }
-// upper is ignored during netlify generation phase
-// import from here
-export const handler: BackgroundHandler = async (event) => {
+
+serve(async (event: Request) => {
   try {
-    const url: URL = new URL(event.rawUrl)
-    console.log('queryStringParameters', event.queryStringParameters)
-    const headers: BaseHeaders = { ...event.headers }
-    const method: string = event.httpMethod
-    const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : event.queryStringParameters
-    await main(url, headers, method, body)
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
   }
   catch (e) {
-    console.log('error', e)
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
-}
+})

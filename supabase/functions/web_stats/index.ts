@@ -1,8 +1,9 @@
 import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { isGoodPlan, isOnboarded, isPaying, isTrial, supabaseAdmin } from '../_utils/supabase.ts'
-import { getEnv, sendRes } from '../_utils/utils.ts'
+import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import { insights } from '../_utils/logsnag.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
 
 interface UserStats {
   users: number
@@ -93,7 +94,7 @@ const getStats = (): GlobalStats => {
               const name = product.name as keyof typeof data.plans
               // console.log('stripe_info name', name, res.data?.status, res.data)
               if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
-                data.plans[name] += res.data?.status === 'succeeded' || name === 'Free' ? 1 : 0
+                data.plans[name] += (res.data?.status === 'succeeded' || name === 'Free') ? 1 : 0
             }))
           all.push(isTrial(user.id)
             .then((res) => {
@@ -125,9 +126,9 @@ const getStats = (): GlobalStats => {
     stars: getGithubStars(),
   }
 }
-serve(async (event: Request) => {
+const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   const API_SECRET = getEnv('API_SECRET')
-  const authorizationSecret = event.headers.get('apisecret')
+  const authorizationSecret = headers.apisecret
   if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
 
@@ -230,5 +231,18 @@ serve(async (event: Request) => {
       status: 'Error unknow',
       error: JSON.stringify(e),
     }, 500)
+  }
+}
+
+serve(async (event: Request) => {
+  try {
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
+  }
+  catch (e) {
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 })

@@ -27,7 +27,8 @@ const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const baseNetlifyEdgeTests = `${baseNetlify}/${baseEdgeFunctions + baseTests}`
 const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top']
-const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
+const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info']
+// const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
 const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'notifications', 'stripe', 'r2', 'downloadUrl']
 
 const supaTempl = {}
@@ -114,19 +115,31 @@ const mutationsEgde = [
   { from: 'import { serve } from \'https://deno.land/std@0.179.0/http/server.ts\'', to: 'import type { Context } from \'https://edge.netlify.com\'' },
   { from: supaTempl.handler, to: netlifyEdgeTempl.handler },
 ]
+const mutationsBg = [
+  { from: 'sendRes(', to: 'sendResBg(' },
+  { from: ', sendRes', to: ', sendResBg' },
+  { from: '{ sendRes', to: '{ sendResBg' },
+  { from: 'Handler', to: 'BackgroundHandler' },
+  { from: 'npm:adm-zip', to: 'adm-zip' },
+  { from: 'npm:google-play-scraper', to: 'google-play-scraper' },
+]
 // list deno functions folder and filter by allowed
 
-const folders = readdirSync(baseSupaFunctions).filter(f => allowed.includes(f))
+const folders = readdirSync(baseSupaFunctions).filter(f => allowed.includes(f) || background.includes(f))
+const foldersNoBg = readdirSync(baseSupaFunctions).filter(f => allowed.includes(f))
+const foldersBg = readdirSync(baseSupaFunctions).filter(f => allowed.includes(f) || background.includes(f))
 
 console.log(`Api found: ${folders.join(', ')}\n`)
 // create list of files from folders folder/index.ts
 
 const files = folders.map(f => `${baseSupaFunctions}/${f}/index.ts`)
+const filesBg = foldersBg.map(f => `${baseSupaFunctions}/${f}/index.ts`)
 // console.log('supabase files', files)
 
 // create list of netlify functions from files supabase/functions/folder/index.ts -> netlify/functions/folder.ts
 const netlifyFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyFunctions}/`).replace('/index.ts', '.ts'))
-const onlyNodeNetlify = onlyNode.map(f => `${baseNetlifyFunctions}/${f}.ts`)
+const netlifyBgFiles = filesBg.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyFunctions}/`).replace('/index.ts', '-background.ts'))
+// const onlyNodeNetlify = onlyNode.map(f => `${baseNetlifyFunctions}/${f}.ts`)
 const netlifyEdgeFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyEdgeFunctions}/`).replace('/index.ts', '.ts'))
 // create netlify/functions folder if not exists
 try {
@@ -144,24 +157,11 @@ catch (e) {
   mkdirSync(baseNetlifyEdgeFunctions, { recursive: true })
 }
 
-// copy file from onlyNode to netlify/functions
-for (let i = 0; i < onlyNode.length; i++) {
-  const file = `${baseNetlifyTemplate}/${onlyNode[i]}.ts`
-  const netlifyFile = onlyNodeNetlify[i]
-  const source = readFileSync(file)
-  let newContent = `// This code is generated don't modify it\n${source}`
-  mutationsNode.forEach((m) => {
-    const { from, to } = m
-    newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
-  })
-  writeFileSync(netlifyFile, newContent)
-  console.log(`Copied: ${file} -> ${netlifyFile}`)
-}
-
 for (let i = 0; i < files.length; i++) {
   const file = files[i]
   const netlifyFile = netlifyFiles[i]
   const netlifyEdgeFile = netlifyEdgeFiles[i]
+  const netlifyBgFile = netlifyBgFiles[i]
   // console.log('file', file)
   // console.log('netlifyFile', netlifyFile)
   // replace imports
@@ -176,9 +176,17 @@ for (let i = 0; i < files.length; i++) {
     const { from, to } = m
     newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
+  let newContentBg = `${newContent}`
+  mutationsBg.forEach((m) => {
+    const { from, to } = m
+    newContentBg = newContentBg.replace(new RegExp(escapeRegExp(from), 'g'), to)
+  })
   // write in new path
   console.log('Generate :', netlifyFile)
-  writeFileSync(netlifyFile, newContent)
+  if (background.includes(folders[i]))
+    writeFileSync(netlifyBgFile, newContentBg)
+  else
+    writeFileSync(netlifyFile, newContent)
   writeFileSync(netlifyEdgeFile, newContentEdge)
 }
 
@@ -252,7 +260,7 @@ const [before] = contentNetlifyConfig.split(splitNetlifyConfig)
 // [[edge_functions]]
 //   path = "/admin"
 //   function = "auth"
-const newContentEdge = folders.map((name) => {
+const newContentEdge = foldersNoBg.map((name) => {
   return `
 [[edge_functions]]
   path = "/api-edge/${name}"

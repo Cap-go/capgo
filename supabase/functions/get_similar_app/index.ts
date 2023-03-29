@@ -1,21 +1,9 @@
-import type { BaseHeaders } from 'supabase/functions/_utils/types'
-import type { BackgroundHandler } from '@netlify/functions'
-import { createClient } from '@supabase/supabase-js'
-import gplay from 'google-play-scraper'
-import type { Database } from '~/types/supabase.types'
-
-export const methodJson = ['POST', 'PUT', 'PATCH']
-
-export const supabaseClient = () => {
-  const options = {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  }
-  return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
-}
+import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
+import gplay from 'npm:google-play-scraper'
+import { supabaseAdmin } from '../_utils/supabase.ts'
+import type { Database } from '../_utils/supabase.types.ts'
+import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
 
 const getAppsInfo = async (appId: string, country: string) => {
   const { title } = await gplay.app({ appId }).catch(() => ({ title: '' }))
@@ -44,13 +32,13 @@ const getSimilar = async (appId: string, country = 'us') => {
     console.log('getInfo', appId)
     const res = await getAppsInfo(appId, country)
     // save in supabase
-    const { error } = await supabaseClient()
+    const { error } = await supabaseAdmin()
       .from('store_apps')
       .upsert(res)
     if (error)
       console.log('error', error)
     // set to_get_similar to false
-    const { error: error2 } = await supabaseClient()
+    const { error: error2 } = await supabaseAdmin()
       .from('store_apps')
       .update({ to_get_similar: false })
       .eq('app_id', appId)
@@ -60,7 +48,7 @@ const getSimilar = async (appId: string, country = 'us') => {
   }
   catch (e) {
     console.log('error getAppInfo', e)
-    const { error } = await supabaseClient()
+    const { error } = await supabaseAdmin()
       .from('store_apps')
       .upsert({
         app_id: appId,
@@ -73,6 +61,14 @@ const getSimilar = async (appId: string, country = 'us') => {
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  const API_SECRET = getEnv('API_SECRET')
+  const authorizationSecret = headers.apisecret
+  if (!authorizationSecret)
+    return sendRes({ status: 'Cannot find authorization secret' }, 400)
+
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
+    return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
+
   console.log('main', method, body)
   // remove from list apps already in supabase
   if (body.appId) {
@@ -96,20 +92,19 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else {
     console.log('cannot get apps', body)
+    return sendRes({ status: 'Error', error: 'cannot get apps' }, 500)
   }
+  return sendRes()
 }
-// upper is ignored during netlify generation phase
-// import from here
-export const handler: BackgroundHandler = async (event) => {
+serve(async (event: Request) => {
   try {
-    const url: URL = new URL(event.rawUrl)
-    console.log('queryStringParameters', event.queryStringParameters)
-    const headers: BaseHeaders = { ...event.headers }
-    const method: string = event.httpMethod
-    const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : event.queryStringParameters
-    await main(url, headers, method, body)
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
   }
   catch (e) {
-    console.log('error general', e)
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
-}
+})

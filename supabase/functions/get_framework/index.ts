@@ -1,21 +1,8 @@
-import type { BaseHeaders } from 'supabase/functions/_utils/types'
-import type { BackgroundHandler } from '@netlify/functions'
-import AdmZip from 'adm-zip'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '~/types/supabase.types'
-
-export const methodJson = ['POST', 'PUT', 'PATCH']
-// https://www.appbrain.com/stats/libraries/tag/app-framework/android-app-frameworks
-export const supabaseClient = () => {
-  const options = {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  }
-  return createClient<Database>(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '', options)
-}
+import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
+import AdmZip from 'npm:adm-zip'
+import { supabaseAdmin } from '../_utils/supabase.ts'
+import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
+import type { BaseHeaders } from '../_utils/types.ts'
 
 const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
   const downloadUrl = `https://d.apkpure.com/b/${mode}/${id}?version=latest`
@@ -64,7 +51,7 @@ const isCapacitor = async (id: string) => {
     console.log('AdmZip', id)
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
-    zipEntries.forEach((zipEntry) => {
+    zipEntries.forEach((zipEntry: any) => {
       // console.log('zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
         console.log('capacitor', 'assets/capacitor.config.json')
@@ -116,7 +103,7 @@ const getInfoCap = async (appId: string) => {
     // remove from list apps already in supabase
     const res = await isCapacitor(appId)
     // save in supabase
-    const { error } = await supabaseClient()
+    const { error } = await supabaseAdmin()
       .from('store_apps')
       .upsert({
         app_id: appId,
@@ -135,7 +122,7 @@ const getInfoCap = async (appId: string) => {
   }
   catch (e) {
     console.log('error getInfoCap', e)
-    const { error } = await supabaseClient()
+    const { error } = await supabaseAdmin()
       .from('store_apps')
       .upsert({
         app_id: appId,
@@ -148,6 +135,14 @@ const getInfoCap = async (appId: string) => {
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+  const API_SECRET = getEnv('API_SECRET')
+  const authorizationSecret = headers.apisecret
+  if (!authorizationSecret)
+    return sendRes({ status: 'Cannot find authorization secret' }, 400)
+
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
+    return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
+
   console.log('main', method, body)
   if (body.appId) {
     await getInfoCap(body.appId)
@@ -160,20 +155,20 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else {
     console.log('cannot get apps', body)
+    return sendRes({ status: 'Error', error: 'cannot get apps' }, 500)
   }
+  return sendRes()
 }
-// upper is ignored during netlify generation phase
-// import from here
-export const handler: BackgroundHandler = async (event) => {
+
+serve(async (event: Request) => {
   try {
-    const url: URL = new URL(event.rawUrl)
-    console.log('queryStringParameters', event.queryStringParameters)
-    const headers: BaseHeaders = { ...event.headers }
-    const method: string = event.httpMethod
-    const body: any = methodJson.includes(method) ? JSON.parse(event.body || '{}') : event.queryStringParameters
-    await main(url, headers, method, body)
+    const url: URL = new URL(event.url)
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
+    const method: string = event.method
+    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    return main(url, headers, method, body)
   }
   catch (e) {
-    console.log('error general', e)
+    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
-}
+})
