@@ -1,7 +1,7 @@
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { downloadUrl } from './supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'

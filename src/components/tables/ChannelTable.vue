@@ -8,7 +8,7 @@ import {
   kDialogButton,
   kFab,
 } from 'konsta/vue'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'

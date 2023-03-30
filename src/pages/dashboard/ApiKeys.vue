@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { setErrors } from '@formkit/core'
 import { useI18n } from 'vue-i18n'
 import { FormKitMessages } from '@formkit/vue'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 
 const isLoading = ref(false)

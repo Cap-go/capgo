@@ -13,6 +13,9 @@
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
     "serve": "vite",
+    "backend": "supabase start && supabase functions serve",
+    "reset": "supabase db reset",
+    "dev": "netlify dev --port 8881",
     "test:e2e": "cypress open",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
@@ -109,13 +112,13 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "semver": "^7.3.8",
-    "sonner": "^0.3.0",
     "veaury": "^2.3.12",
     "vue": "3.2.47",
     "vue-chartjs": "^4.1.2",
     "vue-demi": "0.13.11",
     "vue-i18n": "9.2.2",
-    "vue-router": "4.1.6"
+    "vue-router": "4.1.6",
+    "vue-sonner": "^0.3.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "0.37.0",

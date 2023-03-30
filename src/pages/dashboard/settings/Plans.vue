@@ -2,7 +2,7 @@
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { Capacitor } from '@capacitor/core'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'

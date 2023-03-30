@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import {
   kFab,
 } from 'konsta/vue'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'

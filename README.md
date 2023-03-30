@@ -126,23 +126,29 @@ Replace in `configs.json`
 `supa_anon.local` the key by the one logged in the terminal `anon key`
 Run the front with 
 
-#### Start local Supabase Functions
+#### Start local Supabase db and Functions
 
+You need docker running.
 ```bash
-supabase function serve
+pnpm backend
 ```
 
 #### Start local Front
 
-In the second terminal run
+In the second terminal run this to generate the necessary netlify functions.
 
 ```bash
-pnpm local-serve
+pnpm serve
+```
+Then start the server
+```bash
+pnpm generate:node_serverless
+pnpm serve
 ```
 
 #### Login
 
-Visit http://localhost:3334
+Visit http://localhost:8881
 
 Use the demo credentials.
 Account: test@capgo.app
@@ -157,3 +163,11 @@ Password: adminadmin
 
 This user will be admin so he can impersonate other users.
 You can find the menu for that in the account section.
+
+#### Supabase db reset
+
+You need docker running.
+This will seed the db with the demo data again.
+```bash
+pnpm reset
+```

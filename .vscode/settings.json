@@ -5,7 +5,7 @@
   "prettier.enable": false,
   "typescript.tsdk": "node_modules/typescript/lib",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
+    "source.fixAll.eslint": true
   },
   "files.associations": {
     "*.css": "css"
@@ -20,6 +20,8 @@
     "./netlify/edge-functions_utils",
     "./netlify/edge-functions_tests",
     "./scripts/template/supabase",
-    "./scripts/template/netlify-edge"
+    "./scripts/template/netlify-edge",
+    "netlify/edge-functions"
   ],
+  "deno.importMap": ".netlify/edge-functions-import-map.json"
 }

@@ -6,7 +6,7 @@ import { NativeMarket } from '@capgo/native-market'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()

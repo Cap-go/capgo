@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import {
   kListItem,
 } from 'konsta/vue'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'

@@ -6,7 +6,7 @@ import {
   kList, kListItem,
   kToggle,
 } from 'konsta/vue'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
 import { useMainStore } from '~/stores/main'
