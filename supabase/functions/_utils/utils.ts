@@ -1,5 +1,5 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
 
@@ -44,7 +44,7 @@ export const checkKey = async (authorization: string | undefined,
 
 export const sendResBg = (data: any = { status: 'ok' }, statusCode = 200) => {
   if (statusCode >= 400)
-    console.error('sendRes error', JSON.stringify(data, null, 2))
+    console.error('sendResBg error', JSON.stringify(data, null, 2))
 }
 
 export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {

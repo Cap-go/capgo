@@ -1,5 +1,5 @@
-import { exec as execCb } from 'child_process'
-import util from 'util'
+import { exec as execCb } from 'node:child_process'
+import util from 'node:util'
 import { supa_url } from './utils.mjs'
 
 const exec = util.promisify(execCb)

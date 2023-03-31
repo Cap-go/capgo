@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.1.2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 import type { Person } from './crisp.ts'
 import { updatePerson } from './crisp.ts'
 import { createCustomer } from './stripe.ts'
@@ -198,15 +198,17 @@ export const updateOrCreateDevice = async (update: Database['public']['Tables'][
 }
 
 export const getCurrentPlanName = async (userId: string): Promise<string> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('get_current_plan_name', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('get_current_plan_name', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || ''
   }
-
-  return data || 'Free'
+  catch (error) {
+    console.error('getCurrentPlanName error', userId, error)
+  }
+  return ''
 }
 
 export const getPlanUsagePercent = async (userId: string, dateid: string): Promise<number> => {
@@ -214,7 +216,7 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
     .rpc('get_plan_usage_percent', { userid: userId, dateid })
     .single()
   if (error) {
-    console.error('error.message', error.message)
+    console.error('getPlanUsagePercent error', error.message)
     throw new Error(error.message)
   }
 
@@ -222,97 +224,115 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
 }
 
 export const isGoodPlan = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_good_plan_v3', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_good_plan_v3', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
   }
-
-  return data || false
+  catch (error) {
+    console.error('isGoodPlan error', userId, error)
+  }
+  return false
 }
 
 export const isOnboarded = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_onboarded', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_onboarded', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
   }
-
-  return data || false
+  catch (error) {
+    console.error('isOnboarded error', userId, error)
+  }
+  return false
 }
 
 export const isFreeUsage = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_free_usage', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_free_usage', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
   }
-
-  return data || false
+  catch (error) {
+    console.error('isFreeUsage error', userId, error)
+  }
+  return false
 }
 
 export const isOnboardingNeeded = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_onboarding_needed', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_onboarding_needed', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
   }
-
-  return data || false
+  catch (error) {
+    console.error('isOnboardingNeeded error', userId, error)
+  }
+  return false
 }
 
 export const isCanceled = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_canceled', { userid: userId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data || false
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_canceled', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
+  }
+  catch (error) {
+    console.error('isCanceled error', userId, error)
+  }
+  return false
 }
 
 export const isPaying = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_paying', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_paying', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
   }
-
-  return data || false
+  catch (error) {
+    console.error('isPaying error', userId, error)
+  }
+  return false
 }
 
 export const isTrial = async (userId: string): Promise<number> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_trial', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_trial', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || 0
   }
-
-  return data || 0
+  catch (error) {
+    console.error('isTrial error', userId, error)
+  }
+  return 0
 }
 
 export const isAllowedAction = async (userId: string): Promise<boolean> => {
-  const { data, error } = await supabaseAdmin()
-    .rpc('is_allowed_action_user', { userid: userId })
-    .single()
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
+  try {
+    const { data } = await supabaseAdmin()
+      .rpc('is_allowed_action_user', { userid: userId })
+      .single()
+      .throwOnError()
+    return data || false
   }
-
-  return data
+  catch (error) {
+    console.error('isAllowedAction error', userId, error)
+  }
+  return false
 }
 
 export const sendStats = async (action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) => {

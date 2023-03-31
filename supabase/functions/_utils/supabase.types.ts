@@ -823,6 +823,29 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      count_all_need_upgrade: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      count_all_onboarded: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      count_all_paying: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      count_all_plans: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          product_id: string
+          count: number
+        }[]
+      }
+      count_all_trial: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       count_all_updates: {
         Args: Record<PropertyKey, never>
         Returns: number

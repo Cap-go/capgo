@@ -51,7 +51,7 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
     throw new Error(error.message)
   }
 
-  return data[0] || {
+  return data || {
     mau: 0,
     storage: 0,
     bandwidth: 0,

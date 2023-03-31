@@ -1,52 +1,27 @@
 import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { isGoodPlan, isOnboarded, isPaying, isTrial, supabaseAdmin } from '../_utils/supabase.ts'
+import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import { insights } from '../_utils/logsnag.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
-interface UserStats {
-  users: number
-  plans: {
-    Free: number
-    Solo: number
-    Maker: number
-    Team: number
-    'Pay as you go': number
-  }
-  trial: number
-  need_upgrade: number
-  onboarded: number
-  not_paying: number
-  paying: number
-}
+interface PlanTotal { [key: string]: number }
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
+  users: PromiseLike<number>
   stars: Promise<number>
-  users: PromiseLike<UserStats>
+  trial: PromiseLike<number>
+  onboarded: PromiseLike<number>
+  need_upgrade: PromiseLike<number>
+  paying: PromiseLike<number>
+  plans: PromiseLike<PlanTotal>
 }
 
 const getGithubStars = async (): Promise<number> => {
   const res = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater')
   const json = await res.json()
   return json.stargazers_count
-}
-
-const defaultStats: UserStats = {
-  users: 0,
-  plans: {
-    'Free': 0,
-    'Solo': 0,
-    'Maker': 0,
-    'Team': 0,
-    'Pay as you go': 0,
-  },
-  trial: 0,
-  onboarded: 0,
-  need_upgrade: 0,
-  not_paying: 0,
-  paying: 0,
 }
 
 const getStats = (): GlobalStats => {
@@ -64,71 +39,52 @@ const getStats = (): GlobalStats => {
     }),
     users: supabase
       .from('users')
-      .select()
-      .then(async (res) => {
-        if (res.error || !res.data) {
-          console.log('get users', res.error)
-          return defaultStats
-        }
-        const data: UserStats = defaultStats
-        data.users = res.data.length
-        const all = []
-        for (const user of res.data) {
-          if (user.customer_id) {
-            all.push(supabase
-              .from('stripe_info')
-              .select(`
-                customer_id,
-                status,
-                product_id (
-                  id,
-                  name
-                )
-              `)
-              .eq('customer_id', user.customer_id)
-              .single()
-              .then((res) => {
-                if (res.error)
-                  console.error('stripe_info error', user.customer_id, res.error)
-                if (!res.data)
-                  console.error('stripe_info no body', user.customer_id)
-                const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
-                const name = product.name as keyof typeof data.plans
-                // console.log('stripe_info name', name, res.data?.status, res.data)
-                if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
-                  data.plans[name] += (res.data?.status === 'succeeded' || name === 'Free') ? 1 : 0
-              }))
-          }
-          all.push(isTrial(user.id)
-            .then((res) => {
-              data.trial += res ? 1 : 0
-            }))
-          all.push(isOnboarded(user.id)
-            .then((res) => {
-              data.onboarded += res ? 1 : 0
-            }))
-          all.push(isPaying(user.id)
-            .then((res) => {
-              data.paying += res ? 1 : 0
-              data.not_paying += res ? 0 : 1
-              if (res) {
-                all.push(isGoodPlan(user.id)
-                  .then((res) => {
-                    data.need_upgrade += res ? 0 : 1
-                  }))
-              }
-            }))
-        }
-        console.log('all', all.length)
-        await Promise.all(all)
-        console.log('all done')
-        data.not_paying -= data.trial
-        data.plans.Free -= data.trial
-        return data
-      }),
+      .select('*', { count: 'exact' })
+      .then(res => res.count || 0),
     stars: getGithubStars(),
+    trial: supabase.rpc('count_all_trial', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_trial', res.error)
+      return res.data || 0
+    }),
+    paying: supabase.rpc('count_all_paying', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_paying', res.error)
+      return res.data || 0
+    }),
+    onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_onboarded', res.error)
+      return res.data || 0
+    }),
+    need_upgrade: supabase.rpc('count_all_need_upgrade', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_need_upgrade', res.error)
+      return res.data || 0
+    }),
+    plans: supabase.from('plans').select('name, id').then(({ data: planNames, error }) => {
+      if (error || !planNames) {
+        console.log('get plans', error)
+        return {}
+      }
+      return supabase.rpc('count_all_plans', {}).then((res) => {
+        if (res.error || !res.data) {
+          console.log('count_all_plan', res.error)
+          return {}
+        }
+        // create object with name and count
+        const plans: any = {}
+        for (const plan of res.data) {
+          const name = planNames.find(p => p.id === plan.product_id)?.name
+          if (name)
+            plans[name] = plan.count
+        }
+        return res.data || {}
+      })
+    }),
   }
 }
+
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
@@ -140,7 +96,29 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
 
   try {
     const res = getStats()
-    const [apps, updates, stars, users] = await Promise.all([res.apps, res.updates, res.stars, res.users])
+    const [
+      apps,
+      updates,
+      users,
+      stars,
+      trial,
+      paying,
+      onboarded,
+      need_upgrade,
+      plans,
+    ] = await Promise.all([
+      res.apps,
+      res.updates,
+      res.users,
+      res.stars,
+      res.trial,
+      res.paying,
+      res.onboarded,
+      res.need_upgrade,
+      res.plans,
+    ])
+    const not_paying = users - paying
+    console.log('apps, updates, stars, users', apps, updates, stars, users)
     await insights([
       {
         title: 'Apps',
@@ -154,78 +132,80 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       },
       {
         title: 'User Count',
-        value: users.users,
+        value: users,
         icon: '👨',
       },
       {
         title: 'User need upgrade',
-        value: users.need_upgrade,
+        value: need_upgrade,
         icon: '🤒',
       },
       {
         title: 'User onboarded',
-        value: users.onboarded,
+        value: onboarded,
         icon: '✅',
       },
       {
         title: 'User trial',
-        value: users.trial,
+        value: trial,
         icon: '👶',
       },
       {
         title: 'User paying',
-        value: users.paying,
+        value: paying,
         icon: '💰',
       },
       {
         title: 'User not paying',
-        value: users.not_paying,
+        value: not_paying,
         icon: '🥲',
       },
       {
         title: 'Free plan',
-        value: users.plans.Free,
+        value: plans.Free,
         icon: '🆓',
       },
       {
         title: 'Solo Plan',
-        value: users.plans.Solo,
+        value: plans.Solo,
         icon: '🎸',
       },
       {
         title: 'Maker Plan',
-        value: users.plans.Maker,
+        value: plans.Maker,
         icon: '🤝',
       },
       {
         title: 'Team plan',
-        value: users.plans.Team,
+        value: plans.Team,
         icon: '👏',
       },
       {
         title: 'Pay as you go plan',
-        value: users.plans['Pay as you go'],
+        value: plans['Pay as you go'],
         icon: '📈',
       },
     ]).catch()
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
-    const details = { ...users }
-    details.plans = undefined as any
     const newData: Database['public']['Tables']['global_stats']['Insert'] = {
       date_id,
       apps,
       updates,
       stars,
-      ...details,
+      trial,
+      paying,
+      onboarded,
+      need_upgrade,
+      not_paying,
     }
     console.log('newData', newData)
     const { error } = await supabaseAdmin()
       .from('global_stats')
       .upsert(newData)
     if (error)
-      console.error('global_stats error', error)
+      console.error('insert global_stats error', error)
     return sendRes()
   }
   catch (e) {

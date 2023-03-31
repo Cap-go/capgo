@@ -90,7 +90,7 @@ export const decodeBase64 = (data) => {
 const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
-  { from: 'https://esm.sh/@supabase/supabase-js@^2.1.2', to: '@supabase/supabase-js' },
+  { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://deno.land/x/s3_lite_client@0.5.0/mod.ts', to: 'minio' },
   { from: '{ S3Client }', to: '{ Client }' },
