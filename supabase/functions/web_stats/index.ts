@@ -50,18 +50,19 @@ const defaultStats: UserStats = {
 }
 
 const getStats = (): GlobalStats => {
+  const supabase = supabaseAdmin()
   return {
-    apps: supabaseAdmin().rpc('count_all_apps', {}).single().then((res) => {
+    apps: supabase.rpc('count_all_apps', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_apps', res.error)
       return res.data || 0
     }),
-    updates: supabaseAdmin().rpc('count_all_updates', {}).single().then((res) => {
+    updates: supabase.rpc('count_all_updates', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_updates', res.error)
       return res.data || 0
     }),
-    users: supabaseAdmin()
+    users: supabase
       .from('users')
       .select()
       .then(async (res) => {
@@ -73,29 +74,31 @@ const getStats = (): GlobalStats => {
         data.users = res.data.length
         const all = []
         for (const user of res.data) {
-          all.push(supabaseAdmin()
-            .from('stripe_info')
-            .select(`
-              customer_id,
-              status,
-              product_id (
-                id,
-                name
-              )
-            `)
-            .eq('customer_id', user.customer_id)
-            .single()
-            .then((res) => {
-              if (res.error)
-                console.error('stripe_info error', user.customer_id, res.error)
-              if (!res.data)
-                console.error('stripe_info no body', user.customer_id)
-              const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
-              const name = product.name as keyof typeof data.plans
-              // console.log('stripe_info name', name, res.data?.status, res.data)
-              if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
-                data.plans[name] += (res.data?.status === 'succeeded' || name === 'Free') ? 1 : 0
-            }))
+          if (user.customer_id) {
+            all.push(supabase
+              .from('stripe_info')
+              .select(`
+                customer_id,
+                status,
+                product_id (
+                  id,
+                  name
+                )
+              `)
+              .eq('customer_id', user.customer_id)
+              .single()
+              .then((res) => {
+                if (res.error)
+                  console.error('stripe_info error', user.customer_id, res.error)
+                if (!res.data)
+                  console.error('stripe_info no body', user.customer_id)
+                const product = res.data?.product_id as Database['public']['Tables']['plans']['Row']
+                const name = product.name as keyof typeof data.plans
+                // console.log('stripe_info name', name, res.data?.status, res.data)
+                if (name && Object.prototype.hasOwnProperty.call(data.plans, name))
+                  data.plans[name] += (res.data?.status === 'succeeded' || name === 'Free') ? 1 : 0
+              }))
+          }
           all.push(isTrial(user.id)
             .then((res) => {
               data.trial += res ? 1 : 0
@@ -217,7 +220,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       stars,
       ...details,
     }
-    // console.log('newData', newData)
+    console.log('newData', newData)
     const { error } = await supabaseAdmin()
       .from('global_stats')
       .upsert(newData)
