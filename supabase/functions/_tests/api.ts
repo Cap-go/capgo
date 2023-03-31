@@ -253,4 +253,3 @@ export const deleteBundle = async (baseUrl: string) => {
   })
   return response.data
 }
-
