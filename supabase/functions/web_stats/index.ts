@@ -118,7 +118,16 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       res.plans,
     ])
     const not_paying = users - paying
-    console.log('apps, updates, stars, users', apps, updates, stars, users)
+    console.log('All Promises',
+      apps,
+      updates,
+      users,
+      stars,
+      trial,
+      paying,
+      onboarded,
+      need_upgrade,
+      plans)
     await insights([
       {
         title: 'Apps',
