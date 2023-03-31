@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
-import gplay from 'npm:google-play-scraper'
+import gplay from 'https://esm.sh/google-play-scraper?target=deno'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'

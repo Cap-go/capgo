@@ -98,6 +98,8 @@ const mutationsNode = [
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
   { from: 'https://deno.land/x/semver@v1.4.1/mod.ts', to: 'semver' },
   { from: 'https://deno.land/x/equal@v1.5.0/mod.ts', to: 'lauqe' },
+  { from: 'https://esm.sh/adm-zip?target=deno', to: 'adm-zip' },
+  { from: 'https://esm.sh/google-play-scraper?target=deno', to: 'google-play-scraper' },
   { from: 'import { hmac } from \'https://deno.land/x/hmac@v2.0.1/mod.ts\'', to: 'import crypto from \'crypto\'' },
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
   { from: 'import { serve } from \'https://deno.land/std@0.179.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
@@ -121,8 +123,6 @@ const mutationsBg = [
   { from: ', sendRes', to: ', sendResBg' },
   { from: '{ sendRes', to: '{ sendResBg' },
   { from: 'Handler', to: 'BackgroundHandler' },
-  { from: 'npm:adm-zip', to: 'adm-zip' },
-  { from: 'npm:google-play-scraper', to: 'google-play-scraper' },
 ]
 // list deno functions folder and filter by allowed
 
@@ -184,11 +184,13 @@ for (let i = 0; i < files.length; i++) {
   })
   // write in new path
   console.log('Generate :', netlifyFile)
-  if (background.includes(folders[i]))
+  if (background.includes(folders[i])) {
     writeFileSync(netlifyBgFile, newContentBg)
-  else
+  }
+  else {
     writeFileSync(netlifyFile, newContent)
-  writeFileSync(netlifyEdgeFile, newContentEdge)
+    writeFileSync(netlifyEdgeFile, newContentEdge)
+  }
 }
 
 try {
