@@ -131,11 +131,14 @@ dont-have-an-account: Belum punya akun?
 download: Unduh
 email: Surel
 email-address: Alamat email
+encrypted: Bundel terenkripsi
 enter-your-email-add: >-
   Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
+external-storage: Penyimpanan luar
 fail: Instal gagal
+filters: Filter
 first-name: Nama depan
 force-version: Versi paksa
 forgot: Lupa

@@ -137,11 +137,14 @@ dont-have-an-account: Sie haben kein Konto?
 download: Herunterladen
 email: Email
 email-address: E-Mail-Addresse
+encrypted: Verschlüsselte Pakete
 enter-your-email-add: >-
   Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum
   Zurücksetzen Ihres Passworts.
 enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
+external-storage: Externer Speicher
 fail: Installation fehlgeschlagen
+filters: Filter
 first-name: Vorname
 force-version: Force-Version
 forgot: Vergessen

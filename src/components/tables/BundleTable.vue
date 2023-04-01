@@ -30,7 +30,8 @@ const elements = ref<(typeof element)[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
-  'External storage': false,
+  'external-storage': false,
+  'encrypted': false,
 })
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
@@ -77,8 +78,10 @@ const getData = async () => {
     if (search.value)
       req.like('name', `%${search.value}%`)
 
-    if (filters.value['External storage'])
+    if (filters.value['external-storage'])
       req.neq('external_url', null)
+    if (filters.value['encrypted'])
+      req.neq('session_key', null)
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
@@ -179,7 +182,7 @@ columns.value = [
       else if (elem.external_url)
         return t('stored-externally')
       else
-        return t('package.size-not-found')
+        return t('size-not-found')
     },
   },
   {
@@ -218,7 +221,7 @@ watch(props, async () => {
   <Table
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
     :total="total" row-click :element-list="elements"
-    filter-text="Filters"
+    filter-text="filters"
     :is-loading="isLoading"
     :search-placeholder="t('search-bundle-id')"
     @reload="reload()" @reset="refreshData()"

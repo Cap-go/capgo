@@ -133,9 +133,12 @@ dont-have-an-account: Não tem uma conta?
 download: Download
 email: E-mail
 email-address: Endereço de email
+encrypted: Pacotes criptografados
 enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha.
 enter-your-new-passw: Digite sua nova senha e confirme
+external-storage: Armazenamento externo
 fail: Falha na instalação
+filters: Filtros
 first-name: Primeiro nome
 force-version: Forçar versão
 forgot: Esquecido

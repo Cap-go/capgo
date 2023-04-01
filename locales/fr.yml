@@ -135,11 +135,14 @@ dont-have-an-account: "Vous n'avez pas de compte\_?"
 download: Télécharger
 email: E-mail
 email-address: Adresse e-mail
+encrypted: mise a jour chiffrés
 enter-your-email-add: >-
   Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
+external-storage: Stockage externe
 fail: Échec de l'installation
+filters: Filtres
 first-name: Prénom
 force-version: Version forcée
 forgot: Oublié

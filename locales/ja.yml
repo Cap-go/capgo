@@ -129,9 +129,12 @@ dont-have-an-account: アカウントを持っていませんか？
 download: ダウンロード
 email: Eメール
 email-address: 電子メールアドレス
+encrypted: 暗号化されたバンドル
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
+external-storage: 外部記憶装置
 fail: インストールに失敗しました
+filters: フィルター
 first-name: ファーストネーム
 force-version: 強制バージョン
 forgot: 忘れた

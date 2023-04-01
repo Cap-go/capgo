@@ -129,9 +129,12 @@ dont-have-an-account: 계정이 없습니까?
 download: 다운로드
 email: 이메일
 email-address: 이메일 주소
+encrypted: 암호화된 번들
 enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
 enter-your-new-passw: 새 비밀번호를 입력하고 확인
+external-storage: 외부 저장
 fail: 설치 실패
+filters: 필터
 first-name: 이름
 force-version: 포스 버전
 forgot: 잊어버렸다

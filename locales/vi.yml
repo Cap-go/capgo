@@ -133,11 +133,14 @@ dont-have-an-account: Bạn chưa có tài khoản?
 download: Tải xuống
 email: E-mail
 email-address: Địa chỉ email
+encrypted: Gói được mã hóa
 enter-your-email-add: >-
   Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
+external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
+filters: bộ lọc
 first-name: Họ
 force-version: Phiên bản bắt buộc
 forgot: Quên

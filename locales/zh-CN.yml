@@ -129,9 +129,12 @@ dont-have-an-account: 没有帐户？
 download: 下载
 email: 电子邮件
 email-address: 电子邮件地址
+encrypted: 加密包
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
 enter-your-new-passw: 输入您的新密码并确认
+external-storage: 外置储存
 fail: 安装失败
+filters: 过滤器
 first-name: 名
 force-version: 强制版本
 forgot: 忘记

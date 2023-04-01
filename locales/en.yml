@@ -128,9 +128,12 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
+encrypted: Encrypted bundles
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
+external-storage: External storage
 fail: Install failed
+filters: Filters
 first-name: First name
 force-version: Force version
 forgot: Forgot

@@ -133,9 +133,12 @@ dont-have-an-account: У вас нет аккаунта?
 download: Скачать
 email: Электронная почта
 email-address: Адрес электронной почты
+encrypted: Зашифрованные пакеты
 enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
 enter-your-new-passw: Введите новый пароль и подтвердите
+external-storage: Внешнее хранилище
 fail: Установка не удалась
+filters: Фильтры
 first-name: Имя
 force-version: Принудительная версия
 forgot: Забыл

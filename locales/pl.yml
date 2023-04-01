@@ -133,9 +133,12 @@ dont-have-an-account: Nie masz konta?
 download: Pobierać
 email: E-mail
 email-address: Adres e-mail
+encrypted: Zaszyfrowane pakiety
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
+external-storage: Dysk zewnętrzny
 fail: Instalacja nie powiodła się
+filters: Filtry
 first-name: Imię
 force-version: Wersja na siłę
 forgot: Zapomniałem

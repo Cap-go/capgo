@@ -133,11 +133,14 @@ dont-have-an-account: Non hai un account?
 download: Scaricamento
 email: E-mail
 email-address: Indirizzo e-mail
+encrypted: Bundle crittografati
 enter-your-email-add: >-
   Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la
   password.
 enter-your-new-passw: Inserisci la tua nuova password e conferma
+external-storage: Archiviazione esterna
 fail: Installazione non riuscita
+filters: Filtri
 first-name: Nome di battesimo
 force-version: Versione forzata
 forgot: Dimenticato

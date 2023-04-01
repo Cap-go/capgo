@@ -135,11 +135,14 @@ dont-have-an-account: ¿No tienes una cuenta?
 download: Descargar
 email: Correo electrónico
 email-address: Dirección de correo electrónico
+encrypted: Paquetes cifrados
 enter-your-email-add: >-
   Ingrese su dirección de correo electrónico y le enviaremos un enlace para
   restablecer su contraseña.
 enter-your-new-passw: Ingrese su nueva contraseña y confirme
+external-storage: Almacenamiento externo
 fail: Instalación fallida
+filters: filtros
 first-name: Nombre de pila
 force-version: Forzar versión
 forgot: Olvidó

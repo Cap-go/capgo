@@ -131,11 +131,14 @@ dont-have-an-account: Hesabınız yok mu?
 download: İndirmek
 email: E-posta
 email-address: E-posta adresi
+encrypted: Şifrelenmiş paketler
 enter-your-email-add: >-
   E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
+external-storage: Harici depolama
 fail: Yükleme başarısız
+filters: Filtreler
 first-name: İlk adı
 force-version: Kuvvet versiyonu
 forgot: Unutmuş olmak
