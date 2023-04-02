@@ -105,6 +105,7 @@ confirm-public-desc: |-
 
   Các kênh mặc định khác sẽ không còn mặc định nữa.
 copied-to-clipboard: Sao chép vào clipboard
+copy-command: Sao chép lệnh
 copy-your: Sao chép của bạn
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
@@ -288,6 +289,7 @@ thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
 title: tiêu đề
+to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử

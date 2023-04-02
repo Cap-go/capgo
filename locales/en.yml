@@ -100,6 +100,7 @@ confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
   Others default channels will not be default anymore.
 copied-to-clipboard: Copied to clipboard
+copy-command: Copy command
 copy-your: Copy your
 country: Country
 create-a-free-accoun: Create a free account
@@ -277,6 +278,7 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
+to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
 trial-left: days left
 trial-plan-expired: Trial Expired

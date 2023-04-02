@@ -103,6 +103,7 @@ confirm-public-desc: >-
 
   Diğer varsayılan kanallar artık varsayılan olmayacak.
 copied-to-clipboard: Panoya kopyalandı
+copy-command: Komutu kopyala
 copy-your: kopyala
 country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
@@ -288,6 +289,7 @@ thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
 title: başlık
+to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi

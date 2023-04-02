@@ -101,6 +101,7 @@ confirm-public-desc: |-
 
   다른 기본 채널은 더 이상 기본값이 아닙니다.
 copied-to-clipboard: 클립보드에 복사됨
+copy-command: 복사 명령
 copy-your: 복사
 country: 국가
 create-a-free-accoun: 무료 계정 만들기
@@ -280,6 +281,7 @@ thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
 title: 제목
+to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps: 나의 앱들
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨

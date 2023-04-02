@@ -107,6 +107,7 @@ confirm-public-desc: >-
 
   Les autres canaux par défaut ne seront plus par défaut.
 copied-to-clipboard: Copié dans le presse-papier
+copy-command: Copier la commande
 copy-your: Copiez votre
 country: Pays
 create-a-free-accoun: Créer un compte gratuit
@@ -292,6 +293,7 @@ thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: Le
 this-page-will-self-: Cette page s'actualisera automatiquement
 title: titre
+to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
 trial-left: Jours restants
 trial-plan-expired: Essai expiré

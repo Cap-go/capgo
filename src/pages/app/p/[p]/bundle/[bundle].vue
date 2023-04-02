@@ -200,10 +200,26 @@ const openDownload = async () => {
     buttons: [
       {
         text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
-        handler: () => {
+        handler: async () => {
           displayStore.showActionSheet = false
           if (!version.value)
             return
+          if (version.value.session_key) {
+            const command = `npx @capgo/cli bundle decrypt ./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'} ${version.value.session_key} --key ./.capgo_key`
+            displayStore.dialogOption = {
+              header: '',
+              message: `${t('to-open-encrypted-bu')}<br/><code>${command}</code>`,
+              buttons: [
+                {
+                  text: t('copy-command'),
+                  id: 'confirm-button',
+                },
+              ],
+            }
+            displayStore.showDialog = true
+            await  displayStore.onDialogDismiss()
+            copyToast(command)
+          }
           openVersion(version.value)
         },
       },
@@ -289,7 +305,7 @@ const hideString = (str: string) => {
     <div v-if="version" class="h-full overflow-y-scroll md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+        <div class="flex flex-col overflow-y-scroll shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
@@ -314,7 +330,7 @@ const hideString = (str: string) => {
         </div>
       </div>
       <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
-        <div class="mx-auto flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+        <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
           <DeviceTable
             class="p-3"
             :app-id="packageId"

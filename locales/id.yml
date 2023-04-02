@@ -103,6 +103,7 @@ confirm-public-desc: >-
 
   Saluran default lainnya tidak akan menjadi default lagi.
 copied-to-clipboard: Disalin ke papan klip
+copy-command: Salin perintah
 copy-your: Salin Anda
 country: Negara
 create-a-free-accoun: Buat Akun gratis
@@ -288,6 +289,7 @@ thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri
 title: judul
+to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis

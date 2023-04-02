@@ -107,6 +107,7 @@ confirm-public-desc: >-
 
   Otros canales predeterminados ya no serán predeterminados.
 copied-to-clipboard: Copiado al portapapeles
+copy-command: Copiar comando
 copy-your: copia tu
 country: País
 create-a-free-accoun: Crea una cuenta nueva
@@ -296,6 +297,7 @@ thank-you-for-choosi: ¡Gracias por elegir Capgo!
 the: El
 this-page-will-self-: Esta página se actualizará automáticamente
 title: título
+to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps: Mis aplicaciones
 trial-left: Días restantes
 trial-plan-expired: Prueba caducada

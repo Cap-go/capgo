@@ -21,6 +21,11 @@ const close = (item?: ActionSheetOptionButton) => {
 
 const modalElement = ref(null)
 
+const displayText = (text?: string) => {
+  if (!text)
+    return ''
+  return text.replace(/\n/g, '<br/>')
+}
 onMounted(() => {
   const modalOptions: ModalOptions = {
     placement: 'center',
@@ -71,8 +76,7 @@ onMounted(() => {
         </div>
         <!-- Modal body -->
         <div class="p-6 space-y-6">
-          <p class="text-base leading-relaxed text-gray-500 dark:text-gray-400">
-            {{ displayStore.dialogOption?.message }}
+          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)">
           </p>
         </div>
         <!-- Modal footer -->

@@ -101,6 +101,7 @@ confirm-public-desc: |-
 
   他のデフォルト チャネルはデフォルトではなくなります。
 copied-to-clipboard: クリップボードにコピーしました
+copy-command: コピー コマンド
 copy-your: あなたのコピー
 country: 国
 create-a-free-accoun: 無料アカウントを作成
@@ -280,6 +281,7 @@ thank-you-for-choosi: Capgo をお選びいただきありがとうございま�
 the: の
 this-page-will-self-: このページは自動的に更新されます
 title: タイトル
+to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps: 私のアプリ
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
