@@ -52,7 +52,8 @@ const accumulateData = computed(() => {
       newVal = last
     // console.log('accumulateData', i, monthDay, val, last, newVal)
     // console.log('accumulateData', i, val, last, newVal)
-    return [...acc, newVal] as number[]
+    // return [...acc, newVal] as number[]
+    return acc.concat([newVal as number])
   }, [])
 })
 
@@ -92,7 +93,8 @@ const projectionData = computed(() => {
       newVal = lastDay
     else if (i >= monthDay)
       newVal = last + randomizedEvolution
-    return [...acc, newVal] as number[]
+    // return [...acc, newVal] as number[]
+    return acc.concat([newVal as number])
   }, [])
   return res
 })
