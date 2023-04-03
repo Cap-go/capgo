@@ -80,7 +80,7 @@ const getData = async () => {
 
     if (filters.value['external-storage'])
       req.neq('external_url', null)
-    if (filters.value['encrypted'])
+    if (filters.value.encrypted)
       req.neq('session_key', null)
     if (columns.value.length) {
       columns.value.forEach((col) => {
@@ -134,16 +134,12 @@ const deleteOne = async (one: typeof element) => {
       toast.error(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-device')}`)
       return
     }
-    const { error: delError } = await supabase
-      .storage
-      .from('apps')
-      .remove([`${one.user_id}/${one.app_id}/versions/${one.bucket_id}`])
     const { error: delAppError } = await supabase
       .from('app_versions')
       .update({ deleted: true })
       .eq('app_id', one.app_id)
       .eq('id', one.id)
-    if (delAppError || delError) {
+    if (delAppError) {
       toast.error(t('cannot-delete-bundle'))
     }
     else {
