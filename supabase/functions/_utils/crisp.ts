@@ -77,11 +77,11 @@ export const getDataPerson = async (email: string): Promise<{ [key: string]: str
 
 export const deleteDataPerson = async (email: string, data: Person) => {
   const current = await getDataPerson(email)
-  const curentKeys = Object.keys(current)
+  const currentKeys = Object.keys(current)
   // check if keys exist in current
   const newData: any = { }
   let found = false
-  curentKeys.forEach((key) => {
+  currentKeys.forEach((key) => {
     if (!data[key])
       newData[key] = current[key]
     else

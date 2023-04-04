@@ -15,5 +15,5 @@ import { Toaster } from 'vue-sonner'
 </script>
 
 <template>
-  <Toaster richColors closeButton position="top-right" />
+  <Toaster rich-colors close-button position="top-right" />
 </template>

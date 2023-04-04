@@ -217,7 +217,7 @@ const openDownload = async () => {
               ],
             }
             displayStore.showDialog = true
-            await  displayStore.onDialogDismiss()
+            await displayStore.onDialogDismiss()
             copyToast(command)
           }
           openVersion(version.value)

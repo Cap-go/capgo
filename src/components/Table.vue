@@ -163,7 +163,7 @@ onMounted(() => {
           <IconDown class="hidden m-1 ml-2 md:block" />
         </button>
         <!-- Dropdown menu -->
-        <div id="dropdownRadio" v-if="filterText && filterList.length" class="z-50 hidden w-48 bg-white border divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
+        <div v-if="filterText && filterList.length" id="dropdownRadio" class="z-50 hidden w-48 bg-white border divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
           <div class="block px-4 py-3 text-sm text-gray-900 md:hidden dark:text-white">
             <div>{{ t(filterText) }}</div>
           </div>

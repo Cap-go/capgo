@@ -76,8 +76,7 @@ onMounted(() => {
         </div>
         <!-- Modal body -->
         <div class="p-6 space-y-6">
-          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)">
-          </p>
+          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)" />
         </div>
         <!-- Modal footer -->
         <div class="flex items-center p-6 space-x-2 border-t border-gray-200 rounded-b dark:border-gray-600">
