@@ -518,10 +518,7 @@ export const customerToSegment = async (userId: string, customer: Database['publ
     return segments
   }
 
-  if (paying && canUseMore && plan)
-    segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly')
-
-  else if (canceled)
+  if (canceled)
     segments.push('Canceled')
 
   else if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7)
@@ -535,6 +532,9 @@ export const customerToSegment = async (userId: string, customer: Database['publ
 
   else if (paying && !canUseMore && plan)
     segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly', 'Overuse')
+
+  else if (paying && canUseMore && plan)
+    segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly')
 
   else
     segments.push('Not_found')
