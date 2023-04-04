@@ -88,8 +88,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
 
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
-    return sendRes({ message: 'Fail Authorization', authorizationSecret, API_SECRET }, 400)
+  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
+    console.error('Fail Authorization', { authorizationSecret, API_SECRET })
+    return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
+  }
 
   console.log('main', method, body)
   // remove from list apps already in supabase
