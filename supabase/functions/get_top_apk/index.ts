@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.179.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
 import gplay from 'https://esm.sh/google-play-scraper?target=deno'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
