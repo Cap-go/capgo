@@ -14,7 +14,7 @@ const props = defineProps<{
   versionId?: number | undefined
 }>()
 
-const element: Database['public']['Tables']['devices']['Row'] = {} as any
+const element: Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] } = {} as any
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -64,7 +64,7 @@ const columns = ref<TableColumn[]>([
   },
 ])
 
-const getDevicesID = async (elem: typeof element) => {
+const getDevicesID = async () => {
   const req = supabase
     .from('channel_devices')
     .select('device_id')
@@ -109,7 +109,7 @@ const getData = async () => {
       req.or(`device_id.like.%${search.value}%,custom_id.like.%${search.value}%`)
 
     if (filters.value.Override) {
-      const ids = await getDevicesID(element)
+      const ids = await getDevicesID()
       req.in('device_id', ids)
     }
     if (columns.value.length) {

@@ -58,7 +58,7 @@ const versionData = async () => {
     if (!res?.length)
       return
     versions.value.push(...res)
-    elements.value.forEach((elem, index) => {
+    elements.value.forEach((elem) => {
       elem.version = findVersion(elem.version, versions.value) || { name: 'unknown', id: 0 } as any
     })
   }

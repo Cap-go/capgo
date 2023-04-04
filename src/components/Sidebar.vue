@@ -21,7 +21,7 @@ const { t } = useI18n()
 const sidebar = ref(null)
 const route = useRoute()
 
-onClickOutside(sidebar, event => emit('closeSidebar'))
+onClickOutside(sidebar, () => emit('closeSidebar'))
 
 const storedSidebarExpanded = localStorage.getItem('sidebar-expanded')
 const sidebarExpanded = ref(storedSidebarExpanded === null ? false : storedSidebarExpanded === 'true')
@@ -71,7 +71,7 @@ const tabs = ref<Tab[]>([
 <template>
   <div>
     <!-- Sidebar backdrop (mobile only) -->
-    <div class="inset-0-safe fixed z-40 bg-slate-900 bg-opacity-30 transition-opacity duration-200 lg:z-auto lg:hidden" :class="props.sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'" aria-hidden="true" />
+    <div class="fixed z-40 transition-opacity duration-200 inset-0-safe bg-slate-900 bg-opacity-30 lg:z-auto lg:hidden" :class="props.sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'" aria-hidden="true" />
 
     <!-- Sidebar -->
     <div
@@ -81,11 +81,11 @@ const tabs = ref<Tab[]>([
       :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
     >
       <!-- Sidebar header -->
-      <div class="sidebar-expanded:mx-10 mb-10 mt-4 flex justify-between px-3 sm:px-2">
+      <div class="flex justify-between px-3 mt-4 mb-10 sidebar-expanded:mx-10 sm:px-2">
         <!-- Logo -->
         <router-link class="flex flex-row items-center space-x-2" to="/app/home">
           <img src="/capgo.webp" alt="logo" class="h-[32px] w-[32px]">
-          <span class="lg:sidebar-expanded:block truncate font-prompt text-xl font-medium text-slate-200 transition duration-150 2xl:block lg:hidden hover:text-white">Capgo</span>
+          <span class="text-xl font-medium truncate transition duration-150 lg:sidebar-expanded:block font-prompt text-slate-200 2xl:block lg:hidden hover:text-white">Capgo</span>
         </router-link>
       </div>
 
@@ -94,16 +94,16 @@ const tabs = ref<Tab[]>([
         <!-- Pages group -->
         <div>
           <h3 class="pl-3 text-xs font-semibold uppercase text-slate-500">
-            <span class="lg:sidebar-expanded:hidden hidden w-6 text-center lg:block 2xl:hidden" aria-hidden="true">•••</span>
+            <span class="hidden w-6 text-center lg:sidebar-expanded:hidden lg:block 2xl:hidden" aria-hidden="true">•••</span>
             <span class="lg:sidebar-expanded:block 2xl:block lg:hidden">{{ t('pages') }}</span>
           </h3>
           <ul class="mt-3">
             <li v-for="tab, i in tabs" :key="i" class="mb-0.5 rounded-sm px-3 py-2 last:mb-0">
-              <button class="block truncate text-slate-200 transition duration-150 hover:text-white" :class="{ 'hover:text-slate-200': isTabActive(tab.key) }" @click="openTab(tab)">
+              <button class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="{ 'hover:text-slate-200': isTabActive(tab.key) }" @click="openTab(tab)">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
-                    <component :is="tab.icon" class="h-6 w-6 fill-current" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
-                    <span class="lg:sidebar-expanded:opacity-100 ml-3 text-sm font-medium duration-200 2xl:opacity-100 lg:opacity-0" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }">{{ tab.label }}</span>
+                    <component :is="tab.icon" class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
+                    <span class="ml-3 text-sm font-medium duration-200 lg:sidebar-expanded:opacity-100 2xl:opacity-100 lg:opacity-0" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }">{{ tab.label }}</span>
                   </div>
                 </div>
               </button>
@@ -113,11 +113,11 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- Expand / collapse button -->
-      <div class="mt-auto hidden justify-end pt-3 2xl:hidden lg:inline-flex">
+      <div class="justify-end hidden pt-3 mt-auto 2xl:hidden lg:inline-flex">
         <div class="px-3 py-2">
           <button @click.prevent="sidebarExpanded = !sidebarExpanded">
             <span class="sr-only">Expand / collapse sidebar</span>
-            <IconExpand class="sidebar-expanded:rotate-180 h-6 w-6 fill-current" />
+            <IconExpand class="w-6 h-6 fill-current sidebar-expanded:rotate-180" />
           </button>
         </div>
       </div>
