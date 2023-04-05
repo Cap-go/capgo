@@ -5,7 +5,7 @@ AS $function$
 Begin
   RETURN (SELECT COUNT(DISTINCT user_id) FROM apps);
 End;  
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.count_all_plans()
@@ -17,7 +17,7 @@ Begin
     FROM stripe_info
     GROUP BY stripe_info.product_id);
 End;  
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.count_all_paying()
  RETURNS integer
@@ -26,7 +26,7 @@ AS $function$
 Begin
   RETURN (SELECT COUNT(*) FROM stripe_info WHERE status = 'succeeded');
 End;  
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.count_all_need_upgrade()
  RETURNS integer
@@ -35,9 +35,8 @@ AS $function$
 Begin
   RETURN (SELECT COUNT(*) FROM stripe_info WHERE is_good_plan = false AND status = 'succeeded');
 End;  
-$function$
+$function$;
 
-SELECT COUNT(*) FROM stripe_info WHERE trial_at > NOW();
 CREATE OR REPLACE FUNCTION public.count_all_trial()
  RETURNS integer
  LANGUAGE plpgsql
@@ -45,4 +44,4 @@ AS $function$
 Begin
   RETURN (SELECT COUNT(*) FROM stripe_info WHERE trial_at > NOW());
 End;  
-$function$
+$function$;
