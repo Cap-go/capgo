@@ -11,7 +11,7 @@ gplay.memoized()
 const getAppInfo = async (appId: string, country = 'en') => {
   const item = await gplay.app({
     appId,
-    // throttle: 10,
+    throttle: 50,
   })
   if (!item)
     return null
