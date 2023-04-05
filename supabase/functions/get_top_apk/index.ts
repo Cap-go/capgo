@@ -1,9 +1,10 @@
 import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
 import gplay from 'https://esm.sh/google-play-scraper?target=deno'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { saveStoreInfo, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
+import { countries } from '../_utils/gplay_categ.ts'
 
 gplay.memoized()
 const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, country = 'us') => {
@@ -13,6 +14,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     fullDetail: false,
     country,
     num: limit,
+    // throttle: 100,
   }))
   // remove the first skip
   const ids = res.map((item: any) => item.appId)
@@ -27,64 +29,39 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   }
   // use data to filter res
   const filtered = res.filter((item: any) => !data?.find((row: { app_id: string }) => row.app_id === item.appId))
-  console.log('filtered', filtered.length, filtered)
   const upgraded = filtered.map((item: any) => {
-    // console.log('item', item.appId)
-    // check if already exist in db and skip
-    return gplay.app({ appId: item.appId, country })
-      .then((res: any) => {
-        const row: Database['public']['Tables']['store_apps']['Insert'] = {
-          url: item.url,
-          app_id: item.appId,
-          title: item.title,
-          summary: item.summary,
-          developer: item.developer,
-          developer_id: item.developerId,
-          lang: country,
-          icon: item.icon,
-          score: item.score,
-          free: item.free,
-          category,
-          developer_email: res.developerEmail,
-          installs: res.maxInstalls,
-          to_get_info: false,
-        }
-        return row
-      })
-      .catch((err: any) => {
-        console.log('err', err)
-        const row: Database['public']['Tables']['store_apps']['Insert'] = {
-          url: item.url,
-          app_id: item.appId,
-          title: item.title,
-          summary: item.summary,
-          developer: item.developer,
-          developer_id: item.developerId,
-          lang: country,
-          icon: item.icon,
-          score: item.score,
-          free: item.free,
-          category,
-          developer_email: '',
-          installs: 0,
-          to_get_info: false,
-          error_get_info: err.message,
-        }
-        return row
-      })
+    const row: Database['public']['Tables']['store_apps']['Insert'] = {
+      url: item.url || '',
+      app_id: item.appId,
+      title: item.title || '',
+      summary: item.summary || '',
+      developer: item.developer || '',
+      developer_id: item.developerId || '',
+      lang: country || '',
+      icon: item.icon || '',
+      score: item.score || 0,
+      free: item.free || true,
+      category,
+    }
+    return row
   })
-  return await Promise.all(upgraded)
+  return upgraded
 }
 
-const getTop = async (category = gplay.category.APPLICATION, country: string, collection = gplay.collection.TOP_FREE, limit = 1000) => {
-  const list = await getList(category, collection, limit, country)
-  console.log('getTop', category, country, collection, list.length)
-  // save in supabase
-  const { error } = await supabaseAdmin()
-    .from('store_apps')
-    .upsert(list)
-  if (error)
-    console.log('error', error)
+const getTop = async (category = gplay.category.APPLICATION, country = 'us', collection = gplay.collection.TOP_FREE, limit = 1000) => {
+  try {
+    console.log('getTop', category, country, collection)
+    const res = await getList(category, collection, limit, country)
+    if (!res.length)
+      return []
+    // set to_get_similar to false
+    console.log('getTop', country, res.length)
+    return res
+  }
+  catch (e) {
+    console.log('error getTop', e)
+  }
+  return []
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
@@ -97,26 +74,29 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     console.error('Fail Authorization', { authorizationSecret, API_SECRET })
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
-
+  const all: Promise<(Database['public']['Tables']['store_apps']['Insert'])[]>[] = []
   // console.log('main', url, headers, method, body)
-  if (body.country && body.category) {
-    await getTop(body.category, body.country, body.collection, body.limit)
-  }
-  else if (body.countries && body.categories) {
+  if (body.countries && body.categories) {
     // call getTop with all countries and categories
-    const countries = body.countries
-    const categories = body.categories
-    const all = []
-    for (const country of countries) {
-      for (const category of categories)
+    for (const country of body.countries) {
+      for (const category of body.categories)
         all.push(getTop(category, country, body.collection, body.limit))
     }
-    await Promise.all(all)
+  }
+  else if (body.categories) {
+    // call getTop with all countries and categories
+    for (const country of countries) {
+      for (const category of body.categories)
+        all.push(getTop(category, country, body.collection, body.limit))
+    }
   }
   else {
-    console.log('cannot get apps', body)
-    return sendRes({ status: 'Error', error: 'cannot get apps' }, 500)
+    for (const country of countries)
+      all.push(getTop(body.category, country, body.collection, body.limit))
   }
+  const toSave = await Promise.all(all)
+  const flattenToSave = toSave.flat()
+  await saveStoreInfo(flattenToSave)
   return sendRes()
 }
 

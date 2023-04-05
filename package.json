@@ -68,7 +68,7 @@
     "@capgo/capacitor-purchases": "^2.1.0",
     "@capgo/capacitor-screen-recorder": "^1.2.44",
     "@capgo/capacitor-updater": "4.20.0",
-    "@capgo/google-play-scraper": "^9.1.1",
+    "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^0.4.2",
     "@capgo/native-audio": "^5.0.15",
     "@capgo/native-market": "^1.1.27",

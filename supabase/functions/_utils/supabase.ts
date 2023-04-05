@@ -500,6 +500,19 @@ export const userToPerson = (user: Database['public']['Tables']['users']['Row'],
   return person
 }
 
+export const saveStoreInfo = async (apps: (Database['public']['Tables']['store_apps']['Insert'])[]) => {
+  // save in supabase
+  if (!apps.length)
+    return
+  const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
+  console.log('saveStoreInfo', noDup.length)
+  const { error } = await supabaseAdmin()
+    .from('store_apps')
+    .upsert(noDup)
+  if (error)
+    console.error('saveStoreInfo error', error)
+}
+
 export const customerToSegment = async (userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
   plan?: Database['public']['Tables']['plans']['Row']): Promise<string[]> => {
   const isMonthly = plan?.price_m_id === customer.price_id

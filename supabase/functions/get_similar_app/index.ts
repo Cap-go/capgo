@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
 import gplay from 'https://esm.sh/google-play-scraper?target=deno'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { saveStoreInfo, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
@@ -9,8 +9,19 @@ import { countries } from '../_utils/gplay_categ.ts'
 gplay.memoized()
 
 const getAppsInfo = async (appId: string, country: string): Promise<(Database['public']['Tables']['store_apps']['Insert'])[]> => {
-  const { title } = await gplay.app({ appId }).catch(() => ({ title: '' }))
-  const itemsSim = await gplay.similar({ appId, num: 250, country }).catch(() => [])
+  const { title } = await gplay.app({
+    appId,
+    // throttle: 10,
+  }).catch(() => ({ title: '' }))
+  if (!title)
+    return []
+
+  const itemsSim = await gplay.similar({
+    appId,
+    num: 250,
+    country,
+    // throttle: 10,
+  }).catch(() => [])
   const itemsSearch = title ? await gplay.search({ term: title, num: 250, country }).catch(() => []) : []
 
   return [...itemsSim, ...itemsSearch].map((item) => {
@@ -61,19 +72,6 @@ const getSimilar = async (appId: string, country = 'us') => {
   return []
 }
 
-const saveSimilar = async (apps: (Database['public']['Tables']['store_apps']['Insert'])[]) => {
-  // save in supabase
-  if (!apps.length)
-    return
-  const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
-  console.log('saveSimilar', noDup.length)
-  const { error } = await supabaseAdmin()
-    .from('store_apps')
-    .upsert(noDup)
-  if (error)
-    console.log('error', error)
-}
-
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
@@ -94,9 +92,8 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   else if (body.countries && body.appIds) {
     // call getTop with all countries and categories
-    const countries = body.countries
     for (const appId of body.appIds) {
-      for (const country of countries)
+      for (const country of body.countries)
         all.push(getSimilar(appId, country))
     }
   }
@@ -112,7 +109,7 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
   }
   const toSave = await Promise.all(all)
   const flattenToSave = toSave.flat()
-  await saveSimilar(flattenToSave)
+  await saveStoreInfo(flattenToSave)
   return sendRes()
 }
 serve(async (event: Request) => {

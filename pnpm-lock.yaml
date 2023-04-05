@@ -110,8 +110,8 @@ dependencies:
     specifier: 4.20.0
     version: 4.20.0(@capacitor/core@4.7.3)
   '@capgo/google-play-scraper':
-    specifier: ^9.1.1
-    version: 9.1.1
+    specifier: ^9.1.2
+    version: 9.1.2
   '@capgo/inappbrowser':
     specifier: ^0.4.2
     version: 0.4.2(@capacitor/core@4.7.3)
@@ -2147,8 +2147,8 @@ packages:
       '@capacitor/core': 4.7.3
     dev: false
 
-  /@capgo/google-play-scraper@9.1.1:
-    resolution: {integrity: sha512-RkV/ncQUQE8ObUUESAbd+5FSZ6FGsAjiu9vmwevLyHMCW+EaIVnR0m1AAxZTW9WlDKXXsRA70yhH8pkPlTlaiw==}
+  /@capgo/google-play-scraper@9.1.2:
+    resolution: {integrity: sha512-vPDAK6PhA3W4GDNG7+gYWZO8dBK4JmxvVZpx7Nro+yX0SJ6Z/oBrAzKPLjMJzlBhCS+z8eVy+5/ZXj9TvigKHg==}
     dependencies:
       cheerio: 1.0.0-rc.12
       debug: 3.2.7(supports-color@5.5.0)
