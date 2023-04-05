@@ -126,7 +126,7 @@
     "@capacitor/core": "~4.7.3",
     "@iconify-json/carbon": "1.1.16",
     "@iconify-json/heroicons": "^1.1.10",
-    "@iconify-json/ion": "1.1.8",
+    "@iconify-json/ion": "1.1.9",
     "@iconify-json/ls": "1.1.4",
     "@iconify/json": "^2.2.43",
     "@intlify/vite-plugin-vue-i18n": "6.0.3",
