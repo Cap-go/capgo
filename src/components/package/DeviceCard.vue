@@ -12,7 +12,7 @@ const props = defineProps<{
 }>()
 const router = useRouter()
 
-const openDevice = async () => {
+async function openDevice() {
   console.log('openDevice', props.device)
 
   router.push(`/app/p/${appIdToUrl(props.device.app_id)}/d/${props.device.device_id}`)

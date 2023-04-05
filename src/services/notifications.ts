@@ -11,7 +11,7 @@ import { useSupabase } from '~/services/supabase'
 // Your web app's Firebase configuration
 const firebaseConfig = import.meta.env.VITE_FIREBASE_CONFIG
 
-const registerToken = async (token: string) => {
+async function registerToken(token: string) {
   const supabase = useSupabase()
   const { data: res } = await supabase.auth.getUser()
   const user = res?.user
@@ -30,7 +30,7 @@ const registerToken = async (token: string) => {
     console.error('error registration', error)
 }
 
-export const initNotif = () => {
+export function initNotif() {
 // Initialize Firebase
   if (!Capacitor.isNativePlatform()) {
     // console.log('register web', firebaseConfig)
@@ -85,7 +85,7 @@ export const initNotif = () => {
   }
 }
 
-export const listenNotif = (router: Router) => {
+export function listenNotif(router: Router) {
   if (!Capacitor.isNativePlatform()) {
     const app = initializeApp(JSON.parse(firebaseConfig as string))
     const messaging = getMessaging(app)

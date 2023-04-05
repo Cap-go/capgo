@@ -21,7 +21,7 @@ const router = useRouter()
 
 const { t } = useI18n()
 
-const submit = async () => {
+async function submit() {
   if (isLoading.value)
     return
   isLoading.value = true

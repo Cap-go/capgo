@@ -94,7 +94,7 @@ modules.value.push(...[
 ])
 // CapacitorUpdater.
 Camera.requestPermissions()
-const runMethod = async (m: Module) => {
+async function runMethod(m: Module) {
   console.log('runMethod', m)
   toast.success(`runMethod: ${JSON.stringify(m)}`);
   (mods as any)[m.name][m.method]({ ...m.option }).then((res: any) => {

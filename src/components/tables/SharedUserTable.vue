@@ -38,7 +38,7 @@ const offset = 10
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-const didCancel = async (name: string) => {
+async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
@@ -57,7 +57,7 @@ const didCancel = async (name: string) => {
   return displayStore.onDialogDismiss()
 }
 
-const getData = async () => {
+async function getData() {
   isLoading.value = true
   try {
     const req = supabase
@@ -101,7 +101,7 @@ const getData = async () => {
   isLoading.value = false
 }
 
-const reload = async () => {
+async function reload() {
   console.log('reload')
   try {
     elements.value.length = 0
@@ -112,7 +112,7 @@ const reload = async () => {
   }
 }
 
-const refreshData = async () => {
+async function refreshData() {
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -122,7 +122,7 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const deleteOne = async (one: typeof element) => {
+async function deleteOne(one: typeof element) {
   if (await didCancel(t('user')))
     return
   const { error } = await supabase
@@ -136,7 +136,7 @@ const deleteOne = async (one: typeof element) => {
     await refreshData()
 }
 
-const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => {
+async function deleteUser(usr: Database['public']['Tables']['users']['Row']) {
   if (await didCancel(t('user')))
     return
   const { error } = await supabase
@@ -150,7 +150,7 @@ const deleteUser = async (usr: Database['public']['Tables']['users']['Row']) => 
     await refreshData()
 }
 
-const onClick = async (usr: Database['public']['Tables']['users']['Row']) => {
+async function onClick(usr: Database['public']['Tables']['users']['Row']) {
   displayStore.actionSheetOption = {
     buttons: [
       {

@@ -35,11 +35,11 @@ const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
 
-const findVersion = (id: number, versions: { name: string; id: number }[]) => {
+function findVersion(id: number, versions: { name: string; id: number }[]) {
   return versions.find(elem => elem.id === id)
 }
 
-const versionData = async () => {
+async function versionData() {
   try {
     const versionsIdAlreadyFetch = versions.value.map(elem => elem.id)
     const versionsIds = elements.value
@@ -67,7 +67,7 @@ const versionData = async () => {
   }
 }
 
-const getData = async () => {
+async function getData() {
   isLoading.value = true
   try {
     const daysLimit = 7
@@ -124,7 +124,7 @@ const getData = async () => {
   }
   isLoading.value = false
 }
-const refreshData = async () => {
+async function refreshData() {
   console.log('refreshData')
   try {
     currentPage.value = 1
@@ -178,7 +178,7 @@ if (!props.deviceId) {
   })
 }
 
-const reload = async () => {
+async function reload() {
   console.log('reload')
   try {
     elements.value.length = 0

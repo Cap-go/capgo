@@ -72,7 +72,7 @@ const evolution = computed(() => {
   return [min, max, median]
 })
 
-const getRandomArbitrary = (min: number, max: number) => {
+function getRandomArbitrary(min: number, max: number) {
   return Math.random() * (max - min) + min
 }
 
@@ -99,14 +99,14 @@ const projectionData = computed(() => {
   return res
 })
 
-const monthdays = () => {
+function monthdays() {
   const keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
   keys.shift()
   const arr = [...keys]
   return arr
 }
 
-const createAnotation = (id: string, y: number, title: string, lineColor: string, bgColor: string) => {
+function createAnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {
   const obj: any = {}
   obj[`line_${id}`] = {
     type: 'line',
@@ -200,7 +200,5 @@ const chartOptions = {
 </script>
 
 <template>
-  <div class="w-full p-6">
-    <Line :chart-data="chartData" :chart-options="chartOptions" />
-  </div>
+  <Line :data="chartData" height="auto" :options="chartOptions" />
 </template>

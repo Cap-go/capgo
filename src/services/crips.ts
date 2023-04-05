@@ -8,43 +8,41 @@ if (!Capacitor.isNativePlatform())
   CapacitorCrisp.isIframe = false
 CapacitorCrisp.init()
 
-export const pushEvent = (data: { name: string; color: eventColor }): void => {
+export function pushEvent(data: { name: string; color: eventColor }): void {
   // 1cc91d4f-4421-4b8c-b46f-9963030d8108
   if (isSpoofed())
     return
   CapacitorCrisp.pushEvent(data)
 }
 
-export const setUserId = (uuid: string): void => {
+export function setUserId(uuid: string): void {
   if (isSpoofed())
     return
   CapacitorCrisp.setString({ key: 'id', value: uuid })
 }
 
-export const setUser = (data: {
+export function setUser(data: {
   nickname?: string
   phone?: string
   email?: string
   avatar?: string
-}): void => {
+}): void {
   // console.log('setUser CapacitorCrisp')
   if (isSpoofed())
     return
   CapacitorCrisp.setUser(data)
 }
-export const setVersion = (version: string): void => {
+export function setVersion(version: string): void {
   if (isSpoofed())
     return
   CapacitorCrisp.setString({ key: 'webVersion', value: version })
 }
-export const setDeviceInfo = (
-  model: string,
+export function setDeviceInfo(model: string,
   platform: string,
   operatingSystem: string,
   osVersion: string,
   webVersion: string,
-  manufacturer: string,
-): void => {
+  manufacturer: string): void {
   if (isSpoofed())
     return
   CapacitorCrisp.setString({ key: 'model', value: model })
@@ -54,27 +52,27 @@ export const setDeviceInfo = (
   CapacitorCrisp.setString({ key: 'nativeVersion', value: webVersion })
   CapacitorCrisp.setString({ key: 'manufacturer', value: manufacturer })
 }
-export const setPaidPlan = (planId: string): void => {
+export function setPaidPlan(planId: string): void {
   if (isSpoofed())
     return
   CapacitorCrisp.setString({ key: 'paid-plan', value: planId })
 }
-export const sendMessage = (value: string): void => {
+export function sendMessage(value: string): void {
   if (isSpoofed())
     return
   CapacitorCrisp.sendMessage({ value })
 }
-export const openChat = (): void => {
+export function openChat(): void {
   if (isSpoofed())
     return
   CapacitorCrisp.openMessenger()
 }
-export const reset = (): void => {
+export function reset(): void {
   if (isSpoofed())
     return
   CapacitorCrisp.reset()
 }
-export const initCrisp = async (): Promise<void> => {
+export async function initCrisp(): Promise<void> {
   if (isSpoofed())
     return
   try {

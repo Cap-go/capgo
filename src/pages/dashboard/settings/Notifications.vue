@@ -18,7 +18,7 @@ optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletter
 console.log('enableNotifications', enableNotifications.value)
 console.log('optForNewsletters', optForNewsletters.value)
 
-const submitNotif = async () => {
+async function submitNotif() {
   isLoading.value = true
   console.log('submitNotif')
   enableNotifications.value = !enableNotifications.value
@@ -37,7 +37,7 @@ const submitNotif = async () => {
     main.auth = data.user
   isLoading.value = false
 }
-const submitDoi = async () => {
+async function submitDoi() {
   isLoading.value = true
   console.log('submitDoi')
 

@@ -18,7 +18,7 @@ defineEmits(['toggleSidebar'])
 const router = useRouter()
 
 const displayStore = useDisplayStore()
-const back = () => {
+function back() {
   if (window.history.length > 2)
     router.back()
   else

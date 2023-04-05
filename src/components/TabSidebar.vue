@@ -12,12 +12,14 @@ const props = defineProps<{
 const emit = defineEmits(['update:activeTab'])
 const router = useRouter()
 
-const openLink = (link: string) => {
+function openLink(link: string) {
   emit('update:activeTab', link)
 }
-const isActive = (to: string) => router.currentRoute.value.path.includes(to)
+function isActive(to: string) {
+  return router.currentRoute.value.path.includes(to)
+}
 
-const findTab = (key: string) => {
+function findTab(key: string) {
   return props.tabs.find(t => t.key === key)
 }
 

@@ -1,10 +1,10 @@
 import dayjs from 'dayjs'
 
-export const formatDate = (date: string | undefined) => {
+export function formatDate(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
-export const getDaysInCurrentMonth = () => {
+export function getDaysInCurrentMonth() {
   const date = new Date()
 
   return new Date(
@@ -14,7 +14,7 @@ export const getDaysInCurrentMonth = () => {
   ).getDate()
 }
 
-export const getCurrentDayMonth = () => {
+export function getCurrentDayMonth() {
   const date = new Date()
 
   return date.getDate()

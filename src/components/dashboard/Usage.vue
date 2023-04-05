@@ -50,7 +50,7 @@ const allLimits = computed(() => {
   })
 })
 
-const getAppStats = async () => {
+async function getAppStats() {
   const date_id = new Date().toISOString().slice(0, 7)
   if (props.appId) {
     // console.log('appID', props.appId)
@@ -70,14 +70,14 @@ const getAppStats = async () => {
   }
 }
 
-const getAllStats = async () => {
+async function getAllStats() {
   // get aapp_stats
   if (!main.user?.id)
     return
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
-const getUsages = async () => {
+async function getUsages() {
   const { data, error } = await getAppStats()
   if (data && !error) {
     datas.value.mau = new Array(getDaysInCurrentMonth()).fill(undefined)
@@ -112,7 +112,7 @@ const getUsages = async () => {
   }
 }
 
-const loadData = async () => {
+async function loadData() {
   isLoading.value = true
   await getPlans().then((pls) => {
     plans.value.length = 0

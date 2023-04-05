@@ -48,7 +48,7 @@ const bundles = ref<(Database['public']['Tables']['app_versions_meta']['Row'] & 
 const dataDevValues = ref([] as number[])
 const dataDevLabels = ref([] as string[])
 
-const buildGraph = () => {
+function buildGraph() {
   const vals = bundles.value.reduce((past, d) => {
     if (d.devices)
       past[d.id.name] = d.devices || 0
@@ -58,7 +58,7 @@ const buildGraph = () => {
   dataDevLabels.value = Object.keys(vals)
 }
 
-const loadData = async () => {
+async function loadData() {
   const dateLimit = new Date()
   dateLimit.setMonth(dateLimit.getMonth() - 1)
   try {
@@ -128,10 +128,10 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="col-span-full flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
     <Spinner size="w-40 h-40" />
   </div>
-  <div v-else class="col-span-full flex flex-col border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+  <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
     <div class="px-5 pt-5">
       <h2 class="mb-2 text-2xl font-semibold text-slate-800 dark:text-white">
         {{ t('bundles') }}
@@ -146,7 +146,7 @@ watchEffect(async () => {
       </div>
     </div>
     <div class="w-full p-6">
-      <Doughnut :chart-data="chartData" :chart-options="chartOptions" />
+      <Doughnut :data="chartData" :options="chartOptions" />
     </div>
   </div>
 </template>

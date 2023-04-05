@@ -22,7 +22,7 @@ const bundlesNb = ref(0)
 const devicesNb = ref(0)
 const updatesNb = ref(0)
 
-const loadAppInfo = async () => {
+async function loadAppInfo() {
   try {
     const { data: dataApp } = await supabase
       .from('apps')
@@ -50,7 +50,7 @@ const loadAppInfo = async () => {
   }
 }
 
-const refreshData = async () => {
+async function refreshData() {
   isLoading.value = true
   try {
     await loadAppInfo()

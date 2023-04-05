@@ -58,7 +58,7 @@ const tabs: Tab[] = [
   },
 ]
 
-const getVersion = async () => {
+async function getVersion() {
   try {
     const { data } = await supabase
       .from('app_versions')
@@ -73,7 +73,7 @@ const getVersion = async () => {
     versions.value = []
   }
 }
-const getChannels = async () => {
+async function getChannels() {
   try {
     const { data } = await supabase
       .from('channels')
@@ -92,7 +92,7 @@ const getChannels = async () => {
   }
 }
 
-const getChannelOverride = async () => {
+async function getChannelOverride() {
   try {
     const { data, error } = await supabase
       .from('channel_devices')
@@ -122,7 +122,7 @@ const getChannelOverride = async () => {
     channelDevice.value = undefined
   }
 }
-const getDeviceOverride = async () => {
+async function getDeviceOverride() {
   try {
     const { data } = await supabase
       .from('devices_override')
@@ -145,7 +145,7 @@ const getDeviceOverride = async () => {
     deviceOverride.value = undefined
   }
 }
-const getDevice = async () => {
+async function getDevice() {
   if (!id.value)
     return
   try {
@@ -181,11 +181,11 @@ const getDevice = async () => {
   }
 }
 
-const minVersion = (val: string, min = '4.6.99') => {
+function minVersion(val: string, min = '4.6.99') {
   return gt(val, min)
 }
 
-const loadData = async () => {
+async function loadData() {
   isLoading.value = true
   logs.value = []
   await Promise.all([
@@ -198,7 +198,7 @@ const loadData = async () => {
   isLoading.value = false
 }
 
-const upsertDevVersion = async (device: string, v: Database['public']['Tables']['app_versions']['Row']) => {
+async function upsertDevVersion(device: string, v: Database['public']['Tables']['app_versions']['Row']) {
   return supabase
     .from('devices_override')
     .upsert({
@@ -208,7 +208,7 @@ const upsertDevVersion = async (device: string, v: Database['public']['Tables'][
       created_by: main.user?.id,
     })
 }
-const didCancel = async (name: string) => {
+async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
@@ -227,7 +227,7 @@ const didCancel = async (name: string) => {
   return displayStore.onDialogDismiss()
 }
 
-const saveCustomId = async () => {
+async function saveCustomId() {
   console.log('saveCustomId', device.value?.custom_id)
   if (!device.value?.device_id)
     return
@@ -240,7 +240,7 @@ const saveCustomId = async () => {
   toast.error(t('custom-id-saved'))
 }
 
-const delDevVersion = async (device: string) => {
+async function delDevVersion(device: string) {
   if (await didCancel(t('device')))
     return
   return supabase
@@ -249,7 +249,7 @@ const delDevVersion = async (device: string) => {
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
-const updateOverride = async () => {
+async function updateOverride() {
   const buttons = []
   if (deviceOverride.value) {
     buttons.push({
@@ -294,7 +294,7 @@ const updateOverride = async () => {
   }
   displayStore.showActionSheet = true
 }
-const upsertDevChannel = async (device: string, channel: Database['public']['Tables']['channels']['Row']) => {
+async function upsertDevChannel(device: string, channel: Database['public']['Tables']['channels']['Row']) {
   if (!main?.user?.id)
     return
   return supabase
@@ -306,7 +306,7 @@ const upsertDevChannel = async (device: string, channel: Database['public']['Tab
       created_by: main.user.id,
     })
 }
-const delDevChannel = async (device: string) => {
+async function delDevChannel(device: string) {
   if (await didCancel(t('channel')))
     return
   return supabase
@@ -316,7 +316,7 @@ const delDevChannel = async (device: string) => {
     .eq('app_id', packageId.value)
 }
 
-const updateChannel = async () => {
+async function updateChannel() {
   const buttons = []
   if (channelDevice.value) {
     buttons.push({

@@ -27,7 +27,7 @@ const isLoading = ref(true)
 const devicesNb = ref(0)
 const { t } = useI18n()
 
-const didCancel = async (name: string) => {
+async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
@@ -46,7 +46,7 @@ const didCancel = async (name: string) => {
   return displayStore.onDialogDismiss()
 }
 
-const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
+async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
   // console.log('deleteApp', app)
   if (await didCancel(t('app')))
     return
@@ -93,7 +93,7 @@ const deleteApp = async (app: Database['public']['Tables']['apps']['Row']) => {
   }
 }
 
-const loadData = async () => {
+async function loadData() {
   if (!props.channel) {
     try {
       const date_id = new Date().toISOString().slice(0, 7)
@@ -113,7 +113,7 @@ const loadData = async () => {
   }
 }
 
-const refreshData = async () => {
+async function refreshData() {
   isLoading.value = true
   try {
     devicesNb.value = 0
@@ -125,7 +125,7 @@ const refreshData = async () => {
   isLoading.value = false
 }
 
-const openPackage = (appId: string) => {
+function openPackage(appId: string) {
   router.push(`/app/package/${appIdToUrl(appId)}`)
 }
 

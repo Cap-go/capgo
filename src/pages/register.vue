@@ -12,7 +12,7 @@ const { t } = useI18n()
 
 const isLoading = ref(false)
 
-const submit = async (form: { first_name: string; last_name: string; password: string; email: string }) => {
+async function submit(form: { first_name: string; last_name: string; password: string; email: string }) {
   if (isLoading.value)
     return
   isLoading.value = true

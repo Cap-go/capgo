@@ -8,7 +8,7 @@ const route = useRoute()
 const isLoading = ref(false)
 const oldId = ref(isSpoofed())
 
-const setLogAs = (id: string) => {
+function setLogAs(id: string) {
   console.log('setLogAs', id)
   saveSpoof(id)
   if (!spoofUser()) {
@@ -21,7 +21,7 @@ const setLogAs = (id: string) => {
     window.location.reload()
   }, 1000)
 }
-const submit = async (form: { uuid: string }) => {
+async function submit(form: { uuid: string }) {
   if (isLoading.value)
     return
   isLoading.value = true
@@ -39,7 +39,7 @@ if (route.path.includes('/admin')) {
     }, 1000)
   }
 }
-const reset = () => {
+function reset() {
   if (isLoading.value)
     return
   isLoading.value = true

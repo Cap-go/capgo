@@ -34,7 +34,7 @@ const filters = ref()
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-const didCancel = async (name: string) => {
+async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
@@ -53,7 +53,7 @@ const didCancel = async (name: string) => {
   return displayStore.onDialogDismiss()
 }
 
-const getData = async () => {
+async function getData() {
   isLoading.value = true
   try {
     const req = supabase
@@ -93,7 +93,7 @@ const getData = async () => {
   }
   isLoading.value = false
 }
-const refreshData = async () => {
+async function refreshData() {
   console.log('refreshData')
   try {
     currentPage.value = 1
@@ -104,7 +104,7 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const deleteOne = async (one: typeof element) => {
+async function deleteOne(one: typeof element) {
   // console.log('deleteBundle', bundle)
   if (await didCancel(t('channel')))
     return
@@ -158,7 +158,7 @@ columns.value = [
   },
 ]
 
-const reload = async () => {
+async function reload() {
   console.log('reload')
   try {
     elements.value.length = 0
@@ -169,7 +169,7 @@ const reload = async () => {
   }
 }
 
-const openOne = async (one: typeof element) => {
+async function openOne(one: typeof element) {
   router.push(`/app/p/${one.id}`)
 }
 onMounted(async () => {

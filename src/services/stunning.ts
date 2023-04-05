@@ -1,4 +1,4 @@
-export const initStunning = (stripeID: string | null) => {
+export function initStunning(stripeID: string | null) {
   if (document.getElementById('stunning-bar') || !stripeID)
     return
   const d = document

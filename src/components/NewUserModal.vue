@@ -29,14 +29,14 @@ const userId = ref('0')
 const isLoading = ref(false)
 const { t } = useI18n()
 
-const addUser = async ({ value }: FormKitNode) => {
+async function addUser({ value }: FormKitNode) {
   // console.log('newUser', newUser.value)
   // exist_user
   userId.value = await existUser(value as string)
   return true
 }
 
-const inviteUser = async (userId: string) => {
+async function inviteUser(userId: string) {
   if (!props.channelId || !props.appId)
     return
   const { error } = await supabase
@@ -50,12 +50,12 @@ const inviteUser = async (userId: string) => {
   if (error)
     setErrors('create-user', [error.message], {})
 }
-const close = () => {
+function close() {
   emit('close')
   clearErrors('create-user')
 }
 
-const submit = async (form: { first_name: string; last_name: string; email: string }) => {
+async function submit(form: { first_name: string; last_name: string; email: string }) {
   isLoading.value = true
   try {
     if (!main.canUseMore) {

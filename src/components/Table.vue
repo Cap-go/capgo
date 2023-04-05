@@ -63,7 +63,7 @@ const filterActivated = computed(() => {
   }, 0)
 })
 
-const sortClick = (key: number) => {
+function sortClick(key: number) {
   if (!props.columns[key].sortable)
     return
   let sortable = props.columns[key].sortable
@@ -92,7 +92,7 @@ watch(search, debounce(() => {
   emit('reload')
 }, 500))
 
-const displayValueKey = (elem: any, col: TableColumn | undefined) => {
+function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
     return ''
   return col.displayFunction ? col.displayFunction(elem) : elem[col.key]
@@ -103,11 +103,11 @@ const displayElemRange = computed(() => {
   return `${begin}-${end}`
 })
 
-const findMobileCol = (name: MobileColType) => {
+function findMobileCol(name: MobileColType) {
   return props.columns ? props.columns.find(col => col.mobile === name) : undefined
 }
 
-const prev = async () => {
+async function prev() {
   console.log('prev')
   if (props.currentPage > 1) {
     emit('prev')
@@ -115,7 +115,7 @@ const prev = async () => {
     emit('reload')
   }
 }
-const next = async () => {
+async function next() {
   console.log('next')
   if (props.currentPage < Math.ceil(props.total / offset.value)) {
     emit('next')
@@ -123,7 +123,7 @@ const next = async () => {
     emit('reload')
   }
 }
-const fastForward = async () => {
+async function fastForward() {
   console.log('fastForward')
   if (props.currentPage < Math.ceil(props.total / offset.value)) {
     emit('fastForward')
@@ -131,7 +131,7 @@ const fastForward = async () => {
     emit('reload')
   }
 }
-const fastBackward = async () => {
+async function fastBackward() {
   console.log('fastBackward')
   if (props.currentPage > 1) {
     emit('fastBackward')

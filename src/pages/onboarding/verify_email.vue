@@ -15,7 +15,7 @@ const isLoading = ref(true)
 
 const user = ref<User | null>(null)
 
-const updateDb = async () => {
+async function updateDb() {
   // console.log('update db')
   const resSession = await supabase.auth.getSession()!
   let session = resSession.data.session

@@ -51,7 +51,7 @@ const simpleStep: Step[] = [
   },
 ]
 const steps = ref(simpleStep)
-const setLog = () => {
+function setLog() {
   if (props.onboarding && main.user?.id) {
     snag.publish({
       channel: 'onboarding-v2',
@@ -68,11 +68,11 @@ const setLog = () => {
     // TODO add emailing on onboarding done to send blog article versioning
   }
 }
-const openExt = (url?: string) => {
+function openExt(url?: string) {
   if (url)
     window.open(url, '_blank')
 }
-const scrollToElement = (id: string) => {
+function scrollToElement(id: string) {
   // Get the element with the id
   const el = document.getElementById(id)
   console.log('el', el)
@@ -82,7 +82,7 @@ const scrollToElement = (id: string) => {
   }
 }
 
-const copyToast = async (allowed: boolean, id: string, text?: string) => {
+async function copyToast(allowed: boolean, id: string, text?: string) {
   if (!allowed || !text)
     return
   copy(text)
@@ -98,7 +98,7 @@ const copyToast = async (allowed: boolean, id: string, text?: string) => {
     scrollToElement(id)
   }
 }
-const getKey = async (retry = true): Promise<void> => {
+async function getKey(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')

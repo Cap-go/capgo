@@ -12,7 +12,7 @@ const props = defineProps({
 const router = useRouter()
 const { t } = useI18n()
 
-const back = () => {
+function back() {
   if (window.history.length > 2)
     router.back()
   else

@@ -37,7 +37,7 @@ if (main.user?.id)
 const dropdownOpen = ref(false)
 
 // close if the esc key is pressed
-const keyHandler = (keyCode: any) => {
+function keyHandler(keyCode: any) {
   if (!dropdownOpen.value || keyCode !== 27)
     return
   dropdownOpen.value = false

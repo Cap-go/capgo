@@ -11,7 +11,8 @@ import { useLogSnag } from '~/services/logsnag'
 import { openChat, sendMessage } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
-const openSupport = () => {
+
+function openSupport() {
   sendMessage('I need a custom plan')
   openChat()
 }
@@ -37,13 +38,15 @@ const route = useRoute()
 const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 
-const planFeatures = (plan: Database['public']['Tables']['plans']['Row']) => [
+function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
+  return [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
   `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
-].filter(Boolean)
+  ].filter(Boolean)
+}
 
-const convertKey = (key: string) => {
+function convertKey(key: string) {
   const keySplit = key.split('.')
   if (keySplit.length === 3)
     return `plan-${keySplit[1]}`
@@ -52,21 +55,21 @@ const convertKey = (key: string) => {
 const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
 const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
 
-const openChangePlan = (planId: string) => {
+function openChangePlan(planId: string) {
   // get the current url
   if (planId)
     openCheckout(planId, window.location.href, window.location.href, isYearly.value)
 }
 
-const getPrice = (plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number => {
+function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
   return plan[t === 'm' ? 'price_m' : 'price_y']
 }
 
-const getSale = (plan: Database['public']['Tables']['plans']['Row']): string => {
+function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 }
 
-const getUsages = async () => {
+async function getUsages() {
   // get aapp_stats
   if (!main.user?.id)
     return
@@ -75,7 +78,7 @@ const getUsages = async () => {
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
-const loadData = async () => {
+async function loadData() {
   isLoading.value = true
   await getPlans().then((pls) => {
     plans.value.length = 0

@@ -10,7 +10,7 @@ import { useDisplayStore } from '~/stores/display'
 * options: optional
 */
 const displayStore = useDisplayStore()
-const close = (item?: ActionSheetOptionButton) => {
+function close(item?: ActionSheetOptionButton) {
   displayStore.showDialog = false
   if (item) {
     if (item.role === 'cancel')
@@ -21,7 +21,7 @@ const close = (item?: ActionSheetOptionButton) => {
 
 const modalElement = ref(null)
 
-const displayText = (text?: string) => {
+function displayText(text?: string) {
   if (!text)
     return ''
   return text.replace(/\n/g, '<br/>')

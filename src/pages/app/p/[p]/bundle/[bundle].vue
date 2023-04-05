@@ -31,7 +31,7 @@ const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 
-const copyToast = async (text: string) => {
+async function copyToast(text: string) {
   copy(text)
   toast.success(t('copied-to-clipboard'))
 }
@@ -49,7 +49,7 @@ const tabs: Tab[] = [
   },
 ]
 
-const getChannels = async () => {
+async function getChannels() {
   if (!version.value)
     return
   channel.value = undefined
@@ -67,7 +67,7 @@ const getChannels = async () => {
   })
 }
 
-const openChannelLink = async () => {
+async function openChannelLink() {
   if (!version.value || !channel.value)
     return
   router.push(`/app/p/${appIdToUrl(version.value.app_id)}/channel/${channel.value?.id}`)
@@ -82,7 +82,7 @@ const showSize = computed(() => {
     return t('app-not-found')
 })
 
-const getUnknowBundleId = async () => {
+async function getUnknowBundleId() {
   if (!version.value)
     return
   const { data } = await supabase
@@ -94,7 +94,7 @@ const getUnknowBundleId = async () => {
   return data?.id
 }
 
-const setChannel = async (channel: Database['public']['Tables']['channels']['Row'], id: number) => {
+async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
   return supabase
     .from('channels')
     .update({
@@ -103,7 +103,7 @@ const setChannel = async (channel: Database['public']['Tables']['channels']['Row
     .eq('id', channel.id)
 }
 
-const ASChannelChooser = async () => {
+async function ASChannelChooser() {
   if (!version.value)
     return
   const buttons = []
@@ -139,7 +139,7 @@ const ASChannelChooser = async () => {
   }
   displayStore.showActionSheet = true
 }
-const openChannel = async () => {
+async function openChannel() {
   if (!version.value || !main.auth)
     return
   if (!channel.value)
@@ -193,7 +193,7 @@ const openChannel = async () => {
   }
   displayStore.showActionSheet = true
 }
-const openDownload = async () => {
+async function openDownload() {
   if (!version.value || !main.auth)
     return
   displayStore.actionSheetOption = {
@@ -242,7 +242,7 @@ const openDownload = async () => {
   displayStore.showActionSheet = true
 }
 
-const getVersion = async () => {
+async function getVersion() {
   if (!id.value)
     return
   try {
@@ -286,7 +286,7 @@ watchEffect(async () => {
   }
 })
 
-const hideString = (str: string) => {
+function hideString(str: string) {
   const first = str.slice(0, 5)
   const last = str.slice(-5)
   return `${first}...${last}`

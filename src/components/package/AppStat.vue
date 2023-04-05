@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const router = useRouter()
 
-const open = () => {
+function open() {
   router.push(props.link)
 }
 </script>

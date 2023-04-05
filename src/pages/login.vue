@@ -16,14 +16,14 @@ const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
 
-const nextLogin = async () => {
+async function nextLogin() {
   router.push('/app/home')
   setTimeout(async () => {
     isLoading.value = false
   }, 500)
 }
 
-const submit = async (form: { email: string; password: string }) => {
+async function submit(form: { email: string; password: string }) {
   isLoading.value = true
   const { error } = await supabase.auth.signInWithPassword({
     email: form.email,
@@ -40,7 +40,7 @@ const submit = async (form: { email: string; password: string }) => {
   }
 }
 
-const checkLogin = async () => {
+async function checkLogin() {
   isLoading.value = true
   const resUser = await supabase.auth.getUser()
   const user = resUser?.data.user

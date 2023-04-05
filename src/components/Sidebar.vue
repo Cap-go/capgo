@@ -33,10 +33,10 @@ watch(sidebarExpanded, () => {
   else
     document.querySelector('body')!.classList.remove('sidebar-expanded')
 })
-const isTabActive = (tab: string) => {
+function isTabActive(tab: string) {
   return route.path.includes(tab)
 }
-const openTab = (tab: Tab) => {
+function openTab(tab: Tab) {
   if (tab.onClick)
     tab.onClick(tab.key)
   else

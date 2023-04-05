@@ -17,7 +17,7 @@ const step = ref(1)
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
 
-const submit = async (form: { email: string; password: string }) => {
+async function submit(form: { email: string; password: string }) {
   isLoading.value = true
   if (step.value === 1) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`

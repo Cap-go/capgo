@@ -7,7 +7,7 @@ import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
 import { initStunning } from '~/services/stunning'
 
-const guard = async (next: any, to: string, from: string) => {
+async function guard(next: any, to: string, from: string) {
   const supabase = useSupabase()
   const { data: auth } = await supabase.auth.getUser()
 

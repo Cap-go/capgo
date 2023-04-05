@@ -19,7 +19,7 @@ export interface Route extends RouteRecordNormalized {
   }
 }
 
-export const initBlog = (): Route[] => {
+export function initBlog(): Route[] {
   const router = useRouter()
   const blogs = router.getRoutes().reduce((acc, route) => {
     const frontmatter = route.meta.frontmatter as Frontmatter
@@ -33,7 +33,7 @@ export const initBlog = (): Route[] => {
   return blogs
 }
 
-export const randomBlog = (path: string, nextBlog = 'undefined'): Route => {
+export function randomBlog(path: string, nextBlog = 'undefined'): Route {
   const blogs = initBlog()
 
   const filtered = blogs.filter(blog => blog.path !== path)
@@ -44,6 +44,6 @@ export const randomBlog = (path: string, nextBlog = 'undefined'): Route => {
   return blog
 }
 
-export const stringToDate = (date: string) => {
+export function stringToDate(date: string) {
   return dayjs(date).format('MMMM DD, YYYY')
 }

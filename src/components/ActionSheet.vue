@@ -9,7 +9,7 @@ import type { ActionSheetOptionButton } from '~/stores/display'
 import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
-const close = (item: ActionSheetOptionButton | undefined) => {
+function close(item: ActionSheetOptionButton | undefined) {
   if (item?.selected)
     return
   displayStore.showActionSheet = false

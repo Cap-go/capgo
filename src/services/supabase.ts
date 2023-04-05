@@ -8,7 +8,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supbaseId = supabaseUrl.split('//')[1].split('.')[0]
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-export const useSupabase = () => {
+export function useSupabase() {
   const options: SupabaseClientOptions<'public'> = {
     auth: {
       autoRefreshToken: true,
@@ -38,10 +38,14 @@ export const useSupabase = () => {
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 
-export const isSpoofed = () => !!localStorage.getItem('supabase.spoof_id')
-export const saveSpoof = (id: string) => localStorage.setItem('supabase.spoof_id', id)
+export function isSpoofed() {
+  return !!localStorage.getItem('supabase.spoof_id')
+}
+export function saveSpoof(id: string) {
+  return localStorage.setItem('supabase.spoof_id', id)
+}
 
-export const spoofUser = () => {
+export function spoofUser() {
   const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
   if (!textData)
     return false
@@ -51,9 +55,13 @@ export const spoofUser = () => {
   localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
   return data.user.id
 }
-export const deleteSupabaseToken = () => localStorage.removeItem(`sb-${supbaseId}-auth-token`)
-export const getSupabaseToken = () => localStorage.getItem(`sb-${supbaseId}-auth-token`)
-export const unspoofUser = () => {
+export function deleteSupabaseToken() {
+  return localStorage.removeItem(`sb-${supbaseId}-auth-token`)
+}
+export function getSupabaseToken() {
+  return localStorage.getItem(`sb-${supbaseId}-auth-token`)
+}
+export function unspoofUser() {
   const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
   if (!textData || !isSpoofed())
     return false
@@ -69,7 +77,7 @@ export const unspoofUser = () => {
   return true
 }
 
-export const downloadUrl = async (provider: string, appId: string, bucketId: string): Promise<string> => {
+export async function downloadUrl(provider: string, appId: string, bucketId: string): Promise<string> {
   const data = {
     app_id: appId,
     storage_provider: provider,
@@ -79,7 +87,7 @@ export const downloadUrl = async (provider: string, appId: string, bucketId: str
   return res.data.url
 }
 
-export const existUser = async (email: string): Promise<string> => {
+export async function existUser(email: string): Promise<string> {
   const { data, error } = await useSupabase()
     .rpc('exist_user', { e_mail: email })
     .single()
@@ -89,7 +97,7 @@ export const existUser = async (email: string): Promise<string> => {
   return data
 }
 
-export const autoAuth = async (route: RouteLocationNormalizedLoaded) => {
+export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   const supabase = useSupabase()
   const { data: session } = await supabase.auth.getSession()!
   if (session.session || !route.hash)
@@ -105,7 +113,7 @@ export const autoAuth = async (route: RouteLocationNormalizedLoaded) => {
   return logSession
 }
 
-export const isGoodPlan = async (userId: string): Promise<boolean> => {
+export async function isGoodPlan(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_good_plan_v3', { userid: userId })
     .single()
@@ -114,7 +122,7 @@ export const isGoodPlan = async (userId: string): Promise<boolean> => {
 
   return data || false
 }
-export const isTrial = async (userId: string): Promise<number> => {
+export async function isTrial(userId: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial', { userid: userId })
     .single()
@@ -123,7 +131,7 @@ export const isTrial = async (userId: string): Promise<number> => {
 
   return data || 0
 }
-export const isAdmin = async (userId: string): Promise<boolean> => {
+export async function isAdmin(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_admin', { userid: userId })
     .single()
@@ -132,7 +140,7 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
 
   return data || false
 }
-export const isCanceled = async (userId: string): Promise<boolean> => {
+export async function isCanceled(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_canceled', { userid: userId })
     .single()
@@ -142,7 +150,7 @@ export const isCanceled = async (userId: string): Promise<boolean> => {
   return data || false
 }
 
-export const isPaying = async (userId: string): Promise<boolean> => {
+export async function isPaying(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_paying', { userid: userId })
     .single()
@@ -152,7 +160,7 @@ export const isPaying = async (userId: string): Promise<boolean> => {
   return data || false
 }
 
-export const getPlans = async (): Promise<Database['public']['Tables']['plans']['Row'][]> => {
+export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
   const { data: plans } = await useSupabase()
     .from('plans')
     .select()
@@ -161,7 +169,7 @@ export const getPlans = async (): Promise<Database['public']['Tables']['plans'][
   return plans || []
 }
 
-export const isAllowedAction = async (userId: string): Promise<boolean> => {
+export async function isAllowedAction(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_allowed_action_user', { userid: userId })
     .single()
@@ -171,7 +179,7 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
   return data
 }
 
-export const getPlanUsagePercent = async (userId: string, dateid: string): Promise<number> => {
+export async function getPlanUsagePercent(userId: string, dateid: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('get_plan_usage_percent', { userid: userId, dateid })
     .single()
@@ -180,7 +188,7 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
   return data || 0
 }
 
-export const getTotalStats = async (userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> => {
+export async function getTotalStats(userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> {
   const { data, error } = await useSupabase()
     .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
     .single()
@@ -195,7 +203,7 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
   }
 }
 
-export const getCurrentPlanName = async (userId: string): Promise<string> => {
+export async function getCurrentPlanName(userId: string): Promise<string> {
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name', { userid: userId })
     .single()
@@ -205,7 +213,7 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
   return data || 'Free'
 }
 
-export const findBestPlan = async (stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> => {
+export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
   // console.log('findBestPlan', stats)
   // const storage = bytesToGb(stats.storage)
   // const bandwidth = bytesToGb(stats.bandwidth)

@@ -14,12 +14,12 @@ const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
 const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
-const copyKey = async (app: Database['public']['Tables']['apikeys']['Row']) => {
+async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
   copy(app.key)
   console.log('displayStore.messageToast', displayStore.messageToast)
   toast.success(t('key-copied'))
 }
-const geKeys = async (retry = true): Promise<void> => {
+async function geKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')

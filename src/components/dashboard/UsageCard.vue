@@ -19,7 +19,9 @@ const props = defineProps({
   },
 })
 const { t } = useI18n()
-const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
+function sum(arr: number[]) {
+  return arr.reduce((a, b) => a + b, 0)
+}
 const total = computed(() => {
   // remove undefined values
   const arr = props.datas as number[]
@@ -39,13 +41,13 @@ const lastDayEvolution = computed(() => {
 </script>
 
 <template>
-  <div class="col-span-full flex flex-col border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+  <div class="flex flex-col h-[460px] bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
     <div class="px-5 pt-3">
       <div class="flex flex-row">
         <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="badge badge-primary font-medium">
+        <div class="font-medium badge badge-primary">
           beta
         </div>
       </div>
@@ -65,6 +67,8 @@ const lastDayEvolution = computed(() => {
     <!-- Chart built with Chart.js 3 -->
 
     <!-- Change the height attribute to adjust the chart height -->
-    <LineChartStats class="mx-auto aspect-square w-full px-3" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
+    <div class="w-full h-full p-6">
+      <LineChartStats :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
+    </div>
   </div>
 </template>

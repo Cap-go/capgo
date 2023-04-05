@@ -1,7 +1,7 @@
 import { LogSnag } from 'logsnag'
 import { isSpoofed } from './supabase'
 
-export const useLogSnag = (): LogSnag => {
+export function useLogSnag(): LogSnag {
   if (isSpoofed()) {
     return {
       getProject: () => '',

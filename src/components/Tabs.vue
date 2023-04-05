@@ -7,10 +7,12 @@ const props = defineProps<{
   noWrap?: boolean
 }>()
 const emit = defineEmits(['update:activeTab'])
-const activeTabColor = (tab: string) => ({
-  'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300': props.activeTab !== tab,
-  'text-blue-600 border-blue-600 border-b-2 rounded-t-lg active dark:text-blue-500 dark:border-blue-500': props.activeTab === tab,
-})
+function activeTabColor(tab: string) {
+  return {
+    'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300': props.activeTab !== tab,
+    'text-blue-600 border-blue-600 border-b-2 rounded-t-lg active dark:text-blue-500 dark:border-blue-500': props.activeTab === tab,
+  }
+}
 </script>
 
 <template>

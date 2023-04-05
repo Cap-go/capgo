@@ -15,7 +15,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
-const signInUser = async () => {
+async function signInUser() {
   if (!route.hash) {
     router.push('/login')
     return
@@ -32,7 +32,7 @@ const signInUser = async () => {
   })
 }
 
-const submit = async (form: { password: string }) => {
+async function submit(form: { password: string }) {
   isLoading.value = true
 
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })

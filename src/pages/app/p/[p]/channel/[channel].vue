@@ -57,14 +57,14 @@ const tabs: Tab[] = [
     key: 'settings',
   },
 ]
-const openBundle = () => {
+function openBundle() {
   if (!channel.value)
     return
   console.log('openBundle', channel.value.version.id)
   router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
 }
 
-const getDeviceIds = async () => {
+async function getDeviceIds() {
   if (!channel.value)
     return
   try {
@@ -83,7 +83,7 @@ const getDeviceIds = async () => {
   }
 }
 
-const getChannel = async () => {
+async function getChannel() {
   if (!id.value)
     return
   try {
@@ -123,12 +123,12 @@ const getChannel = async () => {
   }
 }
 
-const reload = async () => {
+async function reload() {
   await getChannel()
   await getDeviceIds()
 }
 
-const saveChannelChange = async (key: string, val: any) => {
+async function saveChannelChange(key: string, val: any) {
   console.log('saveChannelChange', key, val)
   if (!id.value || !channel.value)
     return
@@ -163,7 +163,7 @@ watchEffect(async () => {
   }
 })
 
-const makeDefault = async (val = true) => {
+async function makeDefault(val = true) {
   displayStore.actionSheetOption = {
     header: t('are-u-sure'),
     message: val ? t('confirm-public-desc') : t('making-this-channel-'),
@@ -196,7 +196,7 @@ const makeDefault = async (val = true) => {
   displayStore.showActionSheet = true
 }
 
-const getUnknownVersion = async (): Promise<number> => {
+async function getUnknownVersion(): Promise<number> {
   if (!channel.value)
     return 0
   try {
@@ -218,7 +218,7 @@ const getUnknownVersion = async (): Promise<number> => {
   return 0
 }
 
-const openPannel = async () => {
+async function openPannel() {
   if (!channel.value || !main.auth)
     return
   displayStore.actionSheetOption = {

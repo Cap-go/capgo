@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
 import { ref, watch } from 'vue'
+
 const props = defineProps<{
   label: string
   value: string

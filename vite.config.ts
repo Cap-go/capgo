@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import path from 'node:path'
-import veauryVitePlugins from 'veaury/vite/index'
+import Vue from '@vitejs/plugin-vue'
+// import veauryVitePlugins from 'veaury/vite/index'
 import { defineConfig } from 'vite'
 import Pages from 'vite-plugin-pages'
 import Layouts from 'vite-plugin-vue-layouts'
@@ -40,20 +41,20 @@ export default defineConfig({
     },
   },
   plugins: [
-    // Vue({
-    //   include: [/\.vue$/, /\.md$/],
-    // }),
-    veauryVitePlugins({
-      type: 'vue',
-      // Configuration of @vitejs/plugin-vue
-      vueOptions: {
-        include: [/\.vue$/, /\.md$/],
-      },
-      // Configuration of @vitejs/plugin-react
-      // reactOptions: {...},
-      // Configuration of @vitejs/plugin-vue-jsx
-      // vueJsxOptions: {...}
+    Vue({
+      include: [/\.vue$/, /\.md$/],
     }),
+    // veauryVitePlugins({
+    //   type: 'vue',
+    //   // Configuration of @vitejs/plugin-vue
+    //   vueOptions: {
+    //     include: [/\.vue$/, /\.md$/],
+    //   },
+    //   // Configuration of @vitejs/plugin-react
+    //   // reactOptions: {...},
+    //   // Configuration of @vitejs/plugin-vue-jsx
+    //   // vueJsxOptions: {...}
+    // }),
     Components({
       resolvers: [
         IconsResolver(),

@@ -6,7 +6,7 @@ import {
 import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
-const closeAToast = (i: number) => {
+function closeAToast(i: number) {
   // delete messageToast as index i
   displayStore.messageToast.splice(i, 1)
 }

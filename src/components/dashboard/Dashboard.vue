@@ -28,7 +28,7 @@ const isLoading = ref(false)
 const route = useRoute()
 const stepsOpen = ref(false)
 
-const onboardingDone = () => {
+function onboardingDone() {
   stepsOpen.value = !stepsOpen.value
 }
 watchEffect(async () => {

@@ -4,7 +4,7 @@ import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
 
-const presentActionSheetOpen = async (url: string) => {
+async function presentActionSheetOpen(url: string) {
   displayStore.actionSheetOption = {
     buttons: [
       {
@@ -17,14 +17,14 @@ const presentActionSheetOpen = async (url: string) => {
   }
   displayStore.showActionSheet = true
 }
-const openBlank = (link: string) => {
+function openBlank(link: string) {
   console.log('openBlank', link)
   if (Capacitor.getPlatform() === 'ios')
     presentActionSheetOpen(link)
   else
     window.open(link, '_blank')
 }
-export const openPortal = async () => {
+export async function openPortal() {
 //   console.log('openPortal')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
@@ -53,11 +53,11 @@ export const openPortal = async () => {
   }
   return null
 }
-const getClientReferenceId = () => {
+function getClientReferenceId() {
   return window.Rewardful && (window.Rewardful.referral ? window.Rewardful.referral : (`checkout_${(new Date()).getTime()}`))
 }
 
-export const openCheckout = async (priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) => {
+export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) {
 //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()

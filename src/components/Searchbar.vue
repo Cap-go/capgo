@@ -13,7 +13,7 @@ const searchInput = ref('')
 watch(searchInput, debounce(() => {
   emit('searchInput', searchInput.value)
 }, 500))
-const click = () => {
+function click() {
   emit('filterButtonClick', null)
 }
 </script>

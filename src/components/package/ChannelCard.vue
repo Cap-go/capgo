@@ -25,7 +25,7 @@ const isLoading = ref(true)
 const devicesNb = ref(0)
 const { t } = useI18n()
 
-const didCancel = async (name: string) => {
+async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
@@ -44,7 +44,7 @@ const didCancel = async (name: string) => {
   return displayStore.onDialogDismiss()
 }
 
-const loadData = async () => {
+async function loadData() {
   if (!props.channel) {
     try {
       const date_id = new Date().toISOString().slice(0, 7)
@@ -64,7 +64,7 @@ const loadData = async () => {
   }
 }
 
-const refreshData = async () => {
+async function refreshData() {
   isLoading.value = true
   try {
     devicesNb.value = 0
@@ -76,7 +76,7 @@ const refreshData = async () => {
   isLoading.value = false
 }
 
-const deleteChannel = async (channel: Database['public']['Tables']['channels']['Row']) => {
+async function deleteChannel(channel: Database['public']['Tables']['channels']['Row']) {
   if (await didCancel(t('channel')))
     return
   try {
@@ -98,7 +98,7 @@ const deleteChannel = async (channel: Database['public']['Tables']['channels']['
   }
 }
 
-const openChannel = (channel: Database['public']['Tables']['channels']['Row']) => {
+function openChannel(channel: Database['public']['Tables']['channels']['Row']) {
   router.push(`/app/p/${appIdToUrl(channel.app_id)}/channel/${channel.id}`)
 }
 

@@ -25,7 +25,7 @@ const isLoading = ref(true)
 const devicesNb = ref(0)
 const { t } = useI18n()
 
-const didCancel = async (name: string) => {
+async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
@@ -44,7 +44,7 @@ const didCancel = async (name: string) => {
   return displayStore.onDialogDismiss()
 }
 
-const loadData = async () => {
+async function loadData() {
   if (!props.version) {
     try {
       const date_id = new Date().toISOString().slice(0, 7)
@@ -64,7 +64,7 @@ const loadData = async () => {
   }
 }
 
-const refreshData = async () => {
+async function refreshData() {
   isLoading.value = true
   try {
     devicesNb.value = 0
@@ -76,7 +76,7 @@ const refreshData = async () => {
   isLoading.value = false
 }
 
-const showSize = () => {
+function showSize() {
   if (props.version.size)
     return bytesToMbText(props.version.size)
   else if (props.version.external_url)
@@ -85,7 +85,7 @@ const showSize = () => {
     return t('package.size-not-found')
 }
 
-const deleteVersion = async (version: Database['public']['Tables']['app_versions']['Row']) => {
+async function deleteVersion(version: Database['public']['Tables']['app_versions']['Row']) {
   if (await didCancel(t('version')))
     return
   try {
@@ -129,7 +129,7 @@ const deleteVersion = async (version: Database['public']['Tables']['app_versions
   }
 }
 
-const openVersion = (version: Database['public']['Tables']['app_versions']['Row']) => {
+function openVersion(version: Database['public']['Tables']['app_versions']['Row']) {
   console.log('openVersion', version)
   router.push(`/app/p/${appIdToUrl(props.version.app_id)}/bundle/${version.id}`)
 }

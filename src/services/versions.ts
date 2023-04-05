@@ -9,7 +9,7 @@ import { i18n } from '~/modules/i18n'
 
 const displayStore = useDisplayStore()
 
-export const openVersion = async (app: Database['public']['Tables']['app_versions']['Row']) => {
+export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {
   const { t } = i18n.global
 
   displayStore.messageLoader = 'Opening version...'

@@ -23,7 +23,7 @@ interface ChannelUserApp {
     version: Database['public']['Tables']['app_versions']['Row']
   }
 }
-const getMyApps = async () => {
+async function getMyApps() {
   const { data } = await supabase
     .from('apps')
     .select()
@@ -34,11 +34,11 @@ const getMyApps = async () => {
     apps.value = []
 }
 
-const onboardingDone = async () => {
+async function onboardingDone() {
   await getMyApps()
 }
 
-const getSharedWithMe = async () => {
+async function getSharedWithMe() {
   const { data } = await supabase
     .from('channel_users')
     .select(`

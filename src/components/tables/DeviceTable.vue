@@ -64,7 +64,7 @@ const columns = ref<TableColumn[]>([
   },
 ])
 
-const getDevicesID = async () => {
+async function getDevicesID() {
   const req = supabase
     .from('channel_devices')
     .select('device_id')
@@ -90,7 +90,7 @@ const getDevicesID = async () => {
   return [...channelDev, ...overrideDev]
 }
 
-const getData = async () => {
+async function getData() {
   isLoading.value = true
   try {
     const req = supabase
@@ -130,7 +130,7 @@ const getData = async () => {
   isLoading.value = false
 }
 
-const reload = async () => {
+async function reload() {
   console.log('reload')
   try {
     elements.value.length = 0
@@ -141,7 +141,7 @@ const reload = async () => {
   }
 }
 
-const refreshData = async () => {
+async function refreshData() {
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -151,7 +151,7 @@ const refreshData = async () => {
     console.error(error)
   }
 }
-const openOne = async (one: typeof element) => {
+async function openOne(one: typeof element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
 onMounted(async () => {

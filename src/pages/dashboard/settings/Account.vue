@@ -27,7 +27,7 @@ const main = useMainStore()
 const isLoading = ref(false)
 // const errorMessage = ref('')
 
-const updloadPhoto = async (data: string, fileName: string, contentType: string) => {
+async function updloadPhoto(data: string, fileName: string, contentType: string) {
   const { error } = await supabase.storage
     .from('images')
     .upload(`${main.user?.id}/${fileName}`, decode(data), {
@@ -54,7 +54,7 @@ const updloadPhoto = async (data: string, fileName: string, contentType: string)
   main.user = usr
 }
 
-const takePhoto = async () => {
+async function takePhoto() {
   const cameraPhoto = await Camera.getPhoto({
     resultType: CameraResultType.DataUrl,
     source: CameraSource.Camera,
@@ -80,14 +80,14 @@ const takePhoto = async () => {
     isLoading.value = false
   }
 }
-const blobToData = (blob: Blob) => {
+function blobToData(blob: Blob) {
   return new Promise<string>((resolve) => {
     const reader = new FileReader()
     reader.onloadend = () => resolve(reader.result as string)
     reader.readAsDataURL(blob)
   })
 }
-const pickPhoto = async () => {
+async function pickPhoto() {
   const { photos } = await Camera.pickImages({
     limit: 1,
     quality: 100,
@@ -121,7 +121,7 @@ const pickPhoto = async () => {
   }
 }
 
-const deleteAccount = async () => {
+async function deleteAccount() {
   displayStore.showActionSheet = true
   displayStore.actionSheetOption = {
     header: t('are-u-sure'),
@@ -168,7 +168,7 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 
-const presentActionSheet = async () => {
+async function presentActionSheet() {
   displayStore.showActionSheet = true
   displayStore.actionSheetOption = {
     header: '',
@@ -197,7 +197,7 @@ const presentActionSheet = async () => {
     ],
   }
 }
-const getEmoji = (country: string) => {
+function getEmoji(country: string) {
   // convert country code to emoji flag
   let countryCode = country
   switch (country) {
@@ -216,7 +216,7 @@ const getEmoji = (country: string) => {
   return countryCodeToFlagEmoji(countryCode)
 }
 
-const submit = async (form: { first_name: string; last_name: string; email: string; country: string }) => {
+async function submit(form: { first_name: string; last_name: string; email: string; country: string }) {
   if (isLoading.value || !main.user?.id)
     return
   isLoading.value = true
