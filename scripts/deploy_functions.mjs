@@ -12,13 +12,11 @@ const folders = readdirSync('./supabase/functions')
 
 const projectRef = supa_url.split('.')[0].replace('https://', '')
 
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
-
 try {
   console.log('projectRef', projectRef)
   await outputFile('./supabase/.temp/project-ref', projectRef)
   // for in folders
-  const all = []
+  // const all = []
   await exec('supabase --version').then((r) => {
     r.stdout && console.log('Supabase CLI', r.stdout)
   })
@@ -33,23 +31,22 @@ try {
     // }
     if (!existsSync(fileNoDeploy)) {
       console.log(`Upload ${folder}${no_verify_jwt ? ' no_verify_jwt' : ''}`)
-      all.push(exec(command).then((r) => {
-      // await exec(command).then((r) => {
+      // all.push(exec(command).then((r) => {
+      await exec(command).then((r) => {
         if (r.stderr && r.stderr !== 'Version 1.30.3 is already installed\n') {
           console.error(folder, r.stderr)
           exit(1)
         }
         console.log(`Done ${folder} ✅`)
         return r
-      // })
-      }))
+      })
+      // }))
     }
     else {
       console.log(`Ignored ${folder} ⏭`)
     }
-    await wait(100)
   }
-  await Promise.all(all)
+  // await Promise.all(all)
 }
 catch (e) {
   console.error('error', e) // should contain code (exit code) and signal (that caused the termination).
