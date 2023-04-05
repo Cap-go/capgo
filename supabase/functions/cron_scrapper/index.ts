@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import { categories, countries } from '../_utils/gplay_categ.ts'
+import { categories } from '../_utils/gplay_categ.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
@@ -48,22 +48,19 @@ serve(async (event: Request) => {
     console.log('appsToGetInfo', appsToGetInfo?.length || 0)
     console.log('appsToGetSimilar', appsToGetSimilar?.length || 0)
     console.log('appsToGetTop categories', categories?.length || 0)
-    console.log('appsToGetTop countries', countries?.length || 0)
-    console.log('appsToGetTop total', (countries?.length || 0) * (categories?.length || 0))
-    console.log('appsToGetTop total result', (countries?.length || 0) * (categories?.length || 0) * 500)
+    console.log('appsToGetTop total', (categories?.length || 0))
+    console.log('appsToGetTop total result', (categories?.length || 0) * 500)
     // loop 100 times to get more random apps
     // for (let i = 0; i < toGetTop; i++) {
     //   const randomCategory = categories[Math.floor(Math.random() * categories.length)]
     //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
     //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
     // split countries by 10 to batch send to netlify
-    for (let i = 0; i < countries.length; i += pageSize) {
-      const countriesBatch = countries.slice(i, i + pageSize)
-      console.log('countriesBatch', countriesBatch.length)
-      console.log('country * categories', countriesBatch.length * categories.length)
+    for (let i = 0; i < categories.length; i += pageSize) {
+      const categoriesBatch = categories.slice(i, i + pageSize)
+      console.log('countriesBatch', categoriesBatch.length)
       all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
-        categories,
-        countries: countriesBatch,
+        categories: categoriesBatch,
       }))
     }
     // all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
@@ -92,15 +89,10 @@ serve(async (event: Request) => {
         // all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
         //   appIds: appsSimilarBatch.map(app => app.app_id),
         // }))
-        for (let i = 0; i < countries.length; i += pageSize) {
-          const countriesBatch = countries.slice(i, i + pageSize)
-          console.log('countriesBatch', countriesBatch.length)
-          console.log('country * categories', countriesBatch.length * categories.length)
-          all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
-            appIds: appsSimilarBatch.map(app => app.app_id),
-            countries: countriesBatch,
-          }))
-        }
+        console.log('appsSimilarBatch', appsSimilarBatch.length)
+        all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
+          appIds: appsSimilarBatch.map(app => app.app_id),
+        }))
       }
     }
     await Promise.all(all)
