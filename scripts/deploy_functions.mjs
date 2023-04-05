@@ -17,6 +17,9 @@ try {
   await outputFile('./supabase/.temp/project-ref', projectRef)
   // for in folders
   const all = []
+  await exec('supabase --version').then((r) => {
+    r.stdout && console.log('Supabase CLI', r.stdout)
+  })
   for (const folder of folders) {
     // const fileNoJWT = `./supabase/functions/${folder}/.no_verify_jwt`
     const fileNoDeploy = `./supabase/functions/${folder}/.no_deploy`
