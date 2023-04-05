@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
 import gplay from 'https://esm.sh/google-play-scraper?target=deno'
-import { saveStoreInfo, supabaseAdmin } from '../_utils/supabase.ts'
+import { saveStoreInfo } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
@@ -16,20 +16,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     num: limit,
     throttle: 50,
   }).catch(() => []))
-  // remove the first skip
-  const ids = res.map((item: any) => item.appId)
-  // console.log('ids', ids.length, ids)
-  const { data, error } = await supabaseAdmin()
-    .from('store_apps')
-    .select('app_id')
-    .in('app_id', ids)
-  if (error) {
-    console.log('error', error)
-    return []
-  }
-  // use data to filter res
-  const filtered = res.filter((item: any) => !data?.find((row: { app_id: string }) => row.app_id === item.appId))
-  const upgraded = filtered.map((item: any) => {
+  const upgraded = res.map((item: any) => {
     const row: Database['public']['Tables']['store_apps']['Insert'] = {
       url: item.url || '',
       app_id: item.appId,
