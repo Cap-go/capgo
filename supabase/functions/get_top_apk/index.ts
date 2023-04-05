@@ -5,6 +5,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
+gplay.memoized()
 const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, country = 'us') => {
   const res = (await gplay.list({
     category,

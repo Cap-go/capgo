@@ -5,6 +5,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
+gplay.memoized()
 const getAppsInfo = async (appId: string, country: string) => {
   const { title } = await gplay.app({ appId }).catch(() => ({ title: '' }))
   const itemsSim = await gplay.similar({ appId, num: 250, country }).catch(() => [])
