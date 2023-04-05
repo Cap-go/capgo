@@ -13,6 +13,8 @@ const getAppInfo = async (appId: string, country = 'en') => {
     appId,
     // throttle: 10,
   })
+  if (!item)
+    return null
   // return upgraded
   const insert: Database['public']['Tables']['store_apps']['Insert'] = {
     url: item.url || '',

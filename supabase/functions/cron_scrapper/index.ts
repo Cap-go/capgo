@@ -58,11 +58,10 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     console.log('appsToGetTop total', (categories?.length || 0))
     console.log('appsToGetTop total result', (categories?.length || 0) * 500)
     // split countries by 10 to batch send to netlify
-    for (let i = 0; i < categories.length; i += pageSize) {
-      const categoriesBatch = categories.slice(i, i + pageSize)
-      console.log('countriesBatch', categoriesBatch.length)
+    for (let i = 0; i < categories.length; i++) {
+      console.log('category', categories[i])
       all.push(axios.post(`${baseApi}/get_top_apk-background`, {
-        categories: categoriesBatch,
+        category: categories[i],
       }, options))
     }
     if (appsToGetFramework?.length) {

@@ -15,7 +15,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
     country,
     num: limit,
     // throttle: 100,
-  }))
+  }).catch(() => []))
   // remove the first skip
   const ids = res.map((item: any) => item.appId)
   // console.log('ids', ids.length, ids)
