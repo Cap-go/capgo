@@ -18,6 +18,11 @@ serve(async (event: Request) => {
     console.error('Fail Authorization', { authorizationSecret, API_SECRET })
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
+  const options = {
+    headers: {
+      apisecret: API_SECRET,
+    },
+  }
 
   try {
     const { data: appsToGetFramework } = await supabaseAdmin()
@@ -61,7 +66,7 @@ serve(async (event: Request) => {
       console.log('countriesBatch', categoriesBatch.length)
       all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
         categories: categoriesBatch,
-      }))
+      }, options))
     }
     // all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
     //   categories,
@@ -72,7 +77,7 @@ serve(async (event: Request) => {
         const appsBatch = appsToGetFramework.slice(i, i + pageSizeLittle)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsBatch.map(app => app.app_id),
-        }))
+        }, options))
       }
     }
     if (appsToGetInfo?.length) {
@@ -80,7 +85,7 @@ serve(async (event: Request) => {
         const appsInfoBatch = appsToGetInfo.slice(i, i + pageSize)
         all.push(axios.post('https://netlify.capgo.app/get_store_info-background', {
           appIds: appsInfoBatch.map(app => app.app_id),
-        }))
+        }, options))
       }
     }
     if (appsToGetSimilar?.length) {
@@ -92,7 +97,7 @@ serve(async (event: Request) => {
         console.log('appsSimilarBatch', appsSimilarBatch.length)
         all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
           appIds: appsSimilarBatch.map(app => app.app_id),
-        }))
+        }, options))
       }
     }
     await Promise.all(all)
