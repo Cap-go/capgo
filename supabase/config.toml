@@ -58,3 +58,78 @@ enable_confirmations = false
 enabled = false
 client_id = ""
 secret = ""
+
+[functions.bundle]
+verify_jwt = false
+
+[functions.channel]
+verify_jwt = false
+
+[functions.channel_self]
+verify_jwt = false
+
+[functions.cron_scrapper]
+verify_jwt = false
+
+[functions.device]
+verify_jwt = false
+
+[functions.ok]
+verify_jwt = false
+
+[functions.on_app_stats_create]
+verify_jwt = false
+
+[functions.on_app_stats_update]
+verify_jwt = false
+
+[functions.on_channel_create]
+verify_jwt = false
+
+[functions.on_channel_update]
+verify_jwt = false
+
+[functions.on_log_create]
+verify_jwt = false
+
+[functions.on_shared_create]
+verify_jwt = false
+
+[functions.on_user_create]
+verify_jwt = false
+
+[functions.on_user_update]
+verify_jwt = false
+
+[functions.on_version_create]
+verify_jwt = false
+
+[functions.on_version_delete]
+verify_jwt = false
+
+[functions.on_version_update]
+verify_jwt = false
+
+[functions.plans]
+verify_jwt = false
+
+[functions.stats]
+verify_jwt = false
+
+[functions.store_top]
+verify_jwt = false
+
+[functions.stripe_event]
+verify_jwt = false
+
+[functions.test_consistency]
+verify_jwt = false
+
+[functions.updates]
+verify_jwt = false
+
+[functions.web_stats]
+verify_jwt = false
+
+[functions.website_stats]
+verify_jwt = false
