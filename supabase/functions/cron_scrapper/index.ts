@@ -10,8 +10,7 @@ const toGetInfo = 5000
 const toGetSimilar = 500
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
-  const DEV_FUNCTIONS = getEnv('DEV_FUNCTIONS')
-  const baseApi = DEV_FUNCTIONS ? 'http://localhost:54321/functions/v1' : 'https://netlify.capgo.app'
+  const baseApi = 'https://netlify.capgo.app'
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret)
@@ -58,11 +57,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
     console.log('appsToGetTop categories', categories?.length || 0)
     console.log('appsToGetTop total', (categories?.length || 0))
     console.log('appsToGetTop total result', (categories?.length || 0) * 500)
-    // loop 100 times to get more random apps
-    // for (let i = 0; i < toGetTop; i++) {
-    //   const randomCategory = categories[Math.floor(Math.random() * categories.length)]
-    //   const randomCountryCode = countries[Math.floor(Math.random() * countries.length)]
-    //   console.log('randomCategory', randomCategory, 'randomCountryCode', randomCountryCode)
     // split countries by 10 to batch send to netlify
     for (let i = 0; i < categories.length; i += pageSize) {
       const categoriesBatch = categories.slice(i, i + pageSize)
@@ -71,10 +65,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
         categories: categoriesBatch,
       }, options))
     }
-    // all.push(axios.post('https://netlify.capgo.app/get_top_apk-background', {
-    //   categories,
-    //   countries,
-    // }))
     if (appsToGetFramework?.length) {
       for (let i = 0; i < appsToGetFramework.length; i += pageSizeLittle) {
         const appsBatch = appsToGetFramework.slice(i, i + pageSizeLittle)

@@ -82,9 +82,10 @@ const getInfo = async (appId: string) => {
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
-  if (!authorizationSecret)
+  if (!authorizationSecret) {
+    console.error('Fail Authorization', headers)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
-
+  }
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
     console.error('Fail Authorization', { authorizationSecret, API_SECRET })
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
