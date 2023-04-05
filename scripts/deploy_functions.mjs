@@ -12,6 +12,8 @@ const folders = readdirSync('./supabase/functions')
 
 const projectRef = supa_url.split('.')[0].replace('https://', '')
 
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 try {
   console.log('projectRef', projectRef)
   await outputFile('./supabase/.temp/project-ref', projectRef)
@@ -45,6 +47,7 @@ try {
     else {
       console.log(`Ignored ${folder} ⏭`)
     }
+    await wait(100)
   }
   await Promise.all(all)
 }
