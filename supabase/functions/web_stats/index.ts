@@ -18,13 +18,13 @@ interface GlobalStats {
   plans: PromiseLike<PlanTotal>
 }
 
-const getGithubStars = async (): Promise<number> => {
+async function getGithubStars(): Promise<number> {
   const res = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater')
   const json = await res.json()
   return json.stargazers_count
 }
 
-const getStats = (): GlobalStats => {
+function getStats(): GlobalStats {
   const supabase = supabaseAdmin()
   return {
     apps: supabase.rpc('count_all_apps', {}).single().then((res) => {
@@ -85,7 +85,7 @@ const getStats = (): GlobalStats => {
   }
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret)
@@ -130,6 +130,26 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
       onboarded,
       need_upgrade,
       plans)
+    // console.log('app', app.app_id, downloads, versions, shared, channels)
+    // create var date_id with yearn-month-day
+    const date_id = new Date().toISOString().slice(0, 10)
+    const newData: Database['public']['Tables']['global_stats']['Insert'] = {
+      date_id,
+      apps,
+      updates,
+      stars,
+      trial,
+      paying,
+      onboarded,
+      need_upgrade,
+      not_paying,
+    }
+    console.log('newData', newData)
+    const { error } = await supabaseAdmin()
+      .from('global_stats')
+      .upsert(newData)
+    if (error)
+      console.error('insert global_stats error', error)
     await insights([
       {
         title: 'Apps',
@@ -197,26 +217,6 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
         icon: '📈',
       },
     ]).catch()
-    // console.log('app', app.app_id, downloads, versions, shared, channels)
-    // create var date_id with yearn-month-day
-    const date_id = new Date().toISOString().slice(0, 10)
-    const newData: Database['public']['Tables']['global_stats']['Insert'] = {
-      date_id,
-      apps,
-      updates,
-      stars,
-      trial,
-      paying,
-      onboarded,
-      need_upgrade,
-      not_paying,
-    }
-    console.log('newData', newData)
-    const { error } = await supabaseAdmin()
-      .from('global_stats')
-      .upsert(newData)
-    if (error)
-      console.error('insert global_stats error', error)
     return sendRes()
   }
   catch (e) {
