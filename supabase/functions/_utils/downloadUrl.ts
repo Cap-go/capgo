@@ -1,7 +1,7 @@
 import { r2 } from './r2.ts'
 import { supabaseAdmin } from './supabase.ts'
 
-export const getBundleUrl = async (platform: string, path: string, bucket_id: string) => {
+export async function getBundleUrl(platform: string, path: string, bucket_id: string) {
   if (platform === 'supabase') {
     const { data } = await supabaseAdmin()
       .storage

@@ -1,7 +1,7 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { getEnv } from './utils.ts'
 
-const getAuth = () => {
+function getAuth() {
   // get stripe token
   const STRIPE_SECRET_KEY = getEnv('STRIPE_SECRET_KEY') || ''
   const STRIPE_TOKEN = `${STRIPE_SECRET_KEY}:`
@@ -9,14 +9,16 @@ const getAuth = () => {
   const STRIPE_TOKEN_B64 = btoa(STRIPE_TOKEN)
   return `Basic ${STRIPE_TOKEN_B64}`
 }
-const getConfig = (form = false) => ({
-  headers: {
-    authorization: getAuth(),
-    ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
-  },
-})
+function getConfig(form = false) {
+  return {
+    headers: {
+      authorization: getAuth(),
+      ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
+    },
+  }
+}
 
-export const createPortal = async (customerId: string, callbackUrl: string) => {
+export async function createPortal(customerId: string, callbackUrl: string) {
   const response = await axios.post('https://api.stripe.com/v1/billing_portal/sessions', new URLSearchParams({
     customer: customerId,
     return_url: callbackUrl,
@@ -24,7 +26,7 @@ export const createPortal = async (customerId: string, callbackUrl: string) => {
   return response.data
 }
 
-const getPriceIds = async (planId: string, reccurence: string): Promise<{ priceId: string | null; meteredIds: string[] }> => {
+async function getPriceIds(planId: string, reccurence: string): Promise<{ priceId: string | null; meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
   try {
@@ -47,7 +49,7 @@ export interface MeteredData {
   [key: string]: string
 }
 
-export const parsePriceIds = (prices: any): { priceId: string | null; productId: string | null; meteredData: MeteredData } => {
+export function parsePriceIds(prices: any): { priceId: string | null; productId: string | null; meteredData: MeteredData } {
   let priceId: string | null = null
   let productId: string | null = null
   const meteredData: { [key: string]: string } = {}
@@ -70,7 +72,7 @@ export const parsePriceIds = (prices: any): { priceId: string | null; productId:
   return { priceId, productId, meteredData }
 }
 
-export const createCheckout = async (customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) => {
+export async function createCheckout(customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
   const prices = await getPriceIds(planId, reccurence)
   console.log('prices', prices)
   if (!prices.priceId)
@@ -106,7 +108,7 @@ export const createCheckout = async (customerId: string, reccurence: string, pla
   }
 }
 
-export const createCustomer = async (email: string, userId: string, name: string) => {
+export async function createCustomer(email: string, userId: string, name: string) {
   const config = getConfig(true)
   const customerData = {
     email,
@@ -118,7 +120,7 @@ export const createCustomer = async (email: string, userId: string, name: string
   return response.data
 }
 
-export const setBillingPeriod = async (subscriptionId: string) => {
+export async function setBillingPeriod(subscriptionId: string) {
   const config = getConfig(true)
   const checkoutData = {
     billing_cycle_anchor: 'now',
@@ -129,7 +131,7 @@ export const setBillingPeriod = async (subscriptionId: string) => {
   return response.data
 }
 
-export const updateCustomer = async (customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) => {
+export async function updateCustomer(customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
   const config = getConfig(true)
   const customerData = {
     email: billing_email || email,
@@ -142,7 +144,7 @@ export const updateCustomer = async (customerId: string, email: string, billing_
   return response.data
 }
 
-export const recordUsage = async (subscriptionId: string, quantity: number) => {
+export async function recordUsage(subscriptionId: string, quantity: number) {
   const config = getConfig(true)
   const checkoutData = {
     quantity,
@@ -153,7 +155,7 @@ export const recordUsage = async (subscriptionId: string, quantity: number) => {
   return response.data
 }
 
-export const removeOldSubscription = async (subscriptionId: string) => {
+export async function removeOldSubscription(subscriptionId: string) {
   const config = getConfig(true)
   console.log('removeOldSubscription', subscriptionId)
   const response = await axios.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, undefined, config)

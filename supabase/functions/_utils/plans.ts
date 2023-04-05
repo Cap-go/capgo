@@ -8,7 +8,7 @@ import {
 import type { Database } from './supabase.types.ts'
 import { recordUsage } from './stripe.ts'
 
-const planToInt = (plan: string) => {
+function planToInt(plan: string) {
   switch (plan) {
     case 'Free':
       return 0
@@ -25,7 +25,7 @@ const planToInt = (plan: string) => {
   }
 }
 
-export const findBestPlan = async (stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> => {
+export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
   const { data, error } = await supabaseAdmin()
     .rpc('find_best_plan_v3', {
       mau: stats.mau || 0,
@@ -41,7 +41,7 @@ export const findBestPlan = async (stats: Database['public']['Functions']['find_
   return data || 'Team'
 }
 
-export const getTotalStats = async (userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> => {
+export async function getTotalStats(userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> {
   const { data, error } = await supabaseAdmin()
     .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
     .single()
@@ -58,7 +58,7 @@ export const getTotalStats = async (userId: string, dateId: string): Promise<Dat
   }
 }
 
-export const getMeterdUsage = async (userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> => {
+export async function getMeterdUsage(userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> {
   const { data, error } = await supabaseAdmin()
     .rpc('get_metered_usage', { userid: userId })
     .single()
@@ -80,7 +80,7 @@ interface Prices {
   bandwidth: string
 }
 
-const setMetered = async (customer_id: string | null, userId: string) => {
+async function setMetered(customer_id: string | null, userId: string) {
   if (customer_id === null)
     return Promise.resolve()
   console.log('setMetered', customer_id, userId)
@@ -102,7 +102,7 @@ const setMetered = async (customer_id: string | null, userId: string) => {
   }
 }
 
-export const checkPlan = async (userId: string): Promise<void> => {
+export async function checkPlan(userId: string): Promise<void> {
   try {
     const { data: user, error: userError } = await supabaseAdmin()
       .from('users')

@@ -28,7 +28,7 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   old_record: Database['public']['Tables'][T]['Row']
 }
 
-export const supabaseClient = () => {
+export function supabaseClient() {
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -40,7 +40,7 @@ export const supabaseClient = () => {
 }
 
 // WARNING: The service role key has admin priviliges and should only be used in secure server environments!
-export const supabaseAdmin = () => {
+export function supabaseAdmin() {
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -51,7 +51,7 @@ export const supabaseAdmin = () => {
   return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
-const allObject = async <T extends string, R>(all: { [key in T]: PromiseLike<R> }) => {
+async function allObject<T extends string, R>(all: { [key in T]: PromiseLike<R> }) {
   const allAwaited: { [key in T]: number } = await Object
     .entries(all)
     .reduce(async (acc, [key, value]) => ({
@@ -61,7 +61,7 @@ const allObject = async <T extends string, R>(all: { [key in T]: PromiseLike<R> 
   return allAwaited
 }
 
-export const updateOrCreateVersion = async (update: Database['public']['Tables']['app_versions']['Insert']) => {
+export async function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
   console.log('updateOrCreateVersion', update)
   const { data } = await supabaseAdmin()
     .from('app_versions')
@@ -85,22 +85,22 @@ export const updateOrCreateVersion = async (update: Database['public']['Tables']
   }
 }
 
-export const updateOnpremStats = async (increment: Database['public']['Functions']['increment_store']['Args']) => {
+export async function updateOnpremStats(increment: Database['public']['Functions']['increment_store']['Args']) {
   const { error } = await supabaseAdmin()
     .rpc('increment_store', increment)
   if (error)
     console.error('increment_store', error)
 }
 
-export const updateVersionStats = async (increment: Database['public']['Functions']['update_version_stats']['Args']) => {
+export async function updateVersionStats(increment: Database['public']['Functions']['update_version_stats']['Args']) {
   const { error } = await supabaseAdmin()
     .rpc('update_version_stats', increment)
   if (error)
     console.error('update_version_stats', error)
 }
 
-export const updateOrAppStats = async (increment: Database['public']['Functions']['increment_stats_v2']['Args'],
-  date_id: string, user_id: string) => {
+export async function updateOrAppStats(increment: Database['public']['Functions']['increment_stats_v2']['Args'],
+  date_id: string, user_id: string) {
   const { data: dataAppStats } = await supabaseAdmin()
     .from('app_stats')
     .select()
@@ -128,7 +128,7 @@ export const updateOrAppStats = async (increment: Database['public']['Functions'
   }
 }
 
-export const updateOrCreateChannel = async (update: Database['public']['Tables']['channels']['Insert']) => {
+export async function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.log('missing app_id, name, or created_by')
@@ -156,7 +156,7 @@ export const updateOrCreateChannel = async (update: Database['public']['Tables']
   }
 }
 
-export const checkAppOwner = async (userId: string | undefined, appId: string | undefined): Promise<boolean> => {
+export async function checkAppOwner(userId: string | undefined, appId: string | undefined): Promise<boolean> {
   if (!appId || !userId)
     return false
   try {
@@ -175,7 +175,7 @@ export const checkAppOwner = async (userId: string | undefined, appId: string | 
   }
 }
 
-export const updateOrCreateDevice = async (update: Database['public']['Tables']['devices']['Insert']) => {
+export async function updateOrCreateDevice(update: Database['public']['Tables']['devices']['Insert']) {
   const { data } = await supabaseAdmin()
     .from('devices')
     .select()
@@ -197,7 +197,7 @@ export const updateOrCreateDevice = async (update: Database['public']['Tables'][
   }
 }
 
-export const getCurrentPlanName = async (userId: string): Promise<string> => {
+export async function getCurrentPlanName(userId: string): Promise<string> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('get_current_plan_name', { userid: userId })
@@ -211,7 +211,7 @@ export const getCurrentPlanName = async (userId: string): Promise<string> => {
   return ''
 }
 
-export const getPlanUsagePercent = async (userId: string, dateid: string): Promise<number> => {
+export async function getPlanUsagePercent(userId: string, dateid: string): Promise<number> {
   const { data, error } = await supabaseAdmin()
     .rpc('get_plan_usage_percent', { userid: userId, dateid })
     .single()
@@ -223,7 +223,7 @@ export const getPlanUsagePercent = async (userId: string, dateid: string): Promi
   return data || 0
 }
 
-export const isGoodPlan = async (userId: string): Promise<boolean> => {
+export async function isGoodPlan(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_good_plan_v3', { userid: userId })
@@ -237,7 +237,7 @@ export const isGoodPlan = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const isOnboarded = async (userId: string): Promise<boolean> => {
+export async function isOnboarded(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_onboarded', { userid: userId })
@@ -251,7 +251,7 @@ export const isOnboarded = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const isFreeUsage = async (userId: string): Promise<boolean> => {
+export async function isFreeUsage(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_free_usage', { userid: userId })
@@ -265,7 +265,7 @@ export const isFreeUsage = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const isOnboardingNeeded = async (userId: string): Promise<boolean> => {
+export async function isOnboardingNeeded(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_onboarding_needed', { userid: userId })
@@ -279,7 +279,7 @@ export const isOnboardingNeeded = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const isCanceled = async (userId: string): Promise<boolean> => {
+export async function isCanceled(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_canceled', { userid: userId })
@@ -293,7 +293,7 @@ export const isCanceled = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const isPaying = async (userId: string): Promise<boolean> => {
+export async function isPaying(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_paying', { userid: userId })
@@ -307,7 +307,7 @@ export const isPaying = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const isTrial = async (userId: string): Promise<number> => {
+export async function isTrial(userId: string): Promise<number> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_trial', { userid: userId })
@@ -321,7 +321,7 @@ export const isTrial = async (userId: string): Promise<number> => {
   return 0
 }
 
-export const isAllowedAction = async (userId: string): Promise<boolean> => {
+export async function isAllowedAction(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
       .rpc('is_allowed_action_user', { userid: userId })
@@ -335,7 +335,7 @@ export const isAllowedAction = async (userId: string): Promise<boolean> => {
   return false
 }
 
-export const sendStats = async (action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) => {
+export async function sendStats(action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) {
   const stat: Database['public']['Tables']['stats']['Insert'] = {
     platform: platform as Database['public']['Enums']['platform_os'],
     device_id,
@@ -365,7 +365,7 @@ export const sendStats = async (action: string, platform: string, device_id: str
   }
 }
 
-const allDateIdOfMonth = () => {
+function allDateIdOfMonth() {
   const date_id = new Date().toISOString().slice(0, 7)
   const lastDay = new Date(new Date().getFullYear(), new Date().getMonth(), 0)
   const days = []
@@ -377,7 +377,7 @@ const allDateIdOfMonth = () => {
   return days
 }
 
-export const createAppStat = async (userId: string, appId: string, date_id: string) => {
+export async function createAppStat(userId: string, appId: string, date_id: string) {
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -456,7 +456,7 @@ export const createAppStat = async (userId: string, appId: string, date_id: stri
   return newData
 }
 
-export const createApiKey = async (userId: string) => {
+export async function createApiKey(userId: string) {
   // check if user has apikeys
   const total = await supabaseAdmin()
     .from('apikeys')
@@ -488,7 +488,7 @@ export const createApiKey = async (userId: string) => {
   return Promise.resolve()
 }
 
-export const userToPerson = (user: Database['public']['Tables']['users']['Row'], customer: Database['public']['Tables']['stripe_info']['Row']): Person => {
+export function userToPerson(user: Database['public']['Tables']['users']['Row'], customer: Database['public']['Tables']['stripe_info']['Row']): Person {
   const person: Person = {
     id: user.id,
     product_id: customer.product_id,
@@ -500,7 +500,7 @@ export const userToPerson = (user: Database['public']['Tables']['users']['Row'],
   return person
 }
 
-export const saveStoreInfo = async (apps: (Database['public']['Tables']['store_apps']['Insert'])[]) => {
+export async function saveStoreInfo(apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
   // save in supabase
   if (!apps.length)
     return
@@ -513,8 +513,8 @@ export const saveStoreInfo = async (apps: (Database['public']['Tables']['store_a
     console.error('saveStoreInfo error', error)
 }
 
-export const customerToSegment = async (userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
-  plan?: Database['public']['Tables']['plans']['Row']): Promise<string[]> => {
+export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
+  plan?: Database['public']['Tables']['plans']['Row']): Promise<string[]> {
   const isMonthly = plan?.price_m_id === customer.price_id
   const segments = ['Capgo']
   const trialDaysLeft = await isTrial(userId)
@@ -555,7 +555,7 @@ export const customerToSegment = async (userId: string, customer: Database['publ
   return segments
 }
 
-export const getStripeCustomer = async (customerId: string) => {
+export async function getStripeCustomer(customerId: string) {
   const { data: stripeInfo } = await supabaseAdmin()
     .from('stripe_info')
     .select('*')
@@ -564,7 +564,7 @@ export const getStripeCustomer = async (customerId: string) => {
   return stripeInfo
 }
 
-export const createStripeCustomer = async (user: Database['public']['Tables']['users']['Row']) => {
+export async function createStripeCustomer(user: Database['public']['Tables']['users']['Row']) {
   const customer = await createCustomer(user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
   // create date + 15 days
   const trial_at = new Date()

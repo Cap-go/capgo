@@ -7,7 +7,7 @@ import { createHmac } from './utils.ts'
 const DEFAULT_TOLERANCE = 300
 const EXPECTED_SCHEME = 'v1'
 
-const parseHeader = (header: string, scheme: string): Details => {
+function parseHeader(header: string, scheme: string): Details {
   return header.split(',').reduce(
     (accum, item) => {
       const [kv0, kv1] = item.split('=')
@@ -22,7 +22,7 @@ const parseHeader = (header: string, scheme: string): Details => {
       signatures: [] as string[],
     } as Details)
 }
-const scmpCompare = (a: string, b: string) => {
+function scmpCompare(a: string, b: string) {
   const len = a.length
   let result = 0
   for (let i = 0; i < len; ++i)
@@ -30,7 +30,7 @@ const scmpCompare = (a: string, b: string) => {
 
   return result === 0
 }
-export const parseStripeEvent = (body: string, signature: string) => {
+export function parseStripeEvent(body: string, signature: string) {
   const details = parseHeader(signature, EXPECTED_SCHEME)
   if (!details || details.timestamp === -1)
     throw new Error('Unable to extract timestamp and signatures from header')
@@ -52,7 +52,7 @@ export const parseStripeEvent = (body: string, signature: string) => {
   return jsonPayload
 }
 
-export const extractDataEvent = (event: any): Database['public']['Tables']['stripe_info']['Insert'] => {
+export function extractDataEvent(event: any): Database['public']['Tables']['stripe_info']['Insert'] {
   const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',

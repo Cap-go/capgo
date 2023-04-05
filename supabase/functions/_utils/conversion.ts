@@ -1,10 +1,26 @@
-export const bytesToMb = (bytes: number) => (Math.round(((bytes / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100)
-export const bytesToGb = (bytes: number) => (Math.round(((bytes / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100)
-export const mbToBytes = (mb: number) => mb * 1024 * 1024
-export const gbToBytes = (gb: number) => gb * 1024 * 1024 * 1024
+export function bytesToMb(bytes: number) {
+  return Math.round(((bytes / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100
+}
+export function bytesToGb(bytes: number) {
+  return Math.round(((bytes / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100
+}
+export function mbToBytes(mb: number) {
+  return mb * 1024 * 1024
+}
+export function gbToBytes(gb: number) {
+  return gb * 1024 * 1024 * 1024
+}
 
-export const bytesToMbText = (bytes: number) => `${bytesToMb(bytes)} MB`
-export const bytesToGBText = (bytes: number) => `${bytesToGb(bytes)} GB`
+export function bytesToMbText(bytes: number) {
+  return `${bytesToMb(bytes)} MB`
+}
+export function bytesToGBText(bytes: number) {
+  return `${bytesToGb(bytes)} GB`
+}
 
-export const urlToAppId = (appId: string) => appId.replace(/--/g, '.')
-export const appIdToUrl = (appId: string) => appId.replace(/\./g, '--')
+export function urlToAppId(appId: string) {
+  return appId.replace(/--/g, '.')
+}
+export function appIdToUrl(appId: string) {
+  return appId.replace(/\./g, '--')
+}

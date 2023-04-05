@@ -1,6 +1,6 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 
-const ipapi = async (ip: string, lang = 'en') => {
+async function ipapi(ip: string, lang = 'en') {
   ip = ip || ''
   lang = lang || 'en'
 
@@ -14,7 +14,7 @@ const ipapi = async (ip: string, lang = 'en') => {
   return res.data
 }
 
-export const invalidIps = async (ips: string[]) => {
+export async function invalidIps(ips: string[]) {
   // check all ip an return true if one is from google
   for (const ip of ips) {
     const res = await ipapi(ip)
@@ -23,7 +23,7 @@ export const invalidIps = async (ips: string[]) => {
   }
   return false
 }
-export const invalidIp = async (ip: string) => {
+export async function invalidIp(ip: string) {
   // check all ip an return true if one is from google
   const res = await ipapi(ip)
   if (res.isp.toLowerCase().includes('google'))

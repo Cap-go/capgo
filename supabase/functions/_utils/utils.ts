@@ -3,8 +3,9 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
 
-export const jwtDecoder = (jwt: string): JwtUser =>
-  JSON.parse(atob(jwt.split('.')[1]))
+export function jwtDecoder(jwt: string): JwtUser {
+  return JSON.parse(atob(jwt.split('.')[1]))
+}
 
 export const fetchLimit = 50
 
@@ -21,8 +22,8 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-export const checkKey = async (authorization: string | undefined,
-  supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> => {
+export async function checkKey(authorization: string | undefined,
+  supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
   try {
@@ -42,12 +43,12 @@ export const checkKey = async (authorization: string | undefined,
   }
 }
 
-export const sendResBg = (data: any = { status: 'ok' }, statusCode = 200) => {
+export function sendResBg(data: any = { status: 'ok' }, statusCode = 200) {
   if (statusCode >= 400)
     console.error('sendResBg error', JSON.stringify(data, null, 2))
 }
 
-export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
+export function sendRes(data: any = { status: 'ok' }, statusCode = 200) {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
 
@@ -60,24 +61,26 @@ export const sendRes = (data: any = { status: 'ok' }, statusCode = 200) => {
   )
 }
 
-export const sendOptionsRes = () => (new Response(
-  'ok',
-  {
-    headers: {
-      ...corsHeaders,
+export function sendOptionsRes() {
+  return new Response(
+    'ok',
+    {
+      headers: {
+        ...corsHeaders,
+      },
     },
-  },
-))
+  )
+}
 
-export const getEnv = (key: string): string => {
+export function getEnv(key: string): string {
   const val = Deno.env.get(key)
   return val || ''
 }
 
-export const makeHMACContent = (payload: string, details: Details) => {
+export function makeHMACContent(payload: string, details: Details) {
   return `${details.timestamp}.${payload}`
 }
 
-export const createHmac = (data: string, details: Details) => {
+export function createHmac(data: string, details: Details) {
   return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
 }

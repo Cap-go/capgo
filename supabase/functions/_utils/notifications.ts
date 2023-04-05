@@ -8,8 +8,8 @@ interface EventData {
   [key: string]: any
 }
 
-const sendNow = async (eventName: string, eventData: EventData,
-  email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) => {
+async function sendNow(eventName: string, eventData: EventData,
+  email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
   console.log('send notif', eventName, email)
   await addDataPerson(email, eventData)
   await addEventPerson(email, {}, eventName, color)
@@ -39,7 +39,7 @@ const sendNow = async (eventName: string, eventData: EventData,
   }
 }
 
-const isDeleted = async (email: string) => {
+async function isDeleted(email: string) {
   try {
     await supabaseAdmin()
       .from('deleted_account')
@@ -54,7 +54,7 @@ const isDeleted = async (email: string) => {
   }
 }
 
-const isSendable = (last: string, cron: string) => {
+function isSendable(last: string, cron: string) {
   const interval = parseCronExpression(cron)
   const last_send_at = new Date(last)
   const now = new Date()
@@ -72,7 +72,7 @@ const isSendable = (last: string, cron: string) => {
   // return false
 }
 
-export const sendNotif = async (eventName: string, eventData: EventData, userId: string, cron: string, color: string) => {
+export async function sendNotif(eventName: string, eventData: EventData, userId: string, cron: string, color: string) {
   const { data: user } = await supabaseAdmin()
     .from('users')
     .select()
