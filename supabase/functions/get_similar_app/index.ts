@@ -4,40 +4,38 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
+import { countries } from '../_utils/gplay_categ.ts'
 
 gplay.memoized()
-const getAppsInfo = async (appId: string, country: string) => {
+
+const getAppsInfo = async (appId: string, country: string): Promise<(Database['public']['Tables']['store_apps']['Insert'])[]> => {
   const { title } = await gplay.app({ appId }).catch(() => ({ title: '' }))
   const itemsSim = await gplay.similar({ appId, num: 250, country }).catch(() => [])
   const itemsSearch = title ? await gplay.search({ term: title, num: 250, country }).catch(() => []) : []
 
   return [...itemsSim, ...itemsSearch].map((item) => {
-    const insert = {
-      url: item.url,
+    const insert: Database['public']['Tables']['store_apps']['Insert'] = {
+      url: item.url || '',
       app_id: item.appId,
-      title: item.title,
-      summary: item.summary,
-      developer: item.developer,
-      developer_id: item.developerId,
-      lang: country,
-      icon: item.icon,
-      score: item.score,
-      free: item.free,
-    } as Database['public']['Tables']['store_apps']['Insert']
+      title: item.title || '',
+      summary: item.summary || '',
+      developer: item.developer || '',
+      developer_id: item.developerId || '',
+      lang: country || '',
+      icon: item.icon || '',
+      score: item.score || 0,
+      free: item.free || true,
+    }
     return insert
   })
 }
 
 const getSimilar = async (appId: string, country = 'us') => {
   try {
-    console.log('getInfo', appId)
+    console.log('getInfo', appId, country)
     const res = await getAppsInfo(appId, country)
-    // save in supabase
-    const { error } = await supabaseAdmin()
-      .from('store_apps')
-      .upsert(res)
-    if (error)
-      console.log('error', error)
+    if (!res.length)
+      return []
     // set to_get_similar to false
     const { error: error2 } = await supabaseAdmin()
       .from('store_apps')
@@ -45,7 +43,8 @@ const getSimilar = async (appId: string, country = 'us') => {
       .eq('app_id', appId)
     if (error2)
       console.log('error', error2)
-    console.log('getSimilar', appId, res.length)
+    console.log('getSimilar', appId, country, res.length)
+    return res
   }
   catch (e) {
     console.log('error getAppInfo', e)
@@ -59,6 +58,20 @@ const getSimilar = async (appId: string, country = 'us') => {
     if (error)
       console.log('error insert', error)
   }
+  return []
+}
+
+const saveSimilar = async (apps: (Database['public']['Tables']['store_apps']['Insert'])[]) => {
+  // save in supabase
+  if (!apps.length)
+    return
+  const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
+  console.log('saveSimilar', noDup.length)
+  const { error } = await supabaseAdmin()
+    .from('store_apps')
+    .upsert(noDup)
+  if (error)
+    console.log('error', error)
 }
 
 const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
@@ -74,29 +87,32 @@ const main = async (url: URL, headers: BaseHeaders, method: string, body: any) =
 
   console.log('main', method, body)
   // remove from list apps already in supabase
+  const all: Promise<(Database['public']['Tables']['store_apps']['Insert'])[]>[] = []
   if (body.appId) {
-    await getSimilar(body.appId)
+    for (const country of countries)
+      all.push(getSimilar(body.appId, country))
   }
   else if (body.countries && body.appIds) {
     // call getTop with all countries and categories
     const countries = body.countries
-    const all = []
     for (const appId of body.appIds) {
       for (const country of countries)
         all.push(getSimilar(appId, country))
     }
-    await Promise.all(all)
   }
   else if (body.appIds) {
-    const all = []
-    for (const appId of body.appIds)
-      all.push(getSimilar(appId))
-    await Promise.all(all)
+    for (const appId of body.appIds) {
+      for (const country of countries)
+        all.push(getSimilar(appId, country))
+    }
   }
   else {
     console.log('cannot get apps', body)
     return sendRes({ status: 'Error', error: 'cannot get apps' }, 500)
   }
+  const toSave = await Promise.all(all)
+  const flattenToSave = toSave.flat()
+  await saveSimilar(flattenToSave)
   return sendRes()
 }
 serve(async (event: Request) => {
