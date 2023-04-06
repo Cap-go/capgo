@@ -73,10 +73,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
       }
     }
     if (appsToGetInfo?.length) {
-      for (let i = 0; i < appsToGetInfo.length; i += pageSize) {
-        const appsInfoBatch = appsToGetInfo.slice(i, i + pageSize)
+      for (let i = 0; i < appsToGetInfo.length; i++) {
         all.push(axios.post(`${baseApi}/get_store_info-background`, {
-          appIds: appsInfoBatch.map(app => app.app_id),
+          appId: appsToGetInfo[i],
         }, options))
       }
     }
