@@ -8,7 +8,7 @@ import { addDataPerson, postPerson, updatePerson } from '../_utils/crisp.ts'
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***'
 const supabaseAnonKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***'
 
-const useSupabase = () => {
+function useSupabase() {
   const options = {
     // const options: SupabaseClientOptions = {
     auth: {
@@ -20,7 +20,7 @@ const useSupabase = () => {
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 // get all users from supabase
-const fixCrisp = async () => {
+async function fixCrisp() {
   const { data: users } = await useSupabase()
     .from('users')
     .select()

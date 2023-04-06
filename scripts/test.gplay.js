@@ -1,7 +1,8 @@
+const Buffer = require('node:buffer').Buffer
 const gplay = require('google-play-scraper')
 const AdmZip = require('adm-zip')
 
-const downloadApkPure = async (id) => {
+async function downloadApkPure(id) {
   const mode = 'APK'
   const downloadUrl = m => `https://d.apkpure.com/b/${m}/${id}?version=latest`
   // https://d.apkpure.com/b/APK/com.pizzahutau?version=latest
@@ -39,7 +40,7 @@ const downloadApkPure = async (id) => {
   }
 }
 
-const isCapacitor = async (id) => {
+async function isCapacitor(id) {
   const found = {
     capacitor: false,
     cordova: false,
@@ -82,7 +83,7 @@ const isCapacitor = async (id) => {
   return found
 }
 
-const getAppInfo = async (appId) => {
+async function getAppInfo(appId) {
   const item = await gplay.app({ appId })
   // return upgraded
   const insert = {
@@ -102,7 +103,7 @@ const getAppInfo = async (appId) => {
   return insert
 }
 
-const getAppsInfo = async (appId) => {
+async function getAppsInfo(appId) {
   const items = await gplay.similar({ appId })
 
   return items.map((item) => {

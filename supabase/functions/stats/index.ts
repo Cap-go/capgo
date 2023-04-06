@@ -12,7 +12,7 @@ const failActions = [
   'update_fail',
   'download_fail',
 ]
-const main = async (url: URL, headers: BaseHeaders, method: string, body: AppStats) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: AppStats) {
   try {
     console.log('body', body)
     let {

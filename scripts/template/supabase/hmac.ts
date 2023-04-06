@@ -4,6 +4,6 @@ import { getEnv, makeHMACContent } from '../../../supabase/functions/_utils/util
 
 // upper is ignored during netlify generation phase
 // import from here
-export const createHmac = (data: string, details: Details) => {
+export function createHmac(data: string, details: Details) {
   return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
 }

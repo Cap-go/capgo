@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://***.supabase.co'
 const supabaseAnonKey = '***'
-export const useSupabase = () => {
+export function useSupabase() {
   const options = {
     // const options: SupabaseClientOptions = {
     auth: {
@@ -15,7 +15,7 @@ export const useSupabase = () => {
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }
 
-const fix_apps = async () => {
+async function fix_apps() {
   const supabase = useSupabase()
 
   const { data } = await supabase

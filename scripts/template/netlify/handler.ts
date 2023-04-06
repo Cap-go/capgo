@@ -3,7 +3,7 @@ import { methodJson } from 'supabase/functions/_utils/utils'
 import type { Handler } from '@netlify/functions'
 import { sendRes } from './res'
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   console.log('main', url, headers, method, body)
   return sendRes()
 }

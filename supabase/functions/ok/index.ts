@@ -13,7 +13,7 @@ import {
 } from '../_tests/api.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const service = body.service
   console.log('service', service)
   if (service == null) {

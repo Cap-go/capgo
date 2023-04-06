@@ -16,7 +16,7 @@ interface GetDevice {
   page?: number
 }
 
-const get = async (body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+async function get(body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -86,7 +86,7 @@ const get = async (body: GetDevice, apikey: Database['public']['Tables']['apikey
   }
 }
 
-const post = async (body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+async function post(body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.device_id || !body.app_id)
     return sendRes({ status: 'Cannot find device' }, 400)
 
@@ -154,7 +154,7 @@ const post = async (body: DeviceLink, apikey: Database['public']['Tables']['apik
   return sendRes()
 }
 
-export const deleteOverride = async (body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+export async function deleteOverride(body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -181,7 +181,7 @@ export const deleteOverride = async (body: DeviceLink, apikey: Database['public'
   return sendRes()
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const apikey_string = headers.authorization
 
   if (!apikey_string)

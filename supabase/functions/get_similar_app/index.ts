@@ -8,7 +8,7 @@ import { countries } from '../_utils/gplay_categ.ts'
 
 gplay.memoized()
 
-const getAppsInfo = async (appId: string, country: string): Promise<(Database['public']['Tables']['store_apps']['Insert'])[]> => {
+async function getAppsInfo(appId: string, country: string): Promise<(Database['public']['Tables']['store_apps']['Insert'])[]> {
   const { title } = await gplay.app({
     appId,
     throttle: 50,
@@ -41,7 +41,7 @@ const getAppsInfo = async (appId: string, country: string): Promise<(Database['p
   })
 }
 
-const getSimilar = async (appId: string, country = 'us') => {
+async function getSimilar(appId: string, country = 'us') {
   try {
     console.log('getInfo', appId, country)
     const res = await getAppsInfo(appId, country)
@@ -72,7 +72,7 @@ const getSimilar = async (appId: string, country = 'us') => {
   return []
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret) {

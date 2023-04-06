@@ -3,7 +3,7 @@ import { methodJson, sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: AppStats) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: AppStats) {
   try {
     console.log('body', body)
     const { data: plans } = await supabaseAdmin()

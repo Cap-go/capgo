@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret)

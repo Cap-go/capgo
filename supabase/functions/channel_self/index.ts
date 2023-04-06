@@ -9,7 +9,7 @@ interface DeviceLink extends AppInfos {
   channel?: string
 }
 
-const post = async (body: DeviceLink): Promise<Response> => {
+async function post(body: DeviceLink): Promise<Response> {
   console.log('body', body)
   let {
     version_name,
@@ -131,7 +131,7 @@ const post = async (body: DeviceLink): Promise<Response> => {
   return sendRes()
 }
 
-const put = async (body: DeviceLink): Promise<Response> => {
+async function put(body: DeviceLink): Promise<Response> {
   console.log('body', body)
   let {
     version_name,
@@ -243,7 +243,7 @@ const put = async (body: DeviceLink): Promise<Response> => {
   }, 400)
 }
 
-const main = (url: URL, headers: BaseHeaders, method: string, body: any) => {
+function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   try {
     if (method === 'POST')
       return post(body)

@@ -1,6 +1,6 @@
 const gplay = require('google-play-scraper')
 
-const main = async () => {
+async function main() {
   const res = await gplay.list({
     category: gplay.category.APPLICATION,
     collection: gplay.collection.TOP_FREE,

@@ -7,7 +7,7 @@ interface TopStore {
   mode?: 'capacitor' | 'cordova' | 'flutter' | 'reactNative' | 'nativeScript'
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: TopStore) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: TopStore) {
   try {
     console.log('body', body)
     // count allapps

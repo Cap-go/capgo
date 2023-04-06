@@ -2,7 +2,7 @@ import type { Context } from 'https://edge.netlify.com'
 import type { BaseHeaders } from '../../../supabase/functions/_utils/types.ts'
 import { methodJson, sendRes } from '../../../supabase/functions/_utils/utils.ts'
 
-const main = (url: URL, headers: BaseHeaders, method: string, body: any) => {
+function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   console.log('main', url, headers, method, body)
   return sendRes()
 }

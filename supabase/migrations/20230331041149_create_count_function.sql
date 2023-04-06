@@ -45,3 +45,6 @@ Begin
   RETURN (SELECT COUNT(*) FROM stripe_info WHERE trial_at > NOW());
 End;  
 $function$;
+
+CREATE INDEX "idx_store_on_prem" ON "public"."store_apps" USING BTREE ("onprem");
+CREATE INDEX "idx_store_capgo" ON "public"."store_apps" USING BTREE ("capgo");

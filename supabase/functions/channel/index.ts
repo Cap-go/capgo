@@ -23,7 +23,7 @@ interface GetDevice {
   page?: number
 }
 
-export const get = async (body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+export async function get(body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -90,7 +90,7 @@ export const get = async (body: GetDevice, apikey: Database['public']['Tables'][
   }
 }
 
-export const deleteChannel = async (body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+export async function deleteChannel(body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -109,7 +109,7 @@ export const deleteChannel = async (body: ChannelSet, apikey: Database['public']
   return sendRes()
 }
 
-export const post = async (body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+export async function post(body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
     app_id: body.app_id,
@@ -149,7 +149,7 @@ export const post = async (body: ChannelSet, apikey: Database['public']['Tables'
   return sendRes()
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const apikey_string = headers.authorization
 
   if (!apikey_string)

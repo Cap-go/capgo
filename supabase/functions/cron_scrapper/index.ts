@@ -9,7 +9,7 @@ const toGetFramwork = 5000
 const toGetInfo = 5000
 const toGetSimilar = 500
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const baseApi = 'https://netlify.capgo.app'
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret

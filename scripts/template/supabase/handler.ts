@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import type { BaseHeaders } from '../../../supabase/functions/_utils/types.ts'
 import { methodJson, sendRes } from '../../../supabase/functions/_utils/utils.ts'
 
-const main = (url: URL, headers: BaseHeaders, method: string, body: any) => {
+function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   console.log('main', url, headers, method, body)
   return sendRes()
 }

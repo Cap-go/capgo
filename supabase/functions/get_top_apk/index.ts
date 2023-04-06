@@ -7,7 +7,7 @@ import type { BaseHeaders } from '../_utils/types.ts'
 import { countries } from '../_utils/gplay_categ.ts'
 
 gplay.memoized()
-const getList = async (category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, country = 'us') => {
+async function getList(category = gplay.category.APPLICATION, collection = gplay.collection.TOP_FREE, limit = 1000, country = 'us') {
   const res = (await gplay.list({
     category,
     collection,
@@ -35,7 +35,7 @@ const getList = async (category = gplay.category.APPLICATION, collection = gplay
   return upgraded
 }
 
-const getTop = async (category = gplay.category.APPLICATION, country = 'us', collection = gplay.collection.TOP_FREE, limit = 1000) => {
+async function getTop(category = gplay.category.APPLICATION, country = 'us', collection = gplay.collection.TOP_FREE, limit = 1000) {
   try {
     console.log('getTop', category, country, collection)
     const res = await getList(category, collection, limit, country)
@@ -51,7 +51,7 @@ const getTop = async (category = gplay.category.APPLICATION, country = 'us', col
   return []
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret) {

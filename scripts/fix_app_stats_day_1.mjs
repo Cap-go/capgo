@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 const supabaseAnonKey = '***'
 
-export const useSupabase = () => {
+export function useSupabase() {
   const options = {
     // const options: SupabaseClientOptions = {
     autoRefreshToken: true,
@@ -14,7 +14,7 @@ export const useSupabase = () => {
   return createClient(supabaseUrl, supabaseAnonKey, options)
 }
 
-const updateOrAppStats = async (increment, date_id, user_id) => {
+async function updateOrAppStats(increment, date_id, user_id) {
   const supabase = useSupabase()
   const { data: dataAppStats } = await supabase
     .from('app_stats')
@@ -41,7 +41,7 @@ const updateOrAppStats = async (increment, date_id, user_id) => {
   }
 }
 
-const fix_apps = async () => {
+async function fix_apps() {
   const supabase = useSupabase()
 
   const { data } = await supabase

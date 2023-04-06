@@ -51,7 +51,7 @@ export const defaultUpdateRes = {
   checksum: defaultChecksum,
   url: `https://xvwzpoazmxkqosrdewyv.supabase.co/storage/v1/object/sign/apps/${defaultUserId}/${defaultAppId}/versions/${defaultBucketId}`,
 }
-export const postUpdate = async (baseUrl: string) => {
+export async function postUpdate(baseUrl: string) {
   const url = `${baseUrl}/updates`
   const payload = { ...defaultUpdatePayload, version_build: defaultVersionDev }
   const response = await axios.post<typeof defaultUpdateRes>(url, payload, {
@@ -65,13 +65,13 @@ export const postUpdate = async (baseUrl: string) => {
 
 export const defaultResOk = { status: 'ok', service: 'ok' }
 export const defaultRes = { status: 'ok' }
-export const getOk = async (baseUrl: string) => {
+export async function getOk(baseUrl: string) {
   const url = `${baseUrl}/ok`
   const response = await axios.get<typeof defaultResOk>(url)
   return response.data
 }
 
-export const getDatabase = async () => {
+export async function getDatabase() {
   const { data, error } = await supabaseAdmin()
     .from('apps')
     .select()
@@ -80,14 +80,14 @@ export const getDatabase = async () => {
   return (data && !error)
 }
 
-export const postStats = async (baseUrl: string) => {
+export async function postStats(baseUrl: string) {
   const url = `${baseUrl}/stats`
   const payload = { ...defaultUpdatePayload, action: defaultAction }
   const response = await axios.post<typeof defaultRes>(url, payload)
   return response.data
 }
 
-export const setChannelSelf = async (baseUrl: string) => {
+export async function setChannelSelf(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
   const payload = { ...defaultUpdatePayload, channel: defaultChannel }
   const response = await axios.post<typeof defaultRes>(url, payload)
@@ -95,7 +95,7 @@ export const setChannelSelf = async (baseUrl: string) => {
 }
 
 export const defaultPutChannelRes = { channel: defaultChannel, status: defaultStatus }
-export const putChannel = async (baseUrl: string) => {
+export async function putChannel(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
   const response = await axios.put<typeof defaultPutChannelRes>(url, defaultUpdatePayload)
   return response.data
@@ -115,7 +115,7 @@ export const defaultGetDevicesRes = [{
   version_build: defaultVersion,
   version: { name: defaultVersion, id: defaultVersionId },
 }]
-export const getDevice = async (baseUrl: string) => {
+export async function getDevice(baseUrl: string) {
   const url = `${baseUrl}/device`
   const response = await axios.get<typeof defaultGetDevicesRes>(url, {
     params: {
@@ -137,7 +137,7 @@ const defaultSetDevice = {
   version_id: defaultVersion,
   channel: defaultChannel,
 }
-export const deleteDevice = async (baseUrl: string) => {
+export async function deleteDevice(baseUrl: string) {
   const url = `${baseUrl}/device`
   const response = await axios.delete<typeof defaultRes>(url, {
     params: {
@@ -148,7 +148,7 @@ export const deleteDevice = async (baseUrl: string) => {
   return response.data
 }
 
-export const postDevice = async (baseUrl: string) => {
+export async function postDevice(baseUrl: string) {
   const url = `${baseUrl}/device`
   const response = await axios.post<typeof defaultRes>(url, defaultSetDevice, {
     headers,
@@ -172,7 +172,7 @@ export const defaultGetChannelRes = [{
   version: { name: defaultVersion, id: defaultVersionId },
 }]
 
-export const getChannels = async (baseUrl: string) => {
+export async function getChannels(baseUrl: string) {
   const url = `${baseUrl}/channel`
   const response = await axios.get<typeof defaultGetChannelRes>(url, {
     params: {
@@ -187,7 +187,7 @@ export const getChannels = async (baseUrl: string) => {
     return res
   })
 }
-export const setChannel = async (baseUrl: string) => {
+export async function setChannel(baseUrl: string) {
   const url = `${baseUrl}/channel`
   const response = await axios.post<typeof defaultRes>(url, {
 
@@ -228,7 +228,7 @@ export const defaultGetBundleRes = [
 //   return response.data
 // }
 
-export const getBundle = async (baseUrl: string) => {
+export async function getBundle(baseUrl: string) {
   const url = `${baseUrl}/bundle`
   const response = await axios.get<typeof defaultGetBundleRes>(url, {
     params: {
@@ -243,7 +243,7 @@ export const getBundle = async (baseUrl: string) => {
   })
 }
 
-export const deleteBundle = async (baseUrl: string) => {
+export async function deleteBundle(baseUrl: string) {
   const url = `${baseUrl}/bundle`
   const response = await axios.delete<typeof defaultRes>(url, {
     params: {

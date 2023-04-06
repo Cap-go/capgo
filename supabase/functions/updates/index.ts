@@ -10,7 +10,7 @@ import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
-const resToVersion = (plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) => {
+function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
     version: version.name,
     url: signedURL,
@@ -22,7 +22,7 @@ const resToVersion = (plugin_version: string, signedURL: string, version: Databa
   return res
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: AppInfos) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // create random id
   if (method === 'GET') {
     console.log('v3', headers)

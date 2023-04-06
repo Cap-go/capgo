@@ -4,7 +4,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***'
 const supabaseAnonKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***'
-const useSupabase = () => {
+function useSupabase() {
   const options = {
     auth: {
       autoRefreshToken: true,
@@ -15,7 +15,7 @@ const useSupabase = () => {
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 
-const deleteBucket = async (record: Database['public']['Tables']['app_versions']['Row']) => {
+async function deleteBucket(record: Database['public']['Tables']['app_versions']['Row']) {
   // get the size of the storage and add it to the row
   if (!record.bucket_id) {
     console.log('Cannot find bucket_id', record.id)
@@ -59,7 +59,7 @@ const deleteBucket = async (record: Database['public']['Tables']['app_versions']
 // delete from app_versions_meta where id in (select id from app_versions where deleted = true)
 
 const pageSize = 1000
-const createAll = async () => {
+async function createAll() {
   // list all app_versions
   const allData: Database['public']['Tables']['app_versions']['Row'][] = []
   // loop through all app_versions

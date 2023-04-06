@@ -7,7 +7,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***'
 const supabaseAnonKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***'
 
-const useSupabase = () => {
+function useSupabase() {
   const options = {
     // const options: SupabaseClientOptions = {
     auth: {
@@ -19,7 +19,7 @@ const useSupabase = () => {
   return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
 }
 // get all users from supabase
-const main = async () => {
+async function main() {
 // list all app_versions with deleted true get all pages
   const app_versions: any = []
   let continueLoop = true

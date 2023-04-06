@@ -11,7 +11,7 @@ interface dataDemo {
   iconType: string
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: dataDemo) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: dataDemo) {
   const apikey_string = headers.authorization
   if (!apikey_string)
     return sendRes({ status: 'Missing apikey' }, 400)

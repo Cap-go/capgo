@@ -8,7 +8,7 @@ import { countries } from '../_utils/gplay_categ.ts'
 
 gplay.memoized()
 
-const getAppInfo = async (appId: string, country = 'en') => {
+async function getAppInfo(appId: string, country = 'en') {
   const item = await gplay.app({
     appId,
     throttle: 50,
@@ -36,7 +36,7 @@ const getAppInfo = async (appId: string, country = 'en') => {
   return insert
 }
 
-const findLang = async (appId: string) => {
+async function findLang(appId: string) {
   // loop on all countries with getAppInfo until answer
   for (const country of countries) {
     try {
@@ -51,7 +51,7 @@ const findLang = async (appId: string) => {
   return null
 }
 
-const getInfo = async (appId: string) => {
+async function getInfo(appId: string) {
   try {
     console.log('getInfo', appId)
     const { data } = await supabaseAdmin()
@@ -81,7 +81,7 @@ const getInfo = async (appId: string) => {
   return []
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret) {

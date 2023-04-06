@@ -1,6 +1,7 @@
-const fs = require('fs')
+const fs = require('node:fs')
 const { Parser } = require('json2csv')
 const users = require('/Users/martindonadieu/Downloads/users.json')
+
 const fields = ['email', 'last_name', 'first_name', 'id', 'created_at']
 const opts = { fields }
 

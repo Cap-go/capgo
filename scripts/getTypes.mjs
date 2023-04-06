@@ -6,7 +6,7 @@ const exec = util.promisify(execCb)
 const supaId = supa_url.split('//')[1].split('.')[0]
 const command = `pnpm dlx supabase@latest gen types typescript --project-id=${supaId} > src/types/supabase.types.ts`
 
-const main = async () => {
+async function main() {
   try {
     const { stderr } = await exec(command)
     if (stderr)

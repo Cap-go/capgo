@@ -1,10 +1,11 @@
+/* eslint-disable n/prefer-global/buffer */
 import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
 import AdmZip from 'https://esm.sh/adm-zip?target=deno'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
-const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
+async function downloadApkPure(id: string, mode: 'APK' | 'XAPK' = 'APK') {
   const downloadUrl = `https://d.apkpure.com/b/${mode}/${id}?version=latest`
   // https://d.apkpure.com/b/APK/com.pizzahutau?version=latest
   // const responseApk = await fetch(downloadUrl, { headers })
@@ -34,7 +35,7 @@ const downloadApkPure = async (id: string, mode: 'APK' | 'XAPK' = 'APK') => {
   return buffer
 }
 
-const isCapacitor = async (id: string) => {
+async function isCapacitor(id: string) {
   const found = {
     capacitor: false,
     cordova: false,
@@ -97,7 +98,7 @@ const isCapacitor = async (id: string) => {
   console.log('found', id, found)
   return found
 }
-const getInfoCap = async (appId: string) => {
+async function getInfoCap(appId: string) {
   try {
     console.log('getInfoCap', appId)
     // remove from list apps already in supabase
@@ -134,7 +135,7 @@ const getInfoCap = async (appId: string) => {
   }
 }
 
-const main = async (url: URL, headers: BaseHeaders, method: string, body: any) => {
+async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret) {

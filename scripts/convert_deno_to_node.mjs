@@ -81,13 +81,15 @@ netlifyEdgeTemplFiles.forEach((file) => {
 // exit()
 // console.log('netlifyTempl', netlifyTempl)
 // escape url for regex
-export const encodeBase64 = (data) => {
+export function encodeBase64(data) {
   return Buffer.from(data).toString('base64')
 }
-export const decodeBase64 = (data) => {
+export function decodeBase64(data) {
   return Buffer.from(data, 'base64').toString('ascii')
 }
-const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },

@@ -1,3 +1,4 @@
+const Buffer = require('node:buffer').Buffer
 const AdmZip = require('adm-zip')
 const apk = require('apkmirror.js')
 const gplay = require('google-play-scraper')
@@ -6,7 +7,7 @@ const headers = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
 }
 
-const isCapacitor = async (id) => {
+async function isCapacitor(id) {
   let found = false
 
   try {
@@ -48,7 +49,7 @@ const isCapacitor = async (id) => {
 // isCapacitor('de.burgerking.kingfinder')
 // isCapacitor('com.canva.editor')
 
-const getList = async () => {
+async function getList() {
   const res = await gplay.list({
     category: gplay.category.APPLICATION,
     collection: gplay.collection.TOP_FREE,
@@ -60,7 +61,7 @@ const getList = async () => {
   return list
 }
 
-const main = async () => {
+async function main() {
   const list = await getList()
   for (let i = 0; i < list.length; i++) {
     const id = list[i]
