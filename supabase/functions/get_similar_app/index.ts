@@ -11,7 +11,7 @@ gplay.memoized()
 async function getAppsInfo(appId: string, country: string): Promise<(Database['public']['Tables']['store_apps']['Insert'])[]> {
   const { title } = await gplay.app({
     appId,
-    throttle: 50,
+    // throttle: 50,
   }).catch(() => ({ title: '' }))
   if (!title)
     return []
