@@ -86,7 +86,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
         //   appIds: appsSimilarBatch.map(app => app.app_id),
         // }))
         console.log('appsSimilarBatch', appsSimilarBatch.length)
-        all.push(axios.post(`${baseApi}/get_framework-background`, {
+        all.push(axios.post(`${baseApi}/get_similar_app-background`, {
           appIds: appsSimilarBatch.map(app => app.app_id),
         }, options))
       }
