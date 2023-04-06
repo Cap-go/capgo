@@ -42,7 +42,7 @@ async function getTop(category = gplay.category.APPLICATION, country = 'us', col
     if (!res.length)
       return []
     // set to_get_similar to false
-    console.log('getTop', country, res.length)
+    console.log('getTop', category, country, collection, res.length)
     return res
   }
   catch (e) {
