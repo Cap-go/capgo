@@ -79,7 +79,7 @@ function getStats(): GlobalStats {
           if (name)
             plans[name] = plan.count
         }
-        return res.data || {}
+        return plans
       })
     }),
   }
