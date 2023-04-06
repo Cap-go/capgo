@@ -48,3 +48,4 @@ $function$;
 
 CREATE INDEX "idx_store_on_prem" ON "public"."store_apps" USING BTREE ("onprem");
 CREATE INDEX "idx_store_capgo" ON "public"."store_apps" USING BTREE ("capgo");
+alter role service_role set statement_timeout = '30s';
