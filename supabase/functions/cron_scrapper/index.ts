@@ -5,8 +5,8 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
-const toGetFramwork = 5000
-const toGetInfo = 5000
+const toGetFramwork = 500
+const toGetInfo = 500
 const toGetSimilar = 500
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: any) {

@@ -10,12 +10,9 @@ const logsnag = getEnv('LOGSNAG_TOKEN')
 
 async function insights(data: { title: string; value: string | boolean | number; icon: string }[]) {
   const all = []
+  console.log('logsnag', data)
   for (const d of data)
     all.push(logsnag.insight(d))
-  if (!getEnv('LOGSNAG_TOKEN')) {
-    console.log('logsnag not in prod', data)
-    return
-  }
   await Promise.all(all)
 }
 
