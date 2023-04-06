@@ -1,4 +1,4 @@
-import { LogSnag } from 'https://cdn.logsnag.com/deno/0.1.5/index.ts'
+import { LogSnag } from 'https://cdn.logsnag.com/deno/0.1.6/index.ts'
 import { getEnv } from './utils.ts'
 
 const logsnag = getEnv('LOGSNAG_TOKEN')
@@ -12,7 +12,10 @@ async function insights(data: { title: string; value: string | boolean | number;
   const all = []
   for (const d of data)
     all.push(logsnag.insight(d))
-
+  if (!getEnv('LOGSNAG_TOKEN')) {
+    console.log('logsnag not in prod', data)
+    return
+  }
   await Promise.all(all)
 }
 
