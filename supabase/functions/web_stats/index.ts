@@ -216,7 +216,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
         value: plans['Pay as you go'],
         icon: '📈',
       },
-    ]).catch()
+    ]).catch((e) => {
+      console.error('insights error', e)
+    })
     return sendRes()
   }
   catch (e) {
