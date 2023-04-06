@@ -62,7 +62,7 @@ function getStats(): GlobalStats {
         console.log('count_all_need_upgrade', res.error)
       return res.data || 0
     }),
-    plans: supabase.from('plans').select('name, product_id').then(({ data: planNames, error }) => {
+    plans: supabase.from('plans').select('name, stripe_id').then(({ data: planNames, error }) => {
       if (error || !planNames) {
         console.log('get plans', error)
         return {}
@@ -75,7 +75,7 @@ function getStats(): GlobalStats {
         // create object with name and count
         const plans: any = {}
         for (const plan of res.data) {
-          const name = planNames.find(p => p.product_id === plan.product_id)?.name
+          const name = planNames.find(p => p.stripe_id === plan.product_id)?.name
           if (name)
             plans[name] = plan.count
         }
