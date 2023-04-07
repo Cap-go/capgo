@@ -310,7 +310,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         console.log(id, 'Cannot update, ios is disabled', device_id)
         await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
         return sendRes({
-          major: true,
           message: 'Cannot update, ios it\'s disabled',
           error: 'disabled_platform_ios',
           version: version.name,
@@ -321,7 +320,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         console.log(id, 'Cannot update, android is disabled', device_id)
         await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, versionId)
         return sendRes({
-          major: true,
           message: 'Cannot update, android is disabled',
           error: 'disabled_platform_android',
           version: version.name,
@@ -356,7 +354,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         console.log(id, 'Cannot update dev build is disabled', device_id)
         await sendStats('disableDevBuild', platform, device_id, app_id, version_build, versionId)
         return sendRes({
-          major: true,
           message: 'Cannot update, dev build is disabled',
           error: 'disable_dev_build',
           version: version.name,
@@ -367,7 +364,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         console.log(id, 'Cannot update emulator is disabled', device_id)
         await sendStats('disableEmulator', platform, device_id, app_id, version_build, versionId)
         return sendRes({
-          major: true,
           message: 'Cannot update, emulator is disabled',
           error: 'disable_emulator',
           version: version.name,
