@@ -232,7 +232,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
 
       return sendRes({
         message: 'no default channel or override',
-        err: 'no_channel',
+        error: 'no_channel',
       }, 200)
     }
     const version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
@@ -254,7 +254,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     //   console.log('invalid ip', xForwardedFor, ip)
     //   return sendRes({
     //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
-    //     err: 'invalid_ip',
+    //     error: 'invalid_ip',
     //   }, 400)
     // }
     await updateOrCreateDevice({
@@ -276,7 +276,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot update, upgrade plan to continue to update',
-        err: 'need_plan_upgrade',
+        error: 'need_plan_upgrade',
       }, 200)
     }
 
@@ -285,7 +285,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendStats('missingBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot get bundle',
-        err: 'no_bundle',
+        error: 'no_bundle',
       }, 200)
     }
     let signedURL = version.external_url || ''
@@ -384,7 +384,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       await sendStats('cannotGetBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({
         message: 'Cannot get bundle',
-        err: 'no_bundle',
+        error: 'no_bundle',
       }, 200)
     }
     console.log(id, 'New version available', app_id, version.name, signedURL)
