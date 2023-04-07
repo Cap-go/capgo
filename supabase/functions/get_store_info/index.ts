@@ -61,8 +61,17 @@ async function getInfo(appId: string) {
       .single()
 
     const res = (!data || !data.lang) ? await findLang(appId) : await getAppInfo(appId, data.lang)
-    if (!res)
-      throw new Error(`no lang found ${appId}`)
+    if (!res) {
+      console.error('no lang found', appId)
+      await supabaseAdmin()
+        .from('store_apps')
+        .upsert({
+          app_id: appId,
+          to_get_info: false,
+          error_get_info: 'no lang found',
+        })
+      return []
+    }
     console.log('res', res)
     return [res]
   }
