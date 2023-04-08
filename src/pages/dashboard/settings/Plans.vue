@@ -206,7 +206,6 @@ const hightLights = computed<Stat[]>(() => ([
             </h2>
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">
               {{ t(convertKey(p.description)) }}
-              {{ t('plan-solo') }}
             </p>
             <p class="mt-8">
               <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
