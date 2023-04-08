@@ -185,8 +185,8 @@ const hightLights = computed<Stat[]>(() => ([
           </span>
         </div>
       </div>
-      <div class="mt-12 space-y-4 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="p in displayPlans" :key="p.id" class="relative border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+      <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
+        <div v-for="p in displayPlans" :key="p.id" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600" viewBox="0 0 83 64" fill="currentColor"
