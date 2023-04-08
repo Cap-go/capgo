@@ -32,12 +32,11 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
-  const defaultColor = 'bg-neutral-focus'
   const warning = 'bg-warning'
   // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
   const success = 'bg-success'
   if (main.paying && main.canUseMore)
-    return defaultColor
+    return ''
 
   else if (main.canceled)
     return warning
@@ -62,7 +61,7 @@ const bannerColor = computed(() => {
   <div v-if="bannerText" class="navbar" :class="bannerColor">
     <div class="navbar-start" />
     <div class="navbar-center lg:flex">
-      <a class="text-xl normal-case btn btn-ghost">{{ bannerText }}</a>
+      <a class="text-xl font-bold text-black normal-case">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
       <a href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
