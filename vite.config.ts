@@ -18,7 +18,7 @@ import { readdirSync } from 'fs-extra'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
-const getUrl = (): string => {
+function getUrl(): string {
   if (branch === 'local')
     return `http://${getRightKey('base_domain')}`
   else

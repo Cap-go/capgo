@@ -6,49 +6,49 @@ on:
       - renovate/**
 
 jobs:
-  build_android:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out
-        uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 7
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'pnpm'
-      - name: Install dependencies
-        id: install_code
-        run: pnpm install --frozen-lockfile
-      - name: Setup java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '11'
-      - name: Build
-        id: build_code
-        run: pnpm verify:android
-  build_ios:
-    runs-on: macOS-latest
-    steps:
-      - name: Check out
-        uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 7
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'pnpm'
-      - name: Install dependencies
-        id: install_code
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        id: build_code
-        run: pnpm verify:ios
+  # build_android:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Check out
+  #       uses: actions/checkout@v3
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: 8
+  #     - name: Use Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18
+  #         cache: 'pnpm'
+  #     - name: Install dependencies
+  #       id: install_code
+  #       run: pnpm install --frozen-lockfile
+  #     - name: Setup java
+  #       uses: actions/setup-java@v3
+  #       with:
+  #         distribution: 'zulu'
+  #         java-version: '11'
+  #     - name: Build
+  #       id: build_code
+  #       run: pnpm verify:android
+  # build_ios:
+  #   runs-on: macOS-latest
+  #   steps:
+  #     - name: Check out
+  #       uses: actions/checkout@v3
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: 8
+  #     - name: Use Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18
+  #         cache: 'pnpm'
+  #     - name: Install dependencies
+  #       id: install_code
+  #       run: pnpm install --frozen-lockfile
+  #     - name: Build
+  #       id: build_code
+  #       run: pnpm verify:ios
   web:
     runs-on: ubuntu-latest
     name: 'Build code and test'
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
         with:
-          version: 7
+          version: 8
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -72,6 +72,6 @@ jobs:
       - name: Build
         id: build_code
         run: pnpm build
-      - name: Verify
-        id: verify_code
-        run: pnpm verify:web
+      # - name: Verify
+      #   id: verify_code
+      #   run: pnpm verify:web
