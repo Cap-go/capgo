@@ -149,7 +149,7 @@ async function getData() {
   isLoading.value = false
 }
 async function refreshData() {
-  console.log('refreshData')
+  // console.log('refreshData')
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -248,7 +248,7 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <k-fab class="right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary fixed z-20" @click="addChannelModal = true">
+    <k-fab class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="addChannelModal = true">
       <template #icon>
         <component :is="IconPlus" />
       </template>
@@ -260,7 +260,7 @@ watch(props, async () => {
       <template #title>
         {{ t('channel-create') }}
       </template>
-      <input v-model="newChannel" type="text" placeholder="Production" class="w-full rounded-lg p-1 text-lg text-gray-900">
+      <input v-model="newChannel" type="text" placeholder="Production" class="w-full p-1 text-lg text-gray-900 rounded-lg">
       <template #buttons>
         <k-dialog-button class="text-red-800" @click="() => (addChannelModal = false)">
           {{ t('button-cancel') }}

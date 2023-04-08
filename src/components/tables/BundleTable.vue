@@ -101,7 +101,7 @@ async function getData() {
   isLoading.value = false
 }
 async function refreshData() {
-  console.log('refreshData')
+  // console.log('refreshData')
   try {
     currentPage.value = 1
     elements.value.length = 0
