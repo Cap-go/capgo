@@ -68,7 +68,7 @@ displayStore.NavTitle = t('settings')
 </script>
 
 <template>
-  <div class="flex h-full overflow-hidden bg-white pt-safe dark:bg-gray-900/90 safe-areas">
+  <div class="flex h-full overflow-hidden bg-gray-100/90 pt-safe dark:bg-gray-900/90 safe-areas">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
     <!-- Content area -->
