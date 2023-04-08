@@ -15,6 +15,30 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ## iOS
 
+### ios refresh_profiles
+
+```sh
+[bundle exec] fastlane ios refresh_profiles
+```
+
+
+
+### ios register_new_device
+
+```sh
+[bundle exec] fastlane ios register_new_device
+```
+
+Register new device
+
+### ios build
+
+```sh
+[bundle exec] fastlane ios build
+```
+
+
+
 ### ios closed_beta
 
 ```sh
@@ -40,6 +64,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ```sh
 [bundle exec] fastlane android beta
+```
+
+
+
+### android build
+
+```sh
+[bundle exec] fastlane android build
 ```
 
 

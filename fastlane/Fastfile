@@ -59,7 +59,20 @@ platform :ios do
     refresh_profiles
   end
 
-  lane :closed_beta do
+  lane :build do
+    build_app(
+      configuration: "Release",
+      workspace: "./ios/App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: { 
+            DEVELOPER_APP_ID => "#{PROVISIONING_PROFILE_SPECIFIER}"
+        }
+      }
+    )
+  end
+    lane :closed_beta do
     ensure_temp_keychain(TEMP_KEYCHAIN_USER, TEMP_KEYCHAIN_PASSWORD)
 
     api_key = app_store_connect_api_key(
@@ -168,6 +181,18 @@ platform :android do
           skip_upload_images: true,
           skip_upload_screenshots: true,
         )
+    end
+    lane :build do
+      gradle(
+        task: "clean bundleRelease",
+        project_dir: 'android/',
+        print_command: false,
+        properties: {
+          "android.injected.signing.store.file" => "#{KEYSTORE_PATH}",
+          "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
+          "android.injected.signing.key.alias" => "#{KEYSTORE_KEY_ALIAS}",
+          "android.injected.signing.key.password" => "#{KEYSTORE_KEY_PASSWORD}",
+        })
     end
     lane :prod_release do
       build_gradle = File.read("../android/app/build.gradle")
