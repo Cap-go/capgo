@@ -246,11 +246,11 @@ const hightLights = computed<Stat[]>(() => ([
 
           <BlurBg>
             <template #default>
-              <div class="px-16 py-8 lg:px-16 lg:py-14 sm:px-8">
-                <div class="md:flex md:items-center lg:space-x-6 md:space-x-4">
+              <div class="w-full px-16 py-8 lg:px-16 lg:py-14 sm:px-8">
+                <div class="w-full md:flex md:items-center lg:space-x-6 md:space-x-4">
                   <div class="grid grid-cols-1 gap-x-12 gap-y-3 sm:grid-cols-2 xl:gap-x-24">
                     <div>
-                      <ul class="space-y-3 text-base font-medium text-white font-pj">
+                      <ul class="space-y-3 text-base font-medium dark:text-white font-pj">
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -275,7 +275,7 @@ const hightLights = computed<Stat[]>(() => ([
                     </div>
 
                     <div>
-                      <ul class="space-y-3 text-base font-medium text-white font-pj">
+                      <ul class="space-y-3 text-base font-medium dark:text-white font-pj">
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -302,7 +302,7 @@ const hightLights = computed<Stat[]>(() => ([
 
                   <div class="block lg:block md:hidden">
                     <div class="hidden lg:block">
-                      <svg class="w-4 h-auto text-gray-600" viewBox="0 0 16 123" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                      <svg class="w-4 h-auto dark:text-gray-600" viewBox="0 0 16 123" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
                         <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 11)" />
                         <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 46)" />
                         <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 81)" />
@@ -324,7 +324,7 @@ const hightLights = computed<Stat[]>(() => ([
                     </div>
 
                     <div class="block mt-10 md:hidden">
-                      <svg class="w-auto h-4 text-gray-600" viewBox="0 0 172 16" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                      <svg class="w-auto h-4 dark:text-gray-600" viewBox="0 0 172 16" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
                         <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 11 1)" />
                         <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 46 1)" />
                         <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 81 1)" />
@@ -353,11 +353,11 @@ const hightLights = computed<Stat[]>(() => ([
                     </div>
                   </div>
 
-                  <div class="mt-10 md:mt-0">
+                  <div class="!mx-auto mt-10 md:mt-0">
                     <a
                       href="#"
                       title="Get quote now"
-                      class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-900 transition-all duration-200 bg-white border border-transparent font-pj rounded-xl hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white"
+                      class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border border-transparent dark:bg-white dark:text-gray-900 font-pj rounded-xl hover:bg-opacity-50 dark:hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black dark:focus:ring-white"
                       role="button"
                       @click="openSupport()"
                     >
