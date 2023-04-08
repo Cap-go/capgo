@@ -15,15 +15,17 @@ const style = computed(() => ({ background: props.background }))
 </script>
 
 <template>
-  <div class="relative lg:mx-auto lg:max-w-5xl" :class="{ 'mt-12 lg:mt-20': !props.mini, 'mt-6 lg:mt-12': props.mini }">
-    <div class="absolute -inset-2">
-      <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg" :style="style" />
-    </div>
+  <div>
+    <div class="relative lg:mx-auto lg:max-w-5xl" :class="{ 'mt-12 lg:mt-20': !props.mini, 'mt-6 lg:mt-12': props.mini }">
+      <div class="absolute -inset-2">
+        <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg" :style="style" />
+      </div>
 
-    <div class="absolute rounded-xl from-cyan-500 to-purple-500 bg-gradient-to-r -inset-px" />
+      <div class="absolute rounded-xl from-cyan-500 to-purple-500 bg-gradient-to-r -inset-px" />
 
-    <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-white rounded-xl dark:bg-black dark:bg-opacity-90 md:flex-row md:text-left">
-      <slot />
+      <div class="relative flex flex-col items-stretch overflow-hidden text-center bg-white rounded-xl dark:bg-black dark:bg-opacity-90 md:flex-row md:text-left">
+        <slot />
+      </div>
     </div>
   </div>
 </template>

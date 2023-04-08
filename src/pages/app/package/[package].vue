@@ -95,13 +95,13 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="h-full flex flex-col items-center justify-center">
+  <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
     <Spinner size="w-40 h-40" />
   </div>
-  <div v-else class="mb-8 h-full max-h-fit w-full overflow-y-scroll px-4 pt-4 lg:px-8 sm:px-6">
+  <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll max-h-fit lg:px-8 sm:px-6">
     <Usage :app-id="id" />
 
-    <BlurBg>
+    <BlurBg class="mb-10">
       <template #default>
         <StatsBar :stats="stats" />
       </template>
