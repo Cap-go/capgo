@@ -45,7 +45,7 @@ async function versionData() {
     const versionsIds = elements.value
       .map(elem => elem.version)
       .filter(e => !versionsIdAlreadyFetch.includes(e))
-    console.log('versionsIds', versionsIds)
+    // console.log('versionsIds', versionsIds)
     if (!versionsIds.length)
       return
     const { data: res } = await supabase
