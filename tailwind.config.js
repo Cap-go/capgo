@@ -45,7 +45,8 @@ module.exports = konstaConfig({
   },
   content: [
     './index.html',
-    './src/**/*.{vue,js,ts,jsx,tsx}',
+    './src/**/*.{vue,js,ts}',
+    './src/*.{vue,js,ts}',
     './node_modules/flowbite/**/*.js',
   ],
   theme: {
