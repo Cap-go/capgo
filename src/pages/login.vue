@@ -69,30 +69,30 @@ onMounted(checkLogin)
 
 <template>
   <!-- component -->
-  <section class="my-auto h-full w-full flex overflow-y-scroll py-10 lg:py-2 sm:py-8">
-    <div class="mx-auto my-auto max-w-7xl px-4 lg:px-8 sm:px-6">
-      <div class="mx-auto max-w-2xl text-center">
-        <img src="/capgo.webp" alt="logo" class="mx-auto mb-6 w-1/6 rounded">
+  <section class="flex w-full h-full py-10 my-auto overflow-y-scroll lg:py-2 sm:py-8">
+    <div class="px-4 mx-auto my-auto max-w-7xl lg:px-8 sm:px-6">
+      <div class="max-w-2xl mx-auto text-center">
+        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">
         <h1 class="text-3xl font-bold leading-tight text-black lg:text-5xl sm:text-4xl dark:text-white">
           {{ t('welcome-to') }} <p class="inline font-prompt">
             Capgo
           </p> !
         </h1>
-        <p class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
+        <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600 dark:text-gray-300">
           {{ t('login-to-your-accoun') }}
         </p>
       </div>
 
-      <div class="relative mx-auto mt-8 max-w-md md:mt-4">
-        <div class="overflow-hidden rounded-md bg-white shadow-md">
+      <div class="relative max-w-md mx-auto mt-8 md:mt-4">
+        <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="login-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <div>
                   <label for="" class="text-base font-medium text-gray-900"> Email address </label>
                   <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                       </svg>
                     </div>
@@ -122,8 +122,8 @@ onMounted(checkLogin)
                     </router-link>
                   </div>
                   <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"
@@ -148,8 +148,8 @@ onMounted(checkLogin)
                 </div>
                 <FormKitMessages />
                 <div>
-                  <button type="submit" class="w-full inline-flex items-center justify-center">
-                    <svg v-if="isLoading" class="mr-3 inline-block h-5 w-5 animate-spin align-middle text-gray-900 -ml-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <button type="submit" class="inline-flex items-center justify-center w-full">
+                    <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle
                         class="opacity-25"
                         cx="12"
@@ -160,7 +160,7 @@ onMounted(checkLogin)
                       />
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <button v-if="!isLoading" type="submit" class="w-full inline-flex items-center justify-center rounded-md bg-muted-blue-700 px-4 py-4 text-base font-semibold text-white transition-all duration-200 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none">
+                    <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none">
                       {{ t('log-in') }}
                     </button>
                   </button>
