@@ -28,7 +28,7 @@ watch(
 <template>
   <div>
     <div class="h-full overflow-y-scroll md:py-4">
-      <div id="versions" class="mx-auto flex flex-col overflow-y-scroll border border-slate-200 rounded-lg shadow-lg md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+      <div id="versions" class="flex flex-col mx-auto overflow-y-scroll bg-white border rounded-lg shadow-lg border-slate-200 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
         <DeviceTable class="p-3" :app-id="appId" />
       </div>
     </div>

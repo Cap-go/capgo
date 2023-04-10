@@ -3,6 +3,7 @@ import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { gt } from 'semver'
+import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -237,7 +238,7 @@ async function saveCustomId() {
       custom_id: device.value?.custom_id,
     })
     .eq('device_id', id.value)
-  toast.error(t('custom-id-saved'))
+  toast.success(t('custom-id-saved'))
 }
 
 async function delDevVersion(device: string) {
@@ -378,7 +379,7 @@ watchEffect(async () => {
   <div v-if="device" class="h-full overflow-y-scroll md:py-4">
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
           <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
@@ -397,7 +398,7 @@ watchEffect(async () => {
       </div>
     </div>
     <div v-else-if="ActiveTab === 'logs'" id="devices" class="h-full overflow-y-scroll md:py-4">
-      <div class="mx-auto flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col mx-auto overflow-y-scroll bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <LogTable
           class="p-3"
           :device-id="id"

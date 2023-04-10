@@ -305,7 +305,7 @@ function hideString(str: string) {
     <div v-if="version" class="h-full overflow-y-scroll md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div class="flex flex-col overflow-y-scroll shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+        <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
@@ -330,7 +330,7 @@ function hideString(str: string) {
         </div>
       </div>
       <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
-        <div class="flex flex-col mx-auto overflow-y-scroll shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+        <div class="flex flex-col mx-auto overflow-y-scroll bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
           <DeviceTable
             class="p-3"
             :app-id="packageId"

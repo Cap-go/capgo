@@ -250,7 +250,7 @@ async function openPannel() {
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
@@ -263,101 +263,101 @@ async function openPannel() {
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <k-list class="mt-5 w-full list-none border-t border-gray-200">
-            <k-list-item label :title="t('channel-is-public')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+          <k-list class="w-full mt-5 list-none border-t border-gray-200">
+            <k-list-item label :title="t('channel-is-public')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.public"
                   @change="() => (makeDefault(!channel?.public))"
                 />
               </template>
             </k-list-item>
-            <k-list-item label title="iOS" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label title="iOS" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.ios"
                   @change="saveChannelChange('ios', !channel?.ios)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label title="Android" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label title="Android" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.android"
                   @change="saveChannelChange('android', !channel?.android)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('disable-auto-downgra')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label :title="t('disable-auto-downgra')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.disableAutoUpdateUnderNative"
                   @change="saveChannelChange('disable_auto_downgrade', !channel?.disableAutoUpdateUnderNative)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.disableAutoUpdateToMajor"
                   @change="saveChannelChange('disable_auto_upgrade', !channel?.disableAutoUpdateToMajor)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('allow-develoment-bui')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label :title="t('allow-develoment-bui')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_dev"
                   @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('allow-emulator')" class="text-xl font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label :title="t('allow-emulator')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_emulator"
                   @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('allow-device-to-self')" class="text-lg font-medium text-gray-700 dark:text-gray-200">
+            <k-list-item label :title="t('allow-device-to-self')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
-                  class="k-color-success -my-1"
+                  class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_device_self_set"
                   @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('unlink-bundle')" class="text-lg font-medium text-red-500" link @click="openPannel" />
+            <k-list-item label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
           </k-list>
         </dl>
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <DeviceTable class="p-3" :app-id="channel.version.app_id" :channel-id="id" :ids="deviceIds" />
       </div>
     </div>
