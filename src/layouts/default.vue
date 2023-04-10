@@ -7,7 +7,7 @@ const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-full overflow-hidden bg-white pt-safe dark:bg-gray-900/90 safe-areas">
+  <div class="flex h-full overflow-hidden pt-safe safe-areas">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
     <!-- Content area -->

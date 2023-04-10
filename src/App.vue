@@ -9,7 +9,7 @@ const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
 
 <template>
   <kProvider theme="ios">
-    <div class="h-full overflow-hidden k-ios bg-white/90 dark:bg-gray-900/90">
+    <div class="h-full overflow-hidden k-ios">
       <RouterView class="h-full overflow-hidden" />
       <ActionSheet />
       <Toast />

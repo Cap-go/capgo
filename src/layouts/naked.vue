@@ -2,7 +2,7 @@
 </script>
 
 <template>
-  <div class="flex h-full overflow-hidden bg-white dark:bg-gray-900/90">
+  <div class="flex h-full overflow-hidden pt-safe">
     <main class="w-full h-full overflow-y-hidden">
       <RouterView class="static" />
     </main>

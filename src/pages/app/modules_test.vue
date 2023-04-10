@@ -3,6 +3,7 @@ import { kBlockTitle, kList, kListItem } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
+import { NativeAudio } from '@capgo/native-audio'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
@@ -24,6 +25,7 @@ const mods = {
   CapacitorUpdater,
   Camera,
   Mute,
+  NativeAudio,
 }
 modules.value.push(...[
   // {
@@ -55,6 +57,21 @@ modules.value.push(...[
     name: 'NativeMarket',
     method: 'search',
     option: { terms: 'capacitor' },
+  },
+  {
+    name: 'NativeAudio',
+    method: 'preload',
+    option: {
+      assetId: 'example',
+      assetPath: 'assets/file_example.mp3',
+      audioChannelNum: 1,
+      isUrl: false,
+    },
+  },
+  {
+    name: 'NativeAudio',
+    method: 'play',
+    option: { assetId: 'example' },
   },
   {
     name: 'CapacitorUpdater',
