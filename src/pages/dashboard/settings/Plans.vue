@@ -154,30 +154,32 @@ const hightLights = computed<Stat[]>(() => ([
           {{ t('plan-desc') }}<br>
         </p>
       </div>
-      <BlurBg :mini="true" background="">
-        <template #default>
-          <StatsBar :mini="true" :stats="hightLights" />
-        </template>
-      </BlurBg>
+      <section class="px-8 pt-4 sm:px-0">
+        <BlurBg :mini="true">
+          <template #default>
+            <StatsBar :mini="true" :stats="hightLights" />
+          </template>
+        </BlurBg>
+      </section>
       <div class="flex items-center justify-center mt-8 space-x-6 sm:mt-12">
         <div class="flex items-center" @click="segmentVal = 'm'">
           <input
             id="monthly" type="radio" name="pricing-plans"
-            class="w-4 h-4 text-blue-600 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
             :checked="segmentVal === 'm'"
           >
-          <label for="monthly" class="block ml-3 text-sm font-medium text-gray-200 sm:text-base">
-            Monthly Plan
+          <label for="monthly" class="block ml-3 text-sm font-medium sm:text-base">
+            {{ t('monthly-plan') }}
           </label>
         </div>
 
         <div class="flex items-center" @click="segmentVal = 'y'">
           <input
             id="yearly" type="radio" name="pricing-plans"
-            class="w-4 h-4 text-blue-600 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
             :checked="segmentVal === 'y'"
           >
-          <label for="yearly" class="block ml-3 text-sm font-medium text-gray-200 sm:text-base">
+          <label for="yearly" class="block ml-3 text-sm font-medium sm:text-base">
             {{ t('yearly') }}
           </label>
           <span class="ml-1 text-sm font-medium text-blue-600">
@@ -244,9 +246,9 @@ const hightLights = computed<Stat[]>(() => ([
             </h2>
           </div>
 
-          <BlurBg>
+          <BlurBg background="">
             <template #default>
-              <div class="w-full px-16 py-8 lg:px-16 lg:py-14 sm:px-8">
+              <div class="w-full px-16 py-8 lg:px-16 lg:py-14 sm:px-8 bg-blue-50">
                 <div class="w-full md:flex md:items-center lg:space-x-6 md:space-x-4">
                   <div class="grid grid-cols-1 gap-x-12 gap-y-3 sm:grid-cols-2 xl:gap-x-24">
                     <div>
