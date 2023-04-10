@@ -19,6 +19,7 @@ function close(item: ActionSheetOptionButton | undefined) {
     item?.handler && item.handler()
   }
 }
+// gernerate array of 50 elements
 </script>
 
 <template>
@@ -26,13 +27,15 @@ function close(item: ActionSheetOptionButton | undefined) {
     :opened="displayStore.showActionSheet"
     @backdropclick="close(undefined)"
   >
-    <k-actions-group>
-      <k-actions-label v-if="displayStore.actionSheetOption?.header">
-        {{ displayStore.actionSheetOption.header }}
-      </k-actions-label>
-      <k-actions-button v-for="(item, index) in displayStore.actionSheetOption?.buttons" :id="item.id" :key="index" :class="{ 'dark:!bg-white !bg-neutral-800': item.selected }" @click="close(item)">
-        {{ item.text }}
-      </k-actions-button>
-    </k-actions-group>
+    <div class="max-h-screen overflow-y-auto">
+      <k-actions-group>
+        <k-actions-label v-if="displayStore.actionSheetOption?.header">
+          {{ displayStore.actionSheetOption.header }}
+        </k-actions-label>
+        <k-actions-button v-for="(item, index) in displayStore.actionSheetOption?.buttons" :id="item.id" :key="index" :class="{ 'dark:!bg-white !bg-neutral-800': item.selected }" @click="close(item)">
+          {{ item.text }}
+        </k-actions-button>
+      </k-actions-group>
+    </div>
   </k-actions>
 </template>
