@@ -100,7 +100,7 @@ async function isCapacitor(id: string) {
 }
 async function getInfoCap(appId: string) {
   try {
-    console.log('getInfoCap', appId)
+    // console.log('getInfoCap', appId)
     // remove from list apps already in supabase
     const res = await isCapacitor(appId)
     // save in supabase
@@ -120,6 +120,7 @@ async function getInfoCap(appId: string) {
       })
     if (error)
       console.log('error', error)
+    console.log('getInfoCap', appId, res)
   }
   catch (e) {
     console.log('error getInfoCap', e)

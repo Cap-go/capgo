@@ -37,7 +37,7 @@ async function getList(category = gplay.category.APPLICATION, collection = gplay
 
 async function getTop(category = gplay.category.APPLICATION, country = 'us', collection = gplay.collection.TOP_FREE, limit = 1000) {
   try {
-    console.log('getTop', category, country, collection)
+    // console.log('getTop', category, country, collection)
     const res = await getList(category, collection, limit, country)
     if (!res.length)
       return []
