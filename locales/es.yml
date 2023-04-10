@@ -227,9 +227,7 @@ plan-bandwidth: Ancho de banda GB
 plan-buy: Comprar
 plan-desc: >-
   Comience a construir de forma gratuita, luego agregue un plan para ponerlo en
-  marcha. 
-
-  Los planes de cuenta desbloquean funciones adicionales.
+  marcha.
 plan-free: Lo mejor para MVP y pruebas
 plan-inactive: Plan inactivo
 plan-is-the-best-pla: plan es el mejor plan para sus necesidades.

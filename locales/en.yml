@@ -210,9 +210,7 @@ personal-information: Personal Informations
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
 plan-buy: Buy
-plan-desc: >-
-  Start building for free, then add a plan to go live. Account plans unlock
-  additional features.
+plan-desc: Start building for free, then add a plan to go live.
 plan-free: Best for MVP and testing
 plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.

@@ -211,9 +211,7 @@ personal-information: 개인 정보
 plan-abtest: A/B 테스트
 plan-bandwidth: GB 대역폭
 plan-buy: 구입하다
-plan-desc: |-
-  무료로 구축을 시작한 다음 실행 계획을 추가하세요. 
-  계정 계획은 추가 기능을 잠금 해제합니다.
+plan-desc: 무료로 구축을 시작한 다음 실행 계획을 추가하세요.
 plan-free: MVP 및 테스트에 가장 적합
 plan-inactive: 비활성 계획
 plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.

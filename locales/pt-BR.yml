@@ -217,9 +217,7 @@ personal-information: Informações pessoais
 plan-abtest: teste A/B
 plan-bandwidth: GB de largura de banda
 plan-buy: Comprar
-plan-desc: |-
-  Comece a criar gratuitamente e adicione um plano para entrar no ar. 
-  Os planos de conta desbloqueiam recursos adicionais.
+plan-desc: Comece a criar gratuitamente e adicione um plano para entrar no ar.
 plan-free: Melhor para MVP e testes
 plan-inactive: Plano inativo
 plan-is-the-best-pla: plan é o melhor plano para as suas necessidades.

@@ -219,9 +219,7 @@ plan-bandwidth: GB Bant Genişliği
 plan-buy: Satın almak
 plan-desc: >-
   Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
-  ekleyin. 
-
-  Hesap planları ek özelliklerin kilidini açar.
+  ekleyin.
 plan-free: MVP ve test için en iyisi
 plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.

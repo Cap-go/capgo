@@ -225,9 +225,7 @@ personal-information: Informations personnelles
 plan-abtest: Test A/B
 plan-bandwidth: Bande passante Go
 plan-buy: Acheter
-plan-desc: |-
-  Commencez à créer gratuitement, puis ajoutez un plan pour le mettre en ligne. 
-  Les plans de compte débloquent des fonctionnalités supplémentaires.
+plan-desc: Commencez à créer gratuitement, puis ajoutez un plan pour le mettre en ligne.
 plan-free: Idéal pour MVP et les tests
 plan-inactive: Forfait inactif
 plan-is-the-best-pla: plan est le meilleur plan pour vos besoins.

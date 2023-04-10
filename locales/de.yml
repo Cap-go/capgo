@@ -229,9 +229,7 @@ plan-bandwidth: GB Bandbreite
 plan-buy: Besorgen
 plan-desc: >-
   Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan hinzu,
-  um live zu gehen. 
-
-  Kontopläne schalten zusätzliche Funktionen frei.
+  um live zu gehen.
 plan-free: Am besten für MVP und Tests
 plan-inactive: Planen Sie inaktiv
 plan-is-the-best-pla: Plan ist der beste Plan für Ihre Bedürfnisse.

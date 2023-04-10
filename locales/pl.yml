@@ -217,9 +217,7 @@ personal-information: Informacje osobiste
 plan-abtest: Testy A/B
 plan-bandwidth: GB Przepustowość
 plan-buy: Kupić
-plan-desc: |-
-  Rozpocznij tworzenie za darmo, a następnie dodaj plan uruchomienia. 
-  Plany kont odblokowują dodatkowe funkcje.
+plan-desc: Zacznij budować za darmo, a następnie dodaj plan, aby rozpocząć.
 plan-free: Najlepsze do MVP i testów
 plan-inactive: Plan nieaktywny
 plan-is-the-best-pla: plan to najlepszy plan dla Twoich potrzeb.

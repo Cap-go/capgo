@@ -221,9 +221,7 @@ personal-information: Informazioni personali
 plan-abtest: Test A/B
 plan-bandwidth: Larghezza di banda GB
 plan-buy: Acquistare
-plan-desc: |-
-  Inizia a creare gratuitamente, quindi aggiungi un piano per la pubblicazione. 
-  I piani account sbloccano funzionalità aggiuntive.
+plan-desc: Inizia a creare gratuitamente, quindi aggiungi un piano per la pubblicazione.
 plan-free: Ideale per MVP e test
 plan-inactive: Piano inattivo
 plan-is-the-best-pla: plan è il miglior piano per le tue esigenze.

@@ -211,9 +211,7 @@ personal-information: 個人情報
 plan-abtest: A / Bテスト
 plan-bandwidth: GB帯域幅
 plan-buy: 買う
-plan-desc: |-
-  無料で構築を開始し、ライブに移行するための計画を追加します。
-  アカウント プランは、追加機能のロックを解除します。
+plan-desc: 無料で構築を開始し、ライブに移行するための計画を追加します。
 plan-free: MVP とテストに最適
 plan-inactive: プランの非アクティブ
 plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。

@@ -219,9 +219,7 @@ personal-information: Thông tin cá nhân
 plan-abtest: Thử nghiệm A/B
 plan-bandwidth: Băng thông GB
 plan-buy: Mua
-plan-desc: |-
-  Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động. 
-  Gói tài khoản mở khóa các tính năng bổ sung.
+plan-desc: Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động.
 plan-free: Tốt nhất cho MVP và thử nghiệm
 plan-inactive: Kế hoạch không hoạt động
 plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
