@@ -146,7 +146,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="relative pb-4 pb-20 overflow-x-auto shadow-md sm:rounded-lg md:pb-0">
+  <div class="relative pb-4 pb-20 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between pb-4 md:items-center">
       <div class="flex mb-2 md:mb-0">
         <button class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">

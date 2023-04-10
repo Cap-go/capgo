@@ -38,7 +38,7 @@ geKeys()
 </script>
 
 <template>
-  <div class="max-w-9xl mx-auto h-full w-full px-4 py-8 lg:px-8 sm:px-6">
+  <div class="w-full h-full px-4 py-8 mx-auto max-w-9xl lg:px-8 sm:px-6">
     <!-- Page header -->
     <div class="mb-8">
       <!-- Title -->
@@ -47,7 +47,7 @@ geKeys()
       </h1>
     </div>
     <div class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll border-slate-200 shadow-lg md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="copyKey(app)" />
         </dl>
