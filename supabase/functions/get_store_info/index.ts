@@ -53,7 +53,7 @@ async function findLang(appId: string) {
 
 async function getInfo(appId: string) {
   try {
-    console.log('getInfo', appId)
+    // console.log('getInfo', appId)
     const { data } = await supabaseAdmin()
       .from('store_apps')
       .select()
@@ -72,7 +72,7 @@ async function getInfo(appId: string) {
         })
       return []
     }
-    console.log('res', res)
+    console.log('getInfo', appId, res)
     return [res]
   }
   catch (e) {
