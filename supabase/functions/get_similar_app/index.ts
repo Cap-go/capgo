@@ -43,7 +43,7 @@ async function getAppsInfo(appId: string, country: string): Promise<(Database['p
 
 async function getSimilar(appId: string, country = 'us') {
   try {
-    console.log('getInfo', appId, country)
+    // console.log('getSimilar', appId, country)
     const res = await getAppsInfo(appId, country)
     if (!res.length)
       return []
