@@ -81,12 +81,12 @@ export async function sendNotif(eventName: string, eventData: EventData, userId:
 
   if (!user) {
     console.log('user not found', userId)
-    return Promise.resolve()
+    return Promise.resolve(false)
   }
   const isDeletedUser = await isDeleted(user.email)
   if (isDeletedUser) {
     console.log('user is deleted', userId)
-    return Promise.resolve()
+    return Promise.resolve(false)
   }
   // check if notif has already been send in notifications table
   const { data: notif } = await supabaseAdmin()
@@ -98,15 +98,15 @@ export async function sendNotif(eventName: string, eventData: EventData, userId:
   // set user data in crisp
   if (!notif) {
     console.log('notif never sent', eventName, userId)
-    return sendNow(eventName, eventData, user.email, userId, color, null)
+    return sendNow(eventName, eventData, user.email, userId, color, null).then(() => true)
   }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
     console.log('notif already sent', eventName, userId)
-    return Promise.resolve()
+    return Promise.resolve(false)
   }
   console.log('notif ready to sent', eventName, userId)
-  return sendNow(eventName, eventData, user.email, userId, color, notif)
+  return sendNow(eventName, eventData, user.email, userId, color, notif).then(() => true)
 }
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
