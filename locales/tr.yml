@@ -167,6 +167,7 @@ last-upload: Son yükleme
 last-version: Son sürüm
 launch-bundle: Paketi başlat
 limit-reached: Sınıra ulaşıldı
+live-reload: Canlı yeniden yükleme
 loading-more-data: Daha fazla veri yükleniyor...
 log-in: Giriş yapmak
 log-to-the-capgo-cli: Capgo CLI'da oturum açın
@@ -288,6 +289,7 @@ thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
 title: başlık
+to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
 trial-left: Kalan günler
@@ -306,6 +308,7 @@ upperCaseError: Büyük harfler içermelidir
 url: URL
 usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
 usage-title: Toplam
+use-the-command: 'Şu komutu kullanın:'
 user: kullanıcı
 validate: Doğrula
 version: Sürüm

@@ -175,6 +175,7 @@ last-upload: Letzter Upload
 last-version: Letzte Version
 launch-bundle: Bündel starten
 limit-reached: Limit erreicht
+live-reload: Live-Neuladen
 loading-more-data: Weitere Daten werden geladen...
 log-in: Anmeldung
 log-to-the-capgo-cli: Melden Sie sich bei der Capgo-CLI an
@@ -298,6 +299,7 @@ thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
 the: Der
 this-page-will-self-: Diese Seite wird sich selbst aktualisieren
 title: Titel
+to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
 trial-left: Tage übrig
@@ -316,6 +318,7 @@ upperCaseError: Sollte Großbuchstaben enthalten
 url: URL
 usage-success: Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten aktualisiert
 usage-title: Gesamt
+use-the-command: 'Verwenden Sie den Befehl:'
 user: Benutzer
 validate: Bestätigen
 version: Ausführung

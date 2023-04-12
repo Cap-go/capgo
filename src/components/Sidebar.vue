@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import type { Tab } from './comp_def'
 import IconDashboard from '~icons/ic/round-space-dashboard'
+// import FluentLive20Filled from '~icons/fluent/live-20-filled'
 import IconApiKey from '~icons/mdi/shield-key'
 import IconDiscord from '~icons/ic/round-discord'
 import IconDoc from '~icons/gg/loadbar-doc'
@@ -53,6 +54,11 @@ const tabs = ref<Tab[]>([
     icon: shallowRef(IconApiKey),
     key: '/dashboard/apikeys',
   },
+  // {
+  //   label: t('live-reload'),
+  //   icon: shallowRef(FluentLive20Filled),
+  //   key: '/dashboard/livereload',
+  // },
   {
     label: t('documentation'),
     icon: shallowRef(IconDoc),

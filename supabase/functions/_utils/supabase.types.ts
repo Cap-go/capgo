@@ -35,6 +35,26 @@ export interface Database {
           user_id?: string
         }
       }
+      app_live: {
+        Row: {
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          url?: string
+        }
+      }
       app_stats: {
         Row: {
           app_id: string
@@ -901,6 +921,14 @@ export interface Database {
         }
         Returns: {
           name: string
+        }[]
+      }
+      find_missing_app_ids: {
+        Args: {
+          app_ids: string[]
+        }
+        Returns: {
+          missing_app_id: string
         }[]
       }
       get_app_versions: {

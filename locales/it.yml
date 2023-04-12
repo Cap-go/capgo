@@ -169,6 +169,7 @@ last-upload: Ultimo caricamento
 last-version: Ultima versione
 launch-bundle: Pacchetto di lancio
 limit-reached: Limite raggiunto
+live-reload: Ricarica dal vivo
 loading-more-data: Caricamento di altri dati...
 log-in: Login
 log-to-the-capgo-cli: Accedere all'interfaccia a riga di comando di Capgo
@@ -290,6 +291,7 @@ thank-you-for-choosi: Grazie per aver scelto Capgo!
 the: IL
 this-page-will-self-: Questa pagina si aggiornerà automaticamente
 title: titolo
+to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
 top-apps: Le mie applicazioni
 trial-left: giorni rimasti
@@ -308,6 +310,7 @@ upperCaseError: Deve contenere lettere maiuscole
 url: URL
 usage-success: Il tuo piano è stato impostato questa pagina sarà aggiornata, in pochi minuti
 usage-title: Totale
+use-the-command: 'Usa il comando:'
 user: Utente
 validate: Convalidare
 version: Versione

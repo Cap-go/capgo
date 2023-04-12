@@ -169,6 +169,7 @@ last-upload: Unggahan terakhir
 last-version: Versi terakhir
 launch-bundle: Luncurkan bundel
 limit-reached: Batas tercapai
+live-reload: Muat ulang langsung
 loading-more-data: Memuat lebih banyak data...
 log-in: Gabung
 log-to-the-capgo-cli: Masuk ke Capgo CLI
@@ -288,6 +289,7 @@ thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri
 title: judul
+to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 trial-left: hari tersisa
@@ -308,6 +310,7 @@ usage-success: >-
   Rencana Anda telah disiapkan, halaman ini akan diperbarui, dalam beberapa
   menit
 usage-title: Total
+use-the-command: 'Gunakan perintah:'
 user: Pengguna
 validate: Mengesahkan
 version: 'Versi: kapan'

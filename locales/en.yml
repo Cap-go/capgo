@@ -162,6 +162,7 @@ last-upload: Last upload
 last-version: Last version
 launch-bundle: Launch bundle
 limit-reached: Limit reached
+live-reload: Live reload
 loading-more-data: Loading more data...
 log-in: Log in
 log-to-the-capgo-cli: Log to the Capgo CLI
@@ -277,6 +278,7 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
+to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
 trial-left: days left
@@ -295,6 +297,7 @@ upperCaseError: Should contain uppercase letters
 url: URL
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
+use-the-command: 'Use the command:'
 user: User
 validate: Validate
 version: Version

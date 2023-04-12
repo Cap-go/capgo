@@ -173,6 +173,7 @@ last-upload: Dernier téléchargement
 last-version: Dernière version
 launch-bundle: Lancer le bundle
 limit-reached: Limite atteinte
+live-reload: Rechargement en direct
 loading-more-data: Charger plus...
 log-in: Connexion
 log-to-the-capgo-cli: Connectez-vous à la CLI Capgo
@@ -292,6 +293,7 @@ thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: Le
 this-page-will-self-: Cette page s'actualisera automatiquement
 title: titre
+to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
 trial-left: Jours restants
@@ -310,6 +312,7 @@ upperCaseError: Doit contenir des lettres majuscules
 url: URL
 usage-success: Votre plan a été configuré, cette page sera mise à jour dans quelques minutes
 usage-title: Total
+use-the-command: "Utilisez la commande\_:"
 user: Utilisateur
 validate: Valider
 version: Version

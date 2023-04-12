@@ -169,6 +169,7 @@ last-upload: Tải lên lần cuối
 last-version: Phiên bản cuối cùng
 launch-bundle: Khởi chạy gói
 limit-reached: Đạt tới giới hạn
+live-reload: tải lại trực tiếp
 loading-more-data: Đang tải thêm dữ liệu...
 log-in: Đăng nhập
 log-to-the-capgo-cli: Đăng nhập vào Capgo CLI
@@ -288,6 +289,7 @@ thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
 title: tiêu đề
+to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
 trial-left: ngày còn lại
@@ -308,6 +310,7 @@ usage-success: >-
   Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   nữa
 usage-title: Tổng cộng
+use-the-command: 'Sử dụng lệnh:'
 user: Người dùng
 validate: xác thực
 version: Phiên bản

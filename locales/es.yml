@@ -173,6 +173,7 @@ last-upload: última carga
 last-version: Última versión
 launch-bundle: Paquete de lanzamiento
 limit-reached: Límite alcanzado
+live-reload: recarga en vivo
 loading-more-data: Cargando más datos...
 log-in: Acceso
 log-to-the-capgo-cli: Inicie sesión en la CLI de Capgo
@@ -296,6 +297,7 @@ thank-you-for-choosi: ¡Gracias por elegir Capgo!
 the: El
 this-page-will-self-: Esta página se actualizará automáticamente
 title: título
+to-live-reload: vivir recargar.
 to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps: Mis aplicaciones
 trial-left: Días restantes
@@ -314,6 +316,7 @@ upperCaseError: Debe contener letras mayúsculas
 url: URL
 usage-success: Su plan ha sido configurado, esta página se actualizará en unos minutos.
 usage-title: Total
+use-the-command: 'Usa el comando:'
 user: Usuario
 validate: Validar
 version: Versión

@@ -163,6 +163,7 @@ last-upload: 마지막 업로드
 last-version: 마지막 버전
 launch-bundle: 번들 실행
 limit-reached: 한도 도달
+live-reload: 라이브 리로드
 loading-more-data: 더 많은 데이터 로드 중...
 log-in: 로그인
 log-to-the-capgo-cli: Capgo CLI에 로그인
@@ -280,6 +281,7 @@ thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
 title: 제목
+to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps: 나의 앱들
 trial-left: 남은 일
@@ -298,6 +300,7 @@ upperCaseError: 대문자를 포함해야 함
 url: URL
 usage-success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
 usage-title: 총
+use-the-command: 다음 명령을 사용하십시오.
 user: 사용자
 validate: 확인
 version: 버전
