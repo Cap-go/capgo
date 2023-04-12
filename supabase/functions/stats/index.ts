@@ -5,6 +5,7 @@ import { supabaseAdmin, updateOnpremStats, updateVersionStats } from '../_utils/
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
+import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 const failActions = [
@@ -125,12 +126,23 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
         }
       }
       else if (failActions.includes(action)) {
-        await sendNotif('user:update_fail', {
+        const sent = await sendNotif('user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
           current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
         }, appVersion.user_id, '0 0 * * 1', 'orange')
+        if (sent) {
+          await logsnag.publish({
+            channel: 'updates',
+            event: 'update fail',
+            icon: '⚠️',
+            tags: {
+              'user-id': appVersion.user_id,
+            },
+            notify: false,
+          }).catch()
+        }
         all.push(updateVersionStats({
           app_id,
           version_id: appVersion.id,

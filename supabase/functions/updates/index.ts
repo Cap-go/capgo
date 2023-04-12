@@ -8,6 +8,7 @@ import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
+import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
@@ -94,13 +95,23 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     else {
       // get app owner with app_id
 
-      await sendNotif('user:semver_issue', {
+      const sent = await sendNotif('user:semver_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
-
+      if (sent) {
+        await logsnag.publish({
+          channel: 'updates',
+          event: 'semver issue',
+          icon: '⚠️',
+          tags: {
+            'user-id': appOwner.user_id,
+          },
+          notify: false,
+        }).catch()
+      }
       return sendRes({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
@@ -108,12 +119,23 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
     // if plugin_version is < 4 send notif to alert
     if (semver.lt(plugin_version, '4.0.0')) {
-      await sendNotif('user:plugin_issue', {
+      const sent = await sendNotif('user:plugin_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
+      if (sent) {
+        await logsnag.publish({
+          channel: 'updates',
+          event: 'plugin issue',
+          icon: '⚠️',
+          tags: {
+            'user-id': appOwner.user_id,
+          },
+          notify: false,
+        }).catch()
+      }
     }
 
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
