@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { toast } from 'vue-sonner'
 import { useSupabase } from './supabase'
 import { useDisplayStore } from '~/stores/display'
 
@@ -72,7 +73,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         successUrl,
         cancelUrl,
         reccurence: isYear ? 'year' : 'month',
-        clientReferenceId: getClientReferenceId(),
+        clientReferenceId: getClientReferenceId(), // TODO: delete after switch done
       }),
     })
     displayStore.showLoader = false

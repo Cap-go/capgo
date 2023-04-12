@@ -37,6 +37,7 @@ async function submit(form: { first_name: string; last_name: string; password: s
     // supabase auth config
     // http://localhost:3334/onboarding/verify_email,http://localhost:3334/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
   )
+  await window.Reflio.signup(form.email)
   isLoading.value = false
   if (error || !user) {
     setErrors('register-account', [error?.message || 'user not found'], {})

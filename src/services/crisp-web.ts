@@ -38,6 +38,7 @@ export interface CapacitorCrispPlugin {
 declare global {
   interface Window {
     Rewardful: any
+    Reflio: any
     $crisp: unknown[]
     CRISP_RUNTIME_CONFIG: {
       lock_maximized: boolean
