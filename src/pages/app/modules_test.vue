@@ -63,7 +63,7 @@ modules.value.push(...[
     method: 'preload',
     option: {
       assetId: 'example',
-      assetPath: 'assets/file_example.mp3',
+      assetPath: 'file_example.mp3',
       audioChannelNum: 1,
       isUrl: false,
     },
@@ -71,6 +71,21 @@ modules.value.push(...[
   {
     name: 'NativeAudio',
     method: 'play',
+    option: { assetId: 'example' },
+  },
+  {
+    name: 'NativeAudio',
+    method: 'stop',
+    option: { assetId: 'example' },
+  },
+  {
+    name: 'NativeAudio',
+    method: 'pause',
+    option: { assetId: 'example' },
+  },
+  {
+    name: 'NativeAudio',
+    method: 'resume',
     option: { assetId: 'example' },
   },
   {
@@ -122,7 +137,7 @@ async function runMethod(m: Module) {
   }).catch((err: any) => {
     console.log('errMethod', m, err)
     setTimeout(async () => {
-      toast.success(`errMethod: ${err}`)
+      toast.error(`errMethod: ${err}`)
     }, 2000)
   })
 }
