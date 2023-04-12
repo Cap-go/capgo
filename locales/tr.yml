@@ -117,6 +117,7 @@ defined-as: olarak tanımlandı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete-account: Hesabı sil
+deleted: silindi
 details-and-logs: Ayrıntılar ve günlükler
 device: Cihaz
 device-id: Cihaz Kimliği

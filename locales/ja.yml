@@ -115,6 +115,7 @@ defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
+deleted: 削除された
 details-and-logs: 詳細とログ
 device: デバイス
 device-id: デバイスID

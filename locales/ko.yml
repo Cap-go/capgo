@@ -115,6 +115,7 @@ defined-as: 로써 정의 된
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete-account: 계정 삭제
+deleted: 삭제
 details-and-logs: 세부 정보 및 로그
 device: 장치
 device-id: 장치 아이디

@@ -119,6 +119,7 @@ defined-as: Определяется как
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
+deleted: удален
 details-and-logs: Детали и журналы
 device: Устройство
 device-id: Идентификатор устройства

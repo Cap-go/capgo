@@ -121,6 +121,7 @@ defined-as: Défini comme
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
 delete-account: Supprimer le compte
+deleted: supprimé
 details-and-logs: Détails et journaux
 device: Appareil
 device-id: Identifiant de l'appareil

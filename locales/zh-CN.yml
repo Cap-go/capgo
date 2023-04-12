@@ -115,6 +115,7 @@ defined-as: 定义为
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete-account: 删除帐户
+deleted: 删除
 details-and-logs: 详细信息和日志
 device: 设备
 device-id: 设备ID

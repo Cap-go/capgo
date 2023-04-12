@@ -31,6 +31,7 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
   'external-storage': false,
+  'deleted': false,
   'encrypted': false,
 })
 const currentVersionsNumber = computed(() => {
@@ -72,12 +73,12 @@ async function getData() {
       .from('app_versions')
       .select('*', { count: 'exact' })
       .eq('app_id', props.appId)
-      .eq('deleted', false)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
       req.like('name', `%${search.value}%`)
 
+    req.eq('deleted', filters.value.deleted)
     if (filters.value['external-storage'])
       req.neq('external_url', null)
     if (filters.value.encrypted)
@@ -113,7 +114,7 @@ async function refreshData() {
 }
 async function deleteOne(one: typeof element) {
   // console.log('deleteBundle', bundle)
-  if (await didCancel(t('version')))
+  if (one.deleted || await didCancel(t('version')))
     return
   try {
     const { data: channelFound, error: errorChannel } = await supabase
@@ -177,6 +178,8 @@ columns.value = [
         return bytesToMbText(elem.size)
       else if (elem.external_url)
         return t('stored-externally')
+      else if (elem.deleted)
+        return t('deleted')
       else
         return t('size-not-found')
     },
@@ -203,6 +206,8 @@ async function reload() {
 }
 
 async function openOne(one: typeof element) {
+  if (one.deleted)
+    return
   router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)
 }
 onMounted(async () => {
