@@ -55,18 +55,18 @@ onUnmounted(() => {
 <template>
   <div class="relative inline-flex">
     <button
-      class="group inline-flex items-center justify-center"
+      class="inline-flex items-center justify-center group"
       aria-haspopup="true"
       :aria-expanded="dropdownOpen"
       @click.prevent="dropdownOpen = !dropdownOpen"
     >
-      <img v-if="main.user?.image_url" class="mask mask-squircle h-8 w-8" :src="main.user?.image_url" width="32" height="32" alt="User">
-      <div v-else class="h-8 w-8 flex items-center justify-center border border-white rounded-full">
+      <img v-if="main.user?.image_url" class="w-8 h-8 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
+      <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-full dark:border-white">
         <p>{{ acronym }}</p>
       </div>
-      <div class="hidden items-center truncate md:flex">
-        <span class="ml-2 truncate text-sm font-medium dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
-        <IconDown class="ml-1 h-6 w-6 fill-current text-slate-400" />
+      <div class="items-center hidden truncate md:flex">
+        <span class="ml-2 text-sm font-medium truncate dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
+        <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
       </div>
     </button>
     <transition

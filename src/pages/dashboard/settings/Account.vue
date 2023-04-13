@@ -267,7 +267,7 @@ onMounted(() => {
                 v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-white rounded-full">
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
                 <p>{{ acronym }}</p>
               </div>
             </div>
