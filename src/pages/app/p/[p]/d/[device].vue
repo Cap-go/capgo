@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { gt } from 'semver'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
@@ -12,7 +12,7 @@ import { useDisplayStore } from '~/stores/display'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import type { Tab } from '~/components/comp_def'
-import { urlToAppId } from '~/services/conversion'
+import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -32,6 +32,7 @@ interface Stat {
 const displayStore = useDisplayStore()
 const { t } = useI18n()
 const main = useMainStore()
+const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const packageId = ref<string>('')
@@ -324,8 +325,15 @@ async function updateChannel() {
       text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && await delDevChannel(device.value?.device_id)
-        toast.error(t('unlink-channel'))
+        toast.success(t('unlink-channel'))
         await loadData()
+      },
+    })
+    buttons.push({
+      text: t('open-channel'),
+      handler: async () => {
+        displayStore.showActionSheet = false
+        device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${channelDevice.value?.channel_id}`)
       },
     })
   }
@@ -338,7 +346,7 @@ async function updateChannel() {
         isLoading.value = true
         try {
           await upsertDevChannel(device.value?.device_id, channel)
-          toast.error(t('channel-linked'))
+          toast.success(t('channel-linked'))
           await loadData()
         }
         catch (error) {

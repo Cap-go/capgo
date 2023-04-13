@@ -2,10 +2,12 @@
 import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   deviceId?: string
@@ -22,6 +24,7 @@ const element: Database['public']['Tables']['stats']['Row'] & Channel = {} as an
 
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
+const router = useRouter()
 const { t } = useI18n()
 const supabase = useSupabase()
 const total = ref(0)
@@ -189,7 +192,11 @@ async function reload() {
     console.error(error)
   }
 }
-
+async function openOne(one: typeof element) {
+  if (props.deviceId || !props.appId)
+    return
+  router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
+}
 onMounted(async () => {
   await refreshData()
 })
@@ -206,5 +213,6 @@ watch(props, async () => {
     :is-loading="isLoading"
     :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
     @reload="reload()" @reset="refreshData()"
+    @row-click="openOne"
   />
 </template>
