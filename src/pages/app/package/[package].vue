@@ -89,7 +89,7 @@ watchEffect(async () => {
     id.value = urlToAppId(id.value)
     await refreshData()
     displayStore.NavTitle = app.value?.name || ''
-    displayStore.defaultBack = `/app/package/${route.params.package}/channels`
+    displayStore.defaultBack = '/app/home'
   }
 })
 </script>
