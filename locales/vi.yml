@@ -87,7 +87,7 @@ channel: Kênh
 channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
 channel-invit: Nhập email để mời
-channel-is-public: Kênh là công khai
+channel-is-public: Kênh mặc định
 channel-link: liên kết kênh
 channel-link-fail: Không thể liên kết kênh đã xảy ra sự cố
 channel-linked: Kênh được liên kết

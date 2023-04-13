@@ -83,7 +83,7 @@ channel: 渠道
 channel-create: 创建频道
 channel-deleted: 频道已删除
 channel-invit: 输入要邀请的电子邮件
-channel-is-public: 频道是公开的
+channel-is-public: 默认频道
 channel-link: 频道链接
 channel-link-fail: 无法链接频道发生错误
 channel-linked: 频道链接

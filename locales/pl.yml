@@ -85,7 +85,7 @@ channel: Kanał
 channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
 channel-invit: Wpisz e-mail, aby zaprosić
-channel-is-public: Kanał jest publiczny
+channel-is-public: Kanał domyślny
 channel-link: Link do kanału
 channel-link-fail: Nie można połączyć kanału. Wystąpił błąd
 channel-linked: Kanał połączony

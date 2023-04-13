@@ -89,7 +89,7 @@ channel: Kanal
 channel-create: Kanal erstellen
 channel-deleted: Kanal gelöscht
 channel-invit: Geben Sie die einzuladende E-Mail-Adresse ein
-channel-is-public: Kanal ist öffentlich
+channel-is-public: Standardkanal
 channel-link: Kanallink
 channel-link-fail: Der Kanal kann nicht verknüpft werden. Es ist ein Fehler aufgetreten
 channel-linked: Kanal verlinkt

@@ -83,7 +83,7 @@ channel: 채널
 channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-invit: 초대할 이메일 입력
-channel-is-public: 채널이 공개됨
+channel-is-public: 기본 채널
 channel-link: 채널 링크
 channel-link-fail: 채널을 연결할 수 없습니다. 문제가 발생했습니다.
 channel-linked: 연결된 채널

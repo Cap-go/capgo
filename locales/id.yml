@@ -83,7 +83,7 @@ channel: Saluran
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-invit: Ketik email untuk mengundang
-channel-is-public: Saluran bersifat publik
+channel-is-public: Saluran awal
 channel-link: Tautan saluran
 channel-link-fail: Tidak dapat menautkan saluran terjadi kesalahan
 channel-linked: Saluran tertaut

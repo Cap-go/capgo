@@ -83,7 +83,7 @@ channel: チャネル
 channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
 channel-invit: 招待するメールを入力
-channel-is-public: チャンネルは公開されています
+channel-is-public: デフォルトのチャンネル
 channel-link: チャンネルリンク
 channel-link-fail: チャンネルをリンクできません
 channel-linked: リンクされたチャンネル

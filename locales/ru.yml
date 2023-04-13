@@ -87,7 +87,7 @@ channel: Канал
 channel-create: Создать канал
 channel-deleted: Канал удален
 channel-invit: Введите адрес электронной почты, чтобы пригласить
-channel-is-public: Канал общедоступен
+channel-is-public: Канал по умолчанию
 channel-link: Ссылка на канал
 channel-link-fail: Не удается связать канал. Произошла ошибка.
 channel-linked: Канал связан

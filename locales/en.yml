@@ -83,7 +83,7 @@ channel: Channel
 channel-create: Create channel
 channel-deleted: Channel deleted
 channel-invit: Type email to invite
-channel-is-public: Channel is public
+channel-is-public: Default channel
 channel-link: Channel link
 channel-link-fail: Cannot link channel something wrong happened
 channel-linked: Channel linked
