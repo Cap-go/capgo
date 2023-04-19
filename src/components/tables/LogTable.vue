@@ -77,7 +77,7 @@ async function getData() {
     const limitDate = new Date(new Date().getTime() - daysLimit * 24 * 60 * 60 * 1000).toISOString()
     const reqCount = supabase
       .from('stats')
-      .select('id', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
       .eq('app_id', props.appId)
       // limit created_at to 7 days
       .gte('created_at', limitDate)
