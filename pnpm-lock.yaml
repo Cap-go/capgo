@@ -230,8 +230,8 @@ dependencies:
     specifier: 1.0.0-1
     version: 1.0.0-1
   pinia:
-    specifier: 2.0.33
-    version: 2.0.33(typescript@5.0.3)(vue@3.2.47)
+    specifier: 2.0.35
+    version: 2.0.35(typescript@5.0.3)(vue@3.2.47)
   plausible-tracker:
     specifier: ^0.3.8
     version: 0.3.8
@@ -11007,8 +11007,8 @@ packages:
     engines: {node: '>=4'}
     dev: false
 
-  /pinia@2.0.33(typescript@5.0.3)(vue@3.2.47):
-    resolution: {integrity: sha512-HOj1yVV2itw6rNIrR2f7+MirGNxhORjrULL8GWgRwXsGSvEqIQ+SE0MYt6cwtpegzCda3i+rVTZM+AM7CG+kRg==}
+  /pinia@2.0.35(typescript@5.0.3)(vue@3.2.47):
+    resolution: {integrity: sha512-P1IKKQWhxGXiiZ3atOaNI75bYlFUbRxtJdhPLX059Z7+b9Z04rnTZdSY8Aph1LA+/4QEMAYHsTQ638Wfe+6K5g==}
     peerDependencies:
       '@vue/composition-api': ^1.4.0
       typescript: '>=4.4.4'

@@ -108,7 +108,7 @@
     "mime": "^3.0.0",
     "minio": "^7.0.33",
     "nprogress": "1.0.0-1",
-    "pinia": "2.0.33",
+    "pinia": "2.0.35",
     "plausible-tracker": "^0.3.8",
     "prism-theme-vars": "^0.2.4",
     "semver": "^7.4.0",
