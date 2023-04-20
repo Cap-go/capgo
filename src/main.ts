@@ -7,15 +7,21 @@ import generatedRoutes from 'virtual:generated-pages'
 import { setupLayouts } from 'virtual:generated-layouts'
 import type { Router } from 'vue-router'
 import { defaultConfig, plugin } from '@formkit/vue'
+import { generateClasses } from '@formkit/themes'
 import App from './App.vue'
 // your custom styles here
 import './styles/markdown.css'
 import './styles/style.css'
 
 import { initPlausible } from './services/plausible'
+import formkit from './styles/formkit'
 
 const app = createApp(App)
-app.use(plugin, defaultConfig)
+app.use(plugin, defaultConfig({
+  config: {
+    classes: generateClasses(formkit),
+  },
+}))
 CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts

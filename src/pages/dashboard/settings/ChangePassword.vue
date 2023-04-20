@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
+import { iconPassword } from '~/services/icons'
 
 const isLoading = ref(false)
 const supabase = useSupabase()
@@ -28,11 +29,11 @@ async function submit(form: { password: string; password_confirm: string }) {
 </script>
 
 <template>
-  <div class="h-full max-h-fit grow overflow-y-scroll pb-8 md:pb-0">
+  <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
     <!-- <form
       @submit.prevent="submit"
     > -->
-    <FormKit id="change-pass" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
+    <FormKit id="change-pass" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
@@ -40,31 +41,27 @@ async function submit(form: { password: string; password_confirm: string }) {
         </h2>
         <!-- Personal Info -->
         <section>
-          <div class="mt-5 sm:flex sm:items-center sm:items-stretch space-y-4 sm:space-x-4 sm:space-y-0">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-x-4 sm:space-y-0">
             <FormKit
               type="password"
               name="password"
+              :prefix-icon="iconPassword"
               autocomplete="new-password"
               outer-class="sm:w-1/2"
-              input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-              placeholder="******"
               :label="t('password')"
               :help="t('6-characters-minimum')"
-              validation="required|length:6|matches:/(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[#?!@$%^&*-])/"
+              validation="required|length:6|contain_alphanumeric|contain_uppercase|contain_lowercase|contain_symbol"
               validation-visibility="live"
-              message-class="text-red-500"
             />
             <FormKit
               type="password"
               name="password_confirm"
+              :prefix-icon="iconPassword"
               outer-class="sm:w-1/2"
-              input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
               :label="t('confirm-password')"
-              :help="t('confirm-password')"
               validation="required|confirm"
               validation-visibility="live"
               :validation-label="t('password-confirmatio')"
-              message-class="text-red-500"
             />
           </div>
           <FormKitMessages />
@@ -72,10 +69,10 @@ async function submit(form: { password: string; password_confirm: string }) {
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col border-t border-slate-200 px-6 py-5">
+        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
             <button
-              class="btn ml-3 rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
+              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
               type="submit"
               color="secondary"
               shape="round"

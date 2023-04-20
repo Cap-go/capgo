@@ -17,6 +17,7 @@ import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
 import { availableLocales, i18n, loadLanguageAsync } from '~/modules/i18n'
+import { iconEmail, iconName } from '~/services/icons'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -253,7 +254,7 @@ onMounted(() => {
 
 <template>
   <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
-    <FormKit id="update-account" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
+    <FormKit id="update-account" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
@@ -311,15 +312,13 @@ onMounted(() => {
                 type="text"
                 name="first_name"
                 autocomplete="given-name"
+                :prefix-icon="iconName"
                 :disabled="isLoading"
                 :value="main.user?.first_name"
                 validation="required:trim"
                 enterkeyhint="next"
                 autofocus
                 :label="t('first-name')"
-                :placeholder="t('first-name')"
-                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-                message-class="text-red-500"
               />
             </div>
             <div class="sm:w-1/2">
@@ -327,14 +326,12 @@ onMounted(() => {
                 type="text"
                 name="last_name"
                 autocomplete="family-name"
+                :prefix-icon="iconName"
                 :disabled="isLoading"
                 enterkeyhint="next"
                 :value="main.user?.last_name"
                 validation="required:trim"
                 :label="t('last-name')"
-                :placeholder="t('last-name')"
-                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-                message-class="text-red-500"
               />
             </div>
           </div>
@@ -343,28 +340,24 @@ onMounted(() => {
               <FormKit
                 type="email"
                 name="email"
+                :prefix-icon="iconEmail"
                 disabled
                 :value="main.user?.email"
                 enterkeyhint="next"
                 validation="required:trim|email"
                 :label="t('email')"
-                :placeholder="t('email')"
-                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-                message-class="text-red-500"
               />
             </div>
             <div class="sm:w-1/2">
               <FormKit
                 type="text"
                 name="country"
+                prefix-icon="flag"
                 :disabled="isLoading"
                 :value="main.user?.country || ''"
                 enterkeyhint="send"
                 validation="required:trim"
                 :label="t('country')"
-                :placeholder="t('country')"
-                input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-                message-class="text-red-500"
               />
             </div>
           </div>

@@ -13,6 +13,7 @@ import { FormKitMessages } from '@formkit/vue'
 import { existUser, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
+import { iconEmail, iconName } from '~/services/icons'
 
 const props = defineProps<{
   channelId: number
@@ -137,7 +138,7 @@ async function submit(form: { first_name: string; last_name: string; email: stri
 </script>
 
 <template>
-  <FormKit v-if="props.opened" id="create-user" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
+  <FormKit v-if="props.opened" id="create-user" type="form" :actions="false" @submit="submit">
     <k-dialog
       :opened="props.opened"
       @backdropclick="() => (emit('close'))"
@@ -150,36 +151,33 @@ async function submit(form: { first_name: string; last_name: string; email: stri
           type="email"
           name="email"
           :disabled="isLoading"
+          :prefix-icon="iconEmail"
           validation="required:trim|email|(500)addUser"
           validation-visibility="live"
           :validation-rules="{ addUser }"
           :label="t('email')"
           :placeholder="t('email')"
-          input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-          message-class="text-red-500"
         />
         <FormKit
           v-if="!userId"
           type="text"
           name="first_name"
+          :prefix-icon="iconName"
           :disabled="isLoading"
           validation="required:trim"
           autofocus
           :label="t('first-name')"
           :placeholder="t('first-name')"
-          input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-          message-class="text-red-500"
         />
         <FormKit
           v-if="!userId"
           type="text"
           name="first_name"
+          :prefix-icon="iconName"
           :disabled="isLoading"
           validation="required:trim"
           :label="t('last-name')"
           :placeholder="t('last-name')"
-          input-class="w-full p-2 form-input dark:bg-gray-700 dark:text-white"
-          message-class="text-red-500"
         />
         <FormKitMessages />
       </div>

@@ -6,6 +6,7 @@ import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
+import { iconPassword } from '~/services/icons'
 
 const isLoading = ref(false)
 const supabase = useSupabase()
@@ -43,7 +44,6 @@ async function submit(form: { password: string }) {
     toast.success(t('changed-password-suc'))
   router.push('/onboarding/activation')
 }
-
 watchEffect(async () => {
   if (route && route.path === '/onboarding/set_password')
     await signInUser()
@@ -70,63 +70,39 @@ watchEffect(async () => {
         <div class="relative max-w-md mx-auto mt-8 md:mt-4">
           <div class="overflow-hidden bg-white rounded-md shadow-md">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
-              <FormKit id="set-password" messages-class="text-red-500" type="form" :actions="false" @submit="submit">
+              <FormKit id="set-password" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5">
                   <FormKitMessages />
                   <div>
                     <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
-                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
-                          />
-                        </svg>
-                      </div>
-
                       <FormKit
                         type="password"
                         name="password"
+                        :prefix-icon="iconPassword"
                         autocomplete="new-password"
                         enterkeyhint="send"
                         :disabled="isLoading"
-                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
-                        placeholder="******"
                         :label="t('password')"
                         :help="t('6-characters-minimum')"
-                        validation="required|length:6|matches:/(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[#?!@$%^&*-])/"
+                        validation="required|length:6|contain_alphanumeric|contain_uppercase|contain_lowercase|contain_symbol"
                         validation-visibility="live"
-                        message-class="text-red-500"
                       />
                     </div>
                   </div>
 
                   <div>
                     <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
-                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
-                          />
-                        </svg>
-                      </div>
                       <FormKit
                         type="password"
                         name="password_confirm"
+                        :prefix-icon="iconPassword"
                         autocomplete="new-password"
                         :disabled="isLoading"
-                        input-class="block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-blue-600 caret-blue-600"
                         :label="t('confirm-password')"
                         :help="t('confirm-password')"
                         validation="required|confirm"
                         validation-visibility="live"
                         :validation-label="t('password-confirmatio')"
-                        message-class="text-red-500"
                       />
                     </div>
                   </div>

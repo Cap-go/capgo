@@ -281,6 +281,7 @@ module.exports = konstaConfig({
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/line-clamp'),
     require('@tailwindcss/container-queries'),
+    require('@formkit/themes/tailwindcss'),
     require('daisyui'),
     require('flowbite/plugin'),
     // add custom variant for expanding sidebar
