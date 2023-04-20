@@ -90,8 +90,7 @@ async function getData() {
         platform,
         version_build,
         version,
-        created_at,
-        updated_at
+        created_at
       `)
       .eq('app_id', props.appId)
       .gte('created_at', limitDate)
