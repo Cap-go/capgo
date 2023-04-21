@@ -43,7 +43,9 @@ module.exports = konstaConfig({
     ],
   },
   content: [
-    './index.html', './src/**/*.{vue,js,ts,jsx,tsx}',
+    './index.html',
+    './src/**/*.{vue,js,ts,jsx,tsx}',
+    './node_modules/flowbite/**/*.js',
   ],
   theme: {
     extend: {
@@ -277,7 +279,7 @@ module.exports = konstaConfig({
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/line-clamp'),
     require('@tailwindcss/container-queries'),
-    require('@formkit/themes/tailwindcss'),
+    // require('@formkit/themes/tailwindcss'),
     require('daisyui'),
     // require('flowbite/plugin'), // TODO: understand why this is not working
     // add custom variant for expanding sidebar

@@ -94,6 +94,7 @@ onMounted(checkLogin)
                   name="email"
                   :disabled="isLoading"
                   enterkeyhint="next"
+                  input-class="!text-black"
                   :prefix-icon="iconEmail"
                   inputmode="email"
                   :label="t('email')"
@@ -113,6 +114,7 @@ onMounted(checkLogin)
                   <FormKit
                     id="passwordInput"
                     type="password"
+                    input-class="!text-black"
                     :placeholder="t('password')"
                     name="password"
                     :label="t('password')"
