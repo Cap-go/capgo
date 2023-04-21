@@ -252,7 +252,7 @@ const hightLights = computed<Stat[]>(() => ([
                 <div class="w-full md:flex md:items-center lg:space-x-6 md:space-x-4">
                   <div class="grid grid-cols-1 gap-x-12 gap-y-3 sm:grid-cols-2 xl:gap-x-24">
                     <div>
-                      <ul class="space-y-3 text-base font-medium dark:text-white font-pj">
+                      <ul class="space-y-3 text-base font-medium text-black font-pj">
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -277,7 +277,7 @@ const hightLights = computed<Stat[]>(() => ([
                     </div>
 
                     <div>
-                      <ul class="space-y-3 text-base font-medium dark:text-white font-pj">
+                      <ul class="space-y-3 text-base font-medium text-black font-pj">
                         <li class="flex items-center">
                           <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -359,7 +359,7 @@ const hightLights = computed<Stat[]>(() => ([
                     <a
                       href="#"
                       title="Get quote now"
-                      class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border border-transparent dark:bg-white dark:text-gray-900 font-pj rounded-xl hover:bg-opacity-50 dark:hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black dark:focus:ring-white"
+                      class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
                       role="button"
                       @click="openSupport()"
                     >
