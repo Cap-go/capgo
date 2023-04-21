@@ -9,6 +9,7 @@ import type { Router } from 'vue-router'
 import { defaultConfig, plugin } from '@formkit/vue'
 import { generateClasses } from '@formkit/themes'
 import App from './App.vue'
+import 'flowbite'
 // your custom styles here
 import './styles/markdown.css'
 import './styles/style.css'

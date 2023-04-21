@@ -16,7 +16,6 @@ const base100 = '#2A303C'
 const info = '#3ABFF8'
 
 module.exports = konstaConfig({
-  mode: 'jit',
   konsta: {
     colors: {
       primary,
@@ -44,10 +43,7 @@ module.exports = konstaConfig({
     ],
   },
   content: [
-    './index.html',
-    './src/**/*.{vue,js,ts}',
-    './src/*.{vue,js,ts}',
-    './node_modules/flowbite/**/*.js',
+    './index.html', './src/**/*.{vue,js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
@@ -283,7 +279,7 @@ module.exports = konstaConfig({
     require('@tailwindcss/container-queries'),
     require('@formkit/themes/tailwindcss'),
     require('daisyui'),
-    require('flowbite/plugin'),
+    // require('flowbite/plugin'), // TODO: understand why this is not working
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {
       addVariant('sidebar-expanded', ({ modifySelectors, separator }) => {
