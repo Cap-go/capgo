@@ -3,7 +3,7 @@ export default {
   'global': {
     fieldset: 'max-w-md border border-gray-400 rounded px-2 pb-1',
     help: 'text-xs text-gray-500',
-    inner: 'formkit-disabled:bg-gray-200 formkit-disabled:cursor-not-allowed formkit-disabled:pointer-events-none',
+    inner: 'formkit-disabled:bg-gray-200 formkit-disabled:cursor-not-allowed border border-gray-200 formkit-disabled:pointer-events-none',
     // block w-full py-4 pl-10 pr-4 text-black placeholder-gray-500 transition-all duration-200 bg-white border border-gray-200 rounded-md focus:outline-none focus:border-muted-blue-600 caret-muted-blue-600
     input: 'appearance-none py-4 w-full bg-transparent focus:outline-none focus:ring-0 focus:shadow-none',
     label: 'block mb-1 font-bold text-gray-500 text-sm',
