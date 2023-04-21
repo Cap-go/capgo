@@ -269,6 +269,7 @@ session_key: IvSessionKey
 set-bundle: Paketi kanala ayarla
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
+shared-users: 'şuraya paylaşıldı:'
 sign-out: Oturumu Kapat
 size: Boyut
 size-not-found: Bulunamadı

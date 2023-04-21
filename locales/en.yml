@@ -260,6 +260,7 @@ session_key: IvSessionKey
 set-bundle: Set bundle to channel
 settings: Settings
 shared-apps: Shared Apps
+shared-users: Shared to
 sign-out: Sign Out
 size: Size
 size-not-found: Not found

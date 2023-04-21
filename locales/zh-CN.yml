@@ -261,6 +261,7 @@ session_key: Iv会话密钥
 set-bundle: 将捆绑包设置为频道
 settings: 设置
 shared-apps: 共享应用
+shared-users: 分享给
 sign-out: 登出
 size: 尺寸
 size-not-found: 未找到

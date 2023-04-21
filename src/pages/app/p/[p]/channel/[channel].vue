@@ -42,7 +42,7 @@ const tabs: Tab[] = [
     key: 'info',
   },
   {
-    label: t('users'),
+    label: t('shared-users'),
     icon: IconUsers,
     key: 'users',
   },

@@ -261,6 +261,7 @@ session_key: IvSessionKey
 set-bundle: 번들을 채널로 설정
 settings: 설정
 shared-apps: 공유 앱
+shared-users: 공유 대상
 sign-out: 로그아웃
 size: 크기
 size-not-found: 찾을 수 없음
