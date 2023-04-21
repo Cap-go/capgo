@@ -5,6 +5,7 @@ import { PushNotifications } from '@capacitor/push-notifications'
 import type { Router } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { useSupabase } from '~/services/supabase'
+
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 

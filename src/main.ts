@@ -1,6 +1,7 @@
 // register vue composition api globally
 import { createApp } from 'vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+
 // Cannot use official router here because of the IonTab hack
 import { createRouter, createWebHistory } from 'vue-router'
 import generatedRoutes from 'virtual:generated-pages'
@@ -9,6 +10,7 @@ import type { Router } from 'vue-router'
 import { defaultConfig, plugin } from '@formkit/vue'
 import { generateClasses } from '@formkit/themes'
 import App from './App.vue'
+
 // your custom styles here
 import './styles/markdown.css'
 import './styles/style.css'

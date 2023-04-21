@@ -1,5 +1,6 @@
 import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
+
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
