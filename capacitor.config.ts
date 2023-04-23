@@ -14,6 +14,9 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP',
     },
   },
+  android: {
+    webContentsDebuggingEnabled: true,
+  },
 }
 
 export default config
