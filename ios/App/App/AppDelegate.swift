@@ -89,6 +89,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        if #available(macOS 13.3, iOS 16.4, tvOS 16.4, *) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    if let vc = self.window?.rootViewController as? CAPBridgeViewController {
+                        vc.bridge?.webView?.isInspectable = true;
+                    }
+            }
+        }
         return true
     }
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
