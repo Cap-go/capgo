@@ -1,5 +1,7 @@
 6-characters-minimum: 最小 6 文字、大文字 1 つ、小文字 1 つ、特殊文字 1 つ
 Bandwidth: 帯域幅
+Filters: フィルター
+Override: オーバーライド
 Storage: 保管所
 account: アカウント
 account-error: アカウントの更新中にエラーが発生しました

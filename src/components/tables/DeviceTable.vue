@@ -42,9 +42,16 @@ const columns = ref<TableColumn[]>([
   {
     label: t('created-at'),
     key: 'created_at',
+    mobile: 'none',
+    sortable: true,
+    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
+  },
+  {
+    label: t('updated-at'),
+    key: 'updated_at',
     mobile: 'header',
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
   },
   {
     label: t('platform'),
@@ -95,7 +102,7 @@ async function getData() {
   try {
     const req = supabase
       .from('devices')
-      .select('device_id,created_at,platform,os_version,version(name)', { count: 'exact' })
+      .select('device_id,created_at,updated_at,platform,os_version,version(name)', { count: 'exact' })
       .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 

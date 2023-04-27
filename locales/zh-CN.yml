@@ -1,5 +1,7 @@
 6-characters-minimum: 最少 6 个字符，1 个大写字母，1 个小写字母，1 个特殊字符
 Bandwidth: 带宽
+Filters: 过滤器
+Override: 覆盖
 Storage: 贮存
 account: 帐户
 account-error: 更新您的帐户时出错

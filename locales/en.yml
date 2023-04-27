@@ -1,5 +1,7 @@
 6-characters-minimum: 6 characters minimum, 1 uppercase, 1 lowercase, 1 special character
 Bandwidth: Bandwidth
+Filters: Filters
+Override: Override
 Storage: Storage
 account: Account
 account-error: Error while updating your account

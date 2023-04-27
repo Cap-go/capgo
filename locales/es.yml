@@ -1,5 +1,7 @@
 6-characters-minimum: 6 caracteres mínimo, 1 mayúscula, 1 minúscula, 1 carácter especial
 Bandwidth: Banda ancha
+Filters: filtros
+Override: Anular
 Storage: Almacenamiento
 account: Cuenta
 account-error: Error al actualizar su cuenta

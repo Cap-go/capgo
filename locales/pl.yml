@@ -1,5 +1,7 @@
 6-characters-minimum: Minimum 6 znaków, 1 wielka litera, 1 mała litera, 1 znak specjalny
 Bandwidth: Przepustowość łącza
+Filters: Filtry
+Override: Nadpisanie
 Storage: Składowanie
 account: Konto
 account-error: Błąd podczas aktualizowania konta

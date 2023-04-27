@@ -1,5 +1,7 @@
 6-characters-minimum: Minimum 6 karakter, 1 büyük harf, 1 küçük harf, 1 özel karakter
 Bandwidth: Bant genişliği
+Filters: Filtreler
+Override: Geçersiz kıl
 Storage: Depolamak
 account: Hesap
 account-error: Hesabınız güncellenirken hata oluştu
