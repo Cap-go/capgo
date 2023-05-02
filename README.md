@@ -31,7 +31,7 @@
 
 ## Features
 
-- ⚡️ Test webapp direct in your phone with native API
+- ⚡️ Test webapp directly in your phone with native API
 
 - 😃 Share your dev with your teamate
 
