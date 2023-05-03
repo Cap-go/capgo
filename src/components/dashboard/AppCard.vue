@@ -95,16 +95,20 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
 
 async function loadData() {
   if (!props.channel) {
+    devicesNb.value = 0
+
     try {
       const date_id = new Date().toISOString().slice(0, 7)
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('app_stats')
         .select()
         .eq('app_id', props.app.app_id)
         .eq('date_id', date_id)
         .single()
-      if (!data || error)
+        .throwOnError()
+      if (!data)
         return
+
       devicesNb.value = data?.devices
     }
     catch (error) {
@@ -115,13 +119,7 @@ async function loadData() {
 
 async function refreshData() {
   isLoading.value = true
-  try {
-    devicesNb.value = 0
-    await loadData()
-  }
-  catch (error) {
-    console.error(error)
-  }
+  await loadData()
   isLoading.value = false
 }
 
