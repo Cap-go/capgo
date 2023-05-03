@@ -17,6 +17,8 @@ const ignoredEvents = [
   'disableAutoUpdateUnderNative',
   'disableDevBuild',
   'disableEmulator',
+  'cannotGetBundle',
+  'NoChannelOrOverride',
 ]
 serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
