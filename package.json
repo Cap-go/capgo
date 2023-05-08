@@ -67,7 +67,7 @@
     "@capgo/capacitor-mute": "^1.1.47",
     "@capgo/capacitor-purchases": "^2.2.0",
     "@capgo/capacitor-screen-recorder": "^1.2.46",
-    "@capgo/capacitor-updater": "4.36.0",
+    "@capgo/capacitor-updater": "4.41.0",
     "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^0.4.9",
     "@capgo/native-audio": "^5.1.13",
