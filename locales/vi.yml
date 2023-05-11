@@ -90,9 +90,9 @@ channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
 channel-invit: Nhập email để mời
 channel-is-public: Kênh mặc định
-channel-link: liên kết kênh
-channel-link-fail: Không thể liên kết kênh đã xảy ra sự cố
-channel-linked: Kênh được liên kết
+channel-link: ghi đè kênh
+channel-link-fail: Không thể ghi đè lên kênh đã xảy ra sự cố
+channel-linked: Đã đặt ghi đè kênh
 channel-linking: Liên kết đến kênh
 channel-make-now: Làm mặc định
 channels: Kênh truyền hình

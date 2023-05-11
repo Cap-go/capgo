@@ -86,9 +86,9 @@ channel-create: 创建频道
 channel-deleted: 频道已删除
 channel-invit: 输入要邀请的电子邮件
 channel-is-public: 默认频道
-channel-link: 频道链接
-channel-link-fail: 无法链接频道发生错误
-channel-linked: 频道链接
+channel-link: 通道覆盖
+channel-link-fail: 无法覆盖频道发生错误
+channel-linked: 通道覆盖设置
 channel-linking: 链接到频道
 channel-make-now: 使默认
 channels: 频道

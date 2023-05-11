@@ -88,9 +88,9 @@ channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
 channel-invit: Wpisz e-mail, aby zaprosić
 channel-is-public: Kanał domyślny
-channel-link: Link do kanału
-channel-link-fail: Nie można połączyć kanału. Wystąpił błąd
-channel-linked: Kanał połączony
+channel-link: Zastąpienie kanału
+channel-link-fail: Nie można zastąpić kanału. Wystąpił błąd
+channel-linked: Ustawiono zastąpienie kanału
 channel-linking: Link do kanału
 channel-make-now: Ustaw jako domyślne
 channels: Kanały

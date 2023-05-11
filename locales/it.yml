@@ -88,9 +88,9 @@ channel-create: Crea canale
 channel-deleted: Canale eliminato
 channel-invit: Digita l'e-mail per invitare
 channel-is-public: Canale di default
-channel-link: Collegamento al canale
-channel-link-fail: Impossibile collegare il canale è successo qualcosa di sbagliato
-channel-linked: Canale collegato
+channel-link: Override del canale
+channel-link-fail: Impossibile eseguire l'override del canale è successo qualcosa di sbagliato
+channel-linked: Override del canale impostato
 channel-linking: Collegamento al canale
 channel-make-now: Rendere predefinito
 channels: Canali

@@ -86,9 +86,9 @@ channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-invit: Ketik email untuk mengundang
 channel-is-public: Saluran awal
-channel-link: Tautan saluran
-channel-link-fail: Tidak dapat menautkan saluran terjadi kesalahan
-channel-linked: Saluran tertaut
+channel-link: Penimpaan saluran
+channel-link-fail: Tidak dapat mengganti saluran, terjadi kesalahan
+channel-linked: Penimpaan saluran disetel
 channel-linking: Tautkan ke saluran
 channel-make-now: Jadikan bawaan
 channels: Saluran

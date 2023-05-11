@@ -90,9 +90,9 @@ channel-create: Créer un canal
 channel-deleted: Canal supprimé
 channel-invit: Tapez l'e-mail pour inviter
 channel-is-public: Chaîne par défaut
-channel-link: Lien du canal
-channel-link-fail: Impossible d'associer le canal, une erreur s'est produite
-channel-linked: Canal lié
+channel-link: Remplacement de canal
+channel-link-fail: Impossible de remplacer le canal, quelque chose de mal s'est produit
+channel-linked: Remplacement de canal défini
 channel-linking: Lien vers le canal
 channel-make-now: Mettre par défaut
 channels: Canaux

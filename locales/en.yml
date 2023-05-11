@@ -86,9 +86,9 @@ channel-create: Create channel
 channel-deleted: Channel deleted
 channel-invit: Type email to invite
 channel-is-public: Default channel
-channel-link: Channel link
-channel-link-fail: Cannot link channel something wrong happened
-channel-linked: Channel linked
+channel-link: Channel override
+channel-link-fail: Cannot override the channel something wrong happened
+channel-linked: Channel override setted
 channel-linking: Link to channel
 channel-make-now: Make default
 channels: Channels

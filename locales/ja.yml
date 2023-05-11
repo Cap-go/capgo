@@ -86,9 +86,9 @@ channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
 channel-invit: 招待するメールを入力
 channel-is-public: デフォルトのチャンネル
-channel-link: チャンネルリンク
-channel-link-fail: チャンネルをリンクできません
-channel-linked: リンクされたチャンネル
+channel-link: チャンネルオーバーライド
+channel-link-fail: 何か問題が発生したため、チャネルをオーバーライドできません
+channel-linked: チャンネルオーバーライドが設定されました
 channel-linking: チャンネルへのリンク
 channel-make-now: デフォルトにする
 channels: チャネル

@@ -86,9 +86,9 @@ channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-invit: 초대할 이메일 입력
 channel-is-public: 기본 채널
-channel-link: 채널 링크
-channel-link-fail: 채널을 연결할 수 없습니다. 문제가 발생했습니다.
-channel-linked: 연결된 채널
+channel-link: 채널 재정의
+channel-link-fail: 채널을 재정의할 수 없습니다. 문제가 발생했습니다.
+channel-linked: 채널 오버라이드 설정됨
 channel-linking: 채널 링크
 channel-make-now: 기본값으로 설정
 channels: 채널

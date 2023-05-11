@@ -90,9 +90,9 @@ channel-create: Создать канал
 channel-deleted: Канал удален
 channel-invit: Введите адрес электронной почты, чтобы пригласить
 channel-is-public: Канал по умолчанию
-channel-link: Ссылка на канал
-channel-link-fail: Не удается связать канал. Произошла ошибка.
-channel-linked: Канал связан
+channel-link: Переопределение канала
+channel-link-fail: Невозможно переопределить канал. Произошла ошибка.
+channel-linked: Переопределение канала установлено
 channel-linking: Ссылка на канал
 channel-make-now: Использовать по умолчанию
 channels: каналы

@@ -86,9 +86,9 @@ channel-create: Kanal oluştur
 channel-deleted: kanal silindi
 channel-invit: Davet etmek için e-posta yazın
 channel-is-public: varsayılan kanal
-channel-link: kanal bağlantısı
-channel-link-fail: Kanal bağlanamıyor yanlış bir şey oldu
-channel-linked: Kanal bağlantılı
+channel-link: Kanal geçersiz kılma
+channel-link-fail: Kanal geçersiz kılınamıyor yanlış bir şey oldu
+channel-linked: Kanal geçersiz kılma ayarlandı
 channel-linking: kanala bağlantı
 channel-make-now: Varsayılan yap
 channels: Kanallar

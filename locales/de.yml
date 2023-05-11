@@ -92,9 +92,9 @@ channel-create: Kanal erstellen
 channel-deleted: Kanal gelöscht
 channel-invit: Geben Sie die einzuladende E-Mail-Adresse ein
 channel-is-public: Standardkanal
-channel-link: Kanallink
-channel-link-fail: Der Kanal kann nicht verknüpft werden. Es ist ein Fehler aufgetreten
-channel-linked: Kanal verlinkt
+channel-link: Kanalüberschreibung
+channel-link-fail: Der Kanal kann nicht überschrieben werden. Es ist ein Fehler aufgetreten
+channel-linked: Kanalüberschreibung eingestellt
 channel-linking: Link zum Kanal
 channel-make-now: Machen Standard
 channels: Kanäle
