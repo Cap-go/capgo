@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.186.0/http/server.ts'
 import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 
 import {

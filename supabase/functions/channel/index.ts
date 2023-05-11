@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.186.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import type { BaseHeaders } from '../_utils/types.ts'

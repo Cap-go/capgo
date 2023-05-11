@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.186.0/http/server.ts'
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { categories } from '../_utils/gplay_categ.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
