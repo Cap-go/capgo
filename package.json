@@ -150,7 +150,7 @@
     "critters": "0.0.16",
     "cross-env": "^7.0.3",
     "cypress": "12.9.0",
-    "eslint": "8.38.0",
+    "eslint": "8.40.0",
     "eslint-plugin-cypress": "^2.13.2",
     "https-localhost": "4.7.1",
     "postcss": "^8.4.23",
