@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.182.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.186.0/http/server.ts'
 import { addEventPerson, postPerson } from '../_utils/crisp.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { createApiKey, createStripeCustomer } from '../_utils/supabase.ts'
