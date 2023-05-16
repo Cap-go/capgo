@@ -50,7 +50,7 @@ async function submit(form: { password: string; password_confirm: string }) {
               outer-class="sm:w-1/2"
               :label="t('password')"
               :help="t('6-characters-minimum')"
-              validation="required|length:6|contain_alphanumeric|contain_uppercase|contain_lowercase|contain_symbol"
+              validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
               validation-visibility="live"
             />
             <FormKit
