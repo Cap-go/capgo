@@ -35,7 +35,7 @@
     "@capacitor-community/http": "^1.4.1",
     "@capacitor-community/keep-awake": "^3.0.0",
     "@capacitor/action-sheet": "^4.1.0",
-    "@capacitor/android": "~4.7.3",
+    "@capacitor/android": "~4.8.0",
     "@capacitor/app": "^4.1.1",
     "@capacitor/app-launcher": "^4.1.0",
     "@capacitor/assets": "2.0.4",
