@@ -6,6 +6,7 @@ configurations {
     }
 }
 android {
+    namespace "ee.forgr.capacitor_go"
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "ee.forgr.capacitor_go"
