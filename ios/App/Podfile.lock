@@ -64,18 +64,18 @@ PODS:
     - Capacitor
   - CapgoCapacitorMute (2.0.7):
     - Capacitor
-  - CapgoCapacitorPurchases (4.0.0):
+  - CapgoCapacitorPurchases (6.0.0):
     - Capacitor
     - PurchasesHybridCommon (= 4.8.0)
     - RevenueCat (>= 4.16.0)
-  - CapgoCapacitorScreenRecorder (3.0.0):
+  - CapgoCapacitorScreenRecorder (5.0.0):
     - Capacitor
   - CapgoCapacitorUpdater (7.0.0):
     - Alamofire
     - Capacitor
     - SSZipArchive
     - Version
-  - CapgoInappbrowser (2.0.0):
+  - CapgoInappbrowser (3.0.0):
     - Capacitor
   - CapgoNativeAudio (6.0.6):
     - Capacitor
@@ -123,10 +123,10 @@ DEPENDENCIES:
   - "CapgoCapacitorCrisp (from `../../node_modules/.pnpm/@capgo+capacitor-crisp@2.0.4_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-crisp`)"
   - "CapgoCapacitorFlash (from `../../node_modules/.pnpm/@capgo+capacitor-flash@2.0.6_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-flash`)"
   - "CapgoCapacitorMute (from `../../node_modules/.pnpm/@capgo+capacitor-mute@2.0.7_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-mute`)"
-  - "CapgoCapacitorPurchases (from `../../node_modules/.pnpm/@capgo+capacitor-purchases@4.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-purchases`)"
-  - "CapgoCapacitorScreenRecorder (from `../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@3.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-screen-recorder`)"
+  - "CapgoCapacitorPurchases (from `../../node_modules/.pnpm/@capgo+capacitor-purchases@6.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-purchases`)"
+  - "CapgoCapacitorScreenRecorder (from `../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-screen-recorder`)"
   - "CapgoCapacitorUpdater (from `../../node_modules/.pnpm/@capgo+capacitor-updater@7.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-updater`)"
-  - "CapgoInappbrowser (from `../../node_modules/.pnpm/@capgo+inappbrowser@2.0.0_@capacitor+core@5.0.3/node_modules/@capgo/inappbrowser`)"
+  - "CapgoInappbrowser (from `../../node_modules/.pnpm/@capgo+inappbrowser@3.0.0_@capacitor+core@5.0.3/node_modules/@capgo/inappbrowser`)"
   - "CapgoNativeAudio (from `../../node_modules/.pnpm/@capgo+native-audio@6.0.6_@capacitor+core@5.0.3/node_modules/@capgo/native-audio`)"
   - "CapgoNativeMarket (from `../../node_modules/.pnpm/@capgo+native-market@7.0.0/node_modules/@capgo/native-market`)"
 
@@ -205,13 +205,13 @@ EXTERNAL SOURCES:
   CapgoCapacitorMute:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-mute@2.0.7_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-mute"
   CapgoCapacitorPurchases:
-    :path: "../../node_modules/.pnpm/@capgo+capacitor-purchases@4.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-purchases"
+    :path: "../../node_modules/.pnpm/@capgo+capacitor-purchases@6.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-purchases"
   CapgoCapacitorScreenRecorder:
-    :path: "../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@3.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-screen-recorder"
+    :path: "../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-screen-recorder"
   CapgoCapacitorUpdater:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-updater@7.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-updater"
   CapgoInappbrowser:
-    :path: "../../node_modules/.pnpm/@capgo+inappbrowser@2.0.0_@capacitor+core@5.0.3/node_modules/@capgo/inappbrowser"
+    :path: "../../node_modules/.pnpm/@capgo+inappbrowser@3.0.0_@capacitor+core@5.0.3/node_modules/@capgo/inappbrowser"
   CapgoNativeAudio:
     :path: "../../node_modules/.pnpm/@capgo+native-audio@6.0.6_@capacitor+core@5.0.3/node_modules/@capgo/native-audio"
   CapgoNativeMarket:
@@ -251,10 +251,10 @@ SPEC CHECKSUMS:
   CapgoCapacitorCrisp: b7a0e75bc1528fd0ef3a7e7c36c565f318028e1e
   CapgoCapacitorFlash: 59b9d8ba094c753914eb5e6ab6db8c21a58de1f2
   CapgoCapacitorMute: cd5f577e3bb3de93c2de7ab1e6f079c11882d1fc
-  CapgoCapacitorPurchases: 28182fca1f23dad6659bac28fcb262deca0a5fd1
-  CapgoCapacitorScreenRecorder: 32023e11da0b943dfc85796879c34f3cb504e016
+  CapgoCapacitorPurchases: 11a674bd4cad7d8e34cba30e7efb5414da08cc4a
+  CapgoCapacitorScreenRecorder: a4e60b4b73b9797055c3dc9e4b3b7933a2ee1d8e
   CapgoCapacitorUpdater: c50cbd9e722f1edcbb5b99c6b69eb31174f67594
-  CapgoInappbrowser: 6f61cabeda16bc45cecf326d1e862bddb5c9e808
+  CapgoInappbrowser: 58390b6101fe354e10fa94fc21cea45ad22f7778
   CapgoNativeAudio: 147796d0bcb2970030f6d773e9d0cb276920764b
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
   Crisp: 707a2159fd02f9018bc36014aacb0e1bb5b74e0d
@@ -263,6 +263,6 @@ SPEC CHECKSUMS:
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: 6b6766d0c4ef1dcac58bb801cf58a669b3d2224e
+PODFILE CHECKSUM: 5e0beed2a85e09a65a5574353d2fd7161ac72411
 
 COCOAPODS: 1.12.1

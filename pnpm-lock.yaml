@@ -98,11 +98,11 @@ dependencies:
     specifier: ^2.0.7
     version: 2.0.7(@capacitor/core@5.0.3)
   '@capgo/capacitor-purchases':
-    specifier: ^4.0.0
-    version: 4.0.0(@capacitor/core@5.0.3)
+    specifier: ^6.0.0
+    version: 6.0.0(@capacitor/core@5.0.3)
   '@capgo/capacitor-screen-recorder':
-    specifier: ^3.0.0
-    version: 3.0.0(@capacitor/core@5.0.3)
+    specifier: ^5.0.0
+    version: 5.0.0(@capacitor/core@5.0.3)
   '@capgo/capacitor-updater':
     specifier: 7.0.0
     version: 7.0.0(@capacitor/core@5.0.3)
@@ -110,8 +110,8 @@ dependencies:
     specifier: ^9.1.2
     version: 9.1.2
   '@capgo/inappbrowser':
-    specifier: ^2.0.0
-    version: 2.0.0(@capacitor/core@5.0.3)
+    specifier: ^3.0.0
+    version: 3.0.0(@capacitor/core@5.0.3)
   '@capgo/native-audio':
     specifier: ^6.0.6
     version: 6.0.6(@capacitor/core@5.0.3)
@@ -2063,16 +2063,16 @@ packages:
       '@capacitor/core': 5.0.3
     dev: false
 
-  /@capgo/capacitor-purchases@4.0.0(@capacitor/core@5.0.3):
-    resolution: {integrity: sha512-bI3A/Q2RhWLchG4jziyZ2YvLi3Wv4snwmYXK+Cl6MUaiYBPJ2rFPpTBcHtZJ39g1jeUuMcLa2YxoO7At01vuZQ==}
+  /@capgo/capacitor-purchases@6.0.0(@capacitor/core@5.0.3):
+    resolution: {integrity: sha512-FVqtwf6hsd3bS7lPmV1q8Bswlw1S5nEtPyTx4mkQASl5SWlcqsAVUJYYQEx54UX94s4YiYsscFu94Z78DuMIhg==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
       '@capacitor/core': 5.0.3
     dev: false
 
-  /@capgo/capacitor-screen-recorder@3.0.0(@capacitor/core@5.0.3):
-    resolution: {integrity: sha512-lOe1fCn412yVGOZZX9ErZGmkEP4aI34RUAKtI7tMjD9Y74plZAZ8EQ52j2Z9MrWgPvyyt+E1Tg3jEQIDg+U9Dg==}
+  /@capgo/capacitor-screen-recorder@5.0.0(@capacitor/core@5.0.3):
+    resolution: {integrity: sha512-8MPfVk0fjr4YG5dPzONoP68uObcVxK4ja3lvjokF2q7IeW/BhwyXD87KiopOGiBQ+KYlczOIAm0NPZQ2cJ3wvQ==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
@@ -2099,8 +2099,8 @@ packages:
       - supports-color
     dev: false
 
-  /@capgo/inappbrowser@2.0.0(@capacitor/core@5.0.3):
-    resolution: {integrity: sha512-jgjK9LcE5+IpXsS7WO27ccxKDFEO1/nDPp2gNk3o7StRqJPCRwxRYtw4t+jF+fXiqkm5K/m95PkSL+y1XqT15g==}
+  /@capgo/inappbrowser@3.0.0(@capacitor/core@5.0.3):
+    resolution: {integrity: sha512-xqYQ3s/1TJf0+s8g1etWvwWbHJpn/guwAC7dKS7FgGd2Hm1woHnht940j+aqvdLt8LF3fFJvSyZc+HKpwaijNA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
