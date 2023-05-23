@@ -31,8 +31,6 @@ PODS:
     - Capacitor
   - CapacitorLocalNotifications (5.0.2):
     - Capacitor
-  - CapacitorNativeBiometric (0.0.1):
-    - Capacitor
   - CapacitorNetwork (5.0.2):
     - Capacitor
   - CapacitorPreferences (5.0.2):
@@ -63,6 +61,8 @@ PODS:
   - CapgoCapacitorFlash (2.0.6):
     - Capacitor
   - CapgoCapacitorMute (2.0.7):
+    - Capacitor
+  - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
   - CapgoCapacitorPurchases (6.0.0):
     - Capacitor
@@ -107,7 +107,6 @@ DEPENDENCIES:
   - "CapacitorHaptics (from `../../node_modules/.pnpm/@capacitor+haptics@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/haptics`)"
   - "CapacitorKeyboard (from `../../node_modules/.pnpm/@capacitor+keyboard@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/keyboard`)"
   - "CapacitorLocalNotifications (from `../../node_modules/.pnpm/@capacitor+local-notifications@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/local-notifications`)"
-  - "CapacitorNativeBiometric (from `../../node_modules/.pnpm/capacitor-native-biometric@4.1.3/node_modules/capacitor-native-biometric`)"
   - "CapacitorNetwork (from `../../node_modules/.pnpm/@capacitor+network@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/network`)"
   - "CapacitorPreferences (from `../../node_modules/.pnpm/@capacitor+preferences@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/.pnpm/@capacitor+push-notifications@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/push-notifications`)"
@@ -123,6 +122,7 @@ DEPENDENCIES:
   - "CapgoCapacitorCrisp (from `../../node_modules/.pnpm/@capgo+capacitor-crisp@2.0.4_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-crisp`)"
   - "CapgoCapacitorFlash (from `../../node_modules/.pnpm/@capgo+capacitor-flash@2.0.6_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-flash`)"
   - "CapgoCapacitorMute (from `../../node_modules/.pnpm/@capgo+capacitor-mute@2.0.7_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-mute`)"
+  - "CapgoCapacitorNativeBiometric (from `../../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric`)"
   - "CapgoCapacitorPurchases (from `../../node_modules/.pnpm/@capgo+capacitor-purchases@6.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-purchases`)"
   - "CapgoCapacitorScreenRecorder (from `../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-screen-recorder`)"
   - "CapgoCapacitorUpdater (from `../../node_modules/.pnpm/@capgo+capacitor-updater@7.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-updater`)"
@@ -172,8 +172,6 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capacitor+keyboard@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/keyboard"
   CapacitorLocalNotifications:
     :path: "../../node_modules/.pnpm/@capacitor+local-notifications@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/local-notifications"
-  CapacitorNativeBiometric:
-    :path: "../../node_modules/.pnpm/capacitor-native-biometric@4.1.3/node_modules/capacitor-native-biometric"
   CapacitorNetwork:
     :path: "../../node_modules/.pnpm/@capacitor+network@5.0.2_@capacitor+core@5.0.3/node_modules/@capacitor/network"
   CapacitorPreferences:
@@ -204,6 +202,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-flash@2.0.6_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-flash"
   CapgoCapacitorMute:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-mute@2.0.7_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-mute"
+  CapgoCapacitorNativeBiometric:
+    :path: "../../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric"
   CapgoCapacitorPurchases:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-purchases@6.0.0_@capacitor+core@5.0.3/node_modules/@capgo/capacitor-purchases"
   CapgoCapacitorScreenRecorder:
@@ -235,7 +235,6 @@ SPEC CHECKSUMS:
   CapacitorHaptics: 864585542a435bd41eaabf7f30d9ff5ec03024d3
   CapacitorKeyboard: e628d4e66d621c69e449945ebabded17c5b9c2e8
   CapacitorLocalNotifications: db01feb38f85b4fd8c0a0d0fa94a4a6410239563
-  CapacitorNativeBiometric: b47637a8cd349bdac014424bb4ddcae9ee5d4919
   CapacitorNetwork: 77c00ce41b4e014cbc6fdcb233462e7fce4b4755
   CapacitorPreferences: 0ad8838944f900284900d9647d9b0145c89ca27d
   CapacitorPushNotifications: 0566429afa72fe083a4142a58321f0ad83837096
@@ -251,6 +250,7 @@ SPEC CHECKSUMS:
   CapgoCapacitorCrisp: b7a0e75bc1528fd0ef3a7e7c36c565f318028e1e
   CapgoCapacitorFlash: 59b9d8ba094c753914eb5e6ab6db8c21a58de1f2
   CapgoCapacitorMute: cd5f577e3bb3de93c2de7ab1e6f079c11882d1fc
+  CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
   CapgoCapacitorPurchases: 11a674bd4cad7d8e34cba30e7efb5414da08cc4a
   CapgoCapacitorScreenRecorder: a4e60b4b73b9797055c3dc9e4b3b7933a2ee1d8e
   CapgoCapacitorUpdater: c50cbd9e722f1edcbb5b99c6b69eb31174f67594
@@ -263,6 +263,6 @@ SPEC CHECKSUMS:
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: 5e0beed2a85e09a65a5574353d2fd7161ac72411
+PODFILE CHECKSUM: 28199971abc270ed933158f97aac48b9c8fd6886
 
 COCOAPODS: 1.12.1
