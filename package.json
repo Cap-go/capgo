@@ -124,7 +124,7 @@
     "@capacitor/core": "^5.0.3",
     "@iconify-json/carbon": "1.1.16",
     "@iconify-json/heroicons": "^1.1.10",
-    "@iconify-json/ion": "1.1.9",
+    "@iconify-json/ion": "1.1.10",
     "@iconify-json/ls": "1.1.4",
     "@iconify/json": "^2.2.68",
     "@tailwindcss/aspect-ratio": "^0.4.2",
