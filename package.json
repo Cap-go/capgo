@@ -153,7 +153,7 @@
     "eslint-plugin-cypress": "^2.13.3",
     "https-localhost": "4.7.1",
     "postcss": "^8.4.23",
-    "sass": "1.62.0",
+    "sass": "1.62.1",
     "tailwindcss": "^3.3.2",
     "typescript": "5.0.3",
     "unplugin-icons": "0.16.1",
