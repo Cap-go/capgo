@@ -38,7 +38,7 @@ const emit = defineEmits([
   'update:search', 'update:filters', 'update:columns', 'update:currentPage',
   'filterClick', 'rowClick', 'sortClick'])
 const { t } = useI18n()
-const search = ref(props.search || '')
+const searchVal = ref(props.search || '')
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -87,8 +87,8 @@ if (props.filters) {
   })
 }
 
-watch(search, debounce(() => {
-  emit('update:search', search.value)
+watch(searchVal, debounce(() => {
+  emit('update:search', searchVal.value)
   emit('reload')
 }, 500))
 
@@ -184,7 +184,7 @@ onMounted(() => {
         <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
           <IconSearch class="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </div>
-        <input id="table-search" v-model="search" type="text" class="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 md:w-80 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :placeholder="searchPlaceholder">
+        <input id="table-search" v-model="searchVal" type="text" class="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 md:w-80 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :placeholder="searchPlaceholder">
       </div>
     </div>
     <div class="hidden md:block">
