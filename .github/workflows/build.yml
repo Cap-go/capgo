@@ -36,14 +36,6 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: 1.50.13
-      # - name: Verify generated types match Postgres schema
-      #   run: |
-      #     pnpm types
-      #     if ! git diff --ignore-space-at-eol --exit-code --quiet src/types/supabase.types.ts; then
-      #       echo "Detected uncommitted changes after build. See status below:"
-      #       git diff
-      #       exit 1
-      #     fi
       - name: Update functions Alpha
         if: "contains(github.ref, '-alpha.')"
         id: update_functions_preprod
@@ -103,6 +95,14 @@ jobs:
         with:
           fileName: "serviceAccount.json"
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
       - uses: maierj/fastlane-action@v2.3.0
         env:
           KEYSTORE_PATH: ${{ steps.android_keystore.outputs.filePath }}
