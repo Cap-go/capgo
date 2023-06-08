@@ -134,6 +134,12 @@ jobs:
         - name: Install dependencies
           id: install_code
           run: pnpm install --frozen-lockfile
+        - uses: actions/cache@v2
+          with:
+            path: ios/App/Pods
+            key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+            restore-keys: |
+                    ${{ runner.os }}-pods-
         - name: Build
           id: build_code
           run: pnpm mobile
