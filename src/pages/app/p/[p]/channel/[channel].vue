@@ -302,7 +302,7 @@ async function openPannel() {
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.disableAutoUpdateUnderNative"
-                  @change="saveChannelChange('disable_auto_downgrade', !channel?.disableAutoUpdateUnderNative)"
+                  @change="saveChannelChange('disableAutoUpdateUnderNative', !channel?.disableAutoUpdateUnderNative)"
                 />
               </template>
             </k-list-item>
@@ -312,7 +312,7 @@ async function openPannel() {
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.disableAutoUpdateToMajor"
-                  @change="saveChannelChange('disable_auto_upgrade', !channel?.disableAutoUpdateToMajor)"
+                  @change="saveChannelChange('disableAutoUpdateToMajor', !channel?.disableAutoUpdateToMajor)"
                 />
               </template>
             </k-list-item>
