@@ -95,7 +95,7 @@
     "crypto-random-string": "^5.0.0",
     "daisyui": "^2.52.0",
     "dayjs": "1.11.7",
-    "firebase": "9.22.0",
+    "firebase": "9.22.1",
     "flowbite": "^1.6.5",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.1.1",
