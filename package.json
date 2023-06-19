@@ -70,7 +70,7 @@
     "@capgo/capacitor-updater": "7.0.0",
     "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^3.0.0",
-    "@capgo/native-audio": "^5.1.19",
+    "@capgo/native-audio": "^6.0.10",
     "@capgo/native-market": "^1.1.36",
     "@formkit/auto-animate": "1.0.0-beta.6",
     "@formkit/themes": "0.17.1",

@@ -1,4 +1,4 @@
-lockfileVersion: '6.1'
+lockfileVersion: '6.0'
 
 settings:
   autoInstallPeers: true
@@ -123,8 +123,8 @@ dependencies:
     specifier: ^6.0.10
     version: 6.0.10(@capacitor/core@5.0.5)
   '@capgo/native-market':
-    specifier: ^7.0.0
-    version: 7.0.0
+    specifier: ^1.1.36
+    version: 1.1.36
   '@formkit/auto-animate':
     specifier: 1.0.0-beta.6
     version: 1.0.0-beta.6
@@ -1928,6 +1928,12 @@ packages:
       '@capacitor/core': 5.0.5
     dev: false
 
+  /@capacitor/core@4.8.0:
+    resolution: {integrity: sha512-hFgLi1bGmADMmYMFAaitEsVheF3QgoMU4TrHkMgik51NzHwUq3nBdP5+A9oNS9qe3dEDyegoaHF8X9oJc9v8QQ==}
+    dependencies:
+      tslib: 2.5.3
+    dev: false
+
   /@capacitor/core@5.0.5:
     resolution: {integrity: sha512-sulwWXEhYI6cBIj1WnH9k+a8z1f4XTRDtdh3YfXNdeV36UT7T55GCeGrPoQMm7ww6iWyGuv1VEzVIuZFga8rtw==}
     dependencies:
@@ -2178,10 +2184,10 @@ packages:
       '@capacitor/core': 5.0.5
     dev: false
 
-  /@capgo/native-market@7.0.0:
-    resolution: {integrity: sha512-aG0O75Z73XGpvKytD9NI3a2bwalSU4mqOAj8MrzTGqvlHhj5xqDBtLVPtNTbcwaSjUWrFF3kGOWDHKbzy+1hnw==}
+  /@capgo/native-market@1.1.36:
+    resolution: {integrity: sha512-1wsHux9kSIypH15eEvoW/TllsRlAumEgSiebLf0SqePppRlOmsA9ZAeobU4wTPkX0YI2Yx9ocvXeySt39R3QeQ==}
     dependencies:
-      '@capacitor/core': 5.0.5
+      '@capacitor/core': 4.8.0
     dev: false
 
   /@colors/colors@1.5.0:
