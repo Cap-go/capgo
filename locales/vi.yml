@@ -280,7 +280,7 @@ something-went-wrong-try-again-later: |-
   Thử lại sau.
 special-api-access: Quyền truy cập API đặc biệt
 specialError: Nên chứa các ký tự đặc biệt
-start-using-capgo: Bắt đầu sử dụng Capgo!
+start-using-capgo: 'Bắt đầu sử dụng:'
 stored-externally: được lưu trữ bên ngoài
 submit: Nộp
 support: Ủng hộ

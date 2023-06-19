@@ -280,7 +280,7 @@ something-went-wrong-try-again-later: |-
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
 specialError: Özel karakterler içermelidir
-start-using-capgo: Capgo'yu kullanmaya başlayın!
+start-using-capgo: 'Kullanmaya başla:'
 stored-externally: harici olarak depolanır
 submit: Göndermek
 support: Destek

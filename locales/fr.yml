@@ -284,7 +284,7 @@ size-not-found: Introuvable
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
 special-api-access: Accès API privilégié
 specialError: Doit contenir des caractères spéciaux
-start-using-capgo: Commencez à utiliser Capgo !
+start-using-capgo: "Commencez à utiliser\_:"
 stored-externally: stocké en externe
 submit: Soumettre
 support: Support

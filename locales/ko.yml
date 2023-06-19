@@ -272,7 +272,7 @@ something-went-wrong-try-again-later: |-
   나중에 다시 시도하십시오.
 special-api-access: 특수 API 액세스
 specialError: 특수 문자를 포함해야 합니다.
-start-using-capgo: Capgo 사용 시작!
+start-using-capgo: '사용 시작:'
 stored-externally: 외부에 저장
 submit: 제출하다
 support: 지원하다

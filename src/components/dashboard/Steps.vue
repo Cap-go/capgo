@@ -147,22 +147,22 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <section class="h-full max-h-fit overflow-y-scroll bg-gray-50 py-12 dark:bg-gray-900 lg:py-20 sm:py-16">
-    <div class="mx-auto max-w-7xl px-4 lg:px-8 sm:px-6">
+  <section class="h-full py-12 overflow-y-scroll max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
+    <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div v-if="props.onboarding" class="text-center">
-        <h2 class="font-pj text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50">
-          {{ t('start-using-capgo') }}
+        <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
+          {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
         </h2>
-        <p class="font-pj mx-auto mt-6 text-lg font-normal text-gray-600 dark:text-gray-200">
+        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
           {{ t('add-your-first-app-t') }}
         </p>
-        <p class="text-md font-pj mx-auto mt-2 font-normal text-muted-blue-300 dark:text-muted-blue-50">
+        <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">
           {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
         </p>
       </div>
 
       <div v-else class="text-center">
-        <h2 class="font-pj text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50">
+        <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
           {{ t('add-another-app') }}
         </h2>
       </div>
@@ -177,13 +177,13 @@ watchEffect(async () => {
           @change="changeMode()"
         />
       </div> -->
-      <div class="mx-auto mt-12 max-w-2xl sm:px-10">
+      <div class="max-w-2xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="mx-auto h-10 w-1 bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
+          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
-          <div :class="[step !== i ? 'opacity-30' : '']" class="relative overflow-hidden border border-gray-200 rounded-2xl bg-white p-5">
+          <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
-              <div class="font-pj h-14 w-14 inline-flex flex-shrink-0 items-center justify-center rounded-xl bg-muted-blue-800 text-xl font-bold text-white">
+              <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
@@ -191,11 +191,11 @@ watchEffect(async () => {
                   🚀
                 </template>
               </div>
-              <div class="font-pj ml-6 text-xl font-medium text-gray-900">
+              <div class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
                 <span class="text-sm">{{ s.subtitle }}</span>
-                <div class="rounded-lg p-3" :class="{ 'bg-black': s.command }">
-                  <code v-if="s.command" :id="`step_command_${i}`" class="cursor-pointer text-lg text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+                <div class="p-3 rounded-lg" :class="{ 'bg-black': s.command }">
+                  <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
@@ -211,7 +211,7 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <k-fab v-if="!onboarding" class="right-4-safe bottom-4-safe fixed z-20" @click="emit('done')">
+  <k-fab v-if="!onboarding" class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
     <template #icon>
       <component :is="arrowBack" />
     </template>

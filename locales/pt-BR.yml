@@ -278,7 +278,7 @@ something-went-wrong-try-again-later: |-
   Tente mais tarde.
 special-api-access: Acesso especial à API
 specialError: Deve conter caracteres especiais
-start-using-capgo: Comece a usar Capgo!
+start-using-capgo: 'Comece a usar:'
 stored-externally: armazenado externamente
 submit: Enviar
 support: Apoiar

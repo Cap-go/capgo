@@ -278,7 +278,7 @@ something-went-wrong-try-again-later: |-
   Попробуйте позже.
 special-api-access: Специальный доступ к API
 specialError: Должен содержать специальные символы
-start-using-capgo: Начните использовать Capgo!
+start-using-capgo: 'Начните использовать:'
 stored-externally: хранится снаружи
 submit: Представлять на рассмотрение
 support: Поддерживать

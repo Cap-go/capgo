@@ -269,7 +269,7 @@ size-not-found: Not found
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
 specialError: Should contain special characters
-start-using-capgo: Start using Capgo !
+start-using-capgo: 'Start using:'
 stored-externally: stored externally
 submit: Submit
 support: Support

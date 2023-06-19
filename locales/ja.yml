@@ -272,7 +272,7 @@ something-went-wrong-try-again-later: |-
   あとでもう一度試してみてください。
 special-api-access: 特別な API アクセス
 specialError: 特殊文字を含める必要があります
-start-using-capgo: カプゴを使い始めましょう！
+start-using-capgo: '使用を開始します:'
 stored-externally: 外部保存
 submit: 送信
 support: サポート
