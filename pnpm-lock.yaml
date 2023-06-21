@@ -111,8 +111,8 @@ dependencies:
     specifier: ^5.0.0
     version: 5.0.0(@capacitor/core@5.0.5)
   '@capgo/capacitor-updater':
-    specifier: 7.0.0
-    version: 7.0.0(@capacitor/core@5.0.5)
+    specifier: 5.0.1
+    version: 5.0.1(@capacitor/core@5.0.5)
   '@capgo/google-play-scraper':
     specifier: ^9.1.2
     version: 9.1.2
@@ -120,11 +120,11 @@ dependencies:
     specifier: ^3.0.0
     version: 3.0.0(@capacitor/core@5.0.5)
   '@capgo/native-audio':
-    specifier: ^6.0.10
-    version: 6.0.10(@capacitor/core@5.0.5)
+    specifier: ^6.0.12
+    version: 6.0.12(@capacitor/core@5.0.5)
   '@capgo/native-market':
-    specifier: ^7.0.0
-    version: 7.0.0
+    specifier: ^11.0.0
+    version: 11.0.0
   '@formkit/auto-animate':
     specifier: 1.0.0-beta.6
     version: 1.0.0-beta.6
@@ -2140,9 +2140,8 @@ packages:
       '@capacitor/core': 5.0.5
     dev: false
 
-  /@capgo/capacitor-updater@7.0.0(@capacitor/core@5.0.5):
-    resolution: {integrity: sha512-yue0plQCFZJ3A1YtBkLN7462pc7W+Is+/DKPRQx4R4n551gjmOgLRuu6vdu4okqPwXHyA/XTkCq7nNaQyTNoPQ==}
-    deprecated: Go back to v5, this version was send by CI/CD fantaisy, sorry for this
+  /@capgo/capacitor-updater@5.0.1(@capacitor/core@5.0.5):
+    resolution: {integrity: sha512-FZVoLrpAP59+aLWg0z0WZSG16fE/RT+LFuW9wwlhciJBJ0yCfXsfXl2I8OQKXBKN5zk2YnqTbMzksJaYbGCALw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
@@ -2170,16 +2169,16 @@ packages:
       '@capacitor/core': 5.0.5
     dev: false
 
-  /@capgo/native-audio@6.0.10(@capacitor/core@5.0.5):
-    resolution: {integrity: sha512-yDgiMIdVovxwmyKvtsDmj/DS+2etXNsS5qVkwUzPQfAA8gfOOIQ6Y+QuD7Tkz0tcgYcl7Yra5HpQDSFomEeiCw==}
+  /@capgo/native-audio@6.0.12(@capacitor/core@5.0.5):
+    resolution: {integrity: sha512-FnkMz8nrv8njBdPbfPsqp2KCVDBKVVDf7qU8h+UQX9hSozWQOiIE8pR5HFvcY9bwrrM/tJAxUz5IzIX6TNyHsg==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
       '@capacitor/core': 5.0.5
     dev: false
 
-  /@capgo/native-market@7.0.0:
-    resolution: {integrity: sha512-aG0O75Z73XGpvKytD9NI3a2bwalSU4mqOAj8MrzTGqvlHhj5xqDBtLVPtNTbcwaSjUWrFF3kGOWDHKbzy+1hnw==}
+  /@capgo/native-market@11.0.0:
+    resolution: {integrity: sha512-0jtLyyUjt8tDYpKx8ylYC5biHgc6UBodR/h8v5GKOOB7STo368YTgEaxKByHmYM+nD26i3Egu+Cm8vYBLSJ2wQ==}
     dependencies:
       '@capacitor/core': 5.0.5
     dev: false

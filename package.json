@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "14.0.0",
+  "version": "14.0.0-beta.1",
   "scripts": {
     "build": "vite build",
     "test": "cypress open",
@@ -67,11 +67,11 @@
     "@capgo/capacitor-native-biometric": "^5.0.1",
     "@capgo/capacitor-purchases": "^6.0.0",
     "@capgo/capacitor-screen-recorder": "^5.0.0",
-    "@capgo/capacitor-updater": "7.0.0",
+    "@capgo/capacitor-updater": "5.0.1",
     "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^3.0.0",
-    "@capgo/native-audio": "^5.1.19",
-    "@capgo/native-market": "^1.1.36",
+    "@capgo/native-audio": "^6.0.12",
+    "@capgo/native-market": "^11.0.0",
     "@formkit/auto-animate": "1.0.0-beta.6",
     "@formkit/themes": "0.17.1",
     "@formkit/vue": "0.17.1",
