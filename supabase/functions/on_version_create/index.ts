@@ -54,20 +54,32 @@ serve(async (event: Request) => {
       return sendRes()
     }
 
-    const { data, error } = await supabaseAdmin()
-      .storage
-      .from(`apps/${record.user_id}/${record.app_id}/versions`)
-      .download(record.bucket_id)
-    if (error || !data) {
-      console.log('Error', record.bucket_id, error)
-      return sendRes()
+    let checksum = ''
+    let size = 0
+    if (record.storage_provider === 'r2') {
+      // get the size from r2
+      const res = await r2.getSizeChecksum(record.bucket_id)
+      size = res.size
+      checksum = res.checksum
     }
-    const u = await data.arrayBuffer()
-    // get the size of the Uint8Array
-    const size = u.byteLength
-    const unit8 = new Uint8Array(u)
-    // cr32 hash the file
-    const checksum = crc32(unit8)
+    else {
+      const { data, error } = await supabaseAdmin()
+        .storage
+        .from(`apps/${record.user_id}/${record.app_id}/versions`)
+        .download(record.bucket_id)
+      if (error || !data) {
+        console.log('Error', record.bucket_id, error)
+        return sendRes()
+      }
+      const u = await data.arrayBuffer()
+      // get the size of the Uint8Array
+      size = u.byteLength
+      const unit8 = new Uint8Array(u)
+      // cr32 hash the file
+      checksum = crc32(unit8)
+      await r2.upload(record.bucket_id, unit8)
+    }
+
     // create app version meta
     const { error: dbError } = await supabaseAdmin()
       .from('app_versions_meta')
@@ -96,7 +108,6 @@ serve(async (event: Request) => {
     }
     await updateOrAppStats(increment, today_id, record.user_id)
     // `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-    await r2.upload(record.bucket_id, unit8)
     // modify app_versions to set storage to r2
     const { error: errorUpdateStorage } = await supabaseAdmin()
       .from('app_versions')

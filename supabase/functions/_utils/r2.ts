@@ -40,9 +40,17 @@ function getSignedUrl(fileId: string, expirySeconds: number) {
   const client = initR2()
   return client.getPresignedUrl('GET', fileId, { expirySeconds })
 }
+// get the size from r2
+async function getSizeChecksum(fileId: string) {
+  const client = initR2()
+  const { size, metadata } = await client.statObject(fileId)
+  const checksum = metadata['x-amz-checksum-crc32']
+  return { size, checksum }
+}
 
 export const r2 = {
   upload,
+  getSizeChecksum,
   deleteObject,
   checkIfExist,
   getSignedUrl,
