@@ -56,11 +56,13 @@ serve(async (event: Request) => {
 
     let checksum = ''
     let size = 0
-    if (record.storage_provider === 'r2') {
+    if (record.storage_provider === 'r2-direct') {
       // get the size from r2
-      const res = await r2.getSizeChecksum(record.bucket_id)
-      size = res.size
-      checksum = res.checksum
+      // skip checksum and size for r2-direct
+      console.log('r2-direct')
+      // const res = await r2.getSizeChecksum(record.bucket_id)
+      // size = res.size
+      // checksum = res.checksum
     }
     else {
       const { data, error } = await supabaseAdmin()

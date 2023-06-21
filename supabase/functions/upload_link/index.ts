@@ -11,7 +11,7 @@ interface dataUpload {
 }
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataUpload) {
-  const apikey_string = headers.authorization
+  const apikey_string = headers.capgkey
   if (!apikey_string)
     return sendRes({ status: 'Missing apikey' }, 400)
 
@@ -39,7 +39,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     const url = await r2.getUploadUrl(filePath)
     if (!url)
       return sendRes({ status: 'Error unknow' }, 500)
-    return sendRes({ path: filePath })
+    return sendRes({ url })
   }
   catch (e) {
     return sendRes({
