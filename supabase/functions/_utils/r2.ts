@@ -21,6 +21,11 @@ function upload(fileId: string, file: Uint8Array) {
   return client.putObject(fileId, file)
 }
 
+function getUploadUrl(fileId: string, expirySeconds = 60) {
+  const client = initR2()
+  return client.getPresignedUrl('PUT', fileId, { expirySeconds })
+}
+
 function deleteObject(fileId: string) {
   const client = initR2()
   return client.deleteObject(fileId)
@@ -41,4 +46,5 @@ export const r2 = {
   deleteObject,
   checkIfExist,
   getSignedUrl,
+  getUploadUrl,
 }
