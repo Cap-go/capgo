@@ -35,7 +35,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.50.13
+          version: 1.68.6
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
