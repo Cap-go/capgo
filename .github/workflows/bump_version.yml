@@ -8,7 +8,7 @@ on:
 
 jobs:
   bump-version:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     name: "Bump version and create changelog with standard version"
     steps:
@@ -47,7 +47,7 @@ jobs:
           git pull $remote_repo $CURRENT_BRANCH
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
   create-cache:
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     name: "Create global cache on main branch"
     steps:

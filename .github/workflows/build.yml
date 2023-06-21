@@ -37,24 +37,24 @@ jobs:
         with:
           version: 1.50.13
       - name: Update functions Alpha
-        if: "contains(github.ref, '-alpha.')"
+        if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
           BRANCH: development
         run: node scripts/deploy_functions.mjs  
       - name: Update functions
-        if: "!contains(github.ref, '-alpha.')"
+        if: ${{ !contains(github.ref, '-alpha.') }}
         id: update_functions_prod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: node scripts/deploy_functions.mjs 
       - name: Create Release Alpha
-        if: "contains(github.ref, '-alpha.')"
+        if: ${{ contains(github.ref, '-alpha.') }}
         id: create_release_prepro
         run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
-        if: "!contains(github.ref, '-alpha.')"
+        if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
   build_android:
