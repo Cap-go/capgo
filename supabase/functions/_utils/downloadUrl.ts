@@ -9,7 +9,10 @@ export async function getBundleUrl(platform: string, path: string, bucket_id: st
       .createSignedUrl(bucket_id, 120)
     return data?.signedUrl
   }
-  else if (platform === 'r2') {
+  else if (platform === 'r2' && bucket_id.endsWith('.zip')) {
+    return r2.getSignedUrl(`${path}/${bucket_id}`, 120)
+  }
+  else if (platform === 'r2' && !bucket_id.endsWith('.zip')) {
     return r2.getSignedUrl(bucket_id, 120)
   }
   return null
