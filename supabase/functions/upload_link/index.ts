@@ -39,6 +39,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     const url = await r2.getUploadUrl(filePath)
     if (!url)
       return sendRes({ status: 'Error unknow' }, 500)
+    console.log('url', filePath, url)
     return sendRes({ url })
   }
   catch (e) {

@@ -39,8 +39,10 @@ serve(async (event: Request) => {
     // // check if not deleted it's present in r2 storage
     if (!record.deleted) {
       const exist = await r2.checkIfExist(record.bucket_id)
-      console.log('exist ?', exist)
-      if (!exist) {
+      const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+      const existV2 = await r2.checkIfExist(v2Path)
+      console.log('exist ?', record.bucket_id, exist)
+      if (!exist && !existV2) {
         console.log('upload to r2', record.bucket_id)
         // upload to r2
         const { data, error } = await supabaseAdmin()
@@ -78,6 +80,22 @@ serve(async (event: Request) => {
           .eq('id', record.id)
         if (errorUpdateStorage)
           console.log('errorUpdateStorage', errorUpdateStorage)
+      }
+      else if (existV2 && record.storage_provider === 'r2') {
+        // pdate size and checksum
+        console.log('V2', record.bucket_id)
+        const { size, checksum } = await r2.getSizeChecksum(v2Path)
+        if (size && checksum) {
+          const { error: errorUpdate } = await supabaseAdmin()
+            .from('app_versions_meta')
+            .update({
+              size,
+              checksum,
+            })
+            .eq('id', record.id)
+          if (errorUpdate)
+            console.log('errorUpdate', errorUpdate)
+        }
       }
     }
     if (record.deleted === body.old_record.deleted) {
