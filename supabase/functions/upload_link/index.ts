@@ -22,8 +22,17 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
   try {
     console.log('body', body)
     const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
-    // check if object exist inr2
-    // check if app exist
+    // check if app version exist
+    const { error: errorVersion } = await supabaseAdmin()
+      .from('app_versions')
+      .select('version_id')
+      .eq('bucket_id', body.bucket_id)
+      .eq('app_id', body.app_id)
+      .eq('user_id', apikey.user_id)
+      .single()
+    if (errorVersion)
+      return sendRes({ status: 'Error App or Version not found' }, 500)
+
     const { error: errorApp } = await supabaseAdmin()
       .from('apps')
       .select('app_id')
@@ -33,6 +42,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     if (errorApp)
       return sendRes({ status: 'Error App not found' }, 500)
 
+    // check if object exist in r2
     const exist = await r2.checkIfExist(filePath)
     if (exist)
       return sendRes({ status: 'Error already exist' }, 500)
