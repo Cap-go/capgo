@@ -30,7 +30,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
       .eq('user_id', apikey.user_id)
-      // .single()
+      .single()
     if (errorVersion) {
       console.log('errorVersion', errorVersion)
       return sendRes({ status: 'Error App or Version not found' }, 500)
