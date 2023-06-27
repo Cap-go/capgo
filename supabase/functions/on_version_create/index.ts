@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.188.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
-import { supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
+import { incrementSize, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
@@ -57,12 +57,8 @@ serve(async (event: Request) => {
     let checksum = ''
     let size = 0
     if (record.storage_provider === 'r2-direct') {
-      // get the size from r2
       // skip checksum and size for r2-direct
-      console.log('r2-direct')
-      // const res = await r2.getSizeChecksum(record.bucket_id)
-      // size = res.size
-      // checksum = res.checksum
+      console.log('r2-direct skip checksum and size')
     }
     else {
       const { data, error } = await supabaseAdmin()
@@ -94,21 +90,10 @@ serve(async (event: Request) => {
       })
     if (dbError)
       console.error('Cannot create app version meta', dbError)
-    const today_id = new Date().toISOString().slice(0, 10)
-    const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
-      app_id: record.app_id,
-      date_id: today_id,
-      bandwidth: 0,
-      mlu: 0,
-      mlu_real: 0,
-      devices: 0,
-      devices_real: 0,
-      version_size: size,
-      channels: 0,
-      shared: 0,
-      versions: 1,
-    }
-    await updateOrAppStats(increment, today_id, record.user_id)
+    if (record.storage_provider === 'r2-direct')
+      return sendRes() // skip delete s3 and increment size in new upload
+
+    await incrementSize(record.app_id, record.user_id, size) // for old upload system
     // `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
     // modify app_versions to set storage to r2
     const { error: errorUpdateStorage } = await supabaseAdmin()

@@ -4,6 +4,7 @@ import { updatePerson } from './crisp.ts'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
+
 // Import Supabase client
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
@@ -97,6 +98,24 @@ export async function updateVersionStats(increment: Database['public']['Function
     .rpc('update_version_stats', increment)
   if (error)
     console.error('update_version_stats', error)
+}
+
+export function incrementSize(appId: string, userId: string, size: number) {
+  const today_id = new Date().toISOString().slice(0, 10)
+  const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
+    app_id: appId,
+    date_id: today_id,
+    bandwidth: 0,
+    mlu: 0,
+    mlu_real: 0,
+    devices: 0,
+    devices_real: 0,
+    version_size: size,
+    channels: 0,
+    shared: 0,
+    versions: 1,
+  }
+  return updateOrAppStats(increment, today_id, userId)
 }
 
 export async function updateOrAppStats(increment: Database['public']['Functions']['increment_stats_v2']['Args'],
