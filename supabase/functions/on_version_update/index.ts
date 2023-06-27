@@ -6,7 +6,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
-// function.
+
 serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
@@ -41,7 +41,7 @@ serve(async (event: Request) => {
       const exist = await r2.checkIfExist(record.bucket_id)
       const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
       const existV2 = await r2.checkIfExist(v2Path)
-      console.log('exist ?', record.bucket_id, exist)
+      console.log('exist ?', record.bucket_id, v2Path, exist)
       if (!exist && !existV2) {
         console.log('upload to r2', record.bucket_id)
         // upload to r2
@@ -98,10 +98,11 @@ serve(async (event: Request) => {
         }
       }
     }
-    if (record.deleted === body.old_record.deleted) {
+    if (record.deleted === body.old_record.deleted || !record.deleted) {
       console.log('Update but not deleted')
       return sendRes()
     }
+    console.log('Delete', record.bucket_id)
     // check if in r2 storage and delete
     const exist = await r2.checkIfExist(record.bucket_id)
     if (exist) {
@@ -152,7 +153,7 @@ serve(async (event: Request) => {
       .from(`apps/${record.user_id}/${record.app_id}/versions`)
       .remove([record.bucket_id])
     if (errorDelete)
-      console.log('errorDelete', errorDelete)
+      console.log('errorDelete from supabase storage', record.bucket_id, errorDelete)
     return sendRes()
   }
   catch (e) {
