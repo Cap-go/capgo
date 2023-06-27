@@ -167,6 +167,9 @@ dependencies:
   capacitor-rate-app:
     specifier: 4.0.3
     version: 4.0.3(@capacitor/core@5.0.5)
+  capacitor-secure-storage-plugin:
+    specifier: ^0.9.0
+    version: 0.9.0(@capacitor/core@5.0.5)
   chart.js:
     specifier: ^4.3.0
     version: 4.3.0
@@ -5627,6 +5630,14 @@ packages:
 
   /capacitor-rate-app@4.0.3(@capacitor/core@5.0.5):
     resolution: {integrity: sha512-HdTftIzBSfcNfbjQFCtvdvFU83MPCt11H/QXV4t7jctLelA8jXu3qee9MiZ4dqDc+kwNoufcQ95ncoCvn5viig==}
+    peerDependencies:
+      '@capacitor/core': ^5.0.0
+    dependencies:
+      '@capacitor/core': 5.0.5
+    dev: false
+
+  /capacitor-secure-storage-plugin@0.9.0(@capacitor/core@5.0.5):
+    resolution: {integrity: sha512-P5fiC94opcLHu41vceo9weXH+20g0SPYKkeAx+qm9eKNcVFqpcuI4dqwivXlGXYNMDygyjSQuAaFwZ4gW0Y91Q==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
