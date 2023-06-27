@@ -20,19 +20,21 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     return sendRes({ status: 'Missing apikey' }, 400)
 
   try {
-    console.log('body', body)
+    console.log('body', body, apikey.user_id)
     const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
     // check if app version exist
     const { error: errorVersion } = await supabaseAdmin()
       .from('app_versions')
-      .select('version_id')
+      .select('id')
       .eq('bucket_id', body.bucket_id)
       .eq('app_id', body.app_id)
+      .eq('storage_provider', 'r2-direct')
       .eq('user_id', apikey.user_id)
-      .single()
-    if (errorVersion)
+      // .single()
+    if (errorVersion) {
+      console.log('errorVersion', errorVersion)
       return sendRes({ status: 'Error App or Version not found' }, 500)
-
+    }
     const { error: errorApp } = await supabaseAdmin()
       .from('apps')
       .select('app_id')
