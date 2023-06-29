@@ -133,14 +133,12 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
           current_app_id_url: appIdToUrl(app_id),
         }, appVersion.user_id, '0 0 * * 1', 'orange')
         if (sent) {
-          await logsnag.publish({
+          await logsnag.track({
             channel: 'updates',
             event: 'update fail',
             icon: '⚠️',
-            tags: {
-              'user-id': appVersion.user_id,
-            },
-            notify: false,
+            user_id: appVersion.user_id,
+            notify: true,
           }).catch()
         }
         all.push(updateVersionStats({

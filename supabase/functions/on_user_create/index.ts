@@ -34,13 +34,11 @@ serve(async (event: Request) => {
       return sendRes()
     await createStripeCustomer(record as any)
     await addEventPerson(record.email, {}, 'user:register', 'green').catch()
-    await logsnag.publish({
+    await logsnag.track({
       channel: 'user-register',
       event: 'User Joined',
       icon: '🎉',
-      tags: {
-        'user-id': record.id,
-      },
+      user_id: record.id,
       notify: true,
     }).catch()
     return sendRes()

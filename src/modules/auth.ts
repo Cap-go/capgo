@@ -54,13 +54,12 @@ async function guard(next: any, to: string, from: string) {
     isCanceled(main.user?.id).then((res) => {
       main.canceled = res
     })
-    snag.publish({
+
+    snag.track({
       channel: 'user-login',
       event: 'User Login',
       icon: '✅',
-      tags: {
-        'user-id': main.user.id,
-      },
+      user_id: main.user.id,
       notify: false,
     }).catch()
     setUser({

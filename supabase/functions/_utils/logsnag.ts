@@ -1,4 +1,4 @@
-import { LogSnag } from 'https://cdn.logsnag.com/deno/0.1.5/index.ts'
+import { LogSnag } from 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts'
 import { getEnv } from './utils.ts'
 
 const logsnag = getEnv('LOGSNAG_TOKEN')
@@ -6,13 +6,21 @@ const logsnag = getEnv('LOGSNAG_TOKEN')
     token: getEnv('LOGSNAG_TOKEN'),
     project: getEnv('LOGSNAG_PROJECT'),
   })
-  : { publish: () => Promise.resolve(true), insight: () => Promise.resolve(true), insights: () => Promise.resolve(true) }
+  : {
+      publish: () => Promise.resolve(true),
+      track: () => Promise.resolve(true),
+      insight: {
+        track: () => Promise.resolve(true),
+        increment: () => Promise.resolve(true),
+      },
+      insights: () => Promise.resolve(true),
+    }
 
 async function insights(data: { title: string; value: string | boolean | number; icon: string }[]) {
   const all = []
   console.log('logsnag', data)
   for (const d of data)
-    all.push(logsnag.insight(d))
+    all.push(logsnag.insight.track(d))
   await Promise.all(all)
 }
 

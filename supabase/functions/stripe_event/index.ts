@@ -77,13 +77,11 @@ serve(async (event: Request) => {
           plan: plan.name,
         }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'green')
         await addEventPerson(user.email, {}, 'user:upgrade', 'green')
-        await logsnag.publish({
+        await logsnag.track({
           channel: 'usage',
           event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
           icon: '💰',
-          tags: {
-            'user-id': user.id,
-          },
+          user_id: user.id,
           notify: status === 'succeeded',
         }).catch()
       }
@@ -99,13 +97,11 @@ serve(async (event: Request) => {
         const segment = await customerToSegment(user.id, customer)
         await updatePerson(user.email, undefined, segment)
         await addEventPerson(user.email, {}, 'user:cancel', 'red')
-        await logsnag.publish({
+        await logsnag.track({
           channel: 'usage',
           event: 'User cancel',
           icon: '⚠️',
-          tags: {
-            'user-id': user.id,
-          },
+          user_id: user.id,
           notify: true,
         }).catch()
       }

@@ -139,13 +139,11 @@ export async function checkPlan(userId: string): Promise<void> {
         if (best_plan === 'Free' && current_plan === 'Free') {
           await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
           console.log('best_plan is free', userId)
-          await logsnag.publish({
+          await logsnag.track({
             channel: 'usage',
             event: 'User need more time',
             icon: '⏰',
-            tags: {
-              'user-id': userId,
-            },
+            user_id: userId,
             notify: false,
           }).catch()
         }
@@ -154,13 +152,11 @@ export async function checkPlan(userId: string): Promise<void> {
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
             console.log(`user:upgrade_to_${bestPlanKey}`, userId)
-            await logsnag.publish({
+            await logsnag.track({
               channel: 'usage',
               event: `User need upgrade to ${bestPlanKey}`,
               icon: '⚠️',
-              tags: {
-                'user-id': userId,
-              },
+              user_id: userId,
               notify: false,
             }).catch()
           }
@@ -169,13 +165,11 @@ export async function checkPlan(userId: string): Promise<void> {
     }
     else if (!is_onboarded && is_onboarding_needed) {
       await addEventPerson(user.email, {}, 'user:need_onboarding', 'orange')
-      await logsnag.publish({
+      await logsnag.track({
         channel: 'usage',
         event: 'User need onboarding',
         icon: '🥲',
-        tags: {
-          'user-id': userId,
-        },
+        user_id: userId,
         notify: false,
       }).catch()
     }
@@ -186,13 +180,11 @@ export async function checkPlan(userId: string): Promise<void> {
         const sent = await sendNotif('user:90_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'red')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
-          await logsnag.publish({
+          await logsnag.track({
             channel: 'usage',
             event: 'User is at 90% of plan usage',
             icon: '⚠️',
-            tags: {
-              'user-id': userId,
-            },
+            user_id: userId,
             notify: false,
           }).catch()
         }
@@ -202,13 +194,11 @@ export async function checkPlan(userId: string): Promise<void> {
         const sent = await sendNotif('user:70_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
-          await logsnag.publish({
+          await logsnag.track({
             channel: 'usage',
             event: 'User is at 70% of plan usage',
             icon: '⚠️',
-            tags: {
-              'user-id': userId,
-            },
+            user_id: userId,
             notify: false,
           }).catch()
         }
@@ -217,13 +207,11 @@ export async function checkPlan(userId: string): Promise<void> {
         const sent = await sendNotif('user:50_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
-          await logsnag.publish({
+          await logsnag.track({
             channel: 'usage',
             event: 'User is at 50% of plan usage',
             icon: '⚠️',
-            tags: {
-              'user-id': userId,
-            },
+            user_id: userId,
             notify: false,
           }).catch()
         }

@@ -102,13 +102,11 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
       if (sent) {
-        await logsnag.publish({
+        await logsnag.track({
           channel: 'updates',
           event: 'semver issue',
           icon: '⚠️',
-          tags: {
-            'user-id': appOwner.user_id,
-          },
+          user_id: appOwner.user_id,
           notify: false,
         }).catch()
       }
@@ -126,15 +124,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
       if (sent) {
-        await logsnag.publish({
+        await logsnag.track({
           channel: 'updates',
           event: 'plugin issue',
           icon: '⚠️',
-          tags: {
-            'user-id': appOwner.user_id,
-          },
+          user_id: appOwner.user_id,
           notify: false,
-        }).catch()
+        } as any).catch()
       }
     }
 

@@ -104,7 +104,7 @@
     "konsta": "^1.0.2",
     "lauqe": "^1.5.0",
     "lodash.debounce": "^4.0.8",
-    "logsnag": "^0.1.8",
+    "logsnag": "1.0.0-beta.6",
     "mime": "^3.0.0",
     "minio": "^7.1.1",
     "nprogress": "1.0.0-1",

@@ -53,13 +53,11 @@ const simpleStep: Step[] = [
 const steps = ref(simpleStep)
 function setLog() {
   if (props.onboarding && main.user?.id) {
-    snag.publish({
+    snag.track({
       channel: 'onboarding-v2',
       event: `onboarding-step-${step.value}`,
       icon: '👶',
-      tags: {
-        'user-id': main.user.id,
-      },
+      user_id: main.user.id,
       notify: false,
     }).catch()
     pushEvent({ name: `user:step-${step.value}`, color: 'blue' })

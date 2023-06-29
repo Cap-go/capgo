@@ -222,8 +222,8 @@ dependencies:
     specifier: ^4.0.8
     version: 4.0.8
   logsnag:
-    specifier: ^0.1.8
-    version: 0.1.8
+    specifier: 1.0.0-beta.6
+    version: 1.0.0-beta.6
   mime:
     specifier: ^3.0.0
     version: 3.0.0
@@ -9780,8 +9780,8 @@ packages:
       wrap-ansi: 6.2.0
     dev: true
 
-  /logsnag@0.1.8:
-    resolution: {integrity: sha512-iXnlGc8/OaGNnfsTom0yPnuuVtiBEQvg3710k2NDcdEDM8KzIzSF1nre+eShHjqQOrd6mjA0sBHQi45tyrwbag==}
+  /logsnag@1.0.0-beta.6:
+    resolution: {integrity: sha512-Tyk4tBKGEOB8Wf0dvfDqh58jhEBBFw+gTDfrJvEimjZVo901vMot1aSAfH0blHHHrs6SqaFB+xPoQdxo7emJlQ==}
     dependencies:
       isomorphic-fetch: 3.0.0
     transitivePeerDependencies:

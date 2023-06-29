@@ -115,13 +115,11 @@ watchEffect(async () => {
     }
     else if (main.user?.id) {
       loadData()
-      snag.publish({
+      snag.track({
         channel: 'usage',
         event: 'User visit',
         icon: '💳',
-        tags: {
-          'user-id': main.user?.id,
-        },
+        user_id: main.user.id,
         notify: false,
       }).catch()
     }

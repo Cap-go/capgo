@@ -5,6 +5,7 @@ export function useLogSnag(): LogSnag {
   if (isSpoofed()) {
     return {
       getProject: () => '',
+      track: () => Promise.resolve(false),
       publish: () => Promise.resolve(false),
       insight: () => Promise.resolve(false),
     } as any as LogSnag
