@@ -125,6 +125,10 @@ watchEffect(async () => {
     }
   }
 })
+function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
+  return (currentPlan.value?.name === plan.name && main.paying) || isMobile
+}
+
 const hightLights = computed<Stat[]>(() => ([
   {
     label: main.paying ? t('Current') : t('failed'),
@@ -216,7 +220,7 @@ const hightLights = computed<Stat[]>(() => ([
               v-if="p.stripe_id !== 'free'"
               :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-gray-400 dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
-              :disabled="currentPlan?.name === p.name || isMobile" @click="openChangePlan(p.stripe_id)"
+              :disabled="isDisabled(p)" @click="openChangePlan(p.stripe_id)"
             >
               {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
