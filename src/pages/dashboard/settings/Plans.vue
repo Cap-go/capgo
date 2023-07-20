@@ -127,15 +127,15 @@ watchEffect(async () => {
 })
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: 'Current',
+    label: main.paying ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {
-    label: 'Usage',
+    label: t('usage'),
     value: `${planPercent.value.toLocaleString()} %`,
   },
   {
-    label: 'Best plan',
+    label: t('best-plan'),
     value: currentPlanSuggest.value?.name,
   },
 ]))
@@ -214,11 +214,11 @@ const hightLights = computed<Stat[]>(() => ([
             <span v-if="isYearly" class="text-md ml-3 rounded-full bg-emerald-500 px-1.5 font-semibold text-white"> {{ getSale(p) }} </span>
             <button
               v-if="p.stripe_id !== 'free'"
-              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-gray-400 dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name }"
+              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-gray-400 dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="currentPlan?.name === p.name || isMobile" @click="openChangePlan(p.stripe_id)"
             >
-              {{ isMobile ? t('check-on-web') : t('plan-upgrade') }}
+              {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
           </div>
           <div class="px-6 pt-6 pb-8">

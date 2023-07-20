@@ -1,5 +1,6 @@
 6-characters-minimum: 6 characters minimum, 1 uppercase, 1 lowercase, 1 special character
 Bandwidth: Bandwidth
+Current: Current
 Filters: Filters
 Override: Override
 Storage: Storage
@@ -45,6 +46,7 @@ app-not-found: App not found
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
+best-plan: Best plan
 bigger-app-size: Bigger app size
 billing: Billing
 build-your-app-and-s: build your app and sync
@@ -137,6 +139,7 @@ enter-your-email-add: Enter your email address and we'll send you a link to rese
 enter-your-new-passw: Enter your new password and confirm
 external-storage: External storage
 fail: Install failed
+failed: Failed
 filters: Filters
 first-name: First name
 force-version: Force version
@@ -299,6 +302,7 @@ upgrade: Upgrade
 upgrade-now: Upgrade now
 upperCaseError: Should contain uppercase letters
 url: URL
+usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'

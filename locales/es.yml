@@ -1,5 +1,6 @@
 6-characters-minimum: 6 caracteres mínimo, 1 mayúscula, 1 minúscula, 1 carácter especial
 Bandwidth: Banda ancha
+Current: Actual
 Filters: filtros
 Override: Anular
 Storage: Almacenamiento
@@ -49,6 +50,7 @@ app-not-found: Aplicación no encontrada
 are-u-sure: Está seguro ?
 available-in-the-san: Disponible en la aplicación sandbox
 back-to-login-page: Volver a la página de inicio de sesión
+best-plan: mejor plan
 bigger-app-size: Tamaño de aplicación más grande
 billing: Facturación
 build-your-app-and-s: crea tu aplicación y sincroniza
@@ -146,6 +148,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Ingrese su nueva contraseña y confirme
 external-storage: Almacenamiento externo
 fail: Instalación fallida
+failed: Fallido
 filters: filtros
 first-name: Nombre de pila
 force-version: Forzar versión
@@ -318,6 +321,7 @@ upgrade: Mejora
 upgrade-now: Actualizar ahora
 upperCaseError: Debe contener letras mayúsculas
 url: URL
+usage: Uso
 usage-success: Su plan ha sido configurado, esta página se actualizará en unos minutos.
 usage-title: Total
 use-the-command: 'Usa el comando:'

@@ -1,5 +1,6 @@
 6-characters-minimum: Minimum 6 karakter, 1 büyük harf, 1 küçük harf, 1 özel karakter
 Bandwidth: Bant genişliği
+Current: Akım
 Filters: Filtreler
 Override: Geçersiz kıl
 Storage: Depolamak
@@ -45,6 +46,7 @@ app-not-found: Uygulama bulunamadı
 are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
+best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
 billing: Faturalandırma
 build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
@@ -142,6 +144,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 external-storage: Harici depolama
 fail: Yükleme başarısız
+failed: Arızalı
 filters: Filtreler
 first-name: İlk adı
 force-version: Kuvvet versiyonu
@@ -310,6 +313,7 @@ upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
 upperCaseError: Büyük harfler içermelidir
 url: URL
+usage: Kullanım
 usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
 usage-title: Toplam
 use-the-command: 'Şu komutu kullanın:'

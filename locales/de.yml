@@ -1,5 +1,6 @@
 6-characters-minimum: Mindestens 6 Zeichen, 1 Großbuchstabe, 1 Kleinbuchstabe, 1 Sonderzeichen
 Bandwidth: Bandbreite
+Current: Aktuell
 Filters: Filter
 Override: Überschreiben
 Storage: Lagerung
@@ -51,6 +52,7 @@ app-not-found: Anwendung nicht gefunden
 are-u-sure: Bist du dir sicher ?
 available-in-the-san: Verfügbar in der Sandbox-App
 back-to-login-page: Zurück zur Anmeldeseite
+best-plan: Bester Plan
 bigger-app-size: Größere App-Größe
 billing: Abrechnung
 build-your-app-and-s: Erstellen Sie Ihre App und synchronisieren Sie sie
@@ -148,6 +150,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 external-storage: Externer Speicher
 fail: Installation fehlgeschlagen
+failed: Fehlgeschlagen
 filters: Filter
 first-name: Vorname
 force-version: Force-Version
@@ -320,6 +323,7 @@ upgrade: Aktualisierung
 upgrade-now: Jetzt upgraden
 upperCaseError: Sollte Großbuchstaben enthalten
 url: URL
+usage: Verwendung
 usage-success: Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten aktualisiert
 usage-title: Gesamt
 use-the-command: 'Verwenden Sie den Befehl:'

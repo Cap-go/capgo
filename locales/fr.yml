@@ -1,5 +1,6 @@
 6-characters-minimum: 6 caractères minimum, 1 majuscule, 1 minuscule, 1 caractère spécial
 Bandwidth: Bande passante
+Current: Actuel
 Filters: Filtres
 Override: Passer outre
 Storage: Stockage
@@ -49,6 +50,7 @@ app-not-found: Application introuvable
 are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
+best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
 billing: Facturation
 build-your-app-and-s: créer votre application et synchroniser
@@ -146,6 +148,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 external-storage: Stockage externe
 fail: Échec de l'installation
+failed: Échoué
 filters: Filtres
 first-name: Prénom
 force-version: Version forcée
@@ -314,6 +317,7 @@ upgrade: Améliorer
 upgrade-now: Mettre à jour maintenant
 upperCaseError: Doit contenir des lettres majuscules
 url: URL
+usage: Usage
 usage-success: Votre plan a été configuré, cette page sera mise à jour dans quelques minutes
 usage-title: Total
 use-the-command: "Utilisez la commande\_:"

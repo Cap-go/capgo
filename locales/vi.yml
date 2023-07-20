@@ -1,5 +1,6 @@
 6-characters-minimum: Tối thiểu 6 ký tự, 1 chữ hoa, 1 chữ thường, 1 ký tự đặc biệt
 Bandwidth: Băng thông
+Current: Hiện hành
 Filters: bộ lọc
 Override: Ghi đè
 Storage: Kho
@@ -49,6 +50,7 @@ app-not-found: Không tìm thấy ứng dụng
 are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
+best-plan: kế hoạch tốt nhất
 bigger-app-size: Kích thước ứng dụng lớn hơn
 billing: thanh toán
 build-your-app-and-s: xây dựng ứng dụng của bạn và đồng bộ hóa
@@ -144,6 +146,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
+failed: Thất bại
 filters: bộ lọc
 first-name: Họ
 force-version: Phiên bản bắt buộc
@@ -310,6 +313,7 @@ upgrade: Nâng cấp
 upgrade-now: Nâng cấp ngay bây giờ
 upperCaseError: Nên chứa chữ in hoa
 url: URL
+usage: Cách sử dụng
 usage-success: >-
   Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   nữa

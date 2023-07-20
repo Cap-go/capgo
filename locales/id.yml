@@ -1,5 +1,6 @@
 6-characters-minimum: Minimal 6 karakter, 1 huruf besar, 1 huruf kecil, 1 karakter khusus
 Bandwidth: Bandwidth
+Current: Saat ini
 Filters: Filter
 Override: Mengesampingkan
 Storage: Penyimpanan
@@ -45,6 +46,7 @@ app-not-found: Aplikasi tidak ditemukan
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
+best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
 billing: Penagihan
 build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
@@ -142,6 +144,7 @@ enter-your-email-add: >-
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 external-storage: Penyimpanan luar
 fail: Instal gagal
+failed: Gagal
 filters: Filter
 first-name: Nama depan
 force-version: Versi paksa
@@ -310,6 +313,7 @@ upgrade: Meningkatkan
 upgrade-now: Tingkatkan sekarang
 upperCaseError: Harus berisi huruf besar
 url: URL
+usage: Penggunaan
 usage-success: >-
   Rencana Anda telah disiapkan, halaman ini akan diperbarui, dalam beberapa
   menit

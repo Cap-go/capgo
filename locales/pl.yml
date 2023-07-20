@@ -1,5 +1,6 @@
 6-characters-minimum: Minimum 6 znaków, 1 wielka litera, 1 mała litera, 1 znak specjalny
 Bandwidth: Przepustowość łącza
+Current: Aktualny
 Filters: Filtry
 Override: Nadpisanie
 Storage: Składowanie
@@ -47,6 +48,7 @@ app-not-found: Nie znaleziono aplikacji
 are-u-sure: Jesteś pewny ?
 available-in-the-san: Dostępne w aplikacji piaskownicy
 back-to-login-page: Powrót do strony logowania
+best-plan: Najlepszy plan
 bigger-app-size: Większy rozmiar aplikacji
 billing: Dane do faktury
 build-your-app-and-s: zbuduj swoją aplikację i zsynchronizuj
@@ -142,6 +144,7 @@ enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowan
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
 external-storage: Dysk zewnętrzny
 fail: Instalacja nie powiodła się
+failed: Przegrany
 filters: Filtry
 first-name: Imię
 force-version: Wersja na siłę
@@ -308,6 +311,7 @@ upgrade: Aktualizacja
 upgrade-now: Ulepsz teraz
 upperCaseError: Powinien zawierać wielkie litery
 url: Adres URL
+usage: Stosowanie
 usage-success: >-
   Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka
   minut

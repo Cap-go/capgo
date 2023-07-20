@@ -1,5 +1,6 @@
 6-characters-minimum: 最少 6 个字符，1 个大写字母，1 个小写字母，1 个特殊字符
 Bandwidth: 带宽
+Current: 当前的
 Filters: 过滤器
 Override: 覆盖
 Storage: 贮存
@@ -45,6 +46,7 @@ app-not-found: 找不到应用
 are-u-sure: 你确定吗 ？
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
+best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
 billing: 计费
 build-your-app-and-s: 构建您的应用程序并同步
@@ -138,6 +140,7 @@ enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一�
 enter-your-new-passw: 输入您的新密码并确认
 external-storage: 外置储存
 fail: 安装失败
+failed: 失败的
 filters: 过滤器
 first-name: 名
 force-version: 强制版本
@@ -302,6 +305,7 @@ upgrade: 升级
 upgrade-now: 现在升级
 upperCaseError: 应包含大写字母
 url: 网址
+usage: 用法
 usage-success: 您的计划已设置此页面将在几分钟内更新
 usage-title: 全部的
 use-the-command: 使用命令：
