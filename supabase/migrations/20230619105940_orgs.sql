@@ -34,7 +34,7 @@ CREATE TABLE
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.org_users FOR EACH ROW EXECUTE FUNCTION extensions.moddatetime('updated_at');
 
 -- create default org for all users
-INSERT INTO public.orgs (id, user_id, name)
+INSERT INTO public.orgs (id, created_by, name)
 SELECT uuid_generate_v4(), id, COALESCE(first_name, 'Default Org Name')
 FROM public.users;
 
