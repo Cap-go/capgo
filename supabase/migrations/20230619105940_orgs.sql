@@ -12,7 +12,7 @@ CREATE TABLE
 
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.orgs FOR EACH ROW EXECUTE FUNCTION extensions.moddatetime('updated_at');
 
-CREATE TYPE user_right AS ENUM ('admin', 'write', 'upload', 'read');
+CREATE TYPE user_min_right AS ENUM ('read', 'upload', 'write', 'admin');
 
 CREATE TABLE
   public.org_users (
@@ -20,7 +20,7 @@ CREATE TABLE
     created_at timestamp with time zone null default now(),
     updated_at timestamp with time zone null default now(),
     user_id uuid not null,
-    right public.user_right not null default 'read'::user_right,
+    user_right public.user_min_right not null default 'read'::user_min_right,
     org_id uuid not null,
     app_id character varying null,
     channel_id bigint null,
@@ -44,13 +44,36 @@ SET name = CONCAT(name, ' Organization')
 WHERE name NOT LIKE '%Organization';
 
 -- Add all users to org_users for they own org
-INSERT INTO public.org_users (user_id, org_id, "right")
-SELECT users.id, orgs.id, 'admin'::user_right
+INSERT INTO public.org_users (user_id, org_id, user_right)
+SELECT users.id, orgs.id, 'admin'::user_min_right
 FROM public.users
-INNER JOIN public.orgs ON public.users.id = public.orgs.user_id;
+INNER JOIN public.orgs ON public.users.id = public.orgs.created_by;
 
 -- Add old channel users to org_users
-INSERT INTO public.org_users (user_id, org_id, "right", channel_id, app_id)
-SELECT cu.user_id, ou.org_id, 'read'::user_right, cu.channel_id, cu.app_id
-FROM public.channel_users cu
-JOIN public.org_users ou ON cu.user_id = ou.user_id;
+DO
+$$
+DECLARE
+    rec record;
+    org_id uuid;
+BEGIN
+    FOR rec IN SELECT * FROM channel_users
+    LOOP
+        -- Step 2 and 3: get the org id using app id and user id
+        WITH app AS (
+            SELECT * 
+            FROM apps
+            WHERE app_id = rec.app_id
+        )
+        SELECT orgs.id 
+        INTO org_id 
+        FROM orgs, app
+        WHERE orgs.created_by = app.user_id;
+
+        -- Step 4: create new row in org_users with 'read' right
+        INSERT INTO org_users (user_id, org_id, app_id, channel_id, user_right) 
+        VALUES (rec.user_id, org_id, rec.app_id, rec.channel_id, 'read');
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- add function to check if user has min right
