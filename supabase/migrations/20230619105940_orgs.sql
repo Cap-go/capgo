@@ -35,8 +35,13 @@ CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.org_users FOR EACH ROW 
 
 -- create default org for all users
 INSERT INTO public.orgs (id, created_by, name)
-SELECT uuid_generate_v4(), id, COALESCE(first_name, 'Default Org Name')
+SELECT uuid_generate_v4(), id, COALESCE(first_name, 'Default Organization')
 FROM public.users;
+
+-- update orgs name to include 'Organization'
+UPDATE public.orgs 
+SET name = CONCAT(name, ' Organization')
+WHERE name NOT LIKE '%Organization';
 
 -- Add all users to org_users for they own org
 INSERT INTO public.org_users (user_id, org_id, "right")
