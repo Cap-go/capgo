@@ -507,6 +507,40 @@ export async function createApiKey(userId: string) {
   return Promise.resolve()
 }
 
+export async function createdefaultOrg(userId: string, name = 'Default') {
+  // check if user has apikeys
+  const total = await supabaseAdmin()
+    .from('orgs')
+    .select('created_by', { count: 'exact', head: true })
+    .eq('created_by', userId)
+    .then(res => res.count || 0)
+
+  if (total === 0) {
+    // create apikeys
+    const { data } = await supabaseAdmin()
+      .from('orgs')
+      .insert(
+        {
+          created_by: userId,
+          name: `${name} organization`,
+        })
+      .select()
+      .single()
+      // create org_users admin from data.id
+    if (data) {
+      return supabaseAdmin()
+        .from('org_users')
+        .insert([
+          {
+            org_id: data.id,
+            user_id: userId,
+            role: 'admin',
+          }])
+    }
+  }
+  return Promise.resolve()
+}
+
 export function userToPerson(user: Database['public']['Tables']['users']['Row'], customer: Database['public']['Tables']['stripe_info']['Row']): Person {
   const person: Person = {
     id: user.id,
