@@ -7,6 +7,7 @@ import {
 } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { recordUsage } from './stripe.ts'
+import { trackEvent } from './plunk.ts'
 
 function planToInt(plan: string) {
   switch (plan) {
@@ -138,6 +139,7 @@ export async function checkPlan(userId: string): Promise<void> {
         await setMetered(user.customer_id, userId)
         if (best_plan === 'Free' && current_plan === 'Free') {
           await addEventPerson(user.email, {}, 'user:need_more_time', 'blue')
+          await trackEvent(user.email, {}, 'user:need_more_time')
           console.log('best_plan is free', userId)
           await logsnag.track({
             channel: 'usage',
@@ -165,6 +167,7 @@ export async function checkPlan(userId: string): Promise<void> {
     }
     else if (!is_onboarded && is_onboarding_needed) {
       await addEventPerson(user.email, {}, 'user:need_onboarding', 'orange')
+      await trackEvent(user.email, {}, 'user:need_onboarding')
       await logsnag.track({
         channel: 'usage',
         event: 'User need onboarding',

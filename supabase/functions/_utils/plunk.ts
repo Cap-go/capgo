@@ -17,7 +17,7 @@ function getConfig() {
   }
 }
 
-export async function addEventPerson(email: string, data: any, event: string) {
+export async function trackEvent(email: string, data: any, event: string) {
   const url = `${baseUrl()}/v1/track`
   const response = await axios.post(url, {
     email,
@@ -27,7 +27,7 @@ export async function addEventPerson(email: string, data: any, event: string) {
   return response.data
 }
 
-export async function postPerson(email: string, data: any) {
+export async function addContact(email: string, data: any) {
   const url = `${baseUrl()}/v1/contacts`
   const response = await axios.post(url, {
     email,

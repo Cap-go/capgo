@@ -3,6 +3,7 @@ import dayjs from 'https://cdn.skypack.dev/dayjs@1.11.6?dts'
 import { addDataPerson, addEventPerson } from './crisp.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
+import { trackEvent } from './plunk.ts'
 
 interface EventData {
   [key: string]: any
@@ -13,6 +14,7 @@ async function sendNow(eventName: string, eventData: EventData,
   console.log('send notif', eventName, email)
   await addDataPerson(email, eventData)
   await addEventPerson(email, {}, eventName, color)
+  await trackEvent(email, eventData, eventName)
   if (past != null) {
     const { error } = await supabaseAdmin()
       .from('notifications')

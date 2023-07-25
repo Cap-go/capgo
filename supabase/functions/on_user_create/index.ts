@@ -5,6 +5,7 @@ import { createApiKey, createStripeCustomer, createdefaultOrg } from '../_utils/
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { logsnag } from '../_utils/logsnag.ts'
+import { addContact, trackEvent } from '../_utils/plunk.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
@@ -27,21 +28,31 @@ serve(async (event: Request) => {
     }
     const record = body.record
     console.log('record', record)
-    await createApiKey(record.id)
-    await createdefaultOrg(record.id, record.first_name)
-    await postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined)
+    await Promise.all([
+      createApiKey(record.id),
+      createdefaultOrg(record.id, record.first_name || ''),
+      postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined),
+      addContact(record.email, {
+        first_name: record.first_name || '',
+        last_name: record.last_name || '',
+        image_url: record.image_url ? record.image_url : undefined,
+      }),
+    ])
     console.log('createCustomer stripe')
     if (record.customer_id)
       return sendRes()
-    await createStripeCustomer(record as any)
-    await addEventPerson(record.email, {}, 'user:register', 'green').catch()
-    await logsnag.track({
-      channel: 'user-register',
-      event: 'User Joined',
-      icon: '🎉',
-      user_id: record.id,
-      notify: true,
-    }).catch()
+    await Promise.all([
+      createStripeCustomer(record as any),
+      addEventPerson(record.email, {}, 'user:register', 'green').catch(),
+      trackEvent(record.email, {}, 'user:register'),
+      logsnag.track({
+        channel: 'user-register',
+        event: 'User Joined',
+        icon: '🎉',
+        user_id: record.id,
+        notify: true,
+      }),
+    ])
     return sendRes()
   }
   catch (e) {

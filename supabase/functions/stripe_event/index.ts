@@ -5,6 +5,7 @@ import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
 import { logsnag } from '../_utils/logsnag.ts'
+import { trackEvent } from '../_utils/plunk.ts'
 
 serve(async (event: Request) => {
   if (!event.headers.get('stripe-signature') || !getEnv('STRIPE_WEBHOOK_SECRET') || !getEnv('STRIPE_SECRET_KEY'))
@@ -73,10 +74,13 @@ serve(async (event: Request) => {
         const isMonthly = plan.price_m_id === stripeData.price_id
         const segment = await customerToSegment(user.id, customer, plan)
         await updatePerson(user.email, undefined, segment)
+        const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
         await addEventPerson(user.email, {
           plan: plan.name,
-        }, `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`, 'green')
+        }, eventName, 'green')
+        await trackEvent(user.email, { plan: plan.name }, eventName)
         await addEventPerson(user.email, {}, 'user:upgrade', 'green')
+        await trackEvent(user.email, {}, 'user:upgrade')
         await logsnag.track({
           channel: 'usage',
           event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
@@ -97,6 +101,7 @@ serve(async (event: Request) => {
         const segment = await customerToSegment(user.id, customer)
         await updatePerson(user.email, undefined, segment)
         await addEventPerson(user.email, {}, 'user:cancel', 'red')
+        await trackEvent(user.email, {}, 'user:cancel')
         await logsnag.track({
           channel: 'usage',
           event: 'User cancel',
