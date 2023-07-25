@@ -1,5 +1,6 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { getEnv } from './utils.ts'
+import type { Person } from './crisp.ts'
 
 // https://api.useplunk.com/v1
 function getAuth() {
@@ -35,6 +36,10 @@ export async function addContact(email: string, data: any) {
     data,
   }, getConfig())
   return response.data
+}
+
+export function addDataContact(email: string, data: Person) {
+  return trackEvent(email, data, 'user:addData')
 }
 
 export async function sendEmail(to: string, subject: string, body: string) {

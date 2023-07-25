@@ -5,7 +5,7 @@ import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
 import { logsnag } from '../_utils/logsnag.ts'
-import { trackEvent } from '../_utils/plunk.ts'
+import { addDataContact, trackEvent } from '../_utils/plunk.ts'
 
 serve(async (event: Request) => {
   if (!event.headers.get('stripe-signature') || !getEnv('STRIPE_WEBHOOK_SECRET') || !getEnv('STRIPE_SECRET_KEY'))
@@ -45,13 +45,15 @@ serve(async (event: Request) => {
       stripeData.status = 'succeeded'
     console.log('stripeData', stripeData)
 
-    await addDataPerson(user.email, {
+    const userData = {
       id: user.id,
       customer_id: stripeData.customer_id,
       status: stripeData.status as string,
       price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
-    })
+    }
+    await addDataPerson(user.email, userData)
+    await addDataContact(user.email, userData)
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
       stripeData.status = 'succeeded'
