@@ -62,17 +62,7 @@ export function pushEvent(nameEvent: string): void {
   })
 }
 
-export function setUserId(uuid: string): void {
-  if (isSpoofed())
-    return
-  chatLoader(() => {
-    window.$chatwoot.setCustomAttributes({
-      accountId: uuid,
-    })
-  })
-}
-
-export function setUser(data: {
+export function setUser(uuid: string, data: {
   nickname?: string
   phone?: string
   email?: string
@@ -82,7 +72,7 @@ export function setUser(data: {
   if (isSpoofed())
     return
   chatLoader(() => {
-    window.$chatwoot.setUser({
+    window.$chatwoot.setUser(uuid, {
       name: data.nickname,
       email: data.email,
       avatar_url: data.avatar,

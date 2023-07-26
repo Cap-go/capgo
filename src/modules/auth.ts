@@ -2,7 +2,7 @@ import { isSpoofed, spoofUser } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
-import { setUser, setUserId } from '~/services/chatwoot'
+import { setUser } from '~/services/chatwoot'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
 import { initStunning } from '~/services/stunning'
@@ -62,12 +62,11 @@ async function guard(next: any, to: string, from: string) {
       user_id: main.user.id,
       notify: false,
     }).catch()
-    setUser({
+    setUser(main.user.id, {
       nickname: `${main.user.first_name} ${main.user.last_name}`,
       email: main.user.email,
       avatar: main.user.image_url || '',
     })
-    setUserId(main.user.id)
 
     if ((!main.auth?.user_metadata?.activation || !main.auth?.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
       next('/onboarding/activation')
