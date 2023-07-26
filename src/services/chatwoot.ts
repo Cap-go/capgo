@@ -47,6 +47,8 @@ export function chatLoader(cb?: () => void) {
 }
 
 export function openMessenger() {
+  if (isSpoofed())
+    return
   chatLoader(() => {
     window.$chatwoot.toggle('open')
   })
@@ -55,14 +57,18 @@ export function openMessenger() {
 export function pushEvent(nameEvent: string): void {
   if (isSpoofed())
     return
-  window.$chatwoot.setLabel(nameEvent)
+  chatLoader(() => {
+    window.$chatwoot.setLabel(nameEvent)
+  })
 }
 
 export function setUserId(uuid: string): void {
   if (isSpoofed())
     return
-  window.$chatwoot.setCustomAttributes({
-    accountId: uuid,
+  chatLoader(() => {
+    window.$chatwoot.setCustomAttributes({
+      accountId: uuid,
+    })
   })
 }
 
@@ -75,16 +81,20 @@ export function setUser(data: {
   // console.log('setUser chatwood')
   if (isSpoofed())
     return
-  window.$chatwoot.setUser({
-    name: data.nickname,
-    email: data.email,
-    avatar_url: data.avatar,
-    phone_number: data.phone,
+  chatLoader(() => {
+    window.$chatwoot.setUser({
+      name: data.nickname,
+      email: data.email,
+      avatar_url: data.avatar,
+      phone_number: data.phone,
+    })
   })
 }
 
 export function reset(): void {
   if (isSpoofed())
     return
-  window.$chatwoot.reset()
+  chatLoader(() => {
+    window.$chatwoot.reset()
+  })
 }
