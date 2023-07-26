@@ -63,7 +63,7 @@ async function guard(next: any, to: string, from: string) {
       notify: false,
     }).catch()
     setUser(main.user.id, {
-      nickname: `${main.user.first_name} ${main.user.last_name}`,
+      nickname: `${main.user.first_name ?? ''} ${main.user.last_name ?? ''}`,
       email: main.user.email,
       avatar: main.user.image_url || '',
     })

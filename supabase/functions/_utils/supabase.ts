@@ -546,7 +546,7 @@ export function userToPerson(user: Database['public']['Tables']['users']['Row'],
     id: user.id,
     product_id: customer.product_id,
     customer_id: customer.customer_id,
-    nickname: `${user.first_name} ${user.last_name}`,
+    nickname: `${user.first_name ?? ''} ${user.last_name ?? ''}`,
     avatar: user.image_url ? user.image_url : undefined,
     country: user.country ? user.country : undefined,
   }
