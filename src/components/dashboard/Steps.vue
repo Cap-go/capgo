@@ -10,7 +10,7 @@ import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
-import { pushEvent } from '~/services/crips'
+import { pushEvent } from '~/services/chatwoot'
 import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
 
 const props = defineProps<{
@@ -60,9 +60,9 @@ function setLog() {
       user_id: main.user.id,
       notify: false,
     }).catch()
-    pushEvent({ name: `user:step-${step.value}`, color: 'blue' })
+    pushEvent(`user:step-${step.value}`)
     if (step.value === 4)
-      pushEvent({ name: 'user:onboarding-done', color: 'green' })
+      pushEvent('user:onboarding-done')
     // TODO add emailing on onboarding done to send blog article versioning
   }
 }

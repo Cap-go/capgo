@@ -8,13 +8,12 @@ import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
-import { openChat, sendMessage } from '~/services/crips'
+import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 
 function openSupport() {
-  sendMessage('I need a custom plan')
-  openChat()
+  openMessenger()
 }
 
 const { t } = useI18n()

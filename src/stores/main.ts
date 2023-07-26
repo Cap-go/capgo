@@ -6,8 +6,8 @@ import {
   unspoofUser,
 } from './../services/supabase'
 import { useSupabase } from '~/services/supabase'
-import { reset } from '~/services/crips'
 import type { Database } from '~/types/supabase.types'
+import { reset } from '~/services/chatwoot'
 
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()

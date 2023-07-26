@@ -33,7 +33,7 @@ async function fixPlunk() {
   let skip = true
   // const all = []
   for (const record of users) {
-    // cupdate crisp segment add Capgo one
+    // update plunk segment add Capgo one
     // to skip already done
     if (record.email === 'unknow.unknow@unknow.com' && skip)
       skip = false

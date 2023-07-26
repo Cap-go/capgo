@@ -1,11 +1,12 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import { getEnv } from './utils.ts'
+
+// import { getEnv } from './utils.ts'
 import type { Person } from './crisp.ts'
 
 // https://api.useplunk.com/v1
 function getAuth() {
   // get plunk token
-  const PLUNK_API_KEY = getEnv('PLUNK_API_KEY')
+  const PLUNK_API_KEY = 'sk_d5a623505cd289440332329cbdb7725531b693e449f01697'
   return `Bearer ${PLUNK_API_KEY}`
 }
 const baseUrl = () => 'https://api.useplunk.com'
@@ -30,15 +31,18 @@ export async function trackEvent(email: string, data: any, event: string) {
 
 export async function addContact(email: string, data: any) {
   const url = `${baseUrl()}/v1/contacts`
-  const response = await axios.post(url, {
+  const payload = {
     email,
     subscribed: true,
     data,
-  }, getConfig())
+  }
+  console.log('addContact', email)
+  const response = await axios.post(url, payload, getConfig())
   return response.data
 }
 
 export function addDataContact(email: string, data: Person) {
+  console.log('addDataContact', email, data)
   return trackEvent(email, data, 'user:addData')
 }
 

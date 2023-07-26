@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
-import { openChat } from '~/services/crips'
+import { openMessenger } from '~/services/chatwoot'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
 const props = defineProps({
@@ -108,7 +108,7 @@ onUnmounted(() => {
           </li>
           <hr>
           <li>
-            <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="openChat">
+            <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="openMessenger">
               {{ t('support') }}
             </button>
           </li>
