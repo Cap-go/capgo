@@ -1,7 +1,16 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 
-// import { getEnv } from './utils.ts'
-import type { Person } from './crisp.ts'
+export interface Person {
+  nickname?: string
+  avatar?: string
+  status?: string
+  country?: string
+  id?: string
+  customer_id?: string
+  product_id?: string
+  price_id?: string
+  [key: string]: string | boolean | undefined
+}
 
 // https://api.useplunk.com/v1
 function getAuth() {

@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.188.0/http/server.ts'
-import { addEventPerson, postPerson } from '../_utils/crisp.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import { createApiKey, createStripeCustomer, createdefaultOrg } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -31,7 +30,6 @@ serve(async (event: Request) => {
     await Promise.all([
       createApiKey(record.id),
       createdefaultOrg(record.id, record.first_name || ''),
-      postPerson(record.email, record.first_name || '', record.last_name || '', record.image_url ? record.image_url : undefined),
       addContact(record.email, {
         first_name: record.first_name || '',
         last_name: record.last_name || '',
@@ -43,7 +41,6 @@ serve(async (event: Request) => {
       return sendRes()
     await Promise.all([
       createStripeCustomer(record as any),
-      addEventPerson(record.email, {}, 'user:register', 'green').catch(),
       trackEvent(record.email, {}, 'user:register'),
       logsnag.track({
         channel: 'user-register',

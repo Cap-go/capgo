@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.188.0/http/server.ts'
-import { addDataPerson, addEventPerson, updatePerson } from '../_utils/crisp.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -52,7 +51,6 @@ serve(async (event: Request) => {
       price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
     }
-    await addDataPerson(user.email, userData)
     await addDataContact(user.email, userData)
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
@@ -75,13 +73,12 @@ serve(async (event: Request) => {
 
         const isMonthly = plan.price_m_id === stripeData.price_id
         const segment = await customerToSegment(user.id, customer, plan)
-        await updatePerson(user.email, undefined, segment)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
-        await addEventPerson(user.email, {
+        await addDataContact(user.email, {
           plan: plan.name,
-        }, eventName, 'green')
+          ...segment,
+        })
         await trackEvent(user.email, { plan: plan.name }, eventName)
-        await addEventPerson(user.email, {}, 'user:upgrade', 'green')
         await trackEvent(user.email, {}, 'user:upgrade')
         await logsnag.track({
           channel: 'usage',
@@ -93,7 +90,7 @@ serve(async (event: Request) => {
       }
       else {
         const segment = await customerToSegment(user.id, customer)
-        await updatePerson(user.email, undefined, segment)
+        await addDataContact(user.email, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
@@ -101,8 +98,7 @@ serve(async (event: Request) => {
         stripeData.status = 'succeeded'
         stripeData.subscription_anchor = new Date().toISOString()
         const segment = await customerToSegment(user.id, customer)
-        await updatePerson(user.email, undefined, segment)
-        await addEventPerson(user.email, {}, 'user:cancel', 'red')
+        await addDataContact(user.email, segment)
         await trackEvent(user.email, {}, 'user:cancel')
         await logsnag.track({
           channel: 'usage',
@@ -124,7 +120,7 @@ serve(async (event: Request) => {
     }
     else {
       const segment = await customerToSegment(user.id, customer)
-      await updatePerson(user.email, undefined, segment)
+      await addDataContact(user.email, segment)
     }
 
     return sendRes({ received: true })

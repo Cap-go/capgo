@@ -1,9 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
-import type { Person } from './crisp.ts'
-import { updatePerson } from './crisp.ts'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
+import type { Person } from './plunk.ts'
+import { addDataContact } from './plunk.ts'
 
 // Import Supabase client
 
@@ -567,7 +567,7 @@ export async function saveStoreInfo(apps: (Database['public']['Tables']['store_a
 }
 
 export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
-  plan?: Database['public']['Tables']['plans']['Row']): Promise<string[]> {
+  plan?: Database['public']['Tables']['plans']['Row']): Promise<{ [key: string]: boolean }> {
   const isMonthly = plan?.price_m_id === customer.price_id
   const segments = ['Capgo']
   const trialDaysLeft = await isTrial(userId)
@@ -581,7 +581,9 @@ export async function customerToSegment(userId: string, customer: Database['publ
   }
   else {
     segments.push('NotOnboarded')
-    return segments
+    // segments to object with key as segment and value as true
+    const res = segments.reduce((acc, cur) => ({ ...acc, [cur]: true }), {})
+    return res
   }
 
   if (canceled)
@@ -605,7 +607,8 @@ export async function customerToSegment(userId: string, customer: Database['publ
   else
     segments.push('Not_found')
 
-  return segments
+  const res = segments.reduce((acc, cur) => ({ ...acc, [cur]: true }), {})
+  return res
 }
 
 export async function getStripeCustomer(customerId: string) {
@@ -652,10 +655,10 @@ export async function createStripeCustomer(user: Database['public']['Tables']['u
     .select()
     .eq('stripe_id', customer.product_id)
     .single()
-  let segment = ['Capgo']
+  let segment: { [key: string]: boolean } = { Capgo: true }
   if (plan)
     segment = await customerToSegment(user.id, customer, plan)
-  await updatePerson(user.email, person, segment).catch((e) => {
+  await addDataContact(user.email, person).catch((e) => {
     console.log('updatePerson error', e)
   })
   console.log('stripe_info done')
