@@ -1,5 +1,20 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 
+export interface Segments {
+  capgo: boolean
+  onboarded: boolean
+  trial: boolean
+  trial7: boolean
+  trial1: boolean
+  trial0: boolean
+  paying: boolean
+  plan: string
+  payingMonthly: boolean
+  overuse: boolean
+  canceled: boolean
+  issueSegment: boolean
+}
+// herit from Segments person
 export interface Person {
   nickname?: string
   avatar?: string
@@ -9,7 +24,6 @@ export interface Person {
   customer_id?: string
   product_id?: string
   price_id?: string
-  [key: string]: string | boolean | undefined
 }
 
 // https://api.useplunk.com/v1
@@ -50,9 +64,9 @@ export async function addContact(email: string, data: any) {
   return response.data
 }
 
-export function addDataContact(email: string, data: Person) {
-  console.log('addDataContact', email, data)
-  return trackEvent(email, data, 'user:addData')
+export function addDataContact(email: string, data: Person, segments?: Segments) {
+  console.log('addDataContact', email, data, segments)
+  return trackEvent(email, { ...data, ...segments }, 'user:addData')
 }
 
 export async function sendEmail(to: string, subject: string, body: string) {

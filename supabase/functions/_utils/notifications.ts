@@ -2,7 +2,7 @@ import { parseCronExpression } from 'https://cdn.skypack.dev/cron-schedule@3.0.6
 import dayjs from 'https://cdn.skypack.dev/dayjs@1.11.6?dts'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { addDataContact, trackEvent } from './plunk.ts'
+import { trackEvent } from './plunk.ts'
 
 interface EventData {
   [key: string]: any
@@ -10,8 +10,7 @@ interface EventData {
 
 async function sendNow(eventName: string, eventData: EventData,
   email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
-  console.log('send notif', eventName, email)
-  await addDataContact(email, eventData)
+  console.log('send notif', eventName, email, color)
   await trackEvent(email, eventData, eventName)
   if (past != null) {
     const { error } = await supabaseAdmin()

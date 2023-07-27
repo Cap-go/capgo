@@ -4,6 +4,7 @@ import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { removeOldSubscription } from '../_utils/stripe.ts'
 import { logsnag } from '../_utils/logsnag.ts'
+import type { Person } from '../_utils/plunk.ts'
 import { addDataContact, trackEvent } from '../_utils/plunk.ts'
 
 serve(async (event: Request) => {
@@ -44,7 +45,7 @@ serve(async (event: Request) => {
       stripeData.status = 'succeeded'
     console.log('stripeData', stripeData)
 
-    const userData = {
+    const userData: Person = {
       id: user.id,
       customer_id: stripeData.customer_id,
       status: stripeData.status as string,
@@ -74,10 +75,7 @@ serve(async (event: Request) => {
         const isMonthly = plan.price_m_id === stripeData.price_id
         const segment = await customerToSegment(user.id, customer, plan)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
-        await addDataContact(user.email, {
-          plan: plan.name,
-          ...segment,
-        })
+        await addDataContact(user.email, userData, segment)
         await trackEvent(user.email, { plan: plan.name }, eventName)
         await trackEvent(user.email, {}, 'user:upgrade')
         await logsnag.track({
@@ -90,7 +88,7 @@ serve(async (event: Request) => {
       }
       else {
         const segment = await customerToSegment(user.id, customer)
-        await addDataContact(user.email, segment)
+        await addDataContact(user.email, userData, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
@@ -98,7 +96,7 @@ serve(async (event: Request) => {
         stripeData.status = 'succeeded'
         stripeData.subscription_anchor = new Date().toISOString()
         const segment = await customerToSegment(user.id, customer)
-        await addDataContact(user.email, segment)
+        await addDataContact(user.email, userData, segment)
         await trackEvent(user.email, {}, 'user:cancel')
         await logsnag.track({
           channel: 'usage',
@@ -120,7 +118,7 @@ serve(async (event: Request) => {
     }
     else {
       const segment = await customerToSegment(user.id, customer)
-      await addDataContact(user.email, segment)
+      await addDataContact(user.email, userData, segment)
     }
 
     return sendRes({ received: true })

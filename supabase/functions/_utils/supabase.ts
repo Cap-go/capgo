@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
-import type { Person } from './plunk.ts'
+import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 
 // Import Supabase client
@@ -567,48 +567,55 @@ export async function saveStoreInfo(apps: (Database['public']['Tables']['store_a
 }
 
 export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
-  plan?: Database['public']['Tables']['plans']['Row']): Promise<{ [key: string]: boolean }> {
-  const isMonthly = plan?.price_m_id === customer.price_id
-  const segments = ['Capgo']
+  plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+  const segments: Segments = {
+    capgo: true,
+    onboarded: await isOnboarded(userId),
+    trial: false,
+    trial7: false,
+    trial1: false,
+    trial0: false,
+    paying: false,
+    payingMonthly: plan?.price_m_id === customer.price_id,
+    plan: plan?.name ?? '',
+    overuse: false,
+    canceled: await isCanceled(userId),
+    issueSegment: false,
+  }
   const trialDaysLeft = await isTrial(userId)
   const paying = await isPaying(userId)
   const canUseMore = await isGoodPlan(userId)
-  const onboarded = await isOnboarded(userId)
-  const canceled = await isCanceled(userId)
 
-  if (onboarded) {
-    segments.push('Onboarded')
+  if (!segments.onboarded)
+    return segments
+
+  if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7) {
+    segments.trial = true
+    segments.trial7 = true
+  }
+  else if (!paying && trialDaysLeft === 1) {
+    segments.trial = true
+    segments.trial1 = true
+  }
+
+  else if (!paying && !canUseMore) {
+    segments.trial = true
+    segments.trial0 = true
+  }
+
+  else if (paying && !canUseMore && plan) {
+    segments.overuse = true
+    segments.paying = true
+  }
+
+  else if (paying && canUseMore && plan) {
+    segments.paying = true
   }
   else {
-    segments.push('NotOnboarded')
-    // segments to object with key as segment and value as true
-    const res = segments.reduce((acc, cur) => ({ ...acc, [cur]: true }), {})
-    return res
+    segments.issueSegment = true
   }
 
-  if (canceled)
-    segments.push('Canceled')
-
-  else if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7)
-    segments.push('Trial', 'Trial7')
-
-  else if (!paying && trialDaysLeft === 1)
-    segments.push('Trial', 'Trial1')
-
-  else if (!paying && !canUseMore)
-    segments.push('Trial', 'Trial0')
-
-  else if (paying && !canUseMore && plan)
-    segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly', 'Overuse')
-
-  else if (paying && canUseMore && plan)
-    segments.push('Paying', plan.name, isMonthly ? 'Monthly' : 'Yearly')
-
-  else
-    segments.push('Not_found')
-
-  const res = segments.reduce((acc, cur) => ({ ...acc, [cur]: true }), {})
-  return res
+  return segments
 }
 
 export async function getStripeCustomer(customerId: string) {
@@ -655,10 +662,8 @@ export async function createStripeCustomer(user: Database['public']['Tables']['u
     .select()
     .eq('stripe_id', customer.product_id)
     .single()
-  let segment: { [key: string]: boolean } = { Capgo: true }
-  if (plan)
-    segment = await customerToSegment(user.id, customer, plan)
-  await addDataContact(user.email, person).catch((e) => {
+  const segment = await customerToSegment(user.id, customer, plan)
+  await addDataContact(user.email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })
   console.log('stripe_info done')
