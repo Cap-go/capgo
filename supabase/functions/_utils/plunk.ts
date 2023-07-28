@@ -48,7 +48,10 @@ export async function trackEvent(email: string, data: any, event: string) {
     email,
     event,
     data,
-  }, getConfig())
+  }, getConfig()).catch((e) => {
+    console.log('trackEvent error', e)
+    return { data: { error: e } }
+  })
   return response.data
 }
 
@@ -60,7 +63,10 @@ export async function addContact(email: string, data: any) {
     data,
   }
   console.log('addContact', email)
-  const response = await axios.post(url, payload, getConfig())
+  const response = await axios.post(url, payload, getConfig()).catch((e) => {
+    console.log('trackEvent error', e)
+    return { data: { error: e } }
+  })
   return response.data
 }
 
@@ -75,6 +81,9 @@ export async function sendEmail(to: string, subject: string, body: string) {
     to,
     subject,
     body,
-  }, getConfig())
+  }, getConfig()).catch((e) => {
+    console.log('trackEvent error', e)
+    return { data: { error: e } }
+  })
   return response.data
 }
