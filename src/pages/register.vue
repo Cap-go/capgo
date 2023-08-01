@@ -84,7 +84,7 @@ async function submit(form: { first_name: string; last_name: string; password: s
                 />
                 <FormKit
                   type="text"
-                  name="first_name"
+                  name="last_name"
                   :label="t('last-name')"
                   autocomplete="family-name"
                   input-class="!text-black"
