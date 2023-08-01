@@ -77,3 +77,24 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- add function to check if user has min right
+CREATE OR REPLACE FUNCTION check_min_rights(min_right user_min_right, user_id uuid, org_id uuid, app_id varchar, channel_id bigint)
+RETURNS boolean AS $$
+DECLARE
+    user_right_record RECORD;
+BEGIN
+    FOR user_right_record IN 
+        SELECT org_users.user_right, org_users.app_id, org_users.channel_id 
+        FROM org_users 
+        WHERE org_users.org_id = check_min_rights.org_id AND org_users.user_id = check_min_rights.user_id
+    LOOP
+        IF (user_right_record.user_right >= min_right AND user_right_record.app_id IS NULL AND user_right_record.channel_id IS NULL) OR
+           (user_right_record.user_right >= min_right AND user_right_record.app_id = check_min_rights.app_id AND user_right_record.channel_id IS NULL) OR
+           (user_right_record.user_right >= min_right AND user_right_record.app_id = check_min_rights.app_id AND user_right_record.channel_id = check_min_rights.channel_id)
+        THEN
+            RETURN true;
+        END IF;
+    END LOOP;
+
+    RETURN false;
+END;
+$$ LANGUAGE plpgsql;
