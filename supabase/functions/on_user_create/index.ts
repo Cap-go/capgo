@@ -33,6 +33,7 @@ serve(async (event: Request) => {
       addContact(record.email, {
         first_name: record.first_name || '',
         last_name: record.last_name || '',
+        nickname: `${record.first_name || ''} ${record.last_name || ''}`,
         image_url: record.image_url ? record.image_url : undefined,
       }),
     ])
@@ -41,7 +42,11 @@ serve(async (event: Request) => {
       return sendRes()
     await Promise.all([
       createStripeCustomer(record as any),
-      trackEvent(record.email, {}, 'user:register'),
+      trackEvent(record.email, {
+        first_name: record.first_name || '',
+        last_name: record.last_name || '',
+        nickname: `${record.first_name || ''} ${record.last_name || ''}`,
+      }, 'user:register'),
       logsnag.track({
         channel: 'user-register',
         event: 'User Joined',
