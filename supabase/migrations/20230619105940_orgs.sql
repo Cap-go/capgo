@@ -97,4 +97,17 @@ BEGIN
 
     RETURN false;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE POLICY "Allow owner to all" ON "public"."orgs"
+AS PERMISSIVE FOR ALL
+TO authenticated
+USING (check_min_rights('admin', uid(), id, null, null))
+WITH CHECK (check_min_rights('admin', uid(), id, null, null))
+
+
+CREATE POLICY "Allow owner to all" ON "public"."org_users"
+AS PERMISSIVE FOR ALL
+TO authenticated
+USING (check_min_rights('admin', uid(), org_id, null, null))
+WITH CHECK (check_min_rights('admin', uid(), org_id, null, null))
