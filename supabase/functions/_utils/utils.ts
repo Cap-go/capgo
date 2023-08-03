@@ -22,6 +22,15 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+export function shallowCleanObject(obj: Record<string, unknown>) {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value ?? false)
+      acc[key] = value
+
+    return acc
+  }, {} as Record<string, unknown>)
+}
+
 export async function checkKey(authorization: string | undefined,
   supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)

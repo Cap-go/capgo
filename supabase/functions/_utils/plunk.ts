@@ -1,4 +1,5 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import { shallowCleanObject } from './utils.ts'
 
 export interface Segments {
   capgo: boolean
@@ -47,7 +48,7 @@ export async function trackEvent(email: string, data: any, event: string) {
   const response = await axios.post(url, {
     email,
     event,
-    data,
+    data: shallowCleanObject(data),
   }, getConfig()).catch((e) => {
     console.log('trackEvent error', e)
     return { data: { error: e } }
@@ -60,11 +61,11 @@ export async function addContact(email: string, data: any) {
   const payload = {
     email,
     subscribed: true,
-    data,
+    data: shallowCleanObject(data),
   }
   console.log('addContact', email)
   const response = await axios.post(url, payload, getConfig()).catch((e) => {
-    console.log('trackEvent error', e)
+    console.log('addContact error', e)
     return { data: { error: e } }
   })
   return response.data
@@ -72,7 +73,7 @@ export async function addContact(email: string, data: any) {
 
 export function addDataContact(email: string, data: Person, segments?: Segments) {
   console.log('addDataContact', email, data, segments)
-  return trackEvent(email, { ...data, ...segments }, 'user:addData')
+  return trackEvent(email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
 }
 
 export async function sendEmail(to: string, subject: string, body: string) {
