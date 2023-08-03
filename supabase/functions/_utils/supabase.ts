@@ -517,16 +517,20 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
 
   if (total === 0) {
     // create apikeys
-    const { data } = await supabaseAdmin()
+    const { data, error } = await supabaseAdmin()
       .from('orgs')
       .insert(
         {
           created_by: userId,
+          logo: 'https://res.cloudinary.com/dz3vsv9pg/image/upload/v1623349123/capgo/logo.png',
           name: `${name} organization`,
         })
       .select()
       .single()
       // create org_users admin from data.id
+    if (error)
+      console.error('createdefaultOrg error', error)
+
     if (data) {
       return supabaseAdmin()
         .from('org_users')
