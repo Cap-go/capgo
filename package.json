@@ -148,7 +148,7 @@
     "@vue/compiler-sfc": "3.3.4",
     "@vue/server-renderer": "3.3.4",
     "autoprefixer": "^10.4.14",
-    "critters": "0.0.16",
+    "critters": "0.0.20",
     "cross-env": "^7.0.3",
     "cypress": "12.9.0",
     "eslint": "8.41.0",
