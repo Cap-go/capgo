@@ -24,6 +24,7 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
+    // TODO:  add to org_users
     const today_id = new Date().toISOString().slice(0, 10)
     const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
       app_id: record.app_id,
