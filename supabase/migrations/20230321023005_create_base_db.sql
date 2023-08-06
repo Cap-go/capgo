@@ -631,10 +631,11 @@ CREATE FUNCTION public.count_all_apps() RETURNS integer
     LANGUAGE plpgsql
     AS $$
 Begin
-  RETURN (SELECT
-(SELECT COUNT(*) FROM apps)+
-(SELECT COUNT(*) FROM (SELECT DISTINCT app_id FROM store_apps where onprem = true or capgo = true) AS temp)
-AS SumCount);
+  RETURN (SELECT COUNT(*) FROM (
+    SELECT app_id FROM apps
+    UNION
+    SELECT DISTINCT app_id FROM store_apps where (onprem = true or capgo = true) and url != ''
+  ) AS temp);
 End;  
 $$;
 
