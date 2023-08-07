@@ -88,7 +88,7 @@ INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport"
     ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_plan'),
 (10, '5 0 * * *', '
 SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
-    SELECT *
+    SELECT status
     FROM
       http((
           ''POST'',
