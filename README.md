@@ -116,19 +116,20 @@ Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along
 You will need to start each local server in separate terminals.
 
 Before you continue, you need to have these installed:
-- [Docker](https://www.docker.com/);
-- [Supabase CLI](https://supabase.com/docs/guides/cli);
+- [Docker](https://www.docker.com/)
+- [pnpm](https://pnpm.js.org/)
+- [Supabase CLI](https://supabase.com/docs/guides/cli)
 
-If you install `supabase` globally with `pnpm install supabase -g`, you can invoke `supabase` from anywhere.
+You can install the `supabase` CLI globally with `pnpm install supabase -g` and you can invoke `supabase` from anywhere.
 
-If you install `supabase` inside this repo with `pnpm install supabase --save-dev`, you can only invoke it with `./node_modules/supabase/bin/supabase`.
+Alternatively, you can install the CLI inside this repo with `pnpm install supabase --save-dev` but to invoke it use: `./node_modules/supabase/bin/supabase`.
 
 The rest of this guide assumes that you installed the `supabase` CLI globally.
 
 
 #### Start Supabase DB Locally
 
-Start Supabase:
+Start the Supabase DB:
 ```bash
 supabase start
 ```
@@ -153,6 +154,7 @@ service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxX
 
 You need make sure Docker is running.
 ```bash
+pnpm install
 pnpm backend
 ```
 
@@ -166,7 +168,6 @@ In another terminal, run this to generate the necessary Netlify functions:
 ```bash
 export BRANCH=local
 
-pnpm install
 pnpm generate:node_serverless
 ```
 
