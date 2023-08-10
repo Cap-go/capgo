@@ -100,7 +100,7 @@
     "firebase": "9.22.0",
     "flowbite": "^1.6.5",
     "generate-password-browser": "^1.1.0",
-    "google-play-scraper": "^9.1.1",
+    "google-play-scraper": "^10.0.0",
     "json2csv": "^5.0.7",
     "konsta": "^1.0.2",
     "lauqe": "^1.5.0",
