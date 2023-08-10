@@ -51,9 +51,6 @@ INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version"
 INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "date_id", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '', '1.223.0', '', 't', 't');
 
--- INSERT INTO "public"."stats" ("id", "created_at", "platform", "action", "device_id", "version_build", "version", "app_id", "updated_at") VALUES
--- (11783621, now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app', '2023-03-20 00:46:33.664139+00');
-
 INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at", "channels", "mlu", "versions", "shared", "mlu_real", "devices", "date_id", "version_size", "bandwidth", "devices_real") VALUES
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-01 01:18:54.034372+00', '2023-03-01 01:18:54.034372+00', 1, 65, 4, 0, 34, 1, to_char(now(), 'YYYY-MM'), 1099392048, 14761264, 1),
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.269652+00', '2023-03-20 00:29:35.269652+00', 0, 0, 3, 0, 5, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-20'), 3037576, 0, 0),
