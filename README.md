@@ -100,6 +100,7 @@ All official plugin are install and preconfigured
 To build the App in mobile, run
 
 ```bash
+pnpm install
 pnpm mobile
 ```
 
@@ -112,62 +113,91 @@ Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along
 
 ### Development
 
-Start each local server in a separate terminal.
+You will need to start each local server in separate terminals.
 
-#### Start local Supabase DB
+Before you continue, you need to have these installed:
+- [Docker](https://www.docker.com/);
+- [Supabase CLI](https://supabase.com/docs/guides/cli);
 
-> You need to have [Docker](https://www.docker.com/) installed.
-> You need to have Supabase CLI (`npm install supabase --save-dev`) installed.
+If you install `supabase` globally with `pnpm install supabase -g`, you can invoke `supabase` from anywhere.
 
+If you install `supabase` inside this repo with `pnpm install supabase --save-dev`, you can only invoke it with `./node_modules/supabase/bin/supabase`.
+
+The rest of this guide assumes that you installed the `supabase` CLI globally.
+
+
+#### Start Supabase DB Locally
+
+Start Supabase:
 ```bash
 supabase start
 ```
-Replace in `configs.json`
-`supa_anon.local` the key by the one logged in the terminal `anon key`
-Run the front with 
 
-#### Start local Supabase db and Functions
+If the command completed successfully, your console output should be similar to the output below:
+```bash
+Started supabase local development setup.
 
-You need docker running.
+         API URL: http://localhost:54321
+     GraphQL URL: http://localhost:54321/graphql/v1
+          DB URL: postgresql://postgres:postgres@localhost:54322/postgres
+      Studio URL: http://localhost:54323
+    Inbucket URL: http://localhost:54324
+      JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
+        anon key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx
+service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
+```
+
+
+
+#### Start Supabase DB and Functions Locally
+
+You need make sure Docker is running.
 ```bash
 pnpm backend
 ```
 
-#### Start local Front
+#### Start Frontend Locally
 
-In the second terminal run this to generate the necessary netlify functions.
+Before starting the frontend, make sure you replace the value of `supa_anon.local` inside the file `configs.json` with the value of `anon key`. If `supabase` is already running, you can also obtain `anon key` from the output of `supabase status`.  
+
+
+In another terminal, run this to generate the necessary Netlify functions:
 
 ```bash
-pnpm serve
+export BRANCH=local
+
+pnpm install
+pnpm generate:node_serverless
 ```
+
 Then start the server
 ```bash
-pnpm generate:node_serverless
 pnpm serve
 ```
 
 #### Login
 
-Visit http://localhost:8881
+Visit http://localhost:5173
 
-Use the demo credentials.
-Account: test@capgo.app
-Password: testtest
+There are two login credentials you can use:
 
-This account has some demo data in it.
-If the data is not fresh just reset the db with `supabase db reset` the seed has been made in the way the data is always fresh.
+| Account | Username | Password |
+|---------|----------|----------|
+| Demo User | test@capgo.app | testtest |
+| Admin User | admin@capgo.app | adminadmin |
 
-The admin account is
-Account: admin@capgo.app
-Password: adminadmin
+The *demo user* account has some demo data in it.
+If the data is not fresh just reset the db with `supabase db reset`. The seed has been made in the way the data is always fresh.
 
-This user will be admin so he can impersonate other users.
+The *admin user* has admininstrative rights so he can impersonate other users.
 You can find the menu for that in the account section.
 
-#### Supabase db reset
 
-You need docker running.
-This will seed the db with the demo data again.
+#### Supabase DB Reset
+
+Make sure you have Docker running.
+
+This will seed the DB with demo data again.
 ```bash
 pnpm reset
 ```
