@@ -95,7 +95,7 @@ const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
-  { from: 'https://deno.land/x/s3_lite_client@0.5.0/mod.ts', to: 'minio' },
+  { from: 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts', to: 'minio' },
   { from: '{ S3Client }', to: '{ Client }' },
   { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
@@ -105,7 +105,7 @@ const mutationsNode = [
   { from: 'https://esm.sh/google-play-scraper?target=deno', to: 'google-play-scraper' },
   { from: 'import { hmac } from \'https://deno.land/x/hmac@v2.0.1/mod.ts\'', to: 'import crypto from \'crypto\'' },
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
-  { from: 'import { serve } from \'https://deno.land/std@0.188.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
+  { from: 'import { serve } from \'https://deno.land/std@0.198.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
   { from: supaTempl.r2, to: netlifyTempl.r2 },
@@ -118,7 +118,7 @@ const mutationsNode = [
 const mutationsEgde = [
   { from: '../_tests/', to: `../${baseEdgeFunctions}_tests/` },
   { from: '../_utils/', to: `../${baseEdgeFunctions}_utils/` },
-  { from: 'import { serve } from \'https://deno.land/std@0.188.0/http/server.ts\'', to: 'import type { Context } from \'https://edge.netlify.com\'' },
+  { from: 'import { serve } from \'https://deno.land/std@0.198.0/http/server.ts\'', to: 'import type { Context } from \'https://edge.netlify.com\'' },
   { from: supaTempl.handler, to: netlifyEdgeTempl.handler },
 ]
 const mutationsBg = [
