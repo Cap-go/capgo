@@ -275,6 +275,12 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     //     error: 'invalid_ip',
     //   }, 400)
     // }
+
+    const userAgent = headers['user-agent'] || '';
+    if (userAgent.toLocaleLowerCase().includes('google')) {
+      return sendRes({ message: 'Google bot not allowed' }, 403);
+    }
+
     await updateOrCreateDevice({
       app_id,
       device_id,
@@ -323,7 +329,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
 
     if (!devicesOverride && channelData) {
-    // console.log('check disableAutoUpdateToMajor', device_id)
+      // console.log('check disableAutoUpdateToMajor', device_id)
       if (!channelData.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id)
         await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
