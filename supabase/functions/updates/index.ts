@@ -267,6 +267,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     // If there was a version past this call
     if (version.created_at) {
       const newDate = new Date()
+      // here prevDate means the last time the app was updated in dp, right?
       const prevDate = new Date(version.created_at)
       // Extract the User-Agent header from the request
       const userAgent = (headers['user-agent'] || '').toLowerCase();
@@ -275,16 +276,18 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       // Check if the User-Agent indicates an Android device
       const isAndroid = userAgent.includes('android');
       if ((isiOS || isAndroid) && (prevDate < newDate)) {
-        // Rate limit here?
+        // associate an ip with the publishing date
+        if (ip) {
+          // check when was the last ip address updated
+          const lastUpdatedApp = getLastUpdate(ip, app_id)
+          if (lastUpdatedApp >= prevDate) {
+            return sendRes({
+              message: 'No need to update.',
+              error: 'no_need_to_update',
+            }, 200)
+          }
+        }
       }
-      // proceed as usual
-      // Note: this gets called everytime it's not an android/iOS device
-      // user gets billed
-    }
-    else {
-      // proceed by creating one
-      // Note: ensures that this was the only call
-      // user gets billed
     }
 
     await updateOrCreateDevice({
