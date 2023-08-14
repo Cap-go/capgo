@@ -264,30 +264,12 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
 
-    // If there was a version past this call
-    if (version.created_at) {
-      const newDate = new Date()
-      // here prevDate means the last time the app was updated in dp, right?
-      const prevDate = new Date(version.created_at)
-      // Extract the User-Agent header from the request
-      const userAgent = (headers['user-agent'] || '').toLowerCase();
-      // Check if the User-Agent indicates an iOS device
-      const isiOS = userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ipod');
-      // Check if the User-Agent indicates an Android device
-      const isAndroid = userAgent.includes('android');
-      if ((isiOS || isAndroid) && (prevDate < newDate)) {
-        // associate an ip with the publishing date
-        if (ip) {
-          // check when was the last ip address updated
-          const lastUpdatedApp = getLastUpdate(ip, app_id)
-          if (lastUpdatedApp >= prevDate) {
-            return sendRes({
-              message: 'No need to update.',
-              error: 'no_need_to_update',
-            }, 200)
-          }
-        }
-      }
+    if (version_name === version.name) {
+      console.log(id, 'No new version available', device_id, version_name, version.name)
+      await sendStats('noNew', platform, device_id, app_id, version_build, versionId)
+      return sendRes({
+        message: 'No new version available',
+      }, 200)
     }
 
     await updateOrCreateDevice({
@@ -326,15 +308,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       const res = await getBundleUrl(version.storage_provider, `apps/${version.user_id}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
-    }
-
-    // console.log('signedURL', device_id, signedURL, version_name, version.name)
-    if (version_name === version.name) {
-      console.log(id, 'No new version available', device_id, version_name, version.name)
-      await sendStats('noNew', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
-        message: 'No new version available',
-      }, 200)
     }
 
     if (!devicesOverride && channelData) {
