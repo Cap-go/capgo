@@ -264,21 +264,27 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
 
-    // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
-    // check if version is created_at more than 4 hours
-    // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
-
-    // if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
-    //   console.log('invalid ip', xForwardedFor, ip)
-    //   return sendRes({
-    //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
-    //     error: 'invalid_ip',
-    //   }, 400)
-    // }
-
-    const userAgent = headers['user-agent'] || '';
-    if (userAgent.toLocaleLowerCase().includes('google')) {
-      return sendRes({ message: 'Google bot not allowed' }, 403);
+    // If there was a version past this call
+    if (version.created_at) {
+      const newDate = new Date()
+      const prevDate = new Date(version.created_at)
+      // Extract the User-Agent header from the request
+      const userAgent = (headers['user-agent'] || '').toLowerCase();
+      // Check if the User-Agent indicates an iOS device
+      const isiOS = userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ipod');
+      // Check if the User-Agent indicates an Android device
+      const isAndroid = userAgent.includes('android');
+      if ((isiOS || isAndroid) && (prevDate < newDate)) {
+        // Rate limit here?
+      }
+      // proceed as usual
+      // Note: this gets called everytime it's not an android/iOS device
+      // user gets billed
+    }
+    else {
+      // proceed by creating one
+      // Note: ensures that this was the only call
+      // user gets billed
     }
 
     await updateOrCreateDevice({
