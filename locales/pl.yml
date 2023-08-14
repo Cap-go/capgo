@@ -152,6 +152,7 @@ forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione
 from-device: z urządzenia
+generated-new-apikey: Nowy klucz API został wygenerowany!
 good: Dobry
 id: ID
 in-your-main-file: W twoim głównym pliku

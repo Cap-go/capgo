@@ -35,6 +35,16 @@ async function geKeys(retry = true): Promise<void> {
 }
 displayStore.NavTitle = ''
 geKeys()
+
+function onClick(event: MouseEvent, app: Database['public']['Tables']['apikeys']['Row']) {
+  const element = document.elementFromPoint(event.clientX, event.clientY)
+
+  // Make sure not to call copyKey IF we are regenerating the API key
+  if (element?.closest('#regenerateButton') !== null)
+    return
+
+  copyKey(app)
+}
 </script>
 
 <template>
@@ -49,7 +59,7 @@ geKeys()
     <div class="flex flex-col">
       <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="copyKey(app)" />
+          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="(event: MouseEvent) => onClick(event, app)" />
         </dl>
       </div>
     </div>

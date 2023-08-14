@@ -161,6 +161,7 @@ invalid-auth: Your login are not a match, try again.
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-copied: Key copied in your clipboard
+generated-new-apikey: Generated new API key!
 language: Language
 last-name: Last name
 last-update: Last update
