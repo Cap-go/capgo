@@ -272,20 +272,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 200)
     }
 
-    await updateOrCreateDevice({
-      app_id,
-      device_id,
-      platform: platform as Database['public']['Enums']['platform_os'],
-      plugin_version,
-      version: versionId,
-      os_version: version_os,
-      ...(is_emulator != null ? { is_emulator } : {}),
-      ...(is_prod != null ? { is_prod } : {}),
-      ...(custom_id != null ? { custom_id } : {}),
-      version_build,
-      updated_at: new Date().toISOString(),
-    })
-    // console.log('updateOrCreateDevice done')
     if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
       await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, versionId)
@@ -303,6 +289,21 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         error: 'no_bundle',
       }, 200)
     }
+
+    await updateOrCreateDevice({
+      app_id,
+      device_id,
+      platform: platform as Database['public']['Enums']['platform_os'],
+      plugin_version,
+      version: versionId,
+      os_version: version_os,
+      ...(is_emulator != null ? { is_emulator } : {}),
+      ...(is_prod != null ? { is_prod } : {}),
+      ...(custom_id != null ? { custom_id } : {}),
+      version_build,
+      updated_at: new Date().toISOString(),
+    })
+
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
       const res = await getBundleUrl(version.storage_provider, `apps/${version.user_id}/${app_id}/versions`, version.bucket_id)
