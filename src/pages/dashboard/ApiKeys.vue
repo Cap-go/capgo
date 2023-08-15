@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
-import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
@@ -14,12 +12,7 @@ const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
 const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
-async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
-  copy(app.key)
-  console.log('displayStore.messageToast', displayStore.messageToast)
-  toast.success(t('key-copied'))
-}
-async function geKeys(retry = true): Promise<void> {
+async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')
@@ -29,22 +22,12 @@ async function geKeys(retry = true): Promise<void> {
     apps.value = data
 
   else if (retry && main.user?.id)
-    return geKeys(false)
+    return getKeys(false)
 
   isLoading.value = false
 }
 displayStore.NavTitle = ''
-geKeys()
-
-function onClick(event: MouseEvent, app: Database['public']['Tables']['apikeys']['Row']) {
-  const element = document.elementFromPoint(event.clientX, event.clientY)
-
-  // Make sure not to call copyKey IF we are regenerating the API key
-  if (element?.closest('#regenerateButton') !== null)
-    return
-
-  copyKey(app)
-}
+getKeys()
 </script>
 
 <template>
@@ -59,7 +42,7 @@ function onClick(event: MouseEvent, app: Database['public']['Tables']['apikeys']
     <div class="flex flex-col">
       <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @click="(event: MouseEvent) => onClick(event, app)" />
+          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" />
         </dl>
       </div>
     </div>

@@ -32,8 +32,10 @@ add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysy�
 admin: Admin
 afternoon: popołudnie
 alert-confirm-delete: Potwierdź usunięcie
+alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
 alert-not-reverse-message: Ta czynność nie jest odwracalna
+alert-regenerate-key: Czy napewno chcesz zregenerować ten klucz?
 allow-develoment-bui: Zezwalaj na kompilację deweloperską
 allow-device-to-self: Zezwól urządzeniom na samopowiązanie
 allow-emulator: Zezwalaj na emulatory
@@ -69,6 +71,7 @@ button-delete: Usuwać
 button-go: IŚĆ
 button-home: Dom
 button-options: Opcje
+button-regenerate: Regeneruj
 button-remove: Usunąć
 button-tabs: Zakładki
 button-toggle_dark: Przełącz tryb ciemny

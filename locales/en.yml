@@ -30,8 +30,10 @@ add-your-first-app-t: Add your first app to your account and let's push updates 
 admin: Admin
 afternoon: afternoon
 alert-confirm-delete: Confirm Delete
+alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
 alert-not-reverse-message: This action is not reversible
+alert-regenerate-key: Are you sure you want to regenerate this key
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
@@ -67,6 +69,7 @@ button-delete: Delete
 button-go: GO
 button-home: Home
 button-options: Options
+button-regenerate: Regenerate
 button-remove: Remove
 button-tabs: Tabs
 button-toggle_dark: Toggle dark mode
@@ -147,6 +150,7 @@ forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from-device: from device
+generated-new-apikey: Generated new API key!
 good: Good
 id: ID
 in-your-main-file: In your main file
@@ -161,7 +165,6 @@ invalid-auth: Your login are not a match, try again.
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-copied: Key copied in your clipboard
-generated-new-apikey: Generated new API key!
 language: Language
 last-name: Last name
 last-update: Last update
