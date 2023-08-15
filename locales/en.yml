@@ -23,15 +23,20 @@ activation-notification-desc: I accept to receive notification when new app vers
 activation-validate: Validate
 add: Add
 add-another-app: Add your app
+add-api-key: Added new API key successfully
 add-shared-user: Add shared user
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
 admin: Admin
 afternoon: afternoon
+alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete
+alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
+alert-generate-new-key: Please select the type of API key that you want to generate.
 alert-not-reverse-message: This action is not reversible
+alert-regenerate-key: Are you sure you want to regenerate this key
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
@@ -67,6 +72,7 @@ button-delete: Delete
 button-go: GO
 button-home: Home
 button-options: Options
+button-regenerate: Regenerate
 button-remove: Remove
 button-tabs: Tabs
 button-toggle_dark: Toggle dark mode
@@ -147,6 +153,7 @@ forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from-device: from device
+generated-new-apikey: Generated new API key!
 good: Good
 id: ID
 in-your-main-file: In your main file
@@ -160,7 +167,10 @@ into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
 is-emulator: Is Emulator
 is-production-app: Is Production app
+key-all: All
 key-copied: Key copied in your clipboard
+key-read: Read
+key-upload: Upload
 language: Language
 last-name: Last name
 last-update: Last update
@@ -247,6 +257,7 @@ register-desc: Fill the following fields to complete your registration
 register-heading: Registration
 register-next: Register
 reload: Reload
+removed-apikey: API key has been successfully deleted
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves

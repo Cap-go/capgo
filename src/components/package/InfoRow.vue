@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
+import { useI18n } from 'vue-i18n'
+import copy from 'copy-text-to-clipboard'
+import ArrowPath from '~icons/heroicons/arrow-path'
+import Trash from '~icons/heroicons/trash'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 
 const props = defineProps<{
   label: string
@@ -8,13 +15,108 @@ const props = defineProps<{
   editable?: boolean
   isLink?: boolean
 }>()
+
 const emit = defineEmits<{
   (event: 'update:value', value: string): void
+  (event: 'delete', key: string): void
 }>()
+
+const { t } = useI18n()
+const displayStore = useDisplayStore()
+const supabase = useSupabase()
+
+const computedValue = reactive({ value: props.value })
 const rowInput = ref(props.value)
 watch(rowInput, debounce(() => {
   emit('update:value', rowInput.value)
 }, 500))
+
+async function regenrateKey() {
+  if (await showRegenerateKeyModal())
+    return
+
+  const newApiKey = crypto.randomUUID()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    console.log('Not logged in, cannot regenerate API key')
+    return
+  }
+
+  const { error } = await supabase
+    .from('apikeys')
+    .update({ key: newApiKey })
+    .eq('user_id', user.id)
+    .eq('key', computedValue.value)
+
+  if (error || typeof newApiKey !== 'string')
+    throw error
+
+  computedValue.value = newApiKey
+
+  toast.success(t('generated-new-apikey'))
+}
+
+async function deleteKey() {
+  if (await showDeleteKeyModal())
+    return
+
+  const { error } = await supabase
+    .from('apikeys')
+    .delete()
+    .eq('key', computedValue.value)
+
+  if (error)
+    throw error
+
+  toast.success(t('removed-apikey'))
+  emit('delete', computedValue.value)
+}
+
+// This returns true if user has canceled the action
+async function showRegenerateKeyModal() {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-regenerate'),
+    message: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-regenerate'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
+async function showDeleteKeyModal() {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
+async function copyKey() {
+  copy(computedValue.value)
+  console.log('displayStore.messageToast', displayStore.messageToast)
+  toast.success(t('key-copied'))
+}
 </script>
 
 <template>
@@ -29,8 +131,16 @@ watch(rowInput, debounce(() => {
         'text-gray-600 dark:text-gray-200': !props.isLink,
       }"
     >
-      <input v-if="editable" v-model="rowInput" class="block w-full p-1 text-gray-900 bg-white border border-gray-300 rounded-lg dark:bg-gray-50 md:w-1/2 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 sm:text-xs dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400">
-      <span v-else> {{ props.value }} </span>
+      <div class="flex flex-row">
+        <input v-if="editable" v-model="rowInput" class="block w-full p-1 text-gray-900 bg-white border border-gray-300 rounded-lg dark:bg-gray-50 md:w-1/2 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 sm:text-xs dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400">
+        <span v-else @click="copyKey()"> {{ computedValue.value }} </span>
+        <button class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey()">
+          <ArrowPath class="mr-4 text-lg text-red-600" />
+        </button>
+        <button class="w-7 h-7 bg-transparent ml-4" @click="deleteKey()">
+          <Trash class="mr-4 text-lg text-red-600" />
+        </button>
+      </div>
     </dd>
   </div>
 </template>
