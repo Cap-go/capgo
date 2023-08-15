@@ -1,4 +1,4 @@
-lockfileVersion: '6.1'
+lockfileVersion: '6.0'
 
 settings:
   autoInstallPeers: true
@@ -275,8 +275,8 @@ devDependencies:
     specifier: ^5.0.5
     version: 5.0.5
   '@iconify-json/carbon':
-    specifier: 1.1.16
-    version: 1.1.16
+    specifier: 1.1.19
+    version: 1.1.19
   '@iconify-json/heroicons':
     specifier: ^1.1.11
     version: 1.1.11
@@ -3108,8 +3108,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dev: false
 
-  /@iconify-json/carbon@1.1.16:
-    resolution: {integrity: sha512-AD8bcnRSGA0WfcGEass2FbA0sagrUzrpFx5WchuDy3uf7yKBWumdypdQK121DH321fQDl5+zZQ26T6gC9knwUQ==}
+  /@iconify-json/carbon@1.1.19:
+    resolution: {integrity: sha512-4obFv2J5L/bIgXCKnW8Xkly47dGgPH+xbP3NZ6DRYznc8ykAo+X5z3WSAW5/ZKO9cKZzRcOnNS6DYofOZZbRCA==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
