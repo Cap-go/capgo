@@ -77,7 +77,7 @@ async function deleteKey() {
 async function showRegenerateKeyModal() {
   displayStore.dialogOption = {
     header: t('alert-confirm-regenerate'),
-    message: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')} ${name}?`,
+    message: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
     buttons: [
       {
         text: t('button-cancel'),
