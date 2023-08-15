@@ -141,7 +141,7 @@
     "@types/minio": "^7.1.1",
     "@types/node": "18.15.11",
     "@types/nprogress": "^0.2.0",
-    "@types/uuid": "9.0.1",
+    "@types/uuid": "9.0.2",
     "@vitejs/plugin-vue": "4.2.3",
     "@vitejs/plugin-vue-jsx": "^3.0.1",
     "@vue/cli-service": "5.0.8",
