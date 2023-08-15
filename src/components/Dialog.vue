@@ -13,6 +13,7 @@ const displayStore = useDisplayStore()
 function close(item?: ActionSheetOptionButton) {
   displayStore.showDialog = false
   if (item) {
+    displayStore.lastButtonRole = item.id ?? ''
     if (item.role === 'cancel')
       displayStore.dialogCanceled = true
 

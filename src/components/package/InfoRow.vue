@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import copy from 'copy-text-to-clipboard'
 import ArrowPath from '~icons/heroicons/arrow-path'
+import Trash from '~icons/heroicons/trash'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
@@ -17,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'update:value', value: string): void
+  (event: 'delete', key: string): void
 }>()
 
 const { t } = useI18n()
@@ -48,11 +50,27 @@ async function regenrateKey() {
     .eq('key', computedValue.value)
 
   if (error || typeof newApiKey !== 'string')
-    return
+    throw error
 
   computedValue.value = newApiKey
 
   toast.success(t('generated-new-apikey'))
+}
+
+async function deleteKey() {
+  if (await showDeleteKeyModal())
+    return
+
+  const { error } = await supabase
+    .from('apikeys')
+    .delete()
+    .eq('key', computedValue.value)
+
+  if (error)
+    throw error
+
+  toast.success(t('removed-apikey'))
+  emit('delete', computedValue.value)
 }
 
 // This returns true if user has canceled the action
@@ -67,6 +85,25 @@ async function showRegenerateKeyModal() {
       },
       {
         text: t('button-regenerate'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
+async function showDeleteKeyModal() {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
         id: 'confirm-button',
       },
     ],
@@ -97,8 +134,11 @@ async function copyKey() {
       <div class="flex flex-row">
         <input v-if="editable" v-model="rowInput" class="block w-full p-1 text-gray-900 bg-white border border-gray-300 rounded-lg dark:bg-gray-50 md:w-1/2 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 sm:text-xs dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400">
         <span v-else @click="copyKey()"> {{ computedValue.value }} </span>
-        <button id="regenerateButton" class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey()">
+        <button class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey()">
           <ArrowPath class="mr-4 text-lg text-red-600" />
+        </button>
+        <button class="w-7 h-7 bg-transparent ml-4" @click="deleteKey()">
+          <Trash class="mr-4 text-lg text-red-600" />
         </button>
       </div>
     </dd>
