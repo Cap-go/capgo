@@ -1701,7 +1701,7 @@ CREATE POLICY "Allow all to app owner" ON "public"."channel_devices" TO "authent
 
 CREATE POLICY "Allow all to app owner" ON "public"."devices_override" USING ("public"."is_app_owner"("auth"."uid"(), "app_id")) WITH CHECK ("public"."is_app_owner"("auth"."uid"(), "app_id"));
 
-CREATE POLICY "Allow all users to select" ON "public"."users" FOR SELECT TO "authenticated" USING ("public"."is_in_channel"("id", "auth"."uid"()));
+CREATE POLICY "Allow all users to selec present in channel" ON "public"."users" FOR SELECT TO "authenticated" USING ("public"."is_in_channel"("id", "auth"."uid"()));
 
 CREATE POLICY "Allow api to insert" ON "public"."channels" FOR INSERT TO "authenticated" WITH CHECK (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write}'::"public"."key_mode"[], "app_id") AND "public"."is_allowed_action"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"))));
 
