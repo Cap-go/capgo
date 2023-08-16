@@ -14,7 +14,7 @@ async function guard(next: any, to: string, from: string) {
   const snag = useLogSnag()
 
   const main = useMainStore()
-  
+
   if (auth.user && !main.auth) {
     if (isSpoofed())
       auth.user.id = spoofUser()

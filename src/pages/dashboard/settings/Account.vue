@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
@@ -27,21 +27,6 @@ const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
 // const errorMessage = ref('')
-
-async function updateEmail(newEmail: string) {
-  if (isLoading.value)
-    return
-  isLoading.value = true
-
-  const { error: updateError } = await supabase.auth.updateUser({ email: newEmail })
-
-  isLoading.value = false
-  if (updateError)
-    setErrors('change-pass', [t('account-email-error')], {})
-  else
-    toast.success(t('changed-email-suc'))
-}
-
 
 async function updloadPhoto(data: string, fileName: string, contentType: string) {
   const { error } = await supabase.storage
@@ -231,17 +216,12 @@ function getEmoji(country: string) {
   }
   return countryCodeToFlagEmoji(countryCode)
 }
+
 async function submit(form: { first_name: string; last_name: string; email: string; country: string }) {
-  if (isLoading.value || !main.user?.id)
-    return
-  isLoading.value = true
-
-if (form.email !== main.user.email) {
-    // Validate the new email
-
-    // Call the updateEmail method
-    await updateEmail(form.email);
+  if (isLoading.value || !main.user?.id) {
+    return;
   }
+  isLoading.value = true;
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
     id: main.user?.id,
@@ -249,25 +229,52 @@ if (form.email !== main.user.email) {
     last_name: form.last_name,
     email: form.email,
     country: form.country,
+  };
+
+  try {
+    console.log('Before email update:', main.user.email);
+
+if (main.user?.email !== form.email) {
+  // Update the user's email in the authentication system
+  const { error: emailUpdateError } = await supabase.auth.updateUser({ email: form.email });
+
+  if (emailUpdateError) {
+    isLoading.value = false;
+    console.error(emailUpdateError);
+    // Handle error if needed
+    return;
   }
 
-  const { data: usr, error: dbError } = await supabase
-    .from('users')
-    .upsert(updateData)
-    .select()
-    .single()
+  // Update the user's email in the state
+  main.user.email = form.email;
 
-  if (dbError || !usr) {
-    isLoading.value = false
-    setErrors('update-account', [t('account-error')], {})
-    return
-  }
-  else {
-    toast.success(t('account-updated-succ'))
-  }
-  main.user = usr
-  isLoading.value = false
+  console.log('After email update:', main.user.email);
 }
+
+
+    const { data: usr, error: dbError } = await supabase
+      .from('users')
+      .upsert(updateData)
+      .eq('id', main.user?.id)
+      .single();
+
+    if (dbError || !usr) {
+      isLoading.value = false;
+      setErrors('update-account', [t('account-error')], {});
+    } else {
+      toast.success(t('account-updated-succ'));
+      main.user = usr; // Update user data in the state
+    }
+  } catch (error) {
+    isLoading.value = false;
+    console.error(error);
+    // Handle error if needed
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+
 onMounted(() => {
   initDropdowns()
 })
