@@ -231,10 +231,6 @@ function getEmoji(country: string) {
   }
   return countryCodeToFlagEmoji(countryCode)
 }
-function validateEmail(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
 async function submit(form: { first_name: string; last_name: string; email: string; country: string }) {
   if (isLoading.value || !main.user?.id)
     return
@@ -242,11 +238,6 @@ async function submit(form: { first_name: string; last_name: string; email: stri
 
 if (form.email !== main.user.email) {
     // Validate the new email
-    const isValidEmail = validateEmail(form.email);
-    if (!isValidEmail) {
-      setErrors('update-account', [t('invalid-email')], {});
-      return;
-    }
 
     // Call the updateEmail method
     await updateEmail(form.email);
