@@ -24,22 +24,40 @@ async function nextLogin() {
   }, 500)
 }
 
-async function submit(form: { email: string; password: string }) {
-  isLoading.value = true
-  const { error } = await supabase.auth.signInWithPassword({
-    email: form.email,
-    password: form.password,
-  })
-  isLoading.value = false
-  if (error) {
-    console.error('error', error)
-    setErrors('login-account', [error.message], {})
-    toast.error(t('invalid-auth'))
-  }
-  else {
-    await nextLogin()
+async function submit(form: { password: string }) {
+  isLoading.value = true;
+
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+
+    if (auth && auth.user) {
+      const latestEmail = auth.user.email;
+      const { error } = await supabase.auth.signInWithPassword({
+        email: latestEmail,
+        password: form.password,
+      });
+
+      if (error) {
+        console.error('error', error);
+        setErrors('login-account', [error.message], {});
+        toast.error(t('invalid-auth'));
+      } else {
+        await nextLogin();
+      }
+    } else {
+      console.error('User not authenticated');
+      setErrors('login-account', [t('invalid-auth')], {});
+      toast.error(t('invalid-auth'));
+    }
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    setErrors('login-account', [t('invalid-auth')], {});
+    toast.error(t('invalid-auth'));
+  } finally {
+    isLoading.value = false;
   }
 }
+
 
 async function checkLogin() {
   isLoading.value = true

@@ -28,6 +28,21 @@ const main = useMainStore()
 const isLoading = ref(false)
 // const errorMessage = ref('')
 
+async function updateEmail(newEmail: string) {
+  if (isLoading.value)
+    return
+  isLoading.value = true
+
+  const { error: updateError } = await supabase.auth.updateUser({ email: newEmail })
+
+  isLoading.value = false
+  if (updateError)
+    setErrors('change-pass', [t('account-email-error')], {})
+  else
+    toast.success(t('changed-email-suc'))
+}
+
+
 async function updloadPhoto(data: string, fileName: string, contentType: string) {
   const { error } = await supabase.storage
     .from('images')
@@ -216,11 +231,26 @@ function getEmoji(country: string) {
   }
   return countryCodeToFlagEmoji(countryCode)
 }
-
+function validateEmail(email: string) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 async function submit(form: { first_name: string; last_name: string; email: string; country: string }) {
   if (isLoading.value || !main.user?.id)
     return
   isLoading.value = true
+
+if (form.email !== main.user.email) {
+    // Validate the new email
+    const isValidEmail = validateEmail(form.email);
+    if (!isValidEmail) {
+      setErrors('update-account', [t('invalid-email')], {});
+      return;
+    }
+
+    // Call the updateEmail method
+    await updateEmail(form.email);
+  }
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
     id: main.user?.id,
@@ -341,7 +371,6 @@ onMounted(() => {
                 type="email"
                 name="email"
                 :prefix-icon="iconEmail"
-                disabled
                 :value="main.user?.email"
                 enterkeyhint="next"
                 validation="required:trim|email"
