@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
@@ -230,6 +230,15 @@ async function submit(form: { first_name: string; last_name: string; email: stri
     country: form.country,
   }
 
+  if (main.user?.email !== form.email) {
+    const data = await supabase.auth.updateUser({ email: form.email })
+    if (data.error && data.error.name === "AuthApiError") {
+      isLoading.value = false
+      reset('update-account', useMainStore().user)
+      return toast.error('email already taken')
+    }
+  }
+
   const { data: usr, error: dbError } = await supabase
     .from('users')
     .upsert(updateData)
@@ -341,7 +350,6 @@ onMounted(() => {
                 type="email"
                 name="email"
                 :prefix-icon="iconEmail"
-                disabled
                 :value="main.user?.email"
                 enterkeyhint="next"
                 validation="required:trim|email"
