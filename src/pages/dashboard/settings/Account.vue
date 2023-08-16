@@ -226,17 +226,20 @@ async function submit(form: { first_name: string; last_name: string; email: stri
     id: main.user?.id,
     first_name: form.first_name,
     last_name: form.last_name,
-    email: form.email,
+    email: main.user.email,
     country: form.country,
   }
 
   if (main.user?.email !== form.email) {
     const data = await supabase.auth.updateUser({ email: form.email })
+    reset('update-account', useMainStore().user)
     if (data.error && data.error.name === "AuthApiError") {
       isLoading.value = false
-      reset('update-account', useMainStore().user)
       return toast.error('email already taken')
     }
+     toast.success('A confirmation email was sent click to link to confirm your new email', {
+      duration: 10000,
+     })
   }
 
   const { data: usr, error: dbError } = await supabase
