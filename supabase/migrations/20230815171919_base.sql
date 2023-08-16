@@ -732,7 +732,7 @@ CREATE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
-  RETURN userid = 'f83fd102-c21d-4984-b6a1-33c2cf108fd7';
+  RETURN userid::text = (select decrypted_secret from vault.decrypted_secrets where name = 'admin_user');
 End;  
 $$;
 
