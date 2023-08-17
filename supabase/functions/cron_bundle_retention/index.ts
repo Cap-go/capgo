@@ -1,10 +1,11 @@
 import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
-import { methodJson, sendRes } from '../_utils/utils.ts'
+import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
+import { r2 } from '../_utils/r2.js'
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
-  const API_SECRET = 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85'
+  const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
@@ -59,7 +60,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
       user_id,
       bucket_id,
       storage_provider
-      `).in('id', appVersionsIdsToDelete)
+      `).in('id', appVersionsIdsToDelete).eq('deleted', false)
 
     if (appVersionsDataError)
       console.error('ERROR in fetching app versions :: ', channelDataError)
@@ -108,15 +109,30 @@ async function deleteBucket(appVersion: { id: number; app_id: string; user_id: s
     return Promise.resolve()
   }
 
-  const { data: data2, error: error2 } = await supabaseAdmin()
+  if (appVersion.storage_provider === 'supabase') {
+    const { data: data2, error: error2 } = await supabaseAdmin()
     .storage
     .from(`apps/${appVersion.user_id}/${appVersion.app_id}/versions`)
     .remove([appVersion.bucket_id])
-  if (error2 || !data2) {
-    console.log('Error', appVersion.bucket_id, error2)
-    return Promise.resolve()
+    if (error2 || !data2) {
+      console.log('Error', appVersion.bucket_id, error2)
+      return Promise.resolve()
+    }
+    console.log('app_versions storage delete', appVersion.id)
+  } else if (appVersion.storage_provider === 'r2') {
+    const versionPath = `apps/${appVersion.user_id}/${appVersion.app_id}/versions/${appVersion.bucket_id}`;
+    if (r2.checkIfExist(versionPath)) {
+      try {
+        await r2.deleteObject(`apps/${appVersion.user_id}/${appVersion.app_id}/versions`)
+      }
+      catch (e) {
+        console.error('Error in deleting the r2 storage', appVersion.id, errorUpdate)
+        return Promise.resolve()
+      }
+    }
+    console.log('app_versions storage delete', appVersion.id)
   }
-  console.log('app_versions storage delete', appVersion.id)
+
   return Promise.resolve()
 }
 
