@@ -28,6 +28,11 @@ function upload(fileId: string, file: Uint8Array) {
   })
 }
 
+function getUploadUrl(fileId: string, expirySeconds = 60) {
+  const client = initR2()
+  return client.presignedPutObject(bucket, fileId, expirySeconds)
+}
+
 function deleteObject(fileId: string) {
   const client = initR2()
   return client.removeObject(bucket, fileId)
