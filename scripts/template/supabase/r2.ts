@@ -36,3 +36,10 @@ function getSignedUrl(fileId: string, expirySeconds: number) {
   const client = initR2()
   return client.getPresignedUrl('GET', fileId, { expirySeconds })
 }
+
+async function getSizeChecksum(fileId: string) {
+  const client = initR2()
+  const { size, metadata } = await client.statObject(fileId)
+  const checksum = metadata['x-amz-meta-crc32']
+  return { size, checksum }
+}
