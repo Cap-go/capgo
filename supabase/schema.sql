@@ -508,1002 +508,1001 @@
 --     AND action='set'
 --     AND created_at
     
-      BETWEEN date_trunc('month', current_date)-(pastMonth || ' months')::interval
-      AND date_trunc('month', current_date)-(pastMonth || ' months')::interval+'1month'::interval-'1day'::interval
-    GROUP BY stats.app_id;
-END;
-$$;
-
-ALTER FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_max_channel"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$  
-Declare  
- Channel_count integer;  
-Begin
-  SELECT MAX (maxChannel)
-  INTO Channel_count
-  FROM (
-    SELECT app_id, COUNT(app_id) AS maxChannel
-    FROM channels 
-    WHERE created_by=userid
-    GROUP BY app_id
-  ) AS derivedTable;
-  return Channel_count;
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_max_channel"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_max_plan"("userid" "uuid") RETURNS TABLE("mau" bigint, "storage" bigint, "bandwidth" bigint)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  -- RETURN QUERY SELECT 
-  --   SUM(devices)::bigint AS mau,
-  --   SUM(version_size)::bigint AS storage,
-  --   SUM(app_stats.bandwidth)::bigint AS bandwidth
-  -- FROM app_stats
-  -- WHERE user_id = userid
-  -- AND date_id=dateid;
-  RETURN QUERY SELECT 
-     count(*)::bigint as mau,
-     count(*)::bigint as bandwidth,
-     count(*)::bigint as storage
-  FROM apps;  
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_max_plan"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_max_shared"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$  
-Declare  
- Shared_count integer;  
-Begin
-  SELECT MAX (maxShared)
-  INTO Shared_count
-  FROM (
-    SELECT app_id, COUNT(app_id) AS maxShared
-    FROM channel_users 
-    WHERE created_by=userid
-    GROUP BY app_id
-  ) AS derivedTable;
-  return Shared_count;
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_max_shared"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_max_version"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$  
-Declare  
- Version_count integer;  
-Begin
-  SELECT MAX (maxVersion)
-  INTO Version_count
-  FROM (
-    SELECT app_id, COUNT(app_id) AS maxVersion
-    FROM app_versions 
-    WHERE user_id=userid
-    GROUP BY app_id
-  ) AS derivedTable;
-  return Version_count;
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_max_version"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_metered_usage"("userid" "uuid") RETURNS "public"."stats_table"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-DECLARE
-    current_usage stats_table;
-    max_plan stats_table;
-    result stats_table;
-BEGIN
-  -- Get the total values for the user's current usage
-  SELECT * INTO current_usage FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
-  SELECT * INTO max_plan FROM public.get_current_plan_max(userid);
-  result.mau = current_usage.mau::bigint - max_plan.mau::bigint;
-  result.mau = (CASE WHEN result.mau > 0 THEN result.mau ELSE 0 END);
-  result.bandwidth = current_usage.bandwidth::float - max_plan.bandwidth::float;
-  result.bandwidth = (CASE WHEN result.bandwidth > 0 THEN result.bandwidth ELSE 0 END);
-  result.storage = current_usage.storage::float - max_plan.storage::float;
-  result.storage = (CASE WHEN result.storage > 0 THEN result.storage ELSE 0 END);
-  RETURN result;
-END;
-$$;
-
-ALTER FUNCTION "public"."get_metered_usage"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) RETURNS double precision
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-DECLARE
-    current_plan_max stats_table;
-    total_stats stats_table;
-    percent_mau float;
-    percent_bandwidth float;
-    percent_storage float;
-BEGIN
-  -- Get the maximum values for the user's current plan
-  current_plan_max := public.get_current_plan_max(userid);
-  -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v2(userid, dateid);
-  -- Calculate the percentage of usage for each stat and return the average
-  percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
-  percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
-  percent_storage := convert_number_to_percent(total_stats.storage, current_plan_max.storage);
-
-  RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
-END;
-$$;
-
-ALTER FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) RETURNS TABLE("max_channel" bigint, "max_shared" bigint, "max_update" bigint, "max_version" bigint, "max_app" bigint, "max_device" bigint, "mau" bigint)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN QUERY SELECT 
-    MAX(channels)::bigint AS max_channel,
-    MAX(shared)::bigint AS max_shared,
-    (SELECT
-      MAX(MyMaxName) 
-    FROM ( VALUES 
-              (MAX(mlu)), 
-              (MAX(mlu_real)) 
-          ) MyAlias(MyMaxName))::bigint AS max_update,
-    MAX(versions)::bigint AS max_version,
-    COUNT(app_id)::bigint AS max_app,
-    MAX(devices)::bigint AS max_device,
-    SUM(devices)::bigint AS mau
-  FROM app_stats
-  WHERE user_id = userid
-  and date_id=dateid;
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN QUERY SELECT 
-    COALESCE(SUM(devices), 0)::bigint AS mau,
-    COALESCE(round(convert_bytes_to_gb(SUM(app_stats.bandwidth))::numeric,2), 0)::float AS bandwidth,
-    COALESCE(round(convert_bytes_to_gb(SUM(version_size))::numeric,2), 0)::float AS storage
-  FROM app_stats
-  WHERE user_id = userid
-  AND date_id=dateid;
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."get_user_id"("apikey" "text") RETURNS "uuid"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Declare  
- is_found uuid;
-Begin
-  SELECT user_id
-  INTO is_found
-  FROM apikeys
-  WHERE key=apikey;
-  RETURN is_found;
-End;  
-$$;
-
-ALTER FUNCTION "public"."get_user_id"("apikey" "text") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying DEFAULT NULL::character varying, "_channelid" bigint DEFAULT NULL::bigint) RETURNS boolean
-    LANGUAGE "plpgsql"
-    AS $$
-DECLARE 
-    _userRight user_min_right;
-BEGIN
-    -- Check for Channel Rights
-    IF _channelID IS NOT NULL THEN
-        SELECT user_right INTO _userRight
-        FROM org_users
-        WHERE user_id = _userID AND org_id = _orgID AND channel_id = _channelID;
-        IF _userRight IS NOT NULL THEN
-            RETURN _userRight >= _right;
-        END IF;
-    END IF;
-
-    -- Check for App Rights
-    IF _appID IS NOT NULL THEN
-        SELECT user_right INTO _userRight
-        FROM org_users
-        WHERE user_id = _userID AND org_id = _orgID AND app_id = _appID;
-        IF _userRight IS NOT NULL THEN
-            RETURN _userRight >= _right;
-        END IF;
-    END IF;
-
-    -- Check for Org Rights
-    SELECT user_right INTO _userRight
-    FROM org_users
-    WHERE user_id = _userID AND org_id = _orgID;
-
-    -- If userRight is NULL, the user does not exist
-    IF _userRight IS NULL THEN 
-        RETURN false;
-    -- Compare rights
-    ELSE
-        RETURN _userRight >= _right;
-    END IF;
-END;
-$$;
-
-ALTER FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  update app_stats 
-  set bandwidth = app_stats.bandwidth + increment_stats.bandwidth,
-    version_size = app_stats.version_size + increment_stats.version_size,
-    channels = app_stats.channels + increment_stats.channels,
-    shared = app_stats.shared + increment_stats.shared,
-    mlu = app_stats.mlu + increment_stats.mlu,
-    devices = app_stats.devices + increment_stats.devices,
-    mlu_real = app_stats.mlu_real + increment_stats.mlu_real,
-    versions = app_stats.versions + increment_stats.versions
-  where app_stats.date_id = increment_stats.date_id and
-  app_stats.app_id = increment_stats.app_id
-$$;
-
-ALTER FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  update app_stats 
-  set bandwidth = app_stats.bandwidth + increment_stats_v2.bandwidth,
-    version_size = app_stats.version_size + increment_stats_v2.version_size,
-    channels = app_stats.channels + increment_stats_v2.channels,
-    shared = app_stats.shared + increment_stats_v2.shared,
-    mlu = app_stats.mlu + increment_stats_v2.mlu,
-    devices = app_stats.devices + increment_stats_v2.devices,
-    devices_real = app_stats.devices_real + increment_stats_v2.devices_real,
-    mlu_real = app_stats.mlu_real + increment_stats_v2.mlu_real,
-    versions = app_stats.versions + increment_stats_v2.versions
-  where app_stats.date_id = increment_stats_v2.date_id and
-  app_stats.app_id = increment_stats_v2.app_id
-$$;
-
-ALTER FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  update store_apps 
-  set updates = store_apps.updates + increment_store.updates
-  where store_apps.app_id = increment_store.app_id
-$$;
-
-ALTER FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  UPDATE app_versions_meta
-  SET devices = (CASE WHEN (get_devices_version(app_id, version_id) + increment_version_stats.devices > 0)
-    THEN (SELECT COUNT(*) FROM devices WHERE app_id = increment_version_stats.app_id and version = increment_version_stats.version_id)
-    ELSE 0 END)
-  where app_versions_meta.id = increment_version_stats.version_id and
-  app_versions_meta.app_id = increment_version_stats.app_id
-$$;
-
-ALTER FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN userid = 'f83fd102-c21d-4984-b6a1-33c2cf108fd7';
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_admin"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_allowed_action"("apikey" "text") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN is_allowed_action_user(get_user_id(apikey));
-End;
-$$;
-
-ALTER FUNCTION "public"."is_allowed_action"("apikey" "text") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-    RETURN is_trial(userid) > 0
-      or is_free_usage(userid)
-      or (is_good_plan_v3(userid) and is_paying(userid));
-End;
-$$;
-
-ALTER FUNCTION "public"."is_allowed_action_user"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apikeys
-  WHERE key=apikey
-  AND mode=ANY(keymode)));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apikeys
-  WHERE key=apikey
-  AND mode=ANY(keymode))) AND is_app_owner(get_user_id(apikey), app_id);
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apps
-  WHERE app_id=appid
-  AND user_id=userid));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM channel_users
-  WHERE app_id=appid
-  AND user_id=userid));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_canceled"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  from stripe_info
-  where customer_id=(SELECT customer_id from users where id=userid)
-  AND status = 'canceled'));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_canceled"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-    RETURN COALESCE(get_current_plan_name(userid), 'Free') = 'Free';
-End;
-$$;
-
-ALTER FUNCTION "public"."is_free_usage"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_good_plan_v3"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-DECLARE
-    current_plan_total stats_table;
-BEGIN
-  -- Get the total values for the user's current usage
-  SELECT * INTO current_plan_total FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
-  RETURN (select 1 from  find_fit_plan_v3(
-    current_plan_total.mau,
-    current_plan_total.bandwidth,
-    current_plan_total.storage) where find_fit_plan_v3.name = (SELECT get_current_plan_name(userid)));
-END;
-$$;
-
-ALTER FUNCTION "public"."is_good_plan_v3"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql"
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (
-    SELECT user_id
-    FROM channel_users
-    WHERE user_id=userid
-    AND created_by=ownerid
-  ));
-End;
-$$;
-
-ALTER FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_not_deleted"("email_check" character varying) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Declare  
- is_found integer;
-Begin
-  SELECT count(*)
-  INTO is_found
-  FROM public.deleted_account
-  WHERE email=email_check;
-  RETURN is_found = 0;
-End; 
-$$;
-
-ALTER FUNCTION "public"."is_not_deleted"("email_check" character varying) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apps
-  WHERE user_id=userid)) AND (SELECT EXISTS (SELECT 1
-  FROM app_versions
-  WHERE user_id=userid));
-End;
-$$;
-
-ALTER FUNCTION "public"."is_onboarded"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_onboarding_needed"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (NOT is_onboarded(userid)) AND is_trial(userid) = 0;
-End;
-$$;
-
-ALTER FUNCTION "public"."is_onboarding_needed"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  from stripe_info
-  where customer_id=(SELECT customer_id from users where id=userid)
-  AND status = 'succeeded'));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_paying"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_trial"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
-  from stripe_info
-  where customer_id=(SELECT customer_id from users where id=userid));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_trial"("userid" "uuid") OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM(SELECT version
-  FROM channels
-  WHERE id IN (
-    SELECT channel_id
-    FROM channel_users 
-      WHERE user_id=userid
-  )) as derivedTable
-  WHERE version=versionid));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) OWNER TO "supabase_admin";
-
-CREATE FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  UPDATE app_versions_meta
-  SET installs = installs + update_version_stats.install,
-    uninstalls = uninstalls + update_version_stats.uninstall,
-    devices = get_devices_version(app_id, version_id),
-    fails = fails + update_version_stats.fail
-  where app_versions_meta.id = update_version_stats.version_id and
-  app_versions_meta.app_id = update_version_stats.app_id
-$$;
-
-ALTER FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) OWNER TO "supabase_admin";
-
-SET default_tablespace = '';
-
-SET default_table_access_method = "heap";
-
-CREATE TABLE "public"."apikeys" (
-    "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "user_id" "uuid" NOT NULL,
-    "key" character varying NOT NULL,
-    "mode" "public"."key_mode" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"()
-);
-
-ALTER TABLE "public"."apikeys" OWNER TO "supabase_admin";
-
-ALTER TABLE "public"."apikeys" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."apikeys_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-CREATE TABLE "public"."app_live" (
-    "id" "uuid" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "url" "text" NOT NULL
-);
-
-ALTER TABLE "public"."app_live" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."app_stats" (
-    "app_id" character varying NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "channels" smallint DEFAULT '0'::smallint NOT NULL,
-    "mlu" bigint DEFAULT '0'::bigint NOT NULL,
-    "versions" bigint DEFAULT '0'::bigint NOT NULL,
-    "shared" bigint DEFAULT '0'::bigint NOT NULL,
-    "mlu_real" bigint DEFAULT '0'::bigint NOT NULL,
-    "devices" bigint DEFAULT '0'::bigint NOT NULL,
-    "date_id" character varying DEFAULT '2022-05'::character varying NOT NULL,
-    "version_size" bigint DEFAULT '0'::bigint NOT NULL,
-    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
-    "devices_real" bigint DEFAULT '0'::bigint NOT NULL
-);
-
-ALTER TABLE "public"."app_stats" OWNER TO "postgres";
-
-CREATE TABLE "public"."app_versions" (
-    "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "app_id" character varying NOT NULL,
-    "name" character varying NOT NULL,
-    "bucket_id" character varying,
-    "user_id" "uuid" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "deleted" boolean DEFAULT false NOT NULL,
-    "external_url" character varying,
-    "checksum" character varying,
-    "session_key" character varying,
-    "storage_provider" "text" DEFAULT 'r2'::"text" NOT NULL
-);
-
-ALTER TABLE "public"."app_versions" OWNER TO "supabase_admin";
-
-ALTER TABLE "public"."app_versions" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."app_versions_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-CREATE TABLE "public"."app_versions_meta" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "app_id" character varying NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "checksum" character varying NOT NULL,
-    "size" bigint NOT NULL,
-    "id" bigint NOT NULL,
-    "devices" bigint DEFAULT '0'::bigint,
-    "fails" bigint DEFAULT '0'::bigint,
-    "installs" bigint DEFAULT '0'::bigint,
-    "uninstalls" bigint DEFAULT '0'::bigint
-);
-
-ALTER TABLE "public"."app_versions_meta" OWNER TO "supabase_admin";
-
-ALTER TABLE "public"."app_versions_meta" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."app_versions_meta_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-CREATE TABLE "public"."apps" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "app_id" character varying NOT NULL,
-    "icon_url" character varying NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "name" character varying,
-    "last_version" character varying,
-    "updated_at" timestamp with time zone,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"(),
-    "retention" bigint NOT NULL DEFAULT '2592000'::bigint,
-);
-
-ALTER TABLE "public"."apps" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."channel_devices" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "channel_id" bigint NOT NULL,
-    "app_id" character varying NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "created_by" "uuid" NOT NULL,
-    "device_id" "text" NOT NULL
-);
-
-ALTER TABLE "public"."channel_devices" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."channels" (
-    "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "name" character varying NOT NULL,
-    "app_id" character varying NOT NULL,
-    "version" bigint NOT NULL,
-    "created_by" "uuid" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "public" boolean DEFAULT false NOT NULL,
-    "disableAutoUpdateUnderNative" boolean DEFAULT true NOT NULL,
-    "disableAutoUpdateToMajor" boolean DEFAULT true NOT NULL,
-    "beta" boolean DEFAULT false NOT NULL,
-    "ios" boolean DEFAULT true NOT NULL,
-    "android" boolean DEFAULT true NOT NULL,
-    "allow_device_self_set" boolean DEFAULT false NOT NULL,
-    "allow_emulator" boolean DEFAULT true NOT NULL,
-    "allow_dev" boolean DEFAULT true NOT NULL
-);
-
-ALTER TABLE "public"."channels" OWNER TO "supabase_admin";
-
-ALTER TABLE "public"."channels" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."channel_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-CREATE TABLE "public"."channel_users" (
-    "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "user_id" "uuid" NOT NULL,
-    "channel_id" bigint NOT NULL,
-    "app_id" character varying NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "created_by" "uuid"
-);
-
-ALTER TABLE "public"."channel_users" OWNER TO "supabase_admin";
-
-ALTER TABLE "public"."channel_users" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."channel_users_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-CREATE FOREIGN TABLE "public"."clickhouse_stats" (
-    "id" bigint,
-    "created_at" timestamp with time zone,
-    "platform" "text",
-    "action" "text",
-    "device_id" "text",
-    "version_build" "text",
-    "version" bigint,
-    "app_id" "text"
-)
-SERVER "clickhouse_server"
-OPTIONS (
-    "is_new_schema" 'false',
-    "rowid_column" 'id',
-    "schema" 'public',
-    "table" 'stats'
-);
-
-ALTER FOREIGN TABLE "public"."clickhouse_stats" OWNER TO "supabase_admin";
-
-
-CREATE TABLE "public"."deleted_account" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "email" character varying NOT NULL,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
-);
-
-ALTER TABLE "public"."deleted_account" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."devices" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "device_id" "text" NOT NULL,
-    "version" bigint NOT NULL,
-    "app_id" character varying NOT NULL,
-    "platform" "public"."platform_os",
-    "plugin_version" "text" DEFAULT '2.3.3'::"text" NOT NULL,
-    "os_version" character varying,
-    "date_id" character varying DEFAULT ''::character varying,
-    "version_build" "text" DEFAULT 'builtin'::"text",
-    "custom_id" "text" DEFAULT ''::"text" NOT NULL,
-    "is_prod" boolean DEFAULT true,
-    "is_emulator" boolean DEFAULT false
-);
-
-ALTER TABLE "public"."devices" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."devices_override" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "device_id" "text" NOT NULL,
-    "version" bigint NOT NULL,
-    "app_id" character varying NOT NULL,
-    "created_by" "uuid"
-);
-
-ALTER TABLE "public"."devices_override" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."global_stats" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "date_id" character varying NOT NULL,
-    "apps" bigint NOT NULL,
-    "updates" bigint NOT NULL,
-    "stars" bigint NOT NULL,
-    "users" bigint DEFAULT '0'::bigint,
-    "paying" bigint DEFAULT '0'::bigint,
-    "trial" bigint DEFAULT '0'::bigint,
-    "need_upgrade" bigint DEFAULT '0'::bigint,
-    "not_paying" bigint DEFAULT '0'::bigint,
-    "onboarded" bigint DEFAULT '0'::bigint
-);
-
-ALTER TABLE "public"."global_stats" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."notifications" (
-    "id" character varying NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "user_id" "uuid" NOT NULL,
-    "last_send_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "total_send" bigint DEFAULT '1'::bigint NOT NULL
-);
-
-ALTER TABLE "public"."notifications" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."org_users" (
-    "id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "user_id" "uuid" NOT NULL,
-    "org_id" "uuid" NOT NULL,
-    "app_id" character varying,
-    "channel_id" bigint,
-    "user_right" "public"."user_min_right"
-);
-
-ALTER TABLE "public"."org_users" OWNER TO "supabase_admin";
-
-ALTER TABLE "public"."org_users" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME "public"."org_users_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-CREATE TABLE "public"."orgs" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "created_by" "uuid" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "logo" "text",
-    "name" "text" NOT NULL
-);
-
-ALTER TABLE "public"."orgs" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."plans" (
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "name" character varying DEFAULT ''::character varying NOT NULL,
-    "description" character varying DEFAULT ''::character varying NOT NULL,
-    "price_m" bigint DEFAULT '0'::bigint NOT NULL,
-    "price_y" bigint DEFAULT '0'::bigint NOT NULL,
-    "stripe_id" character varying DEFAULT ''::character varying NOT NULL,
-    "app" bigint DEFAULT '0'::bigint NOT NULL,
-    "channel" bigint DEFAULT '0'::bigint NOT NULL,
-    "update" bigint DEFAULT '0'::bigint NOT NULL,
-    "version" bigint DEFAULT '0'::bigint NOT NULL,
-    "shared" bigint DEFAULT '0'::bigint NOT NULL,
-    "abtest" boolean DEFAULT false NOT NULL,
-    "progressive_deploy" boolean DEFAULT false NOT NULL,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
-    "price_m_id" character varying NOT NULL,
-    "price_y_id" character varying NOT NULL,
-    "storage" double precision NOT NULL,
-    "bandwidth" double precision NOT NULL,
-    "mau" bigint DEFAULT '0'::bigint NOT NULL,
-    "market_desc" character varying DEFAULT ''::character varying,
-    "storage_unit" double precision DEFAULT '0'::double precision,
-    "bandwidth_unit" double precision DEFAULT '0'::double precision,
-    "mau_unit" double precision DEFAULT '0'::double precision,
-    "price_m_storage_id" "text",
-    "price_m_bandwidth_id" "text",
-    "price_m_mau_id" "text"
-);
-
-ALTER TABLE "public"."plans" OWNER TO "postgres";
-
-CREATE TABLE "public"."stats" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "platform" "public"."platform_os" NOT NULL,
-    "action" "text" NOT NULL,
-    "device_id" "text" NOT NULL,
-    "version_build" "text" NOT NULL,
-    "version" bigint NOT NULL,
-    "app_id" character varying NOT NULL
-);
-
-ALTER TABLE "public"."stats" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."store_apps" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "url" "text" DEFAULT ''::"text" NOT NULL,
-    "app_id" "text" NOT NULL,
-    "title" "text" DEFAULT ''::"text" NOT NULL,
-    "summary" "text" DEFAULT ''::"text" NOT NULL,
-    "icon" "text" DEFAULT ''::"text" NOT NULL,
-    "free" boolean DEFAULT true NOT NULL,
-    "category" "text" DEFAULT ''::"text" NOT NULL,
-    "capacitor" boolean DEFAULT false NOT NULL,
-    "developer_email" "text" DEFAULT ''::"text" NOT NULL,
-    "installs" bigint DEFAULT '0'::bigint NOT NULL,
-    "developer" "text" DEFAULT ''::"text" NOT NULL,
-    "score" double precision DEFAULT '0'::double precision NOT NULL,
-    "to_get_framework" boolean DEFAULT true NOT NULL,
-    "onprem" boolean DEFAULT false NOT NULL,
-    "updates" bigint DEFAULT '0'::bigint NOT NULL,
-    "to_get_info" boolean DEFAULT true NOT NULL,
-    "error_get_framework" "text" DEFAULT ''::"text" NOT NULL,
-    "to_get_similar" boolean DEFAULT true NOT NULL,
-    "error_get_similar" "text" DEFAULT ''::"text" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "error_get_info" "text" DEFAULT ''::"text" NOT NULL,
-    "cordova" boolean DEFAULT false NOT NULL,
-    "react_native" boolean DEFAULT false NOT NULL,
-    "capgo" boolean DEFAULT false NOT NULL,
-    "kotlin" boolean DEFAULT false NOT NULL,
-    "flutter" boolean DEFAULT false NOT NULL,
-    "native_script" boolean DEFAULT false NOT NULL,
-    "lang" "text",
-    "developer_id" "text"
-);
-
-ALTER TABLE "public"."store_apps" OWNER TO "supabase_admin";
-
-CREATE FOREIGN TABLE "public"."stripe_customers" (
-    "id" "text",
-    "email" "text",
-    "name" "text",
-    "description" "text",
-    "created" timestamp without time zone,
-    "attrs" "jsonb"
-)
-SERVER "stripe_server"
-OPTIONS (
-    "is_new_schema" 'false',
-    "object" 'customers',
-    "schema" 'public'
-);
-
-ALTER FOREIGN TABLE "public"."stripe_customers" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."stripe_info" (
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "subscription_id" character varying,
-    "customer_id" character varying NOT NULL,
-    "status" "public"."stripe_status",
-    "product_id" character varying DEFAULT 'free'::character varying NOT NULL,
-    "trial_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "price_id" character varying,
-    "is_good_plan" boolean DEFAULT true,
-    "plan_usage" bigint DEFAULT '0'::bigint,
-    "subscription_metered" "json" DEFAULT '{}'::"json" NOT NULL,
-    "subscription_anchor" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-ALTER TABLE "public"."stripe_info" OWNER TO "supabase_admin";
-
-CREATE FOREIGN TABLE "public"."stripe_products" (
-    "id" "text",
-    "name" "text",
-    "active" boolean,
-    "default_price" "text",
-    "description" "text",
-    "created" timestamp without time zone,
-    "updated" timestamp without time zone,
-    "attrs" "jsonb"
-)
-SERVER "stripe_server"
-OPTIONS (
-    "is_new_schema" 'false',
-    "object" 'products',
-    "schema" 'public'
-);
-
-ALTER FOREIGN TABLE "public"."stripe_products" OWNER TO "supabase_admin";
-
-CREATE FOREIGN TABLE "public"."stripe_subscriptions" (
-    "id" "text",
-    "customer" "text",
-    "currency" "text",
-    "current_period_start" timestamp without time zone,
-    "current_period_end" timestamp without time zone,
-    "attrs" "jsonb"
-)
-SERVER "stripe_server"
-OPTIONS (
-    "is_new_schema" 'false',
-    "object" 'subscriptions',
-    "schema" 'public'
-);
-
-ALTER FOREIGN TABLE "public"."stripe_subscriptions" OWNER TO "supabase_admin";
-
-CREATE TABLE "public"."users" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "image_url" character varying,
-    "first_name" character varying,
-    "last_name" character varying,
-    "country" character varying,
-    "email" character varying NOT NULL,
-    "id" "uuid" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "enableNotifications" boolean DEFAULT false NOT NULL,
-    "optForNewsletters" boolean DEFAULT false NOT NULL,
-    "legalAccepted" boolean DEFAULT false NOT NULL,
-    "customer_id" character varying,
-    "billing_email" "text"
-);
-
-ALTER TABLE "public"."users" OWNER TO "supabase_admin";
+--       BETWEEN date_trunc('month', current_date)-(pastMonth || ' months')::interval
+--       AND date_trunc('month', current_date)-(pastMonth || ' months')::interval+'1month'::interval-'1day'::interval
+--     GROUP BY stats.app_id;
+-- END;
+-- $$;
+
+-- ALTER FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_max_channel"("userid" "uuid") RETURNS integer
+--     LANGUAGE "plpgsql"
+--     AS $$  
+-- Declare  
+--  Channel_count integer;  
+-- Begin
+--   SELECT MAX (maxChannel)
+--   INTO Channel_count
+--   FROM (
+--     SELECT app_id, COUNT(app_id) AS maxChannel
+--     FROM channels 
+--     WHERE created_by=userid
+--     GROUP BY app_id
+--   ) AS derivedTable;
+--   return Channel_count;
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_max_channel"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_max_plan"("userid" "uuid") RETURNS TABLE("mau" bigint, "storage" bigint, "bandwidth" bigint)
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   -- RETURN QUERY SELECT 
+--   --   SUM(devices)::bigint AS mau,
+--   --   SUM(version_size)::bigint AS storage,
+--   --   SUM(app_stats.bandwidth)::bigint AS bandwidth
+--   -- FROM app_stats
+--   -- WHERE user_id = userid
+--   -- AND date_id=dateid;
+--   RETURN QUERY SELECT 
+--      count(*)::bigint as mau,
+--      count(*)::bigint as bandwidth,
+--      count(*)::bigint as storage
+--   FROM apps;  
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_max_plan"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_max_shared"("userid" "uuid") RETURNS integer
+--     LANGUAGE "plpgsql"
+--     AS $$  
+-- Declare  
+--  Shared_count integer;  
+-- Begin
+--   SELECT MAX (maxShared)
+--   INTO Shared_count
+--   FROM (
+--     SELECT app_id, COUNT(app_id) AS maxShared
+--     FROM channel_users 
+--     WHERE created_by=userid
+--     GROUP BY app_id
+--   ) AS derivedTable;
+--   return Shared_count;
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_max_shared"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_max_version"("userid" "uuid") RETURNS integer
+--     LANGUAGE "plpgsql"
+--     AS $$  
+-- Declare  
+--  Version_count integer;  
+-- Begin
+--   SELECT MAX (maxVersion)
+--   INTO Version_count
+--   FROM (
+--     SELECT app_id, COUNT(app_id) AS maxVersion
+--     FROM app_versions 
+--     WHERE user_id=userid
+--     GROUP BY app_id
+--   ) AS derivedTable;
+--   return Version_count;
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_max_version"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_metered_usage"("userid" "uuid") RETURNS "public"."stats_table"
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- DECLARE
+--     current_usage stats_table;
+--     max_plan stats_table;
+--     result stats_table;
+-- BEGIN
+--   -- Get the total values for the user's current usage
+--   SELECT * INTO current_usage FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
+--   SELECT * INTO max_plan FROM public.get_current_plan_max(userid);
+--   result.mau = current_usage.mau::bigint - max_plan.mau::bigint;
+--   result.mau = (CASE WHEN result.mau > 0 THEN result.mau ELSE 0 END);
+--   result.bandwidth = current_usage.bandwidth::float - max_plan.bandwidth::float;
+--   result.bandwidth = (CASE WHEN result.bandwidth > 0 THEN result.bandwidth ELSE 0 END);
+--   result.storage = current_usage.storage::float - max_plan.storage::float;
+--   result.storage = (CASE WHEN result.storage > 0 THEN result.storage ELSE 0 END);
+--   RETURN result;
+-- END;
+-- $$;
+
+-- ALTER FUNCTION "public"."get_metered_usage"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) RETURNS double precision
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- DECLARE
+--     current_plan_max stats_table;
+--     total_stats stats_table;
+--     percent_mau float;
+--     percent_bandwidth float;
+--     percent_storage float;
+-- BEGIN
+--   -- Get the maximum values for the user's current plan
+--   current_plan_max := public.get_current_plan_max(userid);
+--   -- Get the user's maximum usage stats for the current date
+--   total_stats := public.get_total_stats_v2(userid, dateid);
+--   -- Calculate the percentage of usage for each stat and return the average
+--   percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
+--   percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
+--   percent_storage := convert_number_to_percent(total_stats.storage, current_plan_max.storage);
+
+--   RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
+-- END;
+-- $$;
+
+-- ALTER FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) RETURNS TABLE("max_channel" bigint, "max_shared" bigint, "max_update" bigint, "max_version" bigint, "max_app" bigint, "max_device" bigint, "mau" bigint)
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN QUERY SELECT 
+--     MAX(channels)::bigint AS max_channel,
+--     MAX(shared)::bigint AS max_shared,
+--     (SELECT
+--       MAX(MyMaxName) 
+--     FROM ( VALUES 
+--               (MAX(mlu)), 
+--               (MAX(mlu_real)) 
+--           ) MyAlias(MyMaxName))::bigint AS max_update,
+--     MAX(versions)::bigint AS max_version,
+--     COUNT(app_id)::bigint AS max_app,
+--     MAX(devices)::bigint AS max_device,
+--     SUM(devices)::bigint AS mau
+--   FROM app_stats
+--   WHERE user_id = userid
+--   and date_id=dateid;
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN QUERY SELECT 
+--     COALESCE(SUM(devices), 0)::bigint AS mau,
+--     COALESCE(round(convert_bytes_to_gb(SUM(app_stats.bandwidth))::numeric,2), 0)::float AS bandwidth,
+--     COALESCE(round(convert_bytes_to_gb(SUM(version_size))::numeric,2), 0)::float AS storage
+--   FROM app_stats
+--   WHERE user_id = userid
+--   AND date_id=dateid;
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."get_user_id"("apikey" "text") RETURNS "uuid"
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Declare  
+--  is_found uuid;
+-- Begin
+--   SELECT user_id
+--   INTO is_found
+--   FROM apikeys
+--   WHERE key=apikey;
+--   RETURN is_found;
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."get_user_id"("apikey" "text") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying DEFAULT NULL::character varying, "_channelid" bigint DEFAULT NULL::bigint) RETURNS boolean
+--     LANGUAGE "plpgsql"
+--     AS $$
+-- DECLARE 
+--     _userRight user_min_right;
+-- BEGIN
+--     -- Check for Channel Rights
+--     IF _channelID IS NOT NULL THEN
+--         SELECT user_right INTO _userRight
+--         FROM org_users
+--         WHERE user_id = _userID AND org_id = _orgID AND channel_id = _channelID;
+--         IF _userRight IS NOT NULL THEN
+--             RETURN _userRight >= _right;
+--         END IF;
+--     END IF;
+
+--     -- Check for App Rights
+--     IF _appID IS NOT NULL THEN
+--         SELECT user_right INTO _userRight
+--         FROM org_users
+--         WHERE user_id = _userID AND org_id = _orgID AND app_id = _appID;
+--         IF _userRight IS NOT NULL THEN
+--             RETURN _userRight >= _right;
+--         END IF;
+--     END IF;
+
+--     -- Check for Org Rights
+--     SELECT user_right INTO _userRight
+--     FROM org_users
+--     WHERE user_id = _userID AND org_id = _orgID;
+
+--     -- If userRight is NULL, the user does not exist
+--     IF _userRight IS NULL THEN 
+--         RETURN false;
+--     -- Compare rights
+--     ELSE
+--         RETURN _userRight >= _right;
+--     END IF;
+-- END;
+-- $$;
+
+-- ALTER FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) RETURNS "void"
+--     LANGUAGE "sql"
+--     AS $$
+--   update app_stats 
+--   set bandwidth = app_stats.bandwidth + increment_stats.bandwidth,
+--     version_size = app_stats.version_size + increment_stats.version_size,
+--     channels = app_stats.channels + increment_stats.channels,
+--     shared = app_stats.shared + increment_stats.shared,
+--     mlu = app_stats.mlu + increment_stats.mlu,
+--     devices = app_stats.devices + increment_stats.devices,
+--     mlu_real = app_stats.mlu_real + increment_stats.mlu_real,
+--     versions = app_stats.versions + increment_stats.versions
+--   where app_stats.date_id = increment_stats.date_id and
+--   app_stats.app_id = increment_stats.app_id
+-- $$;
+
+-- ALTER FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) RETURNS "void"
+--     LANGUAGE "sql"
+--     AS $$
+--   update app_stats 
+--   set bandwidth = app_stats.bandwidth + increment_stats_v2.bandwidth,
+--     version_size = app_stats.version_size + increment_stats_v2.version_size,
+--     channels = app_stats.channels + increment_stats_v2.channels,
+--     shared = app_stats.shared + increment_stats_v2.shared,
+--     mlu = app_stats.mlu + increment_stats_v2.mlu,
+--     devices = app_stats.devices + increment_stats_v2.devices,
+--     devices_real = app_stats.devices_real + increment_stats_v2.devices_real,
+--     mlu_real = app_stats.mlu_real + increment_stats_v2.mlu_real,
+--     versions = app_stats.versions + increment_stats_v2.versions
+--   where app_stats.date_id = increment_stats_v2.date_id and
+--   app_stats.app_id = increment_stats_v2.app_id
+-- $$;
+
+-- ALTER FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) RETURNS "void"
+--     LANGUAGE "sql"
+--     AS $$
+--   update store_apps 
+--   set updates = store_apps.updates + increment_store.updates
+--   where store_apps.app_id = increment_store.app_id
+-- $$;
+
+-- ALTER FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) RETURNS "void"
+--     LANGUAGE "sql"
+--     AS $$
+--   UPDATE app_versions_meta
+--   SET devices = (CASE WHEN (get_devices_version(app_id, version_id) + increment_version_stats.devices > 0)
+--     THEN (SELECT COUNT(*) FROM devices WHERE app_id = increment_version_stats.app_id and version = increment_version_stats.version_id)
+--     ELSE 0 END)
+--   where app_versions_meta.id = increment_version_stats.version_id and
+--   app_versions_meta.app_id = increment_version_stats.app_id
+-- $$;
+
+-- ALTER FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN userid = 'f83fd102-c21d-4984-b6a1-33c2cf108fd7';
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_admin"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_allowed_action"("apikey" "text") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN is_allowed_action_user(get_user_id(apikey));
+-- End;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_allowed_action"("apikey" "text") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--     RETURN is_trial(userid) > 0
+--       or is_free_usage(userid)
+--       or (is_good_plan_v3(userid) and is_paying(userid));
+-- End;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_allowed_action_user"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   FROM apikeys
+--   WHERE key=apikey
+--   AND mode=ANY(keymode)));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   FROM apikeys
+--   WHERE key=apikey
+--   AND mode=ANY(keymode))) AND is_app_owner(get_user_id(apikey), app_id);
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   FROM apps
+--   WHERE app_id=appid
+--   AND user_id=userid));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   FROM channel_users
+--   WHERE app_id=appid
+--   AND user_id=userid));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_canceled"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   from stripe_info
+--   where customer_id=(SELECT customer_id from users where id=userid)
+--   AND status = 'canceled'));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_canceled"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--     RETURN COALESCE(get_current_plan_name(userid), 'Free') = 'Free';
+-- End;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_free_usage"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_good_plan_v3"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- DECLARE
+--     current_plan_total stats_table;
+-- BEGIN
+--   -- Get the total values for the user's current usage
+--   SELECT * INTO current_plan_total FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
+--   RETURN (select 1 from  find_fit_plan_v3(
+--     current_plan_total.mau,
+--     current_plan_total.bandwidth,
+--     current_plan_total.storage) where find_fit_plan_v3.name = (SELECT get_current_plan_name(userid)));
+-- END;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_good_plan_v3"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql"
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (
+--     SELECT user_id
+--     FROM channel_users
+--     WHERE user_id=userid
+--     AND created_by=ownerid
+--   ));
+-- End;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_not_deleted"("email_check" character varying) RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Declare  
+--  is_found integer;
+-- Begin
+--   SELECT count(*)
+--   INTO is_found
+--   FROM public.deleted_account
+--   WHERE email=email_check;
+--   RETURN is_found = 0;
+-- End; 
+-- $$;
+
+-- ALTER FUNCTION "public"."is_not_deleted"("email_check" character varying) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   FROM apps
+--   WHERE user_id=userid)) AND (SELECT EXISTS (SELECT 1
+--   FROM app_versions
+--   WHERE user_id=userid));
+-- End;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_onboarded"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_onboarding_needed"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (NOT is_onboarded(userid)) AND is_trial(userid) = 0;
+-- End;
+-- $$;
+
+-- ALTER FUNCTION "public"."is_onboarding_needed"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   from stripe_info
+--   where customer_id=(SELECT customer_id from users where id=userid)
+--   AND status = 'succeeded'));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_paying"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_trial"("userid" "uuid") RETURNS integer
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT GREATEST((trial_at::date - (now())::date), 0) AS days
+--   from stripe_info
+--   where customer_id=(SELECT customer_id from users where id=userid));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_trial"("userid" "uuid") OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) RETURNS boolean
+--     LANGUAGE "plpgsql" SECURITY DEFINER
+--     AS $$
+-- Begin
+--   RETURN (SELECT EXISTS (SELECT 1
+--   FROM(SELECT version
+--   FROM channels
+--   WHERE id IN (
+--     SELECT channel_id
+--     FROM channel_users 
+--       WHERE user_id=userid
+--   )) as derivedTable
+--   WHERE version=versionid));
+-- End;  
+-- $$;
+
+-- ALTER FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) OWNER TO "supabase_admin";
+
+-- CREATE FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) RETURNS "void"
+--     LANGUAGE "sql"
+--     AS $$
+--   UPDATE app_versions_meta
+--   SET installs = installs + update_version_stats.install,
+--     uninstalls = uninstalls + update_version_stats.uninstall,
+--     devices = get_devices_version(app_id, version_id),
+--     fails = fails + update_version_stats.fail
+--   where app_versions_meta.id = update_version_stats.version_id and
+--   app_versions_meta.app_id = update_version_stats.app_id
+-- $$;
+
+-- ALTER FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) OWNER TO "supabase_admin";
+
+-- SET default_tablespace = '';
+
+-- SET default_table_access_method = "heap";
+
+-- CREATE TABLE "public"."apikeys" (
+--     "id" bigint NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "user_id" "uuid" NOT NULL,
+--     "key" character varying NOT NULL,
+--     "mode" "public"."key_mode" NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"()
+-- );
+
+-- ALTER TABLE "public"."apikeys" OWNER TO "supabase_admin";
+
+-- ALTER TABLE "public"."apikeys" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+--     SEQUENCE NAME "public"."apikeys_id_seq"
+--     START WITH 1
+--     INCREMENT BY 1
+--     NO MINVALUE
+--     NO MAXVALUE
+--     CACHE 1
+-- );
+
+-- CREATE TABLE "public"."app_live" (
+--     "id" "uuid" NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "url" "text" NOT NULL
+-- );
+
+-- ALTER TABLE "public"."app_live" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."app_stats" (
+--     "app_id" character varying NOT NULL,
+--     "user_id" "uuid" NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "channels" smallint DEFAULT '0'::smallint NOT NULL,
+--     "mlu" bigint DEFAULT '0'::bigint NOT NULL,
+--     "versions" bigint DEFAULT '0'::bigint NOT NULL,
+--     "shared" bigint DEFAULT '0'::bigint NOT NULL,
+--     "mlu_real" bigint DEFAULT '0'::bigint NOT NULL,
+--     "devices" bigint DEFAULT '0'::bigint NOT NULL,
+--     "date_id" character varying DEFAULT '2022-05'::character varying NOT NULL,
+--     "version_size" bigint DEFAULT '0'::bigint NOT NULL,
+--     "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+--     "devices_real" bigint DEFAULT '0'::bigint NOT NULL
+-- );
+
+-- ALTER TABLE "public"."app_stats" OWNER TO "postgres";
+
+-- CREATE TABLE "public"."app_versions" (
+--     "id" bigint NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "app_id" character varying NOT NULL,
+--     "name" character varying NOT NULL,
+--     "bucket_id" character varying,
+--     "user_id" "uuid" NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "deleted" boolean DEFAULT false NOT NULL,
+--     "external_url" character varying,
+--     "checksum" character varying,
+--     "session_key" character varying,
+--     "storage_provider" "text" DEFAULT 'r2'::"text" NOT NULL
+-- );
+
+-- ALTER TABLE "public"."app_versions" OWNER TO "supabase_admin";
+
+-- ALTER TABLE "public"."app_versions" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+--     SEQUENCE NAME "public"."app_versions_id_seq"
+--     START WITH 1
+--     INCREMENT BY 1
+--     NO MINVALUE
+--     NO MAXVALUE
+--     CACHE 1
+-- );
+
+-- CREATE TABLE "public"."app_versions_meta" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "app_id" character varying NOT NULL,
+--     "user_id" "uuid" NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "checksum" character varying NOT NULL,
+--     "size" bigint NOT NULL,
+--     "id" bigint NOT NULL,
+--     "devices" bigint DEFAULT '0'::bigint,
+--     "fails" bigint DEFAULT '0'::bigint,
+--     "installs" bigint DEFAULT '0'::bigint,
+--     "uninstalls" bigint DEFAULT '0'::bigint
+-- );
+
+-- ALTER TABLE "public"."app_versions_meta" OWNER TO "supabase_admin";
+
+-- ALTER TABLE "public"."app_versions_meta" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+--     SEQUENCE NAME "public"."app_versions_meta_id_seq"
+--     START WITH 1
+--     INCREMENT BY 1
+--     NO MINVALUE
+--     NO MAXVALUE
+--     CACHE 1
+-- );
+
+-- CREATE TABLE "public"."apps" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "app_id" character varying NOT NULL,
+--     "icon_url" character varying NOT NULL,
+--     "user_id" "uuid" NOT NULL,
+--     "name" character varying,
+--     "last_version" character varying,
+--     "updated_at" timestamp with time zone,
+--     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"()
+-- );
+
+-- ALTER TABLE "public"."apps" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."channel_devices" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "channel_id" bigint NOT NULL,
+--     "app_id" character varying NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "created_by" "uuid" NOT NULL,
+--     "device_id" "text" NOT NULL
+-- );
+
+-- ALTER TABLE "public"."channel_devices" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."channels" (
+--     "id" bigint NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "name" character varying NOT NULL,
+--     "app_id" character varying NOT NULL,
+--     "version" bigint NOT NULL,
+--     "created_by" "uuid" NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "public" boolean DEFAULT false NOT NULL,
+--     "disableAutoUpdateUnderNative" boolean DEFAULT true NOT NULL,
+--     "disableAutoUpdateToMajor" boolean DEFAULT true NOT NULL,
+--     "beta" boolean DEFAULT false NOT NULL,
+--     "ios" boolean DEFAULT true NOT NULL,
+--     "android" boolean DEFAULT true NOT NULL,
+--     "allow_device_self_set" boolean DEFAULT false NOT NULL,
+--     "allow_emulator" boolean DEFAULT true NOT NULL,
+--     "allow_dev" boolean DEFAULT true NOT NULL
+-- );
+
+-- ALTER TABLE "public"."channels" OWNER TO "supabase_admin";
+
+-- ALTER TABLE "public"."channels" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+--     SEQUENCE NAME "public"."channel_id_seq"
+--     START WITH 1
+--     INCREMENT BY 1
+--     NO MINVALUE
+--     NO MAXVALUE
+--     CACHE 1
+-- );
+
+-- CREATE TABLE "public"."channel_users" (
+--     "id" bigint NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "user_id" "uuid" NOT NULL,
+--     "channel_id" bigint NOT NULL,
+--     "app_id" character varying NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "created_by" "uuid"
+-- );
+
+-- ALTER TABLE "public"."channel_users" OWNER TO "supabase_admin";
+
+-- ALTER TABLE "public"."channel_users" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+--     SEQUENCE NAME "public"."channel_users_id_seq"
+--     START WITH 1
+--     INCREMENT BY 1
+--     NO MINVALUE
+--     NO MAXVALUE
+--     CACHE 1
+-- );
+
+-- CREATE FOREIGN TABLE "public"."clickhouse_stats" (
+--     "id" bigint,
+--     "created_at" timestamp with time zone,
+--     "platform" "text",
+--     "action" "text",
+--     "device_id" "text",
+--     "version_build" "text",
+--     "version" bigint,
+--     "app_id" "text"
+-- )
+-- SERVER "clickhouse_server"
+-- OPTIONS (
+--     "is_new_schema" 'false',
+--     "rowid_column" 'id',
+--     "schema" 'public',
+--     "table" 'stats'
+-- );
+
+-- ALTER FOREIGN TABLE "public"."clickhouse_stats" OWNER TO "supabase_admin";
+
+
+-- CREATE TABLE "public"."deleted_account" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "email" character varying NOT NULL,
+--     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
+-- );
+
+-- ALTER TABLE "public"."deleted_account" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."devices" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "device_id" "text" NOT NULL,
+--     "version" bigint NOT NULL,
+--     "app_id" character varying NOT NULL,
+--     "platform" "public"."platform_os",
+--     "plugin_version" "text" DEFAULT '2.3.3'::"text" NOT NULL,
+--     "os_version" character varying,
+--     "date_id" character varying DEFAULT ''::character varying,
+--     "version_build" "text" DEFAULT 'builtin'::"text",
+--     "custom_id" "text" DEFAULT ''::"text" NOT NULL,
+--     "is_prod" boolean DEFAULT true,
+--     "is_emulator" boolean DEFAULT false
+-- );
+
+-- ALTER TABLE "public"."devices" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."devices_override" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "device_id" "text" NOT NULL,
+--     "version" bigint NOT NULL,
+--     "app_id" character varying NOT NULL,
+--     "created_by" "uuid"
+-- );
+
+-- ALTER TABLE "public"."devices_override" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."global_stats" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "date_id" character varying NOT NULL,
+--     "apps" bigint NOT NULL,
+--     "updates" bigint NOT NULL,
+--     "stars" bigint NOT NULL,
+--     "users" bigint DEFAULT '0'::bigint,
+--     "paying" bigint DEFAULT '0'::bigint,
+--     "trial" bigint DEFAULT '0'::bigint,
+--     "need_upgrade" bigint DEFAULT '0'::bigint,
+--     "not_paying" bigint DEFAULT '0'::bigint,
+--     "onboarded" bigint DEFAULT '0'::bigint
+-- );
+
+-- ALTER TABLE "public"."global_stats" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."notifications" (
+--     "id" character varying NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "user_id" "uuid" NOT NULL,
+--     "last_send_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "total_send" bigint DEFAULT '1'::bigint NOT NULL
+-- );
+
+-- ALTER TABLE "public"."notifications" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."org_users" (
+--     "id" bigint NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "user_id" "uuid" NOT NULL,
+--     "org_id" "uuid" NOT NULL,
+--     "app_id" character varying,
+--     "channel_id" bigint,
+--     "user_right" "public"."user_min_right"
+-- );
+
+-- ALTER TABLE "public"."org_users" OWNER TO "supabase_admin";
+
+-- ALTER TABLE "public"."org_users" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+--     SEQUENCE NAME "public"."org_users_id_seq"
+--     START WITH 1
+--     INCREMENT BY 1
+--     NO MINVALUE
+--     NO MAXVALUE
+--     CACHE 1
+-- );
+
+-- CREATE TABLE "public"."orgs" (
+--     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+--     "created_by" "uuid" NOT NULL,
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "logo" "text",
+--     "name" "text" NOT NULL
+-- );
+
+-- ALTER TABLE "public"."orgs" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."plans" (
+--     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "name" character varying DEFAULT ''::character varying NOT NULL,
+--     "description" character varying DEFAULT ''::character varying NOT NULL,
+--     "price_m" bigint DEFAULT '0'::bigint NOT NULL,
+--     "price_y" bigint DEFAULT '0'::bigint NOT NULL,
+--     "stripe_id" character varying DEFAULT ''::character varying NOT NULL,
+--     "app" bigint DEFAULT '0'::bigint NOT NULL,
+--     "channel" bigint DEFAULT '0'::bigint NOT NULL,
+--     "update" bigint DEFAULT '0'::bigint NOT NULL,
+--     "version" bigint DEFAULT '0'::bigint NOT NULL,
+--     "shared" bigint DEFAULT '0'::bigint NOT NULL,
+--     "abtest" boolean DEFAULT false NOT NULL,
+--     "progressive_deploy" boolean DEFAULT false NOT NULL,
+--     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+--     "price_m_id" character varying NOT NULL,
+--     "price_y_id" character varying NOT NULL,
+--     "storage" double precision NOT NULL,
+--     "bandwidth" double precision NOT NULL,
+--     "mau" bigint DEFAULT '0'::bigint NOT NULL,
+--     "market_desc" character varying DEFAULT ''::character varying,
+--     "storage_unit" double precision DEFAULT '0'::double precision,
+--     "bandwidth_unit" double precision DEFAULT '0'::double precision,
+--     "mau_unit" double precision DEFAULT '0'::double precision,
+--     "price_m_storage_id" "text",
+--     "price_m_bandwidth_id" "text",
+--     "price_m_mau_id" "text"
+-- );
+
+-- ALTER TABLE "public"."plans" OWNER TO "postgres";
+
+-- CREATE TABLE "public"."stats" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "platform" "public"."platform_os" NOT NULL,
+--     "action" "text" NOT NULL,
+--     "device_id" "text" NOT NULL,
+--     "version_build" "text" NOT NULL,
+--     "version" bigint NOT NULL,
+--     "app_id" character varying NOT NULL
+-- );
+
+-- ALTER TABLE "public"."stats" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."store_apps" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "url" "text" DEFAULT ''::"text" NOT NULL,
+--     "app_id" "text" NOT NULL,
+--     "title" "text" DEFAULT ''::"text" NOT NULL,
+--     "summary" "text" DEFAULT ''::"text" NOT NULL,
+--     "icon" "text" DEFAULT ''::"text" NOT NULL,
+--     "free" boolean DEFAULT true NOT NULL,
+--     "category" "text" DEFAULT ''::"text" NOT NULL,
+--     "capacitor" boolean DEFAULT false NOT NULL,
+--     "developer_email" "text" DEFAULT ''::"text" NOT NULL,
+--     "installs" bigint DEFAULT '0'::bigint NOT NULL,
+--     "developer" "text" DEFAULT ''::"text" NOT NULL,
+--     "score" double precision DEFAULT '0'::double precision NOT NULL,
+--     "to_get_framework" boolean DEFAULT true NOT NULL,
+--     "onprem" boolean DEFAULT false NOT NULL,
+--     "updates" bigint DEFAULT '0'::bigint NOT NULL,
+--     "to_get_info" boolean DEFAULT true NOT NULL,
+--     "error_get_framework" "text" DEFAULT ''::"text" NOT NULL,
+--     "to_get_similar" boolean DEFAULT true NOT NULL,
+--     "error_get_similar" "text" DEFAULT ''::"text" NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "error_get_info" "text" DEFAULT ''::"text" NOT NULL,
+--     "cordova" boolean DEFAULT false NOT NULL,
+--     "react_native" boolean DEFAULT false NOT NULL,
+--     "capgo" boolean DEFAULT false NOT NULL,
+--     "kotlin" boolean DEFAULT false NOT NULL,
+--     "flutter" boolean DEFAULT false NOT NULL,
+--     "native_script" boolean DEFAULT false NOT NULL,
+--     "lang" "text",
+--     "developer_id" "text"
+-- );
+
+-- ALTER TABLE "public"."store_apps" OWNER TO "supabase_admin";
+
+-- CREATE FOREIGN TABLE "public"."stripe_customers" (
+--     "id" "text",
+--     "email" "text",
+--     "name" "text",
+--     "description" "text",
+--     "created" timestamp without time zone,
+--     "attrs" "jsonb"
+-- )
+-- SERVER "stripe_server"
+-- OPTIONS (
+--     "is_new_schema" 'false',
+--     "object" 'customers',
+--     "schema" 'public'
+-- );
+
+-- ALTER FOREIGN TABLE "public"."stripe_customers" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."stripe_info" (
+--     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "subscription_id" character varying,
+--     "customer_id" character varying NOT NULL,
+--     "status" "public"."stripe_status",
+--     "product_id" character varying DEFAULT 'free'::character varying NOT NULL,
+--     "trial_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+--     "price_id" character varying,
+--     "is_good_plan" boolean DEFAULT true,
+--     "plan_usage" bigint DEFAULT '0'::bigint,
+--     "subscription_metered" "json" DEFAULT '{}'::"json" NOT NULL,
+--     "subscription_anchor" timestamp with time zone DEFAULT "now"() NOT NULL
+-- );
+
+-- ALTER TABLE "public"."stripe_info" OWNER TO "supabase_admin";
+
+-- CREATE FOREIGN TABLE "public"."stripe_products" (
+--     "id" "text",
+--     "name" "text",
+--     "active" boolean,
+--     "default_price" "text",
+--     "description" "text",
+--     "created" timestamp without time zone,
+--     "updated" timestamp without time zone,
+--     "attrs" "jsonb"
+-- )
+-- SERVER "stripe_server"
+-- OPTIONS (
+--     "is_new_schema" 'false',
+--     "object" 'products',
+--     "schema" 'public'
+-- );
+
+-- ALTER FOREIGN TABLE "public"."stripe_products" OWNER TO "supabase_admin";
+
+-- CREATE FOREIGN TABLE "public"."stripe_subscriptions" (
+--     "id" "text",
+--     "customer" "text",
+--     "currency" "text",
+--     "current_period_start" timestamp without time zone,
+--     "current_period_end" timestamp without time zone,
+--     "attrs" "jsonb"
+-- )
+-- SERVER "stripe_server"
+-- OPTIONS (
+--     "is_new_schema" 'false',
+--     "object" 'subscriptions',
+--     "schema" 'public'
+-- );
+
+-- ALTER FOREIGN TABLE "public"."stripe_subscriptions" OWNER TO "supabase_admin";
+
+-- CREATE TABLE "public"."users" (
+--     "created_at" timestamp with time zone DEFAULT "now"(),
+--     "image_url" character varying,
+--     "first_name" character varying,
+--     "last_name" character varying,
+--     "country" character varying,
+--     "email" character varying NOT NULL,
+--     "id" "uuid" NOT NULL,
+--     "updated_at" timestamp with time zone DEFAULT "now"(),
+--     "enableNotifications" boolean DEFAULT false NOT NULL,
+--     "optForNewsletters" boolean DEFAULT false NOT NULL,
+--     "legalAccepted" boolean DEFAULT false NOT NULL,
+--     "customer_id" character varying,
+--     "billing_email" "text"
+-- );
+
+-- ALTER TABLE "public"."users" OWNER TO "supabase_admin";
 
 -- ALTER TABLE ONLY "public"."apikeys"
 --     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
@@ -1650,27 +1649,27 @@ ALTER TABLE "public"."users" OWNER TO "supabase_admin";
 
 -- CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
-CREATE TRIGGER "on_app_stats_create" AFTER INSERT ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_app_stats_create" AFTER INSERT ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_app_stats_update" AFTER UPDATE ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_app_stats_update" AFTER UPDATE ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_channel_create" AFTER INSERT ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_channel_create" AFTER INSERT ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_channel_update" AFTER UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_channel_update" AFTER UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_log_create" AFTER INSERT ON "public"."stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_log_create" AFTER INSERT ON "public"."stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_shared_create" AFTER INSERT ON "public"."channel_users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_shared_create" AFTER INSERT ON "public"."channel_users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_user_create" AFTER INSERT ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_user_create" AFTER INSERT ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_user_update" AFTER UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_user_update" AFTER UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_version_create" AFTER INSERT ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_version_create" AFTER INSERT ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_version_delete" AFTER DELETE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_version_delete" AFTER DELETE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_version_update" AFTER UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+-- CREATE TRIGGER "on_version_update" AFTER UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
 -- ALTER TABLE ONLY "public"."apikeys"
 --     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
