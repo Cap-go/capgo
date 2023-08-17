@@ -340,6 +340,16 @@ export async function isTrial(userId: string): Promise<number> {
   return 0
 }
 
+export async function isAdmin(userId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .rpc('is_admin', { userid: userId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || false
+}
+
 export async function isAllowedAction(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()

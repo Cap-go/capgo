@@ -1,11 +1,12 @@
 import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { isAdmin, supabaseAdmin } from '../_utils/supabase.ts'
 import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 
-interface dataDemo {
+interface DataDownload {
   app_id: string
   storage_provider: string
+  user_id?: string
   bucket_id: string
 }
 
@@ -24,9 +25,11 @@ serve(async (event: Request) => {
     if (error || !auth || !auth.user)
       return sendRes({ status: 'not authorize' }, 400)
 
-    const body = (await event.json()) as dataDemo
+    const body = (await event.json()) as DataDownload
+    const admin = await isAdmin(auth.user.id)
+    const userId = (admin && body.user_id) ? body.user_id : auth.user.id
     console.log('body', body)
-    const url = await getBundleUrl(body.storage_provider, `apps/${auth.user.id}/${body.app_id}/versions`, body.bucket_id)
+    const url = await getBundleUrl(body.storage_provider, `apps/${userId}/${body.app_id}/versions`, body.bucket_id)
     if (!url)
       return sendRes({ status: 'Error unknow' }, 500)
     return sendRes({ url })

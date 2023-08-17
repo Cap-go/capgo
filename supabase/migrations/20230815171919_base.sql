@@ -1054,7 +1054,7 @@ CREATE TABLE "public"."apps" (
     "last_version" character varying,
     "updated_at" timestamp with time zone,
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"()
-    "retention" bigint NOT NULL DEFAULT '2592000'::bigint,
+    "retention" bigint NOT NULL DEFAULT '0'::bigint,
 );
 
 
