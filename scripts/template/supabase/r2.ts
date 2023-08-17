@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-unused-vars
-import { S3Client } from 'https://deno.land/x/s3_lite_client@0.3.0/mod.ts'
+import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 
 const accountid = ''
 const access_key_id = ''
