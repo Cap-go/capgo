@@ -111,4 +111,15 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
            ''application/json'',
            ''{}''
         )::http_request)
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats');
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats'),
+(15, '0 0 * * *', '
+    UPDATE app_versions
+    SET deleted = true
+    FROM apps, app_versions_meta
+    WHERE app_versions_meta.app_id = app_versions.app_id
+    AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
+    AND app_versions.deleted = false
+    AND apps.retention > 0
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention');

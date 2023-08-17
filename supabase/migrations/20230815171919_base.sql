@@ -1054,6 +1054,7 @@ CREATE TABLE "public"."apps" (
     "last_version" character varying,
     "updated_at" timestamp with time zone,
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"()
+    "retention" bigint NOT NULL DEFAULT '2592000'::bigint,
 );
 
 
@@ -1549,27 +1550,27 @@ CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."stripe_info" FOR E
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
-CREATE TRIGGER "on_app_stats_create" AFTER INSERT ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_app_stats_create" AFTER INSERT ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_app_stats_update" AFTER UPDATE ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_app_stats_update" AFTER UPDATE ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_channel_create" AFTER INSERT ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_channel_create" AFTER INSERT ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_channel_update" AFTER UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_channel_update" AFTER UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_log_create" AFTER INSERT ON "public"."stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_log_create" AFTER INSERT ON "public"."stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_shared_create" AFTER INSERT ON "public"."channel_users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_shared_create" AFTER INSERT ON "public"."channel_users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_user_create" AFTER INSERT ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_user_create" AFTER INSERT ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_user_update" AFTER UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_user_update" AFTER UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_version_create" AFTER INSERT ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_version_create" AFTER INSERT ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_version_delete" AFTER DELETE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_version_delete" AFTER DELETE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
-CREATE TRIGGER "on_version_update" AFTER UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://localhost:8881/api/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
+CREATE TRIGGER "on_version_update" AFTER UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;

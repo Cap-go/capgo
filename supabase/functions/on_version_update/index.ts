@@ -22,8 +22,6 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   const exist = await r2.checkIfExist(record.bucket_id)
-  const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-  const existV2 = await r2.checkIfExist(v2Path)
   console.log('exist ?', record.app_id, record.bucket_id, v2Path, exist)
   if (!exist && !record.bucket_id.endsWith('.zip')) {
     console.log('upload to r2', record.bucket_id)
@@ -54,21 +52,26 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
       return sendRes()
     }
   }
-  else if (existV2 && record.storage_provider === 'r2') {
-    // pdate size and checksum
-    console.log('V2', record.bucket_id)
-    const { size, checksum } = await r2.getSizeChecksum(v2Path)
-    if (size && checksum) {
-      const { error: errorUpdate } = await supabaseAdmin()
-        .from('app_versions_meta')
-        .update({
-          size,
-          checksum,
-        })
-        .eq('id', record.id)
-      if (errorUpdate)
-        console.log('errorUpdate', errorUpdate)
-      await incrementSize(record.app_id, record.user_id, size) // for new upload system
+  else {
+    const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+    const existV2 = await r2.checkIfExist(v2Path)
+
+    if (existV2 && record.storage_provider === 'r2') {
+      // pdate size and checksum
+      console.log('V2', record.bucket_id)
+      const { size, checksum } = await r2.getSizeChecksum(v2Path)
+      if (size && checksum) {
+        const { error: errorUpdate } = await supabaseAdmin()
+          .from('app_versions_meta')
+          .update({
+            size,
+            checksum,
+          })
+          .eq('id', record.id)
+        if (errorUpdate)
+          console.log('errorUpdate', errorUpdate)
+        await incrementSize(record.app_id, record.user_id, size) // for new upload system
+      }
     }
   }
   return sendRes()
@@ -86,8 +89,10 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   console.log('Delete', record.bucket_id)
+
   // check if in r2 storage and delete
   const exist = await r2.checkIfExist(record.bucket_id)
+
   if (exist) {
     // delete in r2
     try {
@@ -96,6 +101,21 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     catch (error) {
       console.log('Cannot delete r2', record.bucket_id, error)
       return sendRes()
+    }
+  }
+  else {
+    // delete in r2 (V2)
+    const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+    const existV2 = await r2.checkIfExist(v2Path)
+
+    if (existV2) {
+      try {
+        await r2.deleteObject(v2Path)
+      }
+      catch (error) {
+        console.log('Cannot delete r2 (v2)', record.bucket_id, error)
+        return sendRes()
+      }
     }
   }
 
