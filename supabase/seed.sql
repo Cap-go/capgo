@@ -117,6 +117,7 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
     SET deleted = true
     FROM apps
     WHERE app_versions.storage_provider=''r2''
+    AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
     AND app_versions.deleted = false
     AND apps.retention > 0
     AND extract(epoch from now()) - extract(epoch from app_versions.created_at) > apps.retention
