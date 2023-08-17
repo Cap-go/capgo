@@ -86,8 +86,12 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   console.log('Delete', record.bucket_id)
+
   // check if in r2 storage and delete
   const exist = await r2.checkIfExist(record.bucket_id)
+  const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+  const existV2 = await r2.checkIfExist(v2Path)
+
   if (exist) {
     // delete in r2
     try {
@@ -95,6 +99,16 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     }
     catch (error) {
       console.log('Cannot delete r2', record.bucket_id, error)
+      return sendRes()
+    }
+  }
+  else if (existV2) {
+    // delete in r2
+    try {
+      await r2.deleteObject(v2Path)
+    }
+    catch (error) {
+      console.log('Cannot delete r2 (v2)', record.bucket_id, error)
       return sendRes()
     }
   }
