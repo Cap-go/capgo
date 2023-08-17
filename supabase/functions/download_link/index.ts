@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.188.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
@@ -15,7 +15,7 @@ serve(async (event: Request) => {
   const authorization = event.headers.get('authorization')
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)
-
+  // TODO: fix for admin
   try {
     const { data: auth, error } = await supabaseAdmin().auth.getUser(
       authorization?.split('Bearer ')[1],
