@@ -1,0 +1,2 @@
+ALTER TABLE apps 
+    ADD COLUMN retention int8 DEFAULT NULL;

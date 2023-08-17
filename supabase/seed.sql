@@ -111,4 +111,16 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
            ''application/json'',
            ''{}''
         )::http_request)
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats');
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats'),
+(15, '0 1 * * *', '
+    select status
+    from
+      http((
+          ''POST'',
+          ''http://localhost:8881/api/cron_bundle_retention-background'',
+           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ''application/json'',
+           ''{}''
+        )::http_request)
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_bundle_retention');
+

@@ -264,6 +264,7 @@ export interface Database {
           name: string | null
           updated_at: string | null
           user_id: string
+          retention: number | null
         }
         Insert: {
           app_id: string
