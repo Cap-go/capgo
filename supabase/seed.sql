@@ -95,7 +95,7 @@ INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport"
       http((
           ''POST'',
           ''http://localhost:8881/api/cron_good_plan-background'',
-           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ARRAY[http_header(''apisecret'',''testsecret'')],
            ''application/json'',
            ''{}''
         )::http_request)
@@ -107,7 +107,7 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
       http((
           ''POST'',
            ''http://localhost:8881/api/web_stats-background'',
-           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ARRAY[http_header(''apisecret'',''testsecret'')],
            ''application/json'',
            ''{}''
         )::http_request)
