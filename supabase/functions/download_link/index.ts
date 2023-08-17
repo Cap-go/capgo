@@ -15,7 +15,7 @@ serve(async (event: Request) => {
   const authorization = event.headers.get('authorization')
   if (!authorization)
     return sendRes({ status: 'Cannot find authorization' }, 400)
-
+  // TODO: fix for admin
   try {
     const { data: auth, error } = await supabaseAdmin().auth.getUser(
       authorization?.split('Bearer ')[1],
