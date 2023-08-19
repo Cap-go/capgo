@@ -139,11 +139,6 @@ async function deleteAccount() {
             setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
           else {
-            const authUser = await supabase.auth.getUser()
-            if (authUser.data.user == null) {
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-            }
-            await supabase.auth.admin.deleteUser(authUser.data.user.id);
             await main.logout()
             router.replace('/login')
           }

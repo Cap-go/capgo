@@ -103,6 +103,8 @@ serve(async (event: Request) => {
       }
     }
 
+    await supabaseAdminClient.auth.admin.deleteUser(auth.user.id)
+
     const hash = new Sha256();
     hash.update(auth.user.email);
     const hashedEmail = hash.hex();
