@@ -132,16 +132,18 @@ async function deleteAccount() {
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
             return
-          const { error } = await supabase
-            .from('deleted_account')
-            .insert({
-              email: main.auth.email,
-            })
-          if (error) {
-            console.error(error)
+            const res = await useSupabase().functions.invoke('delete_account')
+
+          if (res.error) {
+            console.error(res.error)
             setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
           else {
+            const authUser = await supabase.auth.getUser()
+            if (authUser.data.user == null) {
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            }
+            await supabase.auth.admin.deleteUser(authUser.data.user.id);
             await main.logout()
             router.replace('/login')
           }
