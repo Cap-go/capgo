@@ -395,7 +395,7 @@ function hideString(str: string) {
             <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="channel" :label="t('channel')" :value="secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`" :is-link="true" @click="openChannel()" />
+            <InfoRow v-if="channel" :label="t('channel')" :value="channel!.enableAbTesting ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name" :is-link="true" @click="openChannel()" />
             <InfoRow v-else :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel()" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />

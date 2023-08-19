@@ -139,6 +139,7 @@ async function getChannel() {
     }
 
     channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
+    secondaryVersionPercentage.value = data.secondaryVersionPercentage * 100
 
     // Conversion of type '{ id: number; name: string; public: boolean; version: { id: unknown; name: unknown; app_id: unknown; bucket_id: unknown; created_at: unknown; }[]; created_at: string; allow_emulator: boolean; allow_dev: boolean; allow_device_self_set: boolean; ... 7 more ...; secondVersion: number | null; }' to type '{ allow_dev: boolean; allow_device_self_set: boolean; allow_emulator: boolean; android: boolean; app_id: string; beta: boolean; created_at: string; created_by: string; disableAutoUpdateToMajor: boolean; ... 9 more ...; version: number; } & Channel' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
     // Type '{ id: number; name: string; public: boolean; version: { id: unknown; name: unknown; app_id: unknown; bucket_id: unknown; created_at: unknown; }[]; created_at: string; allow_emulator: boolean; allow_dev: boolean; allow_device_self_set: boolean; ... 7 more ...; secondVersion: number | null; }' is missing the following properties from type '{ allow_dev: boolean; allow_device_self_set: boolean; allow_emulator: boolean; android: boolean; app_id: string; beta: boolean; created_at: string; created_by: string; disableAutoUpdateToMajor: boolean; ... 9 more ...; version: number; }': app_id, beta, created_byts(2352)
@@ -290,18 +291,19 @@ async function enableAbTesting() {
   }
 }
 
+const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
+  const { error } = await supabase
+    .from('channels')
+    .update({ secondaryVersionPercentage: percentage / 100 })
+    .eq('id', id.value)
+
+  if (error)
+    console.error(error)
+}, 500, { leading: true, trailing: true, maxWait: 500 })
+
 async function setSecondaryVersionPercentage(percentage: number) {
   secondaryVersionPercentage.value = percentage
-
-  debounce(async () => {
-    const { error } = await supabase
-      .from('channels')
-      .update({ secondaryVersionPercentage: percentage / 100 })
-      .eq('id', id.value)
-
-    if (error)
-      console.error(error)
-  }, 500)
+  await debouncedSetSecondaryVersionPercentage(percentage)
 }
 </script>
 
