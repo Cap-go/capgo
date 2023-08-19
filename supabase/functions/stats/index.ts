@@ -24,7 +24,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       platform,
       app_id,
       version_os,
-      version,
       device_id,
       action,
       plugin_version = '2.3.3',
@@ -85,7 +84,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       action,
       app_id,
       version_build,
-      version: version || 0,
+      version: 0,
     }
     const all = []
     const { data: appVersion } = await supabaseAdmin()
