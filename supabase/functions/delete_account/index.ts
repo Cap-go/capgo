@@ -5,13 +5,6 @@ import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { Sha256 } from "https://deno.land/std@0.119.0/hash/sha256.ts";
 
 
-
-
-
-interface PortalData {
-  callbackUrl: string
-}
-
 serve(async (event: Request) => {
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
@@ -36,18 +29,11 @@ serve(async (event: Request) => {
       .eq('id', auth.user.id)
       .single()
 
-
     // user
     await supabaseAdmin()
       .from('users')
       .delete()
       .eq('id', auth.user.id)
-
-    // get all app ids
-    const app_ids = await supabaseAdmin()
-      .from('apps')
-      .select('app_id')
-      .eq('user_id', auth.user.id)
 
     // billing
     await supabaseAdmin()
@@ -55,53 +41,7 @@ serve(async (event: Request) => {
       .delete()
       .eq('customer_id', user.customer_id)
 
-
-    const appTables = [
-      "app_stats",
-      "app_versions",
-      "app_versions_meta",
-      "apps",
-      "channel_devices",
-      "channel_users",
-      "channels",
-      "devices",
-      "devices_override",
-      "stats",
-    ]
-
-    const userTables = [
-      'apikeys',
-      'notifications',
-      'org_users',
-      'store_apps',
-    ]
-
-    // Initializing Supabase admin client
     const supabaseAdminClient = supabaseAdmin();
-
-    // Deleting user tables
-    for (const userTable of userTables) {
-      try {
-        await supabaseAdminClient.from(userTable)
-          .delete()
-          .eq('user_id', auth.user.id);
-      } catch (error) {
-        console.error(`Failed to delete records from table ${userTable}. Error: ${error}`);
-      }
-    }
-
-    // Deleting app tables
-    for (const appTable of appTables) {
-      for (const app of app_ids.data) {
-        try {
-          await supabaseAdminClient.from(appTable)
-            .delete()
-            .eq('app_id', app.app_id);
-        } catch (error) {
-          console.error(`Failed to delete records from table ${appTable} with app_id ${app.app_id}. Error: ${error}`);
-        }
-      }
-    }
 
     await supabaseAdminClient.auth.admin.deleteUser(auth.user.id)
 
