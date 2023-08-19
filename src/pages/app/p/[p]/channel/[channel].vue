@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   kList, kListItem,
+  kRange,
   kToggle,
 } from 'konsta/vue'
 import { toast } from 'vue-sonner'
+import debounce from 'lodash.debounce'
 import { useSupabase } from '~/services/supabase'
 import { formatDate } from '~/services/date'
 import { useMainStore } from '~/stores/main'
@@ -21,6 +23,7 @@ import { urlToAppId } from '~/services/conversion'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
+  secondVersion: Database['public']['Tables']['app_versions']['Row']
 }
 const router = useRouter()
 const displayStore = useDisplayStore()
@@ -34,6 +37,7 @@ const loading = ref(true)
 const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
+const secondaryVersionPercentage = ref(50)
 
 const tabs: Tab[] = [
   {
@@ -60,8 +64,19 @@ const tabs: Tab[] = [
 function openBundle() {
   if (!channel.value)
     return
+  if (channel.value.version.name === 'unknown')
+    return
   console.log('openBundle', channel.value.version.id)
   router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
+}
+
+function openSecondBundle() {
+  if (!channel.value)
+    return
+  if (channel.value.secondVersion.name === 'unknown')
+    return
+  console.log('openBundle', channel.value.version.id)
+  router.push(`/app/p/${route.params.p}/bundle/${channel.value.secondVersion.id}`)
 }
 
 async function getDeviceIds() {
@@ -108,7 +123,13 @@ async function getChannel() {
           disableAutoUpdateToMajor,
           ios,
           android,
-          updated_at
+          updated_at,
+          enableAbTesting,
+          secondaryVersionPercentage,
+          secondVersion (
+            name,
+            id
+          )
         `)
       .eq('id', id.value)
       .single()
@@ -116,7 +137,11 @@ async function getChannel() {
       console.error('no channel', error)
       return
     }
-    channel.value = data as Database['public']['Tables']['channels']['Row'] & Channel
+
+    channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
+
+    // Conversion of type '{ id: number; name: string; public: boolean; version: { id: unknown; name: unknown; app_id: unknown; bucket_id: unknown; created_at: unknown; }[]; created_at: string; allow_emulator: boolean; allow_dev: boolean; allow_device_self_set: boolean; ... 7 more ...; secondVersion: number | null; }' to type '{ allow_dev: boolean; allow_device_self_set: boolean; allow_emulator: boolean; android: boolean; app_id: string; beta: boolean; created_at: string; created_by: string; disableAutoUpdateToMajor: boolean; ... 9 more ...; version: number; } & Channel' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+    // Type '{ id: number; name: string; public: boolean; version: { id: unknown; name: unknown; app_id: unknown; bucket_id: unknown; created_at: unknown; }[]; created_at: string; allow_emulator: boolean; allow_dev: boolean; allow_device_self_set: boolean; ... 7 more ...; secondVersion: number | null; }' is missing the following properties from type '{ allow_dev: boolean; allow_device_self_set: boolean; allow_emulator: boolean; android: boolean; app_id: string; beta: boolean; created_at: string; created_by: string; disableAutoUpdateToMajor: boolean; ... 9 more ...; version: number; }': app_id, beta, created_byts(2352)
   }
   catch (error) {
     console.error(error)
@@ -244,6 +269,40 @@ async function openPannel() {
   }
   displayStore.showActionSheet = true
 }
+
+async function enableAbTesting() {
+  if (!channel.value)
+    return
+
+  const val = !channel.value.enableAbTesting
+
+  const { error } = await supabase
+    .from('channels')
+    .update({ enableAbTesting: val })
+    .eq('id', id.value)
+
+  if (error) {
+    console.error(error)
+  }
+  else {
+    channel.value.enableAbTesting = val
+    toast.success(val ? t('enabled-ab-testing') : t('disable-ab-testing'))
+  }
+}
+
+async function setSecondaryVersionPercentage(percentage: number) {
+  secondaryVersionPercentage.value = percentage
+
+  debounce(async () => {
+    const { error } = await supabase
+      .from('channels')
+      .update({ secondaryVersionPercentage: percentage / 100 })
+      .eq('id', id.value)
+
+    if (error)
+      console.error(error)
+  }, 500)
+}
 </script>
 
 <template>
@@ -254,7 +313,11 @@ async function openPannel() {
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
-          <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle" />
+          <InfoRow v-if="!channel.enableAbTesting" :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="channel.version.name !== 'unknown' ? openBundle : ''" />
+          <template v-else>
+            <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('bundle-number')} B`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
+          </template>
           <!-- Created At -->
           <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
           <!-- Last Update -->
@@ -343,6 +406,27 @@ async function openPannel() {
                   component="div"
                   :checked="channel?.allow_device_self_set"
                   @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="t('channel-ab-testing')" class="text-lg text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.enableAbTesting"
+                  @change="enableAbTesting()"
+                />
+              </template>
+            </k-list-item>
+            <k-list-item label :title="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`" class="text-lg text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-range
+                  :value="secondaryVersionPercentage"
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :step="5"
+                  @input="(e: any) => (setSecondaryVersionPercentage(parseInt(e.target.value, 10)))"
                 />
               </template>
             </k-list-item>

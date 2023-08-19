@@ -416,10 +416,13 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
+          enableAbTesting: boolean
           id: number
           ios: boolean
           name: string
           public: boolean
+          secondaryVersionPercentage: number
+          secondVersion: number | null
           updated_at: string
           version: number
         }
@@ -434,10 +437,13 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
+          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name: string
           public?: boolean
+          secondaryVersionPercentage?: number
+          secondVersion?: number | null
           updated_at?: string
           version: number
         }
@@ -452,10 +458,13 @@ export interface Database {
           created_by?: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
+          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name?: string
           public?: boolean
+          secondaryVersionPercentage?: number
+          secondVersion?: number | null
           updated_at?: string
           version?: number
         }
@@ -470,6 +479,12 @@ export interface Database {
             foreignKeyName: "channels_created_by_fkey"
             columns: ["created_by"]
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channels_secondVersion_fkey"
+            columns: ["secondVersion"]
+            referencedRelation: "app_versions"
             referencedColumns: ["id"]
           },
           {

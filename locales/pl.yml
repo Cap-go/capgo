@@ -5,6 +5,10 @@ Filters: Filtry
 Override: Nadpisanie
 Storage: Składowanie
 account: Konto
+channel-ab-testing: Włącz testowanie AB
+channel-ab-testing-percentage: Procent użytkowników którzy otrzymają drugą wersję
+disable-ab-testing: Wyłączono testy AB
+enabled-ab-testing: Włączono testy AB
 account-error: Błąd podczas aktualizowania konta
 account-password-error: Wystąpił błąd, spróbuj ponownie
 account-password-heading: Zmień moje hasło
