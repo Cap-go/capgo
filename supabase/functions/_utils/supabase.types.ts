@@ -1197,6 +1197,10 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      delete_user: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       exist_app: {
         Args: {
           appid: string

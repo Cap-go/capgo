@@ -12,7 +12,7 @@ import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import { useMainStore } from '~/stores/main'
-import { useSupabase } from '~/services/supabase'
+import { deleteUser, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
@@ -161,7 +161,6 @@ async function deleteAccount() {
               .delete()
               .eq('customer_id', userData.data?.customer_id)
 
-            await supabaseClient.auth.admin.deleteUser(authUser.data.user.id)
             const hashedEmail = await hashEmail(authUser.data.user.email!)
 
             await supabaseClient
@@ -169,6 +168,13 @@ async function deleteAccount() {
               .insert({
                 email: hashedEmail,
               })
+
+            await supabaseClient
+            .from('users')
+            .delete()
+            .eq('id', userData.data?.id)
+
+            await deleteUser()
 
             await main.logout()
             router.replace('/login')

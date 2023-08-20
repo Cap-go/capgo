@@ -1404,6 +1404,11 @@ CREATE TABLE "public"."users" (
     "billing_email" "text"
 );
 
+CREATE OR REPLACE FUNCTION "public"."delete_user"() RETURNS void
+LANGUAGE SQL SECURITY DEFINER 
+AS $$
+   delete from auth.users where id = auth.uid();
+$$;
 
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
@@ -1756,7 +1761,7 @@ CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" USING
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
-CREATE POLICY "Enable update for users based on email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK (("auth"."email"() = ("email")::"text"));
+CREATE POLICY "Enable update for users based on email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK  (encode(digest(auth.email(), 'sha256'::text), 'hex'::text) = (email)::text)
 
 CREATE POLICY "Select if app is shared with you or api" ON "public"."channels" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read}'::"public"."key_mode"[], "app_id")));
 
