@@ -121,6 +121,17 @@ async function pickPhoto() {
     isLoading.value = false
   }
 }
+async function hashEmail(email: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(email);
+
+  const hashBuffer = await  window.crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+
+}
+
 
 async function deleteAccount() {
   displayStore.showActionSheet = true
@@ -132,15 +143,38 @@ async function deleteAccount() {
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
             return
-            const res = await useSupabase().functions.invoke('delete_account')
+          const supabaseClient = useSupabase();
 
-          if (res.error) {
-            console.error(res.error)
-            setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+          const authUser = await supabase.auth.getUser()
+          if (authUser.error) {
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
-          else {
+          try {
+            const userData = await supabaseClient
+              .from('users')
+              .select()
+              .eq('id', authUser.data.user.id)
+              .single()
+
+            await supabaseClient
+              .from('stripe_info')
+              .delete()
+              .eq('customer_id', userData.data?.customer_id)
+
+            await supabaseClient.auth.admin.deleteUser(authUser.data.user.id)
+            const hashedEmail = await hashEmail(authUser.data.user.email!)
+
+            await supabaseClient
+              .from('deleted_account')
+              .insert({
+                email: hashedEmail,
+              })
+
             await main.logout()
             router.replace('/login')
+          } catch (error) {
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
           }
         },
       },
