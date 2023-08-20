@@ -242,6 +242,18 @@ export async function getPlanUsagePercent(userId: string, dateid: string): Promi
   return data || 0
 }
 
+export async function getOrgs(userId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin()
+    .rpc('get_orgs', { userid: userId })
+    .single()
+  if (error) {
+    console.error('getOrgs error', error.message)
+    throw new Error(error.message)
+  }
+
+  return data || 0
+}
+
 export async function isGoodPlan(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()

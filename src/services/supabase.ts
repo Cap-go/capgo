@@ -124,6 +124,19 @@ export async function isGoodPlan(userId: string): Promise<boolean> {
 
   return data || false
 }
+
+export async function getOrgs(userId: string): Promise<[]> {
+  const { data, error } = await useSupabase()
+    .rpc('get_orgs', { userid: userId })
+    .single()
+  if (error) {
+    console.error('getOrgs error', error.message)
+    throw new Error(error.message)
+  }
+
+  return data || ['asd']
+}
+
 export async function isTrial(userId: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial', { userid: userId })
