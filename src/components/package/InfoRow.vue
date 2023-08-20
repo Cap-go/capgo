@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
 import { reactive, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import { useI18n } from 'vue-i18n'
-import copy from 'copy-text-to-clipboard'
-import { useDisplayStore } from '~/stores/display'
 
 const props = defineProps<{
   label: string
@@ -18,20 +14,11 @@ const emit = defineEmits<{
   (event: 'delete', key: string): void
 }>()
 
-const { t } = useI18n()
-const displayStore = useDisplayStore()
-
 const computedValue = reactive({ value: props.value })
 const rowInput = ref(props.value)
 watch(rowInput, debounce(() => {
   emit('update:value', rowInput.value)
 }, 500))
-
-async function copyKey() {
-  copy(computedValue.value)
-  console.log('displayStore.messageToast', displayStore.messageToast)
-  toast.success(t('key-copied'))
-}
 </script>
 
 <template>
@@ -48,8 +35,10 @@ async function copyKey() {
     >
       <div class="flex flex-row">
         <input v-if="editable" v-model="rowInput" class="block w-full p-1 text-gray-900 bg-white border border-gray-300 rounded-lg dark:bg-gray-50 md:w-1/2 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 sm:text-xs dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400">
-        <span v-else @click="copyKey()"> {{ computedValue.value }} </span>
-        <slot />
+        <span v-else> {{ computedValue.value }} </span>
+        <div style="margin-left: auto">
+          <slot />
+        </div>
       </div>
     </dd>
   </div>

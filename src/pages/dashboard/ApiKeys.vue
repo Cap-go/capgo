@@ -2,13 +2,15 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import copy from 'copy-text-to-clipboard'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
 import Plus from '~icons/heroicons/plus'
-import ArrowPath from '~icons/heroicons/arrow-path'
 import Trash from '~icons/heroicons/trash'
+import Pencil from '~icons/heroicons/pencil'
+import Clipboard from '~icons/heroicons/clipboard-document'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -185,6 +187,12 @@ async function showAddNewKeyModal() {
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
 }
+
+async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
+  copy(app.key)
+  console.log('displayStore.messageToast', displayStore.messageToast)
+  toast.success(t('key-copied'))
+}
 </script>
 
 <template>
@@ -196,15 +204,18 @@ async function showAddNewKeyModal() {
         {{ t('api-keys') }}
       </h1>
       <button class=" ml-auto mr-2" @click="addNewApiKey()">
-        <Plus class=" text-green-500" />
+        <Plus class="text-green-500" />
       </button>
     </div>
     <div class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <div class="flex flex-col bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800 overflow-hidden">
         <dl class="divide-y divide-gray-500">
           <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true">
             <button class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey(app)">
-              <ArrowPath class="mr-4 text-lg text-red-600" />
+              <Pencil class="mr-4 text-lg" />
+            </button>
+            <button class="w-7 h-7 bg-transparent ml-auto" @click="copyKey(app)">
+              <Clipboard class="mr-4 text-lg" />
             </button>
             <button class="w-7 h-7 bg-transparent ml-4" @click="deleteKey(app)">
               <Trash class="mr-4 text-lg text-red-600" />
