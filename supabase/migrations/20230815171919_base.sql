@@ -945,6 +945,40 @@ CREATE FUNCTION "public"."update_version_stats"("app_id" character varying, "ver
   app_versions_meta.app_id = update_version_stats.app_id
 $$;
 
+CREATE FUNCTION "public"."add_deleted_user" (userid uuid) RETURNS void AS $$
+BEGIN
+-- remove user from organization
+  DELETE FROM org_users WHERE org_users.user_id = userid;
+-- delete user's app
+  DELETE FROM apps WHERE apps.user_id = userid;
+-- delete user's api keys
+  DELETE FROM apikeys WHERE apikeys.user_id = userid;
+-- delete user's app stats
+  DELETE FROM app_stats WHERE app_stats.user_id = userid;
+-- delete user's app versions
+  DELETE FROM app_versions WHERE app_versions.user_id = userid;
+-- delete user's app versions meta
+  DELETE FROM app_versions_meta WHERE app_versions_meta.user_id = userid;
+-- delete user's channel users
+  DELETE FROM channel_users WHERE channel_users.user_id = userid;
+-- delete user's notifications
+  DELETE FROM notifications WHERE notifications.user_id = userid;
+-- save deleted user's email's hash
+  INSERT INTO public.deleted_account (email) VALUES (crypt(CAST((
+    SELECT email FROM users WHERE users.id = userid
+  ) AS varchar), gen_salt('bf')));
+-- delete user
+  DELETE FROM users WHERE users.id = userid;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION "public"."is_deleted_user" ("emailaddress" character varying) RETURNS boolean as $$
+BEGIN
+  RETURN EXISTS (
+    SELECT * FROM deleted_account WHERE deleted_account.email = crypt(emailaddress, gen_salt('bf'))
+  );
+END
+$$ LANGUAGE plpgsql;
 
 SET default_tablespace = '';
 
@@ -1053,8 +1087,8 @@ CREATE TABLE "public"."apps" (
     "name" character varying,
     "last_version" character varying,
     "updated_at" timestamp with time zone,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"()
-    "retention" bigint NOT NULL DEFAULT '0'::bigint,
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"(),
+    "retention" bigint NOT NULL DEFAULT '0'::bigint
 );
 
 
