@@ -78,8 +78,9 @@ export function unspoofUser() {
   return true
 }
 
-export async function downloadUrl(provider: string, appId: string, bucketId: string): Promise<string> {
+export async function downloadUrl(provider: string, userId: string, appId: string, bucketId: string): Promise<string> {
   const data = {
+    user_id: userId,
     app_id: appId,
     storage_provider: provider,
     bucket_id: bucketId,
@@ -141,6 +142,7 @@ export async function isAdmin(userId: string): Promise<boolean> {
 
   return data || false
 }
+
 export async function isCanceled(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_canceled', { userid: userId })

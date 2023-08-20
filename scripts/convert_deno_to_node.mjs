@@ -92,7 +92,7 @@ function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 const mutationsNode = [
-  { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
+  { from: 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts', to: 'logsnag' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts', to: 'minio' },

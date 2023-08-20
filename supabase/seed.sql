@@ -23,6 +23,10 @@ INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_nam
 ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u5', NULL),
 ('2022-06-03 05:54:15+00', '', 'test', 'Capgo', NULL, 'test@capgo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u7', NULL);
 
+INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name") VALUES
+('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Admin org'),
+('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Demo org');
+
 INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
 (911, '2022-07-12 12:06:18.822406+00', '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'upload', '2022-07-12 12:06:18.822406+00'),
 (912, '2022-07-12 12:06:22.425878+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', '2022-07-12 12:06:22.425878+00'),
@@ -30,6 +34,7 @@ INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "u
 (914, '2022-07-12 12:06:36.468855+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', '2022-07-12 12:06:36.468855+00');
 
 INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "user_id", "name", "last_version", "updated_at", "id") VALUES
+('2022-03-07 14:08:28.910887+00', 'com.demoadmin.app', '', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'Demo Admin app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792'),
 ('2022-03-07 14:08:28.910887+00', 'com.demo.app', '', '6aa76066-55ef-4238-ade6-0b32334a4097', 'Demo app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792');
 
 INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "user_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider") VALUES
@@ -47,7 +52,12 @@ INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "up
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
 INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdateToMajor", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't');
+(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't'),
+(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't');
+
+INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "org_id", "app_id", "channel_id", "user_right") VALUES
+(1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),
+(2, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.demo.app', 22, 'admin');
 
 INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "date_id", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '', '1.223.0', '', 't', 't');
@@ -85,7 +95,7 @@ INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport"
       http((
           ''POST'',
           ''http://localhost:8881/api/cron_good_plan-background'',
-           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ARRAY[http_header(''apisecret'',''testsecret'')],
            ''application/json'',
            ''{}''
         )::http_request)
@@ -97,8 +107,19 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
       http((
           ''POST'',
            ''http://localhost:8881/api/web_stats-background'',
-           ARRAY[http_header(''apisecret'',''Y3p63TMDGNTHTze6MchBM7tPmB5'')],
+           ARRAY[http_header(''apisecret'',''testsecret'')],
            ''application/json'',
            ''{}''
         )::http_request)
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats');
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats'),
+(15, '0 0 * * *', '
+    UPDATE app_versions
+    SET deleted = true
+    FROM apps, app_versions_meta
+    WHERE app_versions_meta.app_id = app_versions.app_id
+    AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
+    AND app_versions.deleted = false
+    AND apps.retention > 0
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention');

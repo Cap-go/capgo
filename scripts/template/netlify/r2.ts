@@ -28,6 +28,11 @@ function upload(fileId: string, file: Uint8Array) {
   })
 }
 
+function getUploadUrl(fileId: string, expirySeconds = 60) {
+  const client = initR2()
+  return client.presignedPutObject(bucket, fileId, expirySeconds)
+}
+
 function deleteObject(fileId: string) {
   const client = initR2()
   return client.removeObject(bucket, fileId)
@@ -44,5 +49,12 @@ function checkIfExist(fileId: string) {
 
 function getSignedUrl(fileId: string, expirySeconds: number) {
   const client = initR2()
-  return client.presignedUrl('GET', bucket, fileId, expirySeconds)
+  return client.presignedGetObject(bucket, fileId, expirySeconds)
+}
+
+async function getSizeChecksum(fileId: string) {
+  const client = initR2()
+  const { size, metaData } = await client.statObject(bucket, fileId)
+  const checksum = metaData['x-amz-meta-crc32']
+  return { size, checksum }
 }

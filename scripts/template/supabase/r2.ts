@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-unused-vars
-import { S3Client } from 'https://deno.land/x/s3_lite_client@0.3.0/mod.ts'
+import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 
 const accountid = ''
 const access_key_id = ''
@@ -22,6 +22,11 @@ function upload(fileId: string, file: Uint8Array) {
   return client.putObject(fileId, file)
 }
 
+function getUploadUrl(fileId: string, expirySeconds = 60) {
+  const client = initR2()
+  return client.getPresignedUrl('PUT', fileId, { expirySeconds })
+}
+
 function deleteObject(fileId: string) {
   const client = initR2()
   return client.deleteObject(fileId)
@@ -35,4 +40,11 @@ function checkIfExist(fileId: string) {
 function getSignedUrl(fileId: string, expirySeconds: number) {
   const client = initR2()
   return client.getPresignedUrl('GET', fileId, { expirySeconds })
+}
+// get the size from r2
+async function getSizeChecksum(fileId: string) {
+  const client = initR2()
+  const { size, metadata } = await client.statObject(fileId)
+  const checksum = metadata['x-amz-meta-crc32']
+  return { size, checksum }
 }

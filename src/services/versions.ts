@@ -16,7 +16,7 @@ export async function openVersion(app: Database['public']['Tables']['app_version
   displayStore.showLoader = true
   let signedURL
   if (app.bucket_id)
-    signedURL = await downloadUrl(app.storage_provider, app.app_id, app.bucket_id)
+    signedURL = await downloadUrl(app.storage_provider, app.user_id, app.app_id, app.bucket_id)
   else
     signedURL = app.external_url
 

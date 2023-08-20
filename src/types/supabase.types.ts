@@ -262,6 +262,7 @@ export interface Database {
           id: string | null
           last_version: string | null
           name: string | null
+          retention: number
           updated_at: string | null
           user_id: string
         }
@@ -272,6 +273,7 @@ export interface Database {
           id?: string | null
           last_version?: string | null
           name?: string | null
+          retention?: number
           updated_at?: string | null
           user_id: string
         }
@@ -282,6 +284,7 @@ export interface Database {
           id?: string | null
           last_version?: string | null
           name?: string | null
+          retention?: number
           updated_at?: string | null
           user_id?: string
         }
@@ -1569,7 +1572,6 @@ export interface Database {
       }
     }
     Enums: {
-      app_mode: "prod" | "dev" | "livereload"
       key_mode: "read" | "write" | "all" | "upload"
       pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
@@ -1595,3 +1597,4 @@ export interface Database {
     }
   }
 }
+

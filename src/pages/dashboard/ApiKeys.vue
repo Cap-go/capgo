@@ -7,6 +7,8 @@ import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
 import Plus from '~icons/heroicons/plus'
+import ArrowPath from '~icons/heroicons/arrow-path'
+import Trash from '~icons/heroicons/trash'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -76,6 +78,87 @@ async function addNewApiKey() {
   toast.success(t('add-api-key'))
 }
 
+async function regenrateKey(app: Database['public']['Tables']['apikeys']['Row']) {
+  if (await showRegenerateKeyModal())
+    return
+
+  const newApiKey = crypto.randomUUID()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    console.log('Not logged in, cannot regenerate API key')
+    return
+  }
+
+  const { error } = await supabase
+    .from('apikeys')
+    .update({ key: newApiKey })
+    .eq('user_id', user.id)
+    .eq('key', app.key)
+
+  if (error || typeof newApiKey !== 'string')
+    throw error
+
+  app.key = newApiKey
+
+  toast.success(t('generated-new-apikey'))
+}
+
+async function deleteKey(app: Database['public']['Tables']['apikeys']['Row']) {
+  if (await showDeleteKeyModal())
+    return
+
+  const { error } = await supabase
+    .from('apikeys')
+    .delete()
+    .eq('key', app.key)
+
+  if (error)
+    throw error
+
+  toast.success(t('removed-apikey'))
+  apps.value = apps.value?.filter(filterKey => filterKey.key !== app.key)
+}
+
+// This returns true if user has canceled the action
+async function showRegenerateKeyModal() {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-regenerate'),
+    message: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-regenerate'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
+async function showDeleteKeyModal() {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
 async function showAddNewKeyModal() {
   displayStore.dialogOption = {
     header: t('alert-add-new-key'),
@@ -102,10 +185,6 @@ async function showAddNewKeyModal() {
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
 }
-
-function deleteApiKey(key: string) {
-  apps.value = apps.value?.filter(filterKey => filterKey.key !== key)
-}
 </script>
 
 <template>
@@ -123,7 +202,14 @@ function deleteApiKey(key: string) {
     <div class="flex flex-col">
       <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true" @delete="deleteApiKey" />
+          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true">
+            <button class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey(app)">
+              <ArrowPath class="mr-4 text-lg text-red-600" />
+            </button>
+            <button class="w-7 h-7 bg-transparent ml-4" @click="deleteKey(app)">
+              <Trash class="mr-4 text-lg text-red-600" />
+            </button>
+          </InfoRow>
         </dl>
       </div>
     </div>
