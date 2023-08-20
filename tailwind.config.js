@@ -16,6 +16,7 @@ const base100 = '#2A303C'
 const info = '#3ABFF8'
 
 module.exports = konstaConfig({
+  darkMode: 'class',
   konsta: {
     colors: {
       primary,
