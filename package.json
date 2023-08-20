@@ -78,7 +78,7 @@
     "@formkit/vue": "0.17.1",
     "@intlify/unplugin-vue-i18n": "^0.12.2",
     "@netlify/functions": "^1.6.0",
-    "@supabase/supabase-js": "2.22.0",
+    "@supabase/supabase-js": "2.31.0",
     "@tailwindcss/forms": "^0.5.4",
     "@vueuse/components": "^10.3.0",
     "@vueuse/core": "10.1.2",
