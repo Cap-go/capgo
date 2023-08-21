@@ -6,6 +6,7 @@ import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
 import { useSupabase } from '~/services/supabase'
 import { iconEmail, iconName, iconPassword } from '~/services/icons'
+import { toast } from 'vue-sonner'
 
 const router = useRouter()
 const supabase = useSupabase()
