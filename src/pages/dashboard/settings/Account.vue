@@ -122,6 +122,16 @@ async function pickPhoto() {
   }
 }
 
+async function digestMessageSha256(message: string) {
+  const msgUint8 = new TextEncoder().encode(message) // encode as (utf-8) Uint8Array
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8) // hash the message
+  const hashArray = Array.from(new Uint8Array(hashBuffer)) // convert buffer to byte array
+  const hashHex = hashArray
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('') // convert bytes to hex string
+  return hashHex
+}
+
 async function deleteAccount() {
   displayStore.showActionSheet = true
   displayStore.actionSheetOption = {
@@ -130,21 +140,34 @@ async function deleteAccount() {
       {
         text: t('button-remove'),
         handler: async () => {
-          if (!main.auth || main.auth?.email == null)
+          if (!main.auth || main.auth?.email == null || main.auth?.id == null)
             return
+
+          const hashedEmail = await digestMessageSha256(main.auth.email)
+
           const { error } = await supabase
             .from('deleted_account')
             .insert({
-              email: main.auth.email,
+              email: hashedEmail,
             })
+
           if (error) {
             console.error(error)
             setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            return
           }
-          else {
-            await main.logout()
-            router.replace('/login')
+
+          const { data: _, error: deleteError } = await supabase
+            .rpc('delete_user')
+
+          if (deleteError) {
+            console.error(error)
+            setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            return
           }
+
+          await main.logout()
+          router.replace('/login')
         },
       },
       {
@@ -379,7 +402,7 @@ onMounted(() => {
         </div>
       </div>
       <!-- Panel footer -->
-      <footer>
+      <footer> 
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
             <button class="p-2 text-white bg-red-400 border-red-200 rounded btn hover:bg-red-600" @click="deleteAccount()">

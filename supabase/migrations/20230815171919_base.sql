@@ -120,6 +120,12 @@ BEGIN
 END;
 $$;
 
+CREATE or replace function "delete_user"()
+  RETURNS void
+LANGUAGE SQL SECURITY DEFINER 
+AS $$
+   delete from auth.users where id = auth.uid();
+$$;
 
 CREATE FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) RETURNS double precision
     LANGUAGE "plpgsql"
@@ -1663,7 +1669,7 @@ ALTER TABLE ONLY "public"."stats"
     ADD CONSTRAINT "logs_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."notifications"
-    ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id");
+    ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."org_users"
     ADD CONSTRAINT "org_users_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
@@ -1757,6 +1763,7 @@ CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" USING
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
 CREATE POLICY "Enable update for users based on email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK (("auth"."email"() = ("email")::"text"));
+CREATE POLICY "Enable update for users based on hashed email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK ((encode(digest("auth"."email"(), 'sha256'::text), 'hex'::"text") = ("email")::"text"));
 
 CREATE POLICY "Select if app is shared with you or api" ON "public"."channels" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read}'::"public"."key_mode"[], "app_id")));
 
