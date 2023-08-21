@@ -865,7 +865,7 @@ Begin
   SELECT count(*)
   INTO is_found
   FROM (SELECT PGP_SYM_DECRYPT(email::bytea, 'bf') as email from deleted_account) as decrypted
-  WHERE email=email_check;
+  WHERE decrypted.email=email_check;
   RETURN is_found = 0;
 End; 
 $$;
