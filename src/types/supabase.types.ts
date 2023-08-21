@@ -416,13 +416,14 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
+          enable_progressive_deploy: boolean
           enableAbTesting: boolean
           id: number
           ios: boolean
           name: string
           public: boolean
           secondaryVersionPercentage: number
-          secondVersion: number | null
+          secondVersion: number
           updated_at: string
           version: number
         }
@@ -437,15 +438,16 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
+          enable_progressive_deploy?: boolean
           enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name: string
           public?: boolean
           secondaryVersionPercentage?: number
-          secondVersion?: number | null
+          secondVersion?: number
           updated_at?: string
-          version: number
+          version?: number
         }
         Update: {
           allow_dev?: boolean
@@ -458,13 +460,14 @@ export interface Database {
           created_by?: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
+          enable_progressive_deploy?: boolean
           enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name?: string
           public?: boolean
           secondaryVersionPercentage?: number
-          secondVersion?: number | null
+          secondVersion?: number
           updated_at?: string
           version?: number
         }
@@ -1159,6 +1162,10 @@ export interface Database {
         }
         Returns: number
       }
+      delete_user: {
+        Args: {}
+        Returns: void
+      },
       convert_bytes_to_mb: {
         Args: {
           byt: number

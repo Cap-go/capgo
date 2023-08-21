@@ -1079,6 +1079,7 @@ CREATE TABLE "public"."channels" (
     "public" boolean DEFAULT false NOT NULL,
     "disableAutoUpdateUnderNative" boolean DEFAULT true NOT NULL,
     "enableAbTesting" boolean not null default false,
+    "enable_progressive_deploy" boolean not null default false,
     "secondaryVersionPercentage" double precision not null default '0'::double precision,
     "secondVersion" bigint not null default '1883'::bigint,
     "disableAutoUpdateToMajor" boolean DEFAULT true NOT NULL,

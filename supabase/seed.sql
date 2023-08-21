@@ -122,4 +122,11 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
     AND apps.retention > 0
     AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
     AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention');
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention'),
+(20, '*/10 * * * *', '
+    update channels
+    SET
+      "secondaryVersionPercentage" = CASE WHEN channels."secondVersion" not in (select version from stats where stats.action=''update_fail'' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) THEN "secondaryVersionPercentage" + 0.1 ELSE 0 END
+    where channels.enable_progressive_deploy = true
+    and channels."secondaryVersionPercentage" between 0 AND 0.9;
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_progressive_deploy');

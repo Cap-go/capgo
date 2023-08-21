@@ -115,6 +115,28 @@ async function setSecondChannel(channel: Database['public']['Tables']['channels'
     .eq('id', channel.id)
 }
 
+async function setChannelProgressive(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+  return supabase
+    .from('channels')
+    .update({
+      secondVersion: id,
+      version: channel.secondVersion,
+      secondaryVersionPercentage: 0.1,
+    })
+    .eq('id', channel.id)
+}
+
+async function setChannelSkipProgressive(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+  return supabase
+    .from('channels')
+    .update({
+      secondVersion: id,
+      version: id,
+      secondaryVersionPercentage: 1,
+    })
+    .eq('id', channel.id)
+}
+
 async function ASChannelChooser() {
   if (!version.value)
     return
@@ -172,14 +194,14 @@ async function ASChannelChooser() {
 
   for (const chan of channels.value) {
     const v: number = chan.version as any
-    if (!chan.enableAbTesting) {
+    if (!chan.enableAbTesting && !chan.enable_progressive_deploy) {
       buttons.push({
         text: chan.name,
         selected: version.value.id === v,
         handler: async () => { await normalHandler(chan) },
       })
     }
-    else {
+    else if (chan.enableAbTesting && !chan.enable_progressive_deploy) {
       buttons.push({
         text: `${chan.name}-A`,
         selected: version.value.id === v,
@@ -194,6 +216,63 @@ async function ASChannelChooser() {
         handler: async () => {
           await commonAbHandler(channel.value, 'b')
           await secondHandler(chan)
+        },
+      })
+    }
+    else {
+      buttons.push({
+        text: `${chan.name}`,
+        selected: version.value.id === chan.secondVersion,
+        handler: async () => {
+          const newButtons = []
+          newButtons.push({
+            text: t('start-new-deploy'),
+            selected: false,
+            handler: async () => {
+              if (!version.value)
+                return
+
+              try {
+                await setChannelProgressive(chan, version.value.id)
+                await getChannels()
+              }
+              catch (error) {
+                console.error(error)
+                toast.error(t('cannot-test-app-some'))
+              }
+            },
+          })
+
+          newButtons.push({
+            text: t('force-version-change'),
+            selected: false,
+            handler: async () => {
+              if (!version.value)
+                return
+              try {
+                await setChannelSkipProgressive(chan, version.value.id)
+                await getChannels()
+              }
+              catch (error) {
+                console.error(error)
+                toast.error(t('cannot-test-app-some'))
+              }
+            },
+          })
+
+          newButtons.push({
+            text: t('button-cancel'),
+            role: 'cancel',
+            handler: () => {
+              // console.log('Cancel clicked')
+            },
+          })
+
+          displayStore.actionSheetOption = {
+            header: t('progressive-deploy-option'),
+            buttons: newButtons,
+          }
+          displayStore.showActionSheet = true
         },
       })
     }

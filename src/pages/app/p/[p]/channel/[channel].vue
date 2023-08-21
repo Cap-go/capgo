@@ -125,6 +125,7 @@ async function getChannel() {
           android,
           updated_at,
           enableAbTesting,
+          enable_progressive_deploy,
           secondaryVersionPercentage,
           secondVersion (
             name,
@@ -277,6 +278,11 @@ async function enableAbTesting() {
 
   const val = !channel.value.enableAbTesting
 
+  if (val && channel.value.enable_progressive_deploy) {
+    toast.error(t('ab-testing-progressive-deploy-conflict'))
+    return
+  }
+
   const { error } = await supabase
     .from('channels')
     .update({ enableAbTesting: val })
@@ -291,6 +297,31 @@ async function enableAbTesting() {
   }
 }
 
+async function enableProgressiveDeploy() {
+  if (!channel.value)
+    return
+
+  const val = !channel.value.enable_progressive_deploy
+
+  if (val && channel.value.enableAbTesting) {
+    toast.error(t('ab-testing-progressive-deploy-conflict'))
+    return
+  }
+
+  const { error } = await supabase
+    .from('channels')
+    .update({ enable_progressive_deploy: val })
+    .eq('id', id.value)
+
+  if (error) {
+    console.error(error)
+  }
+  else {
+    channel.value.enable_progressive_deploy = val
+    toast.success(val ? t('enabled-progressive-deploy') : t('disable-progressive-deploy'))
+  }
+}
+
 const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
   const { error } = await supabase
     .from('channels')
@@ -301,9 +332,23 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
     console.error(error)
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
+const debouncedInformAboutProgressiveDeployPercentageSet = debounce(() => {
+  toast.error(t('progressive-deploy-set-percentage'))
+}, 500, { leading: true, trailing: true, maxWait: 500 })
+
 async function setSecondaryVersionPercentage(percentage: number) {
+  if (channel.value?.enable_progressive_deploy)
+    return
+
   secondaryVersionPercentage.value = percentage
   await debouncedSetSecondaryVersionPercentage(percentage)
+}
+
+function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
+  if (channel.value?.enable_progressive_deploy) {
+    debouncedInformAboutProgressiveDeployPercentageSet()
+    event.preventDefault()
+  }
 }
 </script>
 
@@ -315,10 +360,15 @@ async function setSecondaryVersionPercentage(percentage: number) {
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
-          <InfoRow v-if="!channel.enableAbTesting" :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="channel.version.name !== 'unknown' ? openBundle : ''" />
-          <template v-else>
+          <InfoRow v-if="!channel.enableAbTesting && !channel.enable_progressive_deploy" :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle()" />
+          <template v-else-if="channel.enableAbTesting && !channel.enable_progressive_deploy">
             <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle" />
             <InfoRow :label="`${t('bundle-number')} B`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
+          </template>
+          <template v-else>
+            <InfoRow :label="`${t('main-bundle-number')}`" :value="channel.version.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
+            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : `${((channel.secondaryVersionPercentage * 100) | 0)}%`" />
           </template>
           <!-- Created At -->
           <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
@@ -421,6 +471,16 @@ async function setSecondaryVersionPercentage(percentage: number) {
                 />
               </template>
             </k-list-item>
+            <k-list-item label :title="t('channel-progressive-deploy')" class="text-lg text-gray-700 dark:text-gray-200">
+              <template #after>
+                <k-toggle
+                  class="-my-1 k-color-success"
+                  component="div"
+                  :checked="channel?.enable_progressive_deploy"
+                  @change="enableProgressiveDeploy()"
+                />
+              </template>
+            </k-list-item>
             <k-list-item label :title="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-range
@@ -429,6 +489,7 @@ async function setSecondaryVersionPercentage(percentage: number) {
                   component="div"
                   :step="5"
                   @input="(e: any) => (setSecondaryVersionPercentage(parseInt(e.target.value, 10)))"
+                  @mousedown="onMouseDownSecondaryVersionSlider"
                 />
               </template>
             </k-list-item>

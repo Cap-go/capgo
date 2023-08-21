@@ -413,7 +413,8 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
-          enableAbTesting: boolean
+          enableAbTesting: boolean,
+          enable_progressive_deploy?: boolean
           id: number
           ios: boolean
           name: string
@@ -435,6 +436,7 @@ export interface Database {
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enableAbTesting?: boolean
+          enable_progressive_deploy?: boolean
           id?: number
           ios?: boolean
           name: string
@@ -456,6 +458,7 @@ export interface Database {
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enableAbTesting?: boolean
+          enable_progressive_deploy?: boolean
           id?: number
           ios?: boolean
           name?: string
