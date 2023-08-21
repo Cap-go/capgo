@@ -4,9 +4,9 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { iconEmail, iconName, iconPassword } from '~/services/icons'
-import { toast } from 'vue-sonner'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -19,7 +19,7 @@ async function submit(form: { first_name: string; last_name: string; password: s
     return
 
   const { data: deleted, error: errorDeleted } = await supabase
-    .rpc('is_not_deleted_v2', { email_check: form.email })
+    .rpc('is_not_deleted', { email_check: form.email })
   if (errorDeleted)
     console.error(errorDeleted)
   if (!deleted) {
