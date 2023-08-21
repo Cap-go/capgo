@@ -12,7 +12,7 @@ import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import { useMainStore } from '~/stores/main'
-import { useSupabase } from '~/services/supabase'
+import { deleteUser, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
@@ -121,6 +121,17 @@ async function pickPhoto() {
     isLoading.value = false
   }
 }
+async function hashEmail(email: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(email);
+
+  const hashBuffer = await  window.crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+
+}
+
 
 async function deleteAccount() {
   displayStore.showActionSheet = true
@@ -132,18 +143,44 @@ async function deleteAccount() {
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
             return
-          const { error } = await supabase
-            .from('deleted_account')
-            .insert({
-              email: main.auth.email,
-            })
-          if (error) {
-            console.error(error)
-            setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+          const supabaseClient = useSupabase();
+
+          const authUser = await supabase.auth.getUser()
+          if (authUser.error) {
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
-          else {
+          try {
+            const userData = await supabaseClient
+              .from('users')
+              .select()
+              .eq('id', authUser.data.user.id)
+              .single()
+
+            await supabaseClient
+              .from('stripe_info')
+              .delete()
+              .eq('customer_id', userData.data?.customer_id)
+
+            const hashedEmail = await hashEmail(authUser.data.user.email!)
+
+            await supabaseClient
+              .from('deleted_account')
+              .insert({
+                email: hashedEmail,
+              })
+
+            await supabaseClient
+            .from('users')
+            .delete()
+            .eq('id', userData.data?.id)
+
+            await deleteUser()
+
             await main.logout()
             router.replace('/login')
+          } catch (error) {
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
           }
         },
       },

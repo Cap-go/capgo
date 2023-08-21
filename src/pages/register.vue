@@ -6,6 +6,7 @@ import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
 import { useSupabase } from '~/services/supabase'
 import { iconEmail, iconName, iconPassword } from '~/services/icons'
+import { toast } from 'vue-sonner'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -16,6 +17,16 @@ const isLoading = ref(false)
 async function submit(form: { first_name: string; last_name: string; password: string; email: string }) {
   if (isLoading.value)
     return
+
+  const { data: deleted, error: errorDeleted } = await supabase
+    .rpc('is_not_deleted_v2', { email_check: form.email })
+  if (errorDeleted)
+    console.error(errorDeleted)
+  if (!deleted) {
+    toast.error(t('used-to-create'))
+    return
+  }
+
   isLoading.value = true
   const { data: user, error } = await supabase.auth.signUp(
     {
