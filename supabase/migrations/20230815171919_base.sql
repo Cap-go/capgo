@@ -864,7 +864,7 @@ Declare
 Begin
   SELECT count(*)
   INTO is_found
-  FROM public.deleted_account
+  FROM (SELECT PGP_SYM_DECRYPT(email::bytea, 'bf') as email from deleted_account) as decrypted
   WHERE email=email_check;
   RETURN is_found = 0;
 End; 
@@ -944,6 +944,18 @@ CREATE FUNCTION "public"."update_version_stats"("app_id" character varying, "ver
   where app_versions_meta.id = update_version_stats.version_id and
   app_versions_meta.app_id = update_version_stats.app_id
 $$;
+
+CREATE OR REPLACE FUNCTION "public"."add_deleted_user"()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+AS $BODY$
+	DECLARE email character varying;
+    BEGIN
+        email = OLD.email;
+        INSERT INTO "public"."deleted_account" (email) VALUES (PGP_SYM_ENCRYPT(email, 'bf'));
+        RETURN NULL;
+    END;
+$BODY$;
 
 
 SET default_tablespace = '';
@@ -1053,8 +1065,8 @@ CREATE TABLE "public"."apps" (
     "name" character varying,
     "last_version" character varying,
     "updated_at" timestamp with time zone,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"()
-    "retention" bigint NOT NULL DEFAULT '0'::bigint,
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"(),
+    "retention" bigint NOT NULL DEFAULT '0'::bigint
 );
 
 
@@ -1521,6 +1533,8 @@ CREATE INDEX "idx_version_build_logs" ON "public"."stats" USING "btree" ("versio
 CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
+
+CREATE OR REPLACE TRIGGER "handle_delete_user" AFTER DELETE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."add_deleted_user"();
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."apikeys" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
@@ -2101,6 +2115,11 @@ GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" 
 GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."add_deleted_user" TO "postgres";
+GRANT ALL ON FUNCTION "public"."add_deleted_user" TO "anon";
+GRANT ALL ON FUNCTION "public"."add_deleted_user" TO "authenticated";
+GRANT ALL ON FUNCTION "public"."add_deleted_user" TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) TO "postgres";
 GRANT ALL ON FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) TO "anon";
