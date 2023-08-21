@@ -317,6 +317,7 @@ usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
+used-to-create: Account with this email used to exist, cannot recreate
 user: User
 validate: Validate
 version: Version
