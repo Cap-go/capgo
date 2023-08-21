@@ -1410,6 +1410,20 @@ AS $$
    delete from auth.users where id = auth.uid();
 $$;
 
+CREATE FUNCTION "public"."is_not_deleted_v2"("email_check" character varying) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Declare  
+ is_found integer;
+Begin
+  SELECT count(*)
+  INTO is_found
+  FROM public.deleted_account
+  WHERE email=encode(digest(email_check, 'sha256'::text), 'hex'::text);
+  RETURN is_found = 0;
+End; 
+$$;
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
 
