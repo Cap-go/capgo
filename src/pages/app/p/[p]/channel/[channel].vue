@@ -310,7 +310,7 @@ async function enableProgressiveDeploy() {
 
   const { error } = await supabase
     .from('channels')
-    .update({ enable_progressive_deploy: val })
+    .update({ enable_progressive_deploy: val, secondVersion: val ? channel.value.version.id : undefined })
     .eq('id', id.value)
 
   if (error) {
@@ -320,6 +320,8 @@ async function enableProgressiveDeploy() {
     channel.value.enable_progressive_deploy = val
     toast.success(val ? t('enabled-progressive-deploy') : t('disable-progressive-deploy'))
   }
+
+  await reload()
 }
 
 const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
