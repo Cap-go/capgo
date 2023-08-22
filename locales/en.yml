@@ -300,6 +300,7 @@ specialError: Should contain special characters
 start-new-deploy: Start new progressive deploy
 start-using-capgo: 'Start using:'
 status-complete: complete
+status-failed: failed
 stored-externally: stored externally
 submit: Submit
 support: Support

@@ -368,9 +368,9 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
             <InfoRow :label="`${t('bundle-number')} B`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
           </template>
           <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :value="channel.version.name" :is-link="true" @click="openBundle" />
-            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
-            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : `${((channel.secondaryVersionPercentage * 100) | 0)}%`" />
+            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.secondVersion.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
+            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : (channel.secondaryVersionPercentage !== 0 ? `${((channel.secondaryVersionPercentage * 100) | 0)}%` : t('status-failed'))" />
           </template>
           <!-- Created At -->
           <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
