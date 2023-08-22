@@ -11,7 +11,7 @@ const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true' ?? false
 const bucket = 'capgo'
 
 function initR2() {
-  const data = {
+  const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
     useSSL: storageUseSsl,
@@ -20,8 +20,8 @@ function initR2() {
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
-  console.log(`SETUP DATA: ${JSON.stringify(data)}`)
-  return new S3Client(data)
+
+  return new S3Client(params)
 }
 
 function upload(fileId: string, file: Uint8Array) {
@@ -52,9 +52,6 @@ function getSignedUrl(fileId: string, expirySeconds: number) {
 async function getSizeChecksum(fileId: string) {
   const client = initR2()
   const { size, metadata } = await client.statObject(fileId)
-  console.log('meta')
-  console.log(size)
-  console.log(metadata)
   const checksum = metadata['x-amz-meta-crc32']
   return { size, checksum }
 }
