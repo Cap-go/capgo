@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin, updateOnpremStats, updateVersionStats } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOnpremStats } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -99,30 +99,30 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       stat.version = appVersion.id
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
-        const { data: deviceData } = await supabaseAdmin()
-          .from('devices')
-          .select()
-          .eq('app_id', app_id)
-          .eq('device_id', device_id)
-          .single()
-        if (deviceData && deviceData.version !== appVersion.id) {
-          all.push(updateVersionStats({
-            app_id,
-            version_id: deviceData.version,
-            install: 0,
-            uninstall: 1,
-            fail: 0,
-          }))
-        }
-        if (!deviceData || deviceData.version !== appVersion.id) {
-          all.push(updateVersionStats({
-            app_id,
-            version_id: appVersion.id,
-            install: 1,
-            uninstall: 0,
-            fail: 0,
-          }))
-        }
+        // const { data: deviceData } = await supabaseAdmin()
+        //   .from('devices')
+        //   .select()
+        //   .eq('app_id', app_id)
+        //   .eq('device_id', device_id)
+        //   .single()
+        // if (deviceData && deviceData.version !== appVersion.id) {
+        //   all.push(updateVersionStats({
+        //     app_id,
+        //     version_id: deviceData.version,
+        //     install: 0,
+        //     uninstall: 1,
+        //     fail: 0,
+        //   }))
+        // }
+        // if (!deviceData || deviceData.version !== appVersion.id) {
+        //   all.push(updateVersionStats({
+        //     app_id,
+        //     version_id: appVersion.id,
+        //     install: 1,
+        //     uninstall: 0,
+        //     fail: 0,
+        //   }))
+        // }
       }
       else if (failActions.includes(action)) {
         const sent = await sendNotif('user:update_fail', {
@@ -140,13 +140,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
             notify: true,
           }).catch()
         }
-        all.push(updateVersionStats({
-          app_id,
-          version_id: appVersion.id,
-          install: 0,
-          uninstall: 0,
-          fail: 1,
-        }))
+        // all.push(updateVersionStats({
+        //   app_id,
+        //   version_id: appVersion.id,
+        //   install: 0,
+        //   uninstall: 0,
+        //   fail: 1,
+        // }))
       }
     }
     else {
