@@ -982,6 +982,7 @@ CREATE TABLE "public"."app_versions" (
     "checksum" character varying,
     "session_key" character varying,
     "storage_provider" "text" DEFAULT 'r2'::"text" NOT NULL
+    "native_files_sha256" array NULL,
 );
 
 
