@@ -1,4 +1,4 @@
-import { S3Client } from 'https://deno.land/x/s3_lite_client@0.5.0/mod.ts'
+import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import { getEnv } from './utils.ts'
 
 const accountid = getEnv('R2_ACCOUNT_ID')
