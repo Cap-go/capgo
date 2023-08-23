@@ -14,19 +14,19 @@ export const i18n = createI18n({
 
 export const availableLocales = (import.meta.env.locales).split(',')
 export const languages = {
-  de: 'Deutsch',
-  en: 'English',
-  es: 'Español',
-  id: 'Bahasa Indonesia',
-  it: 'Italiano',
-  fr: 'Français',
-  ja: '日本語',
-  ko: '한국어',
-  pl: 'Polski',
+  'de': 'Deutsch',
+  'en': 'English',
+  'es': 'Español',
+  'id': 'Bahasa Indonesia',
+  'it': 'Italiano',
+  'fr': 'Français',
+  'ja': '日本語',
+  'ko': '한국어',
+  'pl': 'Polski',
   'pt-BR': 'Português (Brasil)',
-  ru: 'Русский',
-  tr: 'Türkçe',
-  vi: 'Tiếng Việt',
+  'ru': 'Русский',
+  'tr': 'Türkçe',
+  'vi': 'Tiếng Việt',
   'zh-CN': '简体中文',
 }
 const loadedLanguages: string[] = []
