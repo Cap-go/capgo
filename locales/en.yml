@@ -126,6 +126,7 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
+used-to-create: Account with this email used to exist, cannot recreate
 deleted: deleted
 details-and-logs: Details and logs
 device: Device
