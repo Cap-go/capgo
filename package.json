@@ -81,7 +81,7 @@
     "@supabase/supabase-js": "2.22.0",
     "@tailwindcss/forms": "^0.5.4",
     "@vueuse/components": "^10.3.0",
-    "@vueuse/core": "10.1.2",
+    "@vueuse/core": "10.3.0",
     "adm-zip": "^0.5.10",
     "atropos": "^1.0.2",
     "axios": "^1.4.0",
