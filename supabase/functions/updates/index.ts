@@ -245,7 +245,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     const enableProgressiveDeploy: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
 
-    const version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
+    let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
     const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (devicesOverride?.version || undefined || (enableSecondVersion ? channelData?.secondVersion : undefined)) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
