@@ -506,7 +506,7 @@ export interface Database {
         }
         Insert: {
           created_at?: string | null
-          email: string
+          email?: string
           id?: string
         }
         Update: {
@@ -1146,6 +1146,10 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      add_deleted_user: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_min_rights: {
         Args: {
           min_right: Database["public"]["Enums"]["user_min_right"]
@@ -1221,6 +1225,10 @@ export interface Database {
       count_all_updates: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      delete_user: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       exist_app: {
         Args: {
@@ -1426,21 +1434,6 @@ export interface Database {
         }
         Returns: boolean
       }
-      increment_stats: {
-        Args: {
-          app_id: string
-          date_id: string
-          bandwidth: number
-          version_size: number
-          channels: number
-          shared: number
-          mlu: number
-          mlu_real: number
-          versions: number
-          devices: number
-        }
-        Returns: undefined
-      }
       increment_stats_v2: {
         Args: {
           app_id: string
@@ -1461,14 +1454,6 @@ export interface Database {
         Args: {
           app_id: string
           updates: number
-        }
-        Returns: undefined
-      }
-      increment_version_stats: {
-        Args: {
-          app_id: string
-          version_id: number
-          devices: number
         }
         Returns: undefined
       }
@@ -1551,6 +1536,12 @@ export interface Database {
         }
         Returns: boolean
       }
+      is_not_deleted_v2: {
+        Args: {
+          email_check: string
+        }
+        Returns: boolean
+      }
       is_onboarded: {
         Args: {
           userid: string
@@ -1594,6 +1585,7 @@ export interface Database {
       }
     }
     Enums: {
+      app_mode: "prod" | "dev" | "livereload"
       key_mode: "read" | "write" | "all" | "upload"
       pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
@@ -1619,4 +1611,3 @@ export interface Database {
     }
   }
 }
-

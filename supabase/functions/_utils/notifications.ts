@@ -82,11 +82,6 @@ export async function sendNotif(eventName: string, eventData: EventData, userId:
     console.log('user not found', userId)
     return Promise.resolve(false)
   }
-  const isDeletedUser = await isDeleted(user.email)
-  if (isDeletedUser) {
-    console.log('user is deleted', userId)
-    return Promise.resolve(false)
-  }
   // check if notif has already been send in notifications table
   const { data: notif } = await supabaseAdmin()
     .from('notifications')

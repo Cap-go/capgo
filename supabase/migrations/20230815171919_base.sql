@@ -671,27 +671,9 @@ BEGIN
 END;
 $$;
 
-
-CREATE FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  update app_stats 
-  set bandwidth = app_stats.bandwidth + increment_stats.bandwidth,
-    version_size = app_stats.version_size + increment_stats.version_size,
-    channels = app_stats.channels + increment_stats.channels,
-    shared = app_stats.shared + increment_stats.shared,
-    mlu = app_stats.mlu + increment_stats.mlu,
-    devices = app_stats.devices + increment_stats.devices,
-    mlu_real = app_stats.mlu_real + increment_stats.mlu_real,
-    versions = app_stats.versions + increment_stats.versions
-  where app_stats.date_id = increment_stats.date_id and
-  app_stats.app_id = increment_stats.app_id
-$$;
-
-
-CREATE FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
+CREATE FUNCTION public.increment_stats_v2(app_id character varying, date_id character varying, bandwidth integer, version_size integer, channels integer, shared integer, mlu integer, mlu_real integer, versions integer, devices integer, devices_real integer) 
+RETURNS void AS $$
+BEGIN
   update app_stats 
   set bandwidth = app_stats.bandwidth + increment_stats_v2.bandwidth,
     version_size = app_stats.version_size + increment_stats_v2.version_size,
@@ -703,29 +685,19 @@ CREATE FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_
     mlu_real = app_stats.mlu_real + increment_stats_v2.mlu_real,
     versions = app_stats.versions + increment_stats_v2.versions
   where app_stats.date_id = increment_stats_v2.date_id and
-  app_stats.app_id = increment_stats_v2.app_id
-$$;
+  app_stats.app_id = increment_stats_v2.app_id;
+END;
+$$ LANGUAGE plpgsql;
 
 
-CREATE FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
+CREATE OR REPLACE FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer)
+RETURNS void AS $$
+BEGIN
   update store_apps 
   set updates = store_apps.updates + increment_store.updates
-  where store_apps.app_id = increment_store.app_id
-$$;
-
-
-CREATE FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
-  UPDATE app_versions_meta
-  SET devices = (CASE WHEN (get_devices_version(app_id, version_id) + increment_version_stats.devices > 0)
-    THEN (SELECT COUNT(*) FROM devices WHERE app_id = increment_version_stats.app_id and version = increment_version_stats.version_id)
-    ELSE 0 END)
-  where app_versions_meta.id = increment_version_stats.version_id and
-  app_versions_meta.app_id = increment_version_stats.app_id
-$$;
+  where store_apps.app_id = increment_store.app_id;
+END;
+$$ LANGUAGE plpgsql;
 
 
 CREATE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
@@ -933,17 +905,18 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) RETURNS "void"
-    LANGUAGE "sql"
-    AS $$
+CREATE OR REPLACE FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint)
+RETURNS void AS $$
+BEGIN
   UPDATE app_versions_meta
   SET installs = installs + update_version_stats.install,
     uninstalls = uninstalls + update_version_stats.uninstall,
     devices = get_devices_version(app_id, version_id),
     fails = fails + update_version_stats.fail
   where app_versions_meta.id = update_version_stats.version_id and
-  app_versions_meta.app_id = update_version_stats.app_id
-$$;
+  app_versions_meta.app_id = update_version_stats.app_id;
+END;
+$$ LANGUAGE plpgsql;
 
 
 SET default_tablespace = '';
@@ -1053,8 +1026,8 @@ CREATE TABLE "public"."apps" (
     "name" character varying,
     "last_version" character varying,
     "updated_at" timestamp with time zone,
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"()
-    "retention" bigint NOT NULL DEFAULT '0'::bigint,
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"(),
+    "retention" bigint NOT NULL DEFAULT '0'::bigint
 );
 
 
@@ -1408,6 +1381,11 @@ CREATE TABLE "public"."users" (
     "billing_email" "text"
 );
 
+CREATE OR REPLACE FUNCTION "public"."delete_user"() RETURNS void
+LANGUAGE SQL SECURITY DEFINER 
+AS $$
+   delete from auth.users where id = auth.uid();
+$$;
 
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
@@ -1497,6 +1475,8 @@ CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_a
 CREATE INDEX "idx_device_id_logs" ON "public"."stats" USING "btree" ("device_id");
 
 CREATE INDEX "idx_devices_created_at" ON "public"."devices" USING "btree" ("device_id", "created_at" DESC);
+
+CREATE INDEX idx_app_id_version_devices ON "public".devices(app_id,version);
 
 CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
 
@@ -1760,7 +1740,7 @@ CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" USING
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
-CREATE POLICY "Enable update for users based on email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK (("auth"."email"() = ("email")::"text"));
+--CREATE POLICY "Enable update for users based on email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK  (encode(digest(auth.email(), 'sha256'::text), 'hex'::text) = (email)::text)
 
 CREATE POLICY "Select if app is shared with you or api" ON "public"."channels" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read}'::"public"."key_mode"[], "app_id")));
 
@@ -2001,10 +1981,10 @@ GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid"
 GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "postgres";
-GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "service_role";
+--GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "postgres";
+--GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "anon";
+--GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "authenticated";
+--GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) TO "postgres";
 GRANT ALL ON FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) TO "anon";
@@ -2016,10 +1996,10 @@ GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "up
 GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "postgres";
-GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "service_role";
+--GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "postgres";
+--GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "anon";
+--GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "authenticated";
+--GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "anon";
