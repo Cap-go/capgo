@@ -4,6 +4,7 @@ Current: Current
 Filters: Filters
 Override: Override
 Storage: Storage
+ab-testing-progressive-deploy-conflict: AB testing and progressive deploy cannot be enabled at the same time
 account: Account
 account-error: Error while updating your account
 account-password-error: Error happened, please try again
@@ -101,6 +102,7 @@ channel-link-fail: Cannot override the channel something wrong happened
 channel-linked: Channel override setted
 channel-linking: Link to channel
 channel-make-now: Make default
+channel-progressive-deploy: Enable progressive deploy
 channels: Channels
 check-email: Please check your email and verify
 check-on-web: Check on website
@@ -136,6 +138,7 @@ devices-using-this-b: Devices using this bundle
 disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
+disable-progressive-deploy: Disabled progressive deploy
 discord: Discord
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
@@ -145,6 +148,7 @@ download: Download
 email: Email
 email-address: Email address
 enabled-ab-testing: Enabled AB testing
+enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
@@ -154,6 +158,7 @@ failed: Failed
 filters: Filters
 first-name: First name
 force-version: Force version
+force-version-change: Skip progressive deploy
 forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
@@ -191,6 +196,7 @@ login-to-your-accoun: Login to your account
 logout: Logout
 logs: Logs
 lowerCaseError: Should contain lowercase letters
+main-bundle-number: Main bundle number
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
@@ -254,6 +260,10 @@ please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
+progressive-bundle-number: Progressive bundle number
+progressive-deploy-option: Select progressive deploy option
+progressive-deploy-set-percentage: You cannot set secondary version percentage when progressive deploy is enabled
+progressive-percentage: Progressive deploy status
 projection: Projections
 recommended: Recommended
 recommended-for-you: Recommended for you
@@ -288,7 +298,10 @@ size-not-found: Not found
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
 specialError: Should contain special characters
+start-new-deploy: Start new progressive deploy
 start-using-capgo: 'Start using:'
+status-complete: complete
+status-failed: failed
 stored-externally: stored externally
 submit: Submit
 support: Support

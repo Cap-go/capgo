@@ -159,6 +159,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
             external_url
           ),
           secondaryVersionPercentage,
+          enable_progressive_deploy,
           enableAbTesting,
           version (
             id,
@@ -240,8 +241,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       }, 200)
     }
     let enableAbTesting: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+
+    const enableProgressiveDeploy: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
+    const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
+
     const version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (devicesOverride?.version || undefined || (channelData?.enableAbTesting ? channelData?.secondVersion : undefined)) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (devicesOverride?.version || undefined || (enableSecondVersion ? channelData?.secondVersion : undefined)) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+
     const planValid = await isAllowedAction(appOwner.user_id)
     await checkPlan(appOwner.user_id)
     const versionId = versionData ? versionData.id : version.id
@@ -251,13 +257,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
 
-    if (enableAbTesting) {
-      console.log(secondVersion)
+    if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
+        const secondVersionPercentage: number = (devicesOverride?.version || (channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
         // eslint-disable-next-line max-statements-per-line
-        if (secondVersion.name === version_name || version.name === 'unknown') { version = secondVersion }
+        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
+        else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
         else if (version.name !== version_name) {
-          const secondVersionPercentage: number = (devicesOverride?.version || (channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
           const randomChange = Math.random()
 
           if (randomChange < secondVersionPercentage)
@@ -397,7 +403,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     // console.log(id, 'save stats', device_id)
     await sendStats('get', platform, device_id, app_id, version_build, versionId)
     //  check signedURL and if it's url
-    if (!signedURL || signedURL.startsWith('http://') || !signedURL.startsWith('https://')) {
+    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
       await sendStats('cannotGetBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({

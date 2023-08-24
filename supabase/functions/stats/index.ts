@@ -65,7 +65,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
 
     if (coerce)
       version_build = coerce.version
-    version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
+    console.log(`VERSION NAME: ${version_name}`)
+    version_name = !version_name ? version_build : version_name
     const device: Database['public']['Tables']['devices']['Insert'] = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
@@ -91,10 +92,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       .from('app_versions')
       .select('id, user_id')
       .eq('app_id', app_id)
-      .or(`name.eq.${version_name},name.eq.builtin`)
-      .order('id', { ascending: false })
-      .limit(1)
+      .or(`name.eq.${version_name}`)
       .single()
+    console.log(`appVersion ${JSON.stringify(appVersion)}`)
     if (appVersion) {
       stat.version = appVersion.id
       device.version = appVersion.id
@@ -125,6 +125,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
         // }
       }
       else if (failActions.includes(action)) {
+        console.log('FAIL!')
         const sent = await sendNotif('user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,

@@ -22,7 +22,7 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   const exist = await r2.checkIfExist(record.bucket_id)
-  console.log('exist ?', record.app_id, record.bucket_id, v2Path, exist)
+  console.log('exist ?', record.app_id, record.bucket_id, exist)
   if (!exist && !record.bucket_id.endsWith('.zip')) {
     console.log('upload to r2', record.bucket_id)
     // upload to r2
