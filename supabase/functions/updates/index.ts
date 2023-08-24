@@ -148,6 +148,18 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
           disableAutoUpdateToMajor,
           ios,
           android,
+          secondVersion (
+            id,
+            name,
+            checksum,
+            session_key,
+            user_id,
+            bucket_id,
+            storage_provider,
+            external_url
+          ),
+          secondaryVersionPercentage,
+          enableAbTesting,
           version (
             id,
             name,
@@ -227,7 +239,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         error: 'no_channel',
       }, 200)
     }
+    let enableAbTesting: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
     const version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
+    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (devicesOverride?.version || undefined || (channelData?.enableAbTesting ? channelData?.secondVersion : undefined)) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
     const planValid = await isAllowedAction(appOwner.user_id)
     await checkPlan(appOwner.user_id)
     const versionId = versionData ? versionData.id : version.id
@@ -236,6 +250,24 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     // console.log('xForwardedFor', xForwardedFor)
     const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
+
+    if (enableAbTesting) {
+      console.log(secondVersion)
+      if (secondVersion && secondVersion?.name !== 'unknown') {
+        // eslint-disable-next-line max-statements-per-line
+        if (secondVersion.name === version_name || version.name === 'unknown') { version = secondVersion }
+        else if (version.name !== version_name) {
+          const secondVersionPercentage: number = (devicesOverride?.version || (channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+          const randomChange = Math.random()
+
+          if (randomChange < secondVersionPercentage)
+            version = secondVersion
+        }
+      }
+      else {
+        enableAbTesting = false
+      }
+    }
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
     // check if version is created_at more than 4 hours

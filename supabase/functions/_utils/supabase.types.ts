@@ -416,10 +416,13 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
+          enableAbTesting: boolean
           id: number
           ios: boolean
           name: string
           public: boolean
+          secondaryVersionPercentage: number
+          secondVersion: number | null
           updated_at: string
           version: number
         }
@@ -434,10 +437,13 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
+          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name: string
           public?: boolean
+          secondaryVersionPercentage?: number
+          secondVersion?: number | null
           updated_at?: string
           version: number
         }
@@ -452,10 +458,13 @@ export interface Database {
           created_by?: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
+          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name?: string
           public?: boolean
+          secondaryVersionPercentage?: number
+          secondVersion?: number | null
           updated_at?: string
           version?: number
         }

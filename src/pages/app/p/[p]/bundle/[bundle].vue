@@ -30,6 +30,7 @@ const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
+const secondaryChannel = ref<boolean>(false)
 
 async function copyToast(text: string) {
   copy(text)
@@ -62,8 +63,10 @@ async function getChannels() {
   // search if the bundle is used in a channel
   channels.value.forEach((chan) => {
     const v: number = chan.version as any
-    if (version.value && v === version.value.id)
+    if (version.value && (v === version.value.id || version.value.id === chan.secondVersion)) {
       channel.value = chan
+      secondaryChannel.value = (version.value.id === chan.secondVersion)
+    }
   })
 }
 
@@ -103,28 +106,97 @@ async function setChannel(channel: Database['public']['Tables']['channels']['Row
     .eq('id', channel.id)
 }
 
+async function setSecondChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+  return supabase
+    .from('channels')
+    .update({
+      secondVersion: id,
+    })
+    .eq('id', channel.id)
+}
+
 async function ASChannelChooser() {
   if (!version.value)
     return
   const buttons = []
+
+  // This makes sure that A and B cannot be selected on the same time
+  const commonAbHandler = async (chan: Database['public']['Tables']['channels']['Row'] | undefined, ab: 'a' | 'b') => {
+    if (!chan)
+      return
+
+    const aSelected = version?.value?.id === (chan.version as any)
+    const bSelected = version?.value?.id === (chan.secondVersion as any)
+
+    if (aSelected && ab === 'b') {
+      const id = await getUnknowBundleId()
+      if (!id)
+        return
+
+      setChannel(chan, id)
+    }
+    else if (bSelected && ab === 'a') {
+      const id = await getUnknowBundleId()
+      if (!id)
+        return
+
+      setSecondChannel(chan, id)
+    }
+  }
+
+  const normalHandler = async (chan: Database['public']['Tables']['channels']['Row']) => {
+    if (!version.value)
+      return
+    try {
+      await setChannel(chan, version.value.id)
+      await getChannels()
+    }
+    catch (error) {
+      console.error(error)
+      toast.error(t('cannot-test-app-some'))
+    }
+  }
+
+  const secondHandler = async (chan: Database['public']['Tables']['channels']['Row']) => {
+    if (!version.value)
+      return
+    try {
+      await setSecondChannel(chan, version.value.id)
+      await getChannels()
+    }
+    catch (error) {
+      console.error(error)
+      toast.error(t('cannot-test-app-some'))
+    }
+  }
+
   for (const chan of channels.value) {
     const v: number = chan.version as any
-    buttons.push({
-      text: chan.name,
-      selected: version.value.id === v,
-      handler: async () => {
-        if (!version.value)
-          return
-        try {
-          await setChannel(chan, version.value.id)
-          await getChannels()
-        }
-        catch (error) {
-          console.error(error)
-          toast.error(t('cannot-test-app-some'))
-        }
-      },
-    })
+    if (!chan.enableAbTesting) {
+      buttons.push({
+        text: chan.name,
+        selected: version.value.id === v,
+        handler: async () => { await normalHandler(chan) },
+      })
+    }
+    else {
+      buttons.push({
+        text: `${chan.name}-A`,
+        selected: version.value.id === v,
+        handler: async () => {
+          await commonAbHandler(channel.value, 'a')
+          await normalHandler(chan)
+        },
+      })
+      buttons.push({
+        text: `${chan.name}-B`,
+        selected: version.value.id === chan.secondVersion,
+        handler: async () => {
+          await commonAbHandler(channel.value, 'b')
+          await secondHandler(chan)
+        },
+      })
+    }
   }
   buttons.push({
     text: t('button-cancel'),
@@ -181,7 +253,11 @@ async function openChannel() {
           const id = await getUnknowBundleId()
           if (!id)
             return
-          await setChannel(channel.value, id)
+          if (!secondaryChannel.value)
+            await setChannel(channel.value, id)
+          else
+            await setSecondChannel(channel.value, id)
+
           await getChannels()
         }
         catch (error) {
@@ -319,7 +395,8 @@ function hideString(str: string) {
             <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow :label="t('channel')" :value="channel ? channel.name : t('set-bundle')" :is-link="true" @click="openChannel()" />
+            <InfoRow v-if="channel" :label="t('channel')" :value="channel!.enableAbTesting ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name" :is-link="true" @click="openChannel()" />
+            <InfoRow v-else :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel()" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
             <!-- version.external_url -->
