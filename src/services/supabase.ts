@@ -58,7 +58,6 @@ export function spoofUser() {
 }
 export async function deleteUser() {
   const { error } = await useSupabase()
-  // @ts-ignore
     .rpc('delete_user')
     .single()
   if (error)
