@@ -130,9 +130,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       .from('app_versions')
       .select('id')
       .eq('app_id', app_id)
-      .or(`name.eq.${version_name},name.eq.builtin`)
-      .order('id', { ascending: false })
-      .limit(1)
+      .or(`name.eq.${version_name}`)
       .single()
     const { data: channelData } = await supabaseAdmin()
       .from('channels')
@@ -192,6 +190,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
             disableAutoUpdateToMajor,
             ios,
             android,
+            secondaryVersionPercentage,
+            enable_progressive_deploy,
+            enableAbTesting,
             version (
               id,
               name,
@@ -240,13 +241,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         error: 'no_channel',
       }, 200)
     }
-    let enableAbTesting: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+    let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
-    const enableProgressiveDeploy: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
+    const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
 
     let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (devicesOverride?.version || undefined || (enableSecondVersion ? channelData?.secondVersion : undefined)) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
     await checkPlan(appOwner.user_id)
@@ -259,7 +260,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = (devicesOverride?.version || (channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
         // eslint-disable-next-line max-statements-per-line
         if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }

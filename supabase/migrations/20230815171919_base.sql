@@ -1054,7 +1054,7 @@ CREATE TABLE "public"."channels" (
     "enableAbTesting" boolean not null default false,
     "enable_progressive_deploy" boolean not null default false,
     "secondaryVersionPercentage" double precision not null default '0'::double precision,
-    "secondVersion" bigint not null default '1883'::bigint,
+    "secondVersion" bigint NULL,
     "disableAutoUpdateToMajor" boolean DEFAULT true NOT NULL,
     "beta" boolean DEFAULT false NOT NULL,
     "ios" boolean DEFAULT true NOT NULL,
