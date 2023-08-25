@@ -949,6 +949,15 @@ CREATE TABLE "public"."app_live" (
     "url" "text" NOT NULL
 );
 
+CREATE TABLE "public"."app_usage" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "app_id" character varying NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    -- main stats
+    "mlu" bigint DEFAULT '0'::bigint NOT NULL,
+    "storage" bigint DEFAULT '0'::bigint NOT NULL,
+    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+);
 
 CREATE TABLE "public"."app_stats" (
     "app_id" character varying NOT NULL,
@@ -1254,7 +1263,6 @@ CREATE TABLE "public"."stats" (
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL
 );
-
 
 CREATE TABLE "public"."store_apps" (
     "created_at" timestamp with time zone DEFAULT "now"(),
