@@ -116,14 +116,10 @@ async function addNewApiKey() {
 
 async function getKey(retry = true): Promise<void> {
   isLoading.value = true
-  const main = await supabase.auth.getUser()
-  if (main.error) {
-    return getKey(true)
-  }
-  const { data } = await useSupabase()
+  const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', main.data.user.id).eq('mode', 'all')
+    .eq('user_id', main?.user?.id).eq('mode', 'all')
 
   if (typeof data !== 'undefined' && data !== null) {
     if (data.length === 0) {
@@ -132,7 +128,7 @@ async function getKey(retry = true): Promise<void> {
     }
     steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key || '')
   }
-  else if (retry && main.data.user.id)
+  else if (retry && main?.user?.id)
     return getKey(false)
 
   isLoading.value = false
@@ -167,6 +163,9 @@ watchEffect(async () => {
 
 watchEffect(async () => {
   if (route.path === '/app/home')
+  if (typeof main.user === 'undefined') {
+    return location.reload();
+  }
     await getKey()
 })
 </script>
