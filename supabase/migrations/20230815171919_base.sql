@@ -1395,6 +1395,9 @@ AS $$
    delete from auth.users where id = auth.uid();
 $$;
 
+ALTER TABLE ONLY "public"."app_usage"
+    ADD CONSTRAINT "app_usage_pkey" PRIMARY KEY ("id");
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
 
