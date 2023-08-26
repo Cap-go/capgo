@@ -1,8 +1,8 @@
 import { Hono } from 'https://deno.land/x/hono@v3.5.4/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import { connect } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import type { RedisConnectOptions } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
+import { parseRedisUrl } from '../_utils/redis.ts'
 
 const UPDATE_FUNCTION = 'http://0.0.0.0:8081/updates'
 const APP_DOES_NOT_EXIST = '{"message":"App not found","error":"app_not_found"}'
@@ -19,28 +19,6 @@ const headersSchema = z.object({
   'x-update-status': z.enum(['app_not_found', 'no_new', 'new_version', 'fail']),
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
-
-function parseRedisUrl(url: string): RedisConnectOptions {
-  url = url.replace('redis://', '')
-  const splitted = url.split(':')
-  if (splitted.length !== 3)
-    throw new Error('Cannot parse redis url')
-
-  const splittedPassword = splitted[1].split('@')
-  if (splittedPassword.length !== 2)
-    throw new Error('Cannot parse redis url (password)')
-
-  const parsed = {
-    hostname: splittedPassword[1],
-    password: splittedPassword[0] === 'default' ? undefined : splittedPassword[0],
-    port: splitted[2],
-    name: splitted[0] === 'default' ? undefined : splitted[0],
-  }
-
-  console.log(JSON.stringify(parsed))
-
-  return parsed
-}
 
 const app = new Hono()
 const redis = await connect(parseRedisUrl(Deno.env.get('REDIS_URL') ?? ''))

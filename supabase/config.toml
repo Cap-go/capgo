@@ -176,6 +176,9 @@ verify_jwt = false
 [functions.updates_cached]
 verify_jwt = false
 
+[functions.invalidate_cache]
+verify_jwt = false
+
 [functions.web_stats]
 verify_jwt = false
 
