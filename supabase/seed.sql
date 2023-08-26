@@ -157,6 +157,12 @@ INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-03 08:40:15.224005+00', '2023-03-03 08:40:15.224005+00', 0, 2, 0, 0, 6, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-01'), 0, 6576705, 0);
 
 -- Create cron jobs
+SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$CALL update_app_usage(5)$$);
+-- SELECT cron.schedule('Update good_plan every day at 1AM', '0 1 * * *', $$CALL update_app_usage(5)$$);
+-- SELECT cron.schedule('Update web_stats every day at 12AM and 5', '5 0 * * *', $$CALL update_app_usage(5)$$);
+-- SELECT cron.schedule('Set to delete old versions after retention every day at 12AM', '0 0 * * *', $$CALL update_app_usage(5)$$);
+-- SELECT cron.schedule('Set channel ', '0 0 * * *', $$CALL update_app_usage(5)$$);
+
 INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport", "database", "username", "active", "jobname") VALUES
 (5, '0 1 * * *', '
     select status
@@ -181,6 +187,7 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
            ''{}''
         )::http_request)
     ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats'),
+-- Set old versions to deleted after retention passed 
 (15, '0 0 * * *', '
     UPDATE app_versions
     SET deleted = true
@@ -192,6 +199,7 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
     AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
     AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention
     ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention'),
+-- update channel for progressive deploy if too many fail
 (20, '*/10 * * * *', '
     update channels
     SET
