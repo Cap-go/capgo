@@ -23,6 +23,15 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   return res
 }
 
+function sendResWithStatus(status: string, data?: any, statusCode?: number, updateOverwritten?: boolean): Response {
+  const response = sendRes(data, 200)
+
+  response.headers.append('x-update-status', status)
+  response.headers.append('x-update-overwritten', (updateOverwritten ?? false).toString())
+
+  return response
+}
+
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // create random id
   const id = cryptoRandomString({ length: 10 })
@@ -60,7 +69,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
             capgo: true,
           })
       }
-      return sendRes({
+      return sendResWithStatus('app_not_found', {
         message: 'App not found',
         error: 'app_not_found',
       }, 200)
@@ -85,7 +94,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
           notify: false,
         }).catch()
       }
-      return sendRes({
+      return sendResWithStatus('fail', {
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
       }, 400)
@@ -110,7 +119,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      return sendRes({
+      return sendResWithStatus('fail', {
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
       }, 400)
@@ -130,9 +139,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       .from('app_versions')
       .select('id')
       .eq('app_id', app_id)
-      .or(`name.eq.${version_name},name.eq.builtin`)
-      .order('id', { ascending: false })
-      .limit(1)
+      .or(`name.eq.${version_name}`)
       .single()
     const { data: channelData } = await supabaseAdmin()
       .from('channels')
@@ -192,6 +199,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
             disableAutoUpdateToMajor,
             ios,
             android,
+            secondaryVersionPercentage,
+            enable_progressive_deploy,
+            enableAbTesting,
             version (
               id,
               name,
@@ -235,18 +245,21 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       if (versionData)
         await sendStats('NoChannelOrOverride', platform, device_id, app_id, version_build, versionData.id)
 
-      return sendRes({
+      return sendResWithStatus('fail', {
         message: 'no default channel or override',
         error: 'no_channel',
       }, 200)
     }
-    let enableAbTesting: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+    let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
-    const enableProgressiveDeploy: boolean = devicesOverride?.version || (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
+    const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
 
+    const updateOverwritten = devicesOverride !== null || channelOverride !== null
+    // console.log(`OVER: ${updateOverwritten}, --- ${devicesOverride} --- ${channelOverride}`)
+
     let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (devicesOverride?.version || undefined || (enableSecondVersion ? channelData?.secondVersion : undefined)) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
     await checkPlan(appOwner.user_id)
@@ -259,7 +272,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = (devicesOverride?.version || (channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
         // eslint-disable-next-line max-statements-per-line
         if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
@@ -303,19 +316,19 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
       await sendStats('needPlanUpgrade', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
+      return sendResWithStatus('fail', {
         message: 'Cannot update, upgrade plan to continue to update',
         error: 'need_plan_upgrade',
-      }, 200)
+      }, 200, updateOverwritten)
     }
 
     if (!version.bucket_id && !version.external_url) {
       console.log(id, 'Cannot get bundle', app_id, version)
       await sendStats('missingBundle', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
+      return sendResWithStatus('fail', {
         message: 'Cannot get bundle',
         error: 'no_bundle',
-      }, 200)
+      }, 200, updateOverwritten)
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
@@ -328,9 +341,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     if (version_name === version.name) {
       console.log(id, 'No new version available', device_id, version_name, version.name)
       await sendStats('noNew', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
+      return sendResWithStatus('no_new', {
         message: 'No new version available',
-      }, 200)
+      }, 200, updateOverwritten)
     }
 
     if (!devicesOverride && channelData) {
@@ -338,66 +351,66 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       if (!channelData.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id)
         await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
-        return sendRes({
+        return sendResWithStatus('fail', {
           message: 'Cannot update, ios it\'s disabled',
           error: 'disabled_platform_ios',
           version: version.name,
           old: version_name,
-        }, 200)
+        }, 200, updateOverwritten)
       }
       if (!channelData.android && platform === 'android') {
         console.log(id, 'Cannot update, android is disabled', device_id)
         await sendStats('disablePlatformAndroid', platform, device_id, app_id, version_build, versionId)
-        return sendRes({
+        return sendResWithStatus('fail', {
           message: 'Cannot update, android is disabled',
           error: 'disabled_platform_android',
           version: version.name,
           old: version_name,
-        }, 200)
+        }, 200, updateOverwritten)
       }
       if (channelData.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id)
         await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, versionId)
-        return sendRes({
+        return sendResWithStatus('fail', {
           major: true,
           message: 'Cannot upgrade major version',
           error: 'disable_auto_update_to_major',
           version: version.name,
           old: version_name,
-        }, 200)
+        }, 200, updateOverwritten)
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
       if (channelData.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
         console.log(id, 'Cannot revert under native version', device_id)
         await sendStats('disableAutoUpdateUnderNative', platform, device_id, app_id, version_build, versionId)
-        return sendRes({
+        return sendResWithStatus('fail', {
           message: 'Cannot revert under native version',
           error: 'disable_auto_update_under_native',
           version: version.name,
           old: version_name,
-        }, 200)
+        }, 200, updateOverwritten)
       }
 
       if (!channelData.allow_dev && !is_prod) {
         console.log(id, 'Cannot update dev build is disabled', device_id)
         await sendStats('disableDevBuild', platform, device_id, app_id, version_build, versionId)
-        return sendRes({
+        return sendResWithStatus('fail', {
           message: 'Cannot update, dev build is disabled',
           error: 'disable_dev_build',
           version: version.name,
           old: version_name,
-        }, 200)
+        }, 200, updateOverwritten)
       }
       if (!channelData.allow_emulator && is_emulator) {
         console.log(id, 'Cannot update emulator is disabled', device_id)
         await sendStats('disableEmulator', platform, device_id, app_id, version_build, versionId)
-        return sendRes({
+        return sendResWithStatus('fail', {
           message: 'Cannot update, emulator is disabled',
           error: 'disable_emulator',
           version: version.name,
           old: version_name,
-        }, 200)
+        }, 200, updateOverwritten)
       }
     }
     // console.log(id, 'save stats', device_id)
@@ -406,13 +419,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
       await sendStats('cannotGetBundle', platform, device_id, app_id, version_build, versionId)
-      return sendRes({
+      return sendResWithStatus('fail', {
         message: 'Cannot get bundle',
         error: 'no_bundle',
-      }, 200)
+      }, 200, updateOverwritten)
     }
     console.log(id, 'New version available', app_id, version.name, signedURL)
-    return sendRes(resToVersion(plugin_version, signedURL, version))
+    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
   }
   catch (e) {
     console.error('e', e)
