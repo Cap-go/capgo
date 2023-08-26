@@ -178,3 +178,6 @@ verify_jwt = false
 
 [functions.website_stats]
 verify_jwt = false
+
+[functions.track_event]
+verify_jwt = false
