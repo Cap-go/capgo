@@ -87,6 +87,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       version_build,
       version: 0,
     }
+    const rows: Database['public']['Tables']['stats']['Insert'][] = []
     const all = []
     const { data: appVersion } = await supabaseAdmin()
       .from('app_versions')
@@ -111,9 +112,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
             action: 'uninstall',
             version_id: deviceData.version,
           }
-          all.push(supabaseAdmin()
-            .from('stats')
-            .insert(statUninstall))
+          rows.push(statUninstall)
         }
       }
       else if (failActions.includes(action)) {
@@ -142,12 +141,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
         error: 'app_not_found',
       }, 200)
     }
+    rows.push(stat)
     all.push(supabaseAdmin()
       .from('devices')
       .upsert(device)
       .then(() => supabaseAdmin()
         .from('stats')
-        .insert(stat)))
+        .insert(rows)))
     await Promise.all(all)
     return sendRes()
   }
