@@ -1514,6 +1514,59 @@ CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
+CREATE OR REPLACE FUNCTION get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
+$$ SECURITY DEFINER STABLE PARALLEL SAFE;
+
+CREATE OR REPLACE FUNCTION get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='apikey';
+$$ SECURITY DEFINER STABLE PARALLEL SAFE;
+
+REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.get_apikey() TO postgres;
+
+CREATE OR REPLACE FUNCTION public.http_post_to_function() 
+RETURNS trigger 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+AS $BODY$
+DECLARE 
+  request_id text;
+  payload jsonb;
+BEGIN 
+  -- Build the payload
+  payload := jsonb_build_object(
+    'old_record', OLD, 
+    'record', NEW, 
+    'type', TG_OP,
+    'table', TG_TABLE_NAME,
+    'schema', TG_TABLE_SCHEMA
+  );
+
+  -- Make an async HTTP POST request using pg_net
+  SELECT INTO request_id net.http_post(
+    url := get_db_url() || '/functions/v1/' || TG_ARGV[0],
+    headers := jsonb_build_object(
+      'Content-Type',
+      'application/json',
+      'apisecret',
+      get_apikey()
+    ),
+    body := payload,
+    timeout_milliseconds := 15000
+  );
+
+  RETURN NEW;
+END;
+$BODY$;
+
+REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.http_post_to_function() TO postgres;
+
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."apikeys" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."app_live" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
@@ -1541,28 +1594,6 @@ CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."plans" FOR EACH RO
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."stripe_info" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
-
-CREATE TRIGGER "on_app_stats_create" AFTER INSERT ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_app_stats_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_app_stats_update" AFTER UPDATE ON "public"."app_stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_app_stats_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_channel_create" AFTER INSERT ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_channel_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_channel_update" AFTER UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_channel_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_log_create" AFTER INSERT ON "public"."stats" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_log_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_shared_create" AFTER INSERT ON "public"."channel_users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_shared_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_user_create" AFTER INSERT ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_user_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_user_update" AFTER UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_user_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_version_create" AFTER INSERT ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_create', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_version_delete" AFTER DELETE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_delete', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
-
-CREATE TRIGGER "on_version_update" AFTER UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "supabase_functions"."http_request"('http://172.17.0.1:54321/functions/v1/on_version_update', 'POST', '{"Content-type":"application/json","apisecret":"testsecret"}', '{}', '1000');
 
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;

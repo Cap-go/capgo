@@ -135,6 +135,33 @@ export interface Database {
           }
         ]
       }
+      app_usage: {
+        Row: {
+          app_id: string
+          bandwidth: number
+          created_at: string | null
+          id: string
+          mlu: number
+          storage: number
+        }
+        Insert: {
+          app_id: string
+          bandwidth?: number
+          created_at?: string | null
+          id?: string
+          mlu?: number
+          storage?: number
+        }
+        Update: {
+          app_id?: string
+          bandwidth?: number
+          created_at?: string | null
+          id?: string
+          mlu?: number
+          storage?: number
+        }
+        Relationships: []
+      }
       app_versions: {
         Row: {
           app_id: string
@@ -416,8 +443,8 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
-          enableAbTesting: boolean,
-          enable_progressive_deploy?: boolean
+          enable_progressive_deploy: boolean
+          enableAbTesting: boolean
           id: number
           ios: boolean
           name: string
@@ -438,8 +465,8 @@ export interface Database {
           created_by: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
-          enableAbTesting?: boolean
           enable_progressive_deploy?: boolean
+          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name: string
@@ -460,8 +487,8 @@ export interface Database {
           created_by?: string
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
-          enableAbTesting?: boolean
           enable_progressive_deploy?: boolean
+          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name?: string
@@ -482,6 +509,12 @@ export interface Database {
             foreignKeyName: "channels_created_by_fkey"
             columns: ["created_by"]
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channels_secondVersion_fkey"
+            columns: ["secondVersion"]
+            referencedRelation: "app_versions"
             referencedColumns: ["id"]
           },
           {
@@ -1281,6 +1314,10 @@ export interface Database {
           missing_app_id: string
         }[]
       }
+      get_apikey: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_app_versions: {
         Args: {
           appid: string
@@ -1303,6 +1340,10 @@ export interface Database {
         Args: {
           userid: string
         }
+        Returns: string
+      }
+      get_db_url: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       get_devices_version: {
