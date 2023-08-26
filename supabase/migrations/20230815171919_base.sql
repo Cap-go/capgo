@@ -1709,11 +1709,11 @@ ALTER TABLE ONLY "public"."users"
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-CREATE POLICY " allow anon to select" ON "public"."global_stats" FOR SELECT TO "supabase_functions_admin", "anon", "service_role" USING (true);
+CREATE POLICY " allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
 
 CREATE POLICY "All all to api owner" ON "public"."channels" TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "All self to select" ON "public"."app_stats" FOR SELECT USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "All self to select" ON "public"."app_stats" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "All self user to all" ON "public"."app_live" TO "authenticated" USING ((("auth"."uid"() = "id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -1723,7 +1723,7 @@ CREATE POLICY "Allow all for app owner" ON "public"."channel_users" TO "authenti
 
 CREATE POLICY "Allow all to app owner" ON "public"."channel_devices" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
-CREATE POLICY "Allow all to app owner" ON "public"."devices_override" USING ("public"."is_app_owner"("auth"."uid"(), "app_id")) WITH CHECK ("public"."is_app_owner"("auth"."uid"(), "app_id"));
+CREATE POLICY "Allow all to app owner" ON "public"."devices_override" TO "authenticated" USING ("public"."is_app_owner"("auth"."uid"(), "app_id")) WITH CHECK ("public"."is_app_owner"("auth"."uid"(), "app_id"));
 
 CREATE POLICY "Allow all users to selec present in channel" ON "public"."users" FOR SELECT TO "authenticated" USING ("public"."is_in_channel"("id", "auth"."uid"()));
 
@@ -1775,7 +1775,7 @@ CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH C
 
 CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHECK (false);
 
-CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
@@ -1793,11 +1793,15 @@ CREATE POLICY "allow for delete by the CLI" ON "public"."app_versions" FOR UPDAT
 
 CREATE POLICY "allowed shared to select" ON "public"."apps" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
+CREATE POLICY "Allow user to get they app_usage" ON "public"."app_usage" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
+
 ALTER TABLE "public"."apikeys" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."app_live" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."app_stats" ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE "public"."app_usage" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."app_versions" ENABLE ROW LEVEL SECURITY;
 
