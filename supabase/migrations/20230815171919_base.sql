@@ -1352,6 +1352,14 @@ CREATE TABLE "public"."store_apps" (
     "developer_id" "text"
 );
 
+CREATE OR REPLACE FUNCTION one_month_ahead() 
+RETURNS timestamp AS 
+$$
+BEGIN
+   RETURN NOW() + INTERVAL '1 month';
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE TABLE "public"."stripe_info" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -1365,7 +1373,7 @@ CREATE TABLE "public"."stripe_info" (
     "plan_usage" bigint DEFAULT '0'::bigint,
     "subscription_metered" "json" DEFAULT '{}'::"json" NOT NULL,
     "subscription_anchor_start" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "subscription_anchor_end" timestamp with time zone DEFAULT "now"() NOT NULL
+    "subscription_anchor_end" timestamp with time zone DEFAULT one_month_ahead() NOT NULL
 );
 
 
