@@ -52,6 +52,12 @@ CREATE TYPE "public"."key_mode" AS ENUM (
     'upload'
 );
 
+CREATE TYPE "public"."usage_mode" AS ENUM (
+    '5min',
+    'day',
+    'month'
+);
+
 CREATE TYPE "public"."match_plan" AS (
 	"name" character varying
 );
@@ -786,45 +792,65 @@ BEGIN
     thirty_days_ago := NOW() - INTERVAL '30 days';
 
     WITH bandwidth AS (
-        SELECT stats.app_id, SUM(app_versions_meta.size) AS bandwidth, 0 AS storage, 0 AS mlu
+        SELECT stats.app_id, SUM(app_versions_meta.size) AS bandwidth, 0 AS storage, 0 AS mau
         FROM stats
         JOIN app_versions_meta ON stats.app_id = app_versions_meta.app_id
         WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
         GROUP BY stats.app_id
     ), storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mlu
+        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
         FROM app_versions
         WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS FALSE
         GROUP BY app_versions.app_id
     ), deleted_storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mlu
+        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
         FROM app_versions
         WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
         GROUP BY app_versions.app_id
-    ), mlu AS (
-        SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mlu
+    ), mau AS (
+        SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mau
         FROM devices
         WHERE (devices.created_at BETWEEN n_minutes_ago AND one_minute_ago OR devices.updated_at BETWEEN n_minutes_ago AND one_minute_ago)
-        AND (devices.date_id IS NULL OR devices.date_id < thirty_days_ago)
+        AND (devices.last_MAU IS NULL OR devices.last_MAU < thirty_days_ago)
         GROUP BY devices.app_id
     ), combined AS (
         SELECT * FROM bandwidth
         UNION ALL
         SELECT * FROM storage
         UNION ALL
-        SELECT * FROM mlu
+        SELECT * FROM mau
         UNION ALL
-        SELECT app_id, bandwidth, -storage, mlu FROM deleted_storage
+        SELECT app_id, bandwidth, -storage, mau FROM deleted_storage
     )
-    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mlu)
-    SELECT app_id, NOW(), SUM(bandwidth), SUM(storage), SUM(mlu)
+    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau)
+    SELECT app_id, NOW(), SUM(bandwidth), SUM(storage), SUM(mau)
     FROM combined
     GROUP BY app_id;
 
-    -- Update date_id for counted devices
-    UPDATE devices SET date_id = NOW()
+    -- Update last_MAU for counted devices
+    UPDATE devices SET last_MAU = NOW()
     WHERE (created_at BETWEEN n_minutes_ago AND one_minute_ago OR updated_at BETWEEN n_minutes_ago AND one_minute_ago)
-    AND (date_id IS NULL OR date_id < thirty_days_ago);
+    AND (last_MAU IS NULL OR last_MAU < thirty_days_ago);
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION calculate_daily_app_usage() RETURNS VOID AS $$
+DECLARE
+    twenty_four_hours_ago TIMESTAMP;
+BEGIN
+    -- Initialize time variable
+    twenty_four_hours_ago := NOW() - INTERVAL '24 hours';
+
+    WITH daily_usage AS (
+        SELECT app_id, SUM(bandwidth) AS daily_bandwidth, SUM(storage) AS daily_storage, SUM(mau) AS daily_mau
+        FROM app_usage
+        WHERE created_at >= twenty_four_hours_ago AND mode = '5min'
+        GROUP BY app_id
+    )
+    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
+    SELECT app_id, NOW(), daily_bandwidth, daily_storage, daily_mau, 'day'
+    FROM daily_usage;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -1165,6 +1191,7 @@ CREATE TABLE "public"."deleted_account" (
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
+    "last_mau" timestamp with time zone DEFAULT "now"(),
     "device_id" "text" NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL,
@@ -1431,6 +1458,8 @@ ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_pkey" PRIMARY KEY ("id");
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
+
+CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at", "mode");
 
 CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
