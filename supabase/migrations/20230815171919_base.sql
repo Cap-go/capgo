@@ -774,6 +774,60 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION update_app_usage(minutes_interval INT) RETURNS VOID AS $$
+DECLARE
+    one_minute_ago TIMESTAMP;
+    n_minutes_ago TIMESTAMP;
+    thirty_days_ago TIMESTAMP;
+BEGIN
+    -- Initialize time variables
+    one_minute_ago := NOW() - INTERVAL '1 minute';
+    n_minutes_ago := NOW() - INTERVAL '1 minute' * minutes_interval;
+    thirty_days_ago := NOW() - INTERVAL '30 days';
+
+    WITH bandwidth AS (
+        SELECT stats.app_id, SUM(app_versions_meta.size) AS bandwidth, 0 AS storage, 0 AS mlu
+        FROM stats
+        JOIN app_versions_meta ON stats.app_id = app_versions_meta.app_id
+        WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
+        GROUP BY stats.app_id
+    ), storage AS (
+        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mlu
+        FROM app_versions
+        WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS FALSE
+        GROUP BY app_versions.app_id
+    ), deleted_storage AS (
+        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mlu
+        FROM app_versions
+        WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
+        GROUP BY app_versions.app_id
+    ), mlu AS (
+        SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mlu
+        FROM devices
+        WHERE (devices.created_at BETWEEN n_minutes_ago AND one_minute_ago OR devices.updated_at BETWEEN n_minutes_ago AND one_minute_ago)
+        AND (devices.date_id IS NULL OR devices.date_id < thirty_days_ago)
+        GROUP BY devices.app_id
+    ), combined AS (
+        SELECT * FROM bandwidth
+        UNION ALL
+        SELECT * FROM storage
+        UNION ALL
+        SELECT * FROM mlu
+        UNION ALL
+        SELECT app_id, bandwidth, -storage, mlu FROM deleted_storage
+    )
+    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mlu)
+    SELECT app_id, NOW(), SUM(bandwidth), SUM(storage), SUM(mlu)
+    FROM combined
+    GROUP BY app_id;
+
+    -- Update date_id for counted devices
+    UPDATE devices SET date_id = NOW()
+    WHERE (created_at BETWEEN n_minutes_ago AND one_minute_ago OR updated_at BETWEEN n_minutes_ago AND one_minute_ago)
+    AND (date_id IS NULL OR date_id < thirty_days_ago);
+END;
+$$ LANGUAGE plpgsql;
+
 
 CREATE FUNCTION "public"."is_canceled"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
