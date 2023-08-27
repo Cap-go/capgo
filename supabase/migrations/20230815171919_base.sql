@@ -1396,7 +1396,7 @@ CREATE INDEX "idx_device_id_logs" ON "public"."stats" USING "btree" ("device_id"
 
 CREATE INDEX "idx_devices_created_at" ON "public"."devices" USING "btree" ("device_id", "created_at" DESC);
 
-CREATE INDEX idx_app_id_version_devices ON "public".devices(app_id,version);
+CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
 
 CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
 
