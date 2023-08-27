@@ -57,6 +57,7 @@ export function extractDataEvent(event: any): Database['public']['Tables']['stri
     product_id: 'free',
     price_id: '',
     subscription_id: undefined,
+    subscription_anchor: undefined,
     subscription_metered: {} as MeteredData,
     customer_id: '',
     is_good_plan: true,
@@ -71,6 +72,7 @@ export function extractDataEvent(event: any): Database['public']['Tables']['stri
       data.price_id = res.priceId
       if (res.productId)
         data.product_id = res.productId
+      data.subscription_anchor = subscription.current_period_start
       data.subscription_metered = res.meteredData
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
