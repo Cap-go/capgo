@@ -167,7 +167,7 @@
     "vite-plugin-pwa": "0.15.0",
     "vite-plugin-vue-inspector": "^3.6.0",
     "vite-plugin-vue-layouts": "0.8.0",
-    "vite-plugin-windicss": "1.9.0",
+    "vite-plugin-windicss": "1.9.1",
     "vitest": "0.31.1",
     "vue-tsc": "1.7.8"
   }
