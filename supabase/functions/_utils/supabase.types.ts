@@ -1186,6 +1186,10 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      calculate_cycle_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       calculate_daily_app_usage: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1354,6 +1358,13 @@ export interface Database {
           userid: string
         }
         Returns: string
+      }
+      get_cycle_info: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subscription_anchor_start: string
+          subscription_anchor_end: string
+        }[]
       }
       get_db_url: {
         Args: Record<PropertyKey, never>
@@ -1617,6 +1628,17 @@ export interface Database {
         }
         Returns: boolean
       }
+      one_month_ahead: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      remove_enum_value: {
+        Args: {
+          enum_type: unknown
+          enum_value: string
+        }
+        Returns: undefined
+      }
       update_app_usage:
         | {
             Args: Record<PropertyKey, never>
@@ -1651,7 +1673,7 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month"
+      usage_mode: "5min" | "day" | "month" | "cycle"
       user_min_right: "read" | "upload" | "write" | "admin"
       user_role: "read" | "upload" | "write" | "admin"
     }

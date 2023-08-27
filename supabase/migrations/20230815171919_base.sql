@@ -1531,6 +1531,25 @@ CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
+CREATE OR REPLACE FUNCTION get_cycle_info()
+RETURNS TABLE (
+    subscription_anchor_start timestamp without time zone,
+    subscription_anchor_end timestamp without time zone
+) AS $$
+DECLARE
+    customer_id_var text;
+BEGIN
+    -- Get the customer_id using auth.uid()
+    SELECT customer_id INTO customer_id_var FROM users WHERE id = auth.uid();
+
+    -- Get the stripe_info using the customer_id
+    RETURN QUERY
+    SELECT stripe_info.subscription_anchor_start, stripe_info.subscription_anchor_end 
+    FROM stripe_info 
+    WHERE customer_id = customer_id_var;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;

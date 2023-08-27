@@ -13,6 +13,10 @@ export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
   const path = ref('')
   const user = ref<Database['public']['Tables']['users']['Row']>()
+  const cycleInfo = ref<{
+    subscription_anchor_start: string
+    subscription_anchor_end: string
+  }>()
   const trialDaysLeft = ref<number>(0)
   const paying = ref<boolean>(false)
   const canceled = ref<boolean>(false)
@@ -45,6 +49,7 @@ export const useMainStore = defineStore('main', () => {
     canUseMore,
     paying,
     user,
+    cycleInfo,
     path,
     logout,
   }
