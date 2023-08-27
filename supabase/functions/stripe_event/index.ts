@@ -94,7 +94,6 @@ serve(async (event: Request) => {
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
-        stripeData.subscription_anchor = new Date().toISOString()
         const segment = await customerToSegment(user.id, customer)
         await addDataContact(user.email, userData, segment)
         await trackEvent(user.email, {}, 'user:cancel')

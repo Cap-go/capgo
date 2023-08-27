@@ -1359,7 +1359,8 @@ CREATE TABLE "public"."stripe_info" (
     "is_good_plan" boolean DEFAULT true,
     "plan_usage" bigint DEFAULT '0'::bigint,
     "subscription_metered" "json" DEFAULT '{}'::"json" NOT NULL,
-    "subscription_anchor" timestamp with time zone DEFAULT "now"() NOT NULL
+    "subscription_anchor_start" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "subscription_anchor_end" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 

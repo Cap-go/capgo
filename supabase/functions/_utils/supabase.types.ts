@@ -141,7 +141,8 @@ export interface Database {
           bandwidth: number
           created_at: string | null
           id: string
-          mlu: number
+          mau: number
+          mode: Database["public"]["Enums"]["usage_mode"]
           storage: number
         }
         Insert: {
@@ -149,7 +150,8 @@ export interface Database {
           bandwidth?: number
           created_at?: string | null
           id?: string
-          mlu?: number
+          mau?: number
+          mode?: Database["public"]["Enums"]["usage_mode"]
           storage?: number
         }
         Update: {
@@ -157,7 +159,8 @@ export interface Database {
           bandwidth?: number
           created_at?: string | null
           id?: string
-          mlu?: number
+          mau?: number
+          mode?: Database["public"]["Enums"]["usage_mode"]
           storage?: number
         }
         Relationships: []
@@ -552,6 +555,7 @@ export interface Database {
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
+          last_mau: string
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
@@ -567,6 +571,7 @@ export interface Database {
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
+          last_mau?: string
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -582,6 +587,7 @@ export interface Database {
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
+          last_mau?: string
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -1064,7 +1070,8 @@ export interface Database {
           price_id: string | null
           product_id: string
           status: Database["public"]["Enums"]["stripe_status"] | null
-          subscription_anchor: string
+          subscription_anchor_end: string
+          subscription_anchor_start: string
           subscription_id: string | null
           subscription_metered: Json
           trial_at: string
@@ -1078,7 +1085,8 @@ export interface Database {
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
-          subscription_anchor?: string
+          subscription_anchor_end?: string
+          subscription_anchor_start?: string
           subscription_id?: string | null
           subscription_metered?: Json
           trial_at?: string
@@ -1092,7 +1100,8 @@ export interface Database {
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
-          subscription_anchor?: string
+          subscription_anchor_end?: string
+          subscription_anchor_start?: string
           subscription_id?: string | null
           subscription_metered?: Json
           trial_at?: string
@@ -1174,6 +1183,10 @@ export interface Database {
     }
     Functions: {
       add_deleted_user: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      calculate_daily_app_usage: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -1604,6 +1617,17 @@ export interface Database {
         }
         Returns: boolean
       }
+      update_app_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: undefined
+          }
+        | {
+            Args: {
+              minutes_interval: number
+            }
+            Returns: undefined
+          }
       update_version_stats: {
         Args: {
           app_id: string
@@ -1627,6 +1651,7 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
+      usage_mode: "5min" | "day" | "month"
       user_min_right: "read" | "upload" | "write" | "admin"
       user_role: "read" | "upload" | "write" | "admin"
     }
