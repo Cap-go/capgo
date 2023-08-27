@@ -284,8 +284,8 @@ devDependencies:
     specifier: 1.1.9
     version: 1.1.9
   '@iconify-json/ls':
-    specifier: 1.1.4
-    version: 1.1.4
+    specifier: 1.1.5
+    version: 1.1.5
   '@iconify/json':
     specifier: ^2.2.101
     version: 2.2.101
@@ -3125,8 +3125,8 @@ packages:
       '@iconify/types': 2.0.0
     dev: true
 
-  /@iconify-json/ls@1.1.4:
-    resolution: {integrity: sha512-WjKbShJ+YNz1IYUVraImxIWuJG+DoMucCRrHjKShxrmq6GbzNhmhfeSlKE3GOfQeUKyN4SkVfCaYZZ/XmLCPYA==}
+  /@iconify-json/ls@1.1.5:
+    resolution: {integrity: sha512-MU6Xs6tjudPqGZSKdsHuiOqDdUoBaXFHMrKi37io3lOlZf2WxIaQStbxmSTplVAF/hOCzDECiDHSc2OQCH4FoA==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
