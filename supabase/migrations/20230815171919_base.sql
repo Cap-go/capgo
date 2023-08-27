@@ -1477,6 +1477,10 @@ CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
 
+CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btree" ("created_at");
+
+CREATE INDEX "idx_app_versions_deleted" ON "public"."app_versions" USING "btree" ("deleted");
+
 CREATE INDEX "idx_app_versions_name" ON "public"."app_versions" USING "btree" ("name");
 
 CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_at");
@@ -1484,6 +1488,10 @@ CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_a
 CREATE INDEX "idx_device_id_logs" ON "public"."stats" USING "btree" ("device_id");
 
 CREATE INDEX "idx_devices_created_at" ON "public"."devices" USING "btree" ("device_id", "created_at" DESC);
+
+CREATE INDEX "idx_devices_last_mau" ON "public"."devices" USING "btree" ("last_mau");
+
+CREATE INDEX "idx_devices_created_at_updated_at" ON "public"."devices" USING "btree" ("created_at", "updated_at");
 
 CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
 
