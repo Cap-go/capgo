@@ -44,7 +44,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 CREATE EXTENSION IF NOT EXISTS "wrappers" WITH SCHEMA "extensions";
 
-
 CREATE TYPE "public"."key_mode" AS ENUM (
     'read',
     'write',
@@ -55,7 +54,7 @@ CREATE TYPE "public"."key_mode" AS ENUM (
 CREATE TYPE "public"."usage_mode" AS ENUM (
     '5min',
     'day',
-    'month'
+    'cycle'
 );
 
 CREATE TYPE "public"."match_plan" AS (
@@ -854,6 +853,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION calculate_cycle_usage() RETURNS VOID AS $$
+BEGIN
+    WITH cycle_usage AS (
+        SELECT apps.app_id, SUM(app_usage.bandwidth) AS cycle_bandwidth, SUM(app_usage.storage) AS cycle_storage, SUM(app_usage.mau) AS cycle_mau
+        FROM app_usage
+        JOIN apps ON app_usage.app_id = apps.app_id
+        JOIN users ON apps.user_id = users.id
+        JOIN stripe_info ON users.customer_id = stripe_info.customer_id
+        WHERE app_usage.created_at BETWEEN stripe_info.subscription_anchor_start AND stripe_info.subscription_anchor_end
+        AND app_usage.mode = '5min'
+        GROUP BY apps.app_id
+    )
+    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
+    SELECT app_id, NOW(), cycle_bandwidth, cycle_storage, cycle_mau, 'cycle'
+    FROM cycle_usage;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE FUNCTION "public"."is_canceled"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
