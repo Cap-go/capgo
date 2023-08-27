@@ -96,16 +96,39 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
     scrollToElement(id)
   }
 }
+
+async function addNewApiKey() {
+  const newApiKey = crypto.randomUUID()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    console.log('Not logged in, cannot regenerate API key')
+    return
+  }
+  const { error } = await supabase
+    .from('apikeys')
+    .upsert({ user_id: user.id, key: newApiKey, mode: 'all' })
+    .select()
+
+  if (error)
+    throw error
+}
+
 async function getKey(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', main.user?.id).eq('mode', 'all')
-  if (data)
-    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key || '')
+    .eq('user_id', main?.user?.id).eq('mode', 'all')
 
-  else if (retry && main.user?.id)
+  if (typeof data !== 'undefined' && data !== null) {
+    if (data.length === 0) {
+      await addNewApiKey()
+      return getKey(false)
+    }
+    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key || '')
+  }
+  else if (retry && main?.user?.id)
     return getKey(false)
 
   isLoading.value = false
@@ -140,6 +163,9 @@ watchEffect(async () => {
 
 watchEffect(async () => {
   if (route.path === '/app/home')
+  if (typeof main.user === 'undefined') {
+    return location.reload();
+  }
     await getKey()
 })
 </script>
