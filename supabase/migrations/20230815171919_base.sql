@@ -1533,8 +1533,8 @@ CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("ap
 
 CREATE OR REPLACE FUNCTION get_cycle_info()
 RETURNS TABLE (
-    subscription_anchor_start timestamp without time zone,
-    subscription_anchor_end timestamp without time zone
+    subscription_anchor_start timestamp with time zone,
+    subscription_anchor_end timestamp with time zone
 ) AS $$
 DECLARE
     customer_id_var text;
@@ -1544,11 +1544,24 @@ BEGIN
 
     -- Get the stripe_info using the customer_id
     RETURN QUERY
-    SELECT stripe_info.subscription_anchor_start, stripe_info.subscription_anchor_end 
-    FROM stripe_info 
-    WHERE customer_id = customer_id_var;
+    WITH cycle_info AS (
+        SELECT stripe_info.subscription_anchor_start, stripe_info.subscription_anchor_end 
+        FROM stripe_info 
+        WHERE customer_id = customer_id_var
+    )
+    SELECT 
+        CASE 
+            WHEN now() BETWEEN cycle_info.subscription_anchor_start AND cycle_info.subscription_anchor_end THEN cycle_info.subscription_anchor_start
+            ELSE date_trunc('MONTH', now()) + (cycle_info.subscription_anchor_start - date_trunc('MONTH', cycle_info.subscription_anchor_start))
+        END,
+        CASE 
+            WHEN now() BETWEEN cycle_info.subscription_anchor_start AND cycle_info.subscription_anchor_end THEN cycle_info.subscription_anchor_end
+            ELSE date_trunc('MONTH', now()) + (cycle_info.subscription_anchor_start - date_trunc('MONTH', cycle_info.subscription_anchor_start)) + INTERVAL '1 month'
+        END
+    FROM cycle_info;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
