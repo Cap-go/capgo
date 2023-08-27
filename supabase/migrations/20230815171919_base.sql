@@ -804,7 +804,7 @@ BEGIN
     ), deleted_storage AS (
         SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
         FROM app_versions
-        WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
+        WHERE app_versions.updated_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
         GROUP BY app_versions.app_id
     ), mau AS (
         SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mau
