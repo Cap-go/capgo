@@ -135,6 +135,33 @@ export interface Database {
           }
         ]
       }
+      app_usage: {
+        Row: {
+          app_id: string
+          bandwidth: number
+          created_at: string | null
+          id: string
+          mlu: number
+          storage: number
+        }
+        Insert: {
+          app_id: string
+          bandwidth?: number
+          created_at?: string | null
+          id?: string
+          mlu?: number
+          storage?: number
+        }
+        Update: {
+          app_id?: string
+          bandwidth?: number
+          created_at?: string | null
+          id?: string
+          mlu?: number
+          storage?: number
+        }
+        Relationships: []
+      }
       app_versions: {
         Row: {
           app_id: string
@@ -423,7 +450,7 @@ export interface Database {
           name: string
           public: boolean
           secondaryVersionPercentage: number
-          secondVersion: number
+          secondVersion: number | null
           updated_at: string
           version: number
         }
@@ -445,9 +472,9 @@ export interface Database {
           name: string
           public?: boolean
           secondaryVersionPercentage?: number
-          secondVersion?: number
+          secondVersion?: number | null
           updated_at?: string
-          version?: number
+          version: number
         }
         Update: {
           allow_dev?: boolean
@@ -467,7 +494,7 @@ export interface Database {
           name?: string
           public?: boolean
           secondaryVersionPercentage?: number
-          secondVersion?: number
+          secondVersion?: number | null
           updated_at?: string
           version?: number
         }
@@ -1166,10 +1193,6 @@ export interface Database {
         }
         Returns: number
       }
-      delete_user: {
-        Args: {}
-        Returns: void
-      },
       convert_bytes_to_mb: {
         Args: {
           byt: number
@@ -1291,6 +1314,10 @@ export interface Database {
           missing_app_id: string
         }[]
       }
+      get_apikey: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_app_versions: {
         Args: {
           appid: string
@@ -1313,6 +1340,10 @@ export interface Database {
         Args: {
           userid: string
         }
+        Returns: string
+      }
+      get_db_url: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       get_devices_version: {

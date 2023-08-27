@@ -285,7 +285,7 @@ async function enableAbTesting() {
 
   const { error } = await supabase
     .from('channels')
-    .update({ enableAbTesting: val })
+    .update({ enableAbTesting: val, secondVersion: val ? channel.value.version.id : undefined })
     .eq('id', id.value)
 
   if (error) {

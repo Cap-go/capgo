@@ -87,6 +87,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       version_build,
       version: 0,
     }
+    const rows: Database['public']['Tables']['stats']['Insert'][] = []
     const all = []
     const { data: appVersion } = await supabaseAdmin()
       .from('app_versions')
@@ -99,30 +100,20 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       stat.version = appVersion.id
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
-        // const { data: deviceData } = await supabaseAdmin()
-        //   .from('devices')
-        //   .select()
-        //   .eq('app_id', app_id)
-        //   .eq('device_id', device_id)
-        //   .single()
-        // if (deviceData && deviceData.version !== appVersion.id) {
-        //   all.push(updateVersionStats({
-        //     app_id,
-        //     version_id: deviceData.version,
-        //     install: 0,
-        //     uninstall: 1,
-        //     fail: 0,
-        //   }))
-        // }
-        // if (!deviceData || deviceData.version !== appVersion.id) {
-        //   all.push(updateVersionStats({
-        //     app_id,
-        //     version_id: appVersion.id,
-        //     install: 1,
-        //     uninstall: 0,
-        //     fail: 0,
-        //   }))
-        // }
+        const { data: deviceData } = await supabaseAdmin()
+          .from('devices')
+          .select()
+          .eq('app_id', app_id)
+          .eq('device_id', device_id)
+          .single()
+        if (deviceData && deviceData.version !== appVersion.id) {
+          const statUninstall = {
+            ...stat,
+            action: 'uninstall',
+            version_id: deviceData.version,
+          }
+          rows.push(statUninstall)
+        }
       }
       else if (failActions.includes(action)) {
         console.log('FAIL!')
@@ -141,13 +132,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
             notify: true,
           }).catch()
         }
-        // all.push(updateVersionStats({
-        //   app_id,
-        //   version_id: appVersion.id,
-        //   install: 0,
-        //   uninstall: 0,
-        //   fail: 1,
-        // }))
       }
     }
     else {
@@ -157,12 +141,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
         error: 'app_not_found',
       }, 200)
     }
+    rows.push(stat)
     all.push(supabaseAdmin()
       .from('devices')
       .upsert(device)
       .then(() => supabaseAdmin()
         .from('stats')
-        .insert(stat)))
+        .insert(rows)))
     await Promise.all(all)
     return sendRes()
   }
