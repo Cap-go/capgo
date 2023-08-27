@@ -1,8 +1,7 @@
 import { Hono } from 'https://deno.land/x/hono@v3.5.4/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { connect } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
-import { parseRedisUrl } from '../_utils/redis.ts'
+import { getRedis } from '../_utils/redis.ts'
 
 const UPDATE_FUNCTION = 'http://0.0.0.0:8081/updates'
 const APP_DOES_NOT_EXIST = '{"message":"App not found","error":"app_not_found"}'
@@ -21,7 +20,7 @@ const headersSchema = z.object({
 })
 
 const app = new Hono()
-const redis = await connect(parseRedisUrl(Deno.env.get('REDIS_URL') ?? ''))
+const redis = await getRedis()
 
 app.post(
   '/updates_cached',
