@@ -862,7 +862,7 @@ BEGIN
         JOIN users ON apps.user_id = users.id
         JOIN stripe_info ON users.customer_id = stripe_info.customer_id
         WHERE app_usage.created_at BETWEEN stripe_info.subscription_anchor_start AND stripe_info.subscription_anchor_end
-        AND app_usage.mode = '5min'
+        AND app_usage.mode = 'day'
         GROUP BY apps.app_id
     )
     INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
@@ -870,17 +870,6 @@ BEGIN
     FROM cycle_usage;
 END;
 $$ LANGUAGE plpgsql;
-
-CREATE FUNCTION "public"."is_canceled"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  from stripe_info
-  where customer_id=(SELECT customer_id from users where id=userid)
-  AND status = 'canceled'));
-End;  
-$$;
 
 
 CREATE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
