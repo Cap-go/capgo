@@ -5,6 +5,7 @@ import type { InsertPayload } from '../_utils/supabase.ts'
 import { incrementSize, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
+import { redisAppVersionInvalidate } from '../_utils/redis.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
@@ -53,6 +54,16 @@ serve(async (event: Request) => {
         console.error('Cannot create app version meta', dbError)
       return sendRes()
     }
+
+    // Invalidate cache
+    if (!record.app_id) {
+      return sendRes({
+        status: 'error app_id',
+        error: 'Np app id included the request',
+      }, 500)
+    }
+
+    await redisAppVersionInvalidate(record.app_id)
 
     let checksum = ''
     let size = 0

@@ -72,6 +72,15 @@ AFTER UPDATE ON public.app_versions
 FOR EACH ROW 
 EXECUTE FUNCTION public.http_post_to_function('on_version_update');
 
+CREATE TRIGGER on_devices_override_update 
+AFTER INSERT or UPDATE or DELETE ON public.devices_override 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_device_update');
+
+CREATE TRIGGER on_channel_devices_update 
+AFTER INSERT or UPDATE or DELETE ON public.channel_devices 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_device_update');
 
 INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "app", "channel", "update", "version", "shared", "abtest", "progressive_deploy", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
 ('2022-06-05 12:25:28+00', '2022-10-05 16:00:46.563382+00', 'Free', 'plan.free.desc', 0, 0, 'free', 1, 1, 500, 10, 0, 'f', 'f', 'c2f582d7-7dcb-4a65-b8da-82cc74a0645d', 'free', 'free', 0.1, 0.5, 50, 'Best for discover', 0, 0, 0, NULL, NULL, NULL),

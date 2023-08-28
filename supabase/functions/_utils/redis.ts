@@ -26,21 +26,27 @@ export function parseRedisUrl(url: string): { hostname: string; password: string
 }
 
 export async function getRedis() {
+  const redisEnv = Deno.env.get('REDIS_URL')
+  if (!redisEnv)
+    return undefined
+
   if (!REDIS)
-    REDIS = await connect(parseRedisUrl(Deno.env.get('REDIS_URL') ?? ''))
+    REDIS = await connect(parseRedisUrl(redisEnv))
 
   return REDIS
 }
 
 export async function redisAppVersionInvalidate(app_id: string) {
   const redis = await getRedis()
+  if (!redis)
+    return
 
   const hashCacheKey = `app_${app_id}`
   let cursor = 0
   const pipeline = redis.pipeline()
   let hscan: [string, string[]]
 
-  async function callHscan() {
+  async function callHscan(redis: Redis) {
     console.log('hscan iter')
     hscan = await redis.hscan(hashCacheKey, cursor, { pattern: 'ver*', count: 5000 })
     cursor = parseInt(hscan[0])
@@ -55,14 +61,17 @@ export async function redisAppVersionInvalidate(app_id: string) {
     }
   }
 
-  await callHscan()
+  await callHscan(redis)
 
   while (cursor !== 0)
-    await callHscan()
+    await callHscan(redis)
 
   await pipeline.flush()
 }
 
 export async function redisDeviceInvalidate(appId: string, deviceId: string) {
-  await ((await getRedis()).hdel(`app_${appId}`, `device_${deviceId}`))
+  const redis = await getRedis()
+  if (!redis)
+    return
+  await redis.hdel(`app_${appId}`, `device_${deviceId}`)
 }
