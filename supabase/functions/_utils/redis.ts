@@ -20,8 +20,6 @@ export function parseRedisUrl(url: string): { hostname: string; password: string
     name: splitted[0] === 'default' ? undefined : splitted[0],
   }
 
-  console.log(JSON.stringify(parsed))
-
   return parsed
 }
 
@@ -47,7 +45,6 @@ export async function redisAppVersionInvalidate(app_id: string) {
   let hscan: [string, string[]]
 
   async function callHscan(redis: Redis) {
-    console.log('hscan iter')
     hscan = await redis.hscan(hashCacheKey, cursor, { pattern: 'ver*', count: 5000 })
     cursor = parseInt(hscan[0])
 
@@ -56,7 +53,6 @@ export async function redisAppVersionInvalidate(app_id: string) {
       if (i % 2 === 1)
         continue
 
-      console.log(`hscan del: ${hscan[1][i]}`)
       await pipeline.hdel(hashCacheKey, hscan[1][i])
     }
   }
