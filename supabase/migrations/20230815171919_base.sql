@@ -833,6 +833,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.update_app_usage() TO postgres;
 
 CREATE OR REPLACE FUNCTION calculate_daily_app_usage() RETURNS VOID AS $$
 DECLARE
@@ -853,6 +857,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_daily_app_usage() TO postgres;
+
 CREATE OR REPLACE FUNCTION calculate_cycle_usage() RETURNS VOID AS $$
 BEGIN
     WITH cycle_usage AS (
@@ -871,6 +880,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_cycle_usage() TO postgres;
 
 CREATE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
