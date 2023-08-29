@@ -242,18 +242,6 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apps
-  WHERE app_id=appid
-  AND user_id=get_user_id(apikey)));
-End;  
-$$;
-
-
 CREATE FUNCTION "public"."exist_app_v2"("appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -274,19 +262,6 @@ Begin
   WHERE app_id=appid
   AND name=name_version
   AND user_id=get_user_id(apikey)));
-End;  
-$$;
-
-
-CREATE FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM channels
-  WHERE app_id=appid
-  AND name=name_channel
-  AND created_by=get_user_id(apikey)));
 End;  
 $$;
 
@@ -333,22 +308,6 @@ RETURN QUERY (
   ORDER BY app
 );
 
-END;
-$$;
-
-
-CREATE FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) RETURNS TABLE("missing_app_id" character varying)
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    RETURN QUERY
-        SELECT app_id
-        FROM unnest(app_ids) AS app_id
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM store_apps
-            WHERE store_apps.app_id = app_id::VARCHAR
-        );
 END;
 $$;
 
@@ -407,82 +366,6 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."get_dl_by_month"("userid" "uuid", "pastmonth" integer) RETURNS TABLE("app_id" character varying, "maxdownload" bigint)
-    LANGUAGE "plpgsql"
-    AS $$
-
-BEGIN
-    RETURN QUERY
-    SELECT stats.app_id, COUNT(stats.app_id) AS maxDownload
-    FROM stats 
-    WHERE stats.app_id IN (
-      SELECT apps.app_id
-      FROM apps 
-      WHERE apps.user_id=userid
-    )
-    AND action='set'
-    AND created_at
-    
-      BETWEEN date_trunc('month', current_date)-(pastMonth || ' months')::interval
-      AND date_trunc('month', current_date)-(pastMonth || ' months')::interval+'1month'::interval-'1day'::interval
-    GROUP BY stats.app_id;
-END;
-$$;
-
-CREATE FUNCTION "public"."get_dl_by_month_by_app"("pastmonth" integer, "appid" character varying) RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-   RETURN (
-   SELECT count(stats.app_id)::int
-   FROM stats
-   WHERE stats.app_id = appid
-    AND action='set'
-    AND created_at
-      BETWEEN date_trunc('month', current_date)-(pastMonth || ' months')::interval
-      AND date_trunc('month', current_date)-(pastMonth || ' months')::interval+'1month'::interval-'1day'::interval
-   );
-END
-$$;
-
-CREATE FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) RETURNS TABLE("app_id" character varying, "maxdownload" bigint)
-    LANGUAGE "plpgsql"
-    AS $$
-
-BEGIN
-    RETURN QUERY
-    SELECT 
-    stats.app_id,
-    COUNT(stats.app_id) AS maxDownload
-    FROM stats 
-    WHERE stats.app_id = appid
-    AND action='set'
-    AND created_at
-    
-      BETWEEN date_trunc('month', current_date)-(pastMonth || ' months')::interval
-      AND date_trunc('month', current_date)-(pastMonth || ' months')::interval+'1month'::interval-'1day'::interval
-    GROUP BY stats.app_id;
-END;
-$$;
-
-CREATE FUNCTION "public"."get_max_channel"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$  
-Declare  
- Channel_count integer;  
-Begin
-  SELECT MAX (maxChannel)
-  INTO Channel_count
-  FROM (
-    SELECT app_id, COUNT(app_id) AS maxChannel
-    FROM channels 
-    WHERE created_by=userid
-    GROUP BY app_id
-  ) AS derivedTable;
-  return Channel_count;
-End;  
-$$;
-
 CREATE FUNCTION "public"."get_max_plan"("userid" "uuid") RETURNS TABLE("mau" bigint, "storage" bigint, "bandwidth" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -499,42 +382,6 @@ Begin
      count(*)::bigint as bandwidth,
      count(*)::bigint as storage
   FROM apps;  
-End;  
-$$;
-
-CREATE FUNCTION "public"."get_max_shared"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$  
-Declare  
- Shared_count integer;  
-Begin
-  SELECT MAX (maxShared)
-  INTO Shared_count
-  FROM (
-    SELECT app_id, COUNT(app_id) AS maxShared
-    FROM channel_users 
-    WHERE created_by=userid
-    GROUP BY app_id
-  ) AS derivedTable;
-  return Shared_count;
-End;  
-$$;
-
-CREATE FUNCTION "public"."get_max_version"("userid" "uuid") RETURNS integer
-    LANGUAGE "plpgsql"
-    AS $$  
-Declare  
- Version_count integer;  
-Begin
-  SELECT MAX (maxVersion)
-  INTO Version_count
-  FROM (
-    SELECT app_id, COUNT(app_id) AS maxVersion
-    FROM app_versions 
-    WHERE user_id=userid
-    GROUP BY app_id
-  ) AS derivedTable;
-  return Version_count;
 End;  
 $$;
 
@@ -580,29 +427,6 @@ BEGIN
 
   RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
 END;
-$$;
-
-CREATE FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) RETURNS TABLE("max_channel" bigint, "max_shared" bigint, "max_update" bigint, "max_version" bigint, "max_app" bigint, "max_device" bigint, "mau" bigint)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN QUERY SELECT 
-    MAX(channels)::bigint AS max_channel,
-    MAX(shared)::bigint AS max_shared,
-    (SELECT
-      MAX(MyMaxName) 
-    FROM ( VALUES 
-              (MAX(mlu)), 
-              (MAX(mlu_real)) 
-          ) MyAlias(MyMaxName))::bigint AS max_update,
-    MAX(versions)::bigint AS max_version,
-    COUNT(app_id)::bigint AS max_app,
-    MAX(devices)::bigint AS max_device,
-    SUM(devices)::bigint AS mau
-  FROM app_stats
-  WHERE user_id = userid
-  and date_id=dateid;
-End;  
 $$;
 
 CREATE FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
@@ -674,25 +498,6 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION public.increment_stats_v2(app_id character varying, date_id character varying, bandwidth integer, version_size integer, channels integer, shared integer, mlu integer, mlu_real integer, versions integer, devices integer, devices_real integer) 
-RETURNS void AS $$
-BEGIN
-  update app_stats 
-  set bandwidth = app_stats.bandwidth + increment_stats_v2.bandwidth,
-    version_size = app_stats.version_size + increment_stats_v2.version_size,
-    channels = app_stats.channels + increment_stats_v2.channels,
-    shared = app_stats.shared + increment_stats_v2.shared,
-    mlu = app_stats.mlu + increment_stats_v2.mlu,
-    devices = app_stats.devices + increment_stats_v2.devices,
-    devices_real = app_stats.devices_real + increment_stats_v2.devices_real,
-    mlu_real = app_stats.mlu_real + increment_stats_v2.mlu_real,
-    versions = app_stats.versions + increment_stats_v2.versions
-  where app_stats.date_id = increment_stats_v2.date_id and
-  app_stats.app_id = increment_stats_v2.app_id;
-END;
-$$ LANGUAGE plpgsql;
-
-
 CREATE OR REPLACE FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer)
 RETURNS void AS $$
 BEGIN
@@ -703,6 +508,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -712,6 +518,7 @@ End;
 $$;
 
 
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_allowed_action"("apikey" "text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -720,7 +527,7 @@ Begin
 End;
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -756,6 +563,7 @@ End;
 $$;
 
 
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -767,7 +575,7 @@ Begin
 End;  
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -778,6 +586,20 @@ Begin
   AND user_id=userid));
 End;  
 $$;
+
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION public.is_canceled(userid uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  from stripe_info
+  where customer_id=(SELECT customer_id from users where id=userid)
+  AND status = 'canceled'));
+End;  
+$function$
 
 CREATE OR REPLACE FUNCTION update_app_usage(minutes_interval INT) RETURNS VOID AS $$
 DECLARE
@@ -833,11 +655,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.update_app_usage() TO postgres;
-
 CREATE OR REPLACE FUNCTION calculate_daily_app_usage() RETURNS VOID AS $$
 DECLARE
     twenty_four_hours_ago TIMESTAMP;
@@ -857,11 +674,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.calculate_daily_app_usage() TO postgres;
-
 CREATE OR REPLACE FUNCTION calculate_cycle_usage() RETURNS VOID AS $$
 BEGIN
     WITH cycle_usage AS (
@@ -880,11 +692,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.calculate_cycle_usage() TO postgres;
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -893,7 +701,7 @@ Begin
 End;
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_good_plan_v3"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -910,6 +718,7 @@ END;
 $$;
 
 
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
@@ -938,7 +747,7 @@ Begin
 End; 
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -951,7 +760,7 @@ Begin
 End;
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_onboarding_needed"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -960,7 +769,7 @@ Begin
 End;
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -972,7 +781,7 @@ Begin
 End;  
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_trial"("userid" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -983,7 +792,7 @@ Begin
 End;  
 $$;
 
-
+-- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -999,20 +808,6 @@ Begin
   WHERE version=versionid));
 End;  
 $$;
-
-
-CREATE OR REPLACE FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint)
-RETURNS void AS $$
-BEGIN
-  UPDATE app_versions_meta
-  SET installs = installs + update_version_stats.install,
-    uninstalls = uninstalls + update_version_stats.uninstall,
-    devices = get_devices_version(app_id, version_id),
-    fails = fails + update_version_stats.fail
-  where app_versions_meta.id = update_version_stats.version_id and
-  app_versions_meta.app_id = update_version_stats.app_id;
-END;
-$$ LANGUAGE plpgsql;
 
 
 SET default_tablespace = '';
@@ -1358,6 +1153,22 @@ CREATE TABLE "public"."store_apps" (
     "developer_id" "text"
 );
 
+CREATE OR REPLACE FUNCTION public.remove_enum_value(enum_type regtype, enum_value text)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    _enum_value text;
+BEGIN
+    FOR _enum_value IN SELECT enumlabel FROM pg_enum WHERE enumtypid = enum_type AND enumlabel <> enum_value LOOP
+        EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, _enum_value, _enum_value || '_old');
+        EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, _enum_value || '_old', _enum_value);
+    END LOOP;
+    EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value, enum_value || '_old');
+    EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value || '_old', enum_value);
+END;
+$function$
+
 CREATE OR REPLACE FUNCTION one_month_ahead() 
 RETURNS timestamp AS 
 $$
@@ -1618,6 +1429,76 @@ REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.http_post_to_function() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_daily_app_usage() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_cycle_usage() TO postgres;
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."apikeys" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
@@ -2034,40 +1915,10 @@ GRANT ALL ON FUNCTION "public"."get_devices_version"("app_id" character varying,
 GRANT ALL ON FUNCTION "public"."get_devices_version"("app_id" character varying, "version_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_devices_version"("app_id" character varying, "version_id" bigint) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."get_dl_by_month"("userid" "uuid", "pastmonth" integer) TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month"("userid" "uuid", "pastmonth" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month"("userid" "uuid", "pastmonth" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month"("userid" "uuid", "pastmonth" integer) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("pastmonth" integer, "appid" character varying) TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("pastmonth" integer, "appid" character varying) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("pastmonth" integer, "appid" character varying) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("pastmonth" integer, "appid" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_dl_by_month_by_app"("userid" "uuid", "pastmonth" integer, "appid" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_max_channel"("userid" "uuid") TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_max_channel"("userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_max_channel"("userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_max_channel"("userid" "uuid") TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."get_max_plan"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_max_plan"("userid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_max_plan"("userid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_max_plan"("userid" "uuid") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_max_shared"("userid" "uuid") TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_max_shared"("userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_max_shared"("userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_max_shared"("userid" "uuid") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_max_version"("userid" "uuid") TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_max_version"("userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_max_version"("userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_max_version"("userid" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "anon";
@@ -2078,11 +1929,6 @@ GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_stats"("userid" "uuid", "dateid" character varying) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "anon";
@@ -2099,25 +1945,10 @@ GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid"
 GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "service_role";
 
---GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "postgres";
---GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "anon";
---GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "authenticated";
---GRANT ALL ON FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) TO "postgres";
-GRANT ALL ON FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."increment_stats_v2"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer, "devices_real" integer) TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "postgres";
 GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "service_role";
-
---GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "postgres";
---GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "anon";
---GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "authenticated";
---GRANT ALL ON FUNCTION "public"."increment_version_stats"("app_id" character varying, "version_id" bigint, "devices" integer) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "anon";
@@ -2203,11 +2034,6 @@ GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" 
 GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) TO "postgres";
-GRANT ALL ON FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."update_version_stats"("app_id" character varying, "version_id" bigint, "install" bigint, "uninstall" bigint, "fail" bigint) TO "service_role";
 
 GRANT ALL ON TABLE "public"."apikeys" TO "postgres";
 GRANT ALL ON TABLE "public"."apikeys" TO "anon";

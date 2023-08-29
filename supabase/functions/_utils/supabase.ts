@@ -93,60 +93,6 @@ export async function updateOnpremStats(increment: Database['public']['Functions
     console.error('increment_store', error)
 }
 
-export async function updateVersionStats(increment: Database['public']['Functions']['update_version_stats']['Args']) {
-  const { error } = await supabaseAdmin()
-    .rpc('update_version_stats', increment)
-  if (error)
-    console.error('update_version_stats', error)
-}
-
-export function incrementSize(appId: string, userId: string, size: number) {
-  const today_id = new Date().toISOString().slice(0, 10)
-  const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
-    app_id: appId,
-    date_id: today_id,
-    bandwidth: 0,
-    mlu: 0,
-    mlu_real: 0,
-    devices: 0,
-    devices_real: 0,
-    version_size: size,
-    channels: 0,
-    shared: 0,
-    versions: 1,
-  }
-  return updateOrAppStats(increment, today_id, userId)
-}
-
-export async function updateOrAppStats(increment: Database['public']['Functions']['increment_stats_v2']['Args'],
-  date_id: string, user_id: string) {
-  const { data: dataAppStats } = await supabaseAdmin()
-    .from('app_stats')
-    .select()
-    .eq('app_id', increment.app_id)
-    .eq('date_id', date_id)
-    .single()
-  console.log('updateOrAppStats', increment, !!dataAppStats)
-  if (dataAppStats) {
-    const { error } = await supabaseAdmin()
-      .rpc('increment_stats_v2', increment)
-    if (error)
-      console.error('increment_stats_v2', error)
-  }
-  else {
-    const newDay: Database['public']['Tables']['app_stats']['Insert'] = {
-      ...increment,
-      devices_real: 0,
-      user_id,
-    }
-    const { error } = await supabaseAdmin()
-      .from('app_stats')
-      .insert(newDay)
-    if (error)
-      console.error('Cannot create app_stats', error)
-  }
-}
-
 export async function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
