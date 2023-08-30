@@ -100,14 +100,13 @@ watchEffect(() => {
                     <FormKit
                       type="email"
                       name="email"
-                      :label="t('first-name')"
+                      :label="t('email')"
                       input-class="!text-black"
                       :disabled="isLoading"
                       :prefix-icon="iconEmail"
                       inputmode="email"
                       autocomplete="email"
                       validation="required:trim"
-                      :lavel="t('email')"
                     />
                   </div>
 
