@@ -1,22 +1,49 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { storeToRefs } from 'pinia'
 import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
 
 import { useOrganizationStore } from '~/stores/organization'
 import Plus from '~icons/heroicons/plus'
 import type { Database } from '~/types/supabase.types'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
+const displayStore = useDisplayStore()
 
 const organizationStore = useOrganizationStore()
+const { currentOrganization } = storeToRefs(organizationStore)
 
 const members = ref([] as Database['public']['Functions']['get_org_members']['Returns'])
+
+watch(currentOrganization, async () => {
+  members.value = await organizationStore.getMembers()
+})
 
 onMounted(async () => {
   members.value = await organizationStore.getMembers()
 })
+
+function showInviteModal() {
+  displayStore.dialogOption = {
+    header: t('insert-invite-email'),
+    message: 'Email',
+    input: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-invite'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
 </script>
 
 <template>
@@ -25,7 +52,7 @@ onMounted(async () => {
       <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
         {{ t('members') }}
       </h2>
-      <button type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+      <button type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
         <Plus />
         {{ t('add-member') }}
       </button>

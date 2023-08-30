@@ -24,6 +24,7 @@ activation-validate: Validate
 add: Add
 add-another-app: Add your app
 add-api-key: Added new API key successfully
+add-member: Add Member
 add-shared-user: Add shared user
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
@@ -71,6 +72,7 @@ button-cancel: Cancel
 button-delete: Delete
 button-go: GO
 button-home: Home
+button-invite: Invite
 button-options: Options
 button-regenerate: Regenerate
 button-remove: Remove
@@ -78,6 +80,7 @@ button-tabs: Tabs
 button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
+cancel: Cancel
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
@@ -153,6 +156,7 @@ forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from-device: from device
+general-information: General Informations
 generated-new-apikey: Generated new API key!
 good: Good
 id: ID
@@ -161,6 +165,7 @@ in-your-project-fold: In your project folder
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
+insert-invite-email: Insert email of the user you want to invite
 install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
@@ -191,6 +196,7 @@ making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+members: Members
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -261,6 +267,7 @@ removed-apikey: API key has been successfully deleted
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves
+save-changes: Save Changes
 search: Search
 search-bundle: Search Bundle
 search-bundle-id: Search by bundle ID
@@ -334,9 +341,3 @@ your-api-key: 'Your API key:'
 your-are-a: Your are a
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is
-general-information: General Informations
-members: Members
-save-changes: Save Changes
-cancel: Cancel
-add-member: Add Member
-

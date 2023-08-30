@@ -85,7 +85,12 @@ onMounted(() => {
         </div>
         <!-- Modal body -->
         <div class="p-6 space-y-6">
-          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)" />
+          <p v-if="!displayStore.dialogOption?.input" class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)" />
+          <template v-else>
+            <div class="flex flex-row max-w-2xl">
+              <input class="border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 w-full ml-4" type="text">
+            </div>
+          </template>
         </div>
         <!-- Modal footer -->
         <div class="flex items-center p-6 space-x-2 border-t border-gray-200 rounded-b dark:border-gray-600">

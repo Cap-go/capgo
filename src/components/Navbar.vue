@@ -48,7 +48,6 @@ const { t } = useI18n()
         <div class="flex">
           <div v-if="displayStore.NavTitle" class="pr-2">
             <button class="flex" @click="back()">
-              {{ orgs }}
               <IconBack
                 class="w-6 h-6 fill-current text-slate-500 dark:text-white hover:text-slate-600 dark:hover:text-slate-50"
               />

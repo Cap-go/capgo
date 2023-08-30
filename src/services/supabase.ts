@@ -1,4 +1,3 @@
-import type { SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
 // import { Http } from '@capacitor-community/http'
@@ -10,7 +9,7 @@ const supbaseId = supabaseUrl.split('//')[1].split('.')[0]
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 export function useSupabase() {
-  const options: SupabaseClientOptions<'public'> = {
+  const options = {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
@@ -127,12 +126,15 @@ export async function isGoodPlan(userId: string): Promise<boolean> {
 
 export async function getOrgs(userId: string): Promise<[]> {
   const { data, error } = await useSupabase()
-    .rpc('get_orgs', { userid: userId })
-    .single()
+    .from('orgs')
+    .select('*')
+
   if (error) {
     console.error('getOrgs error', error.message)
-    throw new Error(error.message)
+    throw error
   }
+
+  console.log('orgs data', data)
 
   return data || ['asd']
 }

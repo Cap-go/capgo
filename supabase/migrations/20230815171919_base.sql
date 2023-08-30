@@ -83,7 +83,10 @@ CREATE TYPE "public"."stripe_status" AS ENUM (
     'canceled'
 );
 
+-- @Martin if you are migrating this use this:
+-- ALTER TYPE "user_min_right" ADD VALUE 'invite' BEFORE 'read'
 CREATE TYPE "public"."user_min_right" AS ENUM (
+    'invite'
     'read',
     'upload',
     'write',
@@ -179,7 +182,7 @@ End;
 $$;
 
 CREATE FUNCTION "public"."is_member_of_org"("user_id" uuid, "org_id" uuid) RETURNS boolean
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Declare
  is_found integer;
@@ -428,7 +431,7 @@ CREATE FUNCTION "public"."get_orgs"("userid" "uuid") RETURNS TABLE(id uuid, logo
 BEGIN
   RETURN QUERY
     SELECT orgs.id, orgs.logo, orgs.name from orgs
-    WHERE created_by = userid;
+    WHERE is_member_of_org(userid, orgs.id) or is_owner_of_org(userid, orgs.id);
 END;  
 $$;
 
@@ -722,6 +725,26 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION "public"."invite_user_to_org"("email" "varchar", "org_id" "uuid") RETURNS "varchar"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Declare  
+ invited_user record;
+Begin
+  SELECT users.id FROM USERS
+  INTO invited_user
+  WHERE users.email=invite_user_to_org.email;
+
+  IF invited_user IS NOT NULL THEN
+    INSERT INTO org_users (user_id, org_id, user_right)
+    VALUES (invited_user.id, invite_user_to_org.org_id, 'invite'::"public"."user_min_right");
+    
+    RETURN '??';
+  ELSE
+    return 'NO_EMAIL';
+  END IF;
+End;
+$$
 
 CREATE FUNCTION "public"."increment_stats"("app_id" character varying, "date_id" character varying, "bandwidth" integer, "version_size" integer, "channels" integer, "shared" integer, "mlu" integer, "mlu_real" integer, "versions" integer, "devices" integer) RETURNS "void"
     LANGUAGE "sql"
