@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import mime from 'mime'
-import { decode } from 'base64-arraybuffer'
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
@@ -18,6 +14,7 @@ import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
 import { availableLocales, i18n, loadLanguageAsync } from '~/modules/i18n'
 import { iconEmail, iconName } from '~/services/icons'
+import { pickPhoto, takePhoto } from '~/services/photos'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -27,100 +24,6 @@ const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
 // const errorMessage = ref('')
-
-async function updloadPhoto(data: string, fileName: string, contentType: string) {
-  const { error } = await supabase.storage
-    .from('images')
-    .upload(`${main.user?.id}/${fileName}`, decode(data), {
-      contentType,
-    })
-
-  const { data: res } = supabase.storage
-    .from('images')
-    .getPublicUrl(`${main.user?.id}/${fileName}`)
-
-  const { data: usr, error: dbError } = await supabase
-    .from('users')
-    .update({ image_url: res.publicUrl })
-    .eq('id', main.user?.id)
-    .select()
-    .single()
-  isLoading.value = false
-
-  if (error || dbError || !res.publicUrl || !usr) {
-    setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-    console.error('upload error', error, dbError)
-    return
-  }
-  main.user = usr
-}
-
-async function takePhoto() {
-  const cameraPhoto = await Camera.getPhoto({
-    resultType: CameraResultType.DataUrl,
-    source: CameraSource.Camera,
-    quality: 100,
-  })
-
-  isLoading.value = true
-
-  const fileName = `${new Date().getTime()}.${cameraPhoto.format}`
-
-  if (!cameraPhoto.dataUrl)
-    return
-
-  const contentType = mime.getType(cameraPhoto.format)
-
-  if (!contentType)
-    return
-  try {
-    await updloadPhoto(cameraPhoto.dataUrl.split('base64,')[1], fileName, contentType)
-  }
-  catch (e) {
-    console.error(e)
-    isLoading.value = false
-  }
-}
-function blobToData(blob: Blob) {
-  return new Promise<string>((resolve) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(reader.result as string)
-    reader.readAsDataURL(blob)
-  })
-}
-async function pickPhoto() {
-  const { photos } = await Camera.pickImages({
-    limit: 1,
-    quality: 100,
-  })
-  isLoading.value = true
-  if (photos.length === 0)
-    return
-  try {
-    let contents
-    if (photos[0].path) {
-      contents = await Filesystem.readFile({
-        path: photos[0].path || photos[0].webPath,
-      })
-    }
-    else {
-      const blob = await blobToData(await fetch(photos[0].webPath).then(r => r.blob()))
-      contents = { data: blob.split('base64,')[1] }
-    }
-    const contentType = mime.getType(photos[0].format)
-    if (!contentType)
-      return
-    await updloadPhoto(
-      contents.data,
-      `${new Date().getTime()}.${photos[0].format}`,
-      contentType,
-    )
-  }
-  catch (e) {
-    console.error(e)
-    isLoading.value = false
-  }
-}
 
 async function deleteAccount() {
   displayStore.showActionSheet = true
@@ -178,14 +81,14 @@ async function presentActionSheet() {
         text: t('button-camera'),
         handler: () => {
           displayStore.showActionSheet = false
-          takePhoto()
+          takePhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
       {
         text: t('button-browse'),
         handler: () => {
           displayStore.showActionSheet = false
-          pickPhoto()
+          pickPhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
       {

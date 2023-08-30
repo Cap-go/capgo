@@ -1,22 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { storeToRefs } from 'pinia'
+import Trash from '~icons/heroicons/trash'
+import Wrench from '~icons/heroicons/Wrench'
+
 import { useOrganizationStore } from '~/stores/organization'
-import { useDisplayStore } from '~/stores/display'
 import Plus from '~icons/heroicons/plus'
+import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 
 const organizationStore = useOrganizationStore()
-const displayStore = useDisplayStore()
 
-const { currentOrganization } = storeToRefs(organizationStore)
-
-const members = ref([])
+const members = ref([] as Database['public']['Functions']['get_org_members']['Returns'])
 
 onMounted(async () => {
-  members.value = organizationStore.getMembers(currentOrganization.id)
+  members.value = await organizationStore.getMembers()
 })
 </script>
 
@@ -31,26 +30,33 @@ onMounted(async () => {
         {{ t('add-member') }}
       </button>
     </div>
-    <div v-for="member in members" :key="member.id">
-      <div class="flex justify-between">
-        <div class="flex">
-          <img
-            v-if="member?.profilePhoto" class="object-cover w-20 h-20 mask mask-squircle" :src="member.profilePhoto"
-            width="80" height="80" alt="profile_photo"
-          >
-          <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
-            <p>{{ 'N/A' }}</p>
+    <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-full md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <dl class="divide-y divide-gray-500">
+        <div v-for="member in members" :key="member.id">
+          <div class="flex justify-between mt-2 mb-2 ml-2">
+            <div class="flex w-1/2">
+              <img
+                v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
+                width="80" height="80" alt="profile_photo"
+              >
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
+                <p>{{ 'N/A' }}</p>
+              </div>
+              <div class="mt-auto mb-auto ml-auto">
+                {{ member.email }}
+              </div>
+            </div>
+            <div class="mt-auto mb-auto mr-4">
+              <button class="w-7 h-7 bg-transparent ml-4">
+                <Wrench class="mr-4 text-lg text-[#397cea]" />
+              </button>
+              <button class="w-7 h-7 bg-transparent ml-4">
+                <Trash class="mr-4 text-lg text-red-600" />
+              </button>
+            </div>
           </div>
-          {{ member.name }}
         </div>
-        <div>
-          <p class="text-lg font-medium text-gray-900 dark:text-white">
-            ...
-          </p>
-        </div>
-      </div>
-      <div>{{ member.position }}</div>
-      <div>{{ member.role }}</div>
+      </dl>
     </div>
   </div>
 </template>

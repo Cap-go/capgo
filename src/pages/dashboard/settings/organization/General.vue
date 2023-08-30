@@ -1,19 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
+import { useSupabase } from '~/services/supabase'
+import { pickPhoto, takePhoto } from '~/services/photos'
 
 const { t } = useI18n()
 
 const organizationStore = useOrganizationStore()
 const displayStore = useDisplayStore()
+const supabase = useSupabase()
+const isLoading = ref(true)
+
+onMounted(async () => {
+  await organizationStore.fetchOrganizations()
+  isLoading.value = false
+})
 
 const { currentOrganization } = storeToRefs(organizationStore)
-
-const logo = ref(currentOrganization.logo)
-const name = ref('')
+const name = computed({
+  get: () => currentOrganization.value?.name ?? '',
+  set: (val) => {
+    if (currentOrganization.value)
+      currentOrganization.value.name = val
+  },
+})
 
 async function presentActionSheet() {
   displayStore.showActionSheet = true
@@ -24,12 +38,14 @@ async function presentActionSheet() {
         text: t('button-camera'),
         handler: () => {
           displayStore.showActionSheet = false
+          takePhoto(isLoading, 'org', '')
         },
       },
       {
         text: t('button-browse'),
         handler: () => {
           displayStore.showActionSheet = false
+          pickPhoto(isLoading, 'org', '')
         },
       },
       {
@@ -42,6 +58,28 @@ async function presentActionSheet() {
     ],
   }
 }
+
+async function saveChanges() {
+  const main = useMainStore()
+
+  console.log(`name: ${name.value}`)
+
+  const { data, error } = await supabase
+    .from('orgs')
+    .update({ name: name.value })
+    .eq('created_by', (main.auth?.id ?? ''))
+    .select('id')
+
+  if (error) {
+    // TODO: INFORM USER THAT HE IS NOT ORG OWNER
+    console.log(`Cannot save changes: ${error}`)
+    return
+  }
+
+  console.log(`dataa: ${data}`)
+
+  console.log('save changes!')
+}
 </script>
 
 <template>
@@ -53,7 +91,7 @@ async function presentActionSheet() {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="currentOrganization?.logo" class="object-cover w-20 h-20 mask mask-squircle" :src="logo"
+                v-if="currentOrganization?.logo" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
                 width="80" height="80" alt="User upload"
               >
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
@@ -71,7 +109,7 @@ async function presentActionSheet() {
         <div>{{ 'You can modify the organization\'s informations here.' }}</div>
         <div class="mb-6">
           <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ 'Organization Name' }}</label>
-          <input id="base-input" v-model="name" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+          <input id="base-input" v-model="name " type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
         </div>
       </div>
       <footer style="margin-top: auto">
@@ -85,6 +123,7 @@ async function presentActionSheet() {
               type="submit"
               color="secondary"
               shape="round"
+              @click.prevent="saveChanges()"
             >
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('save-changes') }}

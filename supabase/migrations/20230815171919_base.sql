@@ -178,6 +178,47 @@ Begin
 End;  
 $$;
 
+CREATE FUNCTION "public"."is_member_of_org"("user_id" uuid, "org_id" uuid) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Declare
+ is_found integer;
+Begin
+  SELECT count(*)
+  INTO is_found
+  FROM orgs
+  JOIN org_users on org_users.org_id = orgs.id
+  WhERE org_users.user_id = is_member_of_org.user_id AND
+  orgs.id = is_member_of_org.org_id;
+  RETURN is_found != 0;
+End;
+$$;
+
+CREATE FUNCTION "public"."is_owner_of_org"("user_id" uuid, "org_id" uuid) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Declare
+ is_found integer;
+Begin
+  SELECT count(*)
+  INTO is_found
+  FROM orgs
+  WHERE orgs.id = org_id
+  AND orgs.created_by = user_id;
+  RETURN is_found != 0;
+End;
+$$;
+
+CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(id int8, created_at timestamp with time zone, updated_at timestamp with time zone, user_id uuid, org_id uuid, app_id character varying, channel_id int8, user_right user_min_right, email character varying, image_url character varying)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+begin
+  return query select o.*, users.email, users.image_url from org_users as o
+  join users on users.id = o.user_id
+  where o.id=guild_id
+  AND (is_member_of_org(users.id, o.org_id) OR is_owner_of_org(users.id, o.org_id));
+End;
+$$;
 
 CREATE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
     LANGUAGE "plpgsql"
@@ -382,20 +423,12 @@ End;
 $$;
 
 CREATE FUNCTION "public"."get_orgs"("userid" "uuid") RETURNS TABLE(id uuid, logo text, name text)
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql"
     AS $$
 BEGIN
-  CREATE TABLE org_ids (id uuid);
-
-  INSERT INTO org_ids
-    SELECT org_id FROM org_users WHERE user_id = userid;
-  
   RETURN QUERY
-    SELECT o.id AS id, o.logo AS logo, o.name AS name
-    FROM org_ids oi
-    JOIN orgs o ON oi.id = o.id;
-    
-  DROP TABLE org_ids;
+    SELECT orgs.id, orgs.logo, orgs.name from orgs
+    WHERE created_by = userid;
 END;  
 $$;
 
@@ -1766,6 +1799,11 @@ CREATE POLICY "Allow user to self get" ON "public"."stripe_info" FOR SELECT TO "
    FROM "public"."users"
   WHERE (("users"."customer_id")::"text" = ("users"."customer_id")::"text"))) OR "public"."is_admin"("auth"."uid"())));
 
+CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users"
+AS PERMISSIVE FOR SELECT
+TO public
+USING ((is_member_of_org(auth.uid(), org_id) OR is_owner_of_org(auth.uid(), org_id)))
+
 CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH CHECK (false);
 
 CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHECK (false);
@@ -1864,6 +1902,11 @@ GRANT ALL ON FUNCTION "public"."convert_number_to_percent"("val" double precisio
 GRANT ALL ON FUNCTION "public"."convert_number_to_percent"("val" double precision, "max_val" double precision) TO "anon";
 GRANT ALL ON FUNCTION "public"."convert_number_to_percent"("val" double precision, "max_val" double precision) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."convert_number_to_percent"("val" double precision, "max_val" double precision) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" uuid) TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" uuid) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" uuid) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_org_members"("guild_id" uuid) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."count_all_apps"() TO "postgres";
 GRANT ALL ON FUNCTION "public"."count_all_apps"() TO "anon";
