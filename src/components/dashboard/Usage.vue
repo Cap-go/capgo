@@ -8,7 +8,8 @@ import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase 
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { bytesToGb } from '~/services/conversion'
+
+// import { bytesToGb } from '~/services/conversion'
 
 const props = defineProps({
   appId: { type: String, default: '' },
@@ -55,9 +56,8 @@ async function getAppStats() {
   if (props.appId) {
     // console.log('appID', props.appId)
     return supabase
-      .from('app_stats')
+      .from('app_usage')
       .select()
-      .eq('user_id', main.user?.id)
       .eq('app_id', props.appId)
       .like('date_id', `${date_id}%`)
   }
@@ -65,7 +65,7 @@ async function getAppStats() {
     return supabase
       .from('app_stats')
       .select()
-      .eq('user_id', main.user?.id)
+      // .eq('user_id', main.user?.id)
       .like('date_id', `${date_id}%`)
   }
 }
@@ -77,38 +77,31 @@ async function getAllStats() {
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
+
 async function getUsages() {
   const { data, error } = await getAppStats()
   if (data && !error) {
     datas.value.mau = new Array(getDaysInCurrentMonth()).fill(undefined)
     datas.value.storage = new Array(getDaysInCurrentMonth()).fill(undefined)
     datas.value.bandwidth = new Array(getDaysInCurrentMonth()).fill(undefined)
-    let currentStorage = 0
-    data.forEach((item: Database['public']['Tables']['app_stats']['Row']) => {
-      if (item.date_id.length > 7) {
-        const dayNumber = Number(item.date_id.slice(8)) - 1
+    data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
+      // Adjust the property names according to the app_usage table structure
+      if (item.created_at) {
+        const dayNumber = new Date(item.created_at).getDate() - 1
         if (datas.value.mau[dayNumber])
-          datas.value.mau[dayNumber] += item.devices || 0
-        else
-          datas.value.mau[dayNumber] = item.devices || 0
+          datas.value.mau[dayNumber] += item.mau || 0
+        else datas.value.mau[dayNumber] = item.mau || 0
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += item.version_size ? bytesToGb(item.version_size) : 0
-        else
-          datas.value.storage[dayNumber] = item.version_size ? bytesToGb(item.version_size) : 0
+          datas.value.storage[dayNumber] += item.storage || 0
+        else datas.value.storage[dayNumber] = item.storage || 0
         if (datas.value.bandwidth[dayNumber])
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
-        else
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] += item.bandwidth || 0
+        else datas.value.bandwidth[dayNumber] = item.bandwidth || 0
       }
-      else if (item.date_id.length === 7) {
-        currentStorage += item.version_size ? bytesToGb(item.version_size) : 0
+      else {
+        // Handle cases where created_at is null or undefined
       }
     })
-    const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    // console.log('storageVariance', storageVariance, currentStorage)
-    datas.value.storage[0] = currentStorage - storageVariance
-    if (datas.value.storage[0] < 0)
-      datas.value.storage[0] = 0
   }
 }
 
@@ -130,16 +123,34 @@ loadData()
 
 <template>
   <div class="grid grid-cols-12 mb-6 gap-6" :class="appId ? 'grid-cols-16' : ''">
-    <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :title="t('montly-active')" unit="Users" />
-    <div v-else class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+    <UsageCard
+      v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau"
+      :title="t('montly-active')" unit="Users"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
       <Spinner size="w-40 h-40" />
     </div>
-    <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :title="t('Storage')" unit="GB" />
-    <div v-else class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+    <UsageCard
+      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
+      :title="t('Storage')" unit="GB"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
       <Spinner size="w-40 h-40" />
     </div>
-    <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :title="t('Bandwidth')" unit="GB" />
-    <div v-else class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+    <UsageCard
+      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth"
+      :title="t('Bandwidth')" unit="GB"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
       <Spinner size="w-40 h-40" />
     </div>
     <MobileStats v-if="appId" />
