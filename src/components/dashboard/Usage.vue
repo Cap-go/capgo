@@ -52,6 +52,9 @@ const allLimits = computed(() => {
 
 async function getAppStats() {
   const date_id = new Date().toISOString().slice(0, 7)
+  if (!main.user)
+    return { data: [], error: 'missing user' }
+
   if (props.appId) {
     // console.log('appID', props.appId)
     return supabase
@@ -80,9 +83,11 @@ async function getAllStats() {
 async function getUsages() {
   const { data, error } = await getAppStats()
   if (data && !error) {
-    datas.value.mau = new Array(getDaysInCurrentMonth()).fill(undefined)
-    datas.value.storage = new Array(getDaysInCurrentMonth()).fill(undefined)
-    datas.value.bandwidth = new Array(getDaysInCurrentMonth()).fill(undefined)
+    datas.value.mau = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
+    // refactor this line without new Array
+    datas.value.mau
+    = datas.value.storage = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
+    datas.value.bandwidth = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
     let currentStorage = 0
     data.forEach((item: Database['public']['Tables']['app_stats']['Row']) => {
       if (item.date_id.length > 7) {
@@ -129,7 +134,7 @@ loadData()
 </script>
 
 <template>
-  <div class="grid grid-cols-12 mb-6 gap-6" :class="appId ? 'grid-cols-16' : ''">
+  <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau" :title="t('montly-active')" unit="Users" />
     <div v-else class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
       <Spinner size="w-40 h-40" />

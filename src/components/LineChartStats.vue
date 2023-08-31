@@ -20,7 +20,7 @@ const props = defineProps({
   title: { type: String, default: '' },
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
-  data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
+  data: { type: Array, default: Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[] },
 })
 
 const { t } = useI18n()

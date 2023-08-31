@@ -65,7 +65,7 @@ watchEffect(() => {
   if (route && route.path === '/forgot_password') {
     console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
-      step.value = parseInt(router.currentRoute.value.query.step as string)
+      step.value = Number.parseInt(router.currentRoute.value.query.step as string)
     isLoadingMain.value = false
   }
 })
