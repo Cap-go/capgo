@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
 import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
 
@@ -9,12 +10,14 @@ import { useOrganizationStore } from '~/stores/organization'
 import Plus from '~icons/heroicons/plus'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
+import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
+const supabase = useSupabase()
 
 const members = ref([] as Database['public']['Functions']['get_org_members']['Returns'])
 
@@ -26,10 +29,20 @@ onMounted(async () => {
   members.value = await organizationStore.getMembers()
 })
 
-function showInviteModal() {
+function validateEmail(email: string) {
+  return String(email)
+    .toLowerCase()
+    .match(
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+    )
+}
+
+async function showInviteModal() {
+  let permision: Database['public']['Enums']['user_min_right'] | undefined
+  let email: string | undefined
+
   displayStore.dialogOption = {
     header: t('insert-invite-email'),
-    message: 'Email',
     input: true,
     buttons: [
       {
@@ -39,10 +52,98 @@ function showInviteModal() {
       {
         text: t('button-invite'),
         id: 'confirm-button',
+        handler() {
+          const input = document.getElementById('dialog-input-field') as HTMLInputElement | undefined
+          email = input?.value
+
+          if (!email || !input)
+            return
+
+          input.value = ''
+
+          if (!validateEmail(email)) {
+            toast.error(t('invalid-email'))
+            return
+          }
+
+          displayStore.dialogOption = {
+            header: t('select-user-perms'),
+            message: t('select-user-perms-expanded'),
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('key-read'),
+                role: 'read',
+                handler: () => permision = 'invite_read',
+              },
+              {
+                text: t('key-upload'),
+                role: 'upload',
+                handler: () => permision = 'invite_upload',
+              },
+              {
+                text: t('key-write'),
+                role: 'write',
+                handler: () => permision = 'invite_write',
+              },
+              {
+                text: t('key-admin'),
+                role: 'admin',
+                handler: () => permision = 'invite_admin',
+              },
+            ],
+          }
+          displayStore.showDialog = true
+        },
       },
     ],
   }
   displayStore.showDialog = true
+  await displayStore.onDialogDismiss()
+  if (!permision || !email)
+    return
+
+  console.log(`KEY: ${permision}`)
+  await sendInvitation(email, permision)
+}
+
+async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']) {
+  console.log(`Invite ${email} with perm ${type}`)
+
+  const orgId = currentOrganization.value?.id
+  if (!orgId)
+    return
+
+  const { data, error } = await supabase.rpc('invite_user_to_org', {
+    email,
+    org_id: orgId,
+    invite_type: type,
+  })
+
+  if (error)
+    throw error
+
+  console.log('invite data', data)
+  handleSendInvitationOutput(data)
+  members.value = await organizationStore.getMembers()
+}
+
+function handleSendInvitationOutput(output: string) {
+  switch (output) {
+    case 'OK': {
+      return
+    }
+    case 'NO_EMAIL': {
+      toast.error(t('email-does-not-exist'))
+      break
+    }
+    case 'ALREADY_INVITED': {
+      toast.error(t('user-already-invited'))
+    }
+  }
 }
 </script>
 

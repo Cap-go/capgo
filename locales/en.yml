@@ -143,6 +143,7 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
+email-does-not-exist: This user does not exist
 encrypted: Encrypted bundles
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
@@ -170,12 +171,15 @@ install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
+invalid-email: Passed email is not valid
 is-emulator: Is Emulator
 is-production-app: Is Production app
+key-admin: Admin
 key-all: All
 key-copied: Key copied in your clipboard
 key-read: Read
 key-upload: Upload
+key-write: Write
 language: Language
 last-name: Last name
 last-update: Last update
@@ -279,6 +283,8 @@ search-by-name: Search by name
 search-device: Search device
 search-user: Search User
 see-usage: See usage
+select-user-perms: Select user's permissions
+select-user-perms-expanded: Select which permission should the invited user have
 session_key: IvSessionKey
 set-bundle: Set bundle to channel
 settings: Settings
@@ -325,6 +331,7 @@ usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
 user: User
+user-already-invited: This user is already invited to this organization
 validate: Validate
 version: Version
 version-build: Version build

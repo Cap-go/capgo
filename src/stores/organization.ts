@@ -74,12 +74,18 @@ export const useOrganizationStore = defineStore('organization', () => {
     console.log('fetch or d', data)
     const organization = <Organization | undefined>data[0]
     if (!organization) {
-      console.log('user has no organization')
+      console.log('user has no main organization')
       return
     }
 
     _organizations.value = new Map(data.map(item => [item.id, item]))
-    currentOrganization.value = organization
+    if (!currentOrganization.value)
+      currentOrganization.value = organization
+  }
+
+  const dedupFetchOrganizations = async () => {
+    if (_organizations.value.size === 0)
+      fetchOrganizations()
   }
 
   const createOrganization = (name: string, logo?: string) => {
@@ -127,5 +133,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationFromValue,
     getMembers,
     fetchOrganizations,
+    dedupFetchOrganizations,
   }
 })

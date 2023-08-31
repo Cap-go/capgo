@@ -16,7 +16,7 @@ const supabase = useSupabase()
 const isLoading = ref(true)
 
 onMounted(async () => {
-  await organizationStore.fetchOrganizations()
+  await organizationStore.dedupFetchOrganizations()
   isLoading.value = false
 })
 

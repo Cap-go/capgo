@@ -1636,6 +1636,7 @@ export interface Database {
         Args: {
           email: string
           org_id: string
+          invite_type: Database["public"]["Enums"]["user_min_right"]
         }
         Returns: string
       }
@@ -1805,7 +1806,15 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
-      user_min_right: "invite" | "read" | "upload" | "write" | "admin"
+      user_min_right:
+        | "invite_read"
+        | "invite_upload"
+        | "invite_write"
+        | "invite_admin"
+        | "read"
+        | "upload"
+        | "write"
+        | "admin"
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {

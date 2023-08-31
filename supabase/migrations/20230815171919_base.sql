@@ -86,7 +86,10 @@ CREATE TYPE "public"."stripe_status" AS ENUM (
 -- @Martin if you are migrating this use this:
 -- ALTER TYPE "user_min_right" ADD VALUE 'invite' BEFORE 'read'
 CREATE TYPE "public"."user_min_right" AS ENUM (
-    'invite'
+    'invite_read',
+    'invite_upload',
+    'invite_write',
+    'invite_admin'
     'read',
     'upload',
     'write',
@@ -212,16 +215,24 @@ Begin
 End;
 $$;
 
-CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(id int8, created_at timestamp with time zone, updated_at timestamp with time zone, user_id uuid, org_id uuid, app_id character varying, channel_id int8, user_right user_min_right, email character varying, image_url character varying)
+CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(email character varying, image_url character varying)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 begin
-  return query select o.*, users.email, users.image_url from org_users as o
+  return query select users.email, users.image_url from org_users as o
   join users on users.id = o.user_id
-  where o.id=guild_id
-  AND (is_member_of_org(users.id, o.org_id) OR is_owner_of_org(users.id, o.org_id));
+  where o.org_id=get_org_members.guild_id
+  AND (is_member_of_org(users.id, o.org_id) OR is_owner_of_org(users.id, o.org_id))
+  union all
+  select users.email, users.image_url from users
+  join orgs on orgs.created_by = users.id
+  where orgs.id=get_org_members.guild_id;
 End;
 $$;
+
+
+drop FUNCTION "public"."get_org_members"("guild_id" uuid)
+select get_org_members('034be89b-648b-47c5-8414-6a40c0ab15a6')
 
 CREATE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
     LANGUAGE "plpgsql"
@@ -725,21 +736,34 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION "public"."invite_user_to_org"("email" "varchar", "org_id" "uuid") RETURNS "varchar"
+CREATE FUNCTION "public"."invite_user_to_org"("email" "varchar", "org_id" "uuid", "invite_type" "public"."user_min_right") RETURNS "varchar"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Declare  
  invited_user record;
+ current_record record;
 Begin
   SELECT users.id FROM USERS
   INTO invited_user
   WHERE users.email=invite_user_to_org.email;
 
   IF invited_user IS NOT NULL THEN
-    INSERT INTO org_users (user_id, org_id, user_right)
-    VALUES (invited_user.id, invite_user_to_org.org_id, 'invite'::"public"."user_min_right");
-    
-    RETURN '??';
+    -- INSERT INTO org_users (user_id, org_id, user_right)
+    -- VALUES (invited_user.id, invite_user_to_org.org_id, invite_type);
+
+        SELECT org_users.id from org_users 
+        INTO current_record
+        WHERE org_users.user_id=invited_user.id
+        AND org_users.org_id=invite_user_to_org.org_id;
+
+    IF current_record IS NOT NULL THEN
+      RETURN 'ALREADY_INVITED';
+    ELSE
+      INSERT INTO org_users (user_id, org_id, user_right)
+      VALUES (invited_user.id, invite_user_to_org.org_id, invite_type);
+      
+      RETURN 'OK';
+    END IF;
   ELSE
     return 'NO_EMAIL';
   END IF;
