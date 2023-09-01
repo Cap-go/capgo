@@ -223,16 +223,16 @@ Begin
 End;
 $$;
 
-CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(email character varying, image_url character varying)
+CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(uid uuid, email character varying, image_url character varying)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 begin
-  return query select users.email, users.image_url from org_users as o
+  return query select users.id as uid, users.email, users.image_url from org_users as o
   join users on users.id = o.user_id
   where o.org_id=get_org_members.guild_id
   AND (is_member_of_org(users.id, o.org_id) OR is_owner_of_org(users.id, o.org_id))
   union all
-  select users.email, users.image_url from users
+  select users.id as uid, users.email, users.image_url from users
   join orgs on orgs.created_by = users.id
   where orgs.id=get_org_members.guild_id;
 End;

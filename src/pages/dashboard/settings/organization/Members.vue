@@ -7,11 +7,12 @@ import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
 
 import { useOrganizationStore } from '~/stores/organization'
-import type { ExtendedOrganizationMembers } from '~/stores/organization'
+import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import Plus from '~icons/heroicons/plus'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -19,6 +20,7 @@ const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const supabase = useSupabase()
+const main = useMainStore()
 
 const members = ref([] as ExtendedOrganizationMembers)
 
@@ -146,6 +148,38 @@ function handleSendInvitationOutput(output: string) {
     }
   }
 }
+
+async function didCancel(name: string) {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
+async function deleteMember(member: ExtendedOrganizationMember) {
+  if (await didCancel(t('app')))
+    return
+
+  const { error } = await supabase.from('org_users').delete().eq('id', member.id)
+  if (error) {
+    console.log('Error delete: ', error)
+    toast.error(t('cannot-delete-member'))
+  }
+
+  toast.success(t('member-deleted'))
+}
 </script>
 
 <template>
@@ -179,7 +213,7 @@ function handleSendInvitationOutput(output: string) {
               <button class="w-7 h-7 bg-transparent ml-4">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button class="w-7 h-7 bg-transparent ml-4">
+              <button v-if="member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id" class="w-7 h-7 bg-transparent ml-4" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>
