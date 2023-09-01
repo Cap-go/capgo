@@ -7,6 +7,7 @@ import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
 
 import { useOrganizationStore } from '~/stores/organization'
+import type { ExtendedOrganizationMembers } from '~/stores/organization'
 import Plus from '~icons/heroicons/plus'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
@@ -19,7 +20,7 @@ const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const supabase = useSupabase()
 
-const members = ref([] as Database['public']['Functions']['get_org_members']['Returns'])
+const members = ref([] as ExtendedOrganizationMembers)
 
 watch(currentOrganization, async () => {
   members.value = await organizationStore.getMembers()
@@ -113,7 +114,7 @@ async function showInviteModal() {
 async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']) {
   console.log(`Invite ${email} with perm ${type}`)
 
-  const orgId = currentOrganization.value?.id
+  const orgId = currentOrganization.value?.gid
   if (!orgId)
     return
 

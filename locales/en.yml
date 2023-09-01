@@ -31,13 +31,19 @@ add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
 admin: Admin
 afternoon: afternoon
+alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete
+alert-confirm-invite: Confirm invitation
 alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
+alert-denied-invite: Invitation denied
 alert-generate-new-key: Please select the type of API key that you want to generate.
+alert-no-invite: This invitation does no longer exist
+alert-not-invited: Invalid invitation, cannot accept
 alert-not-reverse-message: This action is not reversible
 alert-regenerate-key: Are you sure you want to regenerate this key
+alert-unknown-error: Unknown error, see dev console
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
@@ -70,9 +76,11 @@ button-browse: Browse
 button-camera: Camera
 button-cancel: Cancel
 button-delete: Delete
+button-deny-invite: Deny
 button-go: GO
 button-home: Home
 button-invite: Invite
+button-join: Accept
 button-options: Options
 button-regenerate: Regenerate
 button-remove: Remove

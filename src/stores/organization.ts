@@ -4,10 +4,12 @@ import type { ComputedRef, Ref } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
+import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
 type User = Database['public']['Tables']['users']['Row']
-export type Organization = Database['public']['Tables']['orgs']['Row']
-type ExtendedOrganizationMembers = Database['public']['Functions']['get_org_members']['Returns']
+export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
+type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
+export type ExtendedOrganizationMembers = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>[]
 // TODO Create user rights in database
 // type Right = Database['public']['Tables']['user_rights']['Row']
 type Right = 'create' | 'read' | 'update' | 'delete'
@@ -28,7 +30,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const currentOrganization = ref<Organization>()
 
   const setCurrentOrganization = (id: string) => {
-    currentOrganization.value = organizations.value.find(org => org.id === id)
+    currentOrganization.value = organizations.value.find(org => org.gid === id)
   }
 
   const setCurrentOrganizationFromValue = (value: Organization) => {
@@ -36,7 +38,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
-    const currentOrgId = currentOrganization.value?.id
+    const currentOrgId = currentOrganization.value?.gid
     if (!currentOrgId)
       return []
 
@@ -56,29 +58,42 @@ export const useOrganizationStore = defineStore('organization', () => {
       return []
     }
 
-    return data
+    return data.map(
+      (item, id) => {
+        return { id, ...item }
+      },
+    )
   }
 
   const fetchOrganizations = async () => {
     const main = useMainStore()
 
     console.log('fetch orgs!')
+    const userId = main.user?.id
+    if (!userId)
+      return
+
     // We have RLS that ensure that we only selct rows where we are member or owner
     const { data, error } = await supabase
-      .from('orgs')
-      .select('*')
+      .rpc('get_orgs_v2', {
+        userid: userId,
+      })
 
     if (error)
       throw error
 
     console.log('fetch or d', data)
-    const organization = <Organization | undefined>data[0]
+    const organization = data.find(org => org.role === 'owner')
     if (!organization) {
       console.log('user has no main organization')
       return
     }
 
-    _organizations.value = new Map(data.map(item => [item.id, item]))
+    const mappedData = data.map((item, id) => {
+      return { id, ...item }
+    })
+
+    _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
     if (!currentOrganization.value)
       currentOrganization.value = organization
   }

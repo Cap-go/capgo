@@ -2,10 +2,21 @@
 import { Dropdown, initDropdowns } from 'flowbite'
 import { storeToRefs } from 'pinia'
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
+import type { Organization } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
+import { useDisplayStore } from '~/stores/display'
+import { useSupabase } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
 
 const organizationStore = useOrganizationStore()
 const { currentOrganization, organizations } = storeToRefs(organizationStore)
+const displayStore = useDisplayStore()
+const { t } = useI18n()
+const supabase = useSupabase()
+const main = useMainStore()
+
 let dropdown: Dropdown
 
 onMounted(async () => {
@@ -20,8 +31,84 @@ onMounted(async () => {
   )
 })
 
-function onOrganizationClick(org: string) {
-  organizationStore.setCurrentOrganization(org)
+async function handleOrganizationInvitation(org: Organization) {
+  const newName = t('alert-accept-inviation').replace('%ORG%', org.name)
+  console.log(newName)
+  displayStore.dialogOption = {
+    header: t('alert-confirm-invite'),
+    message: `${newName}`,
+    buttons: [
+      {
+        text: t('button-join'),
+        id: 'confirm-button',
+        handler: async () => {
+          const { data, error } = await supabase.rpc('accept_invitation_to_org', {
+            org_id: org.gid,
+          })
+
+          if (!data || error) {
+            console.log('Error accept: ', error)
+            return
+          }
+
+          console.log('Data accept:', data)
+          switch (data) {
+            case 'OK':
+              organizationStore.setCurrentOrganization(org.gid)
+              organizationStore.fetchOrganizations()
+              break
+            case 'NO_INVITE':
+              toast.error(t('alert-no-invite'))
+              break
+            case 'INVALID_ROLE':
+              toast.error(t('alert-not-invited'))
+              break
+            default:
+              toast.error(t('alert-unknown-error'))
+              break
+          }
+        },
+      },
+      {
+        text: t('button-deny-invite'),
+        id: 'deny-button',
+        handler: async () => {
+          const userId = main.user?.id
+          if (userId === undefined)
+            return
+
+          const { error } = await supabase
+            .from('org_users')
+            .delete()
+            .eq('user_id', userId)
+
+          if (error)
+            console.log('Error delete: ', error)
+
+          organizationStore.fetchOrganizations()
+          toast.success(t('alert-denied-invite'))
+        },
+      },
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
+
+function onOrganizationClick(org: Organization) {
+  console.log(org)
+  console.log('Role: ', org.role)
+
+  // Check if the user is invited to the organization
+  if (org.role.startsWith('invite')) {
+    handleOrganizationInvitation(org)
+    return
+  }
+
+  organizationStore.setCurrentOrganization(org.gid)
 
   if (dropdown)
     dropdown.hide()
@@ -37,8 +124,8 @@ function onOrganizationClick(org: string) {
   </button>
   <div id="dropdown-org" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
     <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
-      <li v-for="org in organizations" :key="org.id">
-        <a class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="onOrganizationClick(org.id)">{{ org.name }}</a>
+      <li v-for="org in organizations" :key="org.gid">
+        <a class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="onOrganizationClick(org)">{{ org.name }}</a>
       </li>
     </ul>
   </div>

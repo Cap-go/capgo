@@ -85,7 +85,7 @@ async function saveChanges() {
 <template>
   <div class="h-full p-8 max-h-fit grow md:pb-0 overflow-hidden" style="min-height: 100%;">
     <!-- TODO Classes are not working -->
-    <FormKit id="update-account" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;" @submit="submit">
+    <FormKit id="update-account" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;">
       <div>
         <section>
           <div class="flex items-center">
@@ -115,7 +115,7 @@ async function saveChanges() {
       <footer style="margin-top: auto">
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button type="button" class="text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700 dark:border-gray-700" @click="deleteAccount()">
+            <button type="button" class="text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700 dark:border-gray-700">
               {{ t('cancel') }}
             </button>
             <button

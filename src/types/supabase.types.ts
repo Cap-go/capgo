@@ -1261,6 +1261,12 @@ export interface Database {
       }
     }
     Functions: {
+      accept_invitation_to_org: {
+        Args: {
+          org_id: string
+        }
+        Returns: string
+      }
       check_min_rights: {
         Args: {
           min_right: Database["public"]["Enums"]["user_min_right"]
@@ -1515,26 +1521,20 @@ export interface Database {
           guild_id: string
         }
         Returns: {
-          id: number
-          created_at: string
-          updated_at: string
-          user_id: string
-          org_id: string
-          app_id: string
-          channel_id: number
-          user_right: Database["public"]["Enums"]["user_min_right"]
           email: string
           image_url: string
         }[]
       }
-      get_orgs: {
+      get_orgs_v2: {
         Args: {
           userid: string
         }
         Returns: {
-          id: string
+          gid: string
+          created_by: string
           logo: string
           name: string
+          role: string
         }[]
       }
       get_plan_usage_percent: {
@@ -1820,6 +1820,13 @@ export interface Database {
     CompositeTypes: {
       match_plan: {
         name: string
+      }
+      owned_orgs: {
+        id: string
+        created_by: string
+        logo: string
+        name: string
+        role: string
       }
       stats_table: {
         mau: number

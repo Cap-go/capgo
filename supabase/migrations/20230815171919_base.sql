@@ -74,6 +74,14 @@ CREATE TYPE "public"."stats_table" AS (
 	"storage" double precision
 );
 
+CREATE TYPE "public"."owned_orgs" AS (
+    "id" uuid, 
+    "created_by" uuid, 
+    "logo" text, 
+    "name" text, 
+    "role" varchar
+);
+
 CREATE TYPE "public"."stripe_status" AS ENUM (
     'created',
     'succeeded',
@@ -230,9 +238,44 @@ begin
 End;
 $$;
 
+CREATE FUNCTION "public"."get_orgs_v2"("userid" "uuid") RETURNS TABLE(gid uuid, created_by uuid, logo text, name text, role varchar)
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  return query select o.id as gid, o.created_by, o.logo, o.name, org_users.user_right::varchar from orgs as o
+  join org_users on org_users.user_id=get_orgs_v2.userid
+  where o.created_by != get_orgs_v2.userid
+  union all
+  select o.id as gid, o.created_by, o.logo, o.name, 'owner' as "role" from orgs as o
+  where o.created_by = get_orgs_v2.userid;
+END;  
+$$;
 
-drop FUNCTION "public"."get_org_members"("guild_id" uuid)
-select get_org_members('034be89b-648b-47c5-8414-6a40c0ab15a6')
+-- This is not important, however is a good example of how to return a setof a custom type
+-- Returns a set of custom type is compicated, and this shows how to do it
+-- CREATE FUNCTION "public"."get_orgs_v2"("userid" "uuid") RETURNS setof "public"."owned_orgs"
+--     LANGUAGE "plpgsql"
+--     AS $$
+-- DECLARE
+--     members_size integer := 0;
+--     owner_org "public"."owned_orgs";
+--     result owned_orgs%rowtype;
+-- BEGIN
+--   FOR result in select o.id, o.created_by, o.logo, o.name, org_users.user_right::varchar from orgs as o
+--   join org_users on org_users.user_id=get_orgs_v2.userid
+--   where o.created_by != get_orgs_v2.userid
+--   LOOP
+--     members_size := members_size + 1;
+--     return next result;
+--   end LOOP;
+
+--   select o.id, o.created_by, o.logo, o.name, 'owner' as "role" from orgs as o
+--   into owner_org
+--   where o.created_by = get_orgs_v2.userid;
+
+--   return next owner_org;
+-- END;  
+-- $$;
 
 CREATE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
     LANGUAGE "plpgsql"
@@ -767,6 +810,32 @@ Begin
   ELSE
     return 'NO_EMAIL';
   END IF;
+End;
+$$
+
+CREATE FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") RETURNS varchar
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Declare  
+ invite record;
+Begin
+  SELECT org_users.* FROM org_users
+  INTO invite
+  WHERE org_users.org_id=accept_invitation_to_org.org_id and auth.uid()=org_users.user_id;
+
+  IF invite IS NULL THEN
+    return 'NO_INVITE';
+  else
+    IF NOT (invite.user_right::varchar ilike 'invite_'||'%') THEN
+      return 'INVALID_ROLE';
+    END IF;
+
+    UPDATE org_users
+    SET user_right = REPLACE(invite.user_right::varchar, 'invite_', '')::user_min_right
+    WHERE org_users.id=invite.id;
+
+    return 'OK';
+  end if;
 End;
 $$
 
@@ -1850,6 +1919,11 @@ CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users"
 AS PERMISSIVE FOR SELECT
 TO public
 USING ((is_member_of_org(auth.uid(), org_id) OR is_owner_of_org(auth.uid(), org_id)))
+
+CREATE POLICY "Allow to self delete" ON "public"."org_users"
+AS PERMISSIVE FOR DELETE
+TO public
+USING ((user_id=auth.uid()))
 
 CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH CHECK (false);
 
