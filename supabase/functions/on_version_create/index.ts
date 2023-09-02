@@ -1,8 +1,8 @@
-import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
-import { incrementSize, supabaseAdmin } from '../_utils/supabase.ts'
+import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { redisAppVersionInvalidate } from '../_utils/redis.ts'
@@ -104,7 +104,6 @@ serve(async (event: Request) => {
     if (record.storage_provider === 'r2-direct')
       return sendRes() // skip delete s3 and increment size in new upload
 
-    await incrementSize(record.app_id, record.user_id, size) // for old upload system
     // `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
     // modify app_versions to set storage to r2
     const { error: errorUpdateStorage } = await supabaseAdmin()

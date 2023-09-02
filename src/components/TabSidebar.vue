@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { Tab } from './comp_def'
 
 const props = defineProps<{
@@ -11,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits(['update:activeTab'])
 const router = useRouter()
+const { t } = useI18n()
 
 function openLink(link: string) {
   emit('update:activeTab', link)
@@ -47,7 +49,7 @@ watch(props, (p) => {
               <li v-for="(m, i) in tabs" :key="i" class="mr-0.5 md:mb-0.5 md:mr-0" @click="openLink(m.key)">
                 <button class="flex items-center whitespace-nowrap rounded px-2.5 py-2">
                   <component :is="m.icon" class="w-4 h-4 mr-2 fill-current shrink-0" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }" />
-                  <span class="hidden text-sm font-medium md:block" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }">{{ m.label }}</span>
+                  <span class="hidden text-sm font-medium md:block" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }">{{ t(m.label) }}</span>
                 </button>
               </li>
             </ul>

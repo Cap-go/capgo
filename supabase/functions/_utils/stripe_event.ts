@@ -57,6 +57,8 @@ export function extractDataEvent(event: any): Database['public']['Tables']['stri
     product_id: 'free',
     price_id: '',
     subscription_id: undefined,
+    subscription_anchor_start: undefined,
+    subscription_anchor_end: undefined,
     subscription_metered: {} as MeteredData,
     customer_id: '',
     is_good_plan: true,
@@ -71,6 +73,11 @@ export function extractDataEvent(event: any): Database['public']['Tables']['stri
       data.price_id = res.priceId
       if (res.productId)
         data.product_id = res.productId
+      // current_period_start is epoch and current_period_end is epoch
+      // subscription_anchor_start is date and subscription_anchor_end is date
+      // convert epoch to date
+      data.subscription_anchor_start = new Date(subscription.current_period_start * 1000).toISOString()
+      data.subscription_anchor_end = new Date(subscription.current_period_end * 1000).toISOString()
       data.subscription_metered = res.meteredData
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string

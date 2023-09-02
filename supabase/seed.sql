@@ -93,9 +93,9 @@ INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_a
 ('apps', 'apps', NULL, '2021-12-27 23:51:01.568349+00', '2021-12-27 23:51:01.568349+00', 'f'),
 ('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
-INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor") VALUES
-(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now()),
-(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now());
+INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
+(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
+(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
 
 INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
 ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u5', NULL),
@@ -166,10 +166,13 @@ INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-03 08:40:15.224005+00', '2023-03-03 08:40:15.224005+00', 0, 2, 0, 0, 6, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-01'), 0, 6576705, 0);
 
 -- Create cron jobs
-SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$CALL update_app_usage(5)$$);
--- SELECT cron.schedule('Update good_plan every day at 1AM', '0 1 * * *', $$CALL update_app_usage(5)$$);
--- SELECT cron.schedule('Update web_stats every day at 12AM and 5', '5 0 * * *', $$CALL update_app_usage(5)$$);
--- SELECT cron.schedule('Set to delete old versions after retention every day at 12AM', '0 0 * * *', $$CALL update_app_usage(5)$$);
+SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage(5)$$);
+SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
+SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
+
+-- SELECT cron.schedule('Update good_plan every day at 1AM', '0 1 * * *', $$SELECT update_app_usage(5)$$);
+-- SELECT cron.schedule('Update web_stats every day at 12AM and 5', '5 0 * * *', $$SELECT update_app_usage(5)$$);
+-- SELECT cron.schedule('Set to delete old versions after retention every day at 12AM', '0 0 * * *', $$SELECT update_app_usage(5)$$);
 -- SELECT cron.schedule('Set channel ', '0 0 * * *', $$CALL update_app_usage(5)$$);
 
 INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport", "database", "username", "active", "jobname") VALUES

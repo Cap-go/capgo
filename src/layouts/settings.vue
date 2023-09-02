@@ -24,29 +24,29 @@ const ActiveTab = ref('')
 
 const tabs = ref<Tab[]>([
   {
-    label: t('account'),
+    label: 'account',
     icon: shallowRef(IconAcount),
     key: '/dashboard/settings/account',
   },
   {
-    label: t('password'),
+    label: 'password',
     icon: shallowRef(IconPassword),
     key: '/dashboard/settings/changepassword',
   },
   {
-    label: t('notifications'),
+    label: 'notifications',
     icon: shallowRef(IconNotification),
     key: '/dashboard/settings/notifications',
   },
   {
-    label: t('plans'),
+    label: 'plans',
     icon: shallowRef(IconPlans),
     key: '/dashboard/settings/plans',
   },
 ])
 if (!Capacitor.isNativePlatform()) {
   tabs.value.push({
-    label: t('billing'),
+    label: 'billing',
     icon: shallowRef(IconBilling) as any,
     key: '/billing',
     onClick: openPortal,
@@ -56,7 +56,7 @@ if (main.user?.id) {
   isAdmin(main.user?.id).then((res) => {
     if (!!res || isSpoofed()) {
       tabs.value.push({
-        label: t('admin'),
+        label: 'admin',
         icon: shallowRef(IconAdmin) as any,
         key: '/dashboard/settings/admin',
       })
