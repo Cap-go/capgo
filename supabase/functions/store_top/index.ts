@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { BaseHeaders } from '../_utils/types.ts'

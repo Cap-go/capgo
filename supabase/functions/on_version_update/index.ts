@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
-import { incrementSize, supabaseAdmin, updateOrAppStats } from '../_utils/supabase.ts'
+import { supabaseAdmin } from '../_utils/supabase.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -22,7 +22,7 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   const exist = await r2.checkIfExist(record.bucket_id)
-  console.log('exist ?', record.app_id, record.bucket_id, v2Path, exist)
+  console.log('exist ?', record.app_id, record.bucket_id, exist)
   if (!exist && !record.bucket_id.endsWith('.zip')) {
     console.log('upload to r2', record.bucket_id)
     // upload to r2
@@ -70,7 +70,6 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
           .eq('id', record.id)
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
-        await incrementSize(record.app_id, record.user_id, size) // for new upload system
       }
     }
   }
@@ -129,21 +128,6 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
 
-  const today_id = new Date().toISOString().slice(0, 10)
-  const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
-    app_id: record.app_id,
-    date_id: today_id,
-    bandwidth: 0,
-    mlu: 0,
-    mlu_real: 0,
-    devices: 0,
-    devices_real: 0,
-    version_size: -data.size,
-    channels: 0,
-    shared: 0,
-    versions: -1,
-  }
-  await updateOrAppStats(increment, today_id, record.user_id)
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin()
     .from('app_versions_meta')

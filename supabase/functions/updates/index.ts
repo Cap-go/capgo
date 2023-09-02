@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
@@ -25,29 +25,6 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // create random id
-  if (method === 'GET') {
-    console.log('v3', headers)
-    // for v3 updates
-    const {
-      cap_version_name,
-      cap_version_build,
-      cap_plugin_version,
-      cap_platform,
-      cap_app_id,
-      cap_version_os,
-      cap_device_id,
-    } = headers
-    body = {
-      ...body,
-      version_name: cap_version_name || '',
-      version_build: cap_version_build || '',
-      plugin_version: cap_plugin_version || '',
-      platform: cap_platform || '',
-      app_id: cap_app_id || '',
-      version_os: cap_version_os || '',
-      device_id: cap_device_id || '',
-    }
-  }
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body)
@@ -72,7 +49,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       .select('user_id, app_id')
       .eq('app_id', app_id)
       .single()
-
     if (!appOwner) {
       if (app_id) {
         await supabaseAdmin()
@@ -94,7 +70,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     }
     else {
       // get app owner with app_id
-
       const sent = await sendNotif('user:semver_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
@@ -133,7 +108,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         } as any).catch()
       }
     }
-
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
       return sendRes({
@@ -156,9 +130,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
       .from('app_versions')
       .select('id')
       .eq('app_id', app_id)
-      .or(`name.eq.${version_name},name.eq.builtin`)
-      .order('id', { ascending: false })
-      .limit(1)
+      .or(`name.eq.${version_name}`)
       .single()
     const { data: channelData } = await supabaseAdmin()
       .from('channels')
@@ -174,6 +146,19 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
           disableAutoUpdateToMajor,
           ios,
           android,
+          secondVersion (
+            id,
+            name,
+            checksum,
+            session_key,
+            user_id,
+            bucket_id,
+            storage_provider,
+            external_url
+          ),
+          secondaryVersionPercentage,
+          enable_progressive_deploy,
+          enableAbTesting,
           version (
             id,
             name,
@@ -205,6 +190,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
             disableAutoUpdateToMajor,
             ios,
             android,
+            secondaryVersionPercentage,
+            enable_progressive_deploy,
+            enableAbTesting,
             version (
               id,
               name,
@@ -253,7 +241,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         error: 'no_channel',
       }, 200)
     }
-    const version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
+    let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+
+    const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
+    const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
+
+    let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
+    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
     await checkPlan(appOwner.user_id)
@@ -263,6 +257,24 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     // console.log('xForwardedFor', xForwardedFor)
     const ip = xForwardedFor.split(',')[1]
     console.log('IP', ip)
+
+    if (enableAbTesting || enableProgressiveDeploy) {
+      if (secondVersion && secondVersion?.name !== 'unknown') {
+        const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        // eslint-disable-next-line max-statements-per-line
+        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
+        else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
+        else if (version.name !== version_name) {
+          const randomChange = Math.random()
+
+          if (randomChange < secondVersionPercentage)
+            version = secondVersion
+        }
+      }
+      else {
+        enableAbTesting = false
+      }
+    }
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
     // check if version is created_at more than 4 hours
@@ -389,11 +401,10 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
         }, 200)
       }
     }
-
     // console.log(id, 'save stats', device_id)
     await sendStats('get', platform, device_id, app_id, version_build, versionId)
     //  check signedURL and if it's url
-    if (!signedURL || signedURL.startsWith('http://') || !signedURL.startsWith('https://')) {
+    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
       await sendStats('cannotGetBundle', platform, device_id, app_id, version_build, versionId)
       return sendRes({

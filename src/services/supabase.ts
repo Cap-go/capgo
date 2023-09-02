@@ -55,6 +55,13 @@ export function spoofUser() {
   localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
   return data.user.id
 }
+export async function deleteUser() {
+  const { error } = await useSupabase()
+    .rpc('delete_user')
+    .single()
+  if (error)
+    throw new Error(error.message)
+}
 export function deleteSupabaseToken() {
   return localStorage.removeItem(`sb-${supbaseId}-auth-token`)
 }

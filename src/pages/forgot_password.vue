@@ -65,7 +65,7 @@ watchEffect(() => {
   if (route && route.path === '/forgot_password') {
     console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
-      step.value = parseInt(router.currentRoute.value.query.step as string)
+      step.value = Number.parseInt(router.currentRoute.value.query.step as string)
     isLoadingMain.value = false
   }
 })
@@ -100,14 +100,13 @@ watchEffect(() => {
                     <FormKit
                       type="email"
                       name="email"
-                      :label="t('first-name')"
+                      :label="t('email')"
                       input-class="!text-black"
                       :disabled="isLoading"
                       :prefix-icon="iconEmail"
                       inputmode="email"
                       autocomplete="email"
                       validation="required:trim"
-                      :lavel="t('email')"
                     />
                   </div>
 

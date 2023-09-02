@@ -3,6 +3,75 @@ INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encryp
 ('00000000-0000-0000-0000-000000000000', '6aa76066-55ef-4238-ade6-0b32334a4097', 'authenticated', 'authenticated', 'test@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsyty', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
 select vault.create_secret('c591b04e-cf29-4945-b9a0-776d0672061a', 'admin_user', 'admin user id');
+select vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
+select vault.create_secret('testsecret', 'apikey', 'admin user id');
+
+-- DROP TRIGGER "on_app_stats_create" ON "public"."app_stats";
+-- DROP TRIGGER "on_app_stats_update" ON "public"."app_stats";
+-- DROP TRIGGER "on_channel_create" ON "public"."channels";
+-- DROP TRIGGER "on_channel_update" ON "public"."channels";
+-- DROP TRIGGER "on_shared_create" ON "public"."channel_users";
+-- DROP TRIGGER "on_user_create" ON "public"."users";
+-- DROP TRIGGER "on_user_update" ON "public"."users";
+-- DROP TRIGGER "on_version_create" ON "public"."app_versions";
+-- DROP TRIGGER "on_version_update" ON "public"."app_versions";
+-- DROP TRIGGER "on_version_delete" ON "public"."app_versions";
+
+CREATE TRIGGER on_app_stats_create 
+AFTER INSERT ON public.app_stats 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_app_stats_create');
+
+CREATE TRIGGER on_app_stats_update 
+AFTER UPDATE ON public.app_stats 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_app_stats_update');
+
+CREATE TRIGGER on_channel_create 
+AFTER INSERT ON public.channels 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_channel_create');
+
+CREATE TRIGGER on_channel_update 
+AFTER UPDATE ON public.channels 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_channel_update');
+
+-- CREATE TRIGGER on_log_create 
+-- AFTER CREATE ON public.app_stats 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.http_post_to_function('on_log_create');
+
+CREATE TRIGGER on_shared_create 
+AFTER INSERT ON public.channel_users 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_shared_create');
+
+CREATE TRIGGER on_user_create 
+AFTER INSERT ON public.users 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_user_create');
+
+CREATE TRIGGER on_user_update 
+AFTER UPDATE ON public.users 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_user_update');
+
+CREATE TRIGGER on_version_create 
+AFTER INSERT ON public.app_versions 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_version_create');
+
+CREATE TRIGGER on_version_delete 
+AFTER DELETE ON public.app_versions 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_version_delete');
+
+CREATE TRIGGER on_version_update 
+AFTER UPDATE ON public.app_versions 
+FOR EACH ROW 
+EXECUTE FUNCTION public.http_post_to_function('on_version_update');
+
 
 INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "app", "channel", "update", "version", "shared", "abtest", "progressive_deploy", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
 ('2022-06-05 12:25:28+00', '2022-10-05 16:00:46.563382+00', 'Free', 'plan.free.desc', 0, 0, 'free', 1, 1, 500, 10, 0, 'f', 'f', 'c2f582d7-7dcb-4a65-b8da-82cc74a0645d', 'free', 'free', 0.1, 0.5, 50, 'Best for discover', 0, 0, 0, NULL, NULL, NULL),
@@ -15,9 +84,9 @@ INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_a
 ('apps', 'apps', NULL, '2021-12-27 23:51:01.568349+00', '2021-12-27 23:51:01.568349+00', 'f'),
 ('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
-INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor") VALUES
-(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now()),
-(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now());
+INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
+(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
+(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
 
 INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
 ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u5', NULL),
@@ -88,6 +157,15 @@ INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at
 ('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-03 08:40:15.224005+00', '2023-03-03 08:40:15.224005+00', 0, 2, 0, 0, 6, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-01'), 0, 6576705, 0);
 
 -- Create cron jobs
+SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage(5)$$);
+SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
+SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
+
+-- SELECT cron.schedule('Update good_plan every day at 1AM', '0 1 * * *', $$SELECT update_app_usage(5)$$);
+-- SELECT cron.schedule('Update web_stats every day at 12AM and 5', '5 0 * * *', $$SELECT update_app_usage(5)$$);
+-- SELECT cron.schedule('Set to delete old versions after retention every day at 12AM', '0 0 * * *', $$SELECT update_app_usage(5)$$);
+-- SELECT cron.schedule('Set channel ', '0 0 * * *', $$CALL update_app_usage(5)$$);
+
 INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport", "database", "username", "active", "jobname") VALUES
 (5, '0 1 * * *', '
     select status
@@ -112,6 +190,7 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
            ''{}''
         )::http_request)
     ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats'),
+-- Set old versions to deleted after retention passed 
 (15, '0 0 * * *', '
     UPDATE app_versions
     SET deleted = true
@@ -122,4 +201,12 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
     AND apps.retention > 0
     AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
     AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention');
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention'),
+-- update channel for progressive deploy if too many fail
+(20, '*/10 * * * *', '
+    update channels
+    SET
+      "secondaryVersionPercentage" = CASE WHEN channels."secondVersion" not in (select version from stats where stats.action=''update_fail'' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) THEN "secondaryVersionPercentage" + 0.1 ELSE 0 END
+    where channels.enable_progressive_deploy = true
+    and channels."secondaryVersionPercentage" between 0 AND 0.9;
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_progressive_deploy');

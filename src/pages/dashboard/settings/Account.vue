@@ -8,11 +8,11 @@ import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import { useMainStore } from '~/stores/main'
-import { useSupabase } from '~/services/supabase'
+import { deleteUser, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
-import { availableLocales, i18n, loadLanguageAsync } from '~/modules/i18n'
+import { availableLocales, i18n, languages, loadLanguageAsync } from '~/modules/i18n'
 import { iconEmail, iconName } from '~/services/icons'
 import { pickPhoto, takePhoto } from '~/services/photos'
 
@@ -25,6 +25,16 @@ const main = useMainStore()
 const isLoading = ref(false)
 // const errorMessage = ref('')
 
+async function hashEmail(email: string) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(email)
+
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return hashHex
+}
+
 async function deleteAccount() {
   displayStore.showActionSheet = true
   displayStore.actionSheetOption = {
@@ -35,18 +45,48 @@ async function deleteAccount() {
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
             return
-          const { error } = await supabase
-            .from('deleted_account')
-            .insert({
-              email: main.auth.email,
-            })
-          if (error) {
-            console.error(error)
-            setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-          }
-          else {
+          const supabaseClient = useSupabase()
+
+          const authUser = await supabase.auth.getUser()
+          if (authUser.error)
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+          try {
+            const { data: user } = await supabaseClient
+              .from('users')
+              .select()
+              .eq('id', authUser.data.user.id)
+              .single()
+            if (!user)
+              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+            if (user.customer_id) {
+              await supabaseClient
+                .from('stripe_info')
+                .delete()
+                .eq('customer_id', user.customer_id)
+            }
+
+            const hashedEmail = await hashEmail(authUser.data.user.email!)
+
+            await supabaseClient
+              .from('deleted_account')
+              .insert({
+                email: hashedEmail,
+              })
+
+            await supabaseClient
+              .from('users')
+              .delete()
+              .eq('id', user.id)
+
+            await deleteUser()
+
             await main.logout()
             router.replace('/login')
+          }
+          catch (error) {
+            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
         },
       },
@@ -199,13 +239,13 @@ onMounted(() => {
           </p>
           <div class="md:ml-6">
             <button id="dropdownDefaultButton" data-dropdown-toggle="dropdown" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" type="button">
-              {{ getEmoji(i18n.global.locale.value) }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </button>
             <!-- Dropdown menu -->
-            <div id="dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
+            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
               <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
                 <li v-for="locale in availableLocales" :key="locale" @click="loadLanguageAsync(locale)">
-                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }}</span>
+                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
                 </li>
               </ul>
             </div>

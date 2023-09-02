@@ -1,7 +1,7 @@
-import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin, updateOnpremStats, updateVersionStats } from '../_utils/supabase.ts'
+import { supabaseAdmin, updateOnpremStats } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -24,7 +24,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       platform,
       app_id,
       version_os,
-      version,
       device_id,
       action,
       plugin_version = '2.3.3',
@@ -66,7 +65,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
 
     if (coerce)
       version_build = coerce.version
-    version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
+    console.log(`VERSION NAME: ${version_name}`)
+    version_name = !version_name ? version_build : version_name
     const device: Database['public']['Tables']['devices']['Insert'] = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
@@ -85,17 +85,17 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       action,
       app_id,
       version_build,
-      version: version || 0,
+      version: 0,
     }
+    const rows: Database['public']['Tables']['stats']['Insert'][] = []
     const all = []
     const { data: appVersion } = await supabaseAdmin()
       .from('app_versions')
       .select('id, user_id')
       .eq('app_id', app_id)
-      .or(`name.eq.${version_name},name.eq.builtin`)
-      .order('id', { ascending: false })
-      .limit(1)
+      .or(`name.eq.${version_name}`)
       .single()
+    console.log(`appVersion ${JSON.stringify(appVersion)}`)
     if (appVersion) {
       stat.version = appVersion.id
       device.version = appVersion.id
@@ -107,25 +107,16 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
           .eq('device_id', device_id)
           .single()
         if (deviceData && deviceData.version !== appVersion.id) {
-          all.push(updateVersionStats({
-            app_id,
+          const statUninstall = {
+            ...stat,
+            action: 'uninstall',
             version_id: deviceData.version,
-            install: 0,
-            uninstall: 1,
-            fail: 0,
-          }))
-        }
-        if (!deviceData || deviceData.version !== appVersion.id) {
-          all.push(updateVersionStats({
-            app_id,
-            version_id: appVersion.id,
-            install: 1,
-            uninstall: 0,
-            fail: 0,
-          }))
+          }
+          rows.push(statUninstall)
         }
       }
       else if (failActions.includes(action)) {
+        console.log('FAIL!')
         const sent = await sendNotif('user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
@@ -141,13 +132,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
             notify: true,
           }).catch()
         }
-        all.push(updateVersionStats({
-          app_id,
-          version_id: appVersion.id,
-          install: 0,
-          uninstall: 0,
-          fail: 1,
-        }))
       }
     }
     else {
@@ -157,12 +141,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
         error: 'app_not_found',
       }, 200)
     }
+    rows.push(stat)
     all.push(supabaseAdmin()
       .from('devices')
       .upsert(device)
       .then(() => supabaseAdmin()
         .from('stats')
-        .insert(stat)))
+        .insert(rows)))
     await Promise.all(all)
     return sendRes()
   }

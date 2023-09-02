@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.198.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -94,7 +94,6 @@ serve(async (event: Request) => {
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
-        stripeData.subscription_anchor = new Date().toISOString()
         const segment = await customerToSegment(user.id, customer)
         await addDataContact(user.email, userData, segment)
         await trackEvent(user.email, {}, 'user:cancel')
