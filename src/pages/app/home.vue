@@ -15,19 +15,16 @@ const route = useRoute()
 const main = useMainStore()
 const supabase = useSupabase()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
-const sharedApps = ref<(Database['public']['Tables']['channel_users']['Row'] & ChannelUserApp)[]>([])
+const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
-interface ChannelUserApp {
-  app_id: Database['public']['Tables']['apps']['Row']
-  channel_id: Database['public']['Tables']['channels']['Row'] & {
-    version: Database['public']['Tables']['app_versions']['Row']
-  }
-}
 async function getMyApps() {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('apps')
     .select()
-    // .eq('user_id', main.user?.id).order('name', { ascending: true })
+    .eq('user_id', main.user?.id).order('name', { ascending: true })
+
+  console.log('my apps', data, error)
+
   if (data && data.length)
     apps.value = data
   else
@@ -44,10 +41,9 @@ async function getSharedWithMe() {
     return
 
   const { data, error } = await supabase
-    .from('org_users')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
+    .from('apps')
+    .select()
+    .neq('user_id', main.user?.id).order('name', { ascending: true })
 
   if (error) {
     console.log('Error get sharred: ', error)
@@ -55,6 +51,7 @@ async function getSharedWithMe() {
   }
 
   console.log('shared', data)
+  sharedApps.value = data
 }
 watchEffect(async () => {
   if (route.path === '/app/home') {
