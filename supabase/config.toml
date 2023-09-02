@@ -173,7 +173,7 @@ verify_jwt = false
 [functions.updates]
 verify_jwt = false
 
-[functions.updates_cached]
+[functions.updates_redis]
 verify_jwt = false
 
 [functions.invalidate_cache]
