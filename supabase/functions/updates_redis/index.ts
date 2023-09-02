@@ -23,7 +23,7 @@ const app = new Hono()
 const redis = await getRedis()
 
 app.post(
-  '/updates',
+  '/updates_redis',
   async (c) => {
     // We do this like this becouse we need both text and json, and json object -> text would be wasteful
 
