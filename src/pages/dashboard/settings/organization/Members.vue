@@ -172,10 +172,24 @@ async function deleteMember(member: ExtendedOrganizationMember) {
   if (await didCancel(t('app')))
     return
 
-  const { error } = await supabase.from('org_users').delete().eq('id', member.id)
+  console.log('Delete member: ', member)
+  if (member.aid === 0) {
+    toast.error(t('cannot-delete-owner'))
+    return
+  }
+
+  const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
   if (error) {
     console.log('Error delete: ', error)
     toast.error(t('cannot-delete-member'))
+  }
+
+  if (member.uid === main.user?.id) {
+    organizationStore.fetchOrganizations()
+    organizationStore.setCurrentOrganizationToMain()
+  }
+  else {
+    members.value = await organizationStore.getMembers()
   }
 
   toast.success(t('member-deleted'))
@@ -213,7 +227,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
               <button class="w-7 h-7 bg-transparent ml-4">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button v-if="member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id" class="w-7 h-7 bg-transparent ml-4" @click="deleteMember(member)">
+              <button v-if="(member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id) && member.uid !== currentOrganization?.created_by" class="w-7 h-7 bg-transparent ml-4" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>

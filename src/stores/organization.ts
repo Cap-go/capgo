@@ -9,7 +9,8 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 type User = Database['public']['Tables']['users']['Row']
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
 type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
-export type ExtendedOrganizationMembers = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>[]
+export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
+export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 // TODO Create user rights in database
 // type Right = Database['public']['Tables']['user_rights']['Row']
 type Right = 'create' | 'read' | 'update' | 'delete'
@@ -35,6 +36,14 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const setCurrentOrganizationFromValue = (value: Organization) => {
     currentOrganization.value = value
+  }
+
+  const setCurrentOrganizationToMain = () => {
+    const organization = organizations.value.find(org => org.role === 'owner')
+    if (!organization)
+      throw new Error('User has no main organization')
+
+    currentOrganization.value = organization
   }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
@@ -146,6 +155,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     currentOrganization,
     setCurrentOrganization,
     setCurrentOrganizationFromValue,
+    setCurrentOrganizationToMain,
     getMembers,
     fetchOrganizations,
     dedupFetchOrganizations,

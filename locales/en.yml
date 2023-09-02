@@ -94,6 +94,8 @@ cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
+cannot-delete-member: Cannot delete member, check browser console
+cannot-delete-owner: Cannot delete owner from the organization
 cannot-get-the-test-: Cannot get the test version
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
@@ -208,6 +210,7 @@ making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+member-deleted: Successfully deleted member
 members: Members
 module-heading: Modules
 monthly: Monthly

@@ -74,6 +74,15 @@ CREATE TYPE "public"."stats_table" AS (
 	"storage" double precision
 );
 
+CREATE TYPE "public"."orgs_table" AS (
+    id uuid,
+    created_by uuid,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    logo text,
+    name text
+);
+
 CREATE TYPE "public"."owned_orgs" AS (
     "id" uuid, 
     "created_by" uuid, 
@@ -223,16 +232,18 @@ Begin
 End;
 $$;
 
-CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(uid uuid, email character varying, image_url character varying)
+-- aid = absolute id (does not work for owner)
+-- uid = user id
+CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(aid int8, uid uuid, email character varying, image_url character varying)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 begin
-  return query select users.id as uid, users.email, users.image_url from org_users as o
+  return query select o.id as aid, users.id as uid, users.email, users.image_url from org_users as o
   join users on users.id = o.user_id
   where o.org_id=get_org_members.guild_id
   AND (is_member_of_org(users.id, o.org_id) OR is_owner_of_org(users.id, o.org_id))
   union all
-  select users.id as uid, users.email, users.image_url from users
+  select 0 as aid, users.id as uid, users.email, users.image_url from users
   join orgs on orgs.created_by = users.id
   where orgs.id=get_org_members.guild_id;
 End;
@@ -249,6 +260,21 @@ BEGIN
   select o.id as gid, o.created_by, o.logo, o.name, 'owner' as "role" from orgs as o
   where o.created_by = get_orgs_v2.userid;
 END;  
+$$;
+
+CREATE FUNCTION "public"."get_user_main_org_id"("user_id" uuid) RETURNS uuid
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  org_id uuid;
+begin
+  select orgs.id from orgs
+  into org_id
+  where orgs.created_by=get_user_main_org.user_id
+  limit 1;
+
+  return org_id;
+End;
 $$;
 
 -- This is not important, however is a good example of how to return a setof a custom type
@@ -1925,6 +1951,11 @@ AS PERMISSIVE FOR DELETE
 TO public
 USING ((user_id=auth.uid()))
 
+CREATE POLICY "Allow org member to select" ON "public"."apps"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(user_id), NULL::character varying, NULL::bigint))
+
 CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH CHECK (false);
 
 CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHECK (false);
@@ -1998,6 +2029,11 @@ GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min
 GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
+
+REVOKE EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) TO postgres;
 
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "postgres";
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "anon";

@@ -1521,6 +1521,8 @@ export interface Database {
           guild_id: string
         }
         Returns: {
+          aid: number
+          uid: string
           email: string
           image_url: string
         }[]

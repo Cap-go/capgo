@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import { getOrgs } from '../services/supabase'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
-import DropdownOrganization from './dashboard/DropdownOrganization.vue'
 import Banner from './Banner.vue'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
@@ -62,7 +61,6 @@ const { t } = useI18n()
             <span class="sr-only">{{ t('open-sidebar') }}</span>
             <IconMenu class="w-6 h-6 fill-current" />
           </button>
-          <DropdownOrganization />
         </div>
 
         <div class="lg:absolute lg:inset-y-5 lg:left-1/2 lg:-translate-x-1/2">
@@ -72,6 +70,9 @@ const { t } = useI18n()
         </div>
         <!-- Header: Right side -->
         <div class="flex items-center space-x-3">
+          <div class=" mr-2">
+            <dropdown-organization />
+          </div>
           <UserMenu align="right" />
         </div>
       </div>

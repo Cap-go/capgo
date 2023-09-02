@@ -27,7 +27,7 @@ async function getMyApps() {
   const { data } = await supabase
     .from('apps')
     .select()
-    .eq('user_id', main.user?.id).order('name', { ascending: true })
+    // .eq('user_id', main.user?.id).order('name', { ascending: true })
   if (data && data.length)
     apps.value = data
   else
@@ -39,34 +39,22 @@ async function onboardingDone() {
 }
 
 async function getSharedWithMe() {
-  const { data } = await supabase
-    .from('channel_users')
-    .select(`
-      id,
-      app_id (
-        app_id,
-        name,
-        updated_at,
-        icon_url,
-        last_version,
-        user_id,
-        created_at
-      ),
-      channel_id (
-        version (
-          bucket_id,
-          app_id,
-          name
-        ),
-        name,
-        updated_at,
-        created_at
-      ),
-      user_id
-      `)
-    .eq('user_id', main.user?.id)
-  if (data && data.length)
-    sharedApps.value = data as (Database['public']['Tables']['channel_users']['Row'] & ChannelUserApp)[]
+  const userId = main.user?.id
+  if (!userId)
+    return
+
+  const { data, error } = await supabase
+    .from('org_users')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+
+  if (error) {
+    console.log('Error get sharred: ', error)
+    return
+  }
+
+  console.log('shared', data)
 }
 watchEffect(async () => {
   if (route.path === '/app/home') {
