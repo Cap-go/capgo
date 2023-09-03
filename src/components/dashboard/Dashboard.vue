@@ -43,7 +43,7 @@ watchEffect(async () => {
 <template>
   <Steps v-if="stepsOpen" :onboarding="false" @done="onboardingDone" />
   <div v-else class="h-full pb-4">
-    <div class="max-w-9xl mx-auto mb-8 h-full max-h-fit w-full overflow-y-scroll px-4 pt-8 lg:px-8 sm:px-6">
+    <div class="max-w-9xl mx-auto mb-8 h-full max-h-fit w-full overflow-y-auto px-4 pt-8 lg:px-8 sm:px-6">
       <!-- Welcome banner -->
       <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
       <!-- Cards -->
