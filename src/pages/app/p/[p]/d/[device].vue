@@ -384,7 +384,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="device" class="h-full overflow-y-scroll md:py-4">
+  <div v-if="device" class="h-full md:py-4">
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
