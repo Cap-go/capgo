@@ -304,7 +304,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
+  <div class="h-full pb-8 max-h-fit grow md:pb-0">
     <FormKit id="update-account" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
