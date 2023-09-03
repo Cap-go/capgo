@@ -56,7 +56,7 @@ watch(props, (p) => {
           </div>
         </div>
         <Tabs :active-tab="activeTab" class="block w-full md:hidden" no-wrap :tabs="tabs" @update:active-tab="openLink" />
-        <slot class="h-full overflow-y-scroll" />
+        <slot class="h-full overflow-y-auto" />
       </div>
     </div>
   </div>

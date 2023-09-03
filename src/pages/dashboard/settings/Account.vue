@@ -304,7 +304,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
+  <div class="h-full pb-8 overflow-y-auto max-h-fit grow md:pb-0">
     <FormKit id="update-account" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
@@ -338,7 +338,7 @@ onMounted(() => {
               {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </button>
             <!-- Dropdown menu -->
-            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
+            <div id="dropdown" class="z-10 hidden overflow-y-auto bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
               <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
                 <li v-for="locale in availableLocales" :key="locale" @click="loadLanguageAsync(locale)">
                   <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>

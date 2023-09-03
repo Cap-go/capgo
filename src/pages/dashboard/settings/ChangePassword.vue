@@ -29,7 +29,7 @@ async function submit(form: { password: string; password_confirm: string }) {
 </script>
 
 <template>
-  <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
+  <div class="h-full pb-8 overflow-y-auto max-h-fit grow md:pb-0">
     <!-- <form
       @submit.prevent="submit"
     > -->

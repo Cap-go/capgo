@@ -84,7 +84,7 @@ const tabs = ref<Tab[]>([
     <div
       id="sidebar"
       ref="sidebar"
-      class="left-0-safe top-0-safe no-scrollbar lg:sidebar-expanded:!w-64 absolute z-40 h-full min-h-screen w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out lg:static lg:left-auto lg:top-auto lg:w-14 lg:translate-x-0 lg:overflow-y-auto 2xl:!w-64"
+      class="left-0-safe top-0-safe no-scrollbar lg:sidebar-expanded:!w-64 absolute z-40 h-full min-h-screen w-64 flex shrink-0 flex-col overflow-y-auto bg-slate-800 transition-all duration-200 ease-in-out lg:static lg:left-auto lg:top-auto lg:w-14 lg:translate-x-0 lg:overflow-y-auto 2xl:!w-64"
       :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
     >
       <!-- Sidebar header -->
