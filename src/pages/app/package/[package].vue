@@ -98,7 +98,7 @@ watchEffect(async () => {
   <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
     <Spinner size="w-40 h-40" />
   </div>
-  <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-scroll max-h-fit lg:px-8 sm:px-6">
+  <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6">
     <Usage :app-id="id" />
 
     <BlurBg class="mb-10">

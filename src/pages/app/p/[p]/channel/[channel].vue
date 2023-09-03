@@ -358,7 +358,7 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
@@ -380,7 +380,7 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
           <k-list class="w-full mt-5 list-none border-t border-gray-200">
             <k-list-item label :title="t('channel-is-public')" class="text-lg text-gray-700 dark:text-gray-200">
@@ -501,12 +501,12 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-scroll bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <DeviceTable class="p-3" :app-id="channel.version.app_id" :channel-id="id" :ids="deviceIds" />
       </div>
     </div>
