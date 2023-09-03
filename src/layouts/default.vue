@@ -15,7 +15,7 @@ const sidebarOpen = ref(false)
       <!-- Site header -->
       <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
       <main class="w-full h-full overflow-hidden">
-        <RouterView class="h-full overflow-y-scroll" />
+        <RouterView class="h-full overflow-hidden" />
       </main>
     </div>
   </div>
