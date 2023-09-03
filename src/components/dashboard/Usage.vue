@@ -60,7 +60,7 @@ async function getAppStats() {
     return supabase
       .from('app_stats')
       .select()
-      .eq('user_id', main.user?.id)
+      // .eq('user_id', main.user?.id)
       .eq('app_id', props.appId)
       .like('date_id', `${date_id}%`)
   }
@@ -68,7 +68,7 @@ async function getAppStats() {
     return supabase
       .from('app_stats')
       .select()
-      .eq('user_id', main.user?.id)
+      // .eq('user_id', main.user?.id)
       .like('date_id', `${date_id}%`)
   }
 }

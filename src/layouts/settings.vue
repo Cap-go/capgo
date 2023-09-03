@@ -57,16 +57,6 @@ const organizationTabs = ref<Tab[]>([
     icon: shallowRef(IconPassword),
     key: '/dashboard/settings/organization/members',
   },
-  {
-    label: t('api-keys'),
-    icon: shallowRef(IconNotification),
-    key: '/dashboard/settings/organization/api-keys',
-  },
-  {
-    label: t('billing'),
-    icon: shallowRef(IconPlans),
-    key: '/dashboard/settings/organization/billing',
-  },
 ])
 
 const type: 'user' | 'organization' = ref('user')

@@ -168,7 +168,7 @@ async function setChannelSkipProgressive(channel: Database['public']['Tables']['
 async function ASChannelChooser() {
   if (!version.value)
     return
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
     toast.error(t('no-permission'))
     return
   }

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
+import { toast } from 'vue-sonner'
 import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -30,6 +31,11 @@ const name = computed({
 })
 
 async function presentActionSheet() {
+  if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   displayStore.showActionSheet = true
   displayStore.actionSheetOption = {
     header: '',
@@ -60,6 +66,11 @@ async function presentActionSheet() {
 }
 
 async function saveChanges() {
+  if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   const main = useMainStore()
 
   console.log(`name: ${name.value}`)
@@ -79,6 +90,18 @@ async function saveChanges() {
   console.log(`dataa: ${data}`)
 
   console.log('save changes!')
+}
+
+function onInputClick(event: MouseEvent) {
+  if (!(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+  }
+}
+
+function onInputKeyDown(event: Event) {
+  if (!(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner'))
+    event.preventDefault()
 }
 </script>
 
@@ -109,7 +132,7 @@ async function saveChanges() {
         <div>{{ 'You can modify the organization\'s informations here.' }}</div>
         <div class="mb-6">
           <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ 'Organization Name' }}</label>
-          <input id="base-input" v-model="name " type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+          <input id="base-input" v-model="name " type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
         </div>
       </div>
       <footer style="margin-top: auto">

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
@@ -29,6 +29,18 @@ export const useOrganizationStore = defineStore('organization', () => {
   )
 
   const currentOrganization = ref<Organization>()
+  const currentRole = ref<OrganizationRole | null>(null)
+
+  watch(currentOrganization, (currentOrganization) => {
+    if (!currentOrganization) {
+      currentRole.value = null
+      return
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    currentRole.value = getCurrentRole(currentOrganization.created_by, undefined, undefined)
+    console.log(currentRole.value)
+  })
 
   const setCurrentOrganization = (id: string) => {
     currentOrganization.value = organizations.value.find(org => org.gid === id)
@@ -162,6 +174,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   return {
     organizations,
     currentOrganization,
+    currentRole,
     setCurrentOrganization,
     setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,

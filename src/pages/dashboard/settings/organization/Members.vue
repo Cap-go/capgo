@@ -41,6 +41,11 @@ function validateEmail(email: string) {
 }
 
 async function showInviteModal() {
+  if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   let permision: Database['public']['Enums']['user_min_right'] | undefined
   let email: string | undefined
 
@@ -152,7 +157,7 @@ function handleSendInvitationOutput(output: string) {
 async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -227,7 +232,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
               <button class="w-7 h-7 bg-transparent ml-4">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button v-if="(member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id) && member.uid !== currentOrganization?.created_by" class="w-7 h-7 bg-transparent ml-4" @click="deleteMember(member)">
+              <button v-if="(member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by" class="w-7 h-7 bg-transparent ml-4" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>

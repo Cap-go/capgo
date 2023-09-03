@@ -273,6 +273,10 @@ CREATE FUNCTION "public"."get_org_members"("guild_id" uuid) RETURNS table(aid in
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 begin
+  IF NOT (is_owner_of_org(auth.uid(), get_org_members.guild_id) OR check_min_rights('read'::user_min_right, auth.uid(), get_org_members.guild_id, NULL::character varying, NULL::bigint)) THEN
+    raise exception 'NO_RIGHTS';
+  END IF;
+
   return query select o.id as aid, users.id as uid, users.email, users.image_url from org_users as o
   join users on users.id = o.user_id
   where o.org_id=get_org_members.guild_id
@@ -668,9 +672,24 @@ CREATE FUNCTION "public"."invite_user_to_org"("email" "varchar", "org_id" "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Declare  
- invited_user record;
- current_record record;
+  org record;
+  invited_user record;
+  current_record record;
 Begin
+  SELECT * FROM ORGS
+  INTO org
+  WHERE orgs.id=invite_user_to_org.org_id;
+
+  IF org IS NULL THEN
+    return 'NO_ORG';
+  END IF;
+
+  IF NOT (org.created_by=auth.uid()) THEN
+      if NOT (check_min_rights('admin'::user_min_right, auth.uid(), invite_user_to_org.org_id, NULL::character varying, NULL::bigint)) THEN
+          return 'NO_RIGHTS';
+      END IF;
+  END IF;
+
   SELECT users.id FROM USERS
   INTO invited_user
   WHERE users.email=invite_user_to_org.email;
@@ -820,6 +839,17 @@ Begin
   FROM apikeys
   WHERE key=apikey
   AND mode=ANY(keymode))) AND is_app_owner(get_user_id(apikey), app_id);
+End;  
+$$;
+
+CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "right" "public"."user_min_right", "user_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  FROM apikeys
+  WHERE key=apikey
+  AND mode=ANY(keymode))) AND (is_app_owner(get_user_id(apikey), app_id) OR check_min_rights(is_allowed_capgkey.right, get_user_id(apikey), get_user_main_org_id(user_id), app_id, NULL::bigint));
 End;  
 $$;
 
@@ -1965,7 +1995,7 @@ CREATE POLICY "Allow apikey to insert" ON "public"."apps" FOR INSERT TO "anon" W
 
 CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
 
-CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], "app_id"));
+CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"key_mode"[], "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"key_mode"[], "app_id", 'read'::"public"."user_min_right", "user_id")));
 
 CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[])) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
 
@@ -2034,6 +2064,22 @@ AS PERMISSIVE FOR UPDATE
 TO authenticated
 USING (check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint))
 WITH CHECK (check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint));
+
+CREATE POLICY "Allow org member to select " ON "public"."app_stats"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(user_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org members to select" ON "public"."devices"
+AS PERMISSIVE FOR SELECT
+TO public
+USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id((select user_id from apps where apps.app_id=app_id)), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org owner to all" ON "public"."org_users"
+AS PERMISSIVE FOR ALL
+TO authenticated
+USING (is_owner_of_org(auth.uid(), org_id))
+WITH CHECK (is_owner_of_org(auth.uid(), org_id));
 
 CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH CHECK (false);
 
