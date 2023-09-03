@@ -1008,6 +1008,76 @@ Begin
 End; 
 $$;
 
+CREATE OR REPLACE FUNCTION noupdate() RETURNS trigger
+   LANGUAGE plpgsql AS
+$$BEGIN
+    -- API key? We do not care
+    IF auth.uid() IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- If the user is an admin, we do not care
+    IF (is_app_owner(auth.uid(), OLD.app_id) OR is_admin(auth.uid())) THEN
+        RETURN NEW;
+    END IF;
+
+    -- If the user has the 'admin' role then we do not care
+    IF check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(OLD.created_by), NULL::character varying, NULL::bigint) THEN
+        RETURN NEW;
+    END IF;
+
+    IF NEW."id" <> OLD."id" THEN
+        RAISE EXCEPTION 'not allowed id';
+    END IF;
+        IF NEW."name" <> OLD."name" THEN
+        RAISE EXCEPTION 'not allowed name';
+    END IF;
+    IF NEW."app_id" <> OLD."app_id" THEN
+        RAISE EXCEPTION 'not allowed app_id';
+    END IF;
+    IF NEW."created_by" <> OLD."created_by" THEN
+        RAISE EXCEPTION 'not allowed created_by';
+    END IF;
+    IF NEW."public" <> OLD."public" THEN
+        RAISE EXCEPTION 'not allowed public';
+    END IF;
+    IF NEW."disableAutoUpdateUnderNative" <> OLD."disableAutoUpdateUnderNative" THEN
+        RAISE EXCEPTION 'not allowed disableAutoUpdateUnderNative';
+    END IF;
+    IF NEW."enableAbTesting" <> OLD."enableAbTesting" THEN
+        RAISE EXCEPTION 'not allowed enableAbTesting';
+    END IF;
+    IF NEW."enable_progressive_deploy" <> OLD."enable_progressive_deploy" THEN
+        RAISE EXCEPTION 'not allowed enable_progressive_deploy';
+    END IF;
+    IF NEW."secondaryVersionPercentage" <> OLD."secondaryVersionPercentage" THEN
+        RAISE EXCEPTION 'not allowed secondaryVersionPercentage';
+    END IF;
+    IF NEW."disableAutoUpdateToMajor" <> OLD."disableAutoUpdateToMajor" THEN
+        RAISE EXCEPTION 'not allowed disableAutoUpdateToMajor';
+    END IF;
+    IF NEW."ios" <> OLD."ios" THEN
+        RAISE EXCEPTION 'not allowed ios';
+    END IF;
+    IF NEW."android" <> OLD."android" THEN
+        RAISE EXCEPTION 'not allowed android';
+    END IF;
+    IF NEW."allow_device_self_set" <> OLD."allow_device_self_set" THEN
+        RAISE EXCEPTION 'not allowed allow_device_self_set';
+    END IF;
+    IF NEW."allow_emulator" <> OLD."allow_emulator" THEN
+        RAISE EXCEPTION 'not allowed allow_emulator';
+    END IF;
+    IF NEW."allow_dev" <> OLD."allow_dev" THEN
+      RAISE EXCEPTION 'not allowed allow_dev';
+   END IF;
+   RETURN NEW;
+END;$$;
+
+CREATE TRIGGER noupdate
+   BEFORE UPDATE ON channels FOR EACH ROW
+   EXECUTE PROCEDURE noupdate();
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1949,6 +2019,21 @@ AS PERMISSIVE FOR SELECT
 TO authenticated
 USING (public.is_member_of_org(auth.uid(), id) OR public.is_owner_of_org(auth.uid(), id));
 
+CREATE POLICY "Allow org members to select" ON "public"."channels"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint));
+
+CREATE POLICY "Allow org members to select" ON "public"."app_versions"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(user_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org admins to edit" ON "public"."channels"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING (check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint))
+WITH CHECK (check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint));
 
 CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH CHECK (false);
 

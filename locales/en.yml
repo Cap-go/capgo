@@ -141,7 +141,6 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
-used-to-create: Account with this email used to exist, cannot recreate
 deleted: deleted
 details-and-logs: Details and logs
 device: Device
@@ -237,6 +236,7 @@ need-more-contact-us: Need more ? Contact us for tailored plan
 no-channel-linked: No channel, click to add
 no-devices: No devices
 no-logs: No logs
+no-permission: Insufficient permissions
 no-version-linked: No version, click to add
 not-found: Not found
 notifications: Notifications
@@ -359,6 +359,7 @@ usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
+used-to-create: Account with this email used to exist, cannot recreate
 user: User
 user-already-invited: This user is already invited to this organization
 validate: Validate

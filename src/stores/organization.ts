@@ -8,7 +8,7 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
 type User = Database['public']['Tables']['users']['Row']
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
-type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
+export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 // TODO Create user rights in database
@@ -36,6 +36,15 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const setCurrentOrganizationFromValue = (value: Organization) => {
     currentOrganization.value = value
+  }
+
+  const getCurrentRole = (appOwner: string, appId?: string, channelId?: number): OrganizationRole => {
+    for (const org of _organizations.value.values()) {
+      if (org.created_by === appOwner)
+        return org.role as OrganizationRole
+    }
+
+    throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
   const setCurrentOrganizationToMain = () => {
@@ -157,6 +166,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
     getMembers,
+    getCurrentRole,
     fetchOrganizations,
     dedupFetchOrganizations,
   }

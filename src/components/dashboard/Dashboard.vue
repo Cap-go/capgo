@@ -5,28 +5,23 @@ import {
 } from 'konsta/vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
+import { useI18n } from 'vue-i18n'
 import WelcomeBanner from './WelcomeBanner.vue'
 import Usage from '~/components/dashboard/Usage.vue'
 import TopApps from '~/components/dashboard/TopApps.vue'
-import SharedApps from '~/components/dashboard/SharedApps.vue'
 import type { Database } from '~/types/supabase.types'
 import plusOutline from '~icons/ion/add-outline?width=1em&height=1em'
 
-interface ChannelUserApp {
-  app_id: Database['public']['Tables']['apps']['Row']
-  channel_id: Database['public']['Tables']['channels']['Row'] & {
-    version: Database['public']['Tables']['app_versions']['Row']
-  }
-}
 const props = defineProps<{
   apps: Database['public']['Tables']['apps']['Row'][]
-  sharedApps: (Database['public']['Tables']['channel_users']['Row'])[] & ChannelUserApp[]
+  sharedApps: Database['public']['Tables']['apps']['Row'][]
 }>()
 const emit = defineEmits(['reloadApp', 'reloadShared'])
 const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
 const stepsOpen = ref(false)
+const { t } = useI18n()
 
 function onboardingDone() {
   stepsOpen.value = !stepsOpen.value
@@ -52,9 +47,8 @@ watchEffect(async () => {
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->
         <!-- Table (Top Channels) -->
-        <TopApps :apps="props.apps" @reload="emit('reloadApp')" />
-
-        <SharedApps v-if="props.sharedApps.length" :shared-apps="props.sharedApps" @reload="emit('reloadShared')" />
+        <TopApps :apps="props.apps" :header="t('top-apps')" @reload="emit('reloadApp')" />
+        <TopApps v-if="sharedApps.length > 0" :apps="props.sharedApps" :header="t('shared-apps')" @reload="emit('reloadApp')" />
       </div>
     </div>
     <k-fab v-if="!stepsOpen && !isMobile" class="right-4-safe bottom-4-safe secondary fixed z-20" @click="stepsOpen = true">

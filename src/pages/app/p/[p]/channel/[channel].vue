@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -20,6 +20,8 @@ import IconUsers from '~icons/heroicons/users-solid'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import type { Tab } from '~/components/comp_def'
 import { urlToAppId } from '~/services/conversion'
+import type { OrganizationRole } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -27,6 +29,7 @@ interface Channel {
 }
 const router = useRouter()
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const { t } = useI18n()
 const route = useRoute()
 const main = useMainStore()
@@ -38,6 +41,17 @@ const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
 const secondaryVersionPercentage = ref(50)
+
+const role = ref<OrganizationRole | null>(null)
+watch(channel, (channel) => {
+  if (!channel) {
+    role.value = null
+    return
+  }
+
+  role.value = organizationStore.getCurrentRole(channel.created_by, channel.app_id, channel.id)
+  console.log(role.value)
+})
 
 const tabs: Tab[] = [
   {
@@ -116,6 +130,8 @@ async function getChannel() {
             created_at
           ),
           created_at,
+          created_by,
+          app_id,
           allow_emulator,
           allow_dev,
           allow_device_self_set,
@@ -156,6 +172,11 @@ async function reload() {
 }
 
 async function saveChannelChange(key: string, val: any) {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   console.log('saveChannelChange', key, val)
   if (!id.value || !channel.value)
     return
@@ -191,6 +212,10 @@ watchEffect(async () => {
 })
 
 async function makeDefault(val = true) {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
   displayStore.actionSheetOption = {
     header: t('are-u-sure'),
     message: val ? t('confirm-public-desc') : t('making-this-channel-'),
@@ -248,6 +273,10 @@ async function getUnknownVersion(): Promise<number> {
 async function openPannel() {
   if (!channel.value || !main.auth)
     return
+  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+    toast.error(t('no-permission'))
+    return
+  }
   displayStore.actionSheetOption = {
     buttons: [
       {
@@ -273,6 +302,10 @@ async function openPannel() {
 }
 
 async function enableAbTesting() {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
   if (!channel.value)
     return
 
@@ -298,6 +331,10 @@ async function enableAbTesting() {
 }
 
 async function enableProgressiveDeploy() {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
   if (!channel.value)
     return
 
@@ -325,6 +362,10 @@ async function enableProgressiveDeploy() {
 }
 
 const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
   const { error } = await supabase
     .from('channels')
     .update({ secondaryVersionPercentage: percentage / 100 })
@@ -335,6 +376,10 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
 const debouncedInformAboutProgressiveDeployPercentageSet = debounce(() => {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+    toast.error(t('no-permission'))
+    return
+  }
   toast.error(t('progressive-deploy-set-percentage'))
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
