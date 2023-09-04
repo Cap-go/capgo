@@ -1523,6 +1523,12 @@ export interface Database {
         }
         Returns: number
       }
+      get_orgs: {
+        Args:  {
+          userid: string
+        }
+        Retuns: Array<Object>
+      }
       is_version_shared: {
         Args: {
           userid: string

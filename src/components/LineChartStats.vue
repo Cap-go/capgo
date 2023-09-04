@@ -9,11 +9,11 @@ import {
   Tooltip,
   // AnimationEvent,
 } from 'chart.js'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import annotationPlugin from 'chartjs-plugin-annotation'
 import { useI18n } from 'vue-i18n'
-import { isDark } from '~/composables'
+import { isDark } from '../composables/dark'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 
 const props = defineProps({
@@ -170,7 +170,7 @@ const chartData = ref<ChartData<'line'>>({
   },
   ],
 })
-const chartOptions = {
+const chartOptions = ref({
   scales: {
     y: {
       ticks: {
@@ -195,7 +195,15 @@ const chartOptions = {
       display: false,
     },
   },
-}
+})
+
+watch(isDark, (value) => {
+  const newColor = `${value ? 'white' : 'black'}`
+  console.log(newColor)
+  chartOptions.value.scales.y.ticks.color = newColor
+  chartOptions.value.scales.x.ticks.color = newColor
+})
+
 // chartData.value.datasets[0].data = props.data as number[]
 </script>
 

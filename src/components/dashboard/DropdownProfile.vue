@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
+import { isDark, toggleDark } from '../../composables/dark'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName } from '~/services/supabase'
 import { openMessenger } from '~/services/chatwoot'
@@ -91,6 +92,13 @@ onUnmounted(() => {
           @focusin="dropdownOpen = true"
           @focusout="dropdownOpen = false"
         >
+          <li>
+            <button class="px-3 py-1" @click="toggleDark()">
+              <div class="text-black dark:text-white">
+                {{ isDark ? 'light_mode' : 'dark_mode' }}
+              </div>
+            </button>
+          </li>
           <li>
             <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/dashboard/settings/account" @click="dropdownOpen = false">
               {{ t('settings') }}

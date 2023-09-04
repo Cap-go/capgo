@@ -226,3 +226,8 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
     </div>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: settings
+</route>

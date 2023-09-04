@@ -343,6 +343,24 @@ Begin
 End;  
 $$;
 
+CREATE FUNCTION "public"."get_orgs"("userid" "uuid") RETURNS TABLE(id uuid, logo text, name text)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+  CREATE TABLE org_ids (id uuid);
+
+  INSERT INTO org_ids
+    SELECT org_id FROM org_users WHERE user_id = userid;
+  
+  RETURN QUERY
+    SELECT o.id AS id, o.logo AS logo, o.name AS name
+    FROM org_ids oi
+    JOIN orgs o ON oi.id = o.id;
+    
+  DROP TABLE org_ids;
+END;  
+$$;
+
 CREATE FUNCTION "public"."get_current_plan_name"("userid" "uuid") RETURNS character varying
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -1899,6 +1917,16 @@ GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "na
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."get_orgs"("userid" "uuid") TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_orgs"("userid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_orgs"("userid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_orgs"("userid" "uuid") TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."get_org"("orgid" "uuid") TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_org"("orgid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_org"("orgid" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_current_plan_max"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_current_plan_max"("userid" "uuid") TO "anon";
