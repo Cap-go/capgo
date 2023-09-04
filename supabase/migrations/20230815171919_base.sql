@@ -599,9 +599,9 @@ Begin
   where customer_id=(SELECT customer_id from users where id=userid)
   AND status = 'canceled'));
 End;  
-$function$
+$function$;
 
-CREATE OR REPLACE FUNCTION update_app_usage(minutes_interval INT) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.update_app_usage(minutes_interval INT) RETURNS VOID AS $$
 DECLARE
     one_minute_ago TIMESTAMP;
     n_minutes_ago TIMESTAMP;
@@ -655,7 +655,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION calculate_daily_app_usage() RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.calculate_daily_app_usage() RETURNS VOID AS $$
 DECLARE
     twenty_four_hours_ago TIMESTAMP;
 BEGIN
@@ -674,7 +674,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION calculate_cycle_usage() RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.calculate_cycle_usage() RETURNS VOID AS $$
 BEGIN
     WITH cycle_usage AS (
         SELECT apps.app_id, SUM(app_usage.bandwidth) AS cycle_bandwidth, SUM(app_usage.storage) AS cycle_storage, SUM(app_usage.mau) AS cycle_mau
@@ -840,7 +840,7 @@ CREATE TABLE "public"."app_usage" (
     -- main stats
     "mlu" bigint DEFAULT '0'::bigint NOT NULL,
     "storage" bigint DEFAULT '0'::bigint NOT NULL,
-    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL
 );
 
 CREATE TABLE "public"."app_stats" (
@@ -1167,9 +1167,9 @@ BEGIN
     EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value, enum_value || '_old');
     EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value || '_old', enum_value);
 END;
-$function$
+$function$;
 
-CREATE OR REPLACE FUNCTION one_month_ahead() 
+CREATE OR REPLACE FUNCTION public.one_month_ahead()
 RETURNS timestamp AS 
 $$
 BEGIN
@@ -1190,7 +1190,7 @@ CREATE TABLE "public"."stripe_info" (
     "plan_usage" bigint DEFAULT '0'::bigint,
     "subscription_metered" "json" DEFAULT '{}'::"json" NOT NULL,
     "subscription_anchor_start" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "subscription_anchor_end" timestamp with time zone DEFAULT one_month_ahead() NOT NULL
+    "subscription_anchor_end" timestamp with time zone DEFAULT public.one_month_ahead() NOT NULL
 );
 
 
@@ -1287,7 +1287,7 @@ ALTER TABLE ONLY "public"."users"
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
 
-CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at", "mode");
+CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at");
 
 CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
@@ -1345,7 +1345,7 @@ CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
-CREATE OR REPLACE FUNCTION get_cycle_info()
+CREATE OR REPLACE FUNCTION public.get_cycle_info()
 RETURNS TABLE (
     subscription_anchor_start timestamp with time zone,
     subscription_anchor_end timestamp with time zone
@@ -1377,11 +1377,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
+CREATE OR REPLACE FUNCTION public.get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
-CREATE OR REPLACE FUNCTION get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
+CREATE OR REPLACE FUNCTION public.get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='apikey';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
@@ -1699,7 +1699,7 @@ CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH C
 
 CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHECK (false);
 
-CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
@@ -1865,11 +1865,6 @@ GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "anon";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "postgres";
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "authenticated";
@@ -1880,20 +1875,10 @@ GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "
 GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "postgres";
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "postgres";
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "anon";
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";
