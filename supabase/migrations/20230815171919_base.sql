@@ -627,6 +627,32 @@ Begin
 End;  
 $$;
 
+CREATE FUNCTION "public"."get_user_id"("apikey" "text", "app_id" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Declare  
+ org_owner_id uuid;
+ real_user_id uuid;
+ org_id uuid;
+Begin
+  SELECT apps.user_id FROM apps WHERE apps.app_id=get_user_id.app_id into org_owner_id;
+  SELECT get_user_main_org_id(org_owner_id) INTO org_id;
+
+  -- (public.is_member_of_org(auth.uid(), org_id) OR public.is_owner_of_org(auth.uid(), org_id))
+  SELECT user_id
+  INTO real_user_id
+  FROM apikeys
+  WHERE key=apikey;
+
+  IF NOT ((public.is_member_of_org(real_user_id, org_id) OR public.is_owner_of_org(real_user_id, org_id)))
+  THEN
+    raise exception 'NO_RIGHTS';
+  END IF;
+
+  RETURN org_owner_id;
+End;  
+$$;
+
 CREATE FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying DEFAULT NULL::character varying, "_channelid" bigint DEFAULT NULL::bigint) RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
@@ -853,6 +879,26 @@ Begin
 End;  
 $$;
 
+CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "channel_id" int8, "right" "public"."user_min_right", "user_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  FROM apikeys
+  WHERE key=apikey
+  AND mode=ANY(keymode))) AND (is_app_owner(get_user_id(apikey), app_id) OR check_min_rights(is_allowed_capgkey.right, get_user_id(apikey), get_user_main_org_id(user_id), app_id, "is_allowed_capgkey"."channel_id"));
+End;  
+$$;
+
+CREATE POLICY "Allow org member's API key to select" ON "public"."apps"
+AS PERMISSIVE FOR SELECT
+TO anon
+USING (is_allowed_capgkey(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{all,write,read}'::key_mode[], app_id, 'read'::user_min_right, user_id))
+
+CREATE POLICY "Allow org member's api key to select" ON "public"."channels"
+AS PERMISSIVE FOR SELECT
+TO anon
+USING (is_allowed_capgkey(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{read, upload, write, all}'::key_mode[], app_id, channels.id, 'read'::"public"."user_min_right", created_by))
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
@@ -1038,6 +1084,14 @@ Begin
 End; 
 $$;
 
+CREATE OR REPLACE FUNCTION force_valid_user_id() RETURNS trigger
+   LANGUAGE plpgsql AS
+$$BEGIN
+    IF NEW."user_id" <> (select user_id from apps where app_id=NEW."app_id") THEN
+        RAISE EXCEPTION 'INVALID_USER_ID';
+    END IF;
+END;$$;
+
 CREATE OR REPLACE FUNCTION noupdate() RETURNS trigger
    LANGUAGE plpgsql AS
 $$BEGIN
@@ -1107,6 +1161,10 @@ END;$$;
 CREATE TRIGGER noupdate
    BEFORE UPDATE ON channels FOR EACH ROW
    EXECUTE PROCEDURE noupdate();
+
+CREATE TRIGGER force_valid_user_id
+   BEFORE INSERT ON app_versions FOR EACH ROW
+   EXECUTE PROCEDURE force_valid_user_id();
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
