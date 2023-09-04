@@ -5,11 +5,20 @@ let REDIS: Redis
 
 export async function getRedis() {
   const redisEnv = Deno.env.get('REDIS_URL')
-  if (!redisEnv)
+  if (!redisEnv) {
+    console.error('REDIS_URL is not set')
     return undefined
+  }
 
-  if (!REDIS)
-    REDIS = await connect(parseURL(redisEnv))
+  if (!REDIS) {
+    try {
+      REDIS = await connect(parseURL(redisEnv))
+    }
+    catch (e) {
+      console.error('Could not connect to redis', e)
+      return undefined
+    }
+  }
 
   return REDIS
 }
