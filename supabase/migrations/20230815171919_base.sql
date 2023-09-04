@@ -1586,6 +1586,9 @@ ALTER TABLE ONLY "public"."channels"
 ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
 
+ALTER TABLE ONLY "public"."channels"
+    ADD CONSTRAINT "channels_secondVersion_fkey" FOREIGN KEY ("secondVersion") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
+
 ALTER TABLE ONLY "public"."devices"
     ADD CONSTRAINT "devices_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
