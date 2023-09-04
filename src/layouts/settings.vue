@@ -78,7 +78,7 @@ displayStore.NavTitle = t('settings')
       <main class="w-full h-full overflow-hidden">
         <TabSidebar v-model:active-tab="ActiveTab" :tabs="tabs" class="w-full h-full mx-auto md:px-4 md:py-8 lg:px-8 max-w-9xl">
           <template #default>
-            <RouterView class="h-full overflow-y-scroll" />
+            <RouterView class="h-full overflow-y-auto" />
           </template>
         </TabSidebar>
       </main>
