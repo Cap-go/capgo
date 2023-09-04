@@ -3,6 +3,7 @@ import { kBlockTitle, kList, kListItem } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
+import { InAppBrowser } from '@capgo/inappbrowser'
 import { NativeAudio } from '@capgo/native-audio'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
@@ -25,6 +26,7 @@ const mods = {
   CapacitorUpdater,
   Camera,
   Mute,
+  InAppBrowser,
   NativeAudio,
 }
 modules.value.push(...[
@@ -33,6 +35,20 @@ modules.value.push(...[
   //   method: '',
   //   option: {},
   // },
+  {
+    name: 'InAppBrowser',
+    method: 'openWebView',
+    option: {
+      url: 'https://capacitorjs.com',
+      title: 'Survey',
+      showReloadButton: true,
+      closeModal: true,
+      closeModalTitle: 'Close this survey',
+      closeModalDescription: 'Are you sure ? You cannot open it again.',
+      closeModalOk: 'Bye',
+      closeModalCancel: 'Stay',
+    },
+  },
   {
     name: 'NativeMarket',
     method: 'openStoreListing',
