@@ -148,16 +148,20 @@ async function deleteAccount() {
             return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
 
           try {
-            const userData = await supabaseClient
+            const { data: user } = await supabaseClient
               .from('users')
               .select()
               .eq('id', authUser.data.user.id)
               .single()
+            if (!user)
+              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
 
-            await supabaseClient
-              .from('stripe_info')
-              .delete()
-              .eq('customer_id', userData.data?.customer_id)
+            if (user.customer_id) {
+              await supabaseClient
+                .from('stripe_info')
+                .delete()
+                .eq('customer_id', user.customer_id)
+            }
 
             const hashedEmail = await hashEmail(authUser.data.user.email!)
 
@@ -170,7 +174,7 @@ async function deleteAccount() {
             await supabaseClient
               .from('users')
               .delete()
-              .eq('id', userData.data?.id)
+              .eq('id', user.id)
 
             await deleteUser()
 
@@ -300,7 +304,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full pb-8 overflow-y-scroll max-h-fit grow md:pb-0">
+  <div class="h-full pb-8 max-h-fit grow md:pb-0">
     <FormKit id="update-account" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">

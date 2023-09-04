@@ -65,7 +65,7 @@ watchEffect(() => {
   if (route && route.path === '/forgot_password') {
     console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
-      step.value = parseInt(router.currentRoute.value.query.step as string)
+      step.value = Number.parseInt(router.currentRoute.value.query.step as string)
     isLoadingMain.value = false
   }
 })
@@ -76,7 +76,7 @@ watchEffect(() => {
     <Spinner size="w-40 h-40" class="my-auto" />
   </section>
   <div v-else>
-    <section class="flex w-full h-full py-10 my-auto overflow-y-scroll lg:py-2 sm:py-8">
+    <section class="flex w-full h-full py-10 my-auto overflow-y-auto lg:py-2 sm:py-8">
       <div class="px-4 mx-auto my-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="max-w-2xl mx-auto text-center">
           <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">
@@ -100,14 +100,13 @@ watchEffect(() => {
                     <FormKit
                       type="email"
                       name="email"
-                      :label="t('first-name')"
+                      :label="t('email')"
                       input-class="!text-black"
                       :disabled="isLoading"
                       :prefix-icon="iconEmail"
                       inputmode="email"
                       autocomplete="email"
                       validation="required:trim"
-                      :lavel="t('email')"
                     />
                   </div>
 

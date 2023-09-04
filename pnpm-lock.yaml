@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 dependencies:
   '@capacitor-community/keep-awake':
     specifier: ^4.0.0
@@ -113,8 +117,8 @@ dependencies:
     specifier: ^9.1.2
     version: 9.1.2
   '@capgo/inappbrowser':
-    specifier: ^5.0.0
-    version: 5.0.0(@capacitor/core@5.3.0)
+    specifier: ^1.2.3
+    version: 1.2.3(@capacitor/core@5.3.0)
   '@capgo/native-audio':
     specifier: ^6.0.18
     version: 6.0.18(@capacitor/core@5.3.0)
@@ -1027,6 +1031,7 @@ packages:
   /@babel/plugin-proposal-unicode-property-regex@7.18.6(@babel/core@7.22.11):
     resolution: {integrity: sha512-2BShG/d5yoZyXZfVePH91urL5wTG6ASZU9M4o03lKK8u8UW1y08OMttBSOADTcJrnPMpvDXRG3G8fyLh4ovs8w==}
     engines: {node: '>=4'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-unicode-property-regex instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
@@ -2366,9 +2371,8 @@ packages:
       - supports-color
     dev: false
 
-  /@capgo/inappbrowser@5.0.0(@capacitor/core@5.3.0):
-    resolution: {integrity: sha512-VWCFPfMYFWHIS/DD0FbYutSuqT7nMlImcoWIc7ktqP/k4K4B0J4hpMFQiPhP4b0KnjhqQ076Bk4ct+eoVYvmdw==}
-    deprecated: Go back to v1, this version was send by CI/CD fantaisy, sorry for this
+  /@capgo/inappbrowser@1.2.3(@capacitor/core@5.3.0):
+    resolution: {integrity: sha512-tUQQ7WdWnS6DWB8K2AyIm6/VVwR4bqbFi8tyj9ntEBfjRH+vY+ftcGn+jJg+V8PLpPDycJzX/xxYhYHcIaGdDA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
@@ -14880,7 +14884,3 @@ packages:
     resolution: {integrity: sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==}
     engines: {node: '>=12.20'}
     dev: true
-
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false

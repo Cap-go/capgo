@@ -1,6 +1,6 @@
 {
   "name": "capgo-app",
-  "version": "10.70.0",
+  "version": "10.84.0",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -70,7 +70,7 @@
     "@capgo/capacitor-screen-recorder": "^5.0.0",
     "@capgo/capacitor-updater": "5.2.22",
     "@capgo/google-play-scraper": "^9.1.2",
-    "@capgo/inappbrowser": "^5.0.0",
+    "@capgo/inappbrowser": "^1.2.3",
     "@capgo/native-audio": "^6.0.18",
     "@capgo/native-market": "^5.0.3",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
