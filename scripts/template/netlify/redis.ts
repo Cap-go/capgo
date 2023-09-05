@@ -1,8 +1,6 @@
 import { Redis } from 'ioredis'
 import { getEnv } from './getEnv'
 
-let REDIS: Redis
-
 // upper is ignored during netlify generation phase
 // import from here
 export async function getRedis() {
@@ -12,15 +10,12 @@ export async function getRedis() {
     return undefined
   }
 
-  if (!REDIS) {
-    try {
-      REDIS = new Redis(redisEnv)
-    }
-    catch (e) {
-      console.error('[redis] Could not connect to redis', e)
-      return undefined
-    }
+  try {
+    const redis = new Redis(redisEnv)
+    return redis
   }
-
-  return REDIS
+  catch (e) {
+    console.error('[redis] Could not connect to redis', e)
+    return undefined
+  }
 }

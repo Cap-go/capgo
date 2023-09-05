@@ -2,8 +2,6 @@ import type { Redis } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { getEnv } from './utils.ts'
 
-let REDIS: Redis
-
 export async function getRedis() {
   const redisEnv = getEnv('REDIS_URL')
   if (!redisEnv) {
@@ -11,17 +9,14 @@ export async function getRedis() {
     return undefined
   }
 
-  if (!REDIS) {
-    try {
-      REDIS = await connect(parseURL(redisEnv))
-    }
-    catch (e) {
-      console.error('[redis] Could not connect to redis', e)
-      return undefined
-    }
+  try {
+    const redis = await connect(parseURL(redisEnv))
+    return redis
   }
-
-  return REDIS
+  catch (e) {
+    console.error('[redis] Could not connect to redis', e)
+    return undefined
+  }
 }
 
 export async function redisAppVersionInvalidate(app_id: string) {
