@@ -1,9 +1,9 @@
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { methodJson, sendRes } from '../_utils/utils.ts'
+import { sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 import { checkPlan } from '../_utils/plans.ts'
-import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
+import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
@@ -31,7 +31,7 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function main(headers: BaseHeaders, body: AppInfos) {
+export async function update(body: AppInfos) {
   // create random id
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -264,11 +264,6 @@ async function main(headers: BaseHeaders, body: AppInfos) {
     await checkPlan(appOwner.user_id)
     const versionId = versionData ? versionData.id : version.id
 
-    const xForwardedFor = headers['x-forwarded-for'] || ''
-    // console.log('xForwardedFor', xForwardedFor)
-    const ip = xForwardedFor.split(',')[1]
-    console.log('IP', ip)
-
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
         const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
@@ -288,6 +283,10 @@ async function main(headers: BaseHeaders, body: AppInfos) {
     }
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
+    // const xForwardedFor = headers['x-forwarded-for'] || ''
+    // // console.log('xForwardedFor', xForwardedFor)
+    // const ip = xForwardedFor.split(',')[1]
+    // console.log('IP', ip)
     // check if version is created_at more than 4 hours
     // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
@@ -432,33 +431,5 @@ async function main(headers: BaseHeaders, body: AppInfos) {
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
     }, 500)
-  }
-}
-
-export interface UpdateRequest {
-  headers: Headers
-  body: AppInfos
-}
-
-export async function update(request: UpdateRequest): Promise<Response> {
-  try {
-    const headers: BaseHeaders = Object.fromEntries(request.headers.entries())
-    return main(headers, request.body)
-  }
-  catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
-  }
-}
-
-export async function oldUpdate(event: Request): Promise<Response> {
-  try {
-    const url: URL = new URL(event.url)
-    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
-    const method: string = event.method
-    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
-    return main(headers, body)
-  }
-  catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 }
