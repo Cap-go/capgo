@@ -1,10 +1,11 @@
 import type { Redis } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import { getEnv } from './utils.ts'
 
 let REDIS: Redis
 
 export async function getRedis() {
-  const redisEnv = Deno.env.get('REDIS_URL')
+  const redisEnv = getEnv('REDIS_URL')
   if (!redisEnv) {
     console.error('[redis] REDIS_URL is not set')
     return undefined
