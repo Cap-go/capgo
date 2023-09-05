@@ -20,10 +20,12 @@ const headersSchema = z.object({
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const redis = await getRedis()
+const bypassRedis = true
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
-  if (!redis) {
+  const redis = await getRedis()
+
+  if (!redis || bypassRedis) {
     console.log('[redis] cannot get redis')
     return update(body)
   }
