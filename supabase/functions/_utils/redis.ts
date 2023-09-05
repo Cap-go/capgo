@@ -1,12 +1,13 @@
 import type { Redis } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import { getEnv } from './utils.ts'
 
 let REDIS: Redis
 
 export async function getRedis() {
-  const redisEnv = Deno.env.get('REDIS_URL')
+  const redisEnv = getEnv('REDIS_URL')
   if (!redisEnv) {
-    console.error('REDIS_URL is not set')
+    console.error('[redis] REDIS_URL is not set')
     return undefined
   }
 
@@ -15,7 +16,7 @@ export async function getRedis() {
       REDIS = await connect(parseURL(redisEnv))
     }
     catch (e) {
-      console.error('Could not connect to redis', e)
+      console.error('[redis] Could not connect to redis', e)
       return undefined
     }
   }
@@ -28,6 +29,7 @@ export async function redisAppVersionInvalidate(app_id: string) {
   if (!redis)
     return
 
+  console.log(`[redis] redisAppVersionInvalidate: ${app_id}`)
   const hashCacheKey = `app_${app_id}`
   let cursor = 0
   const pipeline = redis.pipeline()
@@ -39,9 +41,7 @@ export async function redisAppVersionInvalidate(app_id: string) {
 
     // Really?
     for (let i = 0; i < hscan[1].length; i++) {
-      if (i % 2 === 1)
-        continue
-
+      console.log(`[redis] redisAppVersionInvalidateDelete: ${hscan[1][i]}`)
       await pipeline.hdel(hashCacheKey, hscan[1][i])
     }
   }
@@ -58,5 +58,6 @@ export async function redisDeviceInvalidate(appId: string, deviceId: string) {
   const redis = await getRedis()
   if (!redis)
     return
+  console.log(`[redis] redisDeviceInvalidate: ${appId} ${deviceId}`)
   await redis.hdel(`app_${appId}`, `device_${deviceId}`)
 }

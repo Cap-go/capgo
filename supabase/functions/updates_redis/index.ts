@@ -1,6 +1,6 @@
 import { Hono } from 'https://deno.land/x/hono@v3.5.4/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getRedis } from '../_utils/redis.ts'
 import { type UpdateRequest, oldUpdate, update } from '../_utils/update.ts'
 
@@ -27,8 +27,10 @@ app.post(
   async (c) => {
     // We do this like this becouse we need both text and json, and json object -> text would be wasteful
 
-    if (!redis)
+    if (!redis) {
+      console.log('[redis] cannot get redis')
       return oldUpdate(c.req.raw)
+    }
 
     const body = c.req.raw.body
     if (!body)
@@ -55,12 +57,12 @@ app.post(
 
     // Here we know that the requested app does not exist, cache
     if (!appExists && inCache) {
-      console.log('Cached - does not exist')
+      console.log('[redis] Cached - does not exist')
       return new Response(APP_DOES_NOT_EXIST, { status: 200 })
     }
 
     if (inCache && deviceExists && device === 'standard' && cachedVersionExists) {
-      console.log('Cached - cache sucessful')
+      console.log('[redis] Cached - cache sucessful')
       if (cachedVersion === CACHE_NO_NEW_VAL)
         return new Response(APP_VERSION_NO_NEW, { status: 200 })
       else
@@ -75,7 +77,7 @@ app.post(
       })
     }
     catch (err) {
-      console.log(`update error: ${err}`)
+      console.log(`[redis] update error: ${err}`)
       return new Response(JSON.stringify({ error: err }), { status: 500 })
     }
 
@@ -94,8 +96,10 @@ app.post(
     console.log(parseHeadersResult.data)
 
     // We do not cache fails
-    if (updateStatus === 'fail')
+    if (updateStatus === 'fail') {
+      console.log('[redis] Update failed, not caching')
       return res
+    }
 
     const tx = redis.tx()
 
@@ -111,6 +115,7 @@ app.post(
 
     await tx.flush()
 
+    console.log('[redis] Update successful, cached')
     return res
   },
 )
