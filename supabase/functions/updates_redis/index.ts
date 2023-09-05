@@ -1,6 +1,6 @@
 import { Hono } from 'https://deno.land/x/hono@v3.5.4/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getRedis } from '../_utils/redis.ts'
 import { type UpdateRequest, oldUpdate, update } from '../_utils/update.ts'
 
