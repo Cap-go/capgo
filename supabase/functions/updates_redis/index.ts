@@ -3,6 +3,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getRedis } from '../_utils/redis.ts'
 import { type UpdateRequest, oldUpdate, update } from '../_utils/update.ts'
+import { basicHeaders } from '../_utils/utils.ts'
 
 const APP_DOES_NOT_EXIST = '{"message":"App not found","error":"app_not_found"}'
 const APP_VERSION_NO_NEW = '{"message":"No new version available"}'
@@ -34,13 +35,13 @@ app.post(
 
     const body = c.req.raw.body
     if (!body)
-      return new Response(JSON.stringify({ error: 'No body' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'No body' }), { status: 400, headers: basicHeaders })
 
     const json = await c.req.json()
 
     const parseResult = jsonRequestSchema.passthrough().safeParse(json)
     if (!parseResult.success)
-      return new Response(JSON.stringify({ error: `Cannot parse json: ${parseResult.error}` }), { status: 400 })
+      return new Response(JSON.stringify({ error: `Cannot parse json: ${parseResult.error}` }), { status: 400, headers: basicHeaders })
 
     const { device_id: deviceId, version_name: versionName, app_id: appId } = parseResult.data
     const appCacheKey = `app_${appId}`
@@ -58,15 +59,15 @@ app.post(
     // Here we know that the requested app does not exist, cache
     if (!appExists && inCache) {
       console.log('[redis] Cached - does not exist')
-      return new Response(APP_DOES_NOT_EXIST, { status: 200 })
+      return new Response(APP_DOES_NOT_EXIST, { status: 200, headers: basicHeaders })
     }
 
     if (inCache && deviceExists && device === 'standard' && cachedVersionExists) {
       console.log('[redis] Cached - cache sucessful')
       if (cachedVersion === CACHE_NO_NEW_VAL)
-        return new Response(APP_VERSION_NO_NEW, { status: 200 })
+        return new Response(APP_VERSION_NO_NEW, { status: 200, headers: basicHeaders })
       else
-        return new Response(cachedVersion, { status: 200 })
+        return new Response(cachedVersion, { status: 200, headers: basicHeaders })
     }
 
     let res
@@ -78,7 +79,7 @@ app.post(
     }
     catch (err) {
       console.log(`[redis] update error: ${err}`)
-      return new Response(JSON.stringify({ error: err }), { status: 500 })
+      return new Response(JSON.stringify({ error: err }), { status: 500, headers: basicHeaders })
     }
 
     // We do this as heades do not have any way to dynamicly get them
@@ -89,7 +90,7 @@ app.post(
     if (!parseHeadersResult.success) {
       // Do not return what failed, as it might leak some information
       console.log(parseHeadersResult.error)
-      return new Response(JSON.stringify({ error: 'Cannot parse response headers' }), { status: 500 })
+      return new Response(JSON.stringify({ error: 'Cannot parse response headers' }), { status: 500, headers: basicHeaders })
     }
 
     const { 'x-update-status': updateStatus, 'x-update-overwritten': updateOverwritten } = parseHeadersResult.data
