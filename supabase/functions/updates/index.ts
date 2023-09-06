@@ -1,6 +1,7 @@
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-import { getRedis } from '../_utils/redis.ts'
+
+// import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
@@ -23,7 +24,8 @@ const headersSchema = z.object({
 const bypassRedis = true
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
-  const redis = await getRedis()
+  const redis = null
+  // const redis = await getRedis()
 
   if (!redis || bypassRedis) {
     console.log('[redis] cannot get redis')
