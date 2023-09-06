@@ -31,16 +31,13 @@ async function loadAppInfo() {
       .single()
     app.value = dataApp || app.value
 
-    const date_id = new Date().toISOString().slice(0, 7)
     const { data } = await supabase
-      .from('app_stats')
+      .from('stats')
       .select()
       .eq('app_id', id.value)
-      .eq('date_id', date_id)
-      .single()
+      .eq('action', 'set')
     if (data) {
-      updatesNb.value = Math.max(data.mlu, data.mlu_real)
-      devicesNb.value = data.devices
+      updatesNb.value = data.length
     }
     const { data: bundlesData } = await supabase
       .from('app_versions')
