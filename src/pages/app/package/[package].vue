@@ -1,26 +1,31 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useSupabase } from '~/services/supabase'
+import { useRoute } from 'vue-router'
+import { useMainStore } from '~/stores/main'
 import Spinner from '~/components/Spinner.vue'
+import { computed, ref, watchEffect } from 'vue'
+import type { Stat } from '~/components/comp_def'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
-import type { Stat } from '~/components/comp_def'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
-const route = useRoute()
-const { t } = useI18n()
-const supabase = useSupabase()
-const displayStore = useDisplayStore()
 const id = ref('')
-const isLoading = ref(false)
-const app = ref<Database['public']['Tables']['apps']['Row']>()
-const channelsNb = ref(0)
+const { t } = useI18n()
+const route = useRoute()
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
 const updatesNb = ref(0)
+const channelsNb = ref(0)
+const main = useMainStore()
+const isLoading = ref(false)
+const supabase = useSupabase()
+const displayStore = useDisplayStore()
+const app = ref<Database['public']['Tables']['apps']['Row']>()
+
+const cycleStart = main.cycleInfo?.subscription_anchor_start
+const cycleEnd = main.cycleInfo?.subscription_anchor_end
 
 async function loadAppInfo() {
   try {
@@ -30,14 +35,34 @@ async function loadAppInfo() {
       .eq('app_id', id.value)
       .single()
     app.value = dataApp || app.value
-
     const { data } = await supabase
       .from('stats')
       .select()
       .eq('app_id', id.value)
       .eq('action', 'set')
     if (data) {
-      updatesNb.value = data.length
+      data.forEach((item: Database['public']['Tables']['stats']['Row']) => {
+        if (item.created_at) {
+          let createdAtDate = new Date(item.created_at)
+          // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
+          let notContinue = false
+          // condition in which this shall not proceed with calculation
+          if (cycleStart) {
+            if (createdAtDate < new Date(cycleStart)) {
+              notContinue = true
+            }
+          }
+          if (cycleEnd) {
+            if (createdAtDate > new Date(cycleEnd)) {
+              notContinue = true
+            }
+          }
+          // if not anything of the above, it is false and proceed
+          if (!notContinue) {
+            updatesNb.value = updatesNb.value + 1
+          }
+        }
+      })
     }
     const { data: bundlesData } = await supabase
       .from('app_versions')
@@ -58,7 +83,28 @@ async function loadAppInfo() {
       .select()
       .eq('app_id', id.value)
     if (devicesData) {
-      devicesNb.value = devicesData.length
+      devicesData.forEach((item: Database['public']['Tables']['devices']['Row']) => {
+        if (item.created_at) {
+          let createdAtDate = new Date(item.created_at)
+          // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
+          let notContinue = false
+          // condition in which this shall not proceed with calculation
+          if (cycleStart) {
+            if (createdAtDate < new Date(cycleStart)) {
+              notContinue = true
+            }
+          }
+          if (cycleEnd) {
+            if (createdAtDate > new Date(cycleEnd)) {
+              notContinue = true
+            }
+          }
+          // if not anything of the above, it is false and proceed
+          if (!notContinue) {
+            devicesNb.value = devicesNb.value + 1
+          }
+        }
+      })
     }
   }
   catch (error) {
