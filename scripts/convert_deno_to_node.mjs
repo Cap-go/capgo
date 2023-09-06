@@ -28,10 +28,10 @@ const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const baseNetlifyEdgeTests = `${baseNetlify}/${baseEdgeFunctions + baseTests}`
 const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
-const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top']
+const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
-const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ']
+const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update']
 
 const supaTempl = {}
 const netlifyTempl = {}
@@ -93,6 +93,7 @@ function escapeRegExp(string) {
 }
 const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts', to: 'logsnag' },
+  { from: 'import type { Redis } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: 'import { Redis } from \'ioredis\'' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts', to: 'minio' },
@@ -108,11 +109,13 @@ const mutationsNode = [
   { from: 'import { serve } from \'https://deno.land/std@0.200.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
+  { from: 'redis.hscan(hashCacheKey, cursor, { pattern: \'ver*\', count: 5000 })', to: 'redis.hscan(hashCacheKey, cursor, { match: \'ver*\', count: 5000 })' },
   { from: supaTempl.r2, to: netlifyTempl.r2 },
   { from: supaTempl.handler, to: netlifyTempl.handler },
   { from: supaTempl.getEnv, to: netlifyTempl.getEnv },
   { from: supaTempl.res, to: netlifyTempl.res },
   { from: supaTempl.hmac, to: netlifyTempl.hmac },
+  { from: supaTempl.redis, to: netlifyTempl.redis },
   { from: '.ts\'', to: '\'' },
 ]
 const mutationsEgde = [

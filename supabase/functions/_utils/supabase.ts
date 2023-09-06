@@ -62,28 +62,13 @@ async function allObject<T extends string, R>(all: { [key in T]: PromiseLike<R> 
   return allAwaited
 }
 
-export async function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
+export function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
   console.log('updateOrCreateVersion', update)
-  const { data } = await supabaseAdmin()
+  return supabaseAdmin()
     .from('app_versions')
-    .select()
+    .upsert(update)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-    .single()
-  if (data) {
-    console.log('update Version')
-    update.deleted = false
-    return supabaseAdmin()
-      .from('app_versions')
-      .update(update)
-      .eq('app_id', update.app_id)
-      .eq('name', update.name)
-  }
-  else {
-    return supabaseAdmin()
-      .from('app_versions')
-      .insert(update)
-  }
 }
 
 export async function updateOnpremStats(increment: Database['public']['Functions']['increment_store']['Args']) {
@@ -93,32 +78,18 @@ export async function updateOnpremStats(increment: Database['public']['Functions
     console.error('increment_store', error)
 }
 
-export async function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
+export function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
-  const { data } = await supabaseAdmin()
+  return supabaseAdmin()
     .from('channels')
-    .select()
+    .upsert(update)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)
-    .single()
-  if (data) {
-    return supabaseAdmin()
-      .from('channels')
-      .update(update)
-      .eq('app_id', update.app_id)
-      .eq('name', update.name)
-      .eq('created_by', update.created_by)
-  }
-  else {
-    return supabaseAdmin()
-      .from('channels')
-      .insert(update)
-  }
 }
 
 export async function checkAppOwner(userId: string | undefined, appId: string | undefined): Promise<boolean> {
@@ -140,26 +111,12 @@ export async function checkAppOwner(userId: string | undefined, appId: string | 
   }
 }
 
-export async function updateOrCreateDevice(update: Database['public']['Tables']['devices']['Insert']) {
-  const { data } = await supabaseAdmin()
+export function updateOrCreateDevice(update: Database['public']['Tables']['devices']['Insert']) {
+  return supabaseAdmin()
     .from('devices')
-    .select()
+    .upsert(update)
     .eq('app_id', update.app_id)
     .eq('device_id', update.device_id)
-    .single()
-  console.log('updateOrCreateDevice', update, !!data)
-  if (data) {
-    return supabaseAdmin()
-      .from('devices')
-      .update(update)
-      .eq('app_id', update.app_id)
-      .eq('device_id', update.device_id)
-  }
-  else {
-    return supabaseAdmin()
-      .from('devices')
-      .insert(update)
-  }
 }
 
 export async function getCurrentPlanName(userId: string): Promise<string> {

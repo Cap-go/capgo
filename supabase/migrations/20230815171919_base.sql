@@ -1673,6 +1673,16 @@ CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" 
 
 CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
 
+CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
+
+CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
+
+CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
+
 CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
@@ -2055,7 +2065,7 @@ CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" US
 
 CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"public"."key_mode"[], "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"public"."key_mode"[], "app_id", 'read'::"public"."user_min_right", "user_id")));
 
-CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[])) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
+CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow app owner or admin" ON "public"."channels" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -2182,7 +2192,7 @@ CREATE POLICY "allow apikey to delete" ON "public"."app_versions" FOR DELETE TO 
 
 CREATE POLICY "allow apikey to delete" ON "public"."apps" FOR DELETE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "allow apikey to select" ON "public"."apps" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
+CREATE POLICY "allow apikey to select" ON "public"."apps" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "allow for delete by the CLI" ON "public"."app_versions" FOR UPDATE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id"));
 

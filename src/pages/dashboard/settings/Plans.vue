@@ -145,7 +145,7 @@ const hightLights = computed<Stat[]>(() => ([
 </script>
 
 <template>
-  <div v-if="!isLoading" class="h-full overflow-y-scroll bg-white max-h-fit dark:bg-gray-800">
+  <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
