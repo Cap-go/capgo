@@ -2,7 +2,6 @@ import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
-import { checkPlan } from '../_utils/plans.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -29,6 +28,121 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   response.headers.append('x-update-overwritten', (updateOverwritten ?? false).toString())
 
   return response
+}
+
+async function requestInfos(app_id: string, device_id: string, version_name: string) {
+  const recV = supabaseAdmin()
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', app_id)
+    .or(`name.eq.${version_name}`)
+    .single()
+    .then(res => res.data)
+  const recD = supabaseAdmin()
+    .from('devices_override')
+    .select(`
+      device_id,
+      app_id,
+      created_at,
+      updated_at,
+      version (
+        id,
+        name,
+        checksum,
+        session_key,
+        user_id,
+        bucket_id,
+        storage_provider,
+        external_url
+      )
+    `)
+    .eq('device_id', device_id)
+    .eq('app_id', app_id)
+    .single()
+    .then(res => res.data)
+  const recCO = supabaseAdmin()
+    .from('channel_devices')
+    .select(`
+      device_id,
+      app_id,
+      channel_id (
+        id,
+        created_at,
+        created_by,
+        name,
+        app_id,
+        allow_dev,
+        allow_emulator,
+        disableAutoUpdateUnderNative,
+        disableAutoUpdateToMajor,
+        ios,
+        android,
+        secondaryVersionPercentage,
+        enable_progressive_deploy,
+        enableAbTesting,
+        version (
+          id,
+          name,
+          checksum,
+          session_key,
+          user_id,
+          bucket_id,
+          storage_provider,
+          external_url
+        )
+      ),
+      created_at,
+      updated_at
+    `)
+    .eq('device_id', device_id)
+    .eq('app_id', app_id)
+    .single()
+    .then(res => res.data)
+  const recC = supabaseAdmin()
+    .from('channels')
+    .select(`
+      id,
+      created_at,
+      created_by,
+      name,
+      app_id,
+      allow_dev,
+      allow_emulator,
+      disableAutoUpdateUnderNative,
+      disableAutoUpdateToMajor,
+      ios,
+      android,
+      secondVersion (
+        id,
+        name,
+        checksum,
+        session_key,
+        user_id,
+        bucket_id,
+        storage_provider,
+        external_url
+      ),
+      secondaryVersionPercentage,
+      enable_progressive_deploy,
+      enableAbTesting,
+      version (
+        id,
+        name,
+        checksum,
+        session_key,
+        user_id,
+        bucket_id,
+        storage_provider,
+        external_url
+      )
+    `)
+    .eq('app_id', app_id)
+    .eq('public', true)
+    .single()
+    .then(res => res.data)
+  // promise all
+  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
+  return { versionData, channelData, channelOverride, devicesOverride }
 }
 
 export async function update(body: AppInfos) {
@@ -99,7 +213,7 @@ export async function update(body: AppInfos) {
       }, 400)
     }
     // if plugin_version is < 4 send notif to alert
-    if (semver.lt(plugin_version, '4.0.0')) {
+    if (semver.lt(plugin_version, '5.0.0')) {
       const sent = await sendNotif('user:plugin_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
@@ -134,111 +248,7 @@ export async function update(body: AppInfos) {
       plugin_version,
       version_name)
 
-    const { data: versionData } = await supabaseAdmin()
-      .from('app_versions')
-      .select('id')
-      .eq('app_id', app_id)
-      .or(`name.eq.${version_name}`)
-      .single()
-    const { data: channelData } = await supabaseAdmin()
-      .from('channels')
-      .select(`
-          id,
-          created_at,
-          created_by,
-          name,
-          app_id,
-          allow_dev,
-          allow_emulator,
-          disableAutoUpdateUnderNative,
-          disableAutoUpdateToMajor,
-          ios,
-          android,
-          secondVersion (
-            id,
-            name,
-            checksum,
-            session_key,
-            user_id,
-            bucket_id,
-            storage_provider,
-            external_url
-          ),
-          secondaryVersionPercentage,
-          enable_progressive_deploy,
-          enableAbTesting,
-          version (
-            id,
-            name,
-            checksum,
-            session_key,
-            user_id,
-            bucket_id,
-            storage_provider,
-            external_url
-          )
-        `)
-      .eq('app_id', app_id)
-      .eq('public', true)
-      .single()
-    const { data: channelOverride } = await supabaseAdmin()
-      .from('channel_devices')
-      .select(`
-          device_id,
-          app_id,
-          channel_id (
-            id,
-            created_at,
-            created_by,
-            name,
-            app_id,
-            allow_dev,
-            allow_emulator,
-            disableAutoUpdateUnderNative,
-            disableAutoUpdateToMajor,
-            ios,
-            android,
-            secondaryVersionPercentage,
-            enable_progressive_deploy,
-            enableAbTesting,
-            version (
-              id,
-              name,
-              checksum,
-              session_key,
-              user_id,
-              bucket_id,
-              storage_provider,
-              external_url
-            )
-          ),
-          created_at,
-          updated_at
-        `)
-      .eq('device_id', device_id)
-      .eq('app_id', app_id)
-      .single()
-    const { data: devicesOverride } = await supabaseAdmin()
-      .from('devices_override')
-      .select(`
-          device_id,
-          app_id,
-          created_at,
-          updated_at,
-          version (
-            id,
-            name,
-            checksum,
-            session_key,
-            user_id,
-            bucket_id,
-            storage_provider,
-            external_url
-          )
-        `)
-      .eq('device_id', device_id)
-      .eq('app_id', app_id)
-      .single()
+    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(app_id, device_id, version_name)
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
       if (versionData)
@@ -261,7 +271,6 @@ export async function update(body: AppInfos) {
     const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
-    await checkPlan(appOwner.user_id)
     const versionId = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
@@ -297,7 +306,7 @@ export async function update(body: AppInfos) {
     //     error: 'invalid_ip',
     //   }, 400)
     // }
-    await updateOrCreateDevice({
+    const updevice = updateOrCreateDevice({
       app_id,
       device_id,
       platform: platform as Database['public']['Enums']['platform_os'],
@@ -411,8 +420,6 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
     }
-    // console.log(id, 'save stats', device_id)
-    await sendStats('get', platform, device_id, app_id, version_build, versionId)
     //  check signedURL and if it's url
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
@@ -422,6 +429,9 @@ export async function update(body: AppInfos) {
         error: 'no_bundle',
       }, 200, updateOverwritten)
     }
+    await updevice
+    // console.log(id, 'save stats', device_id)
+    await sendStats('get', platform, device_id, app_id, version_build, versionId)
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
   }

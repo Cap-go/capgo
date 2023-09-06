@@ -1295,6 +1295,16 @@ CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" 
 
 CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
 
+CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
+
+CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
+
+CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
+
 CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
