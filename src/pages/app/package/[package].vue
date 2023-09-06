@@ -41,7 +41,6 @@ async function loadAppInfo() {
     if (data) {
       updatesNb.value = Math.max(data.mlu, data.mlu_real)
       devicesNb.value = data.devices
-      channelsNb.value = data.channels
     }
     const { data: bundlesData } = await supabase
       .from('app_versions')
@@ -56,6 +55,13 @@ async function loadAppInfo() {
       .eq('app_id', id.value)
     if (channelsData) {
       channelsNb.value = channelsData.length
+    }
+    const { data: devicesData } = await supabase
+      .from('devices')
+      .select()
+      .eq('app_id', id.value)
+    if (devicesData) {
+      devicesNb.value = devicesData.length
     }
   }
   catch (error) {
