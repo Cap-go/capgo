@@ -208,7 +208,7 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
       </button>
     </div>
     <div class="flex flex-col">
-      <div class="flex flex-col bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800 overflow-hidden">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800 overflow-hidden">
         <dl class="divide-y divide-gray-500">
           <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true">
             <button class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey(app)">
