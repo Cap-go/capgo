@@ -421,7 +421,7 @@ Begin
   FROM app_versions
   WHERE app_id=appid
   AND name=name_version
-  AND user_id=get_user_id(apikey)));
+  AND user_id=get_user_id(apikey, appid)));
 End;  
 $$;
 
@@ -480,7 +480,7 @@ Begin
   FROM app_versions
   WHERE app_id=appid
   AND name=name_version
-  AND user_id=get_user_id(apikey));
+  AND user_id=get_user_id(apikey, appid));
 End;  
 $$;
 
@@ -833,6 +833,14 @@ Begin
 End;
 $$;
 
+CREATE FUNCTION "public"."is_allowed_action"("apikey" "text", "appid" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN is_allowed_action_user(get_user_id(apikey, appid));
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -889,16 +897,6 @@ Begin
   AND mode=ANY(keymode))) AND (is_app_owner(get_user_id(apikey), app_id) OR check_min_rights(is_allowed_capgkey.right, get_user_id(apikey), get_user_main_org_id(user_id), app_id, "is_allowed_capgkey"."channel_id"));
 End;  
 $$;
-
-CREATE POLICY "Allow org member's API key to select" ON "public"."apps"
-AS PERMISSIVE FOR SELECT
-TO anon
-USING (is_allowed_capgkey(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{all,write,read}'::key_mode[], app_id, 'read'::user_min_right, user_id))
-
-CREATE POLICY "Allow org member's api key to select" ON "public"."channels"
-AS PERMISSIVE FOR SELECT
-TO anon
-USING (is_allowed_capgkey(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{read, upload, write, all}'::key_mode[], app_id, channels.id, 'read'::"public"."user_min_right", created_by))
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
@@ -1084,15 +1082,17 @@ Begin
 End; 
 $$;
 
-CREATE OR REPLACE FUNCTION force_valid_user_id() RETURNS trigger
+CREATE OR REPLACE FUNCTION "public"."force_valid_user_id"() RETURNS trigger
    LANGUAGE plpgsql AS
 $$BEGIN
     IF NEW."user_id" <> (select user_id from apps where app_id=NEW."app_id") THEN
         RAISE EXCEPTION 'INVALID_USER_ID';
     END IF;
+
+    RETURN NEW;
 END;$$;
 
-CREATE OR REPLACE FUNCTION noupdate() RETURNS trigger
+CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS trigger
    LANGUAGE plpgsql AS
 $$BEGIN
     -- API key? We do not care
@@ -1157,14 +1157,6 @@ $$BEGIN
    END IF;
    RETURN NEW;
 END;$$;
-
-CREATE TRIGGER noupdate
-   BEFORE UPDATE ON channels FOR EACH ROW
-   EXECUTE PROCEDURE noupdate();
-
-CREATE TRIGGER force_valid_user_id
-   BEFORE INSERT ON app_versions FOR EACH ROW
-   EXECUTE PROCEDURE force_valid_user_id();
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
@@ -1912,6 +1904,14 @@ CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."stripe_info" FOR E
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
+CREATE TRIGGER noupdate
+   BEFORE UPDATE ON "public"."channels" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."noupdate"();
+
+CREATE TRIGGER force_valid_user_id
+   BEFORE INSERT ON "public"."app_versions" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."force_valid_user_id"();
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
@@ -2053,7 +2053,7 @@ CREATE POLICY "Allow apikey to insert" ON "public"."apps" FOR INSERT TO "anon" W
 
 CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
 
-CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"key_mode"[], "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"key_mode"[], "app_id", 'read'::"public"."user_min_right", "user_id")));
+CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"public"."key_mode"[], "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"public"."key_mode"[], "app_id", 'read'::"public"."user_min_right", "user_id")));
 
 CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[])) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
 
@@ -2110,34 +2110,61 @@ USING (public.is_member_of_org(auth.uid(), id) OR public.is_owner_of_org(auth.ui
 CREATE POLICY "Allow org members to select" ON "public"."channels"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint));
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(created_by), NULL::character varying, NULL::bigint));
 
 CREATE POLICY "Allow org members to select" ON "public"."app_versions"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(user_id), app_id, NULL::bigint));
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(user_id), app_id, NULL::bigint));
 
 CREATE POLICY "Allow org admins to edit" ON "public"."channels"
 AS PERMISSIVE FOR UPDATE
 TO authenticated
-USING (check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint))
-WITH CHECK (check_min_rights('admin'::user_min_right, auth.uid(), get_user_main_org_id(created_by), NULL::character varying, NULL::bigint));
+USING ("public"."check_min_rights"('admin'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(created_by), NULL::character varying, NULL::bigint))
+WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(created_by), NULL::character varying, NULL::bigint));
 
 CREATE POLICY "Allow org member to select " ON "public"."app_stats"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id(user_id), app_id, NULL::bigint));
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(user_id), app_id, NULL::bigint));
 
 CREATE POLICY "Allow org members to select" ON "public"."devices"
 AS PERMISSIVE FOR SELECT
 TO public
-USING (check_min_rights('read'::user_min_right, auth.uid(), get_user_main_org_id((select user_id from apps where apps.app_id=app_id)), app_id, NULL::bigint));
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"((select user_id from "public"."apps" where apps.app_id=app_id)), app_id, NULL::bigint));
 
 CREATE POLICY "Allow org owner to all" ON "public"."org_users"
 AS PERMISSIVE FOR ALL
 TO authenticated
-USING (is_owner_of_org(auth.uid(), org_id))
-WITH CHECK (is_owner_of_org(auth.uid(), org_id));
+USING ("public"."is_owner_of_org"(auth.uid(), org_id))
+WITH CHECK ("public"."is_owner_of_org"(auth.uid(), org_id));
+
+CREATE POLICY "Allow org member's API key to select" ON "public"."apps"
+AS PERMISSIVE FOR SELECT
+TO anon
+USING ("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{all,write,read}'::"public"."key_mode"[], app_id, 'read'::"public"."user_min_right", user_id));
+
+CREATE POLICY "Allow org member's api key to select" ON "public"."channels"
+AS PERMISSIVE FOR SELECT
+TO anon
+USING ("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{read, upload, write, all}'::"public"."key_mode"[], app_id, channels.id, 'read'::"public"."user_min_right", created_by));
+
+CREATE POLICY "Allow org member's apikey to insert" ON "public"."app_versions"
+AS PERMISSIVE FOR INSERT
+TO anon
+WITH CHECK (("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{upload,write,all}'::"public"."key_mode"[], app_id, NULL::bigint, 'upload'::"public"."user_min_right", user_id) AND "public"."is_allowed_action"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), app_id)));
+
+CREATE POLICY "Allow org member's apikey to update" ON "public"."app_versions"
+AS PERMISSIVE FOR UPDATE
+TO anon
+USING (("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{upload,write,all}'::"public"."key_mode"[], app_id, NULL::bigint, 'upload'::"public"."user_min_right", user_id) AND "public"."is_allowed_action"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), app_id)))
+WITH CHECK (("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{upload,write,all}'::"public"."key_mode"[], app_id, NULL::bigint, 'upload'::"public"."user_min_right", user_id) AND "public"."is_allowed_action"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), app_id)));
+
+CREATE POLICY "Allow org member's api key to update" ON "public"."channels"
+AS PERMISSIVE FOR UPDATE
+TO anon
+USING (("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{upload,write,all}'::"public"."key_mode"[], app_id, NULL::bigint, 'write'::"public"."user_min_right", created_by) AND "public"."is_allowed_action"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), app_id)))
+WITH CHECK (("public"."is_allowed_capgkey"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{upload,write,all}'::"public"."key_mode"[], app_id, NULL::bigint, 'write'::"public"."user_min_right", created_by) AND "public"."is_allowed_action"(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), app_id)));
 
 CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH CHECK (false);
 
@@ -2250,7 +2277,7 @@ GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min
 GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
 
 REVOKE EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) TO anon;
 GRANT EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION "public"."get_user_main_org_id"("user_id" uuid) TO postgres;
 

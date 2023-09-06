@@ -7,6 +7,7 @@ import type { Database } from '~/types/supabase.types'
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
   header: string
+  deleteButton: boolean
 }>()
 const emit = defineEmits(['reload'])
 const { t } = useI18n()
@@ -52,12 +53,12 @@ const { t } = useI18n()
           <!-- Table body -->
           <tbody class="text-sm font-medium divide-y divide-slate-100">
             <!-- Row -->
-            <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :app="app" channel="" @reload="emit('reload')" />
+            <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :delete-button="deleteButton" :app="app" channel="" @reload="emit('reload')" />
           </tbody>
         </table>
       </div>
       <k-list class="my-0 w-full md:hidden">
-        <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :app="app" channel="" @reload="emit('reload')" />
+        <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :delete-button="deleteButton" :app="app" channel="" @reload="emit('reload')" />
       </k-list>
     </div>
   </div>

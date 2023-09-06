@@ -32,6 +32,8 @@ onMounted(async () => {
   members.value = await organizationStore.getMembers()
 })
 
+// Do not ask me, I don't know how to do it better
+// This was stolen from some stack overflow answer
 function validateEmail(email: string) {
   return String(email)
     .toLowerCase()
@@ -40,13 +42,50 @@ function validateEmail(email: string) {
     )
 }
 
+async function showPermModal(invite: boolean): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
+  let permision: Database['public']['Enums']['user_min_right'] | undefined
+  displayStore.dialogOption = {
+    header: t('select-user-perms'),
+    message: t('select-user-perms-expanded'),
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('key-read'),
+        role: 'read',
+        handler: () => permision = invite ? 'invite_read' : 'read',
+      },
+      {
+        text: t('key-upload'),
+        role: 'upload',
+        handler: () => permision = invite ? 'invite_upload' : 'upload',
+      },
+      {
+        text: t('key-write'),
+        role: 'write',
+        handler: () => permision = invite ? 'invite_write' : 'write',
+      },
+      {
+        text: t('key-admin'),
+        role: 'admin',
+        handler: () => permision = invite ? 'invite_admin' : 'admin',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  await displayStore.onDialogDismiss()
+  return permision
+}
+
 async function showInviteModal() {
   if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
     toast.error(t('no-permission'))
     return
   }
 
-  let permision: Database['public']['Enums']['user_min_right'] | undefined
+  let permisionPromise: Promise<Database['public']['Enums']['user_min_right'] | undefined> | undefined
   let email: string | undefined
 
   displayStore.dialogOption = {
@@ -60,7 +99,7 @@ async function showInviteModal() {
       {
         text: t('button-invite'),
         id: 'confirm-button',
-        handler() {
+        handler: async () => {
           const input = document.getElementById('dialog-input-field') as HTMLInputElement | undefined
           email = input?.value
 
@@ -74,47 +113,18 @@ async function showInviteModal() {
             return
           }
 
-          displayStore.dialogOption = {
-            header: t('select-user-perms'),
-            message: t('select-user-perms-expanded'),
-            buttons: [
-              {
-                text: t('button-cancel'),
-                role: 'cancel',
-              },
-              {
-                text: t('key-read'),
-                role: 'read',
-                handler: () => permision = 'invite_read',
-              },
-              {
-                text: t('key-upload'),
-                role: 'upload',
-                handler: () => permision = 'invite_upload',
-              },
-              {
-                text: t('key-write'),
-                role: 'write',
-                handler: () => permision = 'invite_write',
-              },
-              {
-                text: t('key-admin'),
-                role: 'admin',
-                handler: () => permision = 'invite_admin',
-              },
-            ],
-          }
-          displayStore.showDialog = true
+          permisionPromise = showPermModal(true)
         },
       },
     ],
   }
   displayStore.showDialog = true
   await displayStore.onDialogDismiss()
+  const permision = await permisionPromise
+
   if (!permision || !email)
     return
 
-  console.log(`KEY: ${permision}`)
   await sendInvitation(email, permision)
 }
 
@@ -134,7 +144,6 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   if (error)
     throw error
 
-  console.log('invite data', data)
   handleSendInvitationOutput(data)
   members.value = await organizationStore.getMembers()
 }
@@ -154,7 +163,7 @@ function handleSendInvitationOutput(output: string) {
   }
 }
 
-async function didCancel(name: string) {
+async function didCancel() {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
@@ -174,10 +183,9 @@ async function didCancel(name: string) {
 }
 
 async function deleteMember(member: ExtendedOrganizationMember) {
-  if (await didCancel(t('app')))
+  if (await didCancel())
     return
 
-  console.log('Delete member: ', member)
   if (member.aid === 0) {
     toast.error(t('cannot-delete-owner'))
     return
@@ -199,6 +207,21 @@ async function deleteMember(member: ExtendedOrganizationMember) {
 
   toast.success(t('member-deleted'))
 }
+
+async function changeMemberPermission(member: ExtendedOrganizationMember) {
+  const perm = await showPermModal(false)
+
+  if (!perm)
+    return
+
+  const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
+  if (error) {
+    console.log('Error delete: ', error)
+    toast.error(t('cannot-change-permission'))
+  }
+
+  toast.success(t('permission-changed'))
+}
 </script>
 
 <template>
@@ -216,7 +239,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
       <dl class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
           <div class="flex justify-between mt-2 mb-2 ml-2">
-            <div class="flex w-1/2">
+            <div class="flex">
               <img
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
                 width="80" height="80" alt="profile_photo"
@@ -224,15 +247,15 @@ async function deleteMember(member: ExtendedOrganizationMember) {
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
                 <p>{{ 'N/A' }}</p>
               </div>
-              <div class="mt-auto mb-auto ml-auto">
-                {{ member.email }}
-              </div>
+            </div>
+            <div class="mt-auto mb-auto ml-auto mr-auto text-center">
+              {{ member.email }}
             </div>
             <div class="mt-auto mb-auto mr-4">
-              <button class="w-7 h-7 bg-transparent ml-4">
+              <button :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner') && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button v-if="(member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by" class="w-7 h-7 bg-transparent ml-4" @click="deleteMember(member)">
+              <button :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>

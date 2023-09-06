@@ -90,6 +90,7 @@ button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cancel: Cancel
+cannot-change-permission: Cannot change permissions, check browser console
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
@@ -255,6 +256,7 @@ password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
 percent-fail: Fail percentage
+permission-changed: Successfully changed user permission
 personal-information: Personal Informations
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth

@@ -1391,9 +1391,17 @@ export interface Database {
           storage: number
         }[]
       }
-      get_user_id: {
+      get_user_id:
+      | {
         Args: {
           apikey: string
+        }
+        Returns: string
+      }
+    | {
+        Args: {
+          apikey: string
+          app_id: string
         }
         Returns: string
       }
