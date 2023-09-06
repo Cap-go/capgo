@@ -54,7 +54,6 @@ async function getAppStats() {
   const date_id = new Date().toISOString().slice(0, 7)
   if (!main.user)
     return { data: [], error: 'missing user' }
-  console.log(props)
   if (props.appId) {
     // console.log('appID', props.appId)
     return supabase
