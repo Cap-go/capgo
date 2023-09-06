@@ -23,7 +23,6 @@ onMounted(async () => {
   await organizationStore.fetchOrganizations()
 
   initDropdowns()
-  console.log(organizations)
 
   dropdown = new Dropdown(
     document.getElementById('dropdown-org'),
@@ -33,7 +32,6 @@ onMounted(async () => {
 
 async function handleOrganizationInvitation(org: Organization) {
   const newName = t('alert-accept-inviation').replace('%ORG%', org.name)
-  console.log(newName)
   displayStore.dialogOption = {
     header: t('alert-confirm-invite'),
     message: `${newName}`,

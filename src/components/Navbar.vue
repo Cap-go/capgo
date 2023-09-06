@@ -19,12 +19,11 @@ const props = defineProps({
 
 defineEmits(['toggleSidebar'])
 const main = useMainStore()
-console.log(main.user)
 
 const orgs = ref()
 onMounted(async () => {
   if (main.user)
-    orgs.value = await getOrgs(main.user?.id)
+    orgs.value = await getOrgs()
 })
 
 const router = useRouter()

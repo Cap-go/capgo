@@ -131,7 +131,7 @@ export async function isGoodPlan(userId: string): Promise<boolean> {
   return data || false
 }
 
-export async function getOrgs(userId: string): Promise<[]> {
+export async function getOrgs(): Promise<[]> {
   const { data, error } = await useSupabase()
     .from('orgs')
     .select('*')
@@ -140,8 +140,6 @@ export async function getOrgs(userId: string): Promise<[]> {
     console.error('getOrgs error', error.message)
     throw error
   }
-
-  console.log('orgs data', data)
 
   return data || ['asd']
 }

@@ -39,7 +39,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-use-before-define
     currentRole.value = getCurrentRole(currentOrganization.created_by, undefined, undefined)
-    console.log(currentRole.value)
+    console.log('current role', currentRole.value)
   })
 
   const setCurrentOrganization = (id: string) => {
@@ -98,7 +98,6 @@ export const useOrganizationStore = defineStore('organization', () => {
   const fetchOrganizations = async () => {
     const main = useMainStore()
 
-    console.log('fetch orgs!')
     const userId = main.user?.id
     if (!userId)
       return
@@ -112,7 +111,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (error)
       throw error
 
-    console.log('fetch or d', data)
     const organization = data.find(org => org.role === 'owner')
     if (!organization) {
       console.log('user has no main organization')
