@@ -157,7 +157,6 @@
     "https-localhost": "4.7.1",
     "postcss": "^8.4.28",
     "sass": "1.66.1",
-    "supabase": "^1.93.0",
     "tailwindcss": "^3.3.3",
     "typescript": "5.0.3",
     "unplugin-icons": "0.16.5",
