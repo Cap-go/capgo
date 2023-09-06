@@ -51,30 +51,25 @@ const allLimits = computed(() => {
 })
 
 async function getAppStats() {
-  // const date_id = new Date().toISOString().slice(0, 7)
   if (!main.user)
     return { data: [], error: 'missing user' }
   if (props.appId) {
     return supabase
       .from('app_usage')
       .select()
-      // .eq('user_id', main.user?.id)
       .eq('app_id', props.appId)
-    // .like('date_id', `${date_id}%`)
   }
   else {
     return supabase
       .from('app_usage')
       .select()
-    // .eq('user_id', main.user?.id)
-    // .like('date_id', `${date_id}%`)
   }
 }
 
 async function getAllStats() {
-  // get aapp_stats
-  if (!main.user?.id)
+  if (!main.user?.id) {
     return
+  }
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
@@ -102,7 +97,7 @@ async function getUsages() {
             notContinue = true
           }
         }
-        // if not anything of the above, set it to false
+        // if not anything of the above, it is false and proceed
         if (!notContinue) {
           const dayNumber = createdAtDate.getDate()
           if (datas.value.mau[dayNumber]) {
@@ -125,6 +120,7 @@ async function getUsages() {
           }
         }
       }
+      // TODO: How to fix this?
       // else if (item.date_id.length === 7) {
       //   currentStorage += item.version_size ? bytesToGb(item.version_size) : 0
       // }
