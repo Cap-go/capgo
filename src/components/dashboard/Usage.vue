@@ -51,17 +51,16 @@ const allLimits = computed(() => {
 })
 
 async function getAppStats() {
-  const date_id = new Date().toISOString().slice(0, 7)
+  // const date_id = new Date().toISOString().slice(0, 7)
   if (!main.user)
     return { data: [], error: 'missing user' }
   if (props.appId) {
-    // console.log('appID', props.appId)
     return supabase
       .from('app_usage')
       .select()
       // .eq('user_id', main.user?.id)
       .eq('app_id', props.appId)
-      .like('date_id', `${date_id}%`)
+    // .like('date_id', `${date_id}%`)
   }
   else {
     return supabase
@@ -80,32 +79,50 @@ async function getAllStats() {
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
 async function getUsages() {
+  let currentStorage = 0
   const { data, error } = await getAppStats()
   if (data && !error) {
     datas.value.mau = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
     datas.value.storage = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
-    let currentStorage = 0
+    const cycleStart = main.cycleInfo?.subscription_anchor_start
+    const cycleEnd = main.cycleInfo?.subscription_anchor_end
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
-        const dayNumber = new Date(item.created_at).getDate()
-        if (datas.value.mau[dayNumber]) {
-          datas.value.mau[dayNumber] += item.mau
+        const createdAtDate = new Date(item.created_at)
+        let notContinue = false
+        // condition in which this shall not proceed with calculation
+        if (cycleStart) {
+          if (createdAtDate < new Date(cycleStart)) {
+            notContinue = true
+          }
         }
-        else {
-          datas.value.mau[dayNumber] = item.mau
+        if (cycleEnd) {
+          if (createdAtDate > new Date(cycleEnd)) {
+            notContinue = true
+          }
         }
-        if (datas.value.storage[dayNumber]) {
-          datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
-        }
-        else {
-          datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
-        }
-        if (datas.value.bandwidth[dayNumber]) {
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
-        }
-        else {
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
+        // if not anything of the above, set it to false
+        if (!notContinue) {
+          const dayNumber = createdAtDate.getDate()
+          if (datas.value.mau[dayNumber]) {
+            datas.value.mau[dayNumber] += item.mau
+          }
+          else {
+            datas.value.mau[dayNumber] = item.mau
+          }
+          if (datas.value.storage[dayNumber]) {
+            datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
+          }
+          else {
+            datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
+          }
+          if (datas.value.bandwidth[dayNumber]) {
+            datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          }
+          else {
+            datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          }
         }
       }
       // else if (item.date_id.length === 7) {
