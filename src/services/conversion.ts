@@ -4,6 +4,9 @@ export function bytesToMb(bytes: number) {
 export function bytesToGb(bytes: number) {
   return Math.round(((bytes / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100
 }
+export function octetsToGb(octets: number) {
+  return Math.round(((octets / 8.0 / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100;
+}
 export function mbToBytes(mb: number) {
   return mb * 1024 * 1024
 }

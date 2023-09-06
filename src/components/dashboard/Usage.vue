@@ -8,7 +8,7 @@ import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase 
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { bytesToGb } from '~/services/conversion'
+import { bytesToGb, octetsToGb } from '~/services/conversion'
 
 const props = defineProps({
   appId: { type: String, default: '' },
@@ -114,10 +114,10 @@ async function getUsages() {
             datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
           }
           if (datas.value.bandwidth[dayNumber]) {
-            datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
+            datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
           }
           else {
-            datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
+            datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
           }
         }
       }
