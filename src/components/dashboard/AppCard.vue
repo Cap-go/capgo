@@ -7,11 +7,12 @@ import {
 } from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash'
-import { formatDate } from '~/services/date'
+import { formatDate, getDaysInCurrentMonth } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import { appIdToUrl } from '~/services/conversion'
+import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
@@ -22,9 +23,11 @@ const displayStore = useDisplayStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
+const main = useMainStore()
 
 const isLoading = ref(true)
 const devicesNb = ref(0)
+const mauNb = ref(-1)
 const { t } = useI18n()
 
 async function didCancel(name: string) {
@@ -93,10 +96,18 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
   }
 }
 
+async function getAppStats(app_id: string) {
+  if (app_id) {
+    return supabase
+      .from('app_usage')
+      .select()
+      .eq('app_id', app_id)
+  }
+}
+
 async function loadData() {
   if (!props.channel) {
     devicesNb.value = 0
-
     try {
       const date_id = new Date().toISOString().slice(0, 7)
       const { data } = await supabase
@@ -106,13 +117,51 @@ async function loadData() {
         .eq('date_id', date_id)
         .single()
         .throwOnError()
-      if (!data)
-        return
-
-      devicesNb.value = data?.devices
+      if (data) {
+        devicesNb.value = data?.devices
+      }
     }
     catch (error) {
       console.error(error)
+    }
+  }
+  if (props.app.app_id) {
+    const tmp = await getAppStats(props.app.app_id)
+    if (!tmp) return
+    const { data, error } = tmp
+    if (data && !error) {
+      const datas = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
+      const cycleStart = main.cycleInfo?.subscription_anchor_start
+      const cycleEnd = main.cycleInfo?.subscription_anchor_end
+      data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
+        if (item.created_at) {
+          let createdAtDate = new Date(item.created_at)
+          createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
+          let notContinue = false
+          // condition in which this shall not proceed with calculation
+          if (cycleStart) {
+            if (createdAtDate < new Date(cycleStart)) {
+              notContinue = true
+            }
+          }
+          if (cycleEnd) {
+            if (createdAtDate > new Date(cycleEnd)) {
+              notContinue = true
+            }
+          }
+          // if not anything of the above, it is false and proceed
+          if (!notContinue) {
+            const dayNumber = createdAtDate.getDate()
+            if (datas[dayNumber]) {
+              datas[dayNumber] += item.mau
+            }
+            else {
+              datas[dayNumber] = item.mau
+            }
+          }
+        }
+      })
+      mauNb.value = datas.filter(i => i).reduce((a, b) => a + b, 0);
     }
   }
 }
@@ -148,8 +197,10 @@ watchEffect(async () => {
   <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
     <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
-        <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3">
+        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3"
+          width="36" height="36">
+        <div v-else
+          class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3">
           <p>{{ acronym }}</p>
         </div>
         <div class="max-w-max">
@@ -168,11 +219,8 @@ watchEffect(async () => {
       </div>
     </td>
     <td class="w-1/4 p-2">
-      <div v-if="!isLoading && !props.channel" class="text-center">
-        {{ devicesNb }}
-      </div>
-      <div v-else class="text-center">
-        {{ props.channel }}
+      <div class="text-center">
+        {{ mauNb.toLocaleString() }}
       </div>
     </td>
     <td class="w-1/4 p-2" @click.stop="deleteApp(app)">
@@ -182,12 +230,8 @@ watchEffect(async () => {
     </td>
   </tr>
   <!-- Mobile -->
-  <k-list-item
-    class="md:hidden"
-    :title="props.app.name || ''"
-    :subtitle="formatDate(props.app.updated_at || '')"
-    @click="openPackage(app.app_id)"
-  >
+  <k-list-item class="md:hidden" :title="props.app.name || ''" :subtitle="formatDate(props.app.updated_at || '')"
+    @click="openPackage(app.app_id)">
     <template #media>
       <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
     </template>

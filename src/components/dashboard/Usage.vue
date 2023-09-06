@@ -51,8 +51,9 @@ const allLimits = computed(() => {
 })
 
 async function getAppStats() {
-  if (!main.user)
+  if (!main.user) {
     return { data: [], error: 'missing user' }
+  }
   if (props.appId) {
     return supabase
       .from('app_usage')
@@ -73,6 +74,7 @@ async function getAllStats() {
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
+
 async function getUsages() {
   let currentStorage = 0
   const { data, error } = await getAppStats()
