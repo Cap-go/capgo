@@ -456,16 +456,8 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
     if (error)
       console.error('createdefaultOrg error', error)
 
-    if (data) {
-      return supabaseAdmin()
-        .from('org_users')
-        .insert([
-          {
-            org_id: data.id,
-            user_id: userId,
-            role: 'admin',
-          }])
-    }
+    if (data)
+      return Promise.resolve()
   }
   return Promise.resolve()
 }
