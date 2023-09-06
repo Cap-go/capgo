@@ -135,6 +135,9 @@ async function getUsages() {
       datas.value.storage[0] = 0
     }
   }
+  datas.value.mau = datas.value.mau.filter(i => i)
+  datas.value.storage = datas.value.storage.filter(i => i)
+  datas.value.bandwidth = datas.value.bandwidth.filter(i => i)
 }
 
 async function loadData() {
