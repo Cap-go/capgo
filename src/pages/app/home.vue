@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { ref, watchEffect } from 'vue'
+import Steps from '../../components/dashboard/Steps.vue'
+import Dashboard from '../../components/dashboard/Dashboard.vue'
 import { useMainStore } from '~/stores/main'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import type { Database } from '~/types/supabase.types'
-import Steps from '../../components/dashboard/Steps.vue'
-import Dashboard from '../../components/dashboard/Dashboard.vue'
 
 const route = useRoute()
 const main = useMainStore()

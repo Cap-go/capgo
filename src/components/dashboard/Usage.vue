@@ -51,9 +51,9 @@ const allLimits = computed(() => {
 })
 
 async function getAppStats() {
-  if (!main.user) {
+  if (!main.user)
     return { data: [], error: 'missing user' }
-  }
+
   if (props.appId) {
     return supabase
       .from('app_usage')
@@ -68,15 +68,15 @@ async function getAppStats() {
 }
 
 async function getAllStats() {
-  if (!main.user?.id) {
+  if (!main.user?.id)
     return
-  }
+
   const date_id = new Date().toISOString().slice(0, 7)
   stats.value = await getTotalStats(main.user?.id, date_id)
 }
 
 async function getUsages() {
-  let currentStorage = 0
+  const currentStorage = 0
   const { data, error } = await getAppStats()
   if (data && !error) {
     datas.value.mau = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
@@ -87,40 +87,37 @@ async function getUsages() {
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
         let createdAtDate = new Date(item.created_at)
-        createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
+        createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1))
         let notContinue = false
         // condition in which this shall not proceed with calculation
         if (cycleStart) {
-          if (createdAtDate < new Date(cycleStart)) {
+          if (createdAtDate < new Date(cycleStart))
             notContinue = true
-          }
         }
         if (cycleEnd) {
-          if (createdAtDate > new Date(cycleEnd)) {
+          if (createdAtDate > new Date(cycleEnd))
             notContinue = true
-          }
         }
         // if not anything of the above, it is false and proceed
         if (!notContinue) {
           const dayNumber = createdAtDate.getDate()
-          if (datas.value.mau[dayNumber]) {
+          if (datas.value.mau[dayNumber])
             datas.value.mau[dayNumber] += item.mau
-          }
-          else {
+
+          else
             datas.value.mau[dayNumber] = item.mau
-          }
-          if (datas.value.storage[dayNumber]) {
+
+          if (datas.value.storage[dayNumber])
             datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
-          }
-          else {
+
+          else
             datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
-          }
-          if (datas.value.bandwidth[dayNumber]) {
+
+          if (datas.value.bandwidth[dayNumber])
             datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
-          }
-          else {
+
+          else
             datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
-          }
         }
       }
       // TODO: How to fix this?
@@ -131,9 +128,8 @@ async function getUsages() {
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
     // console.log('storageVariance', storageVariance, currentStorage)
     datas.value.storage[0] = currentStorage - storageVariance
-    if (datas.value.storage[0] < 0) {
+    if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
-    }
   }
   datas.value.mau = datas.value.mau.filter(i => i)
   datas.value.storage = datas.value.storage.filter(i => i)
@@ -158,22 +154,34 @@ loadData()
 
 <template>
   <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
-    <UsageCard v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau"
-      :title="t('montly-active')" unit="Users" />
-    <div v-else
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+    <UsageCard
+      v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau"
+      :title="t('montly-active')" unit="Users"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
       <Spinner size="w-40 h-40" />
     </div>
-    <UsageCard v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" unit="GB" />
-    <div v-else
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+    <UsageCard
+      v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
+      :title="t('Storage')" unit="GB"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
       <Spinner size="w-40 h-40" />
     </div>
-    <UsageCard v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth"
-      :title="t('Bandwidth')" unit="GB" />
-    <div v-else
-      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+    <UsageCard
+      v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth"
+      :title="t('Bandwidth')" unit="GB"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
       <Spinner size="w-40 h-40" />
     </div>
     <MobileStats v-if="appId" />

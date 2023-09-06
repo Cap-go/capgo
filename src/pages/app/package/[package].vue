@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { computed, ref, watchEffect } from 'vue'
 import { useMainStore } from '~/stores/main'
 import Spinner from '~/components/Spinner.vue'
-import { computed, ref, watchEffect } from 'vue'
 import type { Stat } from '~/components/comp_def'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -43,24 +43,21 @@ async function loadAppInfo() {
     if (data) {
       data.forEach((item: Database['public']['Tables']['stats']['Row']) => {
         if (item.created_at) {
-          let createdAtDate = new Date(item.created_at)
+          const createdAtDate = new Date(item.created_at)
           // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
           let notContinue = false
           // condition in which this shall not proceed with calculation
           if (cycleStart) {
-            if (createdAtDate < new Date(cycleStart)) {
+            if (createdAtDate < new Date(cycleStart))
               notContinue = true
-            }
           }
           if (cycleEnd) {
-            if (createdAtDate > new Date(cycleEnd)) {
+            if (createdAtDate > new Date(cycleEnd))
               notContinue = true
-            }
           }
           // if not anything of the above, it is false and proceed
-          if (!notContinue) {
+          if (!notContinue)
             updatesNb.value = updatesNb.value + 1
-          }
         }
       })
     }
@@ -68,16 +65,16 @@ async function loadAppInfo() {
       .from('app_versions')
       .select()
       .eq('app_id', id.value)
-    if (bundlesData) {
+    if (bundlesData)
       bundlesNb.value = bundlesData.length
-    }
+
     const { data: channelsData } = await supabase
       .from('channels')
       .select()
       .eq('app_id', id.value)
-    if (channelsData) {
+    if (channelsData)
       channelsNb.value = channelsData.length
-    }
+
     const { data: devicesData } = await supabase
       .from('devices')
       .select()
@@ -85,24 +82,21 @@ async function loadAppInfo() {
     if (devicesData) {
       devicesData.forEach((item: Database['public']['Tables']['devices']['Row']) => {
         if (item.created_at) {
-          let createdAtDate = new Date(item.created_at)
+          const createdAtDate = new Date(item.created_at)
           // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
           let notContinue = false
           // condition in which this shall not proceed with calculation
           if (cycleStart) {
-            if (createdAtDate < new Date(cycleStart)) {
+            if (createdAtDate < new Date(cycleStart))
               notContinue = true
-            }
           }
           if (cycleEnd) {
-            if (createdAtDate > new Date(cycleEnd)) {
+            if (createdAtDate > new Date(cycleEnd))
               notContinue = true
-            }
           }
           // if not anything of the above, it is false and proceed
-          if (!notContinue) {
+          if (!notContinue)
             devicesNb.value = devicesNb.value + 1
-          }
         }
       })
     }
