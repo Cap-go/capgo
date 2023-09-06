@@ -50,6 +50,13 @@ async function loadAppInfo() {
     if (bundlesData) {
       bundlesNb.value = bundlesData.length
     }
+    const { data: channelsData } = await supabase
+      .from('channels')
+      .select()
+      .eq('app_id', id.value)
+    if (channelsData) {
+      channelsNb.value = channelsData.length
+    }
   }
   catch (error) {
     console.error(error)
