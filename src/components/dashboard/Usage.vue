@@ -84,7 +84,8 @@ async function getUsages() {
     const cycleEnd = main.cycleInfo?.subscription_anchor_end
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
-        const createdAtDate = new Date(item.created_at)
+        let createdAtDate = new Date(item.created_at)
+        // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
         let notContinue = false
         // condition in which this shall not proceed with calculation
         if (cycleStart) {
