@@ -65,6 +65,7 @@ async function loadAppInfo() {
       .from('app_versions')
       .select()
       .eq('app_id', id.value)
+      .eq('deleted', false)
     if (bundlesData)
       bundlesNb.value = bundlesData.length
 
