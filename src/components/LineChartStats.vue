@@ -7,7 +7,6 @@ import {
   LinearScale,
   PointElement,
   Tooltip,
-  // AnimationEvent,
 } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
@@ -38,11 +37,8 @@ Chart.register(
   // Legend,
 )
 
-// console.log('title', props.title, props.data)
 const accumulateData = computed(() => {
-  // console.log('accumulateData', props.data)
   const monthDay = getCurrentDayMonth()
-  // console.log('accumulateData', monthDay, props.data.length)
   return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
     let newVal
@@ -50,9 +46,6 @@ const accumulateData = computed(() => {
       newVal = last + val
     else if (i < monthDay)
       newVal = last
-    // console.log('accumulateData', i, monthDay, val, last, newVal)
-    // console.log('accumulateData', i, val, last, newVal)
-    // return [...acc, newVal] as number[]
     return acc.concat([newVal as number])
   }, [])
 })
@@ -84,26 +77,29 @@ const projectionData = computed(() => {
   const lastDay = arrWithoutUndefined[arrWithoutUndefined.length - 1]
   // create a projection of the evolution, start after the last value of the array, put undefined for the beginning of the month
   // each value is the previous value + the evolution, the first value is the last value of the array
-  const res = [...Array(getDaysInCurrentMonth()).fill(undefined)].reduce((acc: number[], val: number, i: number) => {
-    const last = acc[acc.length - 1] || 0
+  let res = [...Array(getDaysInCurrentMonth()).fill(undefined)]
+  res = res.reduce((acc: number[], val: number, i: number) => {
     let newVal
+    const last = acc[acc.length - 1] || 0
     // randomize Evolution from (half evolutio) to full evolution
     const randomizedEvolution = getRandomArbitrary((evolution.value[0] + evolution.value[2]) / 2, (evolution.value[1] + evolution.value[2]) / 2)
     if (i === monthDay - 1)
       newVal = lastDay
     else if (i >= monthDay)
       newVal = last + randomizedEvolution
-    // return [...acc, newVal] as number[]
     return acc.concat([newVal as number])
   }, [])
+  res = res.filter(i => i)
+  for (let i = 0; i < arrWithoutUndefined.length - 1; i++) {
+    res.unshift(undefined);
+  }
   return res
 })
 
 function monthdays() {
   const keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
   keys.shift()
-  const arr = [...keys]
-  return arr
+  return [...keys]
 }
 
 function createAnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {
@@ -144,7 +140,6 @@ const generateAnnotations = computed(() => {
       }
     }
   })
-  // console.log('generateAnnotations', annotations)
   return annotations
 })
 
