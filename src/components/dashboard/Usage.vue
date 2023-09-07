@@ -8,7 +8,7 @@ import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase 
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { bytesToGb, octetsToGb } from '~/services/conversion'
+import { bytesToGb, getConvertedDate, getDaysBetweenDates, octetsToGb } from '~/services/conversion'
 
 const props = defineProps({
   appId: { type: String, default: '' },
@@ -62,8 +62,8 @@ async function getAppStats() {
         .select()
         .eq('app_id', props.appId)
         .eq('mode', 'day')
-        .gte('created_at', cycleStart.toISOString())
-        .lte('created_at', cycleEnd.toISOString())
+        .gte('created_at', getConvertedDate(cycleStart))
+        .lte('created_at', getConvertedDate(cycleEnd))
     }
     return supabase
       .from('app_usage')
@@ -77,21 +77,14 @@ async function getAppStats() {
         .from('app_usage')
         .select()
         .eq('mode', 'day')
-        .gte('created_at', cycleStart.toISOString())
-        .lte('created_at', cycleEnd.toISOString())
+        .gte('created_at', getConvertedDate(cycleStart))
+        .lte('created_at', getConvertedDate(cycleEnd))
     }
     return supabase
       .from('app_usage')
       .select()
       .eq('mode', 'day')
   }
-}
-
-function getDaysBetweenDates(date1: string | Date, date2: string | Date) {
-  const oneDay = 24 * 60 * 60 * 1000
-  const firstDate = new Date(date1)
-  const secondDate = new Date(date2)
-  return Math.round(Math.abs((firstDate.valueOf() - secondDate.valueOf()) / oneDay))
 }
 
 async function getAllStats() {
@@ -118,7 +111,6 @@ async function getUsages() {
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
         const createdAtDate = new Date(item.created_at)
-
         const dayNumber = createdAtDate.getDate()
         if (datas.value.mau[dayNumber])
           datas.value.mau[dayNumber] += item.mau

@@ -9,7 +9,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import { appIdToUrl, getConvertedDate2, urlToAppId } from '~/services/conversion'
 
 const id = ref('')
 const { t } = useI18n()
@@ -42,8 +42,8 @@ async function loadAppInfo() {
         .select()
         .eq('app_id', id.value)
         .eq('action', 'set')
-        .gte('created_at', cycleStart.toISOString())
-        .lte('created_at', cycleEnd.toISOString())
+        .gte('created_at', getConvertedDate2(cycleStart))
+        .lte('created_at', getConvertedDate2(cycleEnd))
       if (data)
         updatesNb.value = data.length
     }
@@ -77,8 +77,8 @@ async function loadAppInfo() {
         .from('devices')
         .select()
         .eq('app_id', id.value)
-        .gte('created_at', cycleStart.toISOString())
-        .lte('created_at', cycleEnd.toISOString())
+        .gte('created_at', getConvertedDate2(cycleStart))
+        .lte('created_at', getConvertedDate2(cycleEnd))
       if (devicesData)
         devicesNb.value = devicesData.length
     }
