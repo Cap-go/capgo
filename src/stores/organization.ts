@@ -59,6 +59,10 @@ export const useOrganizationStore = defineStore('organization', () => {
     throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
+  const hasPermisisonsInRole = (perm: OrganizationRole, perms: OrganizationRole[]): boolean => {
+    return perms.includes(perm)
+  }
+
   const setCurrentOrganizationToMain = () => {
     const organization = organizations.value.find(org => org.role === 'owner')
     if (!organization)
@@ -178,6 +182,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationToMain,
     getMembers,
     getCurrentRole,
+    hasPermisisonsInRole,
     fetchOrganizations,
     dedupFetchOrganizations,
   }

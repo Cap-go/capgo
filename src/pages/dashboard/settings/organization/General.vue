@@ -73,13 +73,10 @@ async function saveChanges() {
 
   const main = useMainStore()
 
-  console.log(`name: ${name.value}`)
-
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('orgs')
     .update({ name: name.value })
     .eq('created_by', (main.auth?.id ?? ''))
-    .select('id')
 
   if (error) {
     // TODO: INFORM USER THAT HE IS NOT ORG OWNER
@@ -87,9 +84,7 @@ async function saveChanges() {
     return
   }
 
-  console.log(`dataa: ${data}`)
-
-  console.log('save changes!')
+  toast.success(t('org-changes-saved'))
 }
 
 function onInputClick(event: MouseEvent) {

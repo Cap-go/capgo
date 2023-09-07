@@ -49,11 +49,11 @@ async function handleOrganizationInvitation(org: Organization) {
             return
           }
 
-          console.log('Data accept:', data)
           switch (data) {
             case 'OK':
               organizationStore.setCurrentOrganization(org.gid)
               organizationStore.fetchOrganizations()
+              toast.success(t('invite-accepted'))
               break
             case 'NO_INVITE':
               toast.error(t('alert-no-invite'))

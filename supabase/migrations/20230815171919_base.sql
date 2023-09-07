@@ -2133,6 +2133,11 @@ TO authenticated
 USING ("public"."check_min_rights"('admin'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(created_by), NULL::character varying, NULL::bigint))
 WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(created_by), NULL::character varying, NULL::bigint));
 
+CREATE POLICY "Allow org admins to insert" ON "public"."channels"
+AS PERMISSIVE FOR INSERT
+TO authenticated
+WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"(created_by), NULL::character varying, NULL::bigint));
+
 CREATE POLICY "Allow org member to select " ON "public"."app_stats"
 AS PERMISSIVE FOR SELECT
 TO authenticated
@@ -2180,7 +2185,7 @@ CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH C
 
 CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHECK (false);
 
-CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR ALL TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 

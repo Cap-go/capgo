@@ -18,9 +18,11 @@ import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { appIdToUrl } from '~/services/conversion'
+import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   appId: string
+  appOwner: string
 }>()
 
 interface Channel {
@@ -35,6 +37,7 @@ const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const router = useRouter()
 const main = useMainStore()
@@ -80,8 +83,10 @@ function findUnknownVersion() {
 }
 
 async function addChannel() {
+  console.log('???')
   if (!newChannel.value || !versionId.value || !main.user)
     return
+  console.log('!!')
   try {
     console.log('addChannel', newChannel.value, versionId.value, main.user)
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }
@@ -92,7 +97,7 @@ async function addChannel() {
           name: newChannel.value,
           app_id: props.appId,
           version: versionId.value,
-          created_by: main.user.id,
+          created_by: props.appOwner,
         },
       ])
       .select()
@@ -121,6 +126,7 @@ async function getData() {
             name,
             created_at
           ),
+          created_by,
           created_at,
           updated_at
           `, { count: 'exact' })
@@ -139,6 +145,7 @@ async function getData() {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
+    elements.value.length = 0
     elements.value.push(...dataVersions as any)
     // console.log('count', count)
     total.value = count || 0
@@ -162,6 +169,11 @@ async function refreshData() {
 }
 async function deleteOne(one: typeof element) {
   // console.log('deleteBundle', bundle)
+  if (!organizationStore.hasPermisisonsInRole(organizationStore.getCurrentRole(one.created_by, one.app_id, one.id), ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   if (await didCancel(t('channel')))
     return
   try {
@@ -226,6 +238,14 @@ async function reload() {
   }
 }
 
+async function openAddChannel() {
+  if (organizationStore.hasPermisisonsInRole(organizationStore.getCurrentRole(props.appOwner, props.appId), ['admin', 'owner']))
+    addChannelModal.value = true
+
+  else
+    toast.error(t('no-permission'))
+}
+
 async function openOne(one: typeof element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
@@ -248,7 +268,7 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <k-fab class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="addChannelModal = true">
+    <k-fab class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="openAddChannel">
       <template #icon>
         <component :is="IconPlus" />
       </template>
