@@ -119,7 +119,8 @@
     "vue-demi": "0.14.5",
     "vue-i18n": "9.2.2",
     "vue-router": "4.2.4",
-    "vue-sonner": "^0.4.3"
+    "vue-sonner": "^0.4.3",
+    "zod": "^3.22.2"
   },
   "devDependencies": {
     "@antfu/eslint-config": "0.41.0",
