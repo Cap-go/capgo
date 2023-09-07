@@ -24,8 +24,8 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
-const cycleStart = main.cycleInfo?.subscription_anchor_start
-const cycleEnd = main.cycleInfo?.subscription_anchor_end
+const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function loadAppInfo() {
   try {
@@ -35,15 +35,27 @@ async function loadAppInfo() {
       .eq('app_id', id.value)
       .single()
     app.value = dataApp || app.value
-    const { data } = await supabase
-      .from('stats')
-      .select()
-      .eq('app_id', id.value)
-      .eq('action', 'set')
-      .gte('created_at', cycleStart)
-      .lte('created_at', cycleEnd)
-    if (data)
-      updatesNb.value = data.length
+
+    if (cycleStart && cycleEnd) {
+      const { data } = await supabase
+        .from('stats')
+        .select()
+        .eq('app_id', id.value)
+        .eq('action', 'set')
+        .gte('created_at', cycleStart.toISOString())
+        .lte('created_at', cycleEnd.toISOString())
+      if (data)
+        updatesNb.value = data.length
+    }
+    else {
+      const { data } = await supabase
+        .from('stats')
+        .select()
+        .eq('app_id', id.value)
+        .eq('action', 'set')
+      if (data)
+        updatesNb.value = data.length
+    }
 
     const { data: bundlesData } = await supabase
       .from('app_versions')
@@ -60,14 +72,24 @@ async function loadAppInfo() {
     if (channelsData)
       channelsNb.value = channelsData.length
 
-    const { data: devicesData } = await supabase
-      .from('devices')
-      .select()
-      .eq('app_id', id.value)
-      .gte('created_at', cycleStart)
-      .lte('created_at', cycleEnd)
-    if (devicesData)
-      devicesNb.value = devicesData.length
+    if (cycleStart && cycleEnd) {
+      const { data: devicesData } = await supabase
+        .from('devices')
+        .select()
+        .eq('app_id', id.value)
+        .gte('created_at', cycleStart.toISOString())
+        .lte('created_at', cycleEnd.toISOString())
+      if (devicesData)
+        devicesNb.value = devicesData.length
+    }
+    else {
+      const { data: devicesData } = await supabase
+        .from('devices')
+        .select()
+        .eq('app_id', id.value)
+      if (devicesData)
+        devicesNb.value = devicesData.length
+    }
   }
   catch (error) {
     console.error(error)

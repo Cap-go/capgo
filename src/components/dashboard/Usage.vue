@@ -53,7 +53,18 @@ const allLimits = computed(() => {
 async function getAppStats() {
   if (!main.user)
     return { data: [], error: 'missing user' }
+  const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+  const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
   if (props.appId) {
+    if (cycleStart && cycleEnd) {
+      return supabase
+        .from('app_usage')
+        .select()
+        .eq('app_id', props.appId)
+        .eq('mode', 'day')
+        .gte('created_at', cycleStart.toISOString())
+        .lte('created_at', cycleEnd.toISOString())
+    }
     return supabase
       .from('app_usage')
       .select()
@@ -61,6 +72,14 @@ async function getAppStats() {
       .eq('mode', 'day')
   }
   else {
+    if (cycleStart && cycleEnd) {
+      return supabase
+        .from('app_usage')
+        .select()
+        .eq('mode', 'day')
+        .gte('created_at', cycleStart.toISOString())
+        .lte('created_at', cycleEnd.toISOString())
+    }
     return supabase
       .from('app_usage')
       .select()
@@ -98,39 +117,26 @@ async function getUsages() {
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
-        let createdAtDate = new Date(item.created_at)
-        createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1))
-        let notContinue = false
-        // condition in which this shall not proceed with calculation
-        if (cycleStart) {
-          if (createdAtDate < new Date(cycleStart))
-            notContinue = true
-        }
-        if (cycleEnd) {
-          if (createdAtDate > new Date(cycleEnd))
-            notContinue = true
-        }
-        // if not anything of the above, it is false and proceed
-        if (!notContinue) {
-          const dayNumber = createdAtDate.getDate()
-          if (datas.value.mau[dayNumber])
-            datas.value.mau[dayNumber] += item.mau
+        const createdAtDate = new Date(item.created_at)
 
-          else
-            datas.value.mau[dayNumber] = item.mau
+        const dayNumber = createdAtDate.getDate()
+        if (datas.value.mau[dayNumber])
+          datas.value.mau[dayNumber] += item.mau
 
-          if (datas.value.storage[dayNumber])
-            datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
+        else
+          datas.value.mau[dayNumber] = item.mau
 
-          else
-            datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
+        if (datas.value.storage[dayNumber])
+          datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
 
-          if (datas.value.bandwidth[dayNumber])
-            datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
+        else
+          datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
 
-          else
-            datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
-        }
+        if (datas.value.bandwidth[dayNumber])
+          datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
+
+        else
+          datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
       }
       // TODO: How to fix this?
       // else if (item.date_id.length === 7) {
