@@ -57,15 +57,6 @@ CREATE TYPE "public"."usage_mode" AS ENUM (
     'cycle'
 );
 
-CREATE TYPE "public"."match_plan" AS (
-	"name" character varying
-);
-
-CREATE TYPE "public"."pay_as_you_go_type" AS ENUM (
-    'base',
-    'units'
-);
-
 CREATE TYPE "public"."platform_os" AS ENUM (
     'ios',
     'android'
@@ -619,13 +610,15 @@ BEGIN
         WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
         GROUP BY stats.app_id
     ), storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
         FROM app_versions
+        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS FALSE
         GROUP BY app_versions.app_id
     ), deleted_storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
         FROM app_versions
+        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.updated_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
         GROUP BY app_versions.app_id
     ), mau AS (
@@ -838,9 +831,10 @@ CREATE TABLE "public"."app_usage" (
     "app_id" character varying NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     -- main stats
-    "mlu" bigint DEFAULT '0'::bigint NOT NULL,
+    "mau" bigint DEFAULT '0'::bigint NOT NULL,
     "storage" bigint DEFAULT '0'::bigint NOT NULL,
-    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL
+    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+    mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
 );
 
 CREATE TABLE "public"."app_stats" (
@@ -1294,6 +1288,16 @@ CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
+
+CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
+
+CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
+
+CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
 
 CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
