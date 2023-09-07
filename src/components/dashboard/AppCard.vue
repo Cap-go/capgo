@@ -26,7 +26,6 @@ const supabase = useSupabase()
 const main = useMainStore()
 
 const isLoading = ref(true)
-const devicesNb = ref(0)
 const mauNb = ref(-1)
 const { t } = useI18n()
 
@@ -106,24 +105,6 @@ async function getAppStats(app_id: string) {
 }
 
 async function loadData() {
-  if (!props.channel) {
-    devicesNb.value = 0
-    try {
-      const date_id = new Date().toISOString().slice(0, 7)
-      const { data } = await supabase
-        .from('app_stats')
-        .select()
-        .eq('app_id', props.app.app_id)
-        .eq('date_id', date_id)
-        .single()
-        .throwOnError()
-      if (data)
-        devicesNb.value = data?.devices
-    }
-    catch (error) {
-      console.error(error)
-    }
-  }
   if (props.app.app_id) {
     const tmp = await getAppStats(props.app.app_id)
     if (!tmp)
