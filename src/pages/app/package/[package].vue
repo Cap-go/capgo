@@ -40,27 +40,11 @@ async function loadAppInfo() {
       .select()
       .eq('app_id', id.value)
       .eq('action', 'set')
-    if (data) {
-      data.forEach((item: Database['public']['Tables']['stats']['Row']) => {
-        if (item.created_at) {
-          const createdAtDate = new Date(item.created_at)
-          // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
-          let notContinue = false
-          // condition in which this shall not proceed with calculation
-          if (cycleStart) {
-            if (createdAtDate < new Date(cycleStart))
-              notContinue = true
-          }
-          if (cycleEnd) {
-            if (createdAtDate > new Date(cycleEnd))
-              notContinue = true
-          }
-          // if not anything of the above, it is false and proceed
-          if (!notContinue)
-            updatesNb.value = updatesNb.value + 1
-        }
-      })
-    }
+      .gte('created_at', cycleStart)
+      .lte('created_at', cycleEnd)
+    if (data)
+      updatesNb.value = data.length
+
     const { data: bundlesData } = await supabase
       .from('app_versions')
       .select()
@@ -80,27 +64,10 @@ async function loadAppInfo() {
       .from('devices')
       .select()
       .eq('app_id', id.value)
-    if (devicesData) {
-      devicesData.forEach((item: Database['public']['Tables']['devices']['Row']) => {
-        if (item.created_at) {
-          const createdAtDate = new Date(item.created_at)
-          // createdAtDate = new Date(createdAtDate.setMonth(createdAtDate.getMonth() + 1));
-          let notContinue = false
-          // condition in which this shall not proceed with calculation
-          if (cycleStart) {
-            if (createdAtDate < new Date(cycleStart))
-              notContinue = true
-          }
-          if (cycleEnd) {
-            if (createdAtDate > new Date(cycleEnd))
-              notContinue = true
-          }
-          // if not anything of the above, it is false and proceed
-          if (!notContinue)
-            devicesNb.value = devicesNb.value + 1
-        }
-      })
-    }
+      .gte('created_at', cycleStart)
+      .lte('created_at', cycleEnd)
+    if (devicesData)
+      devicesNb.value = devicesData.length
   }
   catch (error) {
     console.error(error)
