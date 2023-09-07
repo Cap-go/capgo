@@ -20,6 +20,7 @@ function initR2() {
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
+console.log(params, "S3 CONFIG");
 
   return new S3Client(params)
 }

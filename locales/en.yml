@@ -107,6 +107,7 @@ channels: Channels
 check-email: Please check your email and verify
 check-on-web: Check on website
 checksum: Checksum
+checksum-partial: Checksum Partial Update
 commands: commands
 confirm-email: Confirm your email
 confirm-password: Confirm password

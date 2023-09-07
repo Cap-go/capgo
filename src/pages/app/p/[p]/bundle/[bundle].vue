@@ -120,7 +120,7 @@ async function setChannelProgressive(channel: Database['public']['Tables']['chan
     .from('channels')
     .update({
       secondVersion: id,
-      version: channel.secondVersion,
+      version: channel.secondVersion!,
       secondaryVersionPercentage: 0.1,
     })
     .eq('id', channel.id)
@@ -468,6 +468,9 @@ function hideString(str: string) {
             <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
+
+            <!-- Checksum -->
+            <InfoRow v-if="version.checksum_partial_update" :label="t('checksum-partial')" :value="version.checksum_partial_update" />
             <!-- meta devices -->
             <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
             <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toLocaleString()" />

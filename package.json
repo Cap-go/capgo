@@ -14,7 +14,7 @@
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
     "serve": "vite",
-    "backend": "supabase start && supabase functions serve",
+    "backend": "supabase start && supabase functions serve --env-file ./supabase/.env.local",
     "reset": "supabase db reset",
     "dev": "npx netlify dev --port 8881",
     "test:e2e": "cypress open",

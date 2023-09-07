@@ -178,3 +178,6 @@ verify_jwt = false
 
 [functions.website_stats]
 verify_jwt = false
+
+[functions.download_latest_bundle]
+verify_jwt = false

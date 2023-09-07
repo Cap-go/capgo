@@ -7,6 +7,7 @@ import { r2 } from '../_utils/r2.ts'
 
 interface dataUpload {
   bucket_id: string
+  bucket_id_partial: string
   app_id: string
 }
 
@@ -21,7 +22,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
 
   try {
     console.log('body', body, apikey.user_id)
-    const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
+    const bundleLocation = `apps/${apikey.user_id}/${body.app_id}/versions`
+    const fullBundlePath = `${bundleLocation}/${body.bucket_id}`
+    const partialBundlePath = `${bundleLocation}/${body.bucket_id_partial}`
     // check if app version exist
     const { error: errorVersion } = await supabaseAdmin()
       .from('app_versions')
@@ -45,16 +48,23 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
       return sendRes({ status: 'Error App not found' }, 500)
 
     // check if object exist in r2
-    const exist = await r2.checkIfExist(filePath)
+    const exist = await r2.checkIfExist(fullBundlePath)
     if (exist)
       return sendRes({ status: 'Error already exist' }, 500)
-    const url = await r2.getUploadUrl(filePath)
-    if (!url)
+    const fullBundleUrl = await r2.getUploadUrl(fullBundlePath)
+    const partialBundleUrl = await r2.getUploadUrl(partialBundlePath)
+
+    if (!fullBundleUrl)
       return sendRes({ status: 'Error unknow' }, 500)
-    console.log('url', filePath, url)
-    return sendRes({ url })
+    console.log('url', fullBundlePath, fullBundleUrl)
+    return sendRes({ urls: {
+      full: fullBundleUrl,
+      partial: partialBundleUrl
+    } })
   }
   catch (e) {
+    console.log(e);
+    
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),
