@@ -7,11 +7,11 @@ import {
 } from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash'
-import { formatDate, getDaysInCurrentMonth } from '~/services/date'
+import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
-import { appIdToUrl } from '~/services/conversion'
+import { appIdToUrl, getConvertedDate2 } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
@@ -28,6 +28,9 @@ const main = useMainStore()
 const isLoading = ref(true)
 const mauNb = ref(-1)
 const { t } = useI18n()
+
+const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -97,10 +100,20 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
 
 async function getAppStats(app_id: string) {
   if (app_id) {
+    if (cycleStart && cycleEnd) {
+      return supabase
+        .from('app_usage')
+        .select()
+        .eq('app_id', app_id)
+        .eq('mode', 'day')
+        .gte('created_at', getConvertedDate2(cycleStart))
+        .lte('created_at', getConvertedDate2(cycleEnd))
+    }
     return supabase
       .from('app_usage')
       .select()
       .eq('app_id', app_id)
+      .eq('mode', 'day')
   }
 }
 
@@ -111,36 +124,19 @@ async function loadData() {
       return
     const { data, error } = tmp
     if (data && !error) {
-      const datas = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
-      const cycleStart = main.cycleInfo?.subscription_anchor_start
-      const cycleEnd = main.cycleInfo?.subscription_anchor_end
       data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
         if (item.created_at) {
-          const createdAtDate = new Date(item.created_at)
-          let notContinue = false
-          // condition in which this shall not proceed with calculation
-          if (cycleStart) {
-            if (createdAtDate < new Date(cycleStart))
-              notContinue = true
-          }
-          if (cycleEnd) {
-            if (createdAtDate > new Date(cycleEnd))
-              notContinue = true
-          }
-          // if not anything of the above, it is false and proceed
-          if (!notContinue) {
-            const dayNumber = createdAtDate.getDate()
-            if (datas[dayNumber])
-              datas[dayNumber] += item.mau
-
-            else
-              datas[dayNumber] = item.mau
-          }
+          if (mauNb.value !== -1)
+            mauNb.value += item.mau
+          else
+            mauNb.value = item.mau
         }
       })
-      mauNb.value = datas.filter(i => i).reduce((a, b) => a + b, 0)
     }
   }
+  // if the value is not updated, fall it back to 0
+  if (mauNb.value === -1)
+    mauNb.value = 0
 }
 
 async function refreshData() {
