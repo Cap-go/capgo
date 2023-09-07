@@ -53,18 +53,26 @@ const allLimits = computed(() => {
 async function getAppStats() {
   if (!main.user)
     return { data: [], error: 'missing user' }
-
   if (props.appId) {
     return supabase
       .from('app_usage')
       .select()
       .eq('app_id', props.appId)
+      .eq('mode', 'day')
   }
   else {
     return supabase
       .from('app_usage')
       .select()
+      .eq('mode', 'day')
   }
+}
+
+function getDaysBetweenDates(date1: string | Date, date2: string | Date) {
+  const oneDay = 24 * 60 * 60 * 1000
+  const firstDate = new Date(date1)
+  const secondDate = new Date(date2)
+  return Math.round(Math.abs((firstDate.valueOf() - secondDate.valueOf()) / oneDay))
 }
 
 async function getAllStats() {
@@ -79,11 +87,15 @@ async function getUsages() {
   const currentStorage = 0
   const { data, error } = await getAppStats()
   if (data && !error) {
-    datas.value.mau = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
-    datas.value.storage = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
-    datas.value.bandwidth = Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[]
-    const cycleStart = main.cycleInfo?.subscription_anchor_start
-    const cycleEnd = main.cycleInfo?.subscription_anchor_end
+    const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+    const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
+    let graphDays = getDaysInCurrentMonth()
+    if (cycleStart && cycleEnd)
+      graphDays = getDaysBetweenDates(cycleStart.toString(), cycleEnd.toString())
+
+    datas.value.mau = Array.from({ length: graphDays }).fill(undefined) as number[]
+    datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
+    datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
         let createdAtDate = new Date(item.created_at)
