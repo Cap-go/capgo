@@ -37,58 +37,58 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
 
     if (cycleStart && cycleEnd) {
-      const { data } = await supabase
+      const { count: statsCount } = await supabase
         .from('stats')
         .select()
         .eq('app_id', id.value)
         .eq('action', 'set')
         .gte('created_at', getConvertedDate2(cycleStart))
         .lte('created_at', getConvertedDate2(cycleEnd))
-      if (data)
-        updatesNb.value = data.length
+      if (statsCount)
+        updatesNb.value = statsCount
     }
     else {
-      const { data } = await supabase
+      const { count: statsCountSet } = await supabase
         .from('stats')
         .select()
         .eq('app_id', id.value)
         .eq('action', 'set')
-      if (data)
-        updatesNb.value = data.length
+      if (statsCountSet)
+        updatesNb.value = statsCountSet
     }
 
-    const { data: bundlesData } = await supabase
+    const { count: bundlesCount } = await supabase
       .from('app_versions')
       .select()
       .eq('app_id', id.value)
       .eq('deleted', false)
-    if (bundlesData)
-      bundlesNb.value = bundlesData.length
+    if (bundlesCount)
+      bundlesNb.value = bundlesCount
 
-    const { data: channelsData } = await supabase
+    const { count: channelsCount } = await supabase
       .from('channels')
       .select()
       .eq('app_id', id.value)
-    if (channelsData)
-      channelsNb.value = channelsData.length
+    if (channelsCount)
+      channelsNb.value = channelsCount
 
     if (cycleStart && cycleEnd) {
-      const { data: devicesData } = await supabase
+      const { count: devicesCount } = await supabase
         .from('devices')
         .select()
         .eq('app_id', id.value)
         .gte('created_at', getConvertedDate2(cycleStart))
         .lte('created_at', getConvertedDate2(cycleEnd))
-      if (devicesData)
-        devicesNb.value = devicesData.length
+      if (devicesCount)
+        devicesNb.value = devicesCount
     }
     else {
-      const { data: devicesData } = await supabase
+      const { count: devicesCount } = await supabase
         .from('devices')
         .select()
         .eq('app_id', id.value)
-      if (devicesData)
-        devicesNb.value = devicesData.length
+      if (devicesCount)
+        devicesNb.value = devicesCount
     }
   }
   catch (error) {

@@ -90,9 +90,9 @@ const projectionData = computed(() => {
     return acc.concat([newVal as number])
   }, [])
   res = res.filter(i => i)
-  for (let i = 0; i < arrWithoutUndefined.length - 1; i++) {
-    res.unshift(undefined);
-  }
+  for (let i = 0; i < arrWithoutUndefined.length - 1; i++)
+    res.unshift(undefined)
+
   return res
 })
 
