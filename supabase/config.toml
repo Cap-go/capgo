@@ -173,6 +173,15 @@ verify_jwt = false
 [functions.updates]
 verify_jwt = false
 
+[functions.updates_redis]
+verify_jwt = false
+
+[functions.invalidate_cache]
+verify_jwt = false
+
+[functions.on_device_update]
+verify_jwt = false
+
 [functions.web_stats]
 verify_jwt = false
 

@@ -1,6 +1,6 @@
 {
   "name": "capgo-app",
-  "version": "10.80.0",
+  "version": "10.100.0",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -70,7 +70,7 @@
     "@capgo/capacitor-screen-recorder": "^5.0.0",
     "@capgo/capacitor-updater": "5.2.22",
     "@capgo/google-play-scraper": "^9.1.2",
-    "@capgo/inappbrowser": "^5.0.0",
+    "@capgo/inappbrowser": "^1.2.7",
     "@capgo/native-audio": "^6.0.18",
     "@capgo/native-market": "^5.0.3",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
@@ -101,6 +101,7 @@
     "flowbite": "^1.8.1",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
+    "ioredis": "^5.3.2",
     "json2csv": "^5.0.7",
     "konsta": "^2.0.0",
     "lauqe": "^1.5.0",
@@ -118,7 +119,8 @@
     "vue-demi": "0.14.5",
     "vue-i18n": "9.2.2",
     "vue-router": "4.2.4",
-    "vue-sonner": "^0.4.3"
+    "vue-sonner": "^0.4.3",
+    "zod": "^3.22.2"
   },
   "devDependencies": {
     "@antfu/eslint-config": "0.41.0",
