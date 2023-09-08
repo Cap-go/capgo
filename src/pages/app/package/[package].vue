@@ -39,7 +39,7 @@ async function loadAppInfo() {
     if (cycleStart && cycleEnd) {
       const { count: statsCount } = await supabase
         .from('stats')
-        .select()
+        .select('*', { count: 'exact' })
         .eq('app_id', id.value)
         .eq('action', 'set')
         .gte('created_at', getConvertedDate2(cycleStart))
@@ -50,7 +50,7 @@ async function loadAppInfo() {
     else {
       const { count: statsCountSet } = await supabase
         .from('stats')
-        .select()
+        .select('*', { count: 'exact' })
         .eq('app_id', id.value)
         .eq('action', 'set')
       if (statsCountSet)
@@ -59,7 +59,7 @@ async function loadAppInfo() {
 
     const { count: bundlesCount } = await supabase
       .from('app_versions')
-      .select()
+      .select('*', { count: 'exact' })
       .eq('app_id', id.value)
       .eq('deleted', false)
     if (bundlesCount)
@@ -67,7 +67,7 @@ async function loadAppInfo() {
 
     const { count: channelsCount } = await supabase
       .from('channels')
-      .select()
+      .select('*', { count: 'exact' })
       .eq('app_id', id.value)
     if (channelsCount)
       channelsNb.value = channelsCount
@@ -75,7 +75,7 @@ async function loadAppInfo() {
     if (cycleStart && cycleEnd) {
       const { count: devicesCount } = await supabase
         .from('devices')
-        .select()
+        .select('*', { count: 'exact' })
         .eq('app_id', id.value)
         .gte('created_at', getConvertedDate2(cycleStart))
         .lte('created_at', getConvertedDate2(cycleEnd))
@@ -85,7 +85,7 @@ async function loadAppInfo() {
     else {
       const { count: devicesCount } = await supabase
         .from('devices')
-        .select()
+        .select('*', { count: 'exact' })
         .eq('app_id', id.value)
       if (devicesCount)
         devicesNb.value = devicesCount
