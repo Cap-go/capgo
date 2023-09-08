@@ -1,9 +1,8 @@
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { methodJson, sendRes } from '../_utils/utils.ts'
+import { sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
-import { checkPlan } from '../_utils/plans.ts'
-import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
+import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
@@ -31,7 +30,122 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function main(headers: BaseHeaders, body: AppInfos) {
+async function requestInfos(app_id: string, device_id: string, version_name: string) {
+  const recV = supabaseAdmin()
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', app_id)
+    .or(`name.eq.${version_name}`)
+    .single()
+    .then(res => res.data)
+  const recD = supabaseAdmin()
+    .from('devices_override')
+    .select(`
+      device_id,
+      app_id,
+      created_at,
+      updated_at,
+      version (
+        id,
+        name,
+        checksum,
+        session_key,
+        user_id,
+        bucket_id,
+        storage_provider,
+        external_url
+      )
+    `)
+    .eq('device_id', device_id)
+    .eq('app_id', app_id)
+    .single()
+    .then(res => res.data)
+  const recCO = supabaseAdmin()
+    .from('channel_devices')
+    .select(`
+      device_id,
+      app_id,
+      channel_id (
+        id,
+        created_at,
+        created_by,
+        name,
+        app_id,
+        allow_dev,
+        allow_emulator,
+        disableAutoUpdateUnderNative,
+        disableAutoUpdateToMajor,
+        ios,
+        android,
+        secondaryVersionPercentage,
+        enable_progressive_deploy,
+        enableAbTesting,
+        version (
+          id,
+          name,
+          checksum,
+          session_key,
+          user_id,
+          bucket_id,
+          storage_provider,
+          external_url
+        )
+      ),
+      created_at,
+      updated_at
+    `)
+    .eq('device_id', device_id)
+    .eq('app_id', app_id)
+    .single()
+    .then(res => res.data)
+  const recC = supabaseAdmin()
+    .from('channels')
+    .select(`
+      id,
+      created_at,
+      created_by,
+      name,
+      app_id,
+      allow_dev,
+      allow_emulator,
+      disableAutoUpdateUnderNative,
+      disableAutoUpdateToMajor,
+      ios,
+      android,
+      secondVersion (
+        id,
+        name,
+        checksum,
+        session_key,
+        user_id,
+        bucket_id,
+        storage_provider,
+        external_url
+      ),
+      secondaryVersionPercentage,
+      enable_progressive_deploy,
+      enableAbTesting,
+      version (
+        id,
+        name,
+        checksum,
+        session_key,
+        user_id,
+        bucket_id,
+        storage_provider,
+        external_url
+      )
+    `)
+    .eq('app_id', app_id)
+    .eq('public', true)
+    .single()
+    .then(res => res.data)
+  // promise all
+  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
+  return { versionData, channelData, channelOverride, devicesOverride }
+}
+
+export async function update(body: AppInfos) {
   // create random id
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -99,7 +213,7 @@ async function main(headers: BaseHeaders, body: AppInfos) {
       }, 400)
     }
     // if plugin_version is < 4 send notif to alert
-    if (semver.lt(plugin_version, '4.0.0')) {
+    if (semver.lt(plugin_version, '5.0.0')) {
       const sent = await sendNotif('user:plugin_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
@@ -134,111 +248,7 @@ async function main(headers: BaseHeaders, body: AppInfos) {
       plugin_version,
       version_name)
 
-    const { data: versionData } = await supabaseAdmin()
-      .from('app_versions')
-      .select('id')
-      .eq('app_id', app_id)
-      .or(`name.eq.${version_name}`)
-      .single()
-    const { data: channelData } = await supabaseAdmin()
-      .from('channels')
-      .select(`
-          id,
-          created_at,
-          created_by,
-          name,
-          app_id,
-          allow_dev,
-          allow_emulator,
-          disableAutoUpdateUnderNative,
-          disableAutoUpdateToMajor,
-          ios,
-          android,
-          secondVersion (
-            id,
-            name,
-            checksum,
-            session_key,
-            user_id,
-            bucket_id,
-            storage_provider,
-            external_url
-          ),
-          secondaryVersionPercentage,
-          enable_progressive_deploy,
-          enableAbTesting,
-          version (
-            id,
-            name,
-            checksum,
-            session_key,
-            user_id,
-            bucket_id,
-            storage_provider,
-            external_url
-          )
-        `)
-      .eq('app_id', app_id)
-      .eq('public', true)
-      .single()
-    const { data: channelOverride } = await supabaseAdmin()
-      .from('channel_devices')
-      .select(`
-          device_id,
-          app_id,
-          channel_id (
-            id,
-            created_at,
-            created_by,
-            name,
-            app_id,
-            allow_dev,
-            allow_emulator,
-            disableAutoUpdateUnderNative,
-            disableAutoUpdateToMajor,
-            ios,
-            android,
-            secondaryVersionPercentage,
-            enable_progressive_deploy,
-            enableAbTesting,
-            version (
-              id,
-              name,
-              checksum,
-              session_key,
-              user_id,
-              bucket_id,
-              storage_provider,
-              external_url
-            )
-          ),
-          created_at,
-          updated_at
-        `)
-      .eq('device_id', device_id)
-      .eq('app_id', app_id)
-      .single()
-    const { data: devicesOverride } = await supabaseAdmin()
-      .from('devices_override')
-      .select(`
-          device_id,
-          app_id,
-          created_at,
-          updated_at,
-          version (
-            id,
-            name,
-            checksum,
-            session_key,
-            user_id,
-            bucket_id,
-            storage_provider,
-            external_url
-          )
-        `)
-      .eq('device_id', device_id)
-      .eq('app_id', app_id)
-      .single()
+    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(app_id, device_id, version_name)
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
       if (versionData)
@@ -261,13 +271,7 @@ async function main(headers: BaseHeaders, body: AppInfos) {
     const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
-    await checkPlan(appOwner.user_id)
     const versionId = versionData ? versionData.id : version.id
-
-    const xForwardedFor = headers['x-forwarded-for'] || ''
-    // console.log('xForwardedFor', xForwardedFor)
-    const ip = xForwardedFor.split(',')[1]
-    console.log('IP', ip)
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
@@ -288,6 +292,10 @@ async function main(headers: BaseHeaders, body: AppInfos) {
     }
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
+    // const xForwardedFor = headers['x-forwarded-for'] || ''
+    // // console.log('xForwardedFor', xForwardedFor)
+    // const ip = xForwardedFor.split(',')[1]
+    // console.log('IP', ip)
     // check if version is created_at more than 4 hours
     // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
@@ -298,7 +306,7 @@ async function main(headers: BaseHeaders, body: AppInfos) {
     //     error: 'invalid_ip',
     //   }, 400)
     // }
-    await updateOrCreateDevice({
+    const updevice = updateOrCreateDevice({
       app_id,
       device_id,
       platform: platform as Database['public']['Enums']['platform_os'],
@@ -412,8 +420,6 @@ async function main(headers: BaseHeaders, body: AppInfos) {
         }, 200, updateOverwritten)
       }
     }
-    // console.log(id, 'save stats', device_id)
-    await sendStats('get', platform, device_id, app_id, version_build, versionId)
     //  check signedURL and if it's url
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
@@ -423,6 +429,9 @@ async function main(headers: BaseHeaders, body: AppInfos) {
         error: 'no_bundle',
       }, 200, updateOverwritten)
     }
+    await updevice
+    // console.log(id, 'save stats', device_id)
+    await sendStats('get', platform, device_id, app_id, version_build, versionId)
     console.log(id, 'New version available', app_id, version.name, signedURL)
     return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
   }
@@ -432,33 +441,5 @@ async function main(headers: BaseHeaders, body: AppInfos) {
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
     }, 500)
-  }
-}
-
-export interface UpdateRequest {
-  headers: Headers
-  body: AppInfos
-}
-
-export async function update(request: UpdateRequest): Promise<Response> {
-  try {
-    const headers: BaseHeaders = Object.fromEntries(request.headers.entries())
-    return main(headers, request.body)
-  }
-  catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
-  }
-}
-
-export async function oldUpdate(event: Request): Promise<Response> {
-  try {
-    const url: URL = new URL(event.url)
-    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
-    const method: string = event.method
-    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
-    return main(headers, body)
-  }
-  catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
   }
 }

@@ -175,7 +175,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-scroll max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
+  <section class="h-full py-12 overflow-y-auto max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div v-if="props.onboarding" class="text-center">
         <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">

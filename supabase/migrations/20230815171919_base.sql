@@ -57,15 +57,6 @@ CREATE TYPE "public"."usage_mode" AS ENUM (
     'cycle'
 );
 
-CREATE TYPE "public"."match_plan" AS (
-	"name" character varying
-);
-
-CREATE TYPE "public"."pay_as_you_go_type" AS ENUM (
-    'base',
-    'units'
-);
-
 CREATE TYPE "public"."platform_os" AS ENUM (
     'ios',
     'android'
@@ -599,9 +590,9 @@ Begin
   where customer_id=(SELECT customer_id from users where id=userid)
   AND status = 'canceled'));
 End;  
-$function$
+$function$;
 
-CREATE OR REPLACE FUNCTION update_app_usage(minutes_interval INT) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.update_app_usage(minutes_interval INT) RETURNS VOID AS $$
 DECLARE
     one_minute_ago TIMESTAMP;
     n_minutes_ago TIMESTAMP;
@@ -619,13 +610,15 @@ BEGIN
         WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
         GROUP BY stats.app_id
     ), storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
         FROM app_versions
+        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS FALSE
         GROUP BY app_versions.app_id
     ), deleted_storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
         FROM app_versions
+        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.updated_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
         GROUP BY app_versions.app_id
     ), mau AS (
@@ -655,7 +648,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION calculate_daily_app_usage() RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.calculate_daily_app_usage() RETURNS VOID AS $$
 DECLARE
     twenty_four_hours_ago TIMESTAMP;
 BEGIN
@@ -674,7 +667,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION calculate_cycle_usage() RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.calculate_cycle_usage() RETURNS VOID AS $$
 BEGIN
     WITH cycle_usage AS (
         SELECT apps.app_id, SUM(app_usage.bandwidth) AS cycle_bandwidth, SUM(app_usage.storage) AS cycle_storage, SUM(app_usage.mau) AS cycle_mau
@@ -838,9 +831,10 @@ CREATE TABLE "public"."app_usage" (
     "app_id" character varying NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     -- main stats
-    "mlu" bigint DEFAULT '0'::bigint NOT NULL,
+    "mau" bigint DEFAULT '0'::bigint NOT NULL,
     "storage" bigint DEFAULT '0'::bigint NOT NULL,
     "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+    mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
 );
 
 CREATE TABLE "public"."app_stats" (
@@ -1167,9 +1161,9 @@ BEGIN
     EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value, enum_value || '_old');
     EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value || '_old', enum_value);
 END;
-$function$
+$function$;
 
-CREATE OR REPLACE FUNCTION one_month_ahead() 
+CREATE OR REPLACE FUNCTION public.one_month_ahead()
 RETURNS timestamp AS 
 $$
 BEGIN
@@ -1190,7 +1184,7 @@ CREATE TABLE "public"."stripe_info" (
     "plan_usage" bigint DEFAULT '0'::bigint,
     "subscription_metered" "json" DEFAULT '{}'::"json" NOT NULL,
     "subscription_anchor_start" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "subscription_anchor_end" timestamp with time zone DEFAULT one_month_ahead() NOT NULL
+    "subscription_anchor_end" timestamp with time zone DEFAULT public.one_month_ahead() NOT NULL
 );
 
 
@@ -1287,13 +1281,23 @@ ALTER TABLE ONLY "public"."users"
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
 
-CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at", "mode");
+CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at");
 
 CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
 CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
+
+CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
+
+CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
+
+CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
 
 CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
@@ -1345,7 +1349,7 @@ CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
-CREATE OR REPLACE FUNCTION get_cycle_info()
+CREATE OR REPLACE FUNCTION public.get_cycle_info()
 RETURNS TABLE (
     subscription_anchor_start timestamp with time zone,
     subscription_anchor_end timestamp with time zone
@@ -1377,11 +1381,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
+CREATE OR REPLACE FUNCTION public.get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
-CREATE OR REPLACE FUNCTION get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
+CREATE OR REPLACE FUNCTION public.get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='apikey';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
@@ -1586,6 +1590,9 @@ ALTER TABLE ONLY "public"."channels"
 ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
 
+ALTER TABLE ONLY "public"."channels"
+    ADD CONSTRAINT "channels_secondVersion_fkey" FOREIGN KEY ("secondVersion") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
+
 ALTER TABLE ONLY "public"."devices"
     ADD CONSTRAINT "devices_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -1659,11 +1666,11 @@ CREATE POLICY "Allow apikey to insert" ON "public"."app_versions" FOR INSERT TO 
 
 CREATE POLICY "Allow apikey to insert" ON "public"."apps" FOR INSERT TO "anon" WITH CHECK (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]) AND "public"."is_allowed_action"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"))));
 
-CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
+CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[])) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
+CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow app owner or admin" ON "public"."channels" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -1699,7 +1706,7 @@ CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH C
 
 CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHECK (false);
 
-CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
@@ -1711,7 +1718,7 @@ CREATE POLICY "allow apikey to delete" ON "public"."app_versions" FOR DELETE TO 
 
 CREATE POLICY "allow apikey to delete" ON "public"."apps" FOR DELETE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "allow apikey to select" ON "public"."apps" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
+CREATE POLICY "allow apikey to select" ON "public"."apps" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "allow for delete by the CLI" ON "public"."app_versions" FOR UPDATE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id"));
 
@@ -1865,11 +1872,6 @@ GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "anon";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "postgres";
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."exist_app"("appid" character varying, "apikey" "text") TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "authenticated";
@@ -1880,20 +1882,10 @@ GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "
 GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "postgres";
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."exist_channel"("appid" character varying, "name_channel" character varying, "apikey" "text") TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."exist_user"("e_mail" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "postgres";
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "anon";
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."find_missing_app_ids"("app_ids" character varying[]) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";

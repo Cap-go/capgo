@@ -23,8 +23,8 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="h-full overflow-y-scroll md:py-4">
-      <div id="versions" class="flex flex-col mx-auto overflow-y-scroll bg-white border rounded-lg shadow-lg border-slate-200 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+    <div class="h-full overflow-y-auto md:py-4">
+      <div id="versions" class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-200 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
         <BundleTable class="p-3" :app-id="appId" />
       </div>
     </div>
