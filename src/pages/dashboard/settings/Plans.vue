@@ -148,7 +148,7 @@ const hightLights = computed<Stat[]>(() => ([
 <template>
   <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
 
-      <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6" v-if="currentPlan?.name !== 'free'">
+      <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6" v-if="!displayPlans && currentPlan?.name !== 'free'">
         <div class="sm:align-center sm:flex sm:flex-col">
           <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
             {{ t('billing') }}
