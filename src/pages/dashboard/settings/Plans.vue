@@ -36,6 +36,7 @@ const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
+const billingCycle = computed(() => main.billingCycle);
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   return [
@@ -373,6 +374,9 @@ const hightLights = computed<Stat[]>(() => ([
           </BlurBg>
         </div>
       </section>
+    <div class="mt-4 text-sm text-gray-500">
+      Billing Cycle: {{ billingCycle.value }}
+    </div>
     </div>
   </div>
 </template>
