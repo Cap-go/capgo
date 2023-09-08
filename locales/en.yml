@@ -192,6 +192,7 @@ install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
 invalid-email: Passed email is not valid
+invite-accepted: Successfully accepted oranization inviation
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-admin: Admin
@@ -248,6 +249,8 @@ open-channel: Open channel
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
+org-changes-saved: Organization updated successfully
+org-invited-user: Successfully invited user to org
 os-version: OS version
 pages: Pages
 password: Password

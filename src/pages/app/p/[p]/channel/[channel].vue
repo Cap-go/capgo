@@ -166,7 +166,7 @@ async function reload() {
 }
 
 async function saveChannelChange(key: string, val: any) {
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -206,7 +206,7 @@ watchEffect(async () => {
 })
 
 async function makeDefault(val = true) {
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -267,7 +267,7 @@ async function getUnknownVersion(): Promise<number> {
 async function openPannel() {
   if (!channel.value || !main.auth)
     return
-  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -296,7 +296,7 @@ async function openPannel() {
 }
 
 async function enableAbTesting() {
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -325,7 +325,7 @@ async function enableAbTesting() {
 }
 
 async function enableProgressiveDeploy() {
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -356,7 +356,7 @@ async function enableProgressiveDeploy() {
 }
 
 const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -370,7 +370,7 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
 const debouncedInformAboutProgressiveDeployPercentageSet = debounce(() => {
-  if (role.value && !(role.value === 'admin' || role.value === 'owner')) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -386,7 +386,7 @@ async function setSecondaryVersionPercentage(percentage: number) {
 }
 
 function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
-  if (channel.value?.enable_progressive_deploy) {
+  if (channel.value?.enable_progressive_deploy || !(role.value && organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner']))) {
     debouncedInformAboutProgressiveDeployPercentageSet()
     event.preventDefault()
   }

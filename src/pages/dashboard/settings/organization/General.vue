@@ -29,9 +29,8 @@ const name = computed({
       currentOrganization.value.name = val
   },
 })
-
 async function presentActionSheet() {
-  if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -66,7 +65,7 @@ async function presentActionSheet() {
 }
 
 async function saveChanges() {
-  if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -88,14 +87,14 @@ async function saveChanges() {
 }
 
 function onInputClick(event: MouseEvent) {
-  if (!(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
     toast.error(t('no-permission'))
     event.preventDefault()
   }
 }
 
 function onInputKeyDown(event: Event) {
-  if (!(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner'))
+  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])))
     event.preventDefault()
 }
 </script>

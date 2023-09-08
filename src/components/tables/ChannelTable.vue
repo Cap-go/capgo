@@ -83,10 +83,8 @@ function findUnknownVersion() {
 }
 
 async function addChannel() {
-  console.log('???')
   if (!newChannel.value || !versionId.value || !main.user)
     return
-  console.log('!!')
   try {
     console.log('addChannel', newChannel.value, versionId.value, main.user)
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }

