@@ -11,6 +11,7 @@ import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
+import dayjs from 'dayjs'
 
 function openSupport() {
   openMessenger()
@@ -146,6 +147,32 @@ const hightLights = computed<Stat[]>(() => ([
 
 <template>
   <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
+
+      <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6" v-if="currentPlan?.name !== 'free'">
+        <div class="sm:align-center sm:flex sm:flex-col">
+          <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
+            {{ t('billing') }}
+          </h1>
+          <div   class="flex justify-center my-8" >
+
+              <div class="bg-gray-100 p-4 rounded-lg shadow-md w-[500px]">
+                <h2 class="text-2xl font-bold text-gray-900">Current Billing Cycle</h2>
+                <div class="flex justify-between mt-2">
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-700">From</h3>
+                    <p class="text-gray-600">{{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}</p>
+                  </div>
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-700">To</h3>
+                    <p class="text-gray-600">{{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}</p>
+                  </div>
+                </div>
+              </div>
+              </div>
+        </div>
+          </div>
+
+
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
