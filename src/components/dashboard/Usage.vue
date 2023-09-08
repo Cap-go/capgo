@@ -119,10 +119,10 @@ async function getUsages() {
           datas.value.mau[dayNumber] = item.mau
 
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
+          datas.value.storage[dayNumber] += item.storage ? octetsToGb(item.storage) : 0
 
         else
-          datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
+          datas.value.storage[dayNumber] = item.storage ? octetsToGb(item.storage) : 0
 
         if (datas.value.bandwidth[dayNumber])
           datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
@@ -132,7 +132,7 @@ async function getUsages() {
       }
       // TODO: How to fix this?
       // else if (item.date_id.length === 7) {
-      //   currentStorage += item.version_size ? bytesToGb(item.version_size) : 0
+      //   currentStorage += item.version_size ? octetsToGb(item.version_size) : 0
       // }
     })
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
