@@ -1,20 +1,192 @@
-import type { Redis } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis/mod.ts'
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts'
 import { getEnv } from './utils.ts'
 
-export async function getRedis() {
+type RedisValue = string | number | Uint8Array
+
+interface RedisInterface {
+  hdel(key: string, ...fields: string[]): Promise<number>
+  pipeline(): RedisPipelineInterface
+  tx(): RedisPipelineInterface
+  hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]>
+  hset(key: string, field: string, value: RedisValue): Promise<void>
+  hmget(key: string, ...fields: string[]): Promise<(string | undefined)[]>
+}
+
+interface RedisPipelineInterface {
+  hdel(key: string, ...fields: string[]): Promise<number>
+  hset(key: string, field: string, value: RedisValue): Promise<void>
+  flush(): Promise<void>
+}
+
+class RedisRedisPipeline implements RedisPipelineInterface {
+  pipeline: RedisPipeline
+
+  constructor(pipeline: RedisPipeline) {
+    this.pipeline = pipeline
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    return await this.pipeline.hdel(key, ...fields)
+  }
+
+  async flush(): Promise<void> {
+    await this.pipeline.flush()
+  }
+
+  async hset(key: string, field: string, value: RedisValue): Promise<void> {
+    await this.pipeline.hset(key, field, value)
+  }
+}
+
+class RedisUpstashPipeline implements RedisPipelineInterface {
+  pipeline: UpstashPipeline<[]>
+
+  constructor(pipeline: UpstashPipeline<[]>) {
+    this.pipeline = pipeline
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    await this.pipeline.hdel(key, ...fields)
+    return 0
+  }
+
+  async flush(): Promise<void> {
+    await this.pipeline.exec()
+  }
+
+  async hset(key: string, field: string, value: RedisValue): Promise<void> {
+    const object: { [field: string]: RedisValue } = {}
+    object[field] = value
+    await this.pipeline.hset(key, object)
+  }
+}
+
+class RedisRedis implements RedisInterface {
+  redis: Redis
+
+  constructor(redis: Redis) {
+    this.redis = redis
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    return await this.redis.hdel(key, ...fields)
+  }
+
+  pipeline(): RedisPipelineInterface {
+    return new RedisRedisPipeline(this.redis.pipeline())
+  }
+
+  tx(): RedisPipelineInterface {
+    return new RedisRedisPipeline(this.redis.tx())
+  }
+
+  async hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]> {
+    return await this.redis.hscan(key, cursor, opts)
+  }
+
+  async hset(key: string, field: string, value: RedisValue) {
+    await this.redis.hset(key, field, value)
+  }
+
+  async hmget(key: string, ...fields: string[]): Promise<(string | undefined)[]> {
+    return await this.redis.hmget(key, ...fields)
+  }
+}
+
+class RedisUpstashImpl implements RedisInterface {
+  redis: RedisUpstash
+
+  constructor(redis: RedisUpstash) {
+    this.redis = redis
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    return await this.redis.hdel(key, ...fields)
+  }
+
+  async hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]> {
+    const [resultCursor, result] = await this.redis.hscan(
+      key,
+      cursor,
+      (opts) ? { match: opts.pattern, count: opts.count } : undefined,
+    )
+
+    return [resultCursor.toString(), result.map(res => res.toString())]
+  }
+
+  async hset(key: string, field: string, value: RedisValue) {
+    await this.redis.hset(key, {
+      [field]: value,
+    })
+  }
+
+  async hmget(key: string, ...fields: string[]): Promise<(string | undefined)[]> {
+    const res = await this.redis.hmget(key, ...fields)
+
+    if (!res)
+      return []
+
+    return Object.values(res).map((data) => {
+      if (!data)
+        return undefined
+
+      return data as string
+    })
+  }
+
+  pipeline(): RedisPipelineInterface {
+    return new RedisUpstashPipeline(this.redis.pipeline())
+  }
+
+  tx = this.pipeline
+}
+
+export async function getRedis(): Promise<RedisInterface | undefined> {
+  const connectionType = getEnv('REDIS_CONNECTION_TYPE')
   const redisEnv = getEnv('REDIS_URL')
-  if (!redisEnv) {
-    console.error('[redis] REDIS_URL is not set')
+
+  if (!redisEnv || !connectionType) {
+    console.error('[redis] REDIS_URL or REDIS_CONNECTION_TYPE is not set')
     return undefined
   }
 
-  try {
-    const redis = await connect(parseURL(redisEnv))
-    return redis
+  if (connectionType.toLocaleLowerCase() === 'redis') {
+    try {
+      const redis = await connect(parseURL(redisEnv))
+      return new RedisRedis(redis)
+    }
+    catch (e) {
+      console.error('[redis] Could not connect to redis', e)
+      return undefined
+    }
   }
-  catch (e) {
-    console.error('[redis] Could not connect to redis', e)
+  else if (connectionType.toLocaleLowerCase() === 'upstash') {
+    const token = getEnv('REDIS_TOKEN')
+
+    if (!token) {
+      console.error('[redis] REDIS_TOKEN is not set')
+      return undefined
+    }
+
+    try {
+      const redis = new RedisUpstash({
+        url: redisEnv,
+        token,
+        automaticDeserialization: false,
+      })
+
+      return new RedisUpstashImpl(redis)
+    }
+    catch (e) {
+      console.error('[redis] Could not connect to upstash', e)
+      return undefined
+    }
+  }
+  else {
+    console.error('[redis] Invalid connection type', connectionType)
     return undefined
   }
 }
@@ -30,7 +202,7 @@ export async function redisAppVersionInvalidate(app_id: string) {
   const pipeline = redis.pipeline()
   let hscan: [string, string[]]
 
-  async function callHscan(redis: Redis) {
+  async function callHscan(redis: RedisInterface) {
     hscan = await redis.hscan(hashCacheKey, cursor, { pattern: 'ver*', count: 5000 })
     cursor = Number.parseInt(hscan[0])
 
