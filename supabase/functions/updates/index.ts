@@ -21,7 +21,7 @@ const headersSchema = z.object({
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = true
+const bypassRedis = false
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // const redis = null
