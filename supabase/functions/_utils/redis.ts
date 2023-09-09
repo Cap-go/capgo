@@ -12,7 +12,7 @@ interface RedisInterface {
   tx(): RedisPipelineInterface
   hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]>
   hset(key: string, field: string, value: RedisValue): Promise<void>
-  hmget(key: string, ...fields: string[]): Promise<(string | undefined)[]>
+  hmget(key: string, ...fields: string[]): Promise<(string | null | undefined)[]>
 }
 
 interface RedisPipelineInterface {
@@ -91,7 +91,7 @@ export class RedisRedis implements RedisInterface {
     await this.redis.hset(key, field, value)
   }
 
-  async hmget(key: string, ...fields: string[]): Promise<(string | undefined)[]> {
+  async hmget(key: string, ...fields: string[]): Promise<(string | null | undefined)[]> {
     return await this.redis.hmget(key, ...fields)
   }
 }
