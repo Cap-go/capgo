@@ -58,7 +58,9 @@ class RedisUpstashPipeline implements RedisPipelineInterface {
   }
 
   async hset(key: string, field: string, value: RedisValue): Promise<void> {
-    await this.pipeline.hset(key, { field, value })
+    const object: { [field: string]: RedisValue } = {}
+    object[field] = value
+    await this.pipeline.hset(key, object)
   }
 }
 
@@ -128,7 +130,10 @@ class RedisUpstashImpl implements RedisInterface {
       return []
 
     return Object.values(res).map((data) => {
-      return data as (string | undefined)
+      if (!data)
+        return undefined
+
+      return data as string
     })
   }
 
@@ -170,6 +175,7 @@ export async function getRedis(): Promise<RedisInterface | undefined> {
       const redis = new RedisUpstash({
         url: redisEnv,
         token,
+        automaticDeserialization: false,
       })
 
       return new RedisUpstashImpl(redis)

@@ -3,7 +3,7 @@ import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 
 import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
-import { methodJson, sendRes } from '../_utils/utils.ts'
+import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 
 const APP_DOES_NOT_EXIST = { message: 'App not found', error: 'app_not_found' }
@@ -55,12 +55,12 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return sendRes(APP_DOES_NOT_EXIST)
   }
 
-  if (inCache && deviceExists && device === 'standard' && cachedVersionExists) {
+  if (inCache && deviceExists && device === 'standard' && cachedVersionExists && cachedVersion) {
     console.log('[redis] Cached - cache sucessful')
     if (cachedVersion === CACHE_NO_NEW_VAL)
       return sendRes(APP_VERSION_NO_NEW)
     else
-      return sendRes(cachedVersion)
+      return sendResText(cachedVersion)
   }
 
   let res
