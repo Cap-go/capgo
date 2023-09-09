@@ -724,10 +724,14 @@ Begin
     -- INSERT INTO org_users (user_id, org_id, user_right)
     -- VALUES (invited_user.id, invite_user_to_org.org_id, invite_type);
 
-        SELECT org_users.id from org_users 
-        INTO current_record
-        WHERE org_users.user_id=invited_user.id
-        AND org_users.org_id=invite_user_to_org.org_id;
+    IF (org.created_by=invited_user.id) THEN
+      RETURN 'CAN_NOT_INVITE_OWNER';
+    END IF;
+
+    SELECT org_users.id from org_users 
+    INTO current_record
+    WHERE org_users.user_id=invited_user.id
+    AND org_users.org_id=invite_user_to_org.org_id;
 
     IF current_record IS NOT NULL THEN
       RETURN 'ALREADY_INVITED';

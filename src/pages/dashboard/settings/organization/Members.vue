@@ -161,6 +161,11 @@ function handleSendInvitationOutput(output: string) {
     }
     case 'ALREADY_INVITED': {
       toast.error(t('user-already-invited'))
+      break
+    }
+    case 'CAN_NOT_INVITE_OWNER': {
+      toast.error(t('cannot-invite-owner'))
+      break
     }
   }
 }
