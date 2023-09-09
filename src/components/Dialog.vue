@@ -4,6 +4,7 @@ import { onMounted, ref, watch } from 'vue'
 import type { ModalInterface, ModalOptions } from 'flowbite'
 import type { ActionSheetOptionButton } from '~/stores/display'
 import { useDisplayStore } from '~/stores/display'
+import DOMPurify from "dompurify";
 
 /*
 * $targetEl: required
@@ -29,7 +30,8 @@ const modalElement = ref(null)
 function displayText(text?: string) {
   if (!text)
     return ''
-  return text.replace(/\n/g, '<br/>')
+  const sanitize = DOMPurify.sanitize(text.replace(/\n/g, '<br/>'))
+  return sanitize
 }
 onMounted(() => {
   const modalOptions: ModalOptions = {
