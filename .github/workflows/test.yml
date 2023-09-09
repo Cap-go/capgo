@@ -1,9 +1,10 @@
 name: Run Tests
 
+
 on:
-  push:
-    tags:
-      - '*'
+  pull_request_target:
+  merge_group:
+  workflow_dispatch:
 
 jobs:
   test:
