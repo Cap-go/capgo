@@ -64,7 +64,7 @@ class RedisUpstashPipeline implements RedisPipelineInterface {
   }
 }
 
-class RedisRedis implements RedisInterface {
+export class RedisRedis implements RedisInterface {
   redis: Redis
 
   constructor(redis: Redis) {
@@ -96,7 +96,7 @@ class RedisRedis implements RedisInterface {
   }
 }
 
-class RedisUpstashImpl implements RedisInterface {
+export class RedisUpstashImpl implements RedisInterface {
   redis: RedisUpstash
 
   constructor(redis: RedisUpstash) {
