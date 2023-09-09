@@ -37,7 +37,11 @@ jobs:
           version: 1.68.6 
       - name: Run Supabase Start
         run: supabase start
+      - name: Run Backend
+        run: pnpm run backend
+      - name: Run Frontend
+        run: pnpm run serve
       - name: Install Playwright Browsers
-        run: pnpm dlx playwright install --with-deps
+        run: npx playwright install --with-deps
       - name: Run Playwright tests
-        run: pnpm dlx playwright test
+        run: npx playwright test
