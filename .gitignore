@@ -33,3 +33,6 @@ fastlane/metadata/review_information/phone_number.txt
 
 /netlify
 scripts/template/netlify/test.gplay.js
+/test-results/
+/playwright-report/
+/playwright/.cache/

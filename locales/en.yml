@@ -55,6 +55,9 @@ back-to-login-page: Back to login page
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billing: Billing
+current-billing-cycle: Current Billing Cycle
+from: From
+to: To
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload

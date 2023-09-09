@@ -4,6 +4,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { Capacitor } from '@capacitor/core'
+import dayjs from 'dayjs'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
@@ -146,6 +147,39 @@ const hightLights = computed<Stat[]>(() => ([
 
 <template>
   <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
+    <div v-if="currentPlan?.name !== 'free'" class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
+      <div class="sm:align-center sm:flex sm:flex-col">
+        <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
+          {{ t('billing') }}
+        </h1>
+        <div class="flex justify-center my-8">
+          <div class="bg-gray-100 p-4 rounded-lg shadow-md w-[500px]">
+            <h2 class="text-2xl font-bold text-gray-900">
+              {{ t('current-billing-cycle') }}
+            </h2>
+            <div class="flex justify-between mt-2">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-700">
+                  {{ t('from') }}
+                </h3>
+                <p class="text-gray-600">
+                  {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
+                </p>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-700">
+                  {{ t('to') }}
+                </h3>
+                <p class="text-gray-600">
+                  {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">

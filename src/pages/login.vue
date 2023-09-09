@@ -146,7 +146,7 @@ onMounted(checkLogin)
                 </div>
                 <FormKitMessages />
                 <div>
-                  <button type="submit" class="inline-flex items-center justify-center w-full">
+                  <div class="inline-flex items-center justify-center w-full">
                     <svg
                       v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin"
                       xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -163,7 +163,7 @@ onMounted(checkLogin)
                     >
                       {{ t('log-in') }}
                     </button>
-                  </button>
+                  </div>
                 </div>
 
                 <div class="text-center">
