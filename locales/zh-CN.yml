@@ -49,6 +49,9 @@ back-to-login-page: 返回登录页面
 best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
 billing: 计费
+current-billing-cycle: 当前账单周期
+from: 从
+to: 至
 build-your-app-and-s: 构建您的应用程序并同步
 build-your-code-and-: 将您的代码上传到 Capgo
 bulk-upload: 批量上传

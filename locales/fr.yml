@@ -53,6 +53,9 @@ back-to-login-page: Retour à la page de connexion
 best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
 billing: Facturation
+current-billing-cycle: Cycle de facturation en cours
+from: Du
+to: Au
 build-your-app-and-s: créer votre application et synchroniser
 build-your-code-and-: Télécharger sur Capgo votre code
 bulk-upload: Transfert groupé
