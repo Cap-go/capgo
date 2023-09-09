@@ -43,34 +43,6 @@ export interface Database {
           }
         ]
       }
-      app_live: {
-        Row: {
-          created_at: string | null
-          id: string
-          updated_at: string | null
-          url: string
-        }
-        Insert: {
-          created_at?: string | null
-          id: string
-          updated_at?: string | null
-          url: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          updated_at?: string | null
-          url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_live_id_fkey"
-            columns: ["id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       app_stats: {
         Row: {
           app_id: string
@@ -135,6 +107,33 @@ export interface Database {
           }
         ]
       }
+      app_usage: {
+        Row: {
+          app_id: string
+          bandwidth: number
+          created_at: string | null
+          id: string
+          mlu: number
+          storage: number
+        }
+        Insert: {
+          app_id: string
+          bandwidth?: number
+          created_at?: string | null
+          id?: string
+          mlu?: number
+          storage?: number
+        }
+        Update: {
+          app_id?: string
+          bandwidth?: number
+          created_at?: string | null
+          id?: string
+          mlu?: number
+          storage?: number
+        }
+        Relationships: []
+      }
       app_versions: {
         Row: {
           app_id: string
@@ -145,7 +144,6 @@ export interface Database {
           external_url: string | null
           id: number
           name: string
-          native_files_sha256: string[] | null
           session_key: string | null
           storage_provider: string
           updated_at: string | null
@@ -160,7 +158,6 @@ export interface Database {
           external_url?: string | null
           id?: number
           name: string
-          native_files_sha256?: string[] | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -175,7 +172,6 @@ export interface Database {
           external_url?: string | null
           id?: number
           name?: string
-          native_files_sha256?: string[] | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -450,7 +446,7 @@ export interface Database {
           secondaryVersionPercentage?: number
           secondVersion?: number | null
           updated_at?: string
-          version?: number
+          version: number
         }
         Update: {
           allow_dev?: boolean
@@ -528,6 +524,7 @@ export interface Database {
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
+          last_mau: string | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
@@ -543,6 +540,7 @@ export interface Database {
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
+          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -558,6 +556,7 @@ export interface Database {
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
+          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -896,7 +895,6 @@ export interface Database {
           app_id: string
           created_at: string | null
           device_id: string
-          id: number
           platform: Database["public"]["Enums"]["platform_os"]
           version: number
           version_build: string
@@ -906,7 +904,6 @@ export interface Database {
           app_id: string
           created_at?: string | null
           device_id: string
-          id?: number
           platform: Database["public"]["Enums"]["platform_os"]
           version: number
           version_build: string
@@ -916,7 +913,6 @@ export interface Database {
           app_id?: string
           created_at?: string | null
           device_id?: string
-          id?: number
           platform?: Database["public"]["Enums"]["platform_os"]
           version?: number
           version_build?: string
@@ -1050,7 +1046,8 @@ export interface Database {
           price_id: string | null
           product_id: string
           status: Database["public"]["Enums"]["stripe_status"] | null
-          subscription_anchor: string
+          subscription_anchor_end: string
+          subscription_anchor_start: string
           subscription_id: string | null
           subscription_metered: Json
           trial_at: string
@@ -1064,7 +1061,8 @@ export interface Database {
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
-          subscription_anchor?: string
+          subscription_anchor_end?: string
+          subscription_anchor_start?: string
           subscription_id?: string | null
           subscription_metered?: Json
           trial_at?: string
@@ -1078,7 +1076,8 @@ export interface Database {
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
-          subscription_anchor?: string
+          subscription_anchor_end?: string
+          subscription_anchor_start?: string
           subscription_id?: string | null
           subscription_metered?: Json
           trial_at?: string
@@ -1092,57 +1091,6 @@ export interface Database {
             referencedColumns: ["stripe_id"]
           }
         ]
-      }
-      temp: {
-        Row: {
-          app_id: string | null
-          channel_id: number | null
-          created_at: string | null
-          email: string | null
-          id: number | null
-          image_url: string | null
-          org_id: string | null
-          updated_at: string | null
-          user_id: string | null
-          user_right: Database["public"]["Enums"]["user_min_right"] | null
-        }
-        Insert: {
-          app_id?: string | null
-          channel_id?: number | null
-          created_at?: string | null
-          email?: string | null
-          id?: number | null
-          image_url?: string | null
-          org_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          user_right?: Database["public"]["Enums"]["user_min_right"] | null
-        }
-        Update: {
-          app_id?: string | null
-          channel_id?: number | null
-          created_at?: string | null
-          email?: string | null
-          id?: number | null
-          image_url?: string | null
-          org_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          user_right?: Database["public"]["Enums"]["user_min_right"] | null
-        }
-        Relationships: []
-      }
-      unknown_version: {
-        Row: {
-          id: number | null
-        }
-        Insert: {
-          id?: number | null
-        }
-        Update: {
-          id?: number | null
-        }
-        Relationships: []
       }
       users: {
         Row: {
@@ -1215,6 +1163,14 @@ export interface Database {
           org_id: string
         }
         Returns: string
+      }
+      calculate_cycle_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      calculate_daily_app_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       check_min_rights: {
         Args: {
@@ -1292,17 +1248,6 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      deleteuser: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      exist_app: {
-        Args: {
-          appid: string
-          apikey: string
-        }
-        Returns: boolean
-      }
       exist_app_v2: {
         Args: {
           appid: string
@@ -1313,14 +1258,6 @@ export interface Database {
         Args: {
           appid: string
           name_version: string
-          apikey: string
-        }
-        Returns: boolean
-      }
-      exist_channel: {
-        Args: {
-          appid: string
-          name_channel: string
           apikey: string
         }
         Returns: boolean
@@ -1348,20 +1285,6 @@ export interface Database {
         Returns: {
           name: string
         }[]
-      }
-      find_missing_app_ids: {
-        Args: {
-          app_ids: string[]
-        }
-        Returns: {
-          missing_app_id: string
-        }[]
-      }
-      find_unknown_version: {
-        Args: {
-          appid: string
-        }
-        Returns: number
       }
       get_apikey: {
         Args: Record<PropertyKey, never>
@@ -1391,6 +1314,13 @@ export interface Database {
         }
         Returns: string
       }
+      get_cycle_info: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subscription_anchor_start: string
+          subscription_anchor_end: string
+        }[]
+      }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1399,41 +1329,6 @@ export interface Database {
         Args: {
           app_id: string
           version_id: number
-        }
-        Returns: number
-      }
-      get_dl_by_month: {
-        Args: {
-          userid: string
-          pastmonth: number
-        }
-        Returns: {
-          app_id: string
-          maxdownload: number
-        }[]
-      }
-      get_dl_by_month_by_app:
-        | {
-            Args: {
-              pastmonth: number
-              appid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-              pastmonth: number
-              appid: string
-            }
-            Returns: {
-              app_id: string
-              maxdownload: number
-            }[]
-          }
-      get_max_channel: {
-        Args: {
-          userid: string
         }
         Returns: number
       }
@@ -1446,18 +1341,6 @@ export interface Database {
           storage: number
           bandwidth: number
         }[]
-      }
-      get_max_shared: {
-        Args: {
-          userid: string
-        }
-        Returns: number
-      }
-      get_max_version: {
-        Args: {
-          userid: string
-        }
-        Returns: number
       }
       get_metered_usage: {
         Args: {
@@ -1474,6 +1357,16 @@ export interface Database {
           uid: string
           email: string
           image_url: string
+        }[]
+      }
+      get_orgs: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          id: string
+          logo: string
+          name: string
         }[]
       }
       get_orgs_v2: {
@@ -1495,21 +1388,6 @@ export interface Database {
         }
         Returns: number
       }
-      get_stats: {
-        Args: {
-          userid: string
-          dateid: string
-        }
-        Returns: {
-          max_channel: number
-          max_shared: number
-          max_update: number
-          max_version: number
-          max_app: number
-          max_device: number
-          mau: number
-        }[]
-      }
       get_total_stats_v2: {
         Args: {
           userid: string
@@ -1521,12 +1399,20 @@ export interface Database {
           storage: number
         }[]
       }
-      get_user_id: {
-        Args: {
-          apikey: string
-        }
-        Returns: string
-      }
+      get_user_id:
+        | {
+            Args: {
+              apikey: string
+              app_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              apikey: string
+            }
+            Returns: string
+          }
       get_user_main_org_id: {
         Args: {
           user_id: string
@@ -1581,14 +1467,6 @@ export interface Database {
         }
         Returns: undefined
       }
-      increment_version_stats: {
-        Args: {
-          app_id: string
-          version_id: number
-          devices: number
-        }
-        Returns: undefined
-      }
       invite_user_to_org: {
         Args: {
           email: string
@@ -1603,12 +1481,20 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_allowed_action: {
-        Args: {
-          apikey: string
-        }
-        Returns: boolean
-      }
+      is_allowed_action:
+        | {
+            Args: {
+              apikey: string
+              appid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              apikey: string
+            }
+            Returns: boolean
+          }
       is_allowed_action_user: {
         Args: {
           userid: string
@@ -1616,6 +1502,27 @@ export interface Database {
         Returns: boolean
       }
       is_allowed_capgkey:
+        | {
+            Args: {
+              apikey: string
+              keymode: Database["public"]["Enums"]["key_mode"][]
+              app_id: string
+              right: Database["public"]["Enums"]["user_min_right"]
+              user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              apikey: string
+              keymode: Database["public"]["Enums"]["key_mode"][]
+              app_id: string
+              channel_id: number
+              right: Database["public"]["Enums"]["user_min_right"]
+              user_id: string
+            }
+            Returns: boolean
+          }
         | {
             Args: {
               apikey: string
@@ -1651,12 +1558,6 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_deleted_user: {
-        Args: {
-          email: string
-        }
-        Returns: boolean[]
-      }
       is_free_usage: {
         Args: {
           userid: string
@@ -1676,28 +1577,14 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_member_of_org:
-        | {
-            Args: {
-              user_id: string
-              org_id: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              user_id: string
-              org_id: string
-            }
-            Returns: boolean
-          }
-      is_not_deleted: {
+      is_member_of_org: {
         Args: {
-          email_check: string
+          user_id: string
+          org_id: string
         }
         Returns: boolean
       }
-      is_not_deleted_v2: {
+      is_not_deleted: {
         Args: {
           email_check: string
         }
@@ -1741,13 +1628,20 @@ export interface Database {
         }
         Returns: boolean
       }
-      update_version_stats: {
+      one_month_ahead: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      remove_enum_value: {
         Args: {
-          app_id: string
-          version_id: number
-          install: number
-          uninstall: number
-          fail: number
+          enum_type: unknown
+          enum_value: string
+        }
+        Returns: undefined
+      }
+      update_app_usage: {
+        Args: {
+          minutes_interval: number
         }
         Returns: undefined
       }
@@ -1763,6 +1657,7 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
+      usage_mode: "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
