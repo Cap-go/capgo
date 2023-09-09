@@ -57,6 +57,9 @@ build-your-app-and-s: создайте свое приложение и синх
 build-your-code-and-: Загрузите в Capgo свой код
 bulk-upload: Массовая загрузка
 bundle: Пучок
+current-billing-cycle: Текущий цикл выставления счетов
+from: С сайта
+to: По
 bundle-deleted: Группа удалена
 bundle-is-linked-channel: Пакет привязан к каналу, сначала отсоедините его.
 bundle-is-linked-device: Пакет привязан к устройству, сначала отсоедините его.

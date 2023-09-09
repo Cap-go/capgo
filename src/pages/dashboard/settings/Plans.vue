@@ -155,12 +155,12 @@ const hightLights = computed<Stat[]>(() => ([
         <div class="flex justify-center my-8">
           <div class="bg-gray-100 p-4 rounded-lg shadow-md w-[500px]">
             <h2 class="text-2xl font-bold text-gray-900">
-              Current Billing Cycle
+              {{ t('current-billing-cycle') }}
             </h2>
             <div class="flex justify-between mt-2">
               <div>
                 <h3 class="text-lg font-semibold text-gray-700">
-                  From
+                  {{ t('from') }}
                 </h3>
                 <p class="text-gray-600">
                   {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
@@ -168,7 +168,7 @@ const hightLights = computed<Stat[]>(() => ([
               </div>
               <div>
                 <h3 class="text-lg font-semibold text-gray-700">
-                  To
+                  {{ t('to') }}
                 </h3>
                 <p class="text-gray-600">
                   {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
