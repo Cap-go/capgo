@@ -1,11 +1,12 @@
 name: Run Tests
 
-
 on:
-  push:
+  pull_request_target:
     branches:
-      - main 
-
+      - main
+  merge_group:
+  workflow_dispatch:
+  
 jobs:
   test:
     runs-on: buildjet-16vcpu-ubuntu-2204
