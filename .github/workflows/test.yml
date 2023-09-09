@@ -2,9 +2,9 @@ name: Run Tests
 
 
 on:
-  pull_request_target:
-  merge_group:
-  workflow_dispatch:
+  push:
+    branches:
+      - main 
 
 jobs:
   test:
