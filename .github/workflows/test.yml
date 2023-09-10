@@ -9,14 +9,14 @@ on:
   
 jobs:
   test:
-    runs-on: buildjet-4vcpu-ubuntu-2204	
+    runs-on: ubuntu-latest	
     name: "Run Tests"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       - name: Install Node.js
-        uses: buildjet/setup-node@v3
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      - uses: buildjet/cache@v3
+      - uses: actions/cache@v3
         name: Setup pnpm cache
         with:
           path: ${{ env.STORE_PATH }}
@@ -53,7 +53,7 @@ jobs:
 
       - name: Cache playwright binaries
         id: playwright-cache
-        uses: buildjet/cache@v2
+        uses: actions/cache@v2
         with:
           path: |
             ~/Library/Caches/ms-playwright
