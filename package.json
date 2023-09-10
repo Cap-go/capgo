@@ -98,6 +98,7 @@
     "daisyui": "^3.6.3",
     "dayjs": "1.11.9",
     "dompurify": "^3.0.5",
+    "dotenv": "^16.3.1",
     "firebase": "10.3.0",
     "flowbite": "^1.8.1",
     "generate-password-browser": "^1.1.0",

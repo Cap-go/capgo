@@ -13,15 +13,15 @@ const webServer: PlaywrightTestConfig["webServer"] = [
     command: "pnpm run backend",
     port: 54321,
     timeout: 60_000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 ];
 
 webServer.push({
   command: "pnpm run serve",
-  port: 3100,
+  port: 5173,
   timeout: 60_000,
-  reuseExistingServer: !process.env.CI,
+  reuseExistingServer: true,
 });
 
 /**
