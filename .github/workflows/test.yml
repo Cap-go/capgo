@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     runs-on: buildjet-4vcpu-ubuntu-2204	
-    name: "Build code and release"
+    name: "Run Tests"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -30,7 +30,6 @@ jobs:
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
       - uses: buildjet/cache@v3
         name: Setup pnpm cache
         with:
@@ -41,17 +40,21 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: 1.68.6 
+
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,storage-api,logflare --ignore-health-check
       # - name: Stop Supabase
       #   run: supabase stop
       - name: Configure frontend env
         run: cp .env.exemple .env
+        
       - name: Install Playwright Browsers
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Run Playwright tests
         run: npx playwright test
