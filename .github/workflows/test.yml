@@ -12,31 +12,45 @@ jobs:
     runs-on: buildjet-4vcpu-ubuntu-2204	
     name: "Build code and release"
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-      - name: Use Node.js
-        uses: actions/setup-node@v3
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: buildjet/setup-node@v3
         with:
           node-version: 18
-          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v2
+        name: Install pnpm
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        id: install_code
-        run: pnpm install --frozen-lockfile
-      # - name: Lint
-      #   id: lint_code
-      #   run: pnpm lint
-        env:
-          VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
-          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
-          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+        run: pnpm install
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: 1.68.6 
       - name: Run Supabase Start
-        run: supabase start
+        run: ENV=local supabase start -x studio,imgproxy,inbucket,storage-api,logflare --ignore-health-check
+      - name: Stop Supabase
+        run: supabase stop
+      - name: Configure frontend env
+        run: cp .env.exemple .env
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
       - name: Run Playwright tests
