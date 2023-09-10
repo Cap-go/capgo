@@ -65,10 +65,10 @@ jobs:
       - name: Install Playwright 
         shell: bash
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm dlx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: pnpm dlx playwright test
+        run: pnpm exec playwright test
 
       - name: Upload Test Results
         if: ${{ always() }}
