@@ -13,6 +13,8 @@ on:
 jobs:
   authorization:
     runs-on: ubuntu-latest
+    outputs:
+      authorized: ${{ steps.check_author.outputs.authorized }}
     steps:
       - name: Check if the author is the pull request creator
         id: check_author
@@ -40,19 +42,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: false
-          action: score
-          scoring_beginning: |
-            Hi ChatGPT, I have a pull request with title "$title" and the description is as follows,
-            > $description
-            I would like to give you the whole diff of the pull request and you need to given a score after
-            reviewing the pull request. The score should be a number between 0 and 100 and 85 means the
-            the pull request is basically acceptable. You just need to reply a number between 0 and 100,
-            e.g., "85", and a comment within 30 words. Reply "Acceptable" to confirm.
+          action: review
+          review_comment_lgtm: true
+          path_filters: '**/*'
+
       - uses: unsafecoerce/chatgpt-action@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: false
-          action: review
-          review_comment_lgtm: true
+          action: score
+          path_filters: '**/*'
