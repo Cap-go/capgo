@@ -7,6 +7,9 @@
 
 [dev]
   framework = "vite"
+[dev.https]
+certFile = "localhost+2.pem"
+keyFile = "localhost+2-key.pem"
 
 [[redirects]]
   from = '/.well-known/*'

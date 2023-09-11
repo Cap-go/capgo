@@ -10,8 +10,8 @@
     "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
   },
   "supa_url": {
-    "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
-    "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
+    "prod": "http://localhost:54321",
+    "development": "http://localhost:54321",
     "local": "http://localhost:54321"
   }
 }

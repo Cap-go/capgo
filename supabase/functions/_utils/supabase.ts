@@ -585,3 +585,29 @@ export async function createStripeCustomer(user: Database['public']['Tables']['u
   })
   console.log('stripe_info done')
 }
+
+export const checkKey = async (apikey: string,
+  keymode: Database['public']['Enums']['key_mode'][]) => {
+  const { data: apiAccess, error: apiAccessError } = await supabaseClient()
+      .rpc('is_allowed_capgkey', { apikey, keymode })
+      .single()
+
+  if (!apiAccess || apiAccessError) {
+      console.log(`Invalid API key or insufficient permissions ${JSON.stringify(apiAccessError)}`);
+  }
+}
+export const verifyUser = async (apikey: string,
+  keymod: Database['public']['Enums']['key_mode'][] = ['all']) => {
+  await checkKey(apikey, keymod);
+
+  const { data: dataUser, error: userIdError } = await supabaseClient()
+      .rpc('get_user_id', { apikey })
+      .single();
+
+  const userId = (dataUser || '').toString();
+
+  if (!userId || userIdError) {
+    console.log(`Cannot verify user ${JSON.stringify(userIdError)}`);
+  }
+  return userId;
+}
