@@ -119,60 +119,60 @@ jobs:
           name: android-release
           path: ./android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 10
-  build_ios:
-      runs-on: macOS-latest
-      steps:
-        - uses: actions/checkout@v3
-        - uses: pnpm/action-setup@v2
-          with:
-            version: 8
-        - name: Use Node.js
-          uses: actions/setup-node@v3
-          with:
-            node-version: 18
-            cache: 'pnpm'
-        - name: Install dependencies
-          id: install_code
-          run: pnpm install --frozen-lockfile
-        - uses: actions/cache@v3
-          with:
-            path: ios/App/Pods
-            key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
-            restore-keys: |
-                    ${{ runner.os }}-pods-
-        - name: Build
-          id: build_code
-          run: pnpm mobile
-        - name: Sync
-          id: sync_code
-          run: pnpm --package=@capacitor/cli dlx cap sync
-        - uses: ruby/setup-ruby@v1
-          with:
-            ruby-version: '2.7.2'
-        - uses: maierj/fastlane-action@v2.3.0
-          env:
-            DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
-            DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
-            PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
-            TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
-            TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
-            APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-            APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-            APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-            CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
-            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
-            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-            FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
-            MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
-            MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-            APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
-            DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
-          with:
-            lane: closed_beta
-            # subdirectory: 'ios'
-        - name: Upload release bundle
-          uses: actions/upload-artifact@v3
-          with:
-            name: ios-release
-            path: ./App.ipa
-            retention-days: 10
+  # build_ios:
+      # runs-on: macOS-latest
+      # steps:
+      #   - uses: actions/checkout@v3
+      #   - uses: pnpm/action-setup@v2
+      #     with:
+      #       version: 8
+      #   - name: Use Node.js
+      #     uses: actions/setup-node@v3
+      #     with:
+      #       node-version: 18
+      #       cache: 'pnpm'
+      #   - name: Install dependencies
+      #     id: install_code
+      #     run: pnpm install --frozen-lockfile
+      #   - uses: actions/cache@v3
+      #     with:
+      #       path: ios/App/Pods
+      #       key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+      #       restore-keys: |
+      #               ${{ runner.os }}-pods-
+      #   - name: Build
+      #     id: build_code
+      #     run: pnpm mobile
+      #   - name: Sync
+      #     id: sync_code
+      #     run: pnpm --package=@capacitor/cli dlx cap sync
+      #   - uses: ruby/setup-ruby@v1
+      #     with:
+      #       ruby-version: '2.7.2'
+      #   - uses: maierj/fastlane-action@v2.3.0
+      #     env:
+      #       DEVELOPER_APP_IDENTIFIER: ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+      #       DEVELOPER_APP_ID: ${{ secrets.DEVELOPER_APP_ID }}
+      #       PROVISIONING_PROFILE_SPECIFIER: match AppStore ${{ secrets.DEVELOPER_APP_IDENTIFIER }}
+      #       TEMP_KEYCHAIN_USER: ${{ secrets.TEMP_KEYCHAIN_USER }}
+      #       TEMP_KEYCHAIN_PASSWORD: ${{ secrets.TEMP_KEYCHAIN_PASSWORD }}
+      #       APPLE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      #       APPLE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+      #       APPLE_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+      #       CERTIFICATE_STORE_URL: https://github.com/${{ secrets.CERTIFICATE_STORE_REPO }}.git
+      #       GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+      #       GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      #       FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+      #       MATCH_USERNAME: ${{ secrets.FASTLANE_APPLE_ID }}
+      #       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      #       APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+      #       DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
+      #     with:
+      #       lane: closed_beta
+      #       # subdirectory: 'ios'
+      #   - name: Upload release bundle
+      #     uses: actions/upload-artifact@v3
+      #     with:
+      #       name: ios-release
+      #       path: ./App.ipa
+      #       retention-days: 10

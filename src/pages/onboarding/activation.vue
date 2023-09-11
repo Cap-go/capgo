@@ -48,7 +48,7 @@ async function submit() {
 
 <template>
   <TitleHead :big="true" :title="t('activation-heading')" />
-  <section class="flex w-full h-full py-10 my-auto overflow-y-scroll lg:py-16 sm:py-8">
+  <section class="flex w-full h-full py-10 my-auto overflow-y-auto lg:py-16 sm:py-8">
     <div class="px-4 mx-auto my-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">

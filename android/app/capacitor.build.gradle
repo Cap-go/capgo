@@ -45,6 +45,7 @@ dependencies {
     implementation project(':capgo-native-audio')
     implementation project(':capgo-native-market')
     implementation project(':capacitor-rate-app')
+    implementation project(':capacitor-secure-storage-plugin')
 
 }
 

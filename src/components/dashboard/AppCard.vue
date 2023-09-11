@@ -11,7 +11,8 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
-import { appIdToUrl } from '~/services/conversion'
+import { appIdToUrl, getConvertedDate2 } from '~/services/conversion'
+import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
@@ -22,10 +23,13 @@ const displayStore = useDisplayStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
-
+const mauNb = ref(0)
+const main = useMainStore()
 const isLoading = ref(true)
-const devicesNb = ref(0)
 const { t } = useI18n()
+
+const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -93,26 +97,36 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
   }
 }
 
-async function loadData() {
-  if (!props.channel) {
-    devicesNb.value = 0
-
-    try {
-      const date_id = new Date().toISOString().slice(0, 7)
-      const { data } = await supabase
-        .from('app_stats')
+async function getAppStats(app_id: string) {
+  if (app_id) {
+    if (cycleStart && cycleEnd) {
+      return supabase
+        .from('app_usage')
         .select()
-        .eq('app_id', props.app.app_id)
-        .eq('date_id', date_id)
-        .single()
-        .throwOnError()
-      if (!data)
-        return
-
-      devicesNb.value = data?.devices
+        .eq('app_id', app_id)
+        .eq('mode', 'day')
+        .gte('created_at', getConvertedDate2(cycleStart))
+        .lte('created_at', getConvertedDate2(cycleEnd))
     }
-    catch (error) {
-      console.error(error)
+    return supabase
+      .from('app_usage')
+      .select()
+      .eq('app_id', app_id)
+      .eq('mode', 'day')
+  }
+}
+
+async function loadData() {
+  if (props.app.app_id) {
+    const tmp = await getAppStats(props.app.app_id)
+    if (!tmp)
+      return
+    const { data, error } = tmp
+    if (data && !error) {
+      data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
+        if (item.created_at)
+          mauNb.value += item.mau
+      })
     }
   }
 }
@@ -169,7 +183,7 @@ watchEffect(async () => {
     </td>
     <td class="w-1/4 p-2">
       <div v-if="!isLoading && !props.channel" class="text-center">
-        {{ devicesNb }}
+        {{ mauNb }}
       </div>
       <div v-else class="text-center">
         {{ props.channel }}

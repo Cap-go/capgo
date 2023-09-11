@@ -24,29 +24,29 @@ const ActiveTab = ref('')
 
 const tabs = ref<Tab[]>([
   {
-    label: t('account'),
+    label: 'account',
     icon: shallowRef(IconAcount),
     key: '/dashboard/settings/account',
   },
   {
-    label: t('password'),
+    label: 'password',
     icon: shallowRef(IconPassword),
     key: '/dashboard/settings/changepassword',
   },
   {
-    label: t('notifications'),
+    label: 'notifications',
     icon: shallowRef(IconNotification),
     key: '/dashboard/settings/notifications',
   },
   {
-    label: t('plans'),
+    label: 'plans',
     icon: shallowRef(IconPlans),
     key: '/dashboard/settings/plans',
   },
 ])
 if (!Capacitor.isNativePlatform()) {
   tabs.value.push({
-    label: t('billing'),
+    label: 'billing',
     icon: shallowRef(IconBilling) as any,
     key: '/billing',
     onClick: openPortal,
@@ -56,7 +56,7 @@ if (main.user?.id) {
   isAdmin(main.user?.id).then((res) => {
     if (!!res || isSpoofed()) {
       tabs.value.push({
-        label: t('admin'),
+        label: 'admin',
         icon: shallowRef(IconAdmin) as any,
         key: '/dashboard/settings/admin',
       })
@@ -78,7 +78,7 @@ displayStore.NavTitle = t('settings')
       <main class="w-full h-full overflow-hidden">
         <TabSidebar v-model:active-tab="ActiveTab" :tabs="tabs" class="w-full h-full mx-auto md:px-4 md:py-8 lg:px-8 max-w-9xl">
           <template #default>
-            <RouterView class="h-full overflow-y-scroll" />
+            <RouterView class="h-full overflow-y-auto" />
           </template>
         </TabSidebar>
       </main>

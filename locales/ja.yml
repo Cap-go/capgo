@@ -49,6 +49,9 @@ back-to-login-page: ログインページに戻る
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
 billing: 請求する
+current-billing-cycle: 現在の請求サイクル
+from: 請求元
+to: 請求先
 build-your-app-and-s: アプリをビルドして同期する
 build-your-code-and-: コードを Capgo にアップロードする
 bulk-upload: 一括アップロード

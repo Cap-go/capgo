@@ -7,7 +7,6 @@ import {
   LinearScale,
   PointElement,
   Tooltip,
-  // AnimationEvent,
 } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
@@ -15,15 +14,19 @@ import annotationPlugin from 'chartjs-plugin-annotation'
 import { useI18n } from 'vue-i18n'
 import { isDark } from '~/composables'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
+import { useMainStore } from '~/stores/main'
 
 const props = defineProps({
   title: { type: String, default: '' },
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
-  data: { type: Array, default: new Array(getDaysInCurrentMonth()).fill(undefined) },
+  data: { type: Array, default: Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[] },
 })
 
 const { t } = useI18n()
+const main = useMainStore()
+const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 Chart.register(
   // Colors,
@@ -38,11 +41,8 @@ Chart.register(
   // Legend,
 )
 
-// console.log('title', props.title, props.data)
 const accumulateData = computed(() => {
-  // console.log('accumulateData', props.data)
   const monthDay = getCurrentDayMonth()
-  // console.log('accumulateData', monthDay, props.data.length)
   return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
     let newVal
@@ -50,9 +50,6 @@ const accumulateData = computed(() => {
       newVal = last + val
     else if (i < monthDay)
       newVal = last
-    // console.log('accumulateData', i, monthDay, val, last, newVal)
-    // console.log('accumulateData', i, val, last, newVal)
-    // return [...acc, newVal] as number[]
     return acc.concat([newVal as number])
   }, [])
 })
@@ -84,26 +81,44 @@ const projectionData = computed(() => {
   const lastDay = arrWithoutUndefined[arrWithoutUndefined.length - 1]
   // create a projection of the evolution, start after the last value of the array, put undefined for the beginning of the month
   // each value is the previous value + the evolution, the first value is the last value of the array
-  const res = [...Array(getDaysInCurrentMonth()).fill(undefined)].reduce((acc: number[], val: number, i: number) => {
-    const last = acc[acc.length - 1] || 0
+  let res = [...Array(getDaysInCurrentMonth()).fill(undefined)]
+  res = res.reduce((acc: number[], val: number, i: number) => {
     let newVal
+    const last = acc[acc.length - 1] || 0
     // randomize Evolution from (half evolutio) to full evolution
     const randomizedEvolution = getRandomArbitrary((evolution.value[0] + evolution.value[2]) / 2, (evolution.value[1] + evolution.value[2]) / 2)
     if (i === monthDay - 1)
       newVal = lastDay
     else if (i >= monthDay)
       newVal = last + randomizedEvolution
-    // return [...acc, newVal] as number[]
     return acc.concat([newVal as number])
   }, [])
+  res = res.filter(i => i)
+  for (let i = 0; i < arrWithoutUndefined.length - 1; i++)
+    res.unshift(undefined)
+
   return res
 })
 
+function getDayNumbers(startDate: Date, endDate: Date) {
+  const dayNumbers = []
+  const currentDate = new Date(startDate)
+  while (currentDate.getTime() <= endDate.getTime()) {
+    dayNumbers.push(currentDate.getDate())
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+  return dayNumbers
+}
+
 function monthdays() {
-  const keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
-  keys.shift()
-  const arr = [...keys]
-  return arr
+  let keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
+  if (cycleStart && cycleEnd)
+    keys = getDayNumbers(cycleStart, cycleEnd)
+
+  else
+    keys.shift()
+
+  return [...keys]
 }
 
 function createAnotation(id: string, y: number, title: string, lineColor: string, bgColor: string) {
@@ -120,7 +135,6 @@ function createAnotation(id: string, y: number, title: string, lineColor: string
     xValue: getDaysInCurrentMonth() / 2,
     yValue: y,
     backgroundColor: bgColor,
-    // color: '#fff',
     content: [title],
     font: {
       size: 10,
@@ -144,7 +158,6 @@ const generateAnnotations = computed(() => {
       }
     }
   })
-  // console.log('generateAnnotations', annotations)
   return annotations
 })
 
@@ -196,7 +209,6 @@ const chartOptions = {
     },
   },
 }
-// chartData.value.datasets[0].data = props.data as number[]
 </script>
 
 <template>

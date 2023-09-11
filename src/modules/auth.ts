@@ -31,6 +31,12 @@ async function guard(next: any, to: string, from: string) {
           main.user = data
         else
           return next('/onboarding/verify_email')
+        const { data: dataCycle, error: errorCycle } = await supabase
+          .rpc('get_cycle_info')
+          .select()
+          .single()
+        if (!errorCycle && dataCycle)
+          main.cycleInfo = dataCycle
       }
       catch (error) {
         console.error('auth', error)

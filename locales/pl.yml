@@ -5,6 +5,10 @@ Filters: Filtry
 Override: Nadpisanie
 Storage: Składowanie
 account: Konto
+channel-ab-testing: Włącz testowanie AB
+channel-ab-testing-percentage: Procent użytkowników którzy otrzymają drugą wersję
+disable-ab-testing: Wyłączono testy AB
+enabled-ab-testing: Włączono testy AB
 account-error: Błąd podczas aktualizowania konta
 account-password-error: Wystąpił błąd, spróbuj ponownie
 account-password-heading: Zmień moje hasło
@@ -25,15 +29,20 @@ activation-notification-desc: >-
 activation-validate: Uprawomocnić
 add: Dodać
 add-another-app: Dodaj swoją aplikację
+add-api-key: Pomyślnie dodano nowy klucz API
 add-shared-user: Dodaj udostępnionego użytkownika
 add-this-code-to-you: Dodaj ten kod do swojego projektu
 add-your-app-to-your: Dodaj swoją aplikację do swojego konta
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysyłajmy aktualizacje!
 admin: Admin
 afternoon: popołudnie
+alert-add-new-key: Wybór typu klucza do wygenerowania
 alert-confirm-delete: Potwierdź usunięcie
+alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
+alert-generate-new-key: Proszę wybrać typ klucza API który chcesz wygenerować.
 alert-not-reverse-message: Ta czynność nie jest odwracalna
+alert-regenerate-key: Czy napewno chcesz zregenerować ten klucz?
 allow-develoment-bui: Zezwalaj na kompilację deweloperską
 allow-device-to-self: Zezwól urządzeniom na samopowiązanie
 allow-emulator: Zezwalaj na emulatory
@@ -51,6 +60,9 @@ back-to-login-page: Powrót do strony logowania
 best-plan: Najlepszy plan
 bigger-app-size: Większy rozmiar aplikacji
 billing: Dane do faktury
+current-billing-cycle: Obecny cykl płatniczy
+from: od
+to: do
 build-your-app-and-s: zbuduj swoją aplikację i zsynchronizuj
 build-your-code-and-: Prześlij do Capgo swój kod
 bulk-upload: Przesyłanie zbiorcze
@@ -69,6 +81,7 @@ button-delete: Usuwać
 button-go: IŚĆ
 button-home: Dom
 button-options: Opcje
+button-regenerate: Regeneruj
 button-remove: Usunąć
 button-tabs: Zakładki
 button-toggle_dark: Przełącz tryb ciemny
@@ -152,6 +165,7 @@ forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione
 from-device: z urządzenia
+generated-new-apikey: Nowy klucz API został wygenerowany!
 good: Dobry
 id: ID
 in-your-main-file: W twoim głównym pliku
@@ -165,7 +179,10 @@ into-your-app-folder: Do folderu aplikacji.
 invalid-auth: Twój login się nie zgadza, spróbuj ponownie.
 is-emulator: jest emulatorem
 is-production-app: Czy aplikacja produkcyjna
+key-all: Wszystko
 key-copied: Klucz skopiowany do schowka
+key-read: Odczyt
+key-upload: Przesył
 language: Język
 last-name: Nazwisko
 last-update: Ostatnia aktualizacja
@@ -254,6 +271,7 @@ register-desc: Wypełnij poniższe pola, aby zakończyć rejestrację
 register-heading: Rejestracja
 register-next: Rejestr
 reload: Przeładować
+removed-apikey: Klucz API został pomyślnie usunięty
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
 save: Zapisuje

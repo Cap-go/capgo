@@ -1,5 +1,6 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { shallowCleanObject } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 export interface Segments {
   capgo: boolean
@@ -30,7 +31,7 @@ export interface Person {
 // https://api.useplunk.com/v1
 function getAuth() {
   // get plunk token
-  const PLUNK_API_KEY = 'sk_d5a623505cd289440332329cbdb7725531b693e449f01697'
+  const PLUNK_API_KEY = getEnv('PLUNK_API_KEY')
   return `Bearer ${PLUNK_API_KEY}`
 }
 const baseUrl = () => 'https://api.useplunk.com'

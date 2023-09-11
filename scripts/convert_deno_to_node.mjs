@@ -28,10 +28,10 @@ const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const baseNetlifyEdgeTests = `${baseNetlify}/${baseEdgeFunctions + baseTests}`
 const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
-const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top']
+const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
-const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ']
+const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis']
 
 const supaTempl = {}
 const netlifyTempl = {}
@@ -92,10 +92,24 @@ function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 const mutationsNode = [
-  { from: 'https://cdn.logsnag.com/deno/0.1.5/index.ts', to: 'logsnag' },
+  { from: 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts', to: 'logsnag' },
+  { from: 'https://deno.land/x/upstash_redis/mod.ts', to: '@upstash/redis' },
+  { from: 'const redis = await connect(parseURL(redisEnv))', to: 'const redis = new Redis(redisEnv)' },
+  { from: 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts', to: '@upstash/redis/types/pkg/pipeline' },
+  { from: 'https://deno.land/x/zod@v3.22.2/mod.ts', to: 'zod' },
+  { from: 'import type { Redis, RedisPipeline } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: 'import type { RedisPipeline } from \'ioredis\'' },
+  { from: 'RedisPipeline', to: 'ChainableCommander' },
+  { from: 'bypassRedis = false', to: 'bypassRedis = true' },
+  { from: 'this.pipeline.flush', to: 'this.pipeline.flushdb' },
+  { from: 'redis.hscan(hashCacheKey, cursor, { match:', to: 'redis.hscan(hashCacheKey, cursor, { pattern:' },
+  { from: '.hset(key, field, value)', to: '.hset(key, { [field]: value })' },
+  { from: 'this.redis.tx()', to: 'this.redis.multi()' },
+  { from: 'return await this.pipeline.hdel(key, ...fields)', to: 'this.pipeline.hdel(key, ...fields)\n return Promise.resolve(0)' },
+  { from: '.hscan(key, cursor, opts)', to: '.hscan(key, cursor, \'MATCH\', opts?.pattern ?? \'\', \'COUNT\', opts?.count ?? \'\')' },
+  { from: 'import { connect, parseURL } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: 'import { Redis } from \'ioredis\'' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
-  { from: 'https://deno.land/x/s3_lite_client@0.5.0/mod.ts', to: 'minio' },
+  { from: 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts', to: 'minio' },
   { from: '{ S3Client }', to: '{ Client }' },
   { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
   { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
@@ -105,20 +119,22 @@ const mutationsNode = [
   { from: 'https://esm.sh/google-play-scraper?target=deno', to: 'google-play-scraper' },
   { from: 'import { hmac } from \'https://deno.land/x/hmac@v2.0.1/mod.ts\'', to: 'import crypto from \'crypto\'' },
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
-  { from: 'import { serve } from \'https://deno.land/std@0.188.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
+  { from: 'import { serve } from \'https://deno.land/std@0.200.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
+  { from: '{ match: \'ver\*\', count: 5000 }', to: '{ pattern: \'ver\*\', count: 5000 })' },
   { from: supaTempl.r2, to: netlifyTempl.r2 },
   { from: supaTempl.handler, to: netlifyTempl.handler },
   { from: supaTempl.getEnv, to: netlifyTempl.getEnv },
   { from: supaTempl.res, to: netlifyTempl.res },
   { from: supaTempl.hmac, to: netlifyTempl.hmac },
+  // { from: supaTempl.redis, to: netlifyTempl.redis },
   { from: '.ts\'', to: '\'' },
 ]
 const mutationsEgde = [
   { from: '../_tests/', to: `../${baseEdgeFunctions}_tests/` },
   { from: '../_utils/', to: `../${baseEdgeFunctions}_utils/` },
-  { from: 'import { serve } from \'https://deno.land/std@0.188.0/http/server.ts\'', to: 'import type { Context } from \'https://edge.netlify.com\'' },
+  { from: 'import { serve } from \'https://deno.land/std@0.200.0/http/server.ts\'', to: 'import type { Context } from \'https://edge.netlify.com\'' },
   { from: supaTempl.handler, to: netlifyEdgeTempl.handler },
 ]
 const mutationsBg = [

@@ -51,13 +51,47 @@ async function checkLogin() {
     await nextLogin()
   }
   else if (!session && route.hash) {
+    const parsedUrl = new URL(route.fullPath, window.location.origin)
+
+    const hash = parsedUrl.hash
+    const params = new URLSearchParams(hash.slice(1))
+    const error = params.get('error_description')
+    const message = params.get('message')
+    const authType = params.get('type')
+
+    if (message) {
+      isLoading.value = false
+      return setTimeout(() => {
+        toast.success(message, {
+          duration: 7000,
+        })
+      }, 400)
+    }
+    if (error) {
+      isLoading.value = false
+      return toast.error(error)
+    }
+
     const logSession = await autoAuth(route)
     if (!logSession)
       return
     if (logSession.session)
       session = logSession.session
-    if (logSession.user)
+    if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
+      if (authType === 'email_change') {
+        const email = logSession.user.email
+        const id = logSession.user.id
+        await supabase
+          .from('users')
+          .upsert({
+            id,
+            email,
+          })
+          .select()
+          .single()
+      }
       await nextLogin()
+    }
   }
   else {
     isLoading.value = false
@@ -70,7 +104,7 @@ onMounted(checkLogin)
 
 <template>
   <!-- component -->
-  <section class="flex w-full h-full py-10 my-auto overflow-y-scroll lg:py-2 sm:py-8">
+  <section class="flex w-full h-full py-10 my-auto overflow-y-auto lg:py-2 sm:py-8">
     <div class="px-4 mx-auto my-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">
@@ -90,15 +124,8 @@ onMounted(checkLogin)
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
-                  type="email"
-                  name="email"
-                  :disabled="isLoading"
-                  enterkeyhint="next"
-                  input-class="!text-black"
-                  :prefix-icon="iconEmail"
-                  inputmode="email"
-                  :label="t('email')"
-                  autocomplete="email"
+                  type="email" name="email" :disabled="isLoading" enterkeyhint="next" input-class="!text-black"
+                  :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                   validation="required:trim"
                 />
 
@@ -112,42 +139,39 @@ onMounted(checkLogin)
                     </router-link>
                   </div>
                   <FormKit
-                    id="passwordInput"
-                    type="password"
-                    input-class="!text-black"
-                    :placeholder="t('password')"
-                    name="password"
-                    :label="t('password')"
-                    :prefix-icon="iconPassword"
-                    :disabled="isLoading"
-                    validation="required:trim"
-                    enterkeyhint="send"
-                    autocomplete="current-password"
+                    id="passwordInput" type="password" input-class="!text-black" :placeholder="t('password')"
+                    name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
+                    validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
                 </div>
                 <FormKitMessages />
                 <div>
-                  <button type="submit" class="inline-flex items-center justify-center w-full">
-                    <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
+                  <div class="inline-flex items-center justify-center w-full">
+                    <svg
+                      v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin"
+                      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    >
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path
+                        class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none">
+                    <button
+                      v-if="!isLoading" type="submit"
+                      class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
+                    >
                       {{ t('log-in') }}
                     </button>
-                  </button>
+                  </div>
                 </div>
 
                 <div class="text-center">
                   <p class="text-base text-gray-600">
-                    {{ t('dont-have-an-account') }} <br> <router-link to="/register" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
+                    {{ t('dont-have-an-account') }} <br> <router-link
+                      to="/register"
+                      class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
+                    >
                       {{ t('create-a-free-accoun') }}
                     </router-link>
                   </p>

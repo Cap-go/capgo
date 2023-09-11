@@ -2,6 +2,7 @@
 import { Modal } from 'flowbite'
 import { onMounted, ref, watch } from 'vue'
 import type { ModalInterface, ModalOptions } from 'flowbite'
+import DOMPurify from 'dompurify'
 import type { ActionSheetOptionButton } from '~/stores/display'
 import { useDisplayStore } from '~/stores/display'
 
@@ -13,8 +14,13 @@ const displayStore = useDisplayStore()
 function close(item?: ActionSheetOptionButton) {
   displayStore.showDialog = false
   if (item) {
+    displayStore.lastButtonRole = item.id ?? ''
     if (item.role === 'cancel')
       displayStore.dialogCanceled = true
+
+    else
+      displayStore.dialogCanceled = false
+
     item?.handler && item.handler()
   }
 }
@@ -24,7 +30,8 @@ const modalElement = ref(null)
 function displayText(text?: string) {
   if (!text)
     return ''
-  return text.replace(/\n/g, '<br/>')
+  const sanitize = DOMPurify.sanitize(text.replace(/\n/g, '<br/>'))
+  return sanitize
 }
 onMounted(() => {
   const modalOptions: ModalOptions = {
@@ -34,6 +41,7 @@ onMounted(() => {
     closable: true,
     onHide: () => {
       console.log('modal is hidden')
+      displayStore.showDialog = false
     },
     onShow: () => {
       console.log('modal is shown')
@@ -47,10 +55,13 @@ onMounted(() => {
 
   // watch for changes
   watch(() => displayStore.showDialog, (val) => {
-    if (val && modal)
+    if (val && modal) {
+      displayStore.dialogCanceled = true
       modal.show()
-    else if (modal)
+    }
+    else if (modal) {
       modal.hide()
+    }
   })
 })
 </script>

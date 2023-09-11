@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { iconEmail, iconName, iconPassword } from '~/services/icons'
 
@@ -16,6 +17,16 @@ const isLoading = ref(false)
 async function submit(form: { first_name: string; last_name: string; password: string; email: string }) {
   if (isLoading.value)
     return
+
+  const { data: deleted, error: errorDeleted } = await supabase
+    .rpc('is_not_deleted', { email_check: form.email })
+  if (errorDeleted)
+    console.error(errorDeleted)
+  if (!deleted) {
+    toast.error(t('used-to-create'))
+    return
+  }
+
   isLoading.value = true
   const { data: user, error } = await supabase.auth.signUp(
     {
@@ -54,7 +65,8 @@ async function submit(form: { first_name: string; last_name: string; password: s
 </script>
 
 <template>
-  <section class="flex w-full min-h-screen py-10 my-auto overflow-y-scroll lg:py-8 sm:py-8">
+  <script async src="https://reflio.com/js/reflio.min.js" data-reflio="hi8q6z93wyt147h" data-domain="https://capgo.app,https://web.capgo.app" />
+  <section class="flex w-full min-h-screen py-10 my-auto overflow-y-auto lg:py-8 sm:py-8">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">

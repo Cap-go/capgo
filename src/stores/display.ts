@@ -28,6 +28,7 @@ export const useDisplayStore = defineStore('display', () => {
   const messageLoader = ref<string>('')
   const durationToast = ref<number>(2000)
   const showLoader = ref<boolean>(false)
+  const lastButtonRole = ref<string>('')
   const onDialogDismiss = (): Promise<boolean> => {
     // watch showDialog for changes and if false then resolve
     return new Promise((resolve) => {
@@ -67,6 +68,7 @@ export const useDisplayStore = defineStore('display', () => {
     showDialog,
     showActionSheet,
     showLoader,
+    lastButtonRole,
     NavTitle,
     defaultBack,
   }

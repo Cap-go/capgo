@@ -62,28 +62,13 @@ async function allObject<T extends string, R>(all: { [key in T]: PromiseLike<R> 
   return allAwaited
 }
 
-export async function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
+export function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
   console.log('updateOrCreateVersion', update)
-  const { data } = await supabaseAdmin()
+  return supabaseAdmin()
     .from('app_versions')
-    .select()
+    .upsert(update)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-    .single()
-  if (data) {
-    console.log('update Version')
-    update.deleted = false
-    return supabaseAdmin()
-      .from('app_versions')
-      .update(update)
-      .eq('app_id', update.app_id)
-      .eq('name', update.name)
-  }
-  else {
-    return supabaseAdmin()
-      .from('app_versions')
-      .insert(update)
-  }
 }
 
 export async function updateOnpremStats(increment: Database['public']['Functions']['increment_store']['Args']) {
@@ -93,86 +78,18 @@ export async function updateOnpremStats(increment: Database['public']['Functions
     console.error('increment_store', error)
 }
 
-export async function updateVersionStats(increment: Database['public']['Functions']['update_version_stats']['Args']) {
-  const { error } = await supabaseAdmin()
-    .rpc('update_version_stats', increment)
-  if (error)
-    console.error('update_version_stats', error)
-}
-
-export function incrementSize(appId: string, userId: string, size: number) {
-  const today_id = new Date().toISOString().slice(0, 10)
-  const increment: Database['public']['Functions']['increment_stats_v2']['Args'] = {
-    app_id: appId,
-    date_id: today_id,
-    bandwidth: 0,
-    mlu: 0,
-    mlu_real: 0,
-    devices: 0,
-    devices_real: 0,
-    version_size: size,
-    channels: 0,
-    shared: 0,
-    versions: 1,
-  }
-  return updateOrAppStats(increment, today_id, userId)
-}
-
-export async function updateOrAppStats(increment: Database['public']['Functions']['increment_stats_v2']['Args'],
-  date_id: string, user_id: string) {
-  const { data: dataAppStats } = await supabaseAdmin()
-    .from('app_stats')
-    .select()
-    .eq('app_id', increment.app_id)
-    .eq('date_id', date_id)
-    .single()
-  console.log('updateOrAppStats', increment, !!dataAppStats)
-  if (dataAppStats) {
-    const { error } = await supabaseAdmin()
-      .rpc('increment_stats_v2', increment)
-    if (error)
-      console.error('increment_stats_v2', error)
-  }
-  else {
-    const newDay: Database['public']['Tables']['app_stats']['Insert'] = {
-      ...increment,
-      devices_real: 0,
-      user_id,
-    }
-    const { error } = await supabaseAdmin()
-      .from('app_stats')
-      .insert(newDay)
-    if (error)
-      console.error('Cannot create app_stats', error)
-  }
-}
-
-export async function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
+export function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
-  const { data } = await supabaseAdmin()
+  return supabaseAdmin()
     .from('channels')
-    .select()
+    .upsert(update)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)
-    .single()
-  if (data) {
-    return supabaseAdmin()
-      .from('channels')
-      .update(update)
-      .eq('app_id', update.app_id)
-      .eq('name', update.name)
-      .eq('created_by', update.created_by)
-  }
-  else {
-    return supabaseAdmin()
-      .from('channels')
-      .insert(update)
-  }
 }
 
 export async function checkAppOwner(userId: string | undefined, appId: string | undefined): Promise<boolean> {
@@ -194,26 +111,12 @@ export async function checkAppOwner(userId: string | undefined, appId: string | 
   }
 }
 
-export async function updateOrCreateDevice(update: Database['public']['Tables']['devices']['Insert']) {
-  const { data } = await supabaseAdmin()
+export function updateOrCreateDevice(update: Database['public']['Tables']['devices']['Insert']) {
+  return supabaseAdmin()
     .from('devices')
-    .select()
+    .upsert(update)
     .eq('app_id', update.app_id)
     .eq('device_id', update.device_id)
-    .single()
-  console.log('updateOrCreateDevice', update, !!data)
-  if (data) {
-    return supabaseAdmin()
-      .from('devices')
-      .update(update)
-      .eq('app_id', update.app_id)
-      .eq('device_id', update.device_id)
-  }
-  else {
-    return supabaseAdmin()
-      .from('devices')
-      .insert(update)
-  }
 }
 
 export async function getCurrentPlanName(userId: string): Promise<string> {
@@ -338,6 +241,16 @@ export async function isTrial(userId: string): Promise<number> {
     console.error('isTrial error', userId, error)
   }
   return 0
+}
+
+export async function isAdmin(userId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .rpc('is_admin', { userid: userId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || false
 }
 
 export async function isAllowedAction(userId: string): Promise<boolean> {
