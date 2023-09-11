@@ -61,8 +61,15 @@ export function sendRes(data: any = { status: 'ok' }, statusCode = 200) {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
 
+  return sendResText(JSON.stringify(data), statusCode)
+}
+
+export function sendResText(data: string, statusCode = 200) {
+  if (statusCode >= 400)
+    console.error('sendRes error', JSON.stringify(data, null, 2))
+
   return new Response(
-    JSON.stringify(data),
+    data,
     {
       status: statusCode,
       headers: { ...basicHeaders, ...corsHeaders },
