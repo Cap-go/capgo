@@ -23,6 +23,7 @@ interface ChannelUserApp {
     version: Database['public']['Tables']['app_versions']['Row']
   }
 }
+
 async function getMyApps() {
   const { data } = await supabase
     .from('apps')

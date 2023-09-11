@@ -10,9 +10,10 @@ import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
 import { getConvertedDate, getDaysBetweenDates, octetsToGb } from '~/services/conversion'
 
-const props = defineProps({
-  appId: { type: String, default: '' },
-})
+const props = defineProps<{
+  appId?: string
+  apps?: Database['public']['Tables']['apps']['Row'][]
+}>()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
@@ -50,41 +51,44 @@ const allLimits = computed(() => {
   })
 })
 
-async function getAppStats() {
+async function getAppStat(app_id: string) {
   if (!main.user)
     return { data: [], error: 'missing user' }
   const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
   const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
+  if (cycleStart && cycleEnd) {
+    return supabase
+      .from('app_usage')
+      .select()
+      .eq('app_id', app_id)
+      .eq('mode', 'day')
+      .gte('created_at', getConvertedDate(cycleStart))
+      .lte('created_at', getConvertedDate(cycleEnd))
+  }
+  return supabase
+    .from('app_usage')
+    .select()
+    .eq('app_id', app_id)
+    .eq('mode', 'day')
+}
+
+async function getAppStats() {
   if (props.appId) {
-    if (cycleStart && cycleEnd) {
-      return supabase
-        .from('app_usage')
-        .select()
-        .eq('app_id', props.appId)
-        .eq('mode', 'day')
-        .gte('created_at', getConvertedDate(cycleStart))
-        .lte('created_at', getConvertedDate(cycleEnd))
-    }
-    return supabase
-      .from('app_usage')
-      .select()
-      .eq('app_id', props.appId)
-      .eq('mode', 'day')
+    const t = await getAppStat(props.appId)
+    return t
   }
-  else {
-    if (cycleStart && cycleEnd) {
-      return supabase
-        .from('app_usage')
-        .select()
-        .eq('mode', 'day')
-        .gte('created_at', getConvertedDate(cycleStart))
-        .lte('created_at', getConvertedDate(cycleEnd))
-    }
-    return supabase
-      .from('app_usage')
-      .select()
-      .eq('mode', 'day')
+  else if (props.apps && props.apps.length > 0) {
+    const t = (await Promise.all(props.apps.map(async (app) => {
+      return await getAppStat(app.app_id)
+    })))
+    t.data = t.map(i => i.data).flat()
+    t.count = t.data.length
+    return t
   }
+  return supabase
+    .from('app_usage')
+    .select()
+    .eq('mode', 'day')
 }
 
 async function getAllStats() {
@@ -130,13 +134,8 @@ async function getUsages() {
         else
           datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
       }
-      // TODO: How to fix this?
-      // else if (item.date_id.length === 7) {
-      //   currentStorage += item.version_size ? octetsToGb(item.version_size) : 0
-      // }
     })
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    // console.log('storageVariance', storageVariance, currentStorage)
     datas.value.storage[0] = currentStorage - storageVariance
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
