@@ -35,64 +35,82 @@ async function loadAppInfo() {
       .eq('app_id', id.value)
       .single()
     app.value = dataApp || app.value
+    const promises = [];
 
     if (cycleStart && cycleEnd) {
-      const { count: statsCount } = await supabase
-        .from('stats')
-        .select('*', { count: 'exact', head: true })
-        .eq('app_id', id.value)
-        .eq('action', 'set')
-        .gte('created_at', getConvertedDate2(cycleStart))
-        .lte('created_at', getConvertedDate2(cycleEnd))
-      if (statsCount)
-        updatesNb.value = statsCount
-    }
-    else {
-      const { count: statsCountSet } = await supabase
-        .from('stats')
-        .select('*', { count: 'exact', head: true })
-        .eq('app_id', id.value)
-        .eq('action', 'set')
-      if (statsCountSet)
-        updatesNb.value = statsCountSet
+      promises.push(
+        supabase
+          .from('stats')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .eq('action', 'set')
+          .gte('created_at', getConvertedDate2(cycleStart))
+          .lte('created_at', getConvertedDate2(cycleEnd))
+          .then(({ count: statsCount }) => {
+            if (statsCount) updatesNb.value = statsCount;
+          })
+      );
+    } else {
+      promises.push(
+        supabase
+          .from('stats')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .eq('action', 'set')
+          .then(({ count: statsCountSet }) => {
+            if (statsCountSet) updatesNb.value = statsCountSet;
+          })
+      );
     }
 
-    const { count: bundlesCount } = await supabase
-      .from('app_versions')
-      .select('*', { count: 'exact', head: true })
-      .eq('app_id', id.value)
-      .eq('deleted', false)
-    if (bundlesCount)
-      bundlesNb.value = bundlesCount
+    promises.push(
+      supabase
+        .from('app_versions')
+        .select('*', { count: 'exact', head: true })
+        .eq('app_id', id.value)
+        .eq('deleted', false)
+        .then(({ count: bundlesCount }) => {
+          if (bundlesCount) bundlesNb.value = bundlesCount;
+        })
+    );
 
-    const { count: channelsCount } = await supabase
-      .from('channels')
-      .select('*', { count: 'exact', head: true })
-      .eq('app_id', id.value)
-    if (channelsCount)
-      channelsNb.value = channelsCount
+    promises.push(
+      supabase
+        .from('channels')
+        .select('*', { count: 'exact', head: true })
+        .eq('app_id', id.value)
+        .then(({ count: channelsCount }) => {
+          if (channelsCount) channelsNb.value = channelsCount;
+        })
+    );
 
     if (cycleStart && cycleEnd) {
-      const { count: devicesCount } = await supabase
-        .from('devices')
-        .select('*', { count: 'exact', head: true })
-        .eq('app_id', id.value)
-        .gte('created_at', getConvertedDate2(cycleStart))
-        .lte('created_at', getConvertedDate2(cycleEnd))
-      if (devicesCount)
-        devicesNb.value = devicesCount
+      promises.push(
+        supabase
+          .from('devices')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .gte('created_at', getConvertedDate2(cycleStart))
+          .lte('created_at', getConvertedDate2(cycleEnd))
+          .then(({ count: devicesCount }) => {
+            if (devicesCount) devicesNb.value = devicesCount;
+          })
+      );
+    } else {
+      promises.push(
+        supabase
+          .from('devices')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .then(({ count: devicesCount }) => {
+            if (devicesCount) devicesNb.value = devicesCount;
+          })
+      );
     }
-    else {
-      const { count: devicesCount } = await supabase
-        .from('devices')
-        .select('*', { count: 'exact', head: true })
-        .eq('app_id', id.value)
-      if (devicesCount)
-        devicesNb.value = devicesCount
-    }
-  }
-  catch (error) {
-    console.error(error)
+
+    await Promise.all(promises);
+  } catch (error) {
+    console.error(error);
   }
 }
 
