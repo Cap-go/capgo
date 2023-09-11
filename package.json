@@ -1,7 +1,12 @@
 {
   "name": "capgo-app",
-  "version": "10.107.0",
+  "version": "10.110.0",
   "private": true,
+  "husky": {
+    "hooks": {
+      "pre-commit": "pnpm run lint"
+    }
+  },
   "scripts": {
     "build": "vite build",
     "test": "playwright test",
@@ -80,6 +85,7 @@
     "@netlify/functions": "^1.6.0",
     "@supabase/supabase-js": "2.33.1",
     "@tailwindcss/forms": "^0.5.5",
+    "@upstash/redis": "^1.22.0",
     "@vueuse/components": "^10.4.0",
     "@vueuse/core": "10.4.0",
     "adm-zip": "^0.5.10",
@@ -160,6 +166,7 @@
     "eslint": "8.48.0",
     "eslint-plugin-cypress": "^2.14.0",
     "https-localhost": "4.7.1",
+    "husky": "^8.0.3",
     "postcss": "^8.4.28",
     "sass": "1.66.1",
     "tailwindcss": "^3.3.3",
