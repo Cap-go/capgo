@@ -93,13 +93,6 @@ onUnmounted(() => {
           @focusout="dropdownOpen = false"
         >
           <li>
-            <button class="px-3 py-1" @click="toggleDark()">
-              <div class="text-black dark:text-white">
-                {{ isDark ? 'light_mode' : 'dark_mode' }}
-              </div>
-            </button>
-          </li>
-          <li>
             <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/dashboard/settings/account" @click="dropdownOpen = false">
               {{ t('settings') }}
             </router-link>
