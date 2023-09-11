@@ -2,9 +2,9 @@
 import { Modal } from 'flowbite'
 import { onMounted, ref, watch } from 'vue'
 import type { ModalInterface, ModalOptions } from 'flowbite'
+import DOMPurify from 'dompurify'
 import type { ActionSheetOptionButton } from '~/stores/display'
 import { useDisplayStore } from '~/stores/display'
-import DOMPurify from "dompurify";
 
 /*
 * $targetEl: required
