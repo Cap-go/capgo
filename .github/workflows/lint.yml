@@ -2,8 +2,9 @@ name: Run Lint
 
 on:
   pull_request_target:
-    branches:
-      - main
+    types:
+      - opened
+      - synchronize
   merge_group:
   workflow_dispatch:
   
