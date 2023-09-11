@@ -35,7 +35,7 @@ async function loadAppInfo() {
       .eq('app_id', id.value)
       .single()
     app.value = dataApp || app.value
-    const promises = [];
+    const promises = []
 
     if (cycleStart && cycleEnd) {
       promises.push(
@@ -47,10 +47,12 @@ async function loadAppInfo() {
           .gte('created_at', getConvertedDate2(cycleStart))
           .lte('created_at', getConvertedDate2(cycleEnd))
           .then(({ count: statsCount }) => {
-            if (statsCount) updatesNb.value = statsCount;
-          })
-      );
-    } else {
+            if (statsCount)
+              updatesNb.value = statsCount
+          }),
+      )
+    }
+    else {
       promises.push(
         supabase
           .from('stats')
@@ -58,9 +60,10 @@ async function loadAppInfo() {
           .eq('app_id', id.value)
           .eq('action', 'set')
           .then(({ count: statsCountSet }) => {
-            if (statsCountSet) updatesNb.value = statsCountSet;
-          })
-      );
+            if (statsCountSet)
+              updatesNb.value = statsCountSet
+          }),
+      )
     }
 
     promises.push(
@@ -70,9 +73,10 @@ async function loadAppInfo() {
         .eq('app_id', id.value)
         .eq('deleted', false)
         .then(({ count: bundlesCount }) => {
-          if (bundlesCount) bundlesNb.value = bundlesCount;
-        })
-    );
+          if (bundlesCount)
+            bundlesNb.value = bundlesCount
+        }),
+    )
 
     promises.push(
       supabase
@@ -80,9 +84,10 @@ async function loadAppInfo() {
         .select('*', { count: 'exact', head: true })
         .eq('app_id', id.value)
         .then(({ count: channelsCount }) => {
-          if (channelsCount) channelsNb.value = channelsCount;
-        })
-    );
+          if (channelsCount)
+            channelsNb.value = channelsCount
+        }),
+    )
 
     if (cycleStart && cycleEnd) {
       promises.push(
@@ -93,24 +98,28 @@ async function loadAppInfo() {
           .gte('created_at', getConvertedDate2(cycleStart))
           .lte('created_at', getConvertedDate2(cycleEnd))
           .then(({ count: devicesCount }) => {
-            if (devicesCount) devicesNb.value = devicesCount;
-          })
-      );
-    } else {
+            if (devicesCount)
+              devicesNb.value = devicesCount
+          }),
+      )
+    }
+    else {
       promises.push(
         supabase
           .from('devices')
           .select('*', { count: 'exact', head: true })
           .eq('app_id', id.value)
           .then(({ count: devicesCount }) => {
-            if (devicesCount) devicesNb.value = devicesCount;
-          })
-      );
+            if (devicesCount)
+              devicesNb.value = devicesCount
+          }),
+      )
     }
 
-    await Promise.all(promises);
-  } catch (error) {
-    console.error(error);
+    await Promise.all(promises)
+  }
+  catch (error) {
+    console.error(error)
   }
 }
 
