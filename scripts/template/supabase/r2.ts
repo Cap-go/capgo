@@ -4,17 +4,25 @@ import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 const accountid = ''
 const access_key_id = ''
 const access_key_secret = ''
+const storageEndpoint = ''
+const storageRegion = ''
+const storageUseSsl = false
+const storagePort = 9000
 const bucket = 'capgo'
 // upper is ignored during netlify generation phase
 // import from here
 function initR2() {
-  return new S3Client({
-    endPoint: `${accountid}.r2.cloudflarestorage.com`,
-    region: 'us-east-1',
+  const params = {
+    endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
+    region: storageRegion ?? 'us-east-1',
+    useSSL: storageUseSsl,
+    port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
     bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,
-  })
+  }
+
+  return new S3Client(params)
 }
 
 function upload(fileId: string, file: Uint8Array) {

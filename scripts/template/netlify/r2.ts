@@ -5,15 +5,23 @@ const accountid = ''
 const access_key_id = ''
 const access_key_secret = ''
 const bucket = 'capgo'
+const storageEndpoint = ''
+const storageRegion = ''
+const storageUseSsl = false
+const storagePort = 9000
 // upper is ignored during netlify generation phase
 // import from here
 function initR2() {
-  return new Client({
-    endPoint: `${accountid}.r2.cloudflarestorage.com`,
-    region: 'us-east-1',
+  const params = {
+    endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
+    region: storageRegion ?? 'us-east-1',
+    useSSL: storageUseSsl,
+    port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
+    bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,
-  })
+  }
+  return new Client(params)
 }
 
 function upload(fileId: string, file: Uint8Array) {
