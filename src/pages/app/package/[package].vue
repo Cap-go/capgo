@@ -1,26 +1,31 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useSupabase } from '~/services/supabase'
+import { useRoute } from 'vue-router'
+import { computed, ref, watchEffect } from 'vue'
+import { useMainStore } from '~/stores/main'
 import Spinner from '~/components/Spinner.vue'
+import type { Stat } from '~/components/comp_def'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
-import type { Stat } from '~/components/comp_def'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import { appIdToUrl, getConvertedDate2, urlToAppId } from '~/services/conversion'
 
-const route = useRoute()
-const { t } = useI18n()
-const supabase = useSupabase()
-const displayStore = useDisplayStore()
 const id = ref('')
-const isLoading = ref(false)
-const app = ref<Database['public']['Tables']['apps']['Row']>()
-const channelsNb = ref(0)
+const { t } = useI18n()
+const route = useRoute()
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
 const updatesNb = ref(0)
+const channelsNb = ref(0)
+const main = useMainStore()
+const isLoading = ref(false)
+const supabase = useSupabase()
+const displayStore = useDisplayStore()
+const app = ref<Database['public']['Tables']['apps']['Row']>()
+
+const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
+const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function loadAppInfo() {
   try {
@@ -30,20 +35,88 @@ async function loadAppInfo() {
       .eq('app_id', id.value)
       .single()
     app.value = dataApp || app.value
+    const promises = []
 
-    const date_id = new Date().toISOString().slice(0, 7)
-    const { data } = await supabase
-      .from('app_stats')
-      .select()
-      .eq('app_id', id.value)
-      .eq('date_id', date_id)
-      .single()
-    if (data) {
-      updatesNb.value = Math.max(data.mlu, data.mlu_real)
-      devicesNb.value = data.devices
-      bundlesNb.value = data.versions
-      channelsNb.value = data.channels
+    if (cycleStart && cycleEnd) {
+      promises.push(
+        supabase
+          .from('stats')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .eq('action', 'set')
+          .gte('created_at', getConvertedDate2(cycleStart))
+          .lte('created_at', getConvertedDate2(cycleEnd))
+          .then(({ count: statsCount }) => {
+            if (statsCount)
+              updatesNb.value = statsCount
+          }),
+      )
     }
+    else {
+      promises.push(
+        supabase
+          .from('stats')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .eq('action', 'set')
+          .then(({ count: statsCountSet }) => {
+            if (statsCountSet)
+              updatesNb.value = statsCountSet
+          }),
+      )
+    }
+
+    promises.push(
+      supabase
+        .from('app_versions')
+        .select('*', { count: 'exact', head: true })
+        .eq('app_id', id.value)
+        .eq('deleted', false)
+        .then(({ count: bundlesCount }) => {
+          if (bundlesCount)
+            bundlesNb.value = bundlesCount
+        }),
+    )
+
+    promises.push(
+      supabase
+        .from('channels')
+        .select('*', { count: 'exact', head: true })
+        .eq('app_id', id.value)
+        .then(({ count: channelsCount }) => {
+          if (channelsCount)
+            channelsNb.value = channelsCount
+        }),
+    )
+
+    if (cycleStart && cycleEnd) {
+      promises.push(
+        supabase
+          .from('devices')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .gte('created_at', getConvertedDate2(cycleStart))
+          .lte('created_at', getConvertedDate2(cycleEnd))
+          .then(({ count: devicesCount }) => {
+            if (devicesCount)
+              devicesNb.value = devicesCount
+          }),
+      )
+    }
+    else {
+      promises.push(
+        supabase
+          .from('devices')
+          .select('*', { count: 'exact', head: true })
+          .eq('app_id', id.value)
+          .then(({ count: devicesCount }) => {
+            if (devicesCount)
+              devicesNb.value = devicesCount
+          }),
+      )
+    }
+
+    await Promise.all(promises)
   }
   catch (error) {
     console.error(error)
