@@ -93,6 +93,7 @@ function escapeRegExp(string) {
 }
 const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts', to: 'logsnag' },
+  { from: 'https://deno.land/x/zod@v3.22.2/mod.ts', to: 'zod' },
   { from: 'import type { Redis } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: 'import { Redis } from \'ioredis\'' },
   { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
