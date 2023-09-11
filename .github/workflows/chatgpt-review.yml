@@ -1,34 +1,19 @@
 name: Capgo PR Code Review via Open AI
 
 permissions:
+  checks: write
   contents: read
   pull-requests: write
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - synchronize
 
 jobs:
-  authorization:
+  review-and-score:
     runs-on: ubuntu-latest
-    outputs:
-      authorized: ${{ steps.check_author.outputs.authorized }}
-    steps:
-      - name: Check if the author is the pull request creator
-        id: check_author
-        run: |
-          if [[ "${{ github.event.pull_request.user.login }}" == "${{ github.event.pull_request.user.login }}" ]]; then
-            echo "::set-output name=authorized::true"
-          else
-            echo "::set-output name=authorized::false"
-          fi
-
-  test:
-    needs: authorization
-    runs-on: ubuntu-latest
-    if: needs.authorization.outputs.authorized == 'true'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -43,8 +28,8 @@ jobs:
         with:
           debug: false
           action: review
-          review_comment_lgtm: true
           path_filters: '**/*'
+          review_comment_lgtm: true
 
       - uses: unsafecoerce/chatgpt-action@main
         env:
