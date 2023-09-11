@@ -11,8 +11,7 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
-import { appIdToUrl, getConvertedDate2 } from '~/services/conversion'
-import { useMainStore } from '~/stores/main'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
@@ -23,14 +22,10 @@ const displayStore = useDisplayStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
-const main = useMainStore()
 
 const isLoading = ref(true)
-const mauNb = ref(-1)
+const devicesNb = ref(0)
 const { t } = useI18n()
-
-const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -98,45 +93,28 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
   }
 }
 
-async function getAppStats(app_id: string) {
-  if (app_id) {
-    if (cycleStart && cycleEnd) {
-      return supabase
-        .from('app_usage')
-        .select()
-        .eq('app_id', app_id)
-        .eq('mode', 'day')
-        .gte('created_at', getConvertedDate2(cycleStart))
-        .lte('created_at', getConvertedDate2(cycleEnd))
-    }
-    return supabase
-      .from('app_usage')
-      .select()
-      .eq('app_id', app_id)
-      .eq('mode', 'day')
-  }
-}
-
 async function loadData() {
-  if (props.app.app_id) {
-    const tmp = await getAppStats(props.app.app_id)
-    if (!tmp)
-      return
-    const { data, error } = tmp
-    if (data && !error) {
-      data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-        if (item.created_at) {
-          if (mauNb.value !== -1)
-            mauNb.value += item.mau
-          else
-            mauNb.value = item.mau
-        }
-      })
+  if (!props.channel) {
+    devicesNb.value = 0
+
+    try {
+      const date_id = new Date().toISOString().slice(0, 7)
+      const { data } = await supabase
+        .from('app_stats')
+        .select()
+        .eq('app_id', props.app.app_id)
+        .eq('date_id', date_id)
+        .single()
+        .throwOnError()
+      if (!data)
+        return
+
+      devicesNb.value = data?.devices
+    }
+    catch (error) {
+      console.error(error)
     }
   }
-  // if the value is not updated, fall it back to 0
-  if (mauNb.value === -1)
-    mauNb.value = 0
 }
 
 async function refreshData() {
@@ -170,14 +148,8 @@ watchEffect(async () => {
   <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
     <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-        <img
-          v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3"
-          width="36" height="36"
-        >
-        <div
-          v-else
-          class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3"
-        >
+        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
+        <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3">
           <p>{{ acronym }}</p>
         </div>
         <div class="max-w-max">
@@ -196,8 +168,11 @@ watchEffect(async () => {
       </div>
     </td>
     <td class="w-1/4 p-2">
-      <div class="text-center">
-        {{ mauNb.toLocaleString() }}
+      <div v-if="!isLoading && !props.channel" class="text-center">
+        {{ devicesNb }}
+      </div>
+      <div v-else class="text-center">
+        {{ props.channel }}
       </div>
     </td>
     <td class="w-1/4 p-2" @click.stop="deleteApp(app)">
@@ -208,7 +183,9 @@ watchEffect(async () => {
   </tr>
   <!-- Mobile -->
   <k-list-item
-    class="md:hidden" :title="props.app.name || ''" :subtitle="formatDate(props.app.updated_at || '')"
+    class="md:hidden"
+    :title="props.app.name || ''"
+    :subtitle="formatDate(props.app.updated_at || '')"
     @click="openPackage(app.app_id)"
   >
     <template #media>
