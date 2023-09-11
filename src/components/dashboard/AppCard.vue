@@ -23,7 +23,7 @@ const displayStore = useDisplayStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
-const mauNb = ref(-1)
+const mauNb = ref(0)
 const main = useMainStore()
 const isLoading = ref(true)
 const { t } = useI18n()
@@ -124,18 +124,11 @@ async function loadData() {
     const { data, error } = tmp
     if (data && !error) {
       data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-        if (item.created_at) {
-          if (mauNb.value !== -1)
-            mauNb.value += item.mau
-          else
-            mauNb.value = item.mau
-        }
+        if (item.created_at)
+          mauNb.value += item.mau
       })
     }
   }
-  // if the value is not updated, fall it back to 0
-  if (mauNb.value === -1)
-    mauNb.value = 0
 }
 
 async function refreshData() {
