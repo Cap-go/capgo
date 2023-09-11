@@ -49,7 +49,7 @@ jobs:
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,storage-api,logflare --ignore-health-check
       - name: Configure frontend env
-        run: cp .env.exemple .env
+        run: cp .env.example .env
 
       - name: Cache playwright binaries
         id: playwright-cache
