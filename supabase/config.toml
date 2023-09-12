@@ -116,6 +116,9 @@ verify_jwt = false
 [functions.cron_scrapper]
 verify_jwt = false
 
+[functions.cron_email]
+verify_jwt = false
+
 [functions.device]
 verify_jwt = false
 
