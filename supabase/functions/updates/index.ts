@@ -173,8 +173,8 @@ async function updateWithTimeout(request: AppInfos): Promise<Response> {
 serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
-    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const method: string = event.method
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }

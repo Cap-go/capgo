@@ -1,13 +1,13 @@
-import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
-import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
-import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
+import { logsnag } from '../_utils/logsnag.ts'
 import type { AppInfos } from '../_utils/types.ts'
-import type { Database } from '../_utils/supabase.types.ts'
+import { appIdToUrl } from './../_utils/conversion.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
-import { logsnag } from '../_utils/logsnag.ts'
-import { appIdToUrl } from './../_utils/conversion.ts'
+import type { Database } from '../_utils/supabase.types.ts'
+import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
+import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
@@ -291,21 +291,6 @@ export async function update(body: AppInfos) {
       }
     }
 
-    // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
-    // const xForwardedFor = headers['x-forwarded-for'] || ''
-    // // console.log('xForwardedFor', xForwardedFor)
-    // const ip = xForwardedFor.split(',')[1]
-    // console.log('IP', ip)
-    // check if version is created_at more than 4 hours
-    // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
-
-    // if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
-    //   console.log('invalid ip', xForwardedFor, ip)
-    //   return sendRes({
-    //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
-    //     error: 'invalid_ip',
-    //   }, 400)
-    // }
     const updevice = updateOrCreateDevice({
       app_id,
       device_id,
