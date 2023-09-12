@@ -1,10 +1,10 @@
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-
-import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
-import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
+import { getRedis } from '../_utils/redis.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
+import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
+import { createHash } from "https://deno.land/std@0.119.0/hash/mod.ts"
 
 const APP_DOES_NOT_EXIST = { message: 'App not found', error: 'app_not_found' }
 const APP_VERSION_NO_NEW = { message: 'No new version available' }
@@ -124,12 +124,33 @@ async function updateWithTimeout(request: AppInfos): Promise<Response> {
   return result as Response
 }
 
+async function incrementDeviceRequestCount(ipAddress: string): Promise<void> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    await redis.hincrby(deviceIpHashKey, 'count', 1);
+  }
+}
+
+async function getDeviceRequestCount(ipAddress: string): Promise<number | null> {
+  const redis = await getRedis();
+  if (!redis) return null
+  const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+  const count = await redis.hget(deviceIpHashKey, 'count');
+  if (count !== null) {
+    return Number(count);
+  }
+  return null
+}
+
 serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const method: string = event.method
     const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
+    const ipAddress = headers['x-real-ip'] || event.conn.remoteAddr.hostname;
+    await incrementDeviceRequestCount(ipAddress);
     return main(url, headers, method, body)
   }
   catch (e) {

@@ -354,7 +354,7 @@ export async function update(body: AppInfos) {
     }
 
     if (!devicesOverride && channelData) {
-    // console.log('check disableAutoUpdateToMajor', device_id)
+      // console.log('check disableAutoUpdateToMajor', device_id)
       if (!channelData.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id)
         await sendStats('disablePlatformIos', platform, device_id, app_id, version_build, versionId)
