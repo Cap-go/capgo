@@ -16,6 +16,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     return sendRes({ status: 'Missing apikey' }, 400)
 
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write', 'upload'])
+  const { data: userId, error: errorUserId } = await supabaseAdmin()
+    .rpc('get_user_id', { apikey: apikey_string, app_id: body.app_id })
   if (!apikey)
     return sendRes({ status: 'Missing apikey' }, 400)
 
@@ -29,7 +31,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
       .eq('bucket_id', body.bucket_id)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
-      .eq('user_id', apikey.user_id)
+      .eq('user_id', userId)
       .single()
     if (errorVersion) {
       console.log('errorVersion', errorVersion)
@@ -39,7 +41,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
       .from('apps')
       .select('app_id')
       .eq('app_id', body.app_id)
-      .eq('user_id', apikey.user_id)
+      .eq('user_id', userId)
       .single()
     if (errorApp)
       return sendRes({ status: 'Error App not found' }, 500)
