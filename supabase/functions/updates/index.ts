@@ -59,7 +59,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return update(body)
   }
 
-  const ipAddress = headers['client-ip']
+  const ipAddress = [headers['x-real-ip'], headers['x-forwarded-for'], headers['client-ip']].find(i => i !== undefined && i !== null)
   if (ipAddress) {
     const getCurrentCount = await getDeviceRequestCount(ipAddress)
     if (getCurrentCount) {
