@@ -42,7 +42,7 @@ watchEffect(async () => {
       <!-- Welcome banner -->
       <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
       <!-- Cards -->
-      <Usage v-if="!isLoading" />
+      <Usage v-if="!isLoading" :apps="props.apps" />
 
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->

@@ -1,9 +1,9 @@
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 
-// import { getRedis } from '../_utils/redis.ts'
+import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
-import { methodJson, sendRes } from '../_utils/utils.ts'
+import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 
 const APP_DOES_NOT_EXIST = { message: 'App not found', error: 'app_not_found' }
@@ -21,11 +21,11 @@ const headersSchema = z.object({
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = true
+const bypassRedis = false
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
-  const redis = null
-  // const redis = await getRedis()
+  // const redis = null
+  const redis = await getRedis()
 
   if (!redis || bypassRedis) {
     console.log('[redis] cannot get redis')
@@ -55,12 +55,12 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return sendRes(APP_DOES_NOT_EXIST)
   }
 
-  if (inCache && deviceExists && device === 'standard' && cachedVersionExists) {
+  if (inCache && deviceExists && device === 'standard' && cachedVersionExists && cachedVersion) {
     console.log('[redis] Cached - cache sucessful')
     if (cachedVersion === CACHE_NO_NEW_VAL)
       return sendRes(APP_VERSION_NO_NEW)
     else
-      return sendRes(cachedVersion)
+      return sendResText(cachedVersion)
   }
 
   let res

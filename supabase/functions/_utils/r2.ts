@@ -6,7 +6,7 @@ const access_key_id = getEnv('R2_ACCESS_KEY_ID')
 const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
 const storageEndpoint = getEnv('S3_ENDPOINT')
 const storageRegion = getEnv('S3_REGION')
-const storagePort = parseInt(getEnv('S3_PORT'))
+const storagePort = Number.parseInt(getEnv('S3_PORT'))
 const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
 const bucket = 'capgo'
 
@@ -15,7 +15,7 @@ function initR2() {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
     useSSL: storageUseSsl,
-    port: storagePort ? (!isNaN(storagePort) ? storagePort : undefined) : undefined,
+    port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
     bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,

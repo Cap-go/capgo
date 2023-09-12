@@ -57,15 +57,6 @@ CREATE TYPE "public"."usage_mode" AS ENUM (
     'cycle'
 );
 
-CREATE TYPE "public"."match_plan" AS (
-	"name" character varying
-);
-
-CREATE TYPE "public"."pay_as_you_go_type" AS ENUM (
-    'base',
-    'units'
-);
-
 CREATE TYPE "public"."platform_os" AS ENUM (
     'ios',
     'android'
@@ -958,13 +949,15 @@ BEGIN
         WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
         GROUP BY stats.app_id
     ), storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
         FROM app_versions
+        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS FALSE
         GROUP BY app_versions.app_id
     ), deleted_storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, COUNT(*) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
         FROM app_versions
+        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.updated_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
         GROUP BY app_versions.app_id
     ), mau AS (
@@ -1253,9 +1246,10 @@ CREATE TABLE "public"."app_usage" (
     "app_id" character varying NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     -- main stats
-    "mlu" bigint DEFAULT '0'::bigint NOT NULL,
+    "mau" bigint DEFAULT '0'::bigint NOT NULL,
     "storage" bigint DEFAULT '0'::bigint NOT NULL,
-    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL
+    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+    mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
 );
 
 CREATE TABLE "public"."app_stats" (
@@ -2065,7 +2059,7 @@ CREATE POLICY "Allow apikey to insert" ON "public"."app_versions" FOR INSERT TO 
 
 CREATE POLICY "Allow apikey to insert" ON "public"."apps" FOR INSERT TO "anon" WITH CHECK (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]) AND "public"."is_allowed_action"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"))));
 
-CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[]));
+CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"public"."key_mode"[], "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::"public"."key_mode"[], "app_id", 'read'::"public"."user_min_right", "user_id")));
 
