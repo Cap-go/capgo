@@ -2,15 +2,27 @@ import { basicHeaders, corsHeaders } from '../../../supabase/functions/_utils/ut
 
 // upper is ignored during netlify generation phase
 // import from here
-export function sendRes(data: any = { status: 'ok' }, statusCode = 200) {
+
+export function sendResText(data: string, statusCode = 200) {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
 
   return new Response(
-    JSON.stringify(data),
+    data,
     {
       status: statusCode,
       headers: { ...basicHeaders, ...corsHeaders },
+    },
+  )
+}
+
+export function sendOptionsRes() {
+  return new Response(
+    'ok',
+    {
+      headers: {
+        ...corsHeaders,
+      },
     },
   )
 }
