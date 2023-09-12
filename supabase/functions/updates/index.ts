@@ -23,6 +23,33 @@ const headersSchema = z.object({
 
 const bypassRedis = false
 
+async function incrementDeviceRequestCount(ipAddress: string): Promise<void> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    await redis.hincrby(deviceIpHashKey, 'count', 1);
+  }
+}
+
+async function getDeviceRequestCount(ipAddress: string): Promise<number | undefined> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    const count = await redis.hget(deviceIpHashKey, 'count');
+    if (count !== null) {
+      return Number(count);
+    }
+  }
+}
+
+async function blacklistDeviceRequest(ipAddress: string): Promise<void> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    await redis.hset(deviceIpHashKey, 'count', -1);
+  }
+}
+
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // const redis = null
   const redis = await getRedis()
@@ -30,6 +57,25 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
   if (!redis || bypassRedis) {
     console.log('[redis] cannot get redis')
     return update(body)
+  }
+
+  const ipAddress = headers['client-ip']
+  if (ipAddress) {
+    const getCurrentCount = await getDeviceRequestCount(ipAddress)
+    if (getCurrentCount) {
+      if (getCurrentCount === -1) {
+        return sendRes({ error: `Blacklist` }, 403)
+      }
+      // TODO: Update limit to blacklist flag
+      else if (getCurrentCount > 10 ** 5) {
+        blacklistDeviceRequest(ipAddress)
+        return sendRes({ error: `Blacklist` }, 403)
+      }
+      await incrementDeviceRequestCount(ipAddress);
+    }
+    else {
+      await incrementDeviceRequestCount(ipAddress);
+    }
   }
 
   const parseResult = jsonRequestSchema.passthrough().safeParse(body)
@@ -124,33 +170,12 @@ async function updateWithTimeout(request: AppInfos): Promise<Response> {
   return result as Response
 }
 
-async function incrementDeviceRequestCount(ipAddress: string): Promise<void> {
-  const redis = await getRedis();
-  if (redis) {
-    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
-    await redis.hincrby(deviceIpHashKey, 'count', 1);
-  }
-}
-
-async function getDeviceRequestCount(ipAddress: string): Promise<number | null> {
-  const redis = await getRedis();
-  if (!redis) return null
-  const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
-  const count = await redis.hget(deviceIpHashKey, 'count');
-  if (count !== null) {
-    return Number(count);
-  }
-  return null
-}
-
 serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const method: string = event.method
     const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
-    const ipAddress = headers['x-real-ip'] || event.conn.remoteAddr.hostname;
-    await incrementDeviceRequestCount(ipAddress);
     return main(url, headers, method, body)
   }
   catch (e) {
