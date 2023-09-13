@@ -57,6 +57,11 @@ CREATE TYPE "public"."usage_mode" AS ENUM (
     'cycle'
 );
 
+CREATE TYPE "public"."stat_time" AS (
+	"device_id" uuid,
+	"created_at" timestamp
+);
+
 CREATE TYPE "public"."platform_os" AS ENUM (
     'ios',
     'android'
@@ -592,24 +597,55 @@ Begin
 End;  
 $function$;
 
-CREATE FUNCTION "public"."get_weekly_stats"("user_id" uuid) RETURNS table(all_updates integer, test integer)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
+CREATE or replace FUNCTION "public"."get_weekly_stats"("app_id" character varying) RETURNS TABLE(all_updates integer, failed_updates integer, open_app integer) AS $$
 Declare
  seven_days_ago TIMESTAMP;
  all_updates integer;
+ failed_updates integer;
+ open_app integer;
+ open_time_array TABLE ("device_id" uuid, "created_at" timestamp)[];
 Begin
   seven_days_ago := NOW() - INTERVAL '7 days';
-
+  
   SELECT count(*)
   INTO all_updates
   FROM public.stats
   WHERE stats.action='set'
-  AND stats.created_at BETWEEN seven_days_ago AND now();
-  
-  RETURN query (select all_updates, all_updates as test);
-End; 
-$$;
+  AND stats.created_at BETWEEN seven_days_ago AND now()
+  AND stats.app_id = get_weekly_stats.app_id;
+
+  SELECT count(*)
+  INTO failed_updates
+  FROM public.stats
+  WHERE (
+    stats.action='set_fail'
+    OR stats.action='update_fail'
+    OR stats.action='download_fail'
+  )
+  AND stats.created_at BETWEEN seven_days_ago AND now()
+  AND stats.app_id = get_weekly_stats.app_id;
+
+  SELECT count(*)
+  INTO open_app
+  FROM public.stats
+  WHERE stats.action='get'
+  AND stats.created_at BETWEEN seven_days_ago AND now()
+  AND stats.app_id = get_weekly_stats.app_id;
+
+  SELECT ARRAY (
+    SELECT ROW (stats.device_id, stats.created_at)
+    FROM public.stats
+    WHERE stats.action='app_moved_to_foreground'
+    AND stats.created_at BETWEEN seven_days_ago AND now()
+    AND stats.app_id = get_weekly_stats.app_id
+  )
+  INTO open_time_array;
+
+  RAISE NOTICE '%', open_time_array;
+
+  RETURN query (select all_updates, failed_updates, open_app); 
+End;                                                           
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.update_app_usage(minutes_interval INT) RETURNS VOID AS $$
 DECLARE

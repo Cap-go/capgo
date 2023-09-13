@@ -13,6 +13,20 @@ interface AppWithUser {
   }
 }
 
+const thresholds = {
+  updates: [
+    100,
+    1000,
+    10000,
+  ],
+  fail_rate: [
+    0.80,
+    0.90,
+    0.95,
+  ],
+
+}
+
 async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   console.log('called!')
   const API_SECRET = getEnv('API_SECRET')
@@ -46,10 +60,15 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
 
   console.log('apps', mappedApps)
 
+  // Set stats = all updates
+  // Sucess updates = set - failed
+  // Fail = failed
   for (const mapApp of mappedApps) {
-    const { error: generateStatsError } = await supabase.rpc('update_app_usage', {
-      minutes_interval: 5,
+    const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
+      app_id: mapApp.app_id,
     }).single()
+
+    console.log('weeklyStats', weeklyStats)
 
     if (generateStatsError) {
       console.error('error', generateStatsError)
@@ -58,6 +77,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   }
 
   const data = {
+    app_name: 'test_app',
     fun_comparison: 'fun',
     weekly_updates: '10',
     weekly_install: '4',
