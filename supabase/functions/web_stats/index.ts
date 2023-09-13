@@ -85,7 +85,7 @@ function getStats(): GlobalStats {
   }
 }
 
-async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
+async function main(url: URL, headers: BaseHeaders, _method: string, _body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret)

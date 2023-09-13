@@ -246,7 +246,6 @@ async function put(body: DeviceLink): Promise<Response> {
 async function deleteOverride(body: DeviceLink): Promise<Response> {
   console.log('body', body)
   let {
-    version_name,
     version_build,
   } = body
   const {
@@ -263,7 +262,6 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
       error: 'semver_error',
     }, 400)
   }
-  version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
   if (!device_id || !app_id) {
     return sendRes({

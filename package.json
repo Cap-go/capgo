@@ -29,6 +29,7 @@
     "dev-ios": "cap sync && cap run ios",
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
+    "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
     "generate:node_serverless": "rm -rf netlify && node ./scripts/convert_deno_to_node.mjs",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
