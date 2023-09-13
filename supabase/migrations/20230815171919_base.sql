@@ -592,6 +592,25 @@ Begin
 End;  
 $function$;
 
+CREATE FUNCTION "public"."get_weekly_stats"("user_id" uuid) RETURNS table(all_updates integer, test integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Declare
+ seven_days_ago TIMESTAMP;
+ all_updates integer;
+Begin
+  seven_days_ago := NOW() - INTERVAL '7 days';
+
+  SELECT count(*)
+  INTO all_updates
+  FROM public.stats
+  WHERE stats.action='set'
+  AND stats.created_at BETWEEN seven_days_ago AND now();
+  
+  RETURN query (select all_updates, all_updates as test);
+End; 
+$$;
+
 CREATE OR REPLACE FUNCTION public.update_app_usage(minutes_interval INT) RETURNS VOID AS $$
 DECLARE
     one_minute_ago TIMESTAMP;
