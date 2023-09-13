@@ -20,6 +20,7 @@ export interface AppInfos {
   platform: string
   app_id: string
   device_id: string
+  partial_update?: boolean
 }
 export interface AppStats extends AppInfos {
   action: string
@@ -33,4 +34,11 @@ export interface BaseHeaders {
 export interface Details {
   timestamp: number
   signatures: string[]
+}
+
+export interface Manifest {
+  target_version: string
+  source_version: string
+  checksum: string
+  url: string
 }

@@ -2,14 +2,14 @@ import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
-import type { AppInfos } from '../_utils/types.ts'
+import type { AppInfos, Manifest } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
-function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
+function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest?: Manifest) {
   const res: any = {
     version: version.name,
     url: signedURL,
@@ -18,6 +18,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
     res.session_key = version.session_key || ''
   if (semver.gte(plugin_version, '4.4.0'))
     res.checksum = version.checksum
+  if (semver.gte(plugin_version, '5.3.0') && manifest)
+    res.manifest = manifest
   return res
 }
 
@@ -163,6 +165,7 @@ export async function update(body: AppInfos) {
       custom_id,
       is_emulator = false,
       is_prod = true,
+      partial_update = false,
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
@@ -339,7 +342,7 @@ export async function update(body: AppInfos) {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(version.storage_provider, `apps/${version.user_id}/${app_id}/versions`, version.bucket_id)
+      const res = await getSignedURL(app_id, version)
       if (res)
         signedURL = res
     }
@@ -429,17 +432,60 @@ export async function update(body: AppInfos) {
         error: 'no_bundle',
       }, 200, updateOverwritten)
     }
+
+    let manifest = undefined
+    if (partial_update) {
+      // fetch partial version of the bundle from the DB
+      const partialBundle = await getPartialUpdate(app_id, version_name, version.name)
+      if (partialBundle) {
+        // get a signed download URL
+        const partialBundleURL = await getSignedURL(app_id, partialBundle)
+        manifest = getManifestForPartialBundle(version_name, version.name, partialBundle.checksum, partialBundleURL)
+      }
+    }
+
     await updevice
     // console.log(id, 'save stats', device_id)
     await sendStats('get', platform, device_id, app_id, version_build, versionId)
     console.log(id, 'New version available', app_id, version.name, signedURL)
-    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
+    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version, manifest), 200, updateOverwritten)
   }
   catch (e) {
     console.error('e', e)
     return sendRes({
-      message: `Error unknow ${JSON.stringify(e)}`,
+      message: `Error unknown ${JSON.stringify(e)}`,
       error: 'unknow_error',
     }, 500)
   }
+}
+
+
+async function getPartialUpdate(app_id: string, source_version: string, target_version: string) {
+  return await supabaseAdmin().from('app_versions').select(`
+      id,
+      name,
+      checksum,
+      session_key,
+      user_id,
+      bucket_id,
+      storage_provider,
+      external_url
+  `)
+  .eq('name', `${target_version}-basedon-${source_version}`)
+  .single()
+  .then(res => res.data)  
+}
+
+function getManifestForPartialBundle(source_version: string, target_version: string, checksum: string, url: string): Manifest {
+  const manifest:Manifest = {
+    source_version: source_version,
+    target_version: target_version,
+    checksum: checksum,
+    url: url
+  }
+  return manifest
+}
+
+function getSignedURL(app_id: string, version: any) {
+  return getBundleUrl(version.storage_provider, `apps/${version.user_id}/${app_id}/versions`, version.bucket_id)
 }
