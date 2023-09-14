@@ -1,4 +1,4 @@
-import type { Integer, Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis/mod.ts'
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts'
@@ -42,7 +42,7 @@ class RedisRedisPipeline implements RedisPipelineInterface {
 }
 
 class RedisUpstashPipeline implements RedisPipelineInterface {
-  size: Integer
+  size: number
   pipeline: UpstashPipeline<[]>
 
   constructor(pipeline: UpstashPipeline<[]>) {
