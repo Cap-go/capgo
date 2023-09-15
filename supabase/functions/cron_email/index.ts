@@ -109,6 +109,9 @@ async function main(_url: URL, headers: BaseHeaders, _method: string, _body: any
       continue
     }
 
+    if (weeklyStats.all_updates === 0)
+      continue
+
     const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
     if (sucessUpdates < 0) {
       console.error('Cannot send email for app, sucessUpdates < 0', weeklyStats, mapApp)
