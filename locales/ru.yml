@@ -93,6 +93,7 @@ changed-password-suc: Пароль успешно изменен
 channel: Канал
 channel-create: Создать канал
 channel-deleted: Канал удален
+channel-forced-devices: Устройства с принудительным каналом
 channel-invit: Введите адрес электронной почты, чтобы пригласить
 channel-is-public: Канал по умолчанию
 channel-link: Переопределение канала
