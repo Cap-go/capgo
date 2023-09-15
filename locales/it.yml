@@ -91,6 +91,7 @@ changed-password-suc: password cambiata con successo
 channel: Canale
 channel-create: Crea canale
 channel-deleted: Canale eliminato
+channel-forced-devices: Dispositivi Forzati sul Canale
 channel-invit: Digita l'e-mail per invitare
 channel-is-public: Canale di default
 channel-link: Override del canale
