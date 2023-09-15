@@ -57,11 +57,6 @@ CREATE TYPE "public"."usage_mode" AS ENUM (
     'cycle'
 );
 
-CREATE TYPE "public"."stat_time" AS (
-	"device_id" uuid,
-	"created_at" timestamp
-);
-
 CREATE TYPE "public"."platform_os" AS ENUM (
     'ios',
     'android'
