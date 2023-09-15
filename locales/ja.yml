@@ -89,6 +89,7 @@ changed-password-suc: パスワードは正常に変更されました
 channel: チャネル
 channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
+channel-forced-devices: チャネル強制デバイス
 channel-invit: 招待するメールを入力
 channel-is-public: デフォルトのチャンネル
 channel-link: チャンネルオーバーライド
