@@ -91,6 +91,7 @@ changed-password-suc: Senha alterada com sucesso
 channel: Canal
 channel-create: Criar canal
 channel-deleted: Canal deletado
+channel-forced-devices: Dispositivos Forçados no Canal
 channel-invit: Digite o e-mail para convidar
 channel-is-public: Canal padrão
 channel-link: Substituição de canal
