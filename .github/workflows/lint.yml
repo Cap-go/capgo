@@ -45,3 +45,6 @@ jobs:
       - name: Run Lint
         run: pnpm run lint
 
+      - name: Run Backend Lint
+        run: pnpm run lint-backend
+

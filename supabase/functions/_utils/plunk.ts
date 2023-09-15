@@ -1,6 +1,5 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import { shallowCleanObject } from './utils.ts'
-import { getEnv } from './utils.ts'
+import { getEnv, shallowCleanObject } from './utils.ts'
 
 export interface Segments {
   capgo: boolean

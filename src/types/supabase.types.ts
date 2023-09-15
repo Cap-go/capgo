@@ -1357,6 +1357,10 @@ export interface Database {
         }
         Returns: number
       }
+      get_external_function_url: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_max_plan: {
         Args: {
           userid: string
@@ -1391,6 +1395,12 @@ export interface Database {
           storage: number
         }[]
       }
+      get_total_storage_size: {
+        Args: {
+          userid: string
+        }
+        Returns: number
+      }
       get_user_id: {
         Args: {
           apikey: string
@@ -1406,6 +1416,14 @@ export interface Database {
           _channelid?: number
         }
         Returns: boolean
+      }
+      http_post_helper: {
+        Args: {
+          function_name: string
+          function_type: string
+          body: Json
+        }
+        Returns: undefined
       }
       increment_store: {
         Args: {
@@ -1541,17 +1559,12 @@ export interface Database {
         }
         Returns: undefined
       }
-      update_app_usage:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: undefined
-          }
-        | {
-            Args: {
-              minutes_interval: number
-            }
-            Returns: undefined
-          }
+      update_app_usage: {
+        Args: {
+          minutes_interval: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_mode: "prod" | "dev" | "livereload"

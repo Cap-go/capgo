@@ -705,38 +705,63 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.calculate_daily_app_usage() RETURNS VOID AS $$
 DECLARE
-    twenty_four_hours_ago TIMESTAMP;
+    current_day TIMESTAMP;
 BEGIN
     -- Initialize time variable
-    twenty_four_hours_ago := NOW() - INTERVAL '24 hours';
+    current_day := DATE_TRUNC('day', NOW());
 
     WITH daily_usage AS (
         SELECT app_id, SUM(bandwidth) AS daily_bandwidth, SUM(storage) AS daily_storage, SUM(mau) AS daily_mau
         FROM app_usage
-        WHERE created_at >= twenty_four_hours_ago AND mode = '5min'
+        WHERE DATE_TRUNC('day', created_at) = current_day AND mode = '5min'
         GROUP BY app_id
+    ), 
+    upsert AS (
+        UPDATE app_usage 
+        SET bandwidth = daily_usage.daily_bandwidth, storage = daily_usage.daily_storage, mau = daily_usage.daily_mau
+        FROM daily_usage
+        WHERE app_usage.app_id = daily_usage.app_id AND DATE_TRUNC('day', app_usage.created_at) = current_day AND app_usage.mode = 'day'
+        RETURNING app_usage.*
     )
     INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
     SELECT app_id, NOW(), daily_bandwidth, daily_storage, daily_mau, 'day'
-    FROM daily_usage;
+    FROM daily_usage
+    WHERE NOT EXISTS (SELECT 1 FROM upsert WHERE upsert.app_id = daily_usage.app_id);
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.calculate_cycle_usage() RETURNS VOID AS $$
+DECLARE
+    current_cycle_start TIMESTAMP;
+    current_cycle_end TIMESTAMP;
 BEGIN
+    -- Initialize cycle time variables
+    SELECT subscription_anchor_start, subscription_anchor_end INTO current_cycle_start, current_cycle_end
+    FROM stripe_info
+    ORDER BY subscription_anchor_start DESC
+    LIMIT 1;
+
     WITH cycle_usage AS (
         SELECT apps.app_id, SUM(app_usage.bandwidth) AS cycle_bandwidth, SUM(app_usage.storage) AS cycle_storage, SUM(app_usage.mau) AS cycle_mau
         FROM app_usage
         JOIN apps ON app_usage.app_id = apps.app_id
         JOIN users ON apps.user_id = users.id
         JOIN stripe_info ON users.customer_id = stripe_info.customer_id
-        WHERE app_usage.created_at BETWEEN stripe_info.subscription_anchor_start AND stripe_info.subscription_anchor_end
+        WHERE app_usage.created_at BETWEEN current_cycle_start AND current_cycle_end
         AND app_usage.mode = 'day'
         GROUP BY apps.app_id
+    ), 
+    upsert AS (
+        UPDATE app_usage 
+        SET bandwidth = cycle_usage.cycle_bandwidth, storage = cycle_usage.cycle_storage, mau = cycle_usage.cycle_mau
+        FROM cycle_usage
+        WHERE app_usage.app_id = cycle_usage.app_id AND app_usage.created_at BETWEEN current_cycle_start AND current_cycle_end AND app_usage.mode = 'cycle'
+        RETURNING app_usage.*
     )
     INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
     SELECT app_id, NOW(), cycle_bandwidth, cycle_storage, cycle_mau, 'cycle'
-    FROM cycle_usage;
+    FROM cycle_usage
+    WHERE NOT EXISTS (SELECT 1 FROM upsert WHERE upsert.app_id = cycle_usage.app_id);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -762,6 +787,78 @@ BEGIN
     current_plan_total.mau,
     current_plan_total.bandwidth,
     current_plan_total.storage) where find_fit_plan_v3.name = (SELECT get_current_plan_name(userid)));
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_stats_v3(userid uuid)
+RETURNS TABLE(mau bigint, bandwidth double precision, storage double precision)
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    subscription_anchor_start date;
+    subscription_anchor_end date;
+BEGIN
+    SELECT anchor_start, anchor_end INTO subscription_anchor_start, subscription_anchor_end 
+    FROM stripe_info
+    WHERE user_id = userid;
+
+    RETURN QUERY SELECT 
+        COALESCE(SUM(mau), 0)::bigint AS mau,
+        COALESCE(round(convert_bytes_to_gb(SUM(app_usage.bandwidth))::numeric,2), 0)::float AS bandwidth,
+        COALESCE(round(convert_bytes_to_gb(SUM(storage))::numeric,2), 0)::float AS storage
+    FROM app_usage
+    WHERE user_id = userid
+    AND created_at >= subscription_anchor_start
+    AND created_at <= subscription_anchor_end
+    AND mode = 'day';
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_storage_size(userid uuid)
+RETURNS double precision
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    total_size double precision := 0;
+BEGIN
+    SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
+    FROM app_versions
+    INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
+    WHERE app_versions.user_id = userid
+    AND app_versions.deleted = false;
+
+    RETURN total_size;
+END;  
+$$;
+
+CREATE OR REPLACE PROCEDURE public.update_app_versions_retention()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE app_versions
+    SET deleted = true
+    FROM apps, app_versions_meta
+    WHERE app_versions_meta.app_id = app_versions.app_id
+    AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
+    AND app_versions.deleted = false
+    AND apps.retention > 0
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE public.update_channels_progressive_deploy()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE channels
+    SET "secondaryVersionPercentage" = CASE 
+        WHEN channels."secondVersion" not in (select version from stats where stats.action='update_fail' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) 
+        THEN "secondaryVersionPercentage" + 0.1 
+        ELSE 0 
+    END
+    WHERE channels.enable_progressive_deploy = true
+    AND channels."secondaryVersionPercentage" between 0 AND 0.9;
 END;
 $$;
 
@@ -1440,6 +1537,10 @@ CREATE OR REPLACE FUNCTION public.get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
+CREATE OR REPLACE FUNCTION public.get_external_function_url() RETURNS TEXT LANGUAGE SQL AS $$
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='external_function_url';
+$$ SECURITY DEFINER STABLE PARALLEL SAFE;
+
 CREATE OR REPLACE FUNCTION public.get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='apikey';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
@@ -1449,13 +1550,43 @@ REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.get_apikey() TO postgres;
 
-CREATE OR REPLACE FUNCTION public.http_post_to_function() 
-RETURNS trigger 
+CREATE OR REPLACE FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) 
+RETURNS void 
 LANGUAGE plpgsql 
 SECURITY DEFINER
 AS $BODY$
 DECLARE 
   request_id text;
+  url text;
+BEGIN 
+  -- Determine the URL based on the function_type
+  IF function_type = 'external' THEN
+    url := get_external_function_url() || function_name;
+  ELSE
+    url := get_db_url() || '/functions/v1/' || function_name;
+  END IF;
+
+  -- Make an async HTTP POST request using pg_net
+  SELECT INTO request_id net.http_post(
+    url := url,
+    headers := jsonb_build_object(
+      'Content-Type',
+      'application/json',
+      'apisecret',
+      get_apikey()
+    ),
+    body := body,
+    timeout_milliseconds := 15000
+  );
+END;
+$BODY$;
+
+CREATE OR REPLACE FUNCTION public.trigger_http_post_to_function() 
+RETURNS trigger 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+AS $BODY$
+DECLARE 
   payload jsonb;
 BEGIN 
   -- Build the payload
@@ -1467,27 +1598,22 @@ BEGIN
     'schema', TG_TABLE_SCHEMA
   );
 
-  -- Make an async HTTP POST request using pg_net
-  SELECT INTO request_id net.http_post(
-    url := get_db_url() || '/functions/v1/' || TG_ARGV[0],
-    headers := jsonb_build_object(
-      'Content-Type',
-      'application/json',
-      'apisecret',
-      get_apikey()
-    ),
-    body := payload,
-    timeout_milliseconds := 15000
-  );
+  -- Call the helper function
+  PERFORM http_post_helper(TG_ARGV[0], TG_ARGV[1], payload);
 
   RETURN NEW;
 END;
 $BODY$;
 
-REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.http_post_to_function() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM anon;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.trigger_http_post_to_function() TO postgres;
 
 REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;

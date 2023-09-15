@@ -11,13 +11,13 @@ const storageUseSsl = false
 const storagePort = 9000
 // upper is ignored during netlify generation phase
 // import from here
+
 function initR2() {
   const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
     useSSL: storageUseSsl,
     port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
-    bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
