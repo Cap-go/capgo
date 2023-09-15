@@ -89,6 +89,7 @@ changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
+channel-forced-devices: Perangkat Terpaksa Saluran
 channel-invit: Ketik email untuk mengundang
 channel-is-public: Saluran awal
 channel-link: Penimpaan saluran
