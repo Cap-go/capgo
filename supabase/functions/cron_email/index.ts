@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
-import { map } from 'https://deno.land/x/fonction@v1.6.2/mod.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { trackEvent } from '../_utils/plunk.ts'
@@ -8,6 +7,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 // This is required propoably due to this https://github.com/supabase/postgrest-js/issues/408
 interface AppWithUser {
   app_id: string
+  name: string | null
   user_id: {
     email: string
   }
@@ -19,12 +19,53 @@ const thresholds = {
     1000,
     10000,
   ],
-  fail_rate: [
+  failRate: [
     0.80,
     0.90,
     0.95,
   ],
+  appOpen: [
+    500,
+    1500,
+    5000,
+  ],
+}
 
+const funComparisons = {
+  updates: [
+    'That\'s like delivering a cupcake to every student in a small school!',
+    'That\'s like delivering a pizza to every resident of a small town!',
+    'That\'s like delivering a burger to everyone in a big city!',
+  ],
+  failRate: [
+    'That\'s above 80% success rate! Even cats don\'t land on their feet that often!',
+    'That\'s a success rate higher than the average pass rate of a tough university exam!',
+    'That\'s a success rate that even the best basketball players would envy!',
+  ],
+  appOpen: [
+    'Your app was opened more times than a popular local bakery\'s door!',
+    'Your app was more popular than the latest episode of a hit TV show!',
+    'Your app was opened more times than a blockbuster movie on its opening weekend!',
+  ],
+}
+
+function getFunComparison(comparison: 'updates' | 'failRate' | 'appOpen', stat: number): string {
+  console.log('stat', stat)
+  const thresholdsForComparisons = thresholds[comparison]
+  const index = thresholdsForComparisons.map((threshold, index) => {
+    if (threshold >= stat)
+      return index
+    else if ((index === 2 && stat >= threshold))
+      return 2 // Last index
+
+    return undefined
+  }).find(i => i !== undefined)
+
+  if (index === undefined || index >= 3)
+    throw new Error(`Cannot find index for fun comparison, ${index}`)
+
+  console.log('final i', index)
+  return funComparisons[comparison][index]
 }
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
@@ -39,12 +80,15 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
 
+  console.log('body', ((1 / 8) * 100).toFixed(2))
+
   const supabase = await supabaseAdmin()
 
   const { data: apps, error: appsError } = await supabase
     .from('apps')
     .select(`
       app_id,
+      name,
       user_id ( id )
     `)
 
@@ -70,6 +114,27 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
 
     console.log('weeklyStats', weeklyStats)
 
+    if (!weeklyStats || generateStatsError) {
+      console.error('Cannot send email for app', mapApp.app_id, generateStatsError, mapApp.user_id.email)
+      continue
+    }
+
+    const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
+    if (sucessUpdates < 0) {
+      console.error('Cannot send email for app, sucessUpdates < 0', weeklyStats, mapApp)
+      continue
+    }
+
+    const successPercantage = (sucessUpdates / weeklyStats.all_updates)
+
+    const metadata = {
+      app_id: mapApp.name ?? mapApp.app_id,
+      weekly_updates: weeklyStats.all_updates,
+      fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
+      weekly_install: sucessUpdates,
+      // weekly_install_success: successPercantage.t
+    }
+
     if (generateStatsError) {
       console.error('error', generateStatsError)
       return sendRes()
@@ -85,8 +150,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     weekly_fail: '12',
     weekly_open: '100',
     fun_comparison_2: 'idk',
-    weekly_open_time: '10min',
-    fun_comparison_3: '??',
   }
 
   // await trackEvent('isupermichael007@gmail.com', data, 'cron-stats')
