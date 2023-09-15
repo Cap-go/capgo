@@ -759,6 +759,23 @@ BEGIN
 END;  
 $$;
 
+CREATE OR REPLACE FUNCTION public.get_total_storage_size(userid uuid)
+RETURNS double precision
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    total_size double precision := 0;
+BEGIN
+    SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
+    FROM app_versions
+    INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
+    WHERE app_versions.user_id = userid
+    AND app_versions.deleted = false;
+
+    RETURN total_size;
+END;  
+$$;
+
 CREATE OR REPLACE PROCEDURE public.update_app_versions_retention()
 LANGUAGE plpgsql
 AS $$

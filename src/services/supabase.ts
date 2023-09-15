@@ -122,6 +122,16 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
+export async function getTotalStorage(userId: string): Promise<number> {
+  const { data, error } = await useSupabase()
+    .rpc('get_total_storage_size', { userid: userId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || 0
+}
+
 export async function isGoodPlan(userId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
     .rpc('is_good_plan_v3', { userid: userId })

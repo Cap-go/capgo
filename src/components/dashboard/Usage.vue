@@ -4,7 +4,7 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, getTotalStorage, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
@@ -51,7 +51,7 @@ const allLimits = computed(() => {
   })
 })
 
-async function getAppStat(app_id: string) {
+async function getAppStat(app_ids: string[]) {
   if (!main.user)
     return { data: [], error: 'missing user' }
   const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
@@ -60,7 +60,7 @@ async function getAppStat(app_id: string) {
     return supabase
       .from('app_usage')
       .select()
-      .eq('app_id', app_id)
+      .in('app_id', app_ids)
       .eq('mode', 'day')
       .gte('created_at', getConvertedDate(cycleStart))
       .lte('created_at', getConvertedDate(cycleEnd))
@@ -68,23 +68,17 @@ async function getAppStat(app_id: string) {
   return supabase
     .from('app_usage')
     .select()
-    .eq('app_id', app_id)
+    .in('app_id', app_ids)
     .eq('mode', 'day')
 }
 
 async function getAppStats() {
-  if (props.appId) {
-    const t = await getAppStat(props.appId)
-    return t
-  }
-  else if (props.apps && props.apps.length > 0) {
-    const t = (await Promise.all(props.apps.map(async (app) => {
-      return await getAppStat(app.app_id)
-    })))
-    t.data = t.map(i => i.data).flat()
-    t.count = t.data.length
-    return t
-  }
+  if (props.appId)
+    return await getAppStat([props.appId])
+
+  else if (props.apps && props.apps.length > 0)
+    return await getAppStat(props.apps.map(i => i.app_id))
+
   return supabase
     .from('app_usage')
     .select()
@@ -101,6 +95,7 @@ async function getAllStats() {
 
 async function getUsages() {
   const currentStorage = 0
+  const totalStorage = main.user?.id ? await getTotalStorage(main.user?.id) : 0
   const { data, error } = await getAppStats()
   if (data && !error) {
     const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
@@ -135,6 +130,8 @@ async function getUsages() {
           datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
       }
     })
+    datas.value.storage[0] = octetsToGb(totalStorage)
+
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
     datas.value.storage[0] = currentStorage - storageVariance
     if (datas.value.storage[0] < 0)
