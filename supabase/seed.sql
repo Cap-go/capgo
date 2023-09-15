@@ -251,4 +251,16 @@ SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
       "secondaryVersionPercentage" = CASE WHEN channels."secondVersion" not in (select version from stats where stats.action=''update_fail'' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) THEN "secondaryVersionPercentage" + 0.1 ELSE 0 END
     where channels.enable_progressive_deploy = true
     and channels."secondaryVersionPercentage" between 0 AND 0.9;
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_progressive_deploy');
+    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_progressive_deploy'),
+(25, '0 12 * * 6', '
+  SELECT net.http_post(
+    url := get_db_url() || ''/functions/v1/'' || ''cron_email'',
+    headers := jsonb_build_object(
+      ''Content-Type'',
+      ''application/json'',
+      ''apisecret'',
+      get_apikey()
+    ),
+    timeout_milliseconds := 300000
+  );
+  ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_email');

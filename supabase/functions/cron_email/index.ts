@@ -33,12 +33,12 @@ const thresholds = {
 
 const funComparisons = {
   updates: [
-    'That\'s like delivering a cupcake to every student in a small school!',
-    'That\'s like delivering a pizza to every resident of a small town!',
-    'That\'s like delivering a burger to everyone in a big city!',
+    'a cupcake to every student in a small school!',
+    'a pizza to every resident of a small town!',
+    'a burger to everyone in a big city!',
   ],
   failRate: [
-    'That\'s above 80% success rate! Even cats don\'t land on their feet that often!',
+    'Even cats don\'t land on their feet that often!',
     'That\'s a success rate higher than the average pass rate of a tough university exam!',
     'That\'s a success rate that even the best basketball players would envy!',
   ],
@@ -50,7 +50,6 @@ const funComparisons = {
 }
 
 function getFunComparison(comparison: 'updates' | 'failRate' | 'appOpen', stat: number): string {
-  console.log('stat', stat)
   const thresholdsForComparisons = thresholds[comparison]
   const index = thresholdsForComparisons.map((threshold, index) => {
     if (threshold >= stat)
@@ -64,12 +63,10 @@ function getFunComparison(comparison: 'updates' | 'failRate' | 'appOpen', stat: 
   if (index === undefined || index >= 3)
     throw new Error(`Cannot find index for fun comparison, ${index}`)
 
-  console.log('final i', index)
   return funComparisons[comparison][index]
 }
 
-async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
-  console.log('called!')
+async function main(_url: URL, headers: BaseHeaders, _method: string, _body: any) {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
   if (!authorizationSecret)
@@ -80,8 +77,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
 
-  console.log('body', ((1 / 8) * 100).toFixed(2))
-
   const supabase = await supabaseAdmin()
 
   const { data: apps, error: appsError } = await supabase
@@ -89,7 +84,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     .select(`
       app_id,
       name,
-      user_id ( id )
+      user_id ( id, email )
     `)
 
   if (appsError) {
@@ -98,11 +93,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     return sendRes()
   }
 
-  // TODO: REMOVE THIS
-  let mappedApps = apps as unknown as AppWithUser[]
-  mappedApps = mappedApps?.filter(app => app.app_id === 'com.demo.app')
-
-  console.log('apps', mappedApps)
+  // We propably do not need this, however for whatever reason supabase does not like our join
+  const mappedApps = apps as unknown as AppWithUser[]
 
   // Set stats = all updates
   // Sucess updates = set - failed
@@ -111,8 +103,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
       app_id: mapApp.app_id,
     }).single()
-
-    console.log('weeklyStats', weeklyStats)
 
     if (!weeklyStats || generateStatsError) {
       console.error('Cannot send email for app', mapApp.app_id, generateStatsError, mapApp.user_id.email)
@@ -125,34 +115,22 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
       continue
     }
 
-    const successPercantage = (sucessUpdates / weeklyStats.all_updates)
+    const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
 
     const metadata = {
-      app_id: mapApp.name ?? mapApp.app_id,
-      weekly_updates: weeklyStats.all_updates,
+      app_id: mapApp.app_id,
+      weekly_updates: (weeklyStats.all_updates).toString(),
       fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
-      weekly_install: sucessUpdates,
-      // weekly_install_success: successPercantage.t
+      weekly_install: sucessUpdates.toString(),
+      weekly_install_success: (successPercantage * 100).toString(),
+      fun_comparison_2: getFunComparison('failRate', successPercantage),
+      weekly_fail: (weeklyStats.failed_updates).toString(),
+      weekly_open: (weeklyStats.open_app).toString(),
+      fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
     }
 
-    if (generateStatsError) {
-      console.error('error', generateStatsError)
-      return sendRes()
-    }
+    await trackEvent(mapApp.user_id.email, metadata, 'cron-stats')
   }
-
-  const data = {
-    app_name: 'test_app',
-    fun_comparison: 'fun',
-    weekly_updates: '10',
-    weekly_install: '4',
-    weekly_install_success: '3',
-    weekly_fail: '12',
-    weekly_open: '100',
-    fun_comparison_2: 'idk',
-  }
-
-  // await trackEvent('isupermichael007@gmail.com', data, 'cron-stats')
 
   return sendRes()
 }
