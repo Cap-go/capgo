@@ -14,16 +14,19 @@ interface AppWithUser {
 }
 
 const thresholds = {
+  // Number of updates in plain number
   updates: [
     100,
     1000,
     10000,
   ],
+  // Percentage in decimal form (0.9 ==== 90%)
   failRate: [
     0.80,
     0.90,
     0.95,
   ],
+  // Number of app opens in plain number
   appOpen: [
     500,
     1500,
@@ -49,6 +52,7 @@ const funComparisons = {
   ],
 }
 
+// Check what treshold does the stat qualify for and return the fun comparison
 function getFunComparison(comparison: 'updates' | 'failRate' | 'appOpen', stat: number): string {
   const thresholdsForComparisons = thresholds[comparison]
   const index = thresholdsForComparisons.map((threshold, index) => {
