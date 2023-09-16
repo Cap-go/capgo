@@ -597,8 +597,8 @@ Declare
  seven_days_ago TIMESTAMP;
  all_updates integer;
  failed_updates integer;
- open_app integer;
- open_time_array TABLE ("device_id" uuid, "created_at" timestamp)[];
+ -- open_app integer;
+ -- open_time_array TABLE ("device_id" uuid, "created_at" timestamp)[];
 Begin
   seven_days_ago := NOW() - INTERVAL '7 days';
   
@@ -627,16 +627,16 @@ Begin
   AND stats.created_at BETWEEN seven_days_ago AND now()
   AND stats.app_id = get_weekly_stats.app_id;
 
-  SELECT ARRAY (
-    SELECT ROW (stats.device_id, stats.created_at)
-    FROM public.stats
-    WHERE stats.action='app_moved_to_foreground'
-    AND stats.created_at BETWEEN seven_days_ago AND now()
-    AND stats.app_id = get_weekly_stats.app_id
-  )
-  INTO open_time_array;
+  --SELECT ARRAY (
+  --  SELECT ROW (stats.device_id, stats.created_at)
+  --  FROM public.stats
+  --  WHERE stats.action='app_moved_to_foreground'
+  --  AND stats.created_at BETWEEN seven_days_ago AND now()
+  --  AND stats.app_id = get_weekly_stats.app_id
+  --)
+  -- INTO open_time_array;
 
-  RAISE NOTICE '%', open_time_array;
+  -- RAISE NOTICE '%', open_time_array;
 
   RETURN query (select all_updates, failed_updates, open_app); 
 End;                                                           

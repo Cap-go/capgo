@@ -53,18 +53,18 @@ const funComparisons = {
 }
 
 // Check what treshold does the stat qualify for and return the fun comparison
-function getFunComparison(comparison: 'updates' | 'failRate' | 'appOpen', stat: number): string {
+function getFunComparison(comparison: keyof typeof funComparisons, stat: number): string {
   const thresholdsForComparisons = thresholds[comparison]
-  const index = thresholdsForComparisons.map((threshold, index) => {
+  const index = thresholdsForComparisons.findIndex((threshold, index) => {
     if (threshold >= stat)
-      return index
+      return true
     else if ((index === 2 && stat >= threshold))
-      return 2 // Last index
+      return true // Last index
 
-    return undefined
-  }).find(i => i !== undefined)
+    return false
+  })
 
-  if (index === undefined || index >= 3)
+  if (index === -1 || index >= 3)
     throw new Error(`Cannot find index for fun comparison, ${index}`)
 
   return funComparisons[comparison][index]
