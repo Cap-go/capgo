@@ -98,7 +98,7 @@ channel-ab-testing: Enable AB testing
 channel-ab-testing-percentage: Percentage of users recving secondary version
 channel-create: Create channel
 channel-deleted: Channel deleted
-channel-forced-devices: Channel-Forced Devices
+channel-forced-devices: Channel-forced devices
 channel-invit: Type email to invite
 channel-is-public: Default channel
 channel-link: Channel override
