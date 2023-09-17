@@ -4,11 +4,11 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, getTotalStorage, useSupabase } from '~/services/supabase'
+import { getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { getConvertedDate, getDaysBetweenDates, octetsToGb } from '~/services/conversion'
+import { bytesToGb, getConvertedDate, getDaysBetweenDates } from '~/services/conversion'
 
 const props = defineProps<{
   appId?: string
@@ -18,14 +18,6 @@ const props = defineProps<{
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
 
-const stats = ref({
-  mau: 0,
-  storage: 0,
-  bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v2']['Returns'][0])
-
-const planSuggest = ref('')
-const planCurrrent = ref('')
 const datas = ref({
   mau: [] as number[],
   storage: [] as number[],
@@ -85,14 +77,6 @@ async function getAppStats() {
     .eq('mode', 'day')
 }
 
-async function getAllStats() {
-  if (!main.user?.id)
-    return
-
-  const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getTotalStats(main.user?.id, date_id)
-}
-
 async function getUsages() {
   const currentStorage = 0
   const totalStorage = main.user?.id ? await getTotalStorage(main.user?.id) : 0
@@ -118,19 +102,19 @@ async function getUsages() {
           datas.value.mau[dayNumber] = item.mau
 
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += item.storage ? octetsToGb(item.storage) : 0
+          datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
 
         else
-          datas.value.storage[dayNumber] = item.storage ? octetsToGb(item.storage) : 0
+          datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
 
         if (datas.value.bandwidth[dayNumber])
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
 
         else
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
     })
-    datas.value.storage[0] = octetsToGb(totalStorage)
+    datas.value.storage[0] = bytesToGb(totalStorage)
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
     datas.value.storage[0] = currentStorage - storageVariance
@@ -149,10 +133,6 @@ async function loadData() {
     plans.value.push(...pls)
   })
   await getUsages()
-  await getAllStats()
-  await findBestPlan(stats.value).then(res => planSuggest.value = res)
-  if (main.user?.id)
-    await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
   isLoading.value = false
 }
 loadData()
