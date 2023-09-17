@@ -11,7 +11,7 @@ const baseData = {
   version_os: '13',
   version_name: '1.0.0',
   plugin_version: '5.2.1',
-  is_emulator: true,
+  is_emulator: false,
   is_prod: true,
 }
 
@@ -60,18 +60,17 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
 
   const disableEmulatorData = getBaseData()
   disableEmulatorData.version_name = '1.1.0'
-  executeWithTeardown(
-    async () => {
-      const disableEmulatorResponse = await sendUpdate(backendBaseUrl, disableEmulatorData)
-      await responseOk(disableEmulatorResponse, 'Disable emulator')
-      const disableEmulatorError = await getResponseError(disableEmulatorResponse)
-      assert (disableEmulatorError === 'disable_emulator', `Response error ${disableEmulatorError} is not equal to disable_emulator`)
-    },
-    async () => {
-      const { error: emulatorError2 } = await supabase.from('channels').update({ allow_emulator: true }).eq('id', 22)
-      assert(emulatorError2 === null, `Supabase disable_emulator error ${JSON.stringify(emulatorError2)} is not null`)
-    },
-  )
+  disableEmulatorData.is_emulator = true
+  try {
+    const disableEmulatorResponse = await sendUpdate(backendBaseUrl, disableEmulatorData)
+    await responseOk(disableEmulatorResponse, 'Disable emulator')
+    const disableEmulatorError = await getResponseError(disableEmulatorResponse)
+    assert (disableEmulatorError === 'disable_emulator', `Response error ${disableEmulatorError} is not equal to disable_emulator`)
+  }
+  finally {
+    const { error: emulatorError2 } = await supabase.from('channels').update({ allow_emulator: true }).eq('id', 22)
+    assert(emulatorError2 === null, `Supabase disable_emulator error ${JSON.stringify(emulatorError2)} is not null`)
+  }
 
   // We disable 'allow_dev' to test what happens when we send a request with allow_dev = true
   const { error: setAllowDevError } = await supabase.from('channels').update({ allow_dev: false }).eq('id', 22)
@@ -80,17 +79,16 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
   const allowDevData = getBaseData()
   allowDevData.version_name = '1.1.0'
   allowDevData.is_prod = false
-  executeWithTeardown(
-    async () => {
-      const allowDevResponse = await sendUpdate(backendBaseUrl, allowDevData)
-      await responseOk(allowDevResponse, 'Allow dev')
-      const allowDevError = await getResponseError(allowDevResponse)
-      assert (allowDevError === 'disable_dev_build', `Response error ${allowDevError} is not equal to disable_dev_build`)
-    },
-    async () => {
-      const { error: setAllowDevError2 } = await supabase.from('channels').update({ allow_dev: true }).eq('id', 22)
-      assert(setAllowDevError2 === null, `Supabase disable_dev_build error ${JSON.stringify(setAllowDevError2)} is not null`)
-    })
+  try {
+    const allowDevResponse = await sendUpdate(backendBaseUrl, allowDevData)
+    await responseOk(allowDevResponse, 'Allow dev')
+    const allowDevError = await getResponseError(allowDevResponse)
+    assert (allowDevError === 'disable_dev_build', `Response error ${allowDevError} is not equal to disable_dev_build`)
+  }
+  finally {
+    const { error: setAllowDevError2 } = await supabase.from('channels').update({ allow_dev: true }).eq('id', 22)
+    assert(setAllowDevError2 === null, `Supabase disable_dev_build error ${JSON.stringify(setAllowDevError2)} is not null`)
+  }
 
   // We test what happens if app does not exist
   const appDoesNotExistData = getBaseData()
@@ -103,34 +101,23 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
   // We test what happens if device id does not exist
   const newDeviceData = getBaseData()
   newDeviceData.device_id = crypto.randomUUID()
-  await executeWithTeardown(
-    async () => {
-      const newDeviceResponse = await sendUpdate(backendBaseUrl, newDeviceData)
-      await responseOk(newDeviceResponse, 'Device does not exist')
-      // We check in supabase now
-      const { data: newDeviceSupa, error: newDeviceSupaError } = await supabase
-        .from('devices')
-        .select()
-        .eq('device_id', newDeviceData.device_id)
-        .single()
-
-      assert(newDeviceSupaError === null, `Supabase get device error ${JSON.stringify(newDeviceSupaError)} is not null`)
-      assert(newDeviceSupa !== null, 'Supabase get device is null')
-      assert(newDeviceSupa?.device_id === newDeviceData.device_id, `Supabase device ${JSON.stringify(newDeviceSupa)} id is not equal to ${newDeviceData.device_id}`)
-    },
-    async () => {
-      const { error: deleteDeviceError } = await supabase.from('devices').delete().eq('device_id', newDeviceData.device_id)
-      assert(deleteDeviceError === null, `Supabase delete device error ${JSON.stringify(deleteDeviceError)} is not null`)
-    },
-  )
-}
-
-async function executeWithTeardown(action: () => Promise<void>, teardown: () => Promise<void>) {
   try {
-    await action()
+    const newDeviceResponse = await sendUpdate(backendBaseUrl, newDeviceData)
+    await responseOk(newDeviceResponse, 'Device does not exist')
+    // We check in supabase now
+    const { data: newDeviceSupa, error: newDeviceSupaError } = await supabase
+      .from('devices')
+      .select()
+      .eq('device_id', newDeviceData.device_id)
+      .single()
+
+    assert(newDeviceSupaError === null, `Supabase get device error ${JSON.stringify(newDeviceSupaError)} is not null`)
+    assert(newDeviceSupa !== null, 'Supabase get device is null')
+    assert(newDeviceSupa?.device_id === newDeviceData.device_id, `Supabase device ${JSON.stringify(newDeviceSupa)} id is not equal to ${newDeviceData.device_id}`)
   }
   finally {
-    await teardown()
+    const { error: deleteDeviceError } = await supabase.from('devices').delete().eq('device_id', newDeviceData.device_id)
+    assert(deleteDeviceError === null, `Supabase delete device error ${JSON.stringify(deleteDeviceError)} is not null`)
   }
 }
 
