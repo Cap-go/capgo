@@ -1,0 +1,40 @@
+name: Backup and Delete Old Entries
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  backup_and_delete:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Deno
+      uses: denolib/setup-deno@v2
+      with:
+        deno-version: '1.16.2' 
+        
+    - name: Install dependencies
+      run: deno cache --unstable --lock=import_map.json --import-map=import_map.json script.ts
+
+    - name: Execute backup script
+      run: deno run --unstable -A script.ts
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+        S3_REGION: ${{ secrets.S3_REGION }}
+        S3_PORT: ${{ secrets.S3_PORT }}
+        S3_SSL: ${{ secrets.S3_SSL }}
+
+    - name: Upload backup to GitHub Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: backup
+        path: backup

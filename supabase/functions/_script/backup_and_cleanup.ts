@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3';
 import 'https://deno.land/x/dotenv/load.ts';
-import { r2 } from '../_utils/r2.js';
+import { r2 } from '../_utils/r2';
 import type { Database } from '../_utils/supabase.types.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***';
@@ -21,40 +21,54 @@ function useSupabase() {
 async function backupAndDeleteOldEntries() {
   const supabase = useSupabase();
   const daysToKeep = 30; 
+  const pageSize = 1000; 
 
   const currentDate = new Date();
   const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
 
-  const { data: oldEntries, error: queryError } = await supabase
-    .from<Database['public']['Tables']['app_versions']['Row']>('app_versions')
-    .select()
-    .lt('updated_at', cutoffDate.toISOString());
+  let offset = 0;
+  let hasMoreData = true;
 
-  if (queryError) {
-    console.error('Error querying the Supabase table:', queryError.message);
-    return;
-  }
+  while (hasMoreData) {
+    const { data: oldEntries, error: queryError } = await supabase
+      .from<Database['public']['Tables']['app_versions']['Row']>('app_versions')
+      .select()
+      .lt('updated_at', cutoffDate.toISOString())
+      .range(offset, offset + pageSize - 1);
 
-  const backupData = JSON.stringify(oldEntries);
-  const backupFilename = `backup-${currentDate.toISOString()}.json`;
-  const backupPath = `${backupFolder}/${backupFilename}`;
+    if (queryError) {
+      console.error('Error querying the Supabase table:', queryError.message);
+      return;
+    }
 
-  try {
-    await r2.upload(backupPath, new TextEncoder().encode(backupData));
-    console.log(`Backup saved to R2: ${backupPath}`);
-  } catch (backupError) {
-    console.error('Error saving backup to R2:', backupError);
-  }
+    if (!oldEntries || oldEntries.length === 0) {
+      hasMoreData = false;
+      break;
+    }
 
-  const { error: deleteError } = await supabase
-    .from('app_versions')
-    .delete()
-    .lt('updated_at', cutoffDate.toISOString());
+    const backupData = JSON.stringify(oldEntries);
+    const backupFilename = `backup-${currentDate.toISOString()}-page-${offset / pageSize}.json`;
+    const backupPath = `${backupFolder}/${backupFilename}`;
 
-  if (deleteError) {
-    console.error('Error deleting entries from the Supabase table:', deleteError.message);
-  } else {
-    console.log('Deletion completed successfully.');
+    try {
+      await r2.upload(backupPath, new TextEncoder().encode(backupData));
+      console.log(`Backup saved to R2: ${backupPath}`);
+    } catch (backupError) {
+      console.error('Error saving backup to R2:', backupError);
+    }
+
+    const { error: deleteError } = await supabase
+      .from('app_versions')
+      .delete()
+      .lt('updated_at', cutoffDate.toISOString());
+
+    if (deleteError) {
+      console.error('Error deleting entries from the Supabase table:', deleteError.message);
+    } else {
+      console.log('Deletion completed successfully.');
+    }
+
+    offset += pageSize;
   }
 }
 
