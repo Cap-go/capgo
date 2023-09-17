@@ -47,7 +47,7 @@ jobs:
         with:
           version: 1.68.6 
 
-      - name: Install Supabase CLI
+      - name: Install Deno
         uses: denoland/setup-deno@v1
         with:
           deno-version: vx.x.x
@@ -63,7 +63,7 @@ jobs:
       - name: Start minio
         run: sh ./tests_backend/gh_actions/minio.sh
       
-      - name: Run Backend Bests
+      - name: Run Backend Tests
         run: pnpm test:backend
         env:
           USE_LOCAL_REDIS: true
