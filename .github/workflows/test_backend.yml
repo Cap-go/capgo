@@ -4,7 +4,6 @@ on:
   pull_request_target:
     branches:
       - main
-      - test_updates_endpoint
   merge_group:
   workflow_dispatch:
   
