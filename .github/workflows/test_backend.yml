@@ -66,8 +66,8 @@ jobs:
         run: pnpm test:backend
         env:
           USE_LOCAL_REDIS: true
-          UPSTASH_TOKEN: ${{ secrets.UPSTASH_TOKEN }}
-          UPSTASH_URL: ${{ secrets.UPSTASH_URL }}
+          UPSTASH_TOKEN: ${{ secrets.UPSTASH_TEST_TOKEN }}
+          UPSTASH_URL: ${{ secrets.UPSTASH_TEST_URL }}
 
       - name: Upload Test Results
         if: ${{ always() }}
