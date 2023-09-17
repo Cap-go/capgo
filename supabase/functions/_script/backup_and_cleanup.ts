@@ -61,7 +61,7 @@ async function backupAndDeleteOldEntries() {
         console.log(`Backup saved to R2: ${backupPath}`);
       } catch (backupError) {
         console.error('Error saving backup to R2:', backupError);
-        break;
+        throw new Error('Backup to R2 failed. Stopping execution to prevent data loss.');
       }
 
       const { error: deleteError } = await supabase
@@ -71,7 +71,7 @@ async function backupAndDeleteOldEntries() {
 
       if (deleteError) {
         console.error('Error deleting entries from the Supabase table:', deleteError.message);
-        break;
+        throw new Error('Deletion from the Supabase table failed. Stopping execution.');
       } else {
         console.log('Deletion completed successfully.');
       }
