@@ -2,10 +2,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3';
 import 'https://deno.land/x/dotenv/load.ts';
 import { r2 } from '../_utils/r2';
 import type { Database } from '../_utils/supabase.types.ts';
+import * as fs from 'https://deno.land/std/fs/mod.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '***';
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***';
-const backupFolder = 'backup'; 
+const backupFolder = 'backup';
 
 function useSupabase() {
   const options = {
@@ -19,56 +20,66 @@ function useSupabase() {
 }
 
 async function backupAndDeleteOldEntries() {
-  const supabase = useSupabase();
-  const daysToKeep = 30; 
-  const pageSize = 1000; 
-
-  const currentDate = new Date();
-  const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
-
-  let offset = 0;
-  let hasMoreData = true;
-
-  while (hasMoreData) {
-    const { data: oldEntries, error: queryError } = await supabase
-      .from<Database['public']['Tables']['app_versions']['Row']>('app_versions')
-      .select()
-      .lt('updated_at', cutoffDate.toISOString())
-      .range(offset, offset + pageSize - 1);
-
-    if (queryError) {
-      console.error('Error querying the Supabase table:', queryError.message);
-      return;
+  try {
+    if (!await fs.exists(backupFolder)) {
+      await fs.ensureDir(backupFolder);
     }
 
-    if (!oldEntries || oldEntries.length === 0) {
-      hasMoreData = false;
-      break;
+    const supabase = useSupabase();
+    const daysToKeep = 30;
+    const pageSize = 1000;
+
+    const currentDate = new Date();
+    const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
+
+    let offset = 0;
+    let hasMoreData = true;
+
+    while (hasMoreData) {
+      const { data: oldEntries, error: queryError } = await supabase
+        .from<Database['public']['Tables']['app_versions']['Row']>('app_versions')
+        .select()
+        .lt('updated_at', cutoffDate.toISOString())
+        .range(offset, offset + pageSize - 1);
+
+      if (queryError) {
+        console.error('Error querying the Supabase table:', queryError.message);
+        break;
+      }
+
+      if (!oldEntries || oldEntries.length === 0) {
+        hasMoreData = false;
+        break;
+      }
+
+      const backupData = JSON.stringify(oldEntries);
+      const backupFilename = `backup-${currentDate.toISOString()}-page-${offset / pageSize}.json`;
+      const backupPath = `${backupFolder}/${backupFilename}`;
+
+      try {
+        await r2.upload(backupPath, new TextEncoder().encode(backupData));
+        console.log(`Backup saved to R2: ${backupPath}`);
+      } catch (backupError) {
+        console.error('Error saving backup to R2:', backupError);
+        break;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('app_versions')
+        .delete()
+        .lt('updated_at', cutoffDate.toISOString());
+
+      if (deleteError) {
+        console.error('Error deleting entries from the Supabase table:', deleteError.message);
+        break;
+      } else {
+        console.log('Deletion completed successfully.');
+      }
+
+      offset += pageSize;
     }
-
-    const backupData = JSON.stringify(oldEntries);
-    const backupFilename = `backup-${currentDate.toISOString()}-page-${offset / pageSize}.json`;
-    const backupPath = `${backupFolder}/${backupFilename}`;
-
-    try {
-      await r2.upload(backupPath, new TextEncoder().encode(backupData));
-      console.log(`Backup saved to R2: ${backupPath}`);
-    } catch (backupError) {
-      console.error('Error saving backup to R2:', backupError);
-    }
-
-    const { error: deleteError } = await supabase
-      .from('app_versions')
-      .delete()
-      .lt('updated_at', cutoffDate.toISOString());
-
-    if (deleteError) {
-      console.error('Error deleting entries from the Supabase table:', deleteError.message);
-    } else {
-      console.log('Deletion completed successfully.');
-    }
-
-    offset += pageSize;
+  } catch (e) {
+    console.error('An error occurred:', e.message);
   }
 }
 
