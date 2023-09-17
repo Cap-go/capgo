@@ -47,6 +47,11 @@ jobs:
         with:
           version: 1.68.6 
 
+      - name: Install Supabase CLI
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: vx.x.x
+
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
       - name: Configure frontend env
