@@ -89,7 +89,7 @@ changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel: 채널
 channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
-channel-forced-devices: 채널 강제 장치
+channel-forced-devices: 강제 장치
 channel-invit: 초대할 이메일 입력
 channel-is-public: 기본 채널
 channel-link: 채널 재정의

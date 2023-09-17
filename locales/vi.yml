@@ -93,7 +93,7 @@ changed-password-suc: Đã đổi mật khẩu thành công
 channel: Kênh
 channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
-channel-forced-devices: Thiết Bị Bắt Buộc Kênh
+channel-forced-devices: Thiết bị bắt buộc
 channel-invit: Nhập email để mời
 channel-is-public: Kênh mặc định
 channel-link: ghi đè kênh
