@@ -51,7 +51,7 @@ const tabs: Tab[] = [
     key: 'users',
   },
   {
-    label: t('devices'),
+    label: t('channel-forced-devices'),
     icon: IconDevice,
     key: 'devices',
   },
