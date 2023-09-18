@@ -78,12 +78,9 @@ async function backupAndDeleteOldEntries() {
 
       offset += pageSize;
     }
-  } catch (e) {
-    console.error('An error occurred:', e.message);
-  }
 }
 
-backupAndDeleteOldEntries().catch((error) => {
+backupAndDeleteOldEntries().then(() => 'Backup logs executed successfully').catch((error) => {
   console.error('An error occurred:', error.message);
   Deno.exit(1);
 });
