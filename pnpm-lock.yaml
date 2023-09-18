@@ -129,8 +129,8 @@ dependencies:
     specifier: 1.0.0-pre-alpha.3
     version: 1.0.0-pre-alpha.3(vue@3.3.4)
   '@formkit/themes':
-    specifier: 0.19.0
-    version: 0.19.0(tailwindcss@3.3.3)
+    specifier: 0.19.3
+    version: 0.19.3(tailwindcss@3.3.3)
   '@formkit/vue':
     specifier: 0.19.0
     version: 0.19.0(tailwindcss@3.3.3)
@@ -3399,6 +3399,12 @@ packages:
       '@formkit/utils': 0.19.0
     dev: false
 
+  /@formkit/core@0.19.3:
+    resolution: {integrity: sha512-6AFthe72r8JeO4C2XwZ2ETcPPzL5HArgh7zKFJHhPAQHA5pTcoyNC/LkwytMGQy8Zr19s9W51ZAGeu4wydUwLw==}
+    dependencies:
+      '@formkit/utils': 0.19.3
+    dev: false
+
   /@formkit/dev@0.19.0:
     resolution: {integrity: sha512-8M9oxQzynsv7e5+LrNj9uvf84UUBKCbdZUPN9H+Q/YHf0DZD+zhzhdIG6DDQfdxExLOSzODM4GOgUkD01U0qVg==}
     dependencies:
@@ -3454,8 +3460,30 @@ packages:
       tailwindcss: 3.3.3
     dev: false
 
+  /@formkit/themes@0.19.3(tailwindcss@3.3.3):
+    resolution: {integrity: sha512-RKJwuys4ne6B8oiJgAOyCpdCe83g9vqRA2tFZWEJzALgcQjMg7cQ8V1vQLl+1vnfjx6NbNERaxkDPgcsHOGXTQ==}
+    peerDependencies:
+      tailwindcss: ^3.2.0
+      unocss: ^0.31.0
+      windicss: ^3.0.0
+    peerDependenciesMeta:
+      tailwindcss:
+        optional: true
+      unocss:
+        optional: true
+      windicss:
+        optional: true
+    dependencies:
+      '@formkit/core': 0.19.3
+      tailwindcss: 3.3.3
+    dev: false
+
   /@formkit/utils@0.19.0:
     resolution: {integrity: sha512-XJn1KTMTXQuw6O/0LcEgClPmnhfcHLV+U7H4yefxc9cOEZKjacqTtojaJs756yxqBUg/JEHLoHfHoHJ9MvnH0w==}
+    dev: false
+
+  /@formkit/utils@0.19.3:
+    resolution: {integrity: sha512-S7iSnFxM/mYpVxMe550oUYJGiW3KTaovylsXXWXe29h2RGnxIumsmGEi3bpmhkA3QtsL4DvsU10fGGL2nVP0gA==}
     dev: false
 
   /@formkit/validation@0.19.0:
