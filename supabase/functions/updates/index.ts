@@ -14,6 +14,8 @@ const jsonRequestSchema = z.object({
   device_id: z.string(),
   version_name: z.string(),
   app_id: z.string(),
+  is_emulator: z.optional(z.boolean()),
+  is_prod: z.optional(z.boolean()),
 })
 
 const headersSchema = z.object({
@@ -21,7 +23,7 @@ const headersSchema = z.object({
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = true
+const bypassRedis = false
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // const redis = null
@@ -36,7 +38,14 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
   if (!parseResult.success)
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
 
-  const { device_id: deviceId, version_name: versionName, app_id: appId } = parseResult.data
+  const {
+    device_id: deviceId,
+    version_name: versionName,
+    app_id: appId,
+    is_emulator: isEmulator,
+    is_prod: isProd,
+  } = parseResult.data
+
   const appCacheKey = `app_${appId}`
   const deviceCacheKey = `device_${deviceId}`
   const versionCacheKey = `ver_${versionName}`
@@ -55,7 +64,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return sendRes(APP_DOES_NOT_EXIST)
   }
 
-  if (inCache && deviceExists && device === 'standard' && cachedVersionExists && cachedVersion) {
+  if (inCache && deviceExists && device === 'standard' && cachedVersionExists && cachedVersion && !isEmulator && isProd) {
     console.log('[redis] Cached - cache sucessful')
     if (cachedVersion === CACHE_NO_NEW_VAL)
       return sendRes(APP_VERSION_NO_NEW)
@@ -101,7 +110,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
   if (!inCache)
     tx.hset(appCacheKey, 'exist', (updateStatus !== 'app_not_found').toString())
 
-  if (!cachedVersionExists && !updateOverwritten)
+  if (!cachedVersionExists && !updateOverwritten && !isEmulator && isProd)
     tx.hset(appCacheKey, versionCacheKey, (updateStatus !== 'no_new') ? await res.clone().text() : CACHE_NO_NEW_VAL)
 
   await tx.flush()
