@@ -160,7 +160,7 @@ const hightLights = computed<Stat[]>(() => ([
                   {{ t('from') }}
                 </h3>
                 <p class="text-gray-600">
-                  {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
+                  {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
                 </p>
               </div>
               <div>
@@ -168,7 +168,7 @@ const hightLights = computed<Stat[]>(() => ([
                   {{ t('to') }}
                 </h3>
                 <p class="text-gray-600">
-                  {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
+                  {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
                 </p>
               </div>
             </div>
