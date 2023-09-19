@@ -25,7 +25,7 @@ function useSupabase() {
   return createClient<Database>(supabaseUrl, supabaseServiceRoleKey, options);
 }
 
-async function backupAndDeleteOldEntries() {
+async function backupAndDeleteTable(tableName: string) {
   const currentDate = new Date();
   const backupFilenames: string[] = [];
   const pageSize = 1000;
@@ -39,12 +39,12 @@ async function backupAndDeleteOldEntries() {
     const daysToKeep = 30;
     let offset = 0;
     let hasMoreData = true;
-    
+
     const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000); // Declare cutoffDate outside the loop
 
     while (hasMoreData) {
       const query = `
-        SELECT * FROM stats
+        SELECT * FROM ${tableName}
         WHERE updated_at < '${cutoffDate.toISOString()}'
         OFFSET ${offset}
         LIMIT ${pageSize}
@@ -54,7 +54,7 @@ async function backupAndDeleteOldEntries() {
         .rpc('exec', { sql: query });
 
       if (queryError) {
-        console.error('Error querying the Supabase table:', queryError.message);
+        console.error(`Error querying the Supabase table "${tableName}":`, queryError.message);
         break;
       }
 
@@ -64,7 +64,7 @@ async function backupAndDeleteOldEntries() {
       }
 
       const backupData = JSON.stringify(oldEntries);
-      const backupFilename = `backup-${currentDate.toISOString()}-page-${offset / pageSize}.json`;
+      const backupFilename = `backup-${currentDate.toISOString()}-${tableName}-page-${offset / pageSize}.json`;
       const backupPath = path.join(backupFolder, backupFilename);
 
       try {
@@ -72,7 +72,7 @@ async function backupAndDeleteOldEntries() {
         console.log(`Backup saved to R2: ${backupPath}`);
         backupFilenames.push(backupFilename);
       } catch (backupError) {
-        console.error('Error saving backup to R2:', backupError);
+        console.error(`Error saving backup to R2 for table "${tableName}":`, backupError);
         break;
       }
 
@@ -81,7 +81,7 @@ async function backupAndDeleteOldEntries() {
 
     if (backupFilenames.length > 0) {
       const deleteQuery = `
-        DELETE FROM stats
+        DELETE FROM ${tableName}
         WHERE updated_at < '${cutoffDate.toISOString()}'
         OFFSET ${offset - pageSize}
         LIMIT ${pageSize}
@@ -90,14 +90,22 @@ async function backupAndDeleteOldEntries() {
       const { error: deleteError } = await supabase.rpc('exec', { sql: deleteQuery });
 
       if (deleteError) {
-        console.error('Error deleting entries from the Supabase table:', deleteError.message);
+        console.error(`Error deleting entries from the Supabase table "${tableName}":`, deleteError.message);
       } else {
-        console.log('Deletion completed successfully.');
+        console.log(`Deletion completed successfully for table "${tableName}".`);
       }
     }
   } catch (e) {
-    console.error('An error occurred:', e.message);
+    console.error(`An error occurred for table "${tableName}":`, e.message);
   }
 }
 
-backupAndDeleteOldEntries();
+async function backupAndDeleteTables() {
+  const tablesToBackupAndDelete = ['stats', 'devices'];
+
+  for (const tableName of tablesToBackupAndDelete) {
+    await backupAndDeleteTable(tableName);
+  }
+}
+
+backupAndDeleteTables();
