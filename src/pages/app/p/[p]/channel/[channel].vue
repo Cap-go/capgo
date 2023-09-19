@@ -120,7 +120,7 @@ async function getChannel() {
           allow_dev,
           allow_device_self_set,
           disableAutoUpdateUnderNative,
-          disableAutoUpdateToMajor,
+          disableAutoUpdate,
           ios,
           android,
           updated_at,
@@ -423,7 +423,7 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg text-gray-700 dark:text-gray-200">
+            <!-- <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
                   class="-my-1 k-color-success"
@@ -431,6 +431,24 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
                   :checked="channel?.disableAutoUpdateToMajor"
                   @change="saveChannelChange('disableAutoUpdateToMajor', !channel?.disableAutoUpdateToMajor)"
                 />
+              </template>
+            </k-list-item> -->
+            <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
+              <template #after>
+                <select class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]">
+                  <option value="major">
+                    Major
+                  </option>
+                  <option value="minor">
+                    Minor
+                  </option>
+                  <option value="metadata">
+                    Metadata
+                  </option>
+                  <option value="none">
+                    None
+                  </option>
+                </select>
               </template>
             </k-list-item>
             <k-list-item label :title="t('allow-develoment-bui')" class="text-lg text-gray-700 dark:text-gray-200">

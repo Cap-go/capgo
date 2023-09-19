@@ -55,9 +55,6 @@ back-to-login-page: Back to login page
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billing: Billing
-current-billing-cycle: Current Billing Cycle
-from: From
-to: To
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
@@ -123,6 +120,7 @@ copy-your: Copy your
 country: Country
 create-a-free-accoun: Create a free account
 created-at: Created at
+current-billing-cycle: Current Billing Cycle
 custom-domain: Custom domain
 custom-id: Custom ID
 custom-id-saved: Custom ID saved
@@ -132,7 +130,6 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
-used-to-create: Account with this email used to exist, cannot recreate
 deleted: deleted
 details-and-logs: Details and logs
 device: Device
@@ -143,6 +140,7 @@ disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 disable-progressive-deploy: Disabled progressive deploy
+disableAutoUpdateToMajor: Disable auto update
 discord: Discord
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
@@ -166,6 +164,7 @@ force-version-change: Skip progressive deploy
 forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
+from: From
 from-device: from device
 generated-new-apikey: Generated new API key!
 good: Good
@@ -318,6 +317,7 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
+to: To
 to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
@@ -339,6 +339,7 @@ usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
+used-to-create: Account with this email used to exist, cannot recreate
 user: User
 validate: Validate
 version: Version
