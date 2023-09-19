@@ -416,7 +416,7 @@ DECLARE
     result stats_table;
 BEGIN
   -- Get the total values for the user's current usage
-  SELECT * INTO current_usage FROM public.get_total_stats_v3(userid, to_char(now(), 'YYYY-MM'));
+  SELECT * INTO current_usage FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
   SELECT * INTO max_plan FROM public.get_current_plan_max(userid);
   result.mau = current_usage.mau::bigint - max_plan.mau::bigint;
   result.mau = (CASE WHEN result.mau > 0 THEN result.mau ELSE 0 END);
@@ -451,7 +451,7 @@ BEGIN
   -- Get the maximum values for the user's current plan
   current_plan_max := public.get_current_plan_max(userid);
   -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v3(userid, dateid);
+  total_stats := public.get_total_stats_v2(userid, dateid);
   -- Calculate the percentage of usage for each stat and return the average
   percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
@@ -593,7 +593,7 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RE
 Begin
     RETURN is_trial(userid) > 0
       or is_free_usage(userid)
-      or (is_good_plan_v4(userid) and is_paying(userid));
+      or (is_good_plan_v3(userid) and is_paying(userid));
 End;
 $$;
 
