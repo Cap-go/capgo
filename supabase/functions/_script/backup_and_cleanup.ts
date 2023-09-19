@@ -44,7 +44,7 @@ async function backupAndDeleteOldEntries() {
 
     while (hasMoreData) {
       const query = `
-        SELECT * FROM app_versions
+        SELECT * FROM stats
         WHERE updated_at < '${cutoffDate.toISOString()}'
         OFFSET ${offset}
         LIMIT ${pageSize}
@@ -81,7 +81,7 @@ async function backupAndDeleteOldEntries() {
 
     if (backupFilenames.length > 0) {
       const deleteQuery = `
-        DELETE FROM app_versions
+        DELETE FROM stats
         WHERE updated_at < '${cutoffDate.toISOString()}'
         OFFSET ${offset - pageSize}
         LIMIT ${pageSize}
