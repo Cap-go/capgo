@@ -1,4 +1,4 @@
-import type { SupabaseClientOptions } from '@supabase/supabase-js'
+import type { SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
 // import { Http } from '@capacitor-community/http'
@@ -8,6 +8,8 @@ import type { Database } from '~/types/supabase.types'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supbaseId = supabaseUrl.split('//')[1].split('.')[0]
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
+let supaClient: SupabaseClient<Database> = null as any
 
 export function useSupabase() {
   const options: SupabaseClientOptions<'public'> = {
@@ -36,7 +38,11 @@ export function useSupabase() {
     //     })
     // },
   }
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+  // return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+  if (supaClient)
+    return supaClient
+  supaClient = createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+  return supaClient
 }
 
 export function isSpoofed() {
@@ -122,27 +128,37 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
-export async function isGoodPlan(userId: string): Promise<boolean> {
+export async function getTotalStorage(): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v3', { userid: userId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data || false
-}
-export async function isTrial(userId: string): Promise<number> {
-  const { data, error } = await useSupabase()
-    .rpc('is_trial', { userid: userId })
+    .rpc('get_total_storage_size', {})
     .single()
   if (error)
     throw new Error(error.message)
 
   return data || 0
 }
-export async function isAdmin(userId: string): Promise<boolean> {
+
+export async function isGoodPlan(): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_admin', { userid: userId })
+    .rpc('is_good_plan_v3', {})
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || false
+}
+export async function isTrial(): Promise<number> {
+  const { data, error } = await useSupabase()
+    .rpc('is_trial', { })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || 0
+}
+export async function isAdmin(): Promise<boolean> {
+  const { data, error } = await useSupabase()
+    .rpc('is_admin', {})
     .single()
   if (error)
     throw new Error(error.message)
@@ -150,9 +166,9 @@ export async function isAdmin(userId: string): Promise<boolean> {
   return data || false
 }
 
-export async function isCanceled(userId: string): Promise<boolean> {
+export async function isCanceled(): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_canceled', { userid: userId })
+    .rpc('is_canceled', {})
     .single()
   if (error)
     throw new Error(error.message)
@@ -160,9 +176,9 @@ export async function isCanceled(userId: string): Promise<boolean> {
   return data || false
 }
 
-export async function isPaying(userId: string): Promise<boolean> {
+export async function isPaying(): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_paying', { userid: userId })
+    .rpc('is_paying', {})
     .single()
   if (error)
     throw new Error(error.message)
@@ -179,9 +195,9 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
   return plans || []
 }
 
-export async function isAllowedAction(userId: string): Promise<boolean> {
+export async function isAllowedAction(): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_allowed_action_user', { userid: userId })
+    .rpc('is_allowed_action_user', {})
     .single()
   if (error)
     throw new Error(error.message)
@@ -189,18 +205,18 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(userId: string, dateid: string): Promise<number> {
+export async function getPlanUsagePercent(dateId: string): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent', { userid: userId, dateid })
+    .rpc('get_plan_usage_percent', { dateid: dateId })
     .single()
   if (error)
     throw new Error(error.message)
   return data || 0
 }
 
-export async function getTotalStats(userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> {
+export async function getTotalStats(): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
   const { data, error } = await useSupabase()
-    .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
+    .rpc('get_total_stats_v3', { })
     .single()
   if (error)
     throw new Error(error.message)
@@ -213,9 +229,9 @@ export async function getTotalStats(userId: string, dateId: string): Promise<Dat
   }
 }
 
-export async function getCurrentPlanName(userId: string): Promise<string> {
+export async function getCurrentPlanName(): Promise<string> {
   const { data, error } = await useSupabase()
-    .rpc('get_current_plan_name', { userid: userId })
+    .rpc('get_current_plan_name', {})
     .single()
   if (error)
     throw new Error(error.message)

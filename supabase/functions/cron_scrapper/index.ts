@@ -9,7 +9,7 @@ const toGetFramwork = 500
 const toGetInfo = 500
 const toGetSimilar = 5000
 
-async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
+async function main(url: URL, headers: BaseHeaders, _method: string, _body: any) {
   const baseApi = 'https://netlify.capgo.app'
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = headers.apisecret
@@ -17,7 +17,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
 
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.error('Fail Authorization', { authorizationSecret, API_SECRET })
+    console.error('Fail Authorization', { authorizationSecret })
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
   const options = {

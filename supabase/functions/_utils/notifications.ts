@@ -38,21 +38,6 @@ async function sendNow(eventName: string, eventData: EventData,
   }
 }
 
-async function isDeleted(email: string) {
-  try {
-    await supabaseAdmin()
-      .from('deleted_account')
-      .select()
-      .eq('email', email)
-      .throwOnError()
-      .single()
-    return true
-  }
-  catch (_e) {
-    return false
-  }
-}
-
 function isSendable(last: string, cron: string) {
   const interval = parseCronExpression(cron)
   const last_send_at = new Date(last)

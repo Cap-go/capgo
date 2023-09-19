@@ -54,18 +54,23 @@ class RedisRedisPipeline implements RedisPipelineInterface {
 }
 
 class RedisUpstashPipeline implements RedisPipelineInterface {
+  size: number
   pipeline: UpstashPipeline<[]>
 
   constructor(pipeline: UpstashPipeline<[]>) {
     this.pipeline = pipeline
+    this.size = 0
   }
 
   async hdel(key: string, ...fields: string[]): Promise<number> {
     await this.pipeline.hdel(key, ...fields)
+    this.size++
     return 0
   }
 
   async flush(): Promise<void> {
+    if (this.size === 0)
+      return
     await this.pipeline.exec()
   }
 
@@ -73,6 +78,7 @@ class RedisUpstashPipeline implements RedisPipelineInterface {
     const object: { [field: string]: RedisValue } = {}
     object[field] = value
     await this.pipeline.hset(key, object)
+    this.size++
   }
 
   async hincrby(key: string, field: string, increment: number): Promise<number> {

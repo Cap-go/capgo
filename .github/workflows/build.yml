@@ -24,7 +24,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint
         id: lint_code
-        run: pnpm lint
+        run: pnpm lint && pnpm lint-backend
       - name: Build
         id: build_code
         run: pnpm mobile
@@ -35,20 +35,22 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.68.6
+          version: 1.93.0
+      - name: Ignore some functions
+        run: node scripts/ignore-functions.mjs
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
           BRANCH: development
-        run: node scripts/deploy_functions.mjs  
+        run: supabase functions deploy
       - name: Update functions
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: update_functions_prod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-        run: node scripts/deploy_functions.mjs 
+        run: supabase functions deploy
       - name: Create Release Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: create_release_prepro

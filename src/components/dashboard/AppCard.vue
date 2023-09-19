@@ -104,15 +104,20 @@ async function getAppStats(app_id: string) {
         .from('app_usage')
         .select()
         .eq('app_id', app_id)
-        .eq('mode', 'day')
+        .eq('mode', 'cycle')
         .gte('created_at', getConvertedDate2(cycleStart))
         .lte('created_at', getConvertedDate2(cycleEnd))
+        .limit(1)
+        .single()
     }
     return supabase
       .from('app_usage')
       .select()
       .eq('app_id', app_id)
-      .eq('mode', 'day')
+      .eq('mode', 'cycle')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
   }
 }
 
@@ -122,12 +127,8 @@ async function loadData() {
     if (!tmp)
       return
     const { data, error } = tmp
-    if (data && !error) {
-      data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-        if (item.created_at)
-          mauNb.value += item.mau
-      })
-    }
+    if (data && !error)
+      mauNb.value = data.mau
   }
 }
 

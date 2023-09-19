@@ -44,20 +44,20 @@ async function guard(next: any, to: string, from: string) {
       }
     }
     initStunning(main.user?.customer_id)
-    isTrial(main.user?.id).then((res) => {
+    isTrial().then((res) => {
       // console.log('isTrial', res)
       main.trialDaysLeft = res
     })
-    isPaying(main.user.id).then((res) => {
+    isPaying().then((res) => {
       main.paying = res
     })
-    isAllowedAction(main.user?.id).then((res) => {
+    isAllowedAction().then((res) => {
       main.canUseMore = res
     })
-    isGoodPlan(main.user?.id).then((res) => {
+    isGoodPlan().then((res) => {
       main.goodPlan = res
     })
-    isCanceled(main.user?.id).then((res) => {
+    isCanceled().then((res) => {
       main.canceled = res
     })
 

@@ -243,12 +243,73 @@ async function put(body: DeviceLink): Promise<Response> {
   }, 400)
 }
 
+async function deleteOverride(body: DeviceLink): Promise<Response> {
+  console.log('body', body)
+  let {
+    version_build,
+  } = body
+  const {
+    app_id,
+    device_id,
+  } = body
+  const coerce = semver.coerce(version_build)
+  if (coerce) {
+    version_build = coerce.version
+  }
+  else {
+    return sendRes({
+      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
+      error: 'semver_error',
+    }, 400)
+  }
+
+  if (!device_id || !app_id) {
+    return sendRes({
+      message: 'Cannot find device_id or appi_id',
+      error: 'missing_info',
+    }, 400)
+  }
+  const { data: dataChannelOverride } = await supabaseAdmin()
+    .from('channel_devices')
+    .select(`
+    app_id,
+    device_id,
+    channel_id (
+      id,
+      allow_device_self_set,
+      name
+    )
+  `)
+    .eq('app_id', app_id)
+    .eq('device_id', device_id)
+    .single()
+  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
+    return sendRes({
+      message: 'Cannot change device override current channel don\t allow it',
+      error: 'cannot_override',
+    }, 400)
+  }
+  const { error } = await supabaseAdmin()
+    .from('channel_devices')
+    .delete()
+    .eq('app_id', app_id)
+    .eq('device_id', device_id)
+  if (error) {
+    return sendRes({
+      message: `Cannot delete channel override ${JSON.stringify(error)}`,
+      error: 'override_not_allowed',
+    }, 400)
+  }
+  return sendRes()
+}
 function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   try {
     if (method === 'POST')
       return post(body)
     else if (method === 'PUT')
       return put(body)
+    else if (method === 'DELETE')
+      return deleteOverride(body)
   }
   catch (error) {
     return sendRes({ message: `Error ${JSON.stringify(error)}`, error: 'general_error' }, 400)
