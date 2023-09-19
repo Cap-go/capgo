@@ -113,10 +113,28 @@ verify_jwt = false
 [functions.channel_self]
 verify_jwt = false
 
+[functions.cron_good_plan]
+verify_jwt = false
+
 [functions.cron_scrapper]
 verify_jwt = false
 
 [functions.device]
+verify_jwt = false
+
+[functions.download_link]
+verify_jwt = false
+
+[functions.get_framework]
+verify_jwt = false
+
+[functions.get_similar_app]
+verify_jwt = false
+
+[functions.get_store_info]
+verify_jwt = false
+
+[functions.get_top_apk]
 verify_jwt = false
 
 [functions.ok]
@@ -128,19 +146,16 @@ verify_jwt = false
 [functions.on_app_stats_update]
 verify_jwt = false
 
-[functions.on_channel_create]
-verify_jwt = false
-
 [functions.on_channel_update]
 verify_jwt = false
 
-[functions.on_log_create]
-verify_jwt = false
-
-[functions.on_shared_create]
+[functions.on_device_update]
 verify_jwt = false
 
 [functions.on_user_create]
+verify_jwt = false
+
+[functions.on_user_delete]
 verify_jwt = false
 
 [functions.on_user_update]
@@ -173,13 +188,10 @@ verify_jwt = false
 [functions.updates]
 verify_jwt = false
 
-[functions.updates_redis]
+[functions.updates_debug]
 verify_jwt = false
 
-[functions.invalidate_cache]
-verify_jwt = false
-
-[functions.on_device_update]
+[functions.upload_link]
 verify_jwt = false
 
 [functions.web_stats]
