@@ -173,7 +173,7 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
       const versionOverwriteJson = await versionOverwriteResponse.json()
       assert(versionOverwriteJson.url !== undefined, `Response ${JSON.stringify(versionOverwriteJson)} has no url`)
       assert(versionOverwriteJson.version !== undefined, `Response ${JSON.stringify(versionOverwriteJson)} has no version`)
-      assert(versionOverwriteJson.version === '1.359.0', `Response ${JSON.stringify(versionOverwriteJson)} version is not equal to 1.0.0`)
+      assert(versionOverwriteJson.version === '1.359.0', `Response ${JSON.stringify(versionOverwriteJson)} version is not equal to 1.359.0`)
     }
     finally {
       const { error: deleteVersionOverwite } = await supabase.from('devices_override').delete().eq('device_id', channelOverwriteData.device_id)
