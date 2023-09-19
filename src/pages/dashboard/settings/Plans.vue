@@ -39,11 +39,17 @@ const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
-  return [
+  const features = [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
   `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
-  ].filter(Boolean)
+  ]
+  if (plan.name.toLowerCase().includes('as you go')) {
+    features.push('API Access')
+    features.push('Dedicated support')
+    features.push('Custom Domain')
+  }
+  return features.filter(Boolean)
 }
 
 function convertKey(key: string) {
