@@ -116,7 +116,7 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
     assert(newDeviceSupa?.device_id === newDeviceData.device_id, `Supabase device ${JSON.stringify(newDeviceSupa)} id is not equal to ${newDeviceData.device_id}`)
 
     // Test channel overwrite
-    // This reuse is becouse after we sent the first request, the device is created in supabase
+    // This reuse is because after we sent the first request, the device is created in supabase
     // If we create new UUID we have to manually create the device in supabase
     const channelOverwriteData = newDeviceData
     try {
