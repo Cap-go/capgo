@@ -1,6 +1,6 @@
 {
   "name": "capgo-app",
-  "version": "10.123.0",
+  "version": "10.139.0",
   "private": true,
   "husky": {
     "hooks": {
@@ -23,6 +23,7 @@
     "reset": "supabase db reset",
     "dev": "npx netlify dev --port 8881",
     "test:e2e": "cypress open",
+    "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
