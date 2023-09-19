@@ -2539,20 +2539,11 @@ REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
 
-REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) TO postgres;
-
 REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) TO postgres;
 
-REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.is_canceled(userid uuid) TO postgres;
 
 REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM anon;
@@ -2625,6 +2616,11 @@ GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
 -- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM anon;
 -- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM authenticated;
 -- GRANT EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) TO postgres;
+
+-- REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM PUBLIC;
+-- REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM anon;
+-- REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM authenticated;
+-- GRANT EXECUTE ON FUNCTION public.is_canceled(userid uuid) TO postgres;
 
 -- REVOKE EXECUTE ON FUNCTION public.get_current_plan_name(userid uuid) FROM PUBLIC;
 -- REVOKE EXECUTE ON FUNCTION public.get_current_plan_name(userid uuid) FROM anon;
