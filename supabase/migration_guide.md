@@ -33,14 +33,41 @@ supabase migrate up -d $LOCAL_DATABASE_URL
 
 Replace `$LOCAL_DATABASE_URL` with the URL of your local development database.
 
-4. **Commit and Push:**
+
+4. **Run Local Supabase DB:**
+
+Before running migrations locally, make sure you have the local Supabase DB running. Use the following command to start the Supabase DB:
+   
+```bash
+
+supabase start
+
+```
+If the command completes successfully, your console output should provide details about the locally running Supabase instance.
+
+
+5. **Commit and Push:**
 
 Once you're confident that the migration works correctly, commit the migration file and push it to your GitHub repository's `main` branch.
 
 **Important:** Once a migration has been pushed to the main branch, it should be treated as immutable. Do not modify existing migrations to make corrections or updates. Instead, create new migrations to address any issues or changes to the database schema.
 
-5. **Automated Deployment:**
+6. **Automated Deployment:**
 
 Our CI/CD workflow will automatically deploy the migration to the production database when changes are pushed to the `main` branch. You don't need to manually apply migrations on the production database
+
+
+7. **Reset Local Supabase DB (Optional):**
+
+If needed, you can reset the local Supabase DB to its initial state. Use the following command to reset the local database:
+   
+```bash
+
+supabase db reset
+
+```
+
+This command will clear all data and schema changes made to the local database, restoring it to its initial state.
+
 
 By following these steps, you can safely add and deploy Supabase migration changes to your project's database schema.
