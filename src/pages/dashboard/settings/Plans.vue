@@ -73,8 +73,7 @@ async function getUsages() {
   // get aapp_stats
   if (!main.user?.id)
     return
-  const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getTotalStats(main.user?.id, date_id)
+  stats.value = await getTotalStats()
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
@@ -86,11 +85,9 @@ async function loadData() {
   })
   await getUsages()
 
-  if (main.user?.id) {
-    const date_id = new Date().toISOString().slice(0, 7)
-    await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
-    await getPlanUsagePercent(main.user?.id, date_id).then(res => planPercent.value = res)
-  }
+  const date_id = new Date().toISOString().slice(0, 7)
+  await getCurrentPlanName().then(res => planCurrrent.value = res)
+  await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
   isLoading.value = false
 }
 

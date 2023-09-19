@@ -4,7 +4,7 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
+import { getPlans, useSupabase } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
@@ -79,7 +79,6 @@ async function getAppStats() {
 
 async function getUsages() {
   const currentStorage = 0
-  const totalStorage = main.user?.id ? await getTotalStorage(main.user?.id) : 0
   const { data, error } = await getAppStats()
   if (data && !error) {
     const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
@@ -114,7 +113,6 @@ async function getUsages() {
           datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
     })
-    datas.value.storage[0] = bytesToGb(totalStorage)
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
     datas.value.storage[0] = currentStorage - storageVariance
