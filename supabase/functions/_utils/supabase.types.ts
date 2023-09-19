@@ -43,34 +43,6 @@ export interface Database {
           }
         ]
       }
-      app_live: {
-        Row: {
-          created_at: string | null
-          id: string
-          updated_at: string | null
-          url: string
-        }
-        Insert: {
-          created_at?: string | null
-          id: string
-          updated_at?: string | null
-          url: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          updated_at?: string | null
-          url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_live_id_fkey"
-            columns: ["id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       app_stats: {
         Row: {
           app_id: string
@@ -536,7 +508,7 @@ export interface Database {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -555,7 +527,7 @@ export interface Database {
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
-          last_mau: string
+          last_mau: string | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
@@ -571,7 +543,7 @@ export interface Database {
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string
+          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -587,7 +559,7 @@ export interface Database {
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string
+          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -1276,13 +1248,6 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      exist_app: {
-        Args: {
-          appid: string
-          apikey: string
-        }
-        Returns: boolean
-      }
       exist_app_v2: {
         Args: {
           appid: string
@@ -1490,6 +1455,16 @@ export interface Database {
         }
         Returns: string
       }
+      get_weekly_stats: {
+        Args: {
+          app_id: string
+        }
+        Returns: {
+          all_updates: number
+          failed_updates: number
+          open_app: number
+        }[]
+      }
       has_min_right: {
         Args: {
           _userid: string
@@ -1499,14 +1474,6 @@ export interface Database {
           _channelid?: number
         }
         Returns: boolean
-      }
-      http_post_helper: {
-        Args: {
-          function_name: string
-          function_type: string
-          body: Json
-        }
-        Returns: undefined
       }
       increment_store: {
         Args: {
@@ -1734,9 +1701,7 @@ export interface Database {
       }
     }
     Enums: {
-      app_mode: "prod" | "dev" | "livereload"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stripe_status:
         | "created"
@@ -1745,13 +1710,14 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle"
+      usage_mode: "5min" | "day" | "cycle"
       user_min_right: "read" | "upload" | "write" | "admin"
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
-      match_plan: {
-        name: string
+      stat_time: {
+        device_id: string
+        created_at: string
       }
       stats_table: {
         mau: number
@@ -1761,3 +1727,4 @@ export interface Database {
     }
   }
 }
+
