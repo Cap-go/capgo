@@ -57,9 +57,9 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
   const thresholdsForComparisons = thresholds[comparison]
   const index = thresholdsForComparisons.findIndex((threshold, index) => {
     const thresholdGreaterThenStat = threshold >= stat
-    const statGreaterOrEqualThresholdAndLastIndex = index === 2 && stat >= threshold
+    const lastIndexAndStatGreaterOrEqualThreshold = index === 2 && stat >= threshold
 
-    return thresholdGreaterThenStat || statGreaterOrEqualThresholdAndLastIndex
+    return thresholdGreaterThenStat || lastIndexAndStatGreaterOrEqualThreshold
   })
 
   if (index === -1 || index >= 3)
