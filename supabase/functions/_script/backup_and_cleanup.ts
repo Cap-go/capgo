@@ -28,7 +28,6 @@ function useSupabase() {
 async function backupAndDeleteOldEntries() {
   const currentDate = new Date();
   const backupFilenames: string[] = [];
-  const recordsToDelete: Database['public']['Tables']['app_versions']['Row'][] = [];
 
   try {
     if (!await fs.exists(backupFolder)) {
@@ -43,12 +42,15 @@ async function backupAndDeleteOldEntries() {
 
     while (hasMoreData) {
       const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
+      const query = `
+        SELECT * FROM app_versions
+        WHERE updated_at < '${cutoffDate.toISOString()}'
+        OFFSET ${offset}
+        LIMIT ${pageSize}
+      `;
 
       const { data: oldEntries, error: queryError } = await supabase
-        .from<Database['public']['Tables']['app_versions']['Row']>('app_versions')
-        .select()
-        .lt('updated_at', cutoffDate.toISOString())
-        .range(offset, offset + pageSize - 1);
+        .rpc('exec', { sql: query });
 
       if (queryError) {
         console.error('Error querying the Supabase table:', queryError.message);
@@ -68,8 +70,6 @@ async function backupAndDeleteOldEntries() {
         await r2.upload(backupPath, new TextEncoder().encode(backupData));
         console.log(`Backup saved to R2: ${backupPath}`);
         backupFilenames.push(backupFilename);
-
-        recordsToDelete.push(...oldEntries);
       } catch (backupError) {
         console.error('Error saving backup to R2:', backupError);
       }
@@ -77,17 +77,16 @@ async function backupAndDeleteOldEntries() {
       offset += pageSize;
     }
 
-    if (recordsToDelete.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('app_versions')
-        .delete()
-        .in('id', recordsToDelete.map(record => record.id));
+    const deleteQuery = `
+      DELETE FROM app_versions
+      WHERE updated_at < '${cutoffDate.toISOString()}'
+    `;
+    const { error: deleteError } = await supabase.rpc('exec', { sql: deleteQuery });
 
-      if (deleteError) {
-        console.error('Error deleting entries from the Supabase table:', deleteError.message);
-      } else {
-        console.log('Deletion completed successfully.');
-      }
+    if (deleteError) {
+      console.error('Error deleting entries from the Supabase table:', deleteError.message);
+    } else {
+      console.log('Deletion completed successfully.');
     }
   } catch (e) {
     console.error('An error occurred:', e.message);
