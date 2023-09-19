@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3';
 import 'https://deno.land/x/dotenv/load.ts';
-import { r2 } from '../_utils/r2';
+import { r2 } from '../_utils/r2.ts';
 import type { Database } from '../_utils/supabase.types.ts';
 import * as fs from 'https://deno.land/std/fs/mod.ts';
 import * as path from 'https://deno.land/std/path/mod.ts';
@@ -28,6 +28,7 @@ function useSupabase() {
 async function backupAndDeleteOldEntries() {
   const currentDate = new Date();
   const backupFilenames: string[] = [];
+  const pageSize = 1000;
 
   try {
     if (!await fs.exists(backupFolder)) {
@@ -36,12 +37,12 @@ async function backupAndDeleteOldEntries() {
 
     const supabase = useSupabase();
     const daysToKeep = 30;
-    const pageSize = 1000;
     let offset = 0;
     let hasMoreData = true;
+    
+    const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000); // Declare cutoffDate outside the loop
 
     while (hasMoreData) {
-      const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
       const query = `
         SELECT * FROM app_versions
         WHERE updated_at < '${cutoffDate.toISOString()}'
@@ -72,21 +73,27 @@ async function backupAndDeleteOldEntries() {
         backupFilenames.push(backupFilename);
       } catch (backupError) {
         console.error('Error saving backup to R2:', backupError);
+        break;
       }
 
       offset += pageSize;
     }
 
-    const deleteQuery = `
-      DELETE FROM app_versions
-      WHERE updated_at < '${cutoffDate.toISOString()}'
-    `;
-    const { error: deleteError } = await supabase.rpc('exec', { sql: deleteQuery });
+    if (backupFilenames.length > 0) {
+      const deleteQuery = `
+        DELETE FROM app_versions
+        WHERE updated_at < '${cutoffDate.toISOString()}'
+        OFFSET ${offset - pageSize}
+        LIMIT ${pageSize}
+      `;
 
-    if (deleteError) {
-      console.error('Error deleting entries from the Supabase table:', deleteError.message);
-    } else {
-      console.log('Deletion completed successfully.');
+      const { error: deleteError } = await supabase.rpc('exec', { sql: deleteQuery });
+
+      if (deleteError) {
+        console.error('Error deleting entries from the Supabase table:', deleteError.message);
+      } else {
+        console.log('Deletion completed successfully.');
+      }
     }
   } catch (e) {
     console.error('An error occurred:', e.message);
