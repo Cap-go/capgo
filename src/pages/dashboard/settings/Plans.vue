@@ -39,7 +39,6 @@ const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
-  console.log(JSON.stringify(plan))
   const features = [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
