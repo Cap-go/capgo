@@ -1,4 +1,4 @@
-### Adding Supabase Migration Changes
+### Adding Supabase Migration
 
 To make changes to the database schema in your Supabase project, follow these steps to create and apply migrations:
 
@@ -36,6 +36,8 @@ Replace `$LOCAL_DATABASE_URL` with the URL of your local development database.
 4. **Commit and Push:**
 
 Once you're confident that the migration works correctly, commit the migration file and push it to your GitHub repository's `main` branch.
+
+**Important:** Once a migration has been pushed to the main branch, it should be treated as immutable. Do not modify existing migrations to make corrections or updates. Instead, create new migrations to address any issues or changes to the database schema.
 
 5. **Automated Deployment:**
 

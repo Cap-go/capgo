@@ -44,7 +44,7 @@
 https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
 
 
-- [Adding Supabase Migration Changes](supabase/migration_guide.md)
+- [Changing supabase](supabase/migration_guide.md)
 
 ## Plugins
 
