@@ -39,12 +39,22 @@ const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
+  console.log(JSON.stringify(plan))
   const features = [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
   `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
   ]
   if (plan.name.toLowerCase().includes('as you go')) {
+    if (plan.mau_unit)
+      features[0] += ` included, then $${plan.mau_unit}/user`
+
+    if (plan.storage_unit)
+      features[1] += ` included, then $${plan.storage_unit} per GB`
+
+    if (plan.bandwidth_unit)
+      features[2] += ` included, then $${plan.bandwidth_unit} per GB`
+
     features.push('API Access')
     features.push('Dedicated support')
     features.push('Custom Domain')
