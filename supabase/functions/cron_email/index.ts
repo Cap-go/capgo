@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { trackEvent } from '../_utils/plunk.ts'
@@ -56,10 +56,10 @@ const funComparisons = {
 function getFunComparison(comparison: keyof typeof funComparisons, stat: number): string {
   const thresholdsForComparisons = thresholds[comparison]
   const index = thresholdsForComparisons.findIndex((threshold, index) => {
-    const thresholdGreaterThenStat = threshold >= stat;
-    const statGreaterOrEqualThresholdAndLastIndex = index === 2 && stat >= threshold;
+    const thresholdGreaterThenStat = threshold >= stat
+    const statGreaterOrEqualThresholdAndLastIndex = index === 2 && stat >= threshold
 
-    return thresholdGreaterThenStat || statGreaterOrEqualThresholdAndLastIndex;
+    return thresholdGreaterThenStat || statGreaterOrEqualThresholdAndLastIndex
   })
 
   if (index === -1 || index >= 3)
