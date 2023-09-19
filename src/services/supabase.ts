@@ -1,4 +1,4 @@
-import type { SupabaseClientOptions } from '@supabase/supabase-js'
+import type { SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
 // import { Http } from '@capacitor-community/http'
@@ -8,6 +8,8 @@ import type { Database } from '~/types/supabase.types'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supbaseId = supabaseUrl.split('//')[1].split('.')[0]
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
+let supaClient: SupabaseClient<Database> = null as any
 
 export function useSupabase() {
   const options: SupabaseClientOptions<'public'> = {
@@ -36,7 +38,11 @@ export function useSupabase() {
     //     })
     // },
   }
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+  // return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+  if (supaClient)
+    return supaClient
+  supaClient = createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+  return supaClient
 }
 
 export function isSpoofed() {
