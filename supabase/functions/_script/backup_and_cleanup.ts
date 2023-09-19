@@ -26,6 +26,10 @@ function useSupabase() {
 }
 
 async function backupAndDeleteOldEntries() {
+  const currentDate = new Date();
+  const backupFilenames: string[] = [];
+  const recordsToDelete: Database['public']['Tables']['app_versions']['Row'][] = [];
+
   try {
     if (!await fs.exists(backupFolder)) {
       await fs.ensureDir(backupFolder);
@@ -34,16 +38,12 @@ async function backupAndDeleteOldEntries() {
     const supabase = useSupabase();
     const daysToKeep = 30;
     const pageSize = 1000;
-
-    const currentDate = new Date();
-    const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
-
     let offset = 0;
     let hasMoreData = true;
-    let fileNumber = 0;
-    let recordsToDelete: Database['public']['Tables']['app_versions']['Row'][] = []; 
 
     while (hasMoreData) {
+      const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000);
+
       const { data: oldEntries, error: queryError } = await supabase
         .from<Database['public']['Tables']['app_versions']['Row']>('app_versions')
         .select()
@@ -61,20 +61,20 @@ async function backupAndDeleteOldEntries() {
       }
 
       const backupData = JSON.stringify(oldEntries);
-      const backupFilename = `backup-${currentDate.toISOString()}-page-${offset}-${offset + pageSize - 1}.json`;
+      const backupFilename = `backup-${currentDate.toISOString()}-page-${offset / pageSize}.json`;
       const backupPath = path.join(backupFolder, backupFilename);
 
       try {
         await r2.upload(backupPath, new TextEncoder().encode(backupData));
         console.log(`Backup saved to R2: ${backupPath}`);
-        recordsToDelete = recordsToDelete.concat(oldEntries);
+        backupFilenames.push(backupFilename);
+
+        recordsToDelete.push(...oldEntries);
       } catch (backupError) {
         console.error('Error saving backup to R2:', backupError);
-        throw new Error('Backup to R2 failed. Stopping execution to prevent data loss.');
       }
 
       offset += pageSize;
-      fileNumber++;
     }
 
     if (recordsToDelete.length > 0) {
@@ -85,7 +85,6 @@ async function backupAndDeleteOldEntries() {
 
       if (deleteError) {
         console.error('Error deleting entries from the Supabase table:', deleteError.message);
-        throw new Error('Deletion from the Supabase table failed. Stopping execution.');
       } else {
         console.log('Deletion completed successfully.');
       }
