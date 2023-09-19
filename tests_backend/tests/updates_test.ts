@@ -1,5 +1,5 @@
 import type { SupabaseType } from '../utils.ts'
-import { assert, assertEquals } from '../utils.ts'
+import { assert, assertEquals, defaultUserId, delay } from '../utils.ts'
 
 const baseData = {
   platform: 'android',
@@ -114,6 +114,77 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
     assert(newDeviceSupaError === null, `Supabase get device error ${JSON.stringify(newDeviceSupaError)} is not null`)
     assert(newDeviceSupa !== null, 'Supabase get device is null')
     assert(newDeviceSupa?.device_id === newDeviceData.device_id, `Supabase device ${JSON.stringify(newDeviceSupa)} id is not equal to ${newDeviceData.device_id}`)
+
+    // Test channel overwrite
+    // This reuse is becouse after we sent the first request, the device is created in supabase
+    // If we create new UUID we have to manually create the device in supabase
+    const channelOverwriteData = newDeviceData
+    try {
+      const { error: channelOverwriteError } = await supabase
+        .from('channel_devices')
+        .insert({
+          device_id: channelOverwriteData.device_id,
+          channel_id: 23,
+          app_id: channelOverwriteData.app_id,
+          created_by: defaultUserId,
+        })
+
+      assert(channelOverwriteError === null, `Supabase channel_devices insert error ${JSON.stringify(channelOverwriteError)} is not null`)
+
+      // 3 seconds of delay so that supabase can invalidate the data
+      await delay(3000)
+
+      const overwritenChannel = await sendUpdate(backendBaseUrl, channelOverwriteData)
+      await responseOk(overwritenChannel, 'Overwrite channel version')
+      const overwriteChannelJson = await overwritenChannel.json()
+      assert(overwriteChannelJson.url !== undefined, `Response ${JSON.stringify(overwriteChannelJson)} has no url`)
+      assert(overwriteChannelJson.version !== undefined, `Response ${JSON.stringify(overwriteChannelJson)} has no version`)
+      assert(overwriteChannelJson.version === '1.361.0', `Response ${JSON.stringify(overwriteChannelJson)} version is not equal to 1.0.0`)
+    }
+    finally {
+      const { error: deleteChannelDeviceError } = await supabase.from('channel_devices').delete().eq('device_id', channelOverwriteData.device_id)
+      assert(deleteChannelDeviceError === null, `Supabase delete channel_device error ${JSON.stringify(deleteChannelDeviceError)} is not null`)
+    }
+
+    // We deleted the channel overwrite, there should not be any new version
+    const noNewOverwriteResponse = await sendUpdate(backendBaseUrl, channelOverwriteData)
+    await responseOk(noNewOverwriteResponse, 'No new overwrite')
+    const noNewOverwriteJson = await noNewOverwriteResponse.json()
+    assertEquals(noNewOverwriteJson, noNew, `Response ${JSON.stringify(noNewOverwriteJson)} is not equal to ${JSON.stringify(noNew)}`)
+
+    // Now we test the version overwrite
+    const versionOverwriteData = channelOverwriteData
+    try {
+      const { error: versionOverwriteInsertError } = await supabase
+        .from('devices_override')
+        .insert({
+          device_id: versionOverwriteData.device_id,
+          version: 9601,
+          app_id: channelOverwriteData.app_id,
+          created_by: defaultUserId,
+        })
+
+      assert(versionOverwriteInsertError === null, `Supabase devices_override insert error ${JSON.stringify(versionOverwriteInsertError)} is not null`)
+
+      // 3 seconds of delay so that supabase can invalidate the data
+      await delay(3000)
+
+      const versionOverwriteResponse = await sendUpdate(backendBaseUrl, versionOverwriteData)
+      const versionOverwriteJson = await versionOverwriteResponse.json()
+      assert(versionOverwriteJson.url !== undefined, `Response ${JSON.stringify(versionOverwriteJson)} has no url`)
+      assert(versionOverwriteJson.version !== undefined, `Response ${JSON.stringify(versionOverwriteJson)} has no version`)
+      assert(versionOverwriteJson.version === '1.359.0', `Response ${JSON.stringify(versionOverwriteJson)} version is not equal to 1.0.0`)
+    }
+    finally {
+      const { error: deleteVersionOverwite } = await supabase.from('devices_override').delete().eq('device_id', channelOverwriteData.device_id)
+      assert(deleteVersionOverwite === null, `Supabase delete devices_override error ${JSON.stringify(deleteVersionOverwite)} is not null`)
+    }
+
+    // We again check for no new version
+    const noNewOverwriteResponse2 = await sendUpdate(backendBaseUrl, versionOverwriteData)
+    await responseOk(noNewOverwriteResponse2, 'No new overwrite')
+    const noNewOverwriteJson2 = await noNewOverwriteResponse2.json()
+    assertEquals(noNewOverwriteJson2, noNew, `Response ${JSON.stringify(noNewOverwriteJson2)} is not equal to ${JSON.stringify(noNew)}`)
   }
   finally {
     const { error: deleteDeviceError } = await supabase.from('devices').delete().eq('device_id', newDeviceData.device_id)
