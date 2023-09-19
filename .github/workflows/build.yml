@@ -37,7 +37,7 @@ jobs:
         with:
           version: 1.93.0
       - name: Ignore some functions
-        run: node ./scripts/ignore-functions.mjs
+        run: node scripts/ignore-functions.mjs
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
