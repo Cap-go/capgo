@@ -1,8 +1,8 @@
-import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis/mod.ts'
-import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts'
 import { getEnv } from './utils.ts'
+import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis/mod.ts'
+import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
+import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts'
 
 type RedisValue = string | number | Uint8Array
 
@@ -13,12 +13,16 @@ interface RedisInterface {
   hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]>
   hset(key: string, field: string, value: RedisValue): Promise<void>
   hmget(key: string, ...fields: string[]): Promise<(string | null | undefined)[]>
+  hincrby(key: string, field: string, increment: number): Promise<number>
+  hget(key: string, field: string): Promise<string | null>
 }
 
 interface RedisPipelineInterface {
   hdel(key: string, ...fields: string[]): Promise<number>
   hset(key: string, field: string, value: RedisValue): Promise<void>
   flush(): Promise<void>
+  hincrby(key: string, field: string, increment: number): Promise<number>
+  hget(key: string, field: string): Promise<string | null>
 }
 
 class RedisRedisPipeline implements RedisPipelineInterface {
@@ -38,6 +42,14 @@ class RedisRedisPipeline implements RedisPipelineInterface {
 
   async hset(key: string, field: string, value: RedisValue): Promise<void> {
     await this.pipeline.hset(key, field, value)
+  }
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    return await this.pipeline.hincrby(key, field, increment)
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    return await this.pipeline.hget(key, field);
   }
 }
 
@@ -67,6 +79,15 @@ class RedisUpstashPipeline implements RedisPipelineInterface {
     object[field] = value
     await this.pipeline.hset(key, object)
     this.size++
+  }
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    await this.pipeline.hincrby(key, field, increment);
+    return 0
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    return await this.pipeline.hget(key, field);
   }
 }
 
@@ -99,6 +120,14 @@ export class RedisRedis implements RedisInterface {
 
   async hmget(key: string, ...fields: string[]): Promise<(string | null | undefined)[]> {
     return await this.redis.hmget(key, ...fields)
+  }
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    return await this.redis.hincrby(key, field, increment);
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    return await this.redis.hget(key, field);
   }
 }
 
@@ -141,6 +170,15 @@ export class RedisUpstashImpl implements RedisInterface {
 
       return data as string
     })
+  }
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    const result = await this.redis.hincrby(key, field, increment);
+    return result;
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    return await this.redis.hget(key, field);
   }
 
   pipeline(): RedisPipelineInterface {

@@ -1,10 +1,10 @@
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-
-import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
-import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
+import { getRedis } from '../_utils/redis.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
+import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
+import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
+import { createHash } from "https://deno.land/std@0.119.0/hash/mod.ts"
 
 const APP_DOES_NOT_EXIST = { message: 'App not found', error: 'app_not_found' }
 const APP_VERSION_NO_NEW = { message: 'No new version available' }
@@ -25,6 +25,33 @@ const headersSchema = z.object({
 
 const bypassRedis = false
 
+async function incrementDeviceRequestCount(ipAddress: string): Promise<void> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    await redis.hincrby(deviceIpHashKey, 'count', 1);
+  }
+}
+
+async function getDeviceRequestCount(ipAddress: string): Promise<number | undefined> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    const count = await redis.hget(deviceIpHashKey, 'count');
+    if (count !== null) {
+      return Number(count);
+    }
+  }
+}
+
+async function blacklistDeviceRequest(ipAddress: string): Promise<void> {
+  const redis = await getRedis();
+  if (redis) {
+    const deviceIpHashKey = `device_requests:${createHash("md5").update(ipAddress).toString()}`;
+    await redis.hset(deviceIpHashKey, 'count', -1);
+  }
+}
+
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
   // const redis = null
   const redis = await getRedis()
@@ -32,6 +59,25 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
   if (!redis || bypassRedis) {
     console.log('[redis] cannot get redis')
     return update(body)
+  }
+
+  const ipAddress = [headers['x-real-ip'], headers['x-forwarded-for'], headers['client-ip']].find(i => i !== undefined && i !== null)
+  if (ipAddress) {
+    const getCurrentCount = await getDeviceRequestCount(ipAddress)
+    if (getCurrentCount) {
+      if (getCurrentCount === -1) {
+        return sendRes({ error: `Blacklist` }, 403)
+      }
+      // TODO: Update limit to blacklist flag
+      else if (getCurrentCount > 10 ** 5) {
+        blacklistDeviceRequest(ipAddress)
+        return sendRes({ error: `Blacklist` }, 403)
+      }
+      await incrementDeviceRequestCount(ipAddress);
+    }
+    else {
+      await incrementDeviceRequestCount(ipAddress);
+    }
   }
 
   const parseResult = jsonRequestSchema.passthrough().safeParse(body)
@@ -136,8 +182,8 @@ async function updateWithTimeout(request: AppInfos): Promise<Response> {
 serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
-    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const method: string = event.method
+    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }
