@@ -27,7 +27,31 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
-    if (record.public) {
+    if (record.public && record.ios) {
+      // find all other channels with same app_i with ios true and update them to false
+      const { error } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('ios', true)
+        .neq('id', record.id)
+      if (error)
+        console.log('error', error)
+    }
+
+    if (record.public && record.android) {
+      // find all other channels with same app_i with android true and update them to false
+      const { error } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('android', true)
+        .neq('id', record.id)
+      if (error)
+        console.log('error', error)
+    }
+
+    if (record.public && record.ios && record.android) {
       // find all other channels with same app_i with public true and update them to false
       const { error } = await supabaseAdmin()
         .from('channels')
