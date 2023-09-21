@@ -1,3 +1,4 @@
+<!-- eslint-disable @typescript-eslint/ban-ts-comment -->
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
@@ -7,7 +8,7 @@ import { Capacitor } from '@capacitor/core'
 import dayjs from 'dayjs'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
@@ -102,7 +103,12 @@ async function loadData() {
 
   const date_id = new Date().toISOString().slice(0, 7)
   await getCurrentPlanName().then(res => planCurrrent.value = res)
-  await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
+  try {
+    await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
+  }
+  catch (error) {
+    console.log(error)
+  }
   isLoading.value = false
 }
 
@@ -155,6 +161,77 @@ const hightLights = computed<Stat[]>(() => ([
     value: currentPlanSuggest.value?.name,
   },
 ]))
+
+const supabase = useSupabase()
+
+async function getUsage() {
+  const apps = await supabase.from('apps')
+    .select('app_id')
+    .eq('user_id', main!.user!.id!)
+
+  if (!apps.data)
+    return
+
+  const usage = await supabase.from('app_usage')
+    .select('mau, storage, bandwidth')
+    .gte('created_at', main.cycleInfo?.subscription_anchor_start)
+    .lte('created_at', main.cycleInfo?.subscription_anchor_end)
+    .in('app_id', apps.data.map(app => app.app_id))
+
+  const plan = plans.value.find(p => p.name === 'Pay as you go')!
+
+  let totalMau = 0
+  let totalStorage = 0
+  let totalBandwidth = 0
+
+  usage?.data?.forEach((item) => {
+    totalMau += item.mau
+    totalStorage += item.storage / (1024 * 1024 * 1024) // Convert bytes to gigabytes
+    totalBandwidth += item.bandwidth / (1024 * 1024 * 1024) // Convert bytes to gigabytes
+  })
+
+  const payg_base = {
+    mau: plan.mau,
+    storage: plan.storage,
+    bandwidth: plan.bandwidth,
+  }
+
+  const payg_units = {
+    mau: plan.mau_unit,
+    storage: plan.storage_unit,
+    bandwidth: plan.bandwidth_unit,
+  }
+
+  console.log(`Total MAU: ${totalMau}`)
+  console.log(`Total Storage: ${totalStorage}`)
+  console.log(`Total Bandwidth: ${totalBandwidth}`)
+  const basePrice = plan.price_m
+
+  const totalPrice = computed(() => {
+    const mauPrice = totalMau > payg_base.mau ? (totalMau - payg_base.mau) * payg_units!.mau! : 0
+    const storagePrice = totalStorage > payg_base.storage ? (totalStorage - payg_base.storage) * payg_units!.storage! : 0
+    const bandwidthPrice = totalBandwidth > payg_base.bandwidth ? ((totalBandwidth - payg_base.bandwidth) / 1000) * payg_units!.bandwidth! : 0
+    const sum = mauPrice + storagePrice + bandwidthPrice
+    return roundNumber(basePrice + sum)
+  })
+
+  return {
+    totalPrice,
+    totalMau,
+    totalBandwidth,
+    totalStorage,
+    plan,
+  }
+}
+function roundNumber(number: number) {
+  return Math.round(number * 100) / 100
+}
+
+const planUsage = ref<Awaited<ReturnType<typeof getUsage>>>()
+
+getUsage().then((res) => {
+  planUsage.value = res
+})
 </script>
 
 <template>
@@ -187,6 +264,98 @@ const hightLights = computed<Stat[]>(() => ([
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="currentPlan?.description.includes('payasyougo') && main.paying" class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
+      <div class="sm:align-center sm:flex sm:flex-col">
+        <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
+          {{ t('billing') }}
+        </h1>
+
+        <div class="my-2">
+          <div class="text-lg font-bold">
+            Monthly Active Users
+          </div>
+          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+          <div class="flex row justify-between mt-2">
+            <div>
+              Included in plan
+            </div>
+            <div class="font-semibold">
+              {{ planUsage?.plan.mau }}
+            </div>
+          </div>
+
+          <hr class="my-1 border-t border-gray-300 opacity-50">
+          <div class="flex row justify-between">
+            <div>
+              Used in period
+            </div>
+            <div class="font-semibold">
+              {{ planUsage?.totalMau }}
+            </div>
+          </div>
+        </div>
+
+        <div class="my-2">
+          <div class="text-lg font-bold">
+            Storage
+          </div>
+          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+          <div class="flex row justify-between mt-2">
+            <div>
+              Included in plan
+            </div>
+            <div class="font-semibold">
+              {{ planUsage?.plan.storage }} GB
+            </div>
+          </div>
+
+          <hr class="my-1 border-t border-gray-300 opacity-50">
+          <div class="flex row justify-between">
+            <div>
+              Used in period
+            </div>
+            <div class="font-semibold">
+              {{ planUsage?.totalStorage.toFixed(3) }} GB
+            </div>
+          </div>
+        </div>
+
+        <div class="my-2">
+          <div class="text-lg font-bold">
+            Bandwidth
+          </div>
+          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+          <div class="flex row justify-between mt-2">
+            <div>
+              Included in plan
+            </div>
+            <div class="font-semibold">
+              {{ planUsage?.plan.bandwidth }} GB
+            </div>
+          </div>
+
+          <hr class="my-1 border-t border-gray-300 opacity-50">
+          <div class="flex row justify-between">
+            <div>
+              Used in period
+            </div>
+            <div class="font-semibold">
+              {{ planUsage?.totalBandwidth.toFixed(3) }} GB
+            </div>
+          </div>
+        </div>
+        <hr class="my-1 border-t border-gray-300 opacity-30">
+        <div class="flex row justify-between">
+          <div>
+            Total estimated bill (Base + Overage)
+          </div>
+          <div class="font-semibold">
+            ${{ planUsage?.totalPrice }}
           </div>
         </div>
       </div>
