@@ -210,7 +210,7 @@ async function getUsage() {
   const totalPrice = computed(() => {
     const mauPrice = totalMau > payg_base.mau ? (totalMau - payg_base.mau) * payg_units!.mau! : 0
     const storagePrice = totalStorage > payg_base.storage ? (totalStorage - payg_base.storage) * payg_units!.storage! : 0
-    const bandwidthPrice = totalBandwidth > payg_base.bandwidth ? ((totalBandwidth - payg_base.bandwidth) / 1000) * payg_units!.bandwidth! : 0
+    const bandwidthPrice = totalBandwidth > payg_base.bandwidth ? (totalBandwidth - payg_base.bandwidth) * payg_units!.bandwidth! : 0
     const sum = mauPrice + storagePrice + bandwidthPrice
     return roundNumber(basePrice + sum)
   })
