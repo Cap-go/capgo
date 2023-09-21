@@ -416,7 +416,7 @@ DECLARE
     result stats_table;
 BEGIN
   -- Get the total values for the user's current usage
-  SELECT * INTO current_usage FROM public.get_total_stats_v3(userid, to_char(now(), 'YYYY-MM'));
+  SELECT * INTO current_usage FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
   SELECT * INTO max_plan FROM public.get_current_plan_max(userid);
   result.mau = current_usage.mau::bigint - max_plan.mau::bigint;
   result.mau = (CASE WHEN result.mau > 0 THEN result.mau ELSE 0 END);
@@ -451,7 +451,7 @@ BEGIN
   -- Get the maximum values for the user's current plan
   current_plan_max := public.get_current_plan_max(userid);
   -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v3(userid, dateid);
+  total_stats := public.get_total_stats_v2(userid, dateid);
   -- Calculate the percentage of usage for each stat and return the average
   percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
@@ -593,7 +593,7 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RE
 Begin
     RETURN is_trial(userid) > 0
       or is_free_usage(userid)
-      or (is_good_plan_v4(userid) and is_paying(userid));
+      or (is_good_plan_v3(userid) and is_paying(userid));
 End;
 $$;
 
@@ -1056,11 +1056,11 @@ Begin
 End;
 $$;
 
-CREATE OR REPLACE FUNCTION "public"."is_in_channel"(ownerid uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_in_channel"(userid uuid) RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
 Begin
-  RETURN is_in_channel(auth.uid(), ownerid);
+  RETURN is_in_channel(userid, auth.uid());
 End;
 $$;
 
@@ -1291,7 +1291,7 @@ CREATE TABLE "public"."apps" (
     "last_version" character varying,
     "updated_at" timestamp with time zone,
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"(),
-    "retention" bigint NOT NULL DEFAULT '0'::bigint
+    "retention" bigint NOT NULL DEFAULT '2592000'::bigint
 );
 
 
@@ -2131,11 +2131,6 @@ GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "postgres";
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "postgres";
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "anon";
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "authenticated";
@@ -2196,6 +2191,26 @@ GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "anon";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "postgres";
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "postgres";
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "postgres";
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "service_role";
+
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "authenticated";
@@ -2250,21 +2265,6 @@ GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" ch
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "postgres";
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "postgres";
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "anon";
@@ -2494,250 +2494,84 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
 
--- TODO: enable it after 1 oct to avoid breaking users
--- REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  TO postgres;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM anon;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.trigger_http_post_to_function() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.trigger_http_post_to_function() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_daily_app_usage() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_cycle_usage() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
+REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM anon;
+REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM authenticated;
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_canceled(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_canceled(userid uuid) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
 
--- REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.calculate_daily_app_usage() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.calculate_cycle_usage() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM anon;
--- REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_name(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_name(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_current_plan_name(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_current_plan_name(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_max_plan(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_max_plan(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_max_plan(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_max_plan(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_metered_usage(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_metered_usage(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_metered_usage(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_metered_usage(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_plan_usage_percent(userid uuid, dateid character varying) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_plan_usage_percent(userid uuid, dateid character varying) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_plan_usage_percent(userid uuid, dateid character varying) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent(userid uuid, dateid character varying) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_total_stats_v2(userid uuid, dateid character varying) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_total_stats_v2(userid uuid, dateid character varying) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_total_stats_v2(userid uuid, dateid character varying) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_total_stats_v2(userid uuid, dateid character varying) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_admin(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_admin(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_admin(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_admin(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_good_plan_v3(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_good_plan_v3(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_good_plan_v3(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_good_plan_v3(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_allowed_action_user(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_allowed_action_user(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_allowed_action_user(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_allowed_action_user(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_app_owner(userid uuid, appid character varying) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_app_owner(userid uuid, appid character varying) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_app_owner(userid uuid, appid character varying) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_app_owner(userid uuid, appid character varying) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_app_shared(userid uuid, appid character varying) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_app_shared(userid uuid, appid character varying) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_app_shared(userid uuid, appid character varying) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_app_shared(userid uuid, appid character varying) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_free_usage(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_free_usage(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_free_usage(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_free_usage(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_good_plan_v4(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_good_plan_v4(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_good_plan_v4(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_good_plan_v4(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_total_stats_v3(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_total_stats_v3(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_total_stats_v3(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_total_stats_v3(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid, app_id character varying) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid, app_id character varying) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid, app_id character varying) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.get_total_storage_size(userid uuid, app_id character varying) TO postgres;
-
--- REVOKE EXECUTE ON PROCEDURE public.update_app_versions_retention() FROM PUBLIC;
--- REVOKE EXECUTE ON PROCEDURE public.update_app_versions_retention() FROM anon;
--- REVOKE EXECUTE ON PROCEDURE public.update_app_versions_retention() FROM authenticated;
--- GRANT EXECUTE ON PROCEDURE public.update_app_versions_retention() TO postgres;
-
--- REVOKE EXECUTE ON PROCEDURE public.update_channels_progressive_deploy() FROM PUBLIC;
--- REVOKE EXECUTE ON PROCEDURE public.update_channels_progressive_deploy() FROM anon;
--- REVOKE EXECUTE ON PROCEDURE public.update_channels_progressive_deploy() FROM authenticated;
--- GRANT EXECUTE ON PROCEDURE public.update_channels_progressive_deploy() TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_in_channel(userid uuid, ownerid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_in_channel(userid uuid, ownerid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_in_channel(userid uuid, ownerid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_in_channel(userid uuid, ownerid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_onboarded(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_onboarded(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_onboarded(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_onboarded(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_onboarding_needed(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_onboarding_needed(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_onboarding_needed(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_onboarding_needed(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_paying(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_paying(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_paying(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_paying(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_trial(userid uuid) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_trial(userid uuid) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_trial(userid uuid) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_trial(userid uuid) TO postgres;
-
--- REVOKE EXECUTE ON FUNCTION public.is_version_shared(userid uuid, versionid bigint) FROM PUBLIC;
--- REVOKE EXECUTE ON FUNCTION public.is_version_shared(userid uuid, versionid bigint) FROM anon;
--- REVOKE EXECUTE ON FUNCTION public.is_version_shared(userid uuid, versionid bigint) FROM authenticated;
--- GRANT EXECUTE ON FUNCTION public.is_version_shared(userid uuid, versionid bigint) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
 
 RESET ALL;
