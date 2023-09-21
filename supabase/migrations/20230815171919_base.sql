@@ -2504,41 +2504,6 @@ REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.trigger_http_post_to_function() TO postgres;
 
-REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
-
 REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
