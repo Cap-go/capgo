@@ -159,6 +159,8 @@ async function saveChannelChange(key: string, val: any) {
   console.log('saveChannelChange', key, val)
   if (!id.value || !channel.value)
     return
+  if (channel.value.public && channel.value.ios !== channel.value.android)
+    return
   try {
     const update = {
       [key]: val,
