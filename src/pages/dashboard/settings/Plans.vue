@@ -12,6 +12,7 @@ import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
+import { bytesToGb } from '~/services/conversion'
 
 function openSupport() {
   openMessenger()
@@ -185,8 +186,8 @@ async function getUsage() {
 
   usage?.data?.forEach((item) => {
     totalMau += item.mau
-    totalStorage += item.storage / (1024 * 1024 * 1024) // Convert bytes to gigabytes
-    totalBandwidth += item.bandwidth / (1024 * 1024 * 1024) // Convert bytes to gigabytes
+    totalStorage += bytesToGb(item.storage)
+    totalBandwidth += bytesToGb(item.bandwidth)
   })
 
   const payg_base = {
