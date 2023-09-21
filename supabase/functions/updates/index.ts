@@ -14,8 +14,8 @@ const jsonRequestSchema = z.object({
   device_id: z.string(),
   version_name: z.string(),
   app_id: z.string(),
-  is_emulator: z.optional(z.boolean()),
-  is_prod: z.optional(z.boolean()),
+  is_emulator: z.boolean().default(false),
+  is_prod: z.boolean().default(true),
 })
 
 const headersSchema = z.object({
