@@ -28,13 +28,7 @@ jobs:
         with:
           version: 8
           run_install: false
-
-      - name: Run Lint
-        run: pnpm run lint
-
-      - name: Run Backend Lint
-        run: pnpm run lint-backend
-
+          
       - name: Get pnpm store directory
         shell: bash
         run: |
@@ -49,6 +43,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+        
+      - name: Run Lint
+        run: pnpm run lint
+
+      - name: Run Backend Lint
+        run: pnpm run lint-backend
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
