@@ -201,6 +201,8 @@ async function makeDefault(val = true) {
         handler: async () => {
           if (!channel.value || !id.value)
             return
+          if (val && channel.value.ios === channel.value.android)
+            return
           const { error } = await supabase
             .from('channels')
             .update({ public: val })
