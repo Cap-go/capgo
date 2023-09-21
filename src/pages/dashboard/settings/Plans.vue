@@ -1,4 +1,3 @@
-<!-- eslint-disable @typescript-eslint/ban-ts-comment -->
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
@@ -202,9 +201,6 @@ async function getUsage() {
     bandwidth: plan.bandwidth_unit,
   }
 
-  console.log(`Total MAU: ${totalMau}`)
-  console.log(`Total Storage: ${totalStorage}`)
-  console.log(`Total Bandwidth: ${totalBandwidth}`)
   const basePrice = plan.price_m
 
   const totalPrice = computed(() => {
@@ -223,6 +219,7 @@ async function getUsage() {
     plan,
   }
 }
+
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
 }
