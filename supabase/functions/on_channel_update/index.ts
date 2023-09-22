@@ -28,31 +28,40 @@ serve(async (event: Request) => {
     console.log('record', record)
 
     if (record.public && record.ios) {
-      // find all other channels with same app_i with ios true and update them to false
-      const { error } = await supabaseAdmin()
+      const { error: iosError } = await supabaseAdmin()
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
         .eq('ios', true)
         .neq('id', record.id)
-      if (error)
-        console.log('error', error)
+      const { error: hiddenError } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('android', false)
+        .eq('ios', false)
+      if (iosError || hiddenError)
+        console.log('error', iosError || hiddenError)
     }
 
     if (record.public && record.android) {
-      // find all other channels with same app_i with android true and update them to false
-      const { error } = await supabaseAdmin()
+      const { error: androidError } = await supabaseAdmin()
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
         .eq('android', true)
         .neq('id', record.id)
-      if (error)
-        console.log('error', error)
+      const { error: hiddenError } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('android', false)
+        .eq('ios', false)
+      if (androidError || hiddenError)
+        console.log('error', androidError || hiddenError)
     }
 
-    if (record.public && record.ios && record.android) {
-      // find all other channels with same app_i with public true and update them to false
+    if (record.public && (record.ios === record.android)) {
       const { error } = await supabaseAdmin()
         .from('channels')
         .update({ public: false })
