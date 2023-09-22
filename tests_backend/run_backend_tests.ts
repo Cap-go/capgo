@@ -14,7 +14,10 @@ import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
 import type { SupabaseType } from './utils.ts'
 import {
   testUpdateEndpoint,
-} from './tests/updates_test.ts'
+} from './tests/backend/updates_test.ts'
+import {
+  testCliOK,
+} from './tests/cli/ok.ts'
 
 let supabaseProcess: Deno.ChildProcess | null = null
 let joined: ReadableStream<Uint8Array> | null = null
@@ -22,18 +25,26 @@ let supabase: SupabaseClient<Database> | null = null
 let functionsUrl: URL | null = null
 let tempUpstashEnvFilePath: string | null = null
 
-interface BackendTest {
+interface Test {
   name: string
   // How much time run the test
   execute: number
   test: (backendBaseUrl: URL, supabase: SupabaseType) => Promise<void>
 }
 
-const tests: BackendTest[] = [
+const backendTests: Test[] = [
   {
     name: 'Test update endpoint',
     test: testUpdateEndpoint,
     execute: 3,
+  },
+]
+
+const cliTests: Test[] = [
+  {
+    name: 'Test cli OK',
+    test: testCliOK,
+    execute: 1,
   },
 ]
 
@@ -158,7 +169,7 @@ function killSupabaseAndOutput() {
   joined?.pipeTo(Deno.stdout.writable)
 }
 
-async function testLoop(functionsUrl: URL, supabase: SupabaseType): Promise<boolean> {
+async function testLoop(functionsUrl: URL, supabase: SupabaseType, tests: Test[]): Promise<boolean> {
   let ok = true
   for (const test of tests) {
     for (let i = 0; i < test.execute; i++) {
@@ -189,7 +200,7 @@ async function testLoop(functionsUrl: URL, supabase: SupabaseType): Promise<bool
   return ok
 }
 
-async function runTests() {
+async function runCliTests() {
   if (!functionsUrl) {
     p.log.error('No functions URL, cannot run tests')
     Deno.exit(1)
@@ -200,7 +211,22 @@ async function runTests() {
     Deno.exit(1)
   }
 
-  let ok = await testLoop(functionsUrl, supabase)
+  const ok = await testLoop(functionsUrl, supabase, cliTests)
+  Deno.exit(ok ? 0 : 1)
+}
+
+async function runBackendTests() {
+  if (!functionsUrl) {
+    p.log.error('No functions URL, cannot run tests')
+    Deno.exit(1)
+  }
+
+  if (!supabase) {
+    p.log.error('No supabase connection, cannot run tests')
+    Deno.exit(1)
+  }
+
+  let ok = await testLoop(functionsUrl, supabase, backendTests)
   // This is likely unreacheble
   if (!ok)
     Deno.exit(1)
@@ -212,7 +238,7 @@ async function runTests() {
     p.log.info('Starting supabase backend with local redis...')
     // Local means redis is running on localhost
     await startSupabaseBackend('local')
-    ok = await testLoop(functionsUrl, supabase)
+    ok = await testLoop(functionsUrl, supabase, backendTests)
     if (!ok)
       Deno.exit(1)
   }
@@ -230,7 +256,7 @@ async function runTests() {
     p.log.info('Starting supabase backend with upstash...')
     // upstash means redis is running remotly and is being hostend by upstash
     await startSupabaseBackend('upstash', tempUpstashEnvFilePath)
-    ok = await testLoop(functionsUrl, supabase)
+    ok = await testLoop(functionsUrl, supabase, backendTests)
     if (!ok)
       Deno.exit(1)
   }
@@ -252,6 +278,15 @@ await connectToSupabase()
 p.log.info('Starting supabase backend...')
 // None means no redis
 await startSupabaseBackend('none')
-p.log.info('Running tests...')
-await runTests()
+
+const firstArg = Deno.args[0]
+if (firstArg === 'cli') {
+  p.log.info('Running cli tests...')
+  runCliTests()
+}
+else {
+  p.log.info('Running backend tests...')
+  await runBackendTests()
+}
+
 // setTimeout(killSupabaseAndOutput, 10000)

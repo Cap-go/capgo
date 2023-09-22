@@ -24,6 +24,7 @@
     "dev": "npx netlify dev --port 8881",
     "test:e2e": "cypress open",
     "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts",
+    "test:cli": "deno run --allow-all tests_backend/run_backend_tests.ts cli",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
