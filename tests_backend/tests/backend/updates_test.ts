@@ -1,5 +1,19 @@
-import type { SupabaseType } from '../../utils.ts'
+import type { RunnableTest, SupabaseType } from '../../utils.ts'
 import { assert, assertEquals, defaultUserId, delay } from '../../utils.ts'
+
+export function getTest(): RunnableTest {
+  return {
+    fullName: 'Test updates endpoint',
+    testWithRedis: false,
+    tests: [
+      {
+        name: 'Test updates endpoint (big)',
+        test: testUpdateEndpoint,
+        execute: 1,
+      },
+    ],
+  }
+}
 
 const baseData = {
   platform: 'android',

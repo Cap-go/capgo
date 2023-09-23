@@ -5,48 +5,25 @@
 import {
   mergeReadableStreams,
 } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
+
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 
 import * as p from 'npm:@clack/prompts@0.7.0'
 
+import { F } from 'https://deno.land/x/fonction@v1.6.2/mod.ts'
 import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
-import type { SupabaseType } from './utils.ts'
+import type { RunnableTest, SupabaseType, Test } from './utils.ts'
 import {
   testUpdateEndpoint,
 } from './tests/backend/updates_test.ts'
-import {
-  testCliOK,
-} from './tests/cli/ok.ts'
 
 let supabaseProcess: Deno.ChildProcess | null = null
 let joined: ReadableStream<Uint8Array> | null = null
 let supabase: SupabaseClient<Database> | null = null
 let functionsUrl: URL | null = null
 let tempUpstashEnvFilePath: string | null = null
-
-interface Test {
-  name: string
-  // How much time run the test
-  execute: number
-  test: (backendBaseUrl: URL, supabase: SupabaseType) => Promise<void>
-}
-
-const backendTests: Test[] = [
-  {
-    name: 'Test update endpoint',
-    test: testUpdateEndpoint,
-    execute: 3,
-  },
-]
-
-const cliTests: Test[] = [
-  {
-    name: 'Test cli OK',
-    test: testCliOK,
-    execute: 1,
-  },
-]
+let backendType: 'none' | 'local' | 'upstash' | null = null
 
 async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string }> {
   const command = new Deno.Command('supabase', {
@@ -110,6 +87,8 @@ async function startSupabaseBackend(
   redis: 'none' | 'local' | 'upstash' = 'none',
   envFile?: string,
 ) {
+  backendType = redis
+
   const command = new Deno.Command('supabase', {
     args: [
       'functions',
@@ -200,93 +179,108 @@ async function testLoop(functionsUrl: URL, supabase: SupabaseType, tests: Test[]
   return ok
 }
 
-async function runCliTests() {
-  if (!functionsUrl) {
-    p.log.error('No functions URL, cannot run tests')
-    Deno.exit(1)
-  }
-
-  if (!supabase) {
-    p.log.error('No supabase connection, cannot run tests')
-    Deno.exit(1)
-  }
-
-  const ok = await testLoop(functionsUrl, supabase, cliTests)
-  Deno.exit(ok ? 0 : 1)
-}
-
-async function runBackendTests() {
-  if (!functionsUrl) {
-    p.log.error('No functions URL, cannot run tests')
-    Deno.exit(1)
-  }
-
-  if (!supabase) {
-    p.log.error('No supabase connection, cannot run tests')
-    Deno.exit(1)
-  }
-
-  let ok = await testLoop(functionsUrl, supabase, backendTests)
-  // This is likely unreacheble
-  if (!ok)
-    Deno.exit(1)
-
+async function runTestsForFolder(folder: string, shortName: string, firstArg: string) {
   const useLocalRedis = Deno.env.get('USE_LOCAL_REDIS') === 'true'
-  if (useLocalRedis) {
-    p.log.info('Running with redis')
-    killSupabase()
-    p.log.info('Starting supabase backend with local redis...')
-    // Local means redis is running on localhost
-    await startSupabaseBackend('local')
-    ok = await testLoop(functionsUrl, supabase, backendTests)
-    if (!ok)
-      Deno.exit(1)
-  }
-
-  else { p.log.warn('Skipping running with redis') }
-
   const upstashToken = Deno.env.get('UPSTASH_TOKEN')
   const upstashUrl = Deno.env.get('UPSTASH_URL')
+
   if (upstashToken && upstashUrl) {
-    p.log.info('Running with upstash')
-    killSupabase()
     p.log.info('Generating temp ENV file for upstash...')
     tempUpstashEnvFilePath = await genTempUpstashEnvFile(upstashToken, upstashUrl)
     p.log.info(`Temp ENV file generated at ${tempUpstashEnvFilePath}`)
-    p.log.info('Starting supabase backend with upstash...')
-    // upstash means redis is running remotly and is being hostend by upstash
-    await startSupabaseBackend('upstash', tempUpstashEnvFilePath)
-    ok = await testLoop(functionsUrl, supabase, backendTests)
-    if (!ok)
-      Deno.exit(1)
   }
 
-  else { p.log.warn('Skipping running with upstash') }
+  for await (const dirEntry of Deno.readDir(folder)) {
+    const firstArg = Deno.args[0]
 
-  if (ok) {
-    killSupabase()
-    await new Promise((_resolve) => {
-      setTimeout(() => {
-        Deno.exit(0)
-      }, 200)
-    })
+    // this last conditions checks if we are supposed to run all tests or just the specific one
+    // Like /test cli will run only tests from the cli folder
+    if (dirEntry.isDirectory || !dirEntry.name.endsWith('.ts') || (firstArg !== 'all' ? shortName !== firstArg : false))
+      continue
+
+    // Make sure the first time we allways have "normal" backend
+    if (backendType !== 'none') {
+      // Only if backend !== null
+      if (backendType) {
+        p.log.info('Killing supabase...')
+        killSupabase()
+      }
+
+      p.log.info('Starting normal backend...')
+      // None means no redis
+      await startSupabaseBackend('none')
+    }
+
+    const path = await Deno.realPath(`${folder}/${dirEntry.name}`)
+    const imported = await import(path)
+
+    const importedTest: RunnableTest = imported.getTest()
+
+    if (!functionsUrl) {
+      p.log.error('No functions URL, cannot run tests')
+      Deno.exit(1)
+    }
+
+    if (!supabase) {
+      p.log.error('No supabase connection, cannot run tests')
+      Deno.exit(1)
+    }
+
+    p.log.info(`Running tests \"${importedTest.fullName}\" (${dirEntry.name})`)
+    let ok = await testLoop(functionsUrl, supabase, importedTest.tests)
+
+    // This is likely unreacheble
+    if (!ok)
+      Deno.exit(1)
+
+    // Test with redis if needed
+    if (importedTest.testWithRedis) {
+      if (useLocalRedis) {
+        p.log.info('Running with redis')
+        killSupabase()
+        p.log.info('Starting supabase backend with local redis...')
+
+        // Local means redis is running on localhost
+        await startSupabaseBackend('local')
+        ok = await testLoop(functionsUrl, supabase, importedTest.tests)
+
+        if (!ok)
+          Deno.exit(1)
+      }
+
+      else { p.log.warn('Skipping running with redis') }
+
+      if (upstashToken && upstashUrl) {
+        p.log.info('Running with upstash')
+        killSupabase()
+
+        p.log.info('Starting supabase backend with upstash...')
+
+        // upstash means redis is running remotly and is being hostend by upstash
+        await startSupabaseBackend('upstash', tempUpstashEnvFilePath!)
+        ok = await testLoop(functionsUrl, supabase, importedTest.tests)
+
+        if (!ok)
+          Deno.exit(1)
+      }
+
+      else { p.log.warn('Skipping running with upstash') }
+    }
   }
 }
 
 p.log.info('Connecting to supabase...')
 await connectToSupabase()
-p.log.info('Starting supabase backend...')
-// None means no redis
-await startSupabaseBackend('none')
 
 const firstArg = Deno.args[0]
-if (firstArg === 'cli') {
-  p.log.info('Running cli tests...')
-  runCliTests()
+if (!firstArg) {
+  p.log.error('Missing argument, please specify \'cli\' or \'backend\' or \'all\'')
+  Deno.exit(1)
 }
 else {
-  p.log.info('Running backend tests...')
-  await runBackendTests()
+  await runTestsForFolder('./tests_backend/tests/backend', 'backend', firstArg)
+  await runTestsForFolder('./tests_backend/tests/cli', 'cli', firstArg)
+  Deno.exit(0)
 }
 
 // setTimeout(killSupabaseAndOutput, 10000)

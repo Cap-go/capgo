@@ -4,6 +4,19 @@ import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 
+export interface Test {
+  name: string
+  // How much time run the test
+  execute: number
+  test: (backendBaseUrl: URL, supabase: SupabaseType) => Promise<void>
+}
+
+export interface RunnableTest {
+  fullName: string
+  tests: Test[]
+  testWithRedis: boolean
+}
+
 export function assert(condition: boolean, conditionAsString: string) {
   if (!condition)
     throw new Error(`Assertion failed for condition: ${conditionAsString}`)
