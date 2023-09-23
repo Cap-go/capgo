@@ -201,6 +201,8 @@ logout: Logout
 logs: Logs
 lowerCaseError: Should contain lowercase letters
 main-bundle-number: Main bundle number
+make-default-android: Make default for Android
+make-default-ios: Make default for iOS
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
