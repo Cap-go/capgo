@@ -30,7 +30,7 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function requestInfos(app_id: string, device_id: string, version_name: string) {
+async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
   const recV = supabaseAdmin()
     .from('app_versions')
     .select('id')
@@ -98,7 +98,7 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
     .eq('app_id', app_id)
     .single()
     .then(res => res.data)
-  const recC = supabaseAdmin()
+  let recC = supabaseAdmin()
     .from('channels')
     .select(`
       id,
@@ -138,8 +138,9 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
     `)
     .eq('app_id', app_id)
     .eq('public', true)
-    .single()
-    .then(res => res.data)
+  if (platform === 'ios' || platform === 'android')
+    recC = recC.eq(platform, true).single().then(res => res.data)
+  else recC = recC.limit(1).single().then(res => res.data)
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
   return { versionData, channelData, channelOverride, devicesOverride }
@@ -248,7 +249,7 @@ export async function update(body: AppInfos) {
       plugin_version,
       version_name)
 
-    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(app_id, device_id, version_name)
+    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(platform, app_id, device_id, version_name)
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
       if (versionData)
