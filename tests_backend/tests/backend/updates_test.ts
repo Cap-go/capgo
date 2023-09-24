@@ -14,7 +14,7 @@ export function getTest(): RunnableTest {
       {
         name: 'Test updates endpoint (big)',
         test: testUpdateEndpoint,
-        execute: 1,
+        execute: 3,
       },
     ],
   }
