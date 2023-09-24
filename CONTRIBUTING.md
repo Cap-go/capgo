@@ -9,7 +9,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 
 This project uses a custom test runner located in [tests_backend](https://github.com/Cap-go/capgo/tree/main/tests_backend).
 There exists some requirements to run the tests:
- * Have minio running (see `tests_backend/gh_actions` for referance) For testing the CLI this is not enough, you have to set up the `MINIO_UR` variable. In linux you can use 
+ * Have minio running (see `tests_backend/gh_actions` for referance) For testing the CLI this is not enough, you have to set up the `MINIO_URL` variable. In linux you can use 
  ```sh
  export MINIO_URL=$(docker inspect minio1 | grep 'Gateway' | head -n 1 | sed -e 's/            "Gateway": "//g' | sed -e 's/",//g')
  ```
