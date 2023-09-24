@@ -11,12 +11,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 
 import * as p from 'npm:@clack/prompts@0.7.0'
 
-import { F } from 'https://deno.land/x/fonction@v1.6.2/mod.ts'
 import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
+import { setSupabaseSecret } from './utils.ts'
 import type { RunnableTest, SupabaseType, Test } from './utils.ts'
-import {
-  testUpdateEndpoint,
-} from './tests/backend/updates_test.ts'
 
 let supabaseProcess: Deno.ChildProcess | null = null
 let joined: ReadableStream<Uint8Array> | null = null
@@ -24,6 +21,8 @@ let supabase: SupabaseClient<Database> | null = null
 let functionsUrl: URL | null = null
 let tempUpstashEnvFilePath: string | null = null
 let backendType: 'none' | 'local' | 'upstash' | null = null
+const noRedisEnvFilePath = await getEnvFile('none')
+const localRedisEnvFilePath = await getEnvFile('local')
 
 async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string }> {
   const command = new Deno.Command('supabase', {
@@ -60,13 +59,35 @@ async function genTempUpstashEnvFile(upstashToken: string, upstashUrl: string): 
   const tempFilePath = await Deno.makeTempFile()
   const exampleEnvFile = await Deno.readTextFile('supabase/.env.exemple')
   const tempEnvFile = `${exampleEnvFile}\nREDIS_CONNECTION_TYPE=upstash\nREDIS_TOKEN=${upstashToken}\nREDIS_URL=${upstashUrl}`
+
+  const minioUrl = Deno.env.get('MINIO_URL')
+  if (minioUrl)
+    tempEnvFile.replace('host.docker.internal', minioUrl)
+
   await Deno.writeTextFile(tempFilePath, tempEnvFile)
   return tempFilePath
+}
+
+async function getEnvFile(redis: 'none' | 'local') {
+  const envFilePath = `supabase/.env.exemple${redis === 'local' ? '.redis' : ''}`
+
+  const minioUrl = Deno.env.get('MINIO_URL')
+  if (minioUrl) {
+    p.log.info('Minio URL is not null, creating a new env file...')
+    const tempEnvFile = await Deno.makeTempFile()
+    const readEnvFile = await Deno.readTextFile(envFilePath)
+    const finalFile = readEnvFile.replace('host.docker.internal', minioUrl)
+    await Deno.writeTextFile(tempEnvFile, finalFile)
+    return tempEnvFile
+  }
+
+  return envFilePath
 }
 
 export async function connectToSupabase() {
   try {
     const { serviceKey, url } = await getAdminSupabaseTokens()
+    setSupabaseSecret(serviceKey)
     const options = {
       auth: {
         autoRefreshToken: false,
@@ -89,12 +110,17 @@ async function startSupabaseBackend(
 ) {
   backendType = redis
 
+  if (redis === 'upstash' && !envFile) {
+    p.log.error('Cannot start upstash backend without env file')
+    Deno.exit(1)
+  }
+
   const command = new Deno.Command('supabase', {
     args: [
       'functions',
       'serve',
       '--env-file',
-      (redis !== 'upstash' || !envFile) ? `supabase/.env.exemple${redis === 'local' ? '.redis' : ''}` : envFile,
+      (redis !== 'upstash' || !envFile) ? (redis === 'none' ? noRedisEnvFilePath : localRedisEnvFilePath) : envFile,
     ],
     stdout: 'piped',
     stderr: 'piped',

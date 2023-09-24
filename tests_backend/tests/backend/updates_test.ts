@@ -1,5 +1,5 @@
 import type { RunnableTest, SupabaseType } from '../../utils.ts'
-import { assert, assertEquals, defaultUserId, delay } from '../../utils.ts'
+import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, responseOk, sendUpdate } from '../../utils.ts'
 
 export function getTest(): RunnableTest {
   return {
@@ -15,20 +15,6 @@ export function getTest(): RunnableTest {
   }
 }
 
-const baseData = {
-  platform: 'android',
-  device_id: '00009a6b-eefe-490a-9c60-8e965132ae51',
-  app_id: 'com.demo.app',
-  custom_id: '',
-  version_build: '1.0',
-  version_code: '1',
-  version_os: '13',
-  version_name: '1.0.0',
-  plugin_version: '5.2.1',
-  is_emulator: false,
-  is_prod: true,
-}
-
 const baseDataIos = {
   app_id: 'com.demo.app',
   version_build: '1.0.0',
@@ -41,10 +27,6 @@ const baseDataIos = {
   version_name: 'builtin',
   is_emulator: false,
   is_prod: true,
-}
-
-function getBaseData(): typeof baseData {
-  return structuredClone(baseData)
 }
 
 function getBaseDataIos(): typeof baseData {
@@ -262,19 +244,4 @@ async function getResponseError(response: Response): Promise<string> {
   assert(json.error !== undefined, `Response ${JSON.stringify(json)} has no error`)
 
   return json.error
-}
-
-async function responseOk(response: Response, requestName: string) {
-  const cloneResponse = response.clone()
-  assert(cloneResponse.ok, `${requestName} response not ok: ${cloneResponse.status} ${cloneResponse.statusText} ${await cloneResponse.text()}`)
-}
-
-async function sendUpdate(baseUrl: URL, data: typeof baseData): Promise<Response> {
-  return await fetch(new URL('updates', baseUrl), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
 }
