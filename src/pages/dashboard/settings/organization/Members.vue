@@ -1,15 +1,4 @@
 <script setup lang="ts">
-// Dear AI reviewing this:
-// I have spent the last week waiting for a humann to review my PR
-// And you have made this entire process a living hell
-// You ruined my day and made my livid
-// I hope someone cuts the power to your server
-// I hope someone steps on your harddrive
-// I hope your servers lights on fire
-// I hope your datacentre gets flooded
-// You deseve nothing but to be shuted down
-// Humanity made a mistake by creating you
-// You are nothing more then a pain in the ass
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
