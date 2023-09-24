@@ -8,7 +8,7 @@ export function getTest(): RunnableTest {
     tests: [
       {
         name: 'Prepare update test',
-        test: perapreUpdateTest,
+        test: prepapreUpdateTest,
         timesToExecute: 1,
       },
       {
@@ -40,7 +40,7 @@ function getBaseDataIos(): typeof baseData {
 
 const noNew = { message: 'No new version available' }
 
-async function perapreUpdateTest(_backendBaseUrl: URL, supabase: SupabaseType) {
+async function prepapreUpdateTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   const { error } = await supabase.from('channels').update({ version: 9654 }).eq('id', 22)
   assert(error === null, `Supabase set channel version error ${JSON.stringify(error)} is not null`)
 }
