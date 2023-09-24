@@ -66,22 +66,22 @@ export function getTest(): RunnableTest {
       {
         name: 'Prepare cli',
         test: prepareCli,
-        execute: 1,
+        timesToExecute: 1,
       },
       {
         name: 'Upload bundle to cloud',
         test: uploadToCloud,
-        execute: 1,
+        timesToExecute: 1,
       },
       {
         name: 'Downlaod from upload endpoint',
         test: checkDownload,
-        execute: 1,
+        timesToExecute: 1,
       },
       {
         name: 'Test frontend',
         test: testFrontend,
-        execute: 1,
+        timesToExecute: 1,
       },
     ],
   }

@@ -10,7 +10,7 @@ let supabaseSecret: string | null = null
 export interface Test {
   name: string
   // How much time run the test
-  execute: number
+  timesToExecute: number
   test: (backendBaseUrl: URL, supabase: SupabaseType) => Promise<void>
 }
 

@@ -177,8 +177,8 @@ function killSupabaseAndOutput() {
 async function testLoop(functionsUrl: URL, supabase: SupabaseType, tests: Test[]): Promise<boolean> {
   let ok = true
   for (const test of tests) {
-    for (let i = 0; i < test.execute; i++) {
-      p.log.info(`Running test (${i + 1}/${test.execute}): \"${test.name}\"`)
+    for (let i = 0; i < test.timesToExecute; i++) {
+      p.log.info(`Running test (${i + 1}/${test.timesToExecute}): \"${test.name}\"`)
 
       try {
         await test.test(functionsUrl, supabase)
@@ -199,7 +199,7 @@ async function testLoop(functionsUrl: URL, supabase: SupabaseType, tests: Test[]
       }
 
       if (ok)
-        p.log.success(`Test \"${test.name}\" passed (${i + 1}/${test.execute})`)
+        p.log.success(`Test \"${test.name}\" passed (${i + 1}/${test.timesToExecute})`)
     }
   }
   return ok
