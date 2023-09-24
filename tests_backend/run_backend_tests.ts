@@ -57,19 +57,19 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
 
 async function genTempUpstashEnvFile(upstashToken: string, upstashUrl: string): Promise<string> {
   const tempFilePath = await Deno.makeTempFile()
-  const exampleEnvFile = await Deno.readTextFile('supabase/.env.exemple')
-  const tempEnvFile = `${exampleEnvFile}\nREDIS_CONNECTION_TYPE=upstash\nREDIS_TOKEN=${upstashToken}\nREDIS_URL=${upstashUrl}`
+  const exampleEnvFile = await Deno.readTextFile('supabase/.env.example')
+  let tempEnvFile = `${exampleEnvFile}\nREDIS_CONNECTION_TYPE=upstash\nREDIS_TOKEN=${upstashToken}\nREDIS_URL=${upstashUrl}`
 
   const minioUrl = Deno.env.get('MINIO_URL')
   if (minioUrl)
-    tempEnvFile.replace('host.docker.internal', minioUrl)
+    tempEnvFile = tempEnvFile.replace('host.docker.internal', minioUrl)
 
   await Deno.writeTextFile(tempFilePath, tempEnvFile)
   return tempFilePath
 }
 
 async function getEnvFile(redis: 'none' | 'local') {
-  const envFilePath = `supabase/.env.exemple${redis === 'local' ? '.redis' : ''}`
+  const envFilePath = `supabase/.env.example${redis === 'local' ? '.redis' : ''}`
 
   const minioUrl = Deno.env.get('MINIO_URL')
   if (minioUrl) {
