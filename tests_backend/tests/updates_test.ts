@@ -73,7 +73,7 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
   }
 
   // We disable 'allow_dev' to test what happens when we send a request with allow_dev = true
-  const { error: setAllowDevError } = await supabase.from('channels').update({ allow_dev: false }).eq('id', 22)
+  const { error: setAllowDevError } = await supabase.from('channels').update({ allow_dev: false }).eq('id', 24)
   assert(emulatorError === null, `Supabase error ${JSON.stringify(setAllowDevError)} is not null`)
 
   const allowDevData = getBaseData()
