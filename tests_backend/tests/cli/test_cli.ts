@@ -130,7 +130,7 @@ async function prepareCli(backendBaseUrl: URL, _supabase: SupabaseType) {
 
 async function runCli(params: string[]): Promise<string> {
   const command = new Deno.Command('node', {
-    args: [cliPath!].concat(params).concat(['--apikey', defaultApiKey]),
+    args: [cliPath!, ...params, '--apikey', defaultApiKey],
     cwd: appPath!,
     stdout: 'piped',
     stderr: 'piped',

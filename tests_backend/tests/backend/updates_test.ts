@@ -4,8 +4,13 @@ import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId,
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test updates endpoint',
-    testWithRedis: false,
+    testWithRedis: true,
     tests: [
+      {
+        name: 'Prepare update test',
+        test: perapreUpdateTest,
+        execute: 1,
+      },
       {
         name: 'Test updates endpoint (big)',
         test: testUpdateEndpoint,
@@ -35,7 +40,12 @@ function getBaseDataIos(): typeof baseData {
 
 const noNew = { message: 'No new version available' }
 
-export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
+async function perapreUpdateTest(_backendBaseUrl: URL, supabase: SupabaseType) {
+  const { error } = await supabase.from('channels').update({ version: 9654 }).eq('id', 22)
+  assert(error === null, `Supabase set channel version error ${JSON.stringify(error)} is not null`)
+}
+
+async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
   const noNewResponse = await sendUpdate(backendBaseUrl, baseData)
   await responseOk(noNewResponse, 'No new')
 
