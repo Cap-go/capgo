@@ -20,11 +20,11 @@ There exists some requirements to run the tests:
  * Having a running supabase (`supabase start`)
 
 The tests can be run with the following commands:
- * `pnpm test:backend` (backend only)
- * `pnpm test:cli` (cli only)
+ * `CLI_PATH=/home/user/CLI/ pnpm test:backend` (backend only)
+ * `CLI_PATH=/home/user/CLI/ pnpm test:cli` (cli only)
  * `pnpm test:backend`
 
-**Running tests localy WILL make changes supabase**
+**Running tests localy WILL make changes to supabase**
 
 After you submit a PR a contributor will run the full test suite on your changes.
 
