@@ -9,12 +9,12 @@ export function getTest(): RunnableTest {
       {
         name: 'Prepare update test',
         test: perapreUpdateTest,
-        execute: 1,
+        timesToExecute: 1,
       },
       {
         name: 'Test updates endpoint (big)',
         test: testUpdateEndpoint,
-        execute: 3,
+        timesToExecute: 3,
       },
     ],
   }
