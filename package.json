@@ -1,6 +1,6 @@
 {
   "name": "capgo-app",
-  "version": "10.114.0",
+  "version": "10.154.0",
   "private": true,
   "husky": {
     "hooks": {
@@ -23,12 +23,14 @@
     "reset": "supabase db reset",
     "dev": "npx netlify dev --port 8881",
     "test:e2e": "cypress open",
+    "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
     "dev-ios": "cap sync && cap run ios",
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
+    "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
     "generate:node_serverless": "rm -rf netlify && node ./scripts/convert_deno_to_node.mjs",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",

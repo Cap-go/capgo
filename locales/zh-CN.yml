@@ -89,6 +89,7 @@ changed-password-suc: 密码修改成功
 channel: 渠道
 channel-create: 创建频道
 channel-deleted: 频道已删除
+channel-forced-devices: 强制设备
 channel-invit: 输入要邀请的电子邮件
 channel-is-public: 默认频道
 channel-link: 通道覆盖

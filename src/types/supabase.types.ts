@@ -113,7 +113,8 @@ export interface Database {
           bandwidth: number
           created_at: string | null
           id: string
-          mlu: number
+          mau: number
+          mode: Database["public"]["Enums"]["usage_mode"]
           storage: number
         }
         Insert: {
@@ -121,7 +122,8 @@ export interface Database {
           bandwidth?: number
           created_at?: string | null
           id?: string
-          mlu?: number
+          mau?: number
+          mode?: Database["public"]["Enums"]["usage_mode"]
           storage?: number
         }
         Update: {
@@ -129,7 +131,8 @@ export interface Database {
           bandwidth?: number
           created_at?: string | null
           id?: string
-          mlu?: number
+          mau?: number
+          mode?: Database["public"]["Enums"]["usage_mode"]
           storage?: number
         }
         Relationships: []
@@ -1172,16 +1175,26 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      check_min_rights: {
-        Args: {
-          min_right: Database["public"]["Enums"]["user_min_right"]
-          user_id: string
-          org_id: string
-          app_id: string
-          channel_id: number
-        }
-        Returns: boolean
-      }
+      check_min_rights:
+        | {
+            Args: {
+              min_right: Database["public"]["Enums"]["user_min_right"]
+              org_id: string
+              app_id: string
+              channel_id: number
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              min_right: Database["public"]["Enums"]["user_min_right"]
+              user_id: string
+              org_id: string
+              app_id: string
+              channel_id: number
+            }
+            Returns: boolean
+          }
       convert_bytes_to_gb: {
         Args: {
           byt: number
@@ -1298,22 +1311,32 @@ export interface Database {
         }
         Returns: number
       }
-      get_current_plan_max: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
-      get_current_plan_name: {
-        Args: {
-          userid: string
-        }
-        Returns: string
-      }
+      get_current_plan_max:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: string
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
+      get_current_plan_name:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: string
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: string
+          }
       get_cycle_info: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1332,22 +1355,40 @@ export interface Database {
         }
         Returns: number
       }
-      get_max_plan: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          mau: number
-          storage: number
-          bandwidth: number
-        }[]
+      get_external_function_url: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
-      get_metered_usage: {
-        Args: {
-          userid: string
-        }
-        Returns: Database["public"]["CompositeTypes"]["stats_table"]
-      }
+      get_max_plan:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
+      get_metered_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: Database["public"]["CompositeTypes"]["stats_table"]
+          }
       get_org_members: {
         Args: {
           guild_id: string
@@ -1381,24 +1422,79 @@ export interface Database {
           role: string
         }[]
       }
-      get_plan_usage_percent: {
-        Args: {
-          userid: string
-          dateid: string
-        }
-        Returns: number
-      }
-      get_total_stats_v2: {
-        Args: {
-          userid: string
-          dateid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
+      get_plan_usage_percent:
+        | {
+            Args: {
+              dateid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              dateid: string
+            }
+            Returns: number
+          }
+      get_total_stats_v2:
+        | {
+            Args: {
+              dateid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
+        | {
+            Args: {
+              userid: string
+              dateid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
+      get_total_stats_v3:
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
+      get_total_storage_size:
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              app_id: string
+            }
+            Returns: number
+          }
       get_user_id:
         | {
             Args: {
@@ -1419,6 +1515,16 @@ export interface Database {
         }
         Returns: string
       }
+      get_weekly_stats: {
+        Args: {
+          app_id: string
+        }
+        Returns: {
+          all_updates: number
+          failed_updates: number
+          open_app: number
+        }[]
+      }
       has_min_right: {
         Args: {
           _userid: string
@@ -1428,6 +1534,14 @@ export interface Database {
           _channelid?: number
         }
         Returns: boolean
+      }
+      http_post_helper: {
+        Args: {
+          function_name: string
+          function_type: string
+          body: Json
+        }
+        Returns: undefined
       }
       increment_stats: {
         Args: {
@@ -1475,12 +1589,17 @@ export interface Database {
         }
         Returns: string
       }
-      is_admin: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
+      is_admin:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_allowed_action:
         | {
             Args: {
@@ -1495,12 +1614,17 @@ export interface Database {
             }
             Returns: boolean
           }
-      is_allowed_action_user: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
+      is_allowed_action_user:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_allowed_capgkey:
         | {
             Args: {
@@ -1538,45 +1662,92 @@ export interface Database {
             }
             Returns: boolean
           }
-      is_app_owner: {
-        Args: {
-          userid: string
-          appid: string
-        }
-        Returns: boolean
-      }
-      is_app_shared: {
-        Args: {
-          userid: string
-          appid: string
-        }
-        Returns: boolean
-      }
-      is_canceled: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
-      is_free_usage: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
-      is_good_plan_v3: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
-      is_in_channel: {
-        Args: {
-          userid: string
-          ownerid: string
-        }
-        Returns: boolean
-      }
+      is_app_owner:
+        | {
+            Args: {
+              appid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
+            }
+            Returns: boolean
+          }
+      is_app_shared:
+        | {
+            Args: {
+              appid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
+            }
+            Returns: boolean
+          }
+      is_canceled:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_free_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_good_plan_v3:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_good_plan_v4:
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: number
+          }
+      is_in_channel:
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+              ownerid: string
+            }
+            Returns: boolean
+          }
       is_member_of_org: {
         Args: {
           user_id: string
@@ -1590,18 +1761,28 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_onboarded: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
-      is_onboarding_needed: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
+      is_onboarded:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_onboarding_needed:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_owner_of_org: {
         Args: {
           user_id: string
@@ -1609,25 +1790,42 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_paying: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
-      is_trial: {
-        Args: {
-          userid: string
-        }
-        Returns: number
-      }
-      is_version_shared: {
-        Args: {
-          userid: string
-          versionid: number
-        }
-        Returns: boolean
-      }
+      is_paying:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_trial:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: number
+          }
+      is_version_shared:
+        | {
+            Args: {
+              versionid: number
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+              versionid: number
+            }
+            Returns: boolean
+          }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1648,7 +1846,6 @@ export interface Database {
     }
     Enums: {
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stripe_status:
         | "created"
@@ -1670,9 +1867,6 @@ export interface Database {
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
-      match_plan: {
-        name: string
-      }
       orgs_table: {
         id: string
         created_by: string

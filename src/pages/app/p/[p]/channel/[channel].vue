@@ -16,6 +16,7 @@ import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconSettings from '~icons/heroicons/cog-6-tooth'
 import IconInformations from '~icons/heroicons/information-circle'
+import IconUsers from '~icons/heroicons/users-solid'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import type { Tab } from '~/components/comp_def'
 import { urlToAppId } from '~/services/conversion'
@@ -59,7 +60,12 @@ const tabs: Tab[] = [
     key: 'info',
   },
   {
-    label: t('devices'),
+    label: t('shared-users'),
+    icon: IconUsers,
+    key: 'users',
+  },
+  {
+    label: t('channel-forced-devices'),
     icon: IconDevice,
     key: 'devices',
   },

@@ -32,8 +32,7 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 
-if (main.user?.id)
-  getCurrentPlanName(main.user?.id).then(res => planCurrent.value = res)
+getCurrentPlanName().then(res => planCurrent.value = res)
 
 const dropdownOpen = ref(false)
 

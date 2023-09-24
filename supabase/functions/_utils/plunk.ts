@@ -1,6 +1,5 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import { shallowCleanObject } from './utils.ts'
-import { getEnv } from './utils.ts'
+import { getEnv, shallowCleanObject } from './utils.ts'
 
 export interface Segments {
   capgo: boolean
@@ -28,6 +27,10 @@ export interface Person {
   price_id?: string
 }
 
+function hasPlunk() {
+  return getEnv('PLUNK_API_KEY').length > 0
+}
+
 // https://api.useplunk.com/v1
 function getAuth() {
   // get plunk token
@@ -45,6 +48,8 @@ function getConfig() {
 }
 
 export async function trackEvent(email: string, data: any, event: string) {
+  if (!hasPlunk())
+    return
   const url = `${baseUrl()}/v1/track`
   const response = await axios.post(url, {
     email,
@@ -58,6 +63,8 @@ export async function trackEvent(email: string, data: any, event: string) {
 }
 
 export async function addContact(email: string, data: any) {
+  if (!hasPlunk())
+    return
   const url = `${baseUrl()}/v1/contacts`
   const payload = {
     email,
@@ -78,6 +85,8 @@ export function addDataContact(email: string, data: Person, segments?: Segments)
 }
 
 export async function sendEmail(to: string, subject: string, body: string) {
+  if (!hasPlunk())
+    return
   const url = `${baseUrl()}/v1/send`
   const response = await axios.post(url, {
     to,

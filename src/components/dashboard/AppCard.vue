@@ -52,15 +52,20 @@ async function didCancel(name: string) {
 }
 
 async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
-  // console.log('deleteApp', app)
   if (await didCancel(t('app')))
     return
+
   try {
-    const { error: errorIcon } = await supabase.storage
-      .from(`images/${app.user_id}`)
-      .remove([app.app_id])
-    if (errorIcon)
-      toast.error(t('cannot-delete-app-icon'))
+    const { data: _data, error: _error } = await supabase
+      .storage
+      .getBucket(`images/${app.user_id}`)
+    if (_data && _data.id) {
+      const { error: errorIcon } = await supabase.storage
+        .from(`images/${app.user_id}`)
+        .remove([app.app_id])
+      if (errorIcon)
+        toast.error(t('cannot-delete-app-icon'))
+    }
 
     const { data, error: vError } = await supabase
       .from('app_versions')
@@ -85,13 +90,13 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
       .delete()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
-    if (vError || dbAppError) {
+    if (vError || dbAppError)
       toast.error(t('cannot-delete-app'))
-    }
-    else {
+
+    else
       toast.success(t('app-deleted'))
-      await emit('reload')
-    }
+
+    await emit('reload')
   }
   catch (error) {
     toast.error(t('cannot-delete-app'))
@@ -105,15 +110,20 @@ async function getAppStats(app_id: string) {
         .from('app_usage')
         .select()
         .eq('app_id', app_id)
-        .eq('mode', 'day')
+        .eq('mode', 'cycle')
         .gte('created_at', getConvertedDate2(cycleStart))
         .lte('created_at', getConvertedDate2(cycleEnd))
+        .limit(1)
+        .single()
     }
     return supabase
       .from('app_usage')
       .select()
       .eq('app_id', app_id)
-      .eq('mode', 'day')
+      .eq('mode', 'cycle')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
   }
 }
 
@@ -123,12 +133,8 @@ async function loadData() {
     if (!tmp)
       return
     const { data, error } = tmp
-    if (data && !error) {
-      data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-        if (item.created_at)
-          mauNb.value += item.mau
-      })
-    }
+    if (data && !error)
+      mauNb.value = data.mau
   }
 }
 

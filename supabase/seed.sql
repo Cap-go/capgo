@@ -4,6 +4,7 @@ INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encryp
 
 select vault.create_secret('c591b04e-cf29-4945-b9a0-776d0672061a', 'admin_user', 'admin user id');
 select vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
+select vault.create_secret('http://localhost:8881/.netlify/functions/', 'external_function_url', 'external function url'); -- Netlify backend for long runny functions
 select vault.create_secret('testsecret', 'apikey', 'admin user id');
 
 -- DROP TRIGGER "on_app_stats_create" ON "public"."app_stats";
@@ -20,22 +21,22 @@ select vault.create_secret('testsecret', 'apikey', 'admin user id');
 CREATE TRIGGER on_app_stats_create 
 AFTER INSERT ON public.app_stats 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_app_stats_create');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_app_stats_create');
 
 CREATE TRIGGER on_app_stats_update 
 AFTER UPDATE ON public.app_stats 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_app_stats_update');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_app_stats_update');
 
 CREATE TRIGGER on_channel_create 
 AFTER INSERT ON public.channels 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_channel_create');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_channel_create');
 
 CREATE TRIGGER on_channel_update 
 AFTER UPDATE ON public.channels 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_channel_update');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_channel_update');
 
 -- CREATE TRIGGER on_log_create 
 -- AFTER CREATE ON public.app_stats 
@@ -45,42 +46,42 @@ EXECUTE FUNCTION public.http_post_to_function('on_channel_update');
 CREATE TRIGGER on_shared_create 
 AFTER INSERT ON public.channel_users 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_shared_create');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_shared_create');
 
 CREATE TRIGGER on_user_create 
 AFTER INSERT ON public.users 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_user_create');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_user_create');
 
 CREATE TRIGGER on_user_update 
 AFTER UPDATE ON public.users 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_user_update');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_user_update');
 
 CREATE TRIGGER on_version_create 
 AFTER INSERT ON public.app_versions 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_version_create');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_create');
 
 CREATE TRIGGER on_version_delete 
 AFTER DELETE ON public.app_versions 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_version_delete');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_delete');
 
 CREATE TRIGGER on_version_update 
 AFTER UPDATE ON public.app_versions 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_version_update');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_update');
 
 CREATE TRIGGER on_devices_override_update 
 AFTER INSERT or UPDATE or DELETE ON public.devices_override 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_device_update');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_device_update');
 
 CREATE TRIGGER on_channel_devices_update 
 AFTER INSERT or UPDATE or DELETE ON public.channel_devices 
 FOR EACH ROW 
-EXECUTE FUNCTION public.http_post_to_function('on_device_update');
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_device_update');
 
 INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "app", "channel", "update", "version", "shared", "abtest", "progressive_deploy", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
 ('2022-06-05 12:25:28+00', '2022-10-05 16:00:46.563382+00', 'Free', 'plan.free.desc', 0, 0, 'free', 1, 1, 500, 10, 0, 'f', 'f', 'c2f582d7-7dcb-4a65-b8da-82cc74a0645d', 'free', 'free', 0.1, 0.5, 50, 'Best for discover', 0, 0, 0, NULL, NULL, NULL),
@@ -131,7 +132,7 @@ INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "up
 
 INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdateToMajor", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
 (22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't'),
-(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't');
+(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 't', 'f', 't', 't', 'f', 't', 't');
 
 INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "date_id", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '', '1.223.0', '', 't', 't');
@@ -198,53 +199,10 @@ INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage"
 SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage(5)$$);
 SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
 SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
-
--- SELECT cron.schedule('Update good_plan every day at 1AM', '0 1 * * *', $$SELECT update_app_usage(5)$$);
--- SELECT cron.schedule('Update web_stats every day at 12AM and 5', '5 0 * * *', $$SELECT update_app_usage(5)$$);
--- SELECT cron.schedule('Set to delete old versions after retention every day at 12AM', '0 0 * * *', $$SELECT update_app_usage(5)$$);
--- SELECT cron.schedule('Set channel ', '0 0 * * *', $$CALL update_app_usage(5)$$);
-
-INSERT INTO "cron"."job" ("jobid", "schedule", "command", "nodename", "nodeport", "database", "username", "active", "jobname") VALUES
-(5, '0 1 * * *', '
-    select status
-    from
-      http((
-          ''POST'',
-          ''http://localhost:8881/api/cron_good_plan-background'',
-           ARRAY[http_header(''apisecret'',''testsecret'')],
-           ''application/json'',
-           ''{}''
-        )::http_request)
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_plan'),
-(10, '5 0 * * *', '
-SELECT http_set_curlopt(''CURLOPT_TIMEOUT_MS'', ''15000'');
-    SELECT status
-    FROM
-      http((
-          ''POST'',
-           ''http://localhost:8881/api/web_stats-background'',
-           ARRAY[http_header(''apisecret'',''testsecret'')],
-           ''application/json'',
-           ''{}''
-        )::http_request)
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_web_stats'),
 -- Set old versions to deleted after retention passed 
-(15, '0 0 * * *', '
-    UPDATE app_versions
-    SET deleted = true
-    FROM apps, app_versions_meta
-    WHERE app_versions_meta.app_id = app_versions.app_id
-    AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
-    AND app_versions.deleted = false
-    AND apps.retention > 0
-    AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
-    AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_everyday_retention'),
+SELECT cron.schedule('Delete old app version', '40 0 * * *', $$CALL update_app_versions_retention()$$);
 -- update channel for progressive deploy if too many fail
-(20, '*/10 * * * *', '
-    update channels
-    SET
-      "secondaryVersionPercentage" = CASE WHEN channels."secondVersion" not in (select version from stats where stats.action=''update_fail'' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) THEN "secondaryVersionPercentage" + 0.1 ELSE 0 END
-    where channels.enable_progressive_deploy = true
-    and channels."secondaryVersionPercentage" between 0 AND 0.9;
-    ', 'localhost', 5432, 'postgres', 'supabase_admin', 't', 'cron_progressive_deploy');
+SELECT cron.schedule('Update channel for progressive deploy if too many fail', '*/10 * * * *', $$CALL update_channels_progressive_deploy()$$);
+SELECT cron.schedule('Update web stats', '22 1 * * *', $$SELECT http_post_to_function('web_stats-background', 'external', '{}'::jsonb)$$);
+SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_to_function('cron_good_plan-background', 'external', '{}'::jsonb)$$);
+SELECT cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT http_post_to_function('cron_email-background', 'external', '{}'::jsonb)$$);

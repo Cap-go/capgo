@@ -54,9 +54,6 @@ export async function openPortal() {
   }
   return null
 }
-function getClientReferenceId() {
-  return window.Rewardful && (window.Rewardful.referral ? window.Rewardful.referral : (`checkout_${(new Date()).getTime()}`))
-}
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) {
 //   console.log('openCheckout')
@@ -73,7 +70,6 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         successUrl,
         cancelUrl,
         reccurence: isYear ? 'year' : 'month',
-        clientReferenceId: getClientReferenceId(), // TODO: delete after switch done
       }),
     })
     displayStore.showLoader = false
