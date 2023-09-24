@@ -506,7 +506,6 @@ BEGIN
 END;  
 $$;
 
-CREATE FUNCTION "public"."get_current_plan_name"("userid" "uuid") RETURNS character varying
 CREATE OR REPLACE FUNCTION public.get_current_plan_max()
 RETURNS character varying
 LANGUAGE plpgsql
