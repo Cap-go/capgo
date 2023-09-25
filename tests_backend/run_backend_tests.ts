@@ -76,8 +76,8 @@ async function getEnvFile(redis: 'none' | 'local') {
     p.log.info('Minio URL is not null, creating a new env file...')
     const tempEnvFile = await Deno.makeTempFile()
     const readEnvFile = await Deno.readTextFile(envFilePath)
-    const finalFile = readEnvFile.replace('host.docker.internal', minioUrl)
-    await Deno.writeTextFile(tempEnvFile, finalFile)
+    const fileContent = readEnvFile.replace('host.docker.internal', minioUrl)
+    await Deno.writeTextFile(tempEnvFile, fileContent)
     return tempEnvFile
   }
 
@@ -221,10 +221,10 @@ async function runTestsForFolder(folder: string, shortName: string, firstArg: st
 
     // this last conditions checks if we are supposed to run all tests or just the specific one
     // Like /test cli will run only tests from the cli folder
-    if (dirEntry.isDirectory || !dirEntry.name.endsWith('.ts') || (firstArg !== 'all' ? shortName !== firstArg : false))
+    if (dirEntry.isDirectory || !dirEntry.name.endsWith('.ts') || (firstArg !== 'all' && shortName !== firstArg))
       continue
 
-    // Make sure the first time we allways have "normal" backend
+    // Make sure the first time we always have "normal" backend
     if (backendType !== 'none') {
       // Only if backend !== null
       if (backendType) {
