@@ -83,7 +83,10 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
     ],
     stdout: 'piped',
     stderr: 'piped',
-    env,
+    env: {
+      SKIP_BACKEND: 'true',
+      ...env,
+    },
   })
 
   const subprocess = playwrightCommand.spawn()

@@ -233,7 +233,8 @@ async function runTestsForFolder(folder: string, shortName: string, firstArg: st
       }
 
       p.log.info('Starting normal backend...')
-      // None means no redis
+      // None means no redis is not going to be configured
+      // This is here to check what happens if redis fails or is disabled for whatever reason
       await startSupabaseBackend('none')
     }
 
