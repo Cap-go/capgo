@@ -129,7 +129,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
             event: 'update fail',
             icon: '⚠️',
             user_id: appVersion.user_id,
-            notify: true,
+            notify: false,
           }).catch()
         }
       }
