@@ -98,7 +98,7 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     .eq('app_id', app_id)
     .single()
     .then(res => res.data)
-  let recC = supabaseAdmin()
+  const recC = supabaseAdmin()
     .from('channels')
     .select(`
       id,
@@ -138,9 +138,9 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     `)
     .eq('app_id', app_id)
     .eq('public', true)
-  if (platform === 'ios' || platform === 'android')
-    recC = recC.eq(platform, true).single().then(res => res.data)
-  else recC = recC.limit(1).single().then(res => res.data)
+    .eq(platform, true)
+    .single()
+    .then(res => res.data)
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
   return { versionData, channelData, channelOverride, devicesOverride }
