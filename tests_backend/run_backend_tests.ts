@@ -69,7 +69,7 @@ async function genTempUpstashEnvFile(upstashToken: string, upstashUrl: string): 
 }
 
 async function getEnvFile(redis: 'none' | 'local') {
-  const envFilePath = `supabase/.env.example${redis === 'local' ? '.redis' : ''}`
+  const envFilePath = `./supabase/.env.example${redis === 'local' ? '.redis' : ''}`
 
   const minioUrl = Deno.env.get('MINIO_URL')
   if (minioUrl) {

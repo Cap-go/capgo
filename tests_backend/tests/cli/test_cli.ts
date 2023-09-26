@@ -149,6 +149,7 @@ async function runCli(params: string[]): Promise<string> {
     subprocess.stderr,
   )
 
+  const _ = await subprocess.status
   const reader = joinedStream.getReader()
   let finalString = ''
 
