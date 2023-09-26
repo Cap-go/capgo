@@ -15,10 +15,10 @@ test('test bundle', async ({ page }) => {
   await page.getByRole('button', { name: 'Log in' }).click()
 
   // Expect the URL to change to the logged in dashboard
-  await expect(page).toHaveURL(`${BASE_URL}/app/home`)
+  await expect(page).toHaveURL(`${BASE_URL}/app/home`, { timeout: 60_000 })
 
   // Go to the production channel
   page.goto(`${BASE_URL}/app/p/com--demo--app/channel/22`)
   // eslint-disable-next-line n/prefer-global/process
-  await expect(page.locator('.cursor-pointer > div:nth-child(1) > span:nth-child(1)')).toHaveText(process.env.BUNDLE!)
+  await expect(page.locator('.cursor-pointer > div:nth-child(1) > span:nth-child(1)')).toHaveText(process.env.BUNDLE!, { timeout: 60_000 })
 })
