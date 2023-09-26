@@ -167,8 +167,7 @@ async function runCli(params: string[]): Promise<string> {
 
 async function uploadToCloud(_backendBaseUrl: URL, _supabase: SupabaseType) {
   // We do not care about the output, if it fails the runCli will throw an error
-  const data = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
-  console.log(data)
+  await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
 }
 
 async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
