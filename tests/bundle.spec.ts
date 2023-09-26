@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test'
 const BASE_URL = 'http://localhost:5173'
 
 test('test bundle', async ({ page }) => {
+  // High timeout, because the first HTTP payload takes a while to load
+  test.setTimeout(60_000)
   await page.goto(`${BASE_URL}/login`)
 
   // Fill in the username and password fields
