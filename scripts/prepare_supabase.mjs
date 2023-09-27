@@ -29,11 +29,13 @@ function deleteFolderRecursive(directoryPath) {
 };
 
 try {
-  console.log('projectRef', projectRef)
+  console.log('Set projectRef', projectRef)
   await outputFile('./supabase/.temp/project-ref', projectRef)
+  console.log('Check supabase version')
   await exec('supabase --version').then((r) => {
     r.stdout && console.log('Supabase CLI', r.stdout)
   })
+  console.log('Remove unwanted functions')
   for (const folder of folders) {
     const folderPath = `./supabase/functions/${folder}`
     const fileNoDeploy = `${folderPath}/.no_deploy`

@@ -36,13 +36,12 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: 1.99.5
+      - name: 🍜 Prepare Supabase
+        run: node scripts/prepare_supabase.mjs
       - name: Apply Supabase Migrations
-        run: supabase migration up -d $SUPABASE_DATABASE_URL
+        run: supabase migration up --linked
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }} 
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_URL }} 
-      - name: Ignore some functions
-        run: node scripts/ignore_functions.mjs
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
