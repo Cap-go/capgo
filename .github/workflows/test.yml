@@ -29,12 +29,6 @@ jobs:
           version: 8
           run_install: false
 
-      - name: Run Lint
-        run: pnpm run lint
-
-      - name: Run Backend Lint
-        run: pnpm run lint-backend
-
       - name: Get pnpm store directory
         shell: bash
         run: |
@@ -50,10 +44,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Run Lint
+        run: pnpm run lint
+
+      - name: Run Backend Lint
+        run: pnpm run lint-backend
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.68.6 
+          version: 1.99.5
 
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
