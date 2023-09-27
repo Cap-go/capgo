@@ -19,6 +19,7 @@
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
     "serve": "vite",
+    "serve-dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
     "reset": "supabase db reset",
     "dev": "npx netlify dev --port 8881",
