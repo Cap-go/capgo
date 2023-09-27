@@ -55,8 +55,8 @@ jobs:
           version: 1.99.5
       - name: 🍜 Prepare Supabase
         run: node scripts/prepare_supabase.mjs
-      - name: Apply Supabase Migrations
-        run: supabase migration up --linked -p ${{ secrets.SUPABASE_DB_PASS }} 
+      # - name: Apply Supabase Migrations TODO: make this work 
+      #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
