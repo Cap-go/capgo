@@ -67,7 +67,7 @@ supabase db reset
 
 ```
 
-This command will clear all data and schema changes made to the local database, restoring it to its initial state.
+This command will clear all data and revert schema changes made to the local database, restoring it to its initial state.
 
 
 By following these steps, you can safely add and deploy Supabase migration changes to your project's database schema.
