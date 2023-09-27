@@ -39,9 +39,7 @@ jobs:
       - name: 🍜 Prepare Supabase
         run: node scripts/prepare_supabase.mjs
       - name: Apply Supabase Migrations
-        run: supabase migration up --linked
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }} 
+        run: supabase migration up --linked -p ${{ secrets.SUPABASE_DB_PASS }} 
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
