@@ -38,7 +38,6 @@ jobs:
           version: 1.93.0
       - name: Apply Supabase Migrations
         run: |
-          npm install -g supabase
           supabase migrate up -d $SUPABASE_DATABASE_URL
         env:
           SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }} 
