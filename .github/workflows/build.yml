@@ -36,6 +36,12 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: 1.93.0
+      - name: Apply Supabase Migrations
+        run: |
+          supabase migrate up -d $SUPABASE_DATABASE_URL
+        env:
+          SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }} 
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_URL }} 
       - name: Ignore some functions
         run: node scripts/ignore_functions.mjs
       - name: Update functions Alpha
