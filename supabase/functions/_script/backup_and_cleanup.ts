@@ -43,6 +43,7 @@ async function backupAndDeleteTable(tableName: string) {
     const cutoffDate = new Date(currentDate.getTime() - daysToKeep * 24 * 60 * 60 * 1000); // Declare cutoffDate outside the loop
 
     while (hasMoreData) {
+      await new Promise(r => setTimeout(r, 3000))
       const query = `
         SELECT * FROM ${tableName}
         WHERE updated_at < '${cutoffDate.toISOString()}'
