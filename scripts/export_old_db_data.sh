@@ -24,7 +24,9 @@ do
     git add "$file"
 done
 
-git commit -m "Add data chunks"
+git add .gitattributes
+
+git commit -m "Add data chunks ${CURRENT_DATE}"
 git push origin main
 
 # Remove the data exported from db
