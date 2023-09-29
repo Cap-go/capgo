@@ -53,7 +53,7 @@ if (!Capacitor.isNativePlatform()) {
   })
 }
 if (main.user?.id) {
-  isAdmin(main.user?.id).then((res) => {
+  isAdmin().then((res) => {
     if (!!res || isSpoofed()) {
       tabs.value.push({
         label: 'admin',
@@ -62,6 +62,13 @@ if (main.user?.id) {
       })
     }
   })
+  if (main.paying) {
+    tabs.value.push({
+      label: 'usage',
+      icon: shallowRef(IconPlans) as any,
+      key: '/dashboard/settings/usage',
+    })
+  }
 }
 
 displayStore.NavTitle = t('settings')
