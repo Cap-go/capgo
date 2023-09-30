@@ -162,6 +162,7 @@ async function runCli(params: string[]): Promise<string> {
     finalString += string
   }
 
+  console.log(`final output\n${finalString}}`)
   return finalString
 }
 

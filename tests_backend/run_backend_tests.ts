@@ -73,7 +73,7 @@ async function getEnvFile(redis: 'none' | 'local') {
 
   const minioUrl = Deno.env.get('MINIO_URL')
   if (minioUrl) {
-    p.log.info('Minio URL is not null, creating a new env file...')
+    p.log.info(`Minio URL is not null (${minioUrl}), creating a new env file...`)
     const tempEnvFile = await Deno.makeTempFile()
     const readEnvFile = await Deno.readTextFile(envFilePath)
     const fileContent = readEnvFile.replace('host.docker.internal', minioUrl)
