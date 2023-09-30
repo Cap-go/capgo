@@ -10,7 +10,8 @@ export function sendLogToTinybird(log: Database['public']['Tables']['stats']['In
     'https://api.tinybird.co/v0/events?name=logs',
     {
       method: 'POST',
-      body: log.map(l => JSON.stringify(l)).join('\n'),
+      // add created_at: new Date().toISOString() to each log
+      body: log.map(l => ({ ...l, created_at: new Date().toISOString() })).map(l => JSON.stringify(l)).join('\n'),
       headers: { Authorization: `Bearer ${getEnv('TINYBIRD_TOKEN')}` },
     },
   )
