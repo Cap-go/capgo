@@ -108,10 +108,10 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
           .eq('device_id', device_id)
           .single()
         if (deviceData && deviceData.version !== appVersion.id) {
-          const statUninstall = {
+          const statUninstall: Database['public']['Tables']['stats']['Insert'] = {
             ...stat,
             action: 'uninstall',
-            version_id: deviceData.version,
+            version: deviceData.version,
           }
           rows.push(statUninstall)
         }
