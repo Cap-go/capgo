@@ -106,6 +106,7 @@ async function prepareCli(backendBaseUrl: URL, _supabase: SupabaseType) {
   await Deno.writeTextFile(capacitorConfigPath, defaultConfig)
   await Deno.mkdir(`${tempFileFolder}/dist`)
   await Deno.writeTextFile(`${tempFileFolder}/dist/index.js`, indexJsCode)
+  await Deno.writeTextFile(`${tempFileFolder}/dist/index.html`, '')
   await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson)
 
   const pnpmInstallCommand = new Deno.Command('pnpm', {
@@ -136,13 +137,6 @@ async function runCli(params: string[]): Promise<string> {
     stderr: 'piped',
   })
 
-  // const command = new Deno.Command('ls', {
-  //   args: ['.'],
-  //   cwd: appPath!,
-  //   stdout: 'piped',
-  //   stderr: 'piped',
-  // })
-
   const subprocess = command.spawn()
   const joinedStream = mergeReadableStreams(
     subprocess.stdout,
@@ -162,7 +156,7 @@ async function runCli(params: string[]): Promise<string> {
     finalString += string
   }
 
-  console.log(`final output\n${finalString}}`)
+  console.log(`final CLI output: \n\n${finalString}}`)
   return finalString
 }
 
