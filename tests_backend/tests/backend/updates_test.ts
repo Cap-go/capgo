@@ -25,7 +25,7 @@ export function getTest(): RunnableTest {
         name: 'Test two channels',
         test: testTwoChannels,
         timesToExecute: 1,
-      }
+      },
     ],
   }
 }
@@ -232,7 +232,7 @@ async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
   assert(changeProductiuonChannelError === null, `Supabase change production channel (ios) error ${JSON.stringify(changeProductiuonChannelError)} is not null`)
 
   try {
-    await delay(1500)
+    await delay(7000)
     const { data: secondChannel, error: getSecondChannelError } = await supabase
       .from('channels')
       .select('*')
@@ -255,7 +255,7 @@ async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
   const { error: changeSecondChannelError } = await supabase.from('channels').update({ android: true }).eq('id', 24)
   assert(changeSecondChannelError === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError)} is not null`)
   try {
-    await delay(1500)
+    await delay(7000)
     const { data: prodChannel, error: getSecondChannelError } = await supabase
       .from('channels')
       .select('*')
@@ -274,18 +274,17 @@ async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
     assert(changeSecondChannelError === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError)} is not null`)
   }
 
-  // We update production channel android: false
+  // We update production channel android: false then check if production channel is still public or not
   const { error: changeSecondChannelError2 } = await supabase.from('channels').update({ android: false }).eq('id', 22)
   assert(changeSecondChannelError2 === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError2)} is not null`)
   try {
-    await delay(1500)
+    await delay(7000)
     const { data: prodChannel, error: getSecondChannelError } = await supabase
       .from('channels')
       .select('*')
       .eq('id', 22)
       .single()
 
-    // We check if production channel is still public or not
     assert(getSecondChannelError === null, `Supabase get second channel error ${JSON.stringify(getSecondChannelError)} is not null`)
     assert(prodChannel!.public === false, 'Second channel is public')
   }
@@ -298,18 +297,17 @@ async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
     assert(changeSecondChannelError === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError)} is not null`)
   }
 
-  // We update two_default channel iOS: false
+  // We update two_default channel iOS: false then check if two_default channel is still public or not
   const { error: changeSecondChannelError3 } = await supabase.from('channels').update({ ios: false }).eq('id', 24)
   assert(changeSecondChannelError3 === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError3)} is not null`)
   try {
-    await delay(1500)
+    await delay(7000)
     const { data: prodChannel, error: getSecondChannelError } = await supabase
       .from('channels')
       .select('*')
       .eq('id', 24)
       .single()
 
-    // We check if two_default channel is still public or not
     assert(getSecondChannelError === null, `Supabase get second channel error ${JSON.stringify(getSecondChannelError)} is not null`)
     assert(prodChannel!.public === false, 'Second channel is public')
   }
