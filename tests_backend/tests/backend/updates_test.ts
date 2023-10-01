@@ -1,3 +1,4 @@
+import { P } from '../../../dist/assets/plus-a14d1be0.js'
 import type { SupabaseType } from '../../utils.ts'
 import { assert, assertEquals, defaultUserId, delay } from '../../utils.ts'
 
@@ -63,6 +64,34 @@ export async function testUpdateEndpoint(backendBaseUrl: URL, supabase: Supabase
   await responseOk(failMajorResponse, 'Disable auto update to major')
   const failMajorError = await getResponseError(failMajorResponse)
   assert(failMajorError === 'disable_auto_update_to_major', `Response error ${failMajorError} is not equal to disable_auto_update_to_major`)
+
+  const setDisableUpdateMinor = await supabase.from('channels').update({ disableAutoUpdate: 'minor' }).eq('id', 22)
+  assert(setDisableUpdateMinor.error === null, `Supabase set minor update error ${JSON.stringify(setDisableUpdateMinor.error)} is not null`)
+  try {
+    // Set version to 1.361.0
+    const setVersionResult = await supabase.from('channels').update({ version: 9653 }).eq('id', 22)
+    assert(setVersionResult.error === null, `Supabase version error ${JSON.stringify(setVersionResult.error)} is not null`)
+
+    // Nested becouse it has to be that way
+
+    try {
+      const autoUpdateMinorFailData = getBaseData()
+      autoUpdateMinorFailData.version_name = '1.1.0'
+      const failMinorResponse = await sendUpdate(backendBaseUrl, autoUpdateMinorFailData)
+      await responseOk(failMinorResponse, 'Disable auto update to minor')
+      const failMinorError = await getResponseError(failMinorResponse)
+      assert(failMinorError === 'disable_auto_update_to_minor', `Response error ${failMinorError} is not equal to disable_auto_update_to_minor`)
+    }
+    finally {
+      // Revert version to 1.0.0
+      const setVersionResult = await supabase.from('channels').update({ version: 9654 }).eq('id', 22)
+      assert(setVersionResult.error === null, `Supabase version error ${JSON.stringify(setVersionResult.error)} is not null`)
+    }
+  }
+  finally {
+    const setDisableUpdateMajor = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+    assert(setDisableUpdateMajor.error === null, `Supabase set minor update error ${JSON.stringify(setDisableUpdateMajor.error)} is not null`)
+  }
 
   const disableAutoUpdateUnderNativeData = getBaseData()
   disableAutoUpdateUnderNativeData.version_build = '2.0.0'
