@@ -4,11 +4,11 @@ To make changes to the database schema in your Supabase project, follow these st
 
 1. **Create a New Migration:**
 
-   Use the Supabase CLI to generate a new migration file. Replace `<migration_name>` with a descriptive name for your migration.
+   Use the Supabase CLI to generate a new migration file. Replace `migration_name` with a descriptive name for your migration.
 
 ```bash
 
-supabase migrate create -n <migration_name>
+supabase migration new migration_name
 
 ```
 This will create a new migration file in the `migrations` directory.
@@ -27,7 +27,7 @@ Before pushing your migration to the main branch, it's a good practice to test i
 
 ```bash
 
-supabase migrate up -d $LOCAL_DATABASE_URL
+supabase migration up
 
 ```
 
