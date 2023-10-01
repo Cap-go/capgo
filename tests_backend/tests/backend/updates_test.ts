@@ -274,7 +274,7 @@ async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
     assert(changeSecondChannelError === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError)} is not null`)
   }
 
-  // We update production channel android: false then check if production channel is still public or not
+  // We update production channel android: false then check if two_default channel is still public or not
   const { error: changeSecondChannelError2 } = await supabase.from('channels').update({ android: false }).eq('id', 22)
   assert(changeSecondChannelError2 === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError2)} is not null`)
   try {
@@ -297,7 +297,7 @@ async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
     assert(changeSecondChannelError === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError)} is not null`)
   }
 
-  // We update two_default channel iOS: false then check if two_default channel is still public or not
+  // We update two_default channel iOS: false then check if production channel is still public or not
   const { error: changeSecondChannelError3 } = await supabase.from('channels').update({ ios: false }).eq('id', 24)
   assert(changeSecondChannelError3 === null, `Supabase change production channel (ios) error ${JSON.stringify(changeSecondChannelError3)} is not null`)
   try {
