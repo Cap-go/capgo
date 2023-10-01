@@ -10,18 +10,35 @@ jobs:
     runs-on: ubuntu-latest
     name: "Build code and release"
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-      - name: Use Node.js
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v2
+        name: Install pnpm
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        id: install_code
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
+
       - name: Lint
         id: lint_code
         run: pnpm lint && pnpm lint-backend
@@ -35,9 +52,11 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.93.0
-      - name: Ignore some functions
-        run: node scripts/ignore_functions.mjs
+          version: 1.99.5
+      - name: 🍜 Prepare Supabase
+        run: node scripts/prepare_supabase.mjs
+      # - name: Apply Supabase Migrations TODO: make this work 
+      #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
@@ -59,6 +78,7 @@ jobs:
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+
   build_android:
     runs-on: ubuntu-latest
     steps:
@@ -100,9 +120,9 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+            ~/android/.gradle/*
+            ~/android/gradle/wrapper/*
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - uses: maierj/fastlane-action@v2.3.0

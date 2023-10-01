@@ -340,7 +340,7 @@ export async function update(body: AppInfos) {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(version.storage_provider, `apps/${version.user_id}/${app_id}/versions`, version.bucket_id)
+      const res = await getBundleUrl(version.storage_provider, `apps/${appOwner.user_id}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
     }

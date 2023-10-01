@@ -13,10 +13,17 @@ const CACHE_NO_NEW_VAL = 'NO_NEW'
 const jsonRequestSchema = z.object({
   device_id: z.string(),
   version_name: z.string(),
+  version_build: z.string(),
   app_id: z.string(),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
-})
+}).passthrough()
+  .transform((val) => {
+    if (val.version_name === 'builtin')
+      val.version_name = val.version_build
+
+    return val
+  })
 
 const headersSchema = z.object({
   'x-update-status': z.enum(['app_not_found', 'no_new', 'new_version', 'fail']),
@@ -25,7 +32,7 @@ const headersSchema = z.object({
 
 const bypassRedis = false
 
-async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
+async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
   // const redis = null
   const redis = await getRedis()
 
@@ -34,7 +41,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return update(body)
   }
 
-  const parseResult = jsonRequestSchema.passthrough().safeParse(body)
+  const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success)
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
 
@@ -46,6 +53,10 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     is_prod: isProd,
   } = parseResult.data
 
+  // if (appId !== 'com.kick.mobile') {
+  //   console.log('[Cache] ignored cache')
+  //   return update(body)
+  // }
   const appCacheKey = `app_${appId}`
   const deviceCacheKey = `device_${deviceId}`
   const versionCacheKey = `ver_${versionName}`
