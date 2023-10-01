@@ -147,6 +147,20 @@ export async function isGoodPlan(): Promise<boolean> {
 
   return data || false
 }
+
+export async function getOrgs(): Promise<[]> {
+  const { data, error } = await useSupabase()
+    .from('orgs')
+    .select('*')
+
+  if (error) {
+    console.error('getOrgs error', error.message)
+    throw error
+  }
+
+  return data || ['asd']
+}
+
 export async function isTrial(): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial', { })
