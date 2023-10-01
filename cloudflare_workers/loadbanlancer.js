@@ -1,6 +1,5 @@
 const MAINHOST = 'xvwzpoazmxkqosrdewyv.functions.supabase.co'
-const BACKUPHOST = 'netlifyedge.capgo.app'
-const BACKUPHOSTNODE = 'netlify.capgo.app'
+const BACKUPHOST = 'web.capgo.app'
 
 async function fetchWithTimeout(resource, options = {}) {
   const { timeout = 5000 } = options
@@ -28,14 +27,20 @@ async function handleRequest(request) {
     // try second host
     const backupUrl = new URL(request.url)
     backupUrl.hostname = BACKUPHOST
+    const end = backupUrl.pathname.split('/').pop()
+    // https://web.capgo.app/api-egde/ok
+    backupUrl.pathname = `/api-egde/${end}`
     try {
       res = await fetch(backupUrl, request.clone())
     }
     catch (err) {
       console.log('err', backupUrl, err)
       // try third host
+      // https://web.capgo.app/api/ok
       const backup2Url = new URL(request.url)
-      backup2Url.hostname = BACKUPHOSTNODE
+      backup2Url.hostname = BACKUPHOST
+      const end = backup2Url.pathname.split('/').pop()
+      backup2Url.pathname = `/api/${end}`
       try {
         res = await fetch(backup2Url, request.clone())
       }
