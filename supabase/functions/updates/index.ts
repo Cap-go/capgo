@@ -30,7 +30,7 @@ const headersSchema = z.object({
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = true
+const bypassRedis = false
 
 async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
   // const redis = null
@@ -53,6 +53,10 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
     is_prod: isProd,
   } = parseResult.data
 
+  // if (appId !== 'com.kick.mobile') {
+  //   console.log('[Cache] ignored cache')
+  //   return update(body)
+  // }
   const appCacheKey = `app_${appId}`
   const deviceCacheKey = `device_${deviceId}`
   const versionCacheKey = `ver_${versionName}`

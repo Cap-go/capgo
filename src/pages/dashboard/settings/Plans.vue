@@ -102,7 +102,12 @@ async function loadData() {
 
   const date_id = new Date().toISOString().slice(0, 7)
   await getCurrentPlanName().then(res => planCurrrent.value = res)
-  await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
+  try {
+    await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
+  }
+  catch (error) {
+    console.log(error)
+  }
   isLoading.value = false
 }
 
