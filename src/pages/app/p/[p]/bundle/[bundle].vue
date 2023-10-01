@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { valid } from 'semver'
 import { useRoute, useRouter } from 'vue-router'
 import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
@@ -65,6 +66,7 @@ async function getChannels() {
     const v: number = chan.version as any
     if (version.value && (v === version.value.id || version.value.id === chan.secondVersion)) {
       channel.value = chan
+      console.log('channel.value', channel.value)
       secondaryChannel.value = (version.value.id === chan.secondVersion)
     }
   })
@@ -446,6 +448,49 @@ function hideString(str: string) {
   const last = str.slice(-5)
   return `${first}...${last}`
 }
+
+async function saveCustomId(input: string) {
+  console.log('saveCustomId', input)
+
+  if (!id.value)
+    return
+
+  if (input.length === 0) {
+    const { error: errorNull } = await supabase
+      .from('app_versions')
+      .update({
+        minUpdateVersion: null,
+      })
+      .eq('id', id.value)
+
+    if (errorNull) {
+      console.log('Cannot set min update version to null', errorNull)
+      return
+    }
+
+    toast.success(t('updated-min-version'))
+    return
+  }
+
+  if (!valid(input)) {
+    toast.error(t('invalid-version'))
+    return
+  }
+
+  const { error } = await supabase
+    .from('app_versions')
+    .update({
+      minUpdateVersion: input,
+    })
+    .eq('id', id.value)
+
+  if (error) {
+    console.log('Cannot set min update version', error)
+    return
+  }
+
+  toast.success(t('updated-min-version'))
+}
 // const failPercent = computed(() => {
 //   if (!version.value)
 //     return '0%'
@@ -468,6 +513,8 @@ function hideString(str: string) {
             <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
+            <!-- Min update version -->
+            <InfoRow v-if="channel?.disableAutoUpdate === 'version_number'" :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''" @update:value="saveCustomId" />
             <!-- meta devices -->
             <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
             <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toLocaleString()" />

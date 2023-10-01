@@ -74,7 +74,7 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
         allow_dev,
         allow_emulator,
         disableAutoUpdateUnderNative,
-        disableAutoUpdateToMajor,
+        disableAutoUpdate,
         ios,
         android,
         secondaryVersionPercentage,
@@ -109,7 +109,7 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
       allow_dev,
       allow_emulator,
       disableAutoUpdateUnderNative,
-      disableAutoUpdateToMajor,
+      disableAutoUpdate,
       ios,
       android,
       secondVersion (
@@ -375,13 +375,26 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (channelData.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
+      if (channelData.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id)
         await sendStats('disableAutoUpdateToMajor', platform, device_id, app_id, version_build, versionId)
         return sendResWithStatus('fail', {
           major: true,
           message: 'Cannot upgrade major version',
           error: 'disable_auto_update_to_major',
+          version: version.name,
+          old: version_name,
+        }, 200, updateOverwritten)
+      }
+
+      console.log('disable', channelData.disableAutoUpdate)
+      if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
+        console.log(id, 'Cannot upgrade minor version', device_id)
+        await sendStats('disableAutoUpdateToMinor', platform, device_id, app_id, version_build, versionId)
+        return sendResWithStatus('fail', {
+          major: true,
+          message: 'Cannot upgrade minor version',
+          error: 'disable_auto_update_to_minor',
           version: version.name,
           old: version_name,
         }, 200, updateOverwritten)

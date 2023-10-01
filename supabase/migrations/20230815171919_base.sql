@@ -68,13 +68,6 @@ CREATE TYPE "public"."stats_table" AS (
 	"storage" double precision
 );
 
-CREATE TYPE "public"."disable_update" AS ENUM (
-    'major',
-    'minor',
-    'version_number',
-    'none'
-);
-
 CREATE TYPE "public"."stripe_status" AS ENUM (
     'created',
     'succeeded',
@@ -1326,7 +1319,7 @@ CREATE TABLE "public"."channels" (
     "enable_progressive_deploy" boolean not null default false,
     "secondaryVersionPercentage" double precision not null default '0'::double precision,
     "secondVersion" bigint NULL,
-    "disableAutoUpdate" "public"."disable_update" not null default 'major'::"public"."disable_update",
+    "disableAutoUpdateToMajor" boolean DEFAULT true NOT NULL,
     "beta" boolean DEFAULT false NOT NULL,
     "ios" boolean DEFAULT true NOT NULL,
     "android" boolean DEFAULT true NOT NULL,
