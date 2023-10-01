@@ -146,6 +146,7 @@ export interface Database {
           deleted: boolean
           external_url: string | null
           id: number
+          minUpdateVersion: string | null
           name: string
           session_key: string | null
           storage_provider: string
@@ -160,6 +161,7 @@ export interface Database {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          minUpdateVersion?: string | null
           name: string
           session_key?: string | null
           storage_provider?: string
@@ -174,6 +176,7 @@ export interface Database {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          minUpdateVersion?: string | null
           name?: string
           session_key?: string | null
           storage_provider?: string

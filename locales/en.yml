@@ -178,6 +178,7 @@ install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
+invalid-version: Invalid semver version
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-all: All
@@ -200,11 +201,16 @@ logout: Logout
 logs: Logs
 lowerCaseError: Should contain lowercase letters
 main-bundle-number: Main bundle number
+major: Major
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+metadata: Metadata
+metadata-min-ver-not-set: Minimal update version for current bundle is undefined
+min-update-version: Minimal update version
+minor: Minor
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -220,6 +226,7 @@ no-channel-linked: No channel, click to add
 no-devices: No devices
 no-logs: No logs
 no-version-linked: No version, click to add
+none: None
 not-found: Not found
 notifications: Notifications
 old-onboarding-mode: old onboarding
@@ -324,6 +331,8 @@ top-apps: My Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
+undefined: undefined
+undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
@@ -331,6 +340,7 @@ unlink-channel: Unlink channel
 unlink-version: Unlink version
 update: Update
 updated-at: Updated at
+updated-min-version: Updated minimal version
 upgrade: Upgrade
 upgrade-now: Upgrade now
 upperCaseError: Should contain uppercase letters
