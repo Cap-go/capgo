@@ -20,7 +20,7 @@ export function sendLogToTinybird(log: Database['public']['Tables']['stats']['In
 
   // make log a string with a newline between each log
   return fetch(
-    'https://api.tinybird.co/v0/events?name=logs',
+    'https://api.tinybird.co/v0/events?name=stats',
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
