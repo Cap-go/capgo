@@ -184,7 +184,7 @@ async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
   const zipReader = new ZipReader(zipFileReader)
   const entries = await zipReader.getEntries()
 
-  assert(entries.length === 1, `Zip file has more than one entry: ${entries.length}`)
+  assert(entries.length === 2, `Zip file does not have 2 entries! (${entries.length} entries)`)
   const entry = entries[0]
   const firstEntryText = await entry.getData!(new TextWriter())
   await zipReader.close()
