@@ -185,8 +185,9 @@ async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
   const entries = await zipReader.getEntries()
 
   assert(entries.length === 2, `Zip file does not have 2 entries! (${entries.length} entries)`)
-  const entry = entries[0]
-  const firstEntryText = await entry.getData!(new TextWriter())
+  const entry = entries.find(e => e.filename.includes('index.js'))
+  assert(entry !== undefined, 'Zip file does not have index.js entry!')
+  const firstEntryText = await entry!.getData!(new TextWriter())
   await zipReader.close()
 
   assert(firstEntryText === indexJsCode, `Zip file entry (${firstEntryText}) is not equal to ${indexJsCode}`)
