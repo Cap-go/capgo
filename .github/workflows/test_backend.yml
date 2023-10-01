@@ -1,0 +1,77 @@
+name: Run Backend Tests
+
+on:
+  pull_request_target:
+    branches:
+      - main
+  merge_group:
+  workflow_dispatch:
+  
+jobs:
+  test:
+    runs-on: ubuntu-latest	
+    name: "Run Backend Tests"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - uses: pnpm/action-setup@v2
+        name: Install pnpm
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 1.99.5 
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: vx.x.x
+
+      - name: Run Supabase Start
+        run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
+      - name: Configure frontend env
+        run: cp .env.example .env
+
+      - name: Start redis
+        run: sh ./tests_backend/gh_actions/docker.sh
+
+      - name: Start minio
+        run: sh ./tests_backend/gh_actions/minio.sh
+      
+      - name: Run Backend Tests
+        run: pnpm test:backend
+        env:
+          USE_LOCAL_REDIS: true
+          UPSTASH_TOKEN: ${{ secrets.UPSTASH_TEST_TOKEN }}
+          UPSTASH_URL: ${{ secrets.UPSTASH_TEST_URL }}
+
+      - name: Upload Test Results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test-results

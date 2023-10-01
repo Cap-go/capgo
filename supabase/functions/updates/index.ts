@@ -13,17 +13,26 @@ const CACHE_NO_NEW_VAL = 'NO_NEW'
 const jsonRequestSchema = z.object({
   device_id: z.string(),
   version_name: z.string(),
+  version_build: z.string(),
   app_id: z.string(),
-})
+  is_emulator: z.boolean().default(false),
+  is_prod: z.boolean().default(true),
+}).passthrough()
+  .transform((val) => {
+    if (val.version_name === 'builtin')
+      val.version_name = val.version_build
+
+    return val
+  })
 
 const headersSchema = z.object({
   'x-update-status': z.enum(['app_not_found', 'no_new', 'new_version', 'fail']),
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = true
+const bypassRedis = false
 
-async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
+async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
   // const redis = null
   const redis = await getRedis()
 
@@ -32,11 +41,22 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return update(body)
   }
 
-  const parseResult = jsonRequestSchema.passthrough().safeParse(body)
+  const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success)
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
 
-  const { device_id: deviceId, version_name: versionName, app_id: appId } = parseResult.data
+  const {
+    device_id: deviceId,
+    version_name: versionName,
+    app_id: appId,
+    is_emulator: isEmulator,
+    is_prod: isProd,
+  } = parseResult.data
+
+  // if (appId !== 'com.kick.mobile') {
+  //   console.log('[Cache] ignored cache')
+  //   return update(body)
+  // }
   const appCacheKey = `app_${appId}`
   const deviceCacheKey = `device_${deviceId}`
   const versionCacheKey = `ver_${versionName}`
@@ -55,7 +75,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
     return sendRes(APP_DOES_NOT_EXIST)
   }
 
-  if (inCache && deviceExists && device === 'standard' && cachedVersionExists && cachedVersion) {
+  if (inCache && deviceExists && device === 'standard' && cachedVersionExists && cachedVersion && !isEmulator && isProd) {
     console.log('[redis] Cached - cache sucessful')
     if (cachedVersion === CACHE_NO_NEW_VAL)
       return sendRes(APP_VERSION_NO_NEW)
@@ -101,7 +121,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppInf
   if (!inCache)
     tx.hset(appCacheKey, 'exist', (updateStatus !== 'app_not_found').toString())
 
-  if (!cachedVersionExists && !updateOverwritten)
+  if (!cachedVersionExists && !updateOverwritten && !isEmulator && isProd)
     tx.hset(appCacheKey, versionCacheKey, (updateStatus !== 'no_new') ? await res.clone().text() : CACHE_NO_NEW_VAL)
 
   await tx.flush()

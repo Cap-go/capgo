@@ -39,11 +39,26 @@ const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
-  return [
+  const features = [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
   `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
-  ].filter(Boolean)
+  ]
+  if (plan.name.toLowerCase().includes('as you go')) {
+    if (plan.mau_unit)
+      features[0] += ` included, then $${plan.mau_unit}/user`
+
+    if (plan.storage_unit)
+      features[1] += ` included, then $${plan.storage_unit} per GB`
+
+    if (plan.bandwidth_unit)
+      features[2] += ` included, then $${plan.bandwidth_unit} per GB`
+
+    features.push('API Access')
+    features.push('Dedicated support')
+    features.push('Custom Domain')
+  }
+  return features.filter(Boolean)
 }
 
 function convertKey(key: string) {
@@ -73,8 +88,7 @@ async function getUsages() {
   // get aapp_stats
   if (!main.user?.id)
     return
-  const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getTotalStats(main.user?.id, date_id)
+  stats.value = await getTotalStats()
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
@@ -86,10 +100,13 @@ async function loadData() {
   })
   await getUsages()
 
-  if (main.user?.id) {
-    const date_id = new Date().toISOString().slice(0, 7)
-    await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
-    await getPlanUsagePercent(main.user?.id, date_id).then(res => planPercent.value = res)
+  const date_id = new Date().toISOString().slice(0, 7)
+  await getCurrentPlanName().then(res => planCurrrent.value = res)
+  try {
+    await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
+  }
+  catch (error) {
+    console.log(error)
   }
   isLoading.value = false
 }
@@ -147,7 +164,7 @@ const hightLights = computed<Stat[]>(() => ([
 
 <template>
   <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
-    <div v-if="currentPlan?.name !== 'free'" class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
+    <div v-if="currentPlan?.name !== 'free' && main.paying" class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
           {{ t('billing') }}
@@ -163,7 +180,7 @@ const hightLights = computed<Stat[]>(() => ([
                   {{ t('from') }}
                 </h3>
                 <p class="text-gray-600">
-                  {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
+                  {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
                 </p>
               </div>
               <div>
@@ -171,7 +188,7 @@ const hightLights = computed<Stat[]>(() => ([
                   {{ t('to') }}
                 </h3>
                 <p class="text-gray-600">
-                  {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
+                  {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
                 </p>
               </div>
             </div>
