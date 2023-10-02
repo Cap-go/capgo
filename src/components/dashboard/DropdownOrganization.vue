@@ -116,7 +116,7 @@ function onOrganizationClick(org: Organization) {
 }
 
 watchEffect(async () => {
-  show.value = route.path.includes('settings')
+  show.value = (route.path.includes('settings') || route.path.includes('home'))
 })
 </script>
 
