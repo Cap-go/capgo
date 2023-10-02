@@ -28,4 +28,7 @@ test('test selectable disallow no metadata warning', async ({ page }) => {
 
   // Check if the input is empty
   // input.block
+  const inputValue = await page.evaluate(() => (document.querySelector('input.block') as any).value)
+  await expect(inputValue).toBeTruthy()
+  await expect(inputValue).toBe('')
 })
