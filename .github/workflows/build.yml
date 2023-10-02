@@ -105,7 +105,6 @@ jobs:
         with:
             distribution: 'zulu'
             java-version: '17'
-            cache: 'gradle'
       - name: Decode Keystore File
         uses: timheuer/base64-to-file@v1
         id: android_keystore
@@ -121,9 +120,9 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+            ~/android/.gradle/*
+            ~/android/gradle/wrapper/*
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - uses: maierj/fastlane-action@v2.3.0

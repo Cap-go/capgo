@@ -1,6 +1,6 @@
 {
   "name": "capgo-app",
-  "version": "10.165.0",
+  "version": "10.177.0",
   "private": true,
   "husky": {
     "hooks": {
@@ -19,11 +19,14 @@
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
     "serve": "vite",
+    "serve-dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
     "reset": "supabase db reset",
     "dev": "npx netlify dev --port 8881",
     "test:e2e": "cypress open",
-    "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts",
+    "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts backend",
+    "test:cli": "deno run --allow-all tests_backend/run_backend_tests.ts cli",
+    "test:all": "deno run --allow-all tests_backend/run_backend_tests.ts all",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
