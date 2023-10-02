@@ -26,6 +26,7 @@
     "test:e2e": "cypress open",
     "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts backend",
     "test:cli": "deno run --allow-all tests_backend/run_backend_tests.ts cli",
+    "test:selectable_disallow": "deno run --allow-all tests_backend/run_backend_tests.ts selectable_disallow",
     "test:all": "deno run --allow-all tests_backend/run_backend_tests.ts all",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",

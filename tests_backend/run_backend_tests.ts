@@ -307,6 +307,7 @@ if (!firstArg) {
 else {
   await runTestsForFolder('./tests_backend/tests/backend', 'backend', firstArg)
   await runTestsForFolder('./tests_backend/tests/cli', 'cli', firstArg)
+  await runTestsForFolder('./tests_backend/tests/selectable_disallow', 'selectable_disallow', firstArg)
   Deno.exit(0)
 }
 

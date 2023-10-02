@@ -63,6 +63,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user1.json',
       },
+      dependencies: ['setup'],
     },
   ],
   timeout: 20_000,
