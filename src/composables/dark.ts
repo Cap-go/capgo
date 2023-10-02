@@ -1,6 +1,6 @@
 import { useDark, useToggle } from '@vueuse/core'
 
-const isDark = useDark()
+const isDark = true
 const toggleDark = useToggle(isDark)
 
 export {
