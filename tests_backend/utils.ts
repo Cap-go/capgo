@@ -6,6 +6,8 @@ import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 let supabaseSecret: string | null = null
+let supabaseAnonToken: string | null = null
+let supabaseUrl: string | null = null
 
 export interface Test {
   name: string
@@ -20,8 +22,10 @@ export interface RunnableTest {
   testWithRedis: boolean
 }
 
-export function setSupabaseSecret(secret: string) {
+export function setSupabaseSecrets(secret: string, anonToken: string, url: string) {
   supabaseSecret = secret
+  supabaseAnonToken = anonToken
+  supabaseUrl = url
 }
 
 export function getSupabaseSecret() {
@@ -85,6 +89,8 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
     stderr: 'piped',
     env: {
       SKIP_BACKEND: 'true',
+      SUPABASE_ANON: supabaseAnonToken!,
+      SUPABASE_URL: supabaseUrl!,
       ...env,
     },
   })

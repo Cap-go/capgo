@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { useSupabase } from './utils'
 
 const BASE_URL = 'http://localhost:5173'
 
@@ -90,6 +91,20 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   // Here we do not test for fails, we have the upper test for that
   await page.type('input.block', '1.0.1', { delay: 50 })
   await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Updated minimal version')
+
+  // We have to change bundle B, right now it points to the same bundle as bundle A
+  // We could click on buttons, however this is not the scope of this test
+  // We will use the supabase SDK authenticated as the user to change the bundle
+  const supabase = await useSupabase()
+
+  // Change the bundle
+  const { error: bundleError } = await supabase
+    .from('channels')
+    .update({ secondVersion: 9601 })
+    .eq('id', 23)
+
+  // Check if this worked
+  await expect(bundleError).toBeNull()
 
   // Go back to channel page
   await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)

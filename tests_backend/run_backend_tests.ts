@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 import * as p from 'npm:@clack/prompts@0.7.0'
 
 import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
-import { setSupabaseSecret } from './utils.ts'
+import { setSupabaseSecrets } from './utils.ts'
 import type { RunnableTest, SupabaseType, Test } from './utils.ts'
 
 let supabaseProcess: Deno.ChildProcess | null = null
@@ -24,7 +24,7 @@ let backendType: 'none' | 'local' | 'upstash' | null = null
 const noRedisEnvFilePath = await getEnvFile('none')
 const localRedisEnvFilePath = await getEnvFile('local')
 
-async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string }> {
+async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string; anonToken: string }> {
   const command = new Deno.Command('supabase', {
     args: [
       'status',
@@ -39,8 +39,9 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
   const separateLines = output.split(/\r?\n|\r|\n/g)
   let adminToken = separateLines.find(line => line.includes('service_role'))
   let url = separateLines.find(line => line.includes('API URL'))
+  let anonToken = separateLines.find(line => line.includes('anon'))
 
-  if (!adminToken || !url) {
+  if (!adminToken || !url || !anonToken) {
     p.log.error('Cannot get supabase tokens')
     console.log('output\n', output)
     Deno.exit(1)
@@ -48,10 +49,12 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
 
   adminToken = adminToken.replace('service_role key: ', '').trim()
   url = url.replace('API URL: ', '').trim()
+  anonToken = anonToken.replace('anon key: ', '').trim()
 
   return {
     serviceKey: adminToken,
     url,
+    anonToken,
   }
 }
 
@@ -86,8 +89,8 @@ async function getEnvFile(redis: 'none' | 'local') {
 
 export async function connectToSupabase() {
   try {
-    const { serviceKey, url } = await getAdminSupabaseTokens()
-    setSupabaseSecret(serviceKey)
+    const { serviceKey, url, anonToken } = await getAdminSupabaseTokens()
+    setSupabaseSecrets(serviceKey, anonToken, url)
     const options = {
       auth: {
         autoRefreshToken: false,
