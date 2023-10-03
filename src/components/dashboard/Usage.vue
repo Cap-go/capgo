@@ -90,6 +90,7 @@ async function getUsages() {
     datas.value.mau = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
+    // console.log('data app_usage', data)
     data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
       if (item.created_at) {
         const createdAtDate = new Date(item.created_at)
@@ -150,7 +151,7 @@ loadData()
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" unit="GB"
+      :title="t('Storage')" unit="GB" :accumulated="false"
     />
     <div
       v-else
