@@ -111,7 +111,7 @@ async function getChannelOverride() {
         updated_at
       `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value)
+      .eq('device_id', id.value!)
       .single()
       .throwOnError()
     if (error) {
@@ -131,17 +131,27 @@ async function getDeviceOverride() {
       .select(`
       device_id,
       app_id,
-      version (
-          name
-      ),
+      version,
       created_at,
       updated_at
     `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value)
+      .eq('device_id', id.value!)
       .single()
       .throwOnError()
-    deviceOverride.value = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
+
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          name
+      `)
+      .eq('id', data!.version)
+      .single()
+      .throwOnError()
+
+    const overwriteVersion = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
+    overwriteVersion.version = dataVersion! as any as typeof overwriteVersion.version
+    deviceOverride.value = overwriteVersion
   }
   catch (_e) {
     deviceOverride.value = undefined
@@ -159,12 +169,7 @@ async function getDevice() {
           platform,
           os_version,
           custom_id,
-          version (
-            name,
-            app_id,
-            bucket_id,
-            created_at
-          ),
+          version,
           is_prod,
           is_emulator,
           version_build,
@@ -175,7 +180,19 @@ async function getDevice() {
       .eq('device_id', id.value)
       .single()
       .throwOnError()
-    device.value = data as Database['public']['Tables']['devices']['Row'] & Device
+
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          name
+      `)
+      .eq('id', data!.version)
+      .single()
+      .throwOnError()
+
+    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
+    deviceValue.version = dataVersion! as any as typeof deviceValue.version
+    device.value = deviceValue
     // console.log('device', device.value)
   }
   catch (error) {

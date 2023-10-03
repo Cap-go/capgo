@@ -102,7 +102,7 @@ async function getData() {
   try {
     const req = supabase
       .from('devices')
-      .select('device_id,created_at,updated_at,platform,os_version,version(name)', { count: 'exact' })
+      .select('device_id,created_at,updated_at,platform,os_version,version', { count: 'exact' })
       .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
@@ -128,7 +128,30 @@ async function getData() {
     const { data, count } = await req
     if (!data)
       return
-    elements.value.push(...data as any)
+
+    const versionPromises = data.map((element) => {
+      return supabase
+        .from('app_versions')
+        .select('name')
+        .eq('id', element.version)
+        .single()
+    })
+
+    // Cast so that we can set version from the other request
+    const finalData = data as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
+
+    // This is faster then awaiting in a big loop
+    const versionData = await Promise.all(versionPromises)
+    versionData.forEach((version, index) => {
+      if (version.error)
+        throw new Error(`Cannot get version ${index}. Error: ${version.error}`)
+
+      // Not the best way to do this but it works
+      // This is dangereus, but due to the lack of foreign key it is the only way to do it
+      finalData[index].version = version.data as any
+    })
+
+    elements.value.push(...finalData as any)
     total.value = count || 0
   }
   catch (error) {

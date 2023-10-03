@@ -6,7 +6,7 @@ import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { logsnag } from '../_utils/logsnag.ts'
-import { sendLogToTinybird } from '../_utils/tynibird.ts'
+import { sendLogToTinybird } from '../_utils/tinybird.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 const failActions = [
