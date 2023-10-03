@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { useSupabase } from './utils'
 
@@ -15,8 +16,17 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   // Checks if the warning triggered
   await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Minimal update version')
 
+  // Check if there is the error in the channels page
+  await page.goto(`${BASE_URL}/app/p/com--demo--app/channels`)
+  await expect(page.locator('#error-missconfig')).toBeVisible()
+
+  // Get the production channel selector
+  const locator = (await page.locator('table.w-full > tbody:nth-child(2)').all())
+    .find(async el => (await el.innerHTML()).includes('production'))
+  await expect(locator).toBeDefined()
+
   // Back to information page
-  await page.click('li.mr-2:nth-child(1) > button:nth-child(1)')
+  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Check if the 'minimal update version' is present
   await expect(page.locator('div.px-4:nth-child(3) > dt:nth-child(1)')).toContainText('Minimal update version')

@@ -211,6 +211,8 @@ metadata: Metadata
 metadata-min-ver-not-set: Minimal update version for current bundle is undefined
 min-update-version: Minimal update version
 minor: Minor
+misconfigured: Misconfigured
+misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -222,6 +224,7 @@ my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+'no': 'no'
 no-channel-linked: No channel, click to add
 no-devices: No devices
 no-logs: No logs
@@ -361,6 +364,7 @@ versions: Versions
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 yearly: Yearly
+'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-api-key: 'Your API key:'
