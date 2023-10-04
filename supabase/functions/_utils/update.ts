@@ -7,6 +7,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { logsnag } from '../_utils/logsnag.ts'
+import channel from '../../../netlify/edge-functions/channel.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
@@ -120,7 +121,8 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
         user_id,
         bucket_id,
         storage_provider,
-        external_url
+        external_url,
+        minUpdateVersion
       ),
       secondaryVersionPercentage,
       enable_progressive_deploy,
@@ -133,7 +135,8 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
         user_id,
         bucket_id,
         storage_provider,
-        external_url
+        external_url,
+        minUpdateVersion
       )
     `)
     .eq('app_id', app_id)
@@ -398,6 +401,35 @@ export async function update(body: AppInfos) {
           version: version.name,
           old: version_name,
         }, 200, updateOverwritten)
+      }
+
+      if (channelData.disableAutoUpdate === 'version_number') {
+        const minUpdateVersion = version.minUpdateVersion
+
+        // The channel is misconfigured
+        if (minUpdateVersion === null) {
+          console.log(id, 'Channel is misconfigured', channelData.name)
+          await sendStats('channelMisconfigured', platform, device_id, app_id, version_build, versionId)
+          return sendResWithStatus('fail', {
+            message: `Channel ${channelData.name} is misconfigured`,
+            error: 'misconfigured_channel',
+            version: version.name,
+            old: version_name,
+          }, 200, updateOverwritten)
+        }
+
+        // Check if the minVersion is greater then the current version
+        if (semver.gt(minUpdateVersion, version_name)) {
+          console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name)
+          await sendStats('disableAutoUpdateMetadata', platform, device_id, app_id, version_build, versionId)
+          return sendResWithStatus('fail', {
+            major: true,
+            message: 'Cannot upgrade version, min update version > current version',
+            error: 'disable_auto_update_to_metadata',
+            version: version.name,
+            old: version_name,
+          }, 200, updateOverwritten)
+        }
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)

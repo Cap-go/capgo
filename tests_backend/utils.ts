@@ -74,6 +74,13 @@ export async function sendUpdate(baseUrl: URL, data: typeof updateAndroidBaseDat
   })
 }
 
+export async function getResponseError(response: Response): Promise<string> {
+  const json = await response.json()
+  assert(json.error !== undefined, `Response ${JSON.stringify(json)} has no error`)
+
+  return json.error
+}
+
 export function getUpdateBaseData(): typeof updateAndroidBaseData {
   return structuredClone(updateAndroidBaseData)
 }

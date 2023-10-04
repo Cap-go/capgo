@@ -1,5 +1,5 @@
 import type { RunnableTest, SupabaseType } from '../../utils.ts'
-import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, responseOk, sendUpdate } from '../../utils.ts'
+import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, getResponseError, responseOk, sendUpdate } from '../../utils.ts'
 
 export function getTest(): RunnableTest {
   return {
@@ -275,11 +275,4 @@ async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
     const { error: deleteDeviceError } = await supabase.from('devices').delete().eq('device_id', baseDataIos.device_id)
     assert(deleteDeviceError === null, `Supabase delete device IOS error ${JSON.stringify(deleteDeviceError)} is not null`)
   }
-}
-
-async function getResponseError(response: Response): Promise<string> {
-  const json = await response.json()
-  assert(json.error !== undefined, `Response ${JSON.stringify(json)} has no error`)
-
-  return json.error
 }
