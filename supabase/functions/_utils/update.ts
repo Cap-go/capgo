@@ -390,7 +390,6 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      console.log('disable', channelData.disableAutoUpdate)
       if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id)
         await sendStats('disableAutoUpdateToMinor', platform, device_id, app_id, version_build, versionId)
