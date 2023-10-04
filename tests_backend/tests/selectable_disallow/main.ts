@@ -26,7 +26,7 @@ async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // Make the channels major allways
   // We disable ab testing so that the second test can safely enable it
   const { data: data1, error: error1 } = await supabase.from('channels')
-    .update({ disableAutoUpdate: 'major', enableAbTesting: false, secondVersion: null })
+    .update({ disableAutoUpdate: 'major', enableAbTesting: false, enable_progressive_deploy: false, secondVersion: null })
     .or('id.in.(22,23)')
     .select('*')
 

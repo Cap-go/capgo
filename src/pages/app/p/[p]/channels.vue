@@ -24,7 +24,7 @@ watchEffect(async () => {
 <template>
   <div>
     <div class="h-full overflow-y-auto md:py-4">
-      <div v-if="misconfiguredRef" class="mt-2 mb-4 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+      <div v-if="misconfiguredRef" id="error-missconfig" class="mt-2 mb-4 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
         {{ t('misconfigured-channels') }}
       </div>
       <div id="versions" class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-200 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
