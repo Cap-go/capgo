@@ -72,6 +72,10 @@ async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
 
   const setDisableUpdateMinor = await supabase.from('channels').update({ disableAutoUpdate: 'minor' }).eq('id', 22)
   assert(setDisableUpdateMinor.error === null, `Supabase set minor update error ${JSON.stringify(setDisableUpdateMinor.error)} is not null`)
+
+  // 3 seconds of delay so that supabase can invalidate the data
+  await delay(3000)
+
   try {
     // Set version to 1.361.0
     const setVersionResult = await supabase.from('channels').update({ version: 9653 }).eq('id', 22)
@@ -96,6 +100,9 @@ async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
   finally {
     const setDisableUpdateMajor = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
     assert(setDisableUpdateMajor.error === null, `Supabase set minor update error ${JSON.stringify(setDisableUpdateMajor.error)} is not null`)
+
+    // 3 seconds of delay so that supabase can invalidate the data
+    await delay(3000)
   }
 
   const disableAutoUpdateUnderNativeData = getBaseData()
