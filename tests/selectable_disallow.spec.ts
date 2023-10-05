@@ -177,9 +177,12 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
   )
 
   // If the channel is not valid, check if the error should be visible
-  const errorVisible = await page.locator('#error-missconfig').isVisible()
+  const errorLocator = page.locator('#error-missconfig')
+  const errorVisible = await errorLocator.isVisible()
   if (!valid) {
-    await expect(errorVisible).toBeTruthy()
+    // toBeVisible has a wait, errorVisible is just the value for the current moment
+    // It might take a while for this error to show
+    await expect(errorLocator).toBeVisible()
   }
   else {
     // The error might be visible becouse a diffrent channel is misconfigured, in tcase we should have at least one failing channel
