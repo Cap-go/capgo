@@ -40,8 +40,8 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  /* Never retry, the entire thing is stateful and retries will never succed becouse of the modifications to supabase in the previous attempt */
+  retries: 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.PWDEBUG ? 1 : os.cpus().length,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -51,7 +51,7 @@ export default defineConfig({
     ['html', { outputFolder: './test-results/reports/playwright-html-report', open: 'never' }],
   ],
   use: {
-    trace: 'on-first-retry',
+    trace: 'on',
     headless,
   },
   webServer,
