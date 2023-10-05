@@ -73,52 +73,20 @@ async function versionData() {
 async function getData() {
   isLoading.value = true
   try {
-    const daysLimit = 7
-    const limitDate = new Date(new Date().getTime() - daysLimit * 24 * 60 * 60 * 1000).toISOString()
-    const reqCount = supabase
-      .from('stats')
-      .select('*', { count: 'exact', head: true })
-      .eq('app_id', props.appId)
-      // limit created_at to 7 days
-      .gte('created_at', limitDate)
-
-    const req = supabase
-      .from('stats')
-      .select(`
-        device_id,
-        action,
-        platform,
-        version_build,
-        version,
-        created_at
-      `)
-      .eq('app_id', props.appId)
-      .gte('created_at', limitDate)
-      .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
-
-    if (props.deviceId) {
-      req.eq('device_id', props.deviceId)
-      reqCount.eq('device_id', props.deviceId)
-    }
-    if (props.deviceId && search.value) {
-      req.like('action', `%${search.value}%`)
-      reqCount.like('action', `%${search.value}%`)
-    }
-    else if (search.value) {
-      req.or(`device_id.like.%${search.value}%,action.like.%${search.value}%`)
-      reqCount.or(`device_id.like.%${search.value}%,action.like.%${search.value}%`)
-    }
-    if (columns.value.length) {
-      columns.value.forEach((col) => {
-        if (col.sortable && typeof col.sortable === 'string')
-          req.order(col.key as any, { ascending: col.sortable === 'asc' })
-      })
-    }
-    const { data: dataVersions } = await req
-    reqCount.then(res => total.value = res.count || 0)
-    if (!dataVersions)
+    const req = await supabase.functions.invoke('get_stats', {
+      body: {
+        appId: props.appId,
+        deviceId: props.deviceId,
+        search: search.value,
+        order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+        rangeStart: currentVersionsNumber.value,
+        rangeEnd: currentVersionsNumber.value + offset - 1,
+      },
+    })
+    const { data } = await req
+    if (!data)
       return
-    elements.value.push(...dataVersions as any)
+    elements.value.push(...data as any)
     // console.log('count', count)
   }
   catch (error) {
