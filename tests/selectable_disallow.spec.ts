@@ -159,7 +159,8 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
   await page.goto(`${BASE_URL}/app/p/com--demo--app/channels`)
 
   // give this time to load
-  await page.waitForTimeout(250)
+  // More time?
+  await page.waitForTimeout(2500)
 
   // Get all channels and the values (check if failing + name)
   const channelTable = await page.locator('table.w-full > tbody:nth-child(2)')

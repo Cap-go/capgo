@@ -51,7 +51,6 @@ export default defineConfig({
     ['html', { outputFolder: './test-results/reports/playwright-html-report', open: 'never' }],
   ],
   use: {
-    trace: 'on',
     headless,
   },
   webServer,
