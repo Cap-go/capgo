@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { sendStats, supabaseAdmin, updateOrCreateDevice } from '../_utils/supabase.ts'
+import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 
@@ -68,7 +68,7 @@ async function post(body: DeviceLink): Promise<Response> {
     .single()
   if (!dataDevice) {
     if (!dataDevice) {
-      await updateOrCreateDevice({
+      await sendDevice({
         app_id,
         device_id,
         plugin_version,
@@ -127,7 +127,14 @@ async function post(body: DeviceLink): Promise<Response> {
     if (dbErrorDev)
       return sendRes({ message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`, error: 'override_not_allowed' }, 400)
   }
-  await sendStats('setChannel', platform, device_id, app_id, version_build, version.id)
+  await sendStats([{
+    action: 'setChannel',
+    platform: platform as Database['public']['Enums']['platform_os'],
+    device_id,
+    app_id,
+    version_build,
+    version: version.id,
+  }])
   return sendRes()
 }
 
@@ -180,7 +187,7 @@ async function put(body: DeviceLink): Promise<Response> {
     .single()
   if (!dataDevice) {
     if (!dataDevice) {
-      await updateOrCreateDevice({
+      await sendDevice({
         app_id,
         device_id,
         plugin_version,
@@ -231,7 +238,14 @@ async function put(body: DeviceLink): Promise<Response> {
     }, 400)
   }
   else if (dataChannel) {
-    await sendStats('getChannel', platform, device_id, app_id, version_build, version.id)
+    await sendStats([{
+      action: 'getChannel',
+      platform: platform as Database['public']['Enums']['platform_os'],
+      device_id,
+      app_id,
+      version_build,
+      version: version.id,
+    }])
     return sendRes({
       channel: dataChannel.name,
       status: 'default',
