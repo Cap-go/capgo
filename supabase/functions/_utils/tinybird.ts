@@ -17,17 +17,24 @@ export function isTinybirdCountLogEnabled() {
   return !!getEnv('TINYBIRD_TOKEN_COUNT_LOG')
 }
 
-export function sendDeviceToTinybird(log: Database['public']['Tables']['devices']['Update'][]) {
+export function sendDeviceToTinybird(devices: Database['public']['Tables']['devices']['Update'][]) {
   if (!isTinybirdIngestEnabled())
     return Promise.resolve()
 
   // make log a string with a newline between each log
+  const devicesReady = devices.map(l => ({
+    ...l,
+    custom_id: undefined,
+    created_at: !l.created_at ? new Date() : l.created_at,
+    updated_at: !l.updated_at ? new Date() : l.updated_at,
+  })).map(l => JSON.stringify(l)).join('\n')
+  console.log('sending device to tinybird', devicesReady)
   return fetch(
     'https://api.tinybird.co/v0/events?name=devices',
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
-      body: log.map(l => ({ ...l, created_at: new Date().toISOString() })).map(l => JSON.stringify(l)).join('\n'),
+      body: devicesReady,
       headers: { Authorization: `Bearer ${getEnv('TINYBIRD_TOKEN_INGEST_LOG')}` },
     },
   )
@@ -45,7 +52,10 @@ export function sendLogToTinybird(log: Database['public']['Tables']['stats']['In
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
-      body: log.map(l => ({ ...l, created_at: new Date().toISOString() })).map(l => JSON.stringify(l)).join('\n'),
+      body: log.map(l => ({
+        ...l,
+        created_at: !l.created_at ? new Date() : l.created_at,
+      })).map(l => JSON.stringify(l)).join('\n'),
       headers: { Authorization: `Bearer ${getEnv('TINYBIRD_TOKEN_INGEST_LOG')}` },
     },
   )
