@@ -108,7 +108,7 @@ getUsage().then((res) => {
 </script>
 
 <template>
-  <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800 w-full">
+  <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
@@ -120,7 +120,7 @@ getUsage().then((res) => {
             Monthly Active Users
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex row justify-between mt-2">
+          <div class="flex justify-between mt-2 row">
             <div>
               Included in plan
             </div>
@@ -130,7 +130,7 @@ getUsage().then((res) => {
           </div>
 
           <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex row justify-between">
+          <div class="flex justify-between row">
             <div>
               Used in period
             </div>
@@ -145,7 +145,7 @@ getUsage().then((res) => {
             Storage
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex row justify-between mt-2">
+          <div class="flex justify-between mt-2 row">
             <div>
               Included in plan
             </div>
@@ -155,7 +155,7 @@ getUsage().then((res) => {
           </div>
 
           <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex row justify-between">
+          <div class="flex justify-between row">
             <div>
               Used in period
             </div>
@@ -170,7 +170,7 @@ getUsage().then((res) => {
             Bandwidth
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex row justify-between mt-2">
+          <div class="flex justify-between mt-2 row">
             <div>
               Included in plan
             </div>
@@ -180,7 +180,7 @@ getUsage().then((res) => {
           </div>
 
           <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex row justify-between">
+          <div class="flex justify-between row">
             <div>
               Used in period
             </div>
@@ -190,7 +190,7 @@ getUsage().then((res) => {
           </div>
         </div>
         <hr class="my-1 border-t border-gray-300 opacity-30">
-        <div class="flex row justify-between">
+        <div class="flex justify-between row">
           <div>
             Total estimated bill (Base + Overage)
           </div>

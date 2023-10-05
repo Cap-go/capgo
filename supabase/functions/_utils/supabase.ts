@@ -4,6 +4,10 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
+import type { Order } from './tinybird.ts'
+import { sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
+
+// import { isTinybirdGetDevicesEnabled, isTinybirdGetLogEnabled, readDevicesInTinyBird, readLogInTinyBird, sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
 
 // Import Supabase client
 
@@ -29,13 +33,14 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   old_record: Database['public']['Tables'][T]['Row']
 }
 
-export function supabaseClient() {
+export function supabaseClient(auth: string) {
   const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
+    global: { headers: { Authorization: auth } },
   }
   return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
 }
@@ -109,14 +114,6 @@ export async function checkAppOwner(userId: string | undefined, appId: string | 
     console.log(error)
     return false
   }
-}
-
-export function updateOrCreateDevice(update: Database['public']['Tables']['devices']['Insert']) {
-  return supabaseAdmin()
-    .from('devices')
-    .upsert(update)
-    .eq('app_id', update.app_id)
-    .eq('device_id', update.device_id)
 }
 
 export async function getCurrentPlanName(userId: string): Promise<string> {
@@ -267,34 +264,106 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return false
 }
 
-export async function sendStats(action: string, platform: string, device_id: string, app_id: string, version_build: string, versionId: number) {
-  const stat: Database['public']['Tables']['stats']['Insert'] = {
-    platform: platform as Database['public']['Enums']['platform_os'],
-    device_id,
-    action,
-    app_id,
-    version_build,
-    version: versionId,
+export function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+  // if (!isTinybirdGetLogEnabled()) {
+  // do the request to supabase
+  console.log('getDevice', appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
+  const req = supabaseClient(auth)
+    .from('devices')
+    .select('device_id,created_at,updated_at,platform,os_version,version', { count: 'exact' })
+    .eq('app_id', appId)
+
+  if (rangeStart !== undefined && rangeEnd !== undefined)
+    req.range(rangeStart, rangeEnd)
+
+  if (versionId)
+    req.eq('version', versionId)
+
+  if (deviceIds)
+    req.in('device_id', deviceIds)
+
+  if (search)
+    req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
+
+  if (deviceIds)
+    req.in('device_id', deviceIds)
+
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string')
+        req.order(col.key as any, { ascending: col.sortable === 'asc' })
+    })
   }
-  try {
-    const { error: errorDev } = await supabaseAdmin()
-      .from('devices')
-      .upsert({
-        app_id,
+  return req
+    .then(res => res.error ? console.error(res.error) : (res.data || []))
+
+  // }
+  // else {
+  //   console.log('getDevice enabled')
+  //   // check the rights of the user
+  //   return readDevicesInTinyBird(appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
+  // }
+}
+
+export function getSStats(auth: string, appId: string, deviceId?: string, search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+  // if (!isTinybirdGetDevicesEnabled()) {
+  console.log('getStats', appId, deviceId, search, order, rangeStart, rangeEnd)
+  const req = supabaseClient(auth)
+    .from('stats')
+    .select(`
         device_id,
-        version: versionId,
-      })
-    if (errorDev)
-      console.log('Cannot upsert device', app_id, version_build, errorDev)
-    const { error } = await supabaseAdmin()
-      .from('stats')
-      .insert(stat)
-    if (error)
-      console.log('Cannot insert stat', app_id, version_build, error)
+        action,
+        platform,
+        version_build,
+        version,
+        created_at
+      `)
+    .eq('app_id', appId)
+
+  if (rangeStart !== undefined && rangeEnd !== undefined)
+    req.range(rangeStart, rangeEnd)
+
+  if (deviceId)
+    req.eq('device_id', deviceId)
+
+  if (deviceId && search)
+    req.like('action', `%${search}%`)
+
+  else if (search)
+    req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string')
+        req.order(col.key as any, { ascending: col.sortable === 'asc' })
+    })
   }
-  catch (err) {
-    console.log('Cannot insert stats', app_id, err)
-  }
+  return req
+    .then(res => res.error ? console.error(res.error) : (res.data || []))
+  // }
+  // else {
+  //   console.log('getStats enabled')
+  //   // check the rights of the user
+  //   return readLogInTinyBird(appId, deviceId, search, order, rangeStart, rangeEnd)
+  // }
+}
+
+export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
+  return Promise.all([supabaseAdmin()
+    .from('devices')
+    .upsert(device), sendDeviceToTinybird([device])])
+    .catch((e) => {
+      console.log('sendDevice error', e)
+    })
+}
+
+export function sendStats(stats: Database['public']['Tables']['stats']['Insert'][]) {
+  return Promise.all([supabaseAdmin()
+    .from('stats')
+    .insert(stats), sendLogToTinybird(stats)])
+    .catch((e) => {
+      console.log('sendDevice error', e)
+    })
 }
 
 function allDateIdOfMonth() {

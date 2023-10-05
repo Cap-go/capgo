@@ -1,12 +1,11 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin, updateOnpremStats } from '../_utils/supabase.ts'
+import { sendDevice, sendStats, supabaseAdmin, updateOnpremStats } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { logsnag } from '../_utils/logsnag.ts'
-import { sendLogToTinybird } from '../_utils/tinybird.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 const failActions = [
@@ -89,7 +88,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       version: 0,
     }
     const rows: Database['public']['Tables']['stats']['Insert'][] = []
-    const all = []
     const { data: appVersion } = await supabaseAdmin()
       .from('app_versions')
       .select('id, user_id')
@@ -143,14 +141,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       }, 200)
     }
     rows.push(stat)
-    all.push(supabaseAdmin()
-      .from('devices')
-      .upsert(device)
-      .then(() => supabaseAdmin()
-        .from('stats')
-        .insert(rows)))
-    all.push(sendLogToTinybird(rows))
-    await Promise.all(all)
+    await Promise.all([sendDevice(device).then(() => sendStats(rows))])
     return sendRes()
   }
   catch (e) {

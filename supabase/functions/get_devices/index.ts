@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-import { getDevice, supabaseAdmin } from '../_utils/supabase.ts'
-import type { Database } from '../_utils/supabase.types.ts'
-import { checkKey, methodJson, sendRes } from '../_utils/utils.ts'
+import { getSDevice } from '../_utils/supabase.ts'
+import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import type { Order } from '../_utils/tinybird.ts'
 
@@ -16,18 +15,10 @@ interface dataDevice {
 }
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataDevice) {
-  const apikey_string = headers.authorization
-  if (!apikey_string)
-    return sendRes({ status: 'Missing apikey' }, 400)
-
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
-  if (!apikey)
-    return sendRes({ status: 'Missing apikey' }, 400)
-
   try {
     console.log('body', body)
 
-    return getDevice(body.appId, body.versionId, body.deviceIds, body.search, body.order, body.rangeStart, body.rangeEnd)
+    return getSDevice(headers.Authorization || '', body.appId, body.versionId, body.deviceIds, body.search, body.order, body.rangeStart, body.rangeEnd)
   }
   catch (e) {
     return sendRes({
@@ -38,6 +29,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataDe
 }
 
 serve(async (event: Request) => {
+  if (event.method === 'OPTIONS')
+    return sendOptionsRes()
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
