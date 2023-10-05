@@ -27,7 +27,7 @@
     "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts backend",
     "test:cli": "deno run --allow-all tests_backend/run_backend_tests.ts cli",
     "test:all": "deno run --allow-all tests_backend/run_backend_tests.ts all",
-    "test:zod": "deno test --allow-all supabase/functions/**/index.test.ts",
+    "test:zod": "deno test --allow-all tests_backend/zod.test.ts",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
