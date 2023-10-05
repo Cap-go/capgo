@@ -82,6 +82,13 @@ async function prepareMetadataTestFail(_backendBaseUrl: URL, supabase: SupabaseT
     .eq('id', 22)
 
   assert(error === null, `Supabase channel error ${JSON.stringify(error)} is not null`)
+
+  // Set the 9601 metadata to null
+  const { error: versionError } = await supabase.from('app_versions')
+    .update({ minUpdateVersion: null })
+    .eq('id', 9601)
+
+  assert(versionError === null, `Supabase app_versions error ${JSON.stringify(versionError)} is not null`)
 }
 
 async function testDisableUpdateBasedOnMetadataFail(backendBaseUrl: URL, _supabase: SupabaseType) {

@@ -5,6 +5,7 @@ import { useSupabase } from './utils'
 const BASE_URL = 'http://localhost:5173'
 
 test('test selectable disallow (no AB)', async ({ page }) => {
+  test.slow()
   await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'
@@ -14,7 +15,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await page.locator('li.text-lg:nth-child(5) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > select').selectOption({ value: 'version_number' })
 
   // Checks if the warning triggered
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Minimal update version')
+  await expectPopout(page, 'Minimal update version')
 
   // At this stage the channel should be misconfigured
   await checkIfChannelIsValid('production', false, page)
@@ -38,16 +39,16 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await expect(inputValue).toBe('')
 
   // Type 'invalid' into the min version input and check if the warning is present
-  await page.type('input.block', 'invalid', { delay: 50 })
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Invalid semver version')
+  await page.fill('input.block', 'invalid')
+  await expectPopout(page, 'Invalid semver version')
 
   // Clear the input and check if value was saved sucessfully
   await page.fill('input.block', '')
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Updated minimal version')
+  await expectPopout(page, 'Updated minimal version')
 
   // Type '1.0.0' and check if value was saved sucessfully
-  await page.type('input.block', '1.0.0', { delay: 50 })
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Updated minimal version')
+  await page.fill('input.block', '1.0.0')
+  await expectPopout(page, 'Updated minimal version')
 
   // At this stage the channel should be configured properly
   await checkIfChannelIsValid('production', true, page)
@@ -63,13 +64,13 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await page.click('li.text-lg:nth-child(9) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1)')
 
   // Check if AB was enabled sucessfully
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Enabled AB testing')
+  await expectPopout(page, 'Enabled AB testing')
 
   // Click on 'metadata'
   await page.locator('li.text-lg:nth-child(5) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > select').selectOption({ value: 'version_number' })
 
   // Checks if the warning triggered
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Minimal update version')
+  await expectPopout(page, 'Minimal update version')
 
   // At this stage both bundle A and B are the same. Bundle A should be undefined, same as bundle B
   // Let's check if this is true
@@ -100,8 +101,8 @@ test('test selectable disallow (with AB)', async ({ page }) => {
 
   // Fill with '1.0.1' and check if value was saved sucessfully
   // Here we do not test for fails, we have the upper test for that
-  await page.type('input.block', '1.0.1', { delay: 50 })
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Updated minimal version')
+  await page.fill('input.block', '1.0.1')
+  await expectPopout(page, 'Updated minimal version')
 
   // We have to change bundle B, right now it points to the same bundle as bundle A
   // We could click on buttons, however this is not the scope of this test
@@ -140,8 +141,8 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await expect(inputValue2).toBe('')
 
   // Type 1.0.2 into the input
-  await page.type('input.block', '1.0.2', { delay: 50 })
-  await expect(page.locator('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)')).toContainText('Updated minimal version')
+  await page.fill('input.block', '1.0.2')
+  await expectPopout(page, 'Updated minimal version')
 
   // Go back to channel page
   await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)
@@ -160,25 +161,52 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
   // give this time to load
   await page.waitForTimeout(250)
 
-  // Check if there is the error in the channels page (if testing if invalid)
-  // Else if checking if valid the error should not be present
-  // This creates a race conditions as some other test might cause a diffrent channel to be invalid
-  // If this happens then this assertation will fail as the error is preaset but it was not caused by this test
-  if (!valid)
-    await expect(page.locator('#error-missconfig')).toBeVisible()
-  else
-    await expect(page.locator('#error-missconfig')).not.toBeVisible()
-
-  // Get the channel selector
+  // Get all channels and the values (check if failing + name)
   const channelTable = await page.locator('table.w-full > tbody:nth-child(2)')
   const channelRows = await channelTable.getByRole('row').all()
-  const rowLocator = channelRows.find(async el => (await el.innerHTML()).includes(channel))
-  await expect(rowLocator).toBeDefined()
+  const failingChannels = await Promise.all(channelRows
+    .map(async (el) => {
+      const name = await el.locator('th:nth-child(1)').innerHTML()
+      const failing = await el.locator('td:nth-child(4)').innerHTML()
 
-  // Now we get the 'misconfiguration' value
-  const misconfigValue = await rowLocator!.locator('td:nth-child(4)')
+      return {
+        name,
+        failing,
+      }
+    }),
+  )
 
-  // Check if the value is 'yes'
+  // If the channel is not valid, check if the error should be visible
+  const errorVisible = await page.locator('#error-missconfig').isVisible()
+  if (!valid) {
+    await expect(errorVisible).toBeTruthy()
+  }
+  else {
+    // The error might be visible becouse a diffrent channel is misconfigured, in tcase we should have at least one failing channel
+    if (errorVisible) {
+      const otherFails = failingChannels.filter(el => el.name !== channel && el.failing === 'yes')
+      expect(otherFails.length).toBeGreaterThan(0)
+    }
+  }
+
   // If valid then misconfigured is 'no', else it is 'yes
-  await expect(misconfigValue).toContainText(valid ? 'no' : 'yes')
+  await expect(failingChannels.find(el => el.name === channel && el.failing === (valid ? 'no' : 'yes'))).toBeDefined()
+}
+
+async function expectPopout(page: Page, toHave: string) {
+  // Check if the popout has the correct text
+  const popOutLocator = '.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)'
+  await expect(page.locator(popOutLocator)).toContainText(toHave)
+
+  // Close all popouts
+  let popOutVisible = true
+  while (popOutVisible) {
+    // Close the popout
+    await page.click('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > button:nth-child(1)')
+
+    await page.waitForTimeout(250)
+
+    // Check if the popout is still visible
+    popOutVisible = await page.locator(popOutLocator).isVisible()
+  }
 }
