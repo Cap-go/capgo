@@ -66,7 +66,6 @@ async function getChannels() {
     const v: number = chan.version as any
     if (version.value && (v === version.value.id || version.value.id === chan.secondVersion)) {
       channel.value = chan
-      console.log('channel.value', channel.value)
       secondaryChannel.value = (version.value.id === chan.secondVersion)
     }
   })
@@ -450,8 +449,6 @@ function hideString(str: string) {
 }
 
 async function saveCustomId(input: string) {
-  console.log('saveCustomId', input)
-
   if (!id.value)
     return
 
