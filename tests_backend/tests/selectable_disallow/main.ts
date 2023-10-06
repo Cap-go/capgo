@@ -60,7 +60,7 @@ async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // This will make the test alter the data in supabase, the developer was warned about this
   const { error: error2 } = await supabase.from('app_versions')
     .update({ minUpdateVersion: null })
-    .or(`id.in.(${data1![0].version},${data1![1].version},9601)`)
+    .or(`id.in.(${data1![0].version},${data1![1].version},9601,9652,9653)`)
 
   assert(error2 === null, `Supabase app_versions error ${JSON.stringify(error2)} is not null`)
 }

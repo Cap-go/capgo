@@ -55,6 +55,17 @@ test('test selectable disallow (no AB)', async ({ page }) => {
 })
 
 test('test selectable disallow (with AB)', async ({ page }) => {
+  // Get supabase (auth + create client)
+  const supabase = await useSupabase()
+
+  // Prepare test
+  const { error: bundleErrorPrepare } = await supabase
+    .from('channels')
+    .update({ version: 9652 })
+    .eq('id', 23)
+
+  await expect(bundleErrorPrepare).toBeNull()
+
   await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Click on 'settings'
@@ -108,12 +119,11 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   // We could click on buttons, however this is not the scope of this test
   // We will use the supabase SDK authenticated as the user to change the bundle
   // We change this while on bundle A so that the next time we go to channel page we will see the change
-  const supabase = await useSupabase()
 
-  // Change the bundle
+  // Change the second bundle
   const { error: bundleError } = await supabase
     .from('channels')
-    .update({ secondVersion: 9601 })
+    .update({ secondVersion: 9653 })
     .eq('id', 23)
 
   // Check if this worked
