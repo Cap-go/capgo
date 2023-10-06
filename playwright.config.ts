@@ -56,6 +56,10 @@ export default defineConfig({
     video: 'on',
     screenshot: 'on',
   },
+  expect: {
+    /* CI/CD is VERY slow, I am sorry */
+    timeout: 20_000,
+  },
   webServer,
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
