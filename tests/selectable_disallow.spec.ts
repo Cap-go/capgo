@@ -30,6 +30,9 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   // Go to the channel bundle
   await page.click('.cursor-pointer > div:nth-child(1) > span:nth-child(1)')
 
+  // Wait for url change
+  await page.waitForURL('.*')
+
   // Check if the 'Minimal update version' is present
   await expect(page.locator('div.px-4:nth-child(6) > dt:nth-child(1)')).toContainText('Minimal update version')
 

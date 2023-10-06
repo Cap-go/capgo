@@ -43,7 +43,7 @@ export default defineConfig({
   /* Never retry, the entire thing is stateful and retries will never succed becouse of the modifications to supabase in the previous attempt */
   retries: 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.PWDEBUG ? 1 : os.cpus().length,
+  workers: os.cpus().length,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list', { printSteps: true }],
