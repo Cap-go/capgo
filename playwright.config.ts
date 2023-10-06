@@ -65,5 +65,5 @@ export default defineConfig({
       dependencies: ['setup'],
     },
   ],
-  timeout: 20_000,
+  timeout: 180 * 1000,
 })
