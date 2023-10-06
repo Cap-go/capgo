@@ -351,7 +351,7 @@ export function getSStats(auth: string, appId: string, deviceId?: string, search
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   return Promise.all([supabaseAdmin()
     .from('devices')
-    .upsert(device), sendDeviceToTinybird([device])])
+    .upsert(device)])
     .catch((e) => {
       console.log('sendDevice error', e)
     })
@@ -360,7 +360,7 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
 export function sendStats(stats: Database['public']['Tables']['stats']['Insert'][]) {
   return Promise.all([supabaseAdmin()
     .from('stats')
-    .insert(stats), sendLogToTinybird(stats)])
+    .insert(stats)])
     .catch((e) => {
       console.log('sendDevice error', e)
     })
