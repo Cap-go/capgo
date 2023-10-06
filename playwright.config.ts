@@ -52,6 +52,9 @@ export default defineConfig({
   ],
   use: {
     headless,
+    trace: 'on',
+    video: 'on',
+    screenshot: 'on',
   },
   webServer,
   projects: [
