@@ -54,7 +54,7 @@ def capacitor_pods
   pod 'CapgoCapacitorPurchases', :path => '../../node_modules/.pnpm/@capgo+capacitor-purchases@5.0.8_@capacitor+core@5.3.0/node_modules/@capgo/capacitor-purchases'
   pod 'CapgoCapacitorScreenRecorder', :path => '../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.3.0/node_modules/@capgo/capacitor-screen-recorder'
   pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@5.2.22_@capacitor+core@5.3.0/node_modules/@capgo/capacitor-updater'
-  pod 'CapgoInappbrowser', :path => '../../node_modules/.pnpm/@capgo+inappbrowser@1.2.7_@capacitor+core@5.3.0/node_modules/@capgo/inappbrowser'
+  pod 'CapgoInappbrowser', :path => '../../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.3.0/node_modules/@capgo/inappbrowser'
   pod 'CapgoNativeAudio', :path => '../../node_modules/.pnpm/@capgo+native-audio@6.0.18_@capacitor+core@5.3.0/node_modules/@capgo/native-audio'
   pod 'CapgoNativeMarket', :path => '../../node_modules/.pnpm/@capgo+native-market@5.0.3/node_modules/@capgo/native-market'
   pod 'CapacitorRateApp', :path => '../../node_modules/.pnpm/capacitor-rate-app@4.0.3_@capacitor+core@5.3.0/node_modules/capacitor-rate-app'
