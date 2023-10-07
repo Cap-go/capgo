@@ -1,6 +1,11 @@
 import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { redisDeviceInvalidate } from '../_utils/redis.ts'
+import type { Database } from '../_utils/supabase.types.ts'
+import type { DeletePayload, InsertPayload, UpdatePayload } from '../_utils/supabase.ts'
+
+// This endpoint is called when a device is updated, created or deleted, and channel_devices or devices_override is updated
+// It invalidates the device cache
 
 serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
@@ -9,8 +14,19 @@ serve(async (event: Request) => {
     return sendRes({ message: 'Fail Authorization' }, 400)
 
   try {
-    const body = await event.json()
+    const tableDev: keyof Database['public']['Tables'] = 'devices'
+    const tableChanDev: keyof Database['public']['Tables'] = 'channel_devices'
+    const tableDevOv: keyof Database['public']['Tables'] = 'devices_override'
+    type TableTypes = typeof tableDev | typeof tableChanDev | typeof tableDevOv
+
+    const body = (await event.json()) as InsertPayload<TableTypes> | UpdatePayload<TableTypes> | DeletePayload<TableTypes>
+
     const record = body.type !== 'DELETE' ? body.record : body.old_record
+
+    if (!record) {
+      console.log('No record')
+      return sendRes({ message: 'No record' }, 200)
+    }
 
     const appId: string | undefined = record.app_id
     const deviceId: string | undefined = record.device_id
@@ -26,7 +42,7 @@ serve(async (event: Request) => {
       const oldRecord = body.old_record
 
       for (const [key, newVal] of Object.entries(record)) {
-        const oldVal = oldRecord[key]
+        const oldVal = (oldRecord as any)[key]
 
         if (oldVal !== newVal && key !== 'updated_at')
           continueExecution = true
