@@ -29,6 +29,7 @@ webServer.push({
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,
+  stdout: 'pipe',
 })
 
 /**
