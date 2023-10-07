@@ -25,7 +25,7 @@ else {
 }
 
 webServer.push({
-  command: 'ENV=local pnpm run serve',
+  command: 'pnpm run prebuild-serve-dev',
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,

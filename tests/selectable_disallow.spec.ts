@@ -5,8 +5,8 @@ import { useSupabase } from './utils'
 const BASE_URL = 'http://localhost:5173'
 
 test('test selectable disallow (no AB)', async ({ page }) => {
-  test.slow()
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/22`)
+  await page.goto(`${BASE_URL}/`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'
   await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
@@ -21,7 +21,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await checkIfChannelIsValid('production', false, page)
 
   // Back to information page
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/22`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Check if the 'minimal update version' is present
   await expect(page.locator('div.px-4:nth-child(3) > dt:nth-child(1)')).toContainText('Minimal update version')
@@ -69,7 +69,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
 
   await expect(bundleErrorPrepare).toBeNull()
 
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Click on 'settings'
   await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
@@ -91,18 +91,19 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await checkIfChannelIsValid('no_access', false, page)
 
   // Back to information page
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Check if the 'minimal update version' is present for both A and B bundle
   // Bundle A
   await expect(page.locator('div.px-4:nth-child(4) > dt:nth-child(1)')).toContainText('Minimal update version A')
-  await expect(page.locator('div.px-4:nth-child(4) > dd:nth-child(2) > div:nth-child(1) > span:nth-child(1)')).toContainText('Undefined')
+  await expect(page.locator('div.px-4:nth-child(4) > dd:nth-child(2) > div:nth-child(1) > span:nth-child(1)')).toContainText('Undefined', { timeout: 20_000 })
 
   // Bundle B
   await expect(page.locator('div.px-4:nth-child(5) > dt:nth-child(1)')).toContainText('Minimal update version B')
   await expect(page.locator('div.px-4:nth-child(5) > dd:nth-child(2) > div:nth-child(1) > span:nth-child(1)')).toContainText('Undefined')
 
   // Go to bundle A
+  // This?
   await page.click('.cursor-pointer > div:nth-child(1) > span:nth-child(1)')
 
   // Check if the 'Minimal update version' is present
@@ -136,7 +137,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await checkIfChannelIsValid('no_access', false, page)
 
   // Go back to channel page
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Check if the A bundle is '1.0.1'
   await expect(page.locator('div.px-4:nth-child(4) > dd:nth-child(2) > div:nth-child(1) > span:nth-child(1)')).toContainText('1.0.1')
@@ -158,7 +159,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await expectPopout(page, 'Updated minimal version')
 
   // Go back to channel page
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channel/23`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Check if the B bundle is '1.0.2'
   await expect(page.locator('div.px-4:nth-child(5) > dd:nth-child(2) > div:nth-child(1) > span:nth-child(1)')).toContainText('1.0.2')
@@ -169,11 +170,10 @@ test('test selectable disallow (with AB)', async ({ page }) => {
 
 async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page) {
   // Go to channels
-  await page.goto(`${BASE_URL}/app/p/com--demo--app/channels`)
+  await goto(page, `${BASE_URL}/app/p/com--demo--app/channels`)
 
   // give this time to load
-  // More time?
-  await page.waitForTimeout(2500)
+  await page.waitForTimeout(250)
 
   // Get all channels and the values (check if failing + name)
   const channelTable = await page.locator('table.w-full > tbody:nth-child(2)')
@@ -226,4 +226,16 @@ async function expectPopout(page: Page, toHave: string) {
     // Check if the popout is still visible
     popOutVisible = await page.locator(popOutLocator).isVisible()
   }
+}
+
+// We have to go around this wierd dev server
+// This is becouse the router is kind of wierd in this dev server (it is not happen in prod)
+// I had to write this like this so it's reiable
+// Perhaps there is a better way but this works 100% of times
+// This dev server is here only becouse vite's failed on the first request making the test unreliable
+async function goto(page: Page, url: string) {
+  await page.goto(`${BASE_URL}/`)
+  await page.waitForURL('**\/app/home')
+  await page.waitForTimeout(500)
+  await page.evaluate(url => window.location.href = url, url)
 }

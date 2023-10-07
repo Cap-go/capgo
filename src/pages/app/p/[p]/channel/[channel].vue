@@ -391,7 +391,7 @@ async function onChangeAutoUpdate(event: Event) {
             <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="t('min-update-version')" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
           </template>
           <template v-else-if="channel.enableAbTesting && !channel.enable_progressive_deploy">
-            <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle()" />
             <InfoRow :label="`${t('bundle-number')} B`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
             <template v-if="channel.disableAutoUpdate === 'version_number'">
               <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
@@ -399,7 +399,7 @@ async function onChangeAutoUpdate(event: Event) {
             </template>
           </template>
           <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle()" />
             <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.secondVersion.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
             <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : (channel.secondaryVersionPercentage !== 0 ? `${((channel.secondaryVersionPercentage * 100) | 0)}%` : t('status-failed'))" />
             <template v-if="channel.disableAutoUpdate === 'version_number'">
