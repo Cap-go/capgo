@@ -125,7 +125,11 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
 
   // We do not cache fails
   if (updateStatus === 'fail') {
-    console.log('[redis] Update failed, not caching')
+    console.log('[redis] Update failed, not caching', parseResult.data, res)
+    if (body.plugin_version === '4.6.10') {
+      console.log('old plugin issue, not caching', parseResult.data, res)
+      return update(body)
+    }
     return res
   }
 

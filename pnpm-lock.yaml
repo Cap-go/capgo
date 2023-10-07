@@ -117,8 +117,8 @@ dependencies:
     specifier: ^9.1.2
     version: 9.1.2
   '@capgo/inappbrowser':
-    specifier: ^1.2.7
-    version: 1.2.7(@capacitor/core@5.3.0)
+    specifier: ^1.2.12
+    version: 1.2.12(@capacitor/core@5.3.0)
   '@capgo/native-audio':
     specifier: ^6.0.18
     version: 6.0.18(@capacitor/core@5.3.0)
@@ -2392,8 +2392,8 @@ packages:
       - supports-color
     dev: false
 
-  /@capgo/inappbrowser@1.2.7(@capacitor/core@5.3.0):
-    resolution: {integrity: sha512-ZUEq4aRS8rIoeOP2MaNdaFatz6AVolh1FUnnsrBhJvfb1OV97lfxmeQZISVzHrRQ2obIweCaWr6E46v4HRiakg==}
+  /@capgo/inappbrowser@1.2.12(@capacitor/core@5.3.0):
+    resolution: {integrity: sha512-T1MEbgtqe7mNEUHW9RqZq9GquRxLoWkMec2GtZ6k9kys5y7RRoB+qlkjFUXoG/9d6WLZIDMG2E/x6EbQJo0row==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:

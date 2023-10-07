@@ -4,6 +4,7 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
+import { redisDeviceInvalidate } from '../_utils/redis.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
@@ -67,21 +68,19 @@ async function post(body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (!dataDevice) {
-    if (!dataDevice) {
-      await sendDevice({
-        app_id,
-        device_id,
-        plugin_version,
-        version: version.id,
-        ...(custom_id != null ? { custom_id } : {}),
-        ...(is_emulator != null ? { is_emulator } : {}),
-        ...(is_prod != null ? { is_prod } : {}),
-        version_build,
-        os_version: version_os,
-        platform: platform as Database['public']['Enums']['platform_os'],
-        updated_at: new Date().toISOString(),
-      })
-    }
+    await sendDevice({
+      app_id,
+      device_id,
+      plugin_version,
+      version: version.id,
+      ...(custom_id != null ? { custom_id } : {}),
+      ...(is_emulator != null ? { is_emulator } : {}),
+      ...(is_prod != null ? { is_prod } : {}),
+      version_build,
+      os_version: version_os,
+      platform: platform as Database['public']['Enums']['platform_os'],
+      updated_at: new Date().toISOString(),
+    })
   }
   const { data: dataChannelOverride } = await supabaseAdmin()
     .from('channel_devices')
@@ -225,6 +224,7 @@ async function put(body: DeviceLink): Promise<Response> {
   if (dataChannelOverride && dataChannelOverride.channel_id) {
     const channelId = dataChannelOverride.channel_id as Database['public']['Tables']['channels']['Row']
 
+    await redisDeviceInvalidate(app_id, device_id)
     return sendRes({
       channel: channelId.name,
       status: 'override',
@@ -314,6 +314,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
       error: 'override_not_allowed',
     }, 400)
   }
+  await redisDeviceInvalidate(app_id, device_id)
   return sendRes()
 }
 function main(url: URL, headers: BaseHeaders, method: string, body: any) {
