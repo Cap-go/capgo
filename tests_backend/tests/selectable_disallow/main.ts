@@ -46,9 +46,8 @@ async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // Make the channels major allways
   // We disable ab testing so that the second test can safely enable it
   const { error: error1, count } = await supabase.from('channels')
-    .update({ disableAutoUpdate: 'major', enableAbTesting: false, enable_progressive_deploy: false, secondVersion: null })
+    .update({ disableAutoUpdate: 'major', enableAbTesting: false, enable_progressive_deploy: false, secondVersion: null }, { count: 'exact' })
     .or('id.in.(22,23)')
-    .select('id')
 
   assert(error1 === null, `Supabase channel error ${JSON.stringify(error1)} is not null`)
   assert(count === 2, `Supabase channel data  length ${count} length is not 2`)
