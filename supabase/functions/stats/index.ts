@@ -82,7 +82,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
 
     const { data: appOwner } = await supabaseAdmin()
       .from('apps')
-      .select('user_id, app_id')
+      .select('app_id')
       .eq('app_id', app_id)
       .single()
 
