@@ -3,11 +3,12 @@ import { expect, test } from '@playwright/test'
 import { useSupabase } from './utils'
 
 const BASE_URL = 'http://localhost:5173'
+const START_TIMEOUT = 5000
 
 test('test selectable disallow (no AB)', async ({ page }) => {
   // Allow the router to load
   await page.goto(`${BASE_URL}/`)
-  await page.waitForTimeout(2500)
+  await page.waitForTimeout(START_TIMEOUT)
 
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
@@ -74,7 +75,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
 
   // Allow the router to load
   await page.goto(`${BASE_URL}/`)
-  await page.waitForTimeout(2500)
+  await page.waitForTimeout(START_TIMEOUT)
 
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
