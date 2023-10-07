@@ -470,7 +470,7 @@ async function onChangeAutoUpdate(event: Event) {
             </k-list-item> -->
             <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
-                <select :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @change="(event) => onChangeAutoUpdate(event)">
+                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @change="(event) => onChangeAutoUpdate(event)">
                   <option value="major">
                     {{ t('major') }}
                   </option>

@@ -15,7 +15,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
 
   // Click on 'metadata'
-  await page.locator('li.text-lg:nth-child(5) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > select').selectOption({ value: 'version_number' })
+  await page.locator('#selectableDisallow').selectOption({ value: 'version_number' })
 
   // Checks if the warning triggered
   await expectPopout(page, 'Minimal update version')
@@ -88,7 +88,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await expectPopout(page, 'Enabled AB testing')
 
   // Click on 'metadata'
-  await page.locator('li.text-lg:nth-child(5) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > select').selectOption({ value: 'version_number' })
+  await page.locator('#selectableDisallow').selectOption({ value: 'version_number' })
 
   // Checks if the warning triggered
   await expectPopout(page, 'Minimal update version')
