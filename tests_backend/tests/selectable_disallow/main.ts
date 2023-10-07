@@ -45,14 +45,13 @@ export function getTest(): RunnableTest {
 async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // Make the channels major allways
   // We disable ab testing so that the second test can safely enable it
-  const { data: data1, error: error1 } = await supabase.from('channels')
+  const { error: error1, count } = await supabase.from('channels')
     .update({ disableAutoUpdate: 'major', enableAbTesting: false, enable_progressive_deploy: false, secondVersion: null })
     .or('id.in.(22,23)')
-    .select('*')
+    .select('id')
 
   assert(error1 === null, `Supabase channel error ${JSON.stringify(error1)} is not null`)
-  assert(data1 !== null, `Supabase channel data ${JSON.stringify(data1)} is null`)
-  assert(data1!.length === 2, `Supabase channel data ${JSON.stringify(data1)} length is not 2`)
+  assert(count === 2, `Supabase channel data  length ${count} length is not 2`)
 
   // Make the versions allways have no minVersionUpdate metadata
   // 9601 is the id for the 1.359.0 version
@@ -60,7 +59,7 @@ async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // This will make the test alter the data in supabase, the developer was warned about this
   const { error: error2 } = await supabase.from('app_versions')
     .update({ minUpdateVersion: null })
-    .or(`id.in.(${data1![0].version},${data1![1].version},9601,9652,9653)`)
+    .or('id.in.(9601,9652,9653)')
 
   assert(error2 === null, `Supabase app_versions error ${JSON.stringify(error2)} is not null`)
 }

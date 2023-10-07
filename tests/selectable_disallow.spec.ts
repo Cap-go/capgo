@@ -68,10 +68,6 @@ test('test selectable disallow (with AB)', async ({ page }) => {
 
   await expect(bundleErrorPrepare).toBeNull()
 
-  // Allow the router to load
-  await page.goto(`${BASE_URL}/`)
-  await page.waitForTimeout(START_TIMEOUT)
-
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Click on 'settings'
