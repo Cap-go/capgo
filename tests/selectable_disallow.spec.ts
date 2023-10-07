@@ -5,7 +5,10 @@ import { useSupabase } from './utils'
 const BASE_URL = 'http://localhost:5173'
 
 test('test selectable disallow (no AB)', async ({ page }) => {
+  // Allow the router to load
   await page.goto(`${BASE_URL}/`)
+  await page.waitForTimeout(2500)
+
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'
@@ -68,6 +71,10 @@ test('test selectable disallow (with AB)', async ({ page }) => {
     .eq('id', 23)
 
   await expect(bundleErrorPrepare).toBeNull()
+
+  // Allow the router to load
+  await page.goto(`${BASE_URL}/`)
+  await page.waitForTimeout(2500)
 
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
@@ -234,9 +241,9 @@ async function expectPopout(page: Page, toHave: string) {
 // Perhaps there is a better way but this works 100% of times
 // This dev server is here only becouse vite's failed on the first request making the test unreliable
 async function goto(page: Page, url: string) {
-  await page.goto(`${BASE_URL}/`)
-  await page.waitForURL('**\/app/home')
-  // Big timeout to let the router start
-  await page.waitForTimeout(1500)
-  await page.evaluate(url => window.location.href = url, url)
+  await page.goto(url)
+  // await page.waitForURL('**\/app/home')
+  // // Big timeout to let the router start
+  // await page.waitForTimeout(1500)
+  // await page.evaluate(url => window.location.href = url, url)
 }
