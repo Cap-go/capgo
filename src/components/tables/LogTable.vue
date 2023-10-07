@@ -83,11 +83,12 @@ async function getData() {
         rangeEnd: currentVersionsNumber.value + offset - 1,
       },
     })
-    const { data } = await req
+    const { data, count } = (await req).data
     if (!data)
       return
     elements.value.push(...data as any)
     // console.log('count', count)
+    total.value = count || 0
   }
   catch (error) {
     console.error(error)

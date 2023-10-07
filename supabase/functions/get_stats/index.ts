@@ -16,7 +16,7 @@ interface dataStats {
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataStats) {
   try {
     console.log('body', body)
-    return getSStats(headers.Authorization || '', body.appId, body.deviceId, body.search, body.order, body.rangeStart, body.rangeEnd)
+    return sendRes(await getSStats(headers.Authorization || '', body.appId, body.deviceId, body.search, body.order, body.rangeStart, body.rangeEnd))
   }
   catch (e) {
     return sendRes({

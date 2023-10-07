@@ -116,7 +116,7 @@ async function getData() {
         rangeEnd: currentVersionsNumber.value + offset - 1,
       },
     })
-    const { data } = await req
+    const { data, count } = (await req).data
     if (!data)
       return
 

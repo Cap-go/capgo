@@ -267,6 +267,12 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
   console.log('getDevice', appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
+
+  const reqCount = supabaseClient(auth)
+    .from('devices')
+    .select('', { count: 'exact' })
+    .eq('app_id', appId)
+    .then(res => res.count || 0)
   const req = supabaseClient(auth)
     .from('devices')
     .select('device_id,created_at,updated_at,platform,os_version,version', { count: 'exact' })
@@ -293,8 +299,7 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
         req.order(col.key as any, { ascending: col.sortable === 'asc' })
     })
   }
-  return req
-    .then(res => res.error ? console.error(res.error) : (res.data || []))
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
 
   // }
   // else {
@@ -306,7 +311,16 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
 
 export function getSStats(auth: string, appId: string, deviceId?: string, search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log('getStats', appId, deviceId, search, order, rangeStart, rangeEnd)
+  console.log(`getStats appId ${appId} deviceId ${deviceId} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+  // getStats ee.forgr.captime undefined  [
+  //   { key: "action", sortable: true },
+  //   { key: "created_at", sortable: "desc" }
+  // ] 0 9
+  const reqCount = supabaseClient(auth)
+    .from('stats')
+    .select('', { count: 'exact' })
+    .eq('app_id', appId)
+    .then(res => res.count || 0)
   const req = supabaseClient(auth)
     .from('stats')
     .select(`
@@ -319,26 +333,35 @@ export function getSStats(auth: string, appId: string, deviceId?: string, search
       `)
     .eq('app_id', appId)
 
-  if (rangeStart !== undefined && rangeEnd !== undefined)
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
     req.range(rangeStart, rangeEnd)
+  }
 
-  if (deviceId)
+  if (deviceId) {
+    console.log('deviceId', deviceId)
     req.eq('device_id', deviceId)
+  }
 
-  if (deviceId && search)
-    req.like('action', `%${search}%`)
-
-  else if (search)
+  if (deviceId && search) {
+    console.log('deviceId and search', deviceId, search)
     req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+  }
+
+  else if (search) {
+    console.log('search', search)
+    req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+  }
 
   if (order?.length) {
     order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string')
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
         req.order(col.key as any, { ascending: col.sortable === 'asc' })
+      }
     })
   }
-  return req
-    .then(res => res.error ? console.error(res.error) : (res.data || []))
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
   // }
   // else {
   //   console.log('getStats enabled')
