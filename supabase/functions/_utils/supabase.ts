@@ -266,7 +266,7 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
 export function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
-  console.log('getDevice', appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
+  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
   const reqCount = supabaseClient(auth)
     .from('devices')
@@ -275,28 +275,45 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
     .then(res => res.count || 0)
   const req = supabaseClient(auth)
     .from('devices')
-    .select('device_id,created_at,updated_at,platform,os_version,version', { count: 'exact' })
+    .select(`
+      device_id,
+      created_at,
+      updated_at,
+      platform,
+      os_version,
+      version
+  `)
     .eq('app_id', appId)
 
-  if (rangeStart !== undefined && rangeEnd !== undefined)
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
     req.range(rangeStart, rangeEnd)
+  }
 
-  if (versionId)
+  if (versionId) {
+    console.log('versionId', versionId)
     req.eq('version', versionId)
+  }
 
-  if (deviceIds)
-    req.in('device_id', deviceIds)
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      req.eq('device_id', deviceIds[0])
+    else
+      req.in('device_id', deviceIds)
+  }
 
-  if (search)
+  if (search) {
+    console.log('search', search)
     req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
-
-  if (deviceIds)
-    req.in('device_id', deviceIds)
+  }
 
   if (order?.length) {
     order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string')
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
         req.order(col.key as any, { ascending: col.sortable === 'asc' })
+      }
     })
   }
   return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
