@@ -236,6 +236,7 @@ async function expectPopout(page: Page, toHave: string) {
 async function goto(page: Page, url: string) {
   await page.goto(`${BASE_URL}/`)
   await page.waitForURL('**\/app/home')
-  await page.waitForTimeout(500)
+  // Big timeout to let the router start
+  await page.waitForTimeout(1500)
   await page.evaluate(url => window.location.href = url, url)
 }
