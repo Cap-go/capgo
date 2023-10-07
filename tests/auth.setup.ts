@@ -11,7 +11,7 @@ setup('authenticate as test1', async ({ page }) => {
   // And the request always fails until this server is loaded
 
   // Limit the max iterations
-  let i = 100
+  let i = 200
 
   while (true) {
     if (i === 0)
