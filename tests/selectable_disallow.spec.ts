@@ -174,6 +174,8 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
   // give this time to load
   await page.waitForTimeout(500)
 
+  expect(page.locator('button.mr-2 > div:nth-child(1) > svg:nth-child(1)')).toHaveCount(0)
+
   // Get all channels and the values (check if failing + name)
   const channelTable = await page.locator('table.w-full > tbody:nth-child(2)')
   const channelRows = await channelTable.getByRole('row').all()
