@@ -5,7 +5,6 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './tinybird.ts'
-import { sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
 
 // import { isTinybirdGetDevicesEnabled, isTinybirdGetLogEnabled, readDevicesInTinyBird, readLogInTinyBird, sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
 
@@ -351,7 +350,7 @@ export function getSStats(auth: string, appId: string, deviceId?: string, search
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   return Promise.all([supabaseAdmin()
     .from('devices')
-    .upsert(device)])
+    .upsert(device as any)])
     .catch((e) => {
       console.log('sendDevice error', e)
     })

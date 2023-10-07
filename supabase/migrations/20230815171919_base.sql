@@ -1364,6 +1364,46 @@ CREATE TABLE "public"."deleted_account" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
+-- Clickhouse table for device
+-- CREATE TABLE IF NOT EXISTS devices
+-- (
+--     created_at DateTime,
+--     updated_at DateTime,
+--     device_id String,
+--     app_id String,
+--     platform String,
+--     plugin_version String,
+--     os_version String,
+--     version_build String,
+--     date_id String,
+--     version Int32,
+--     is_prod boolean,
+--     is_emulator boolean,
+-- ) ENGINE = ReplacingMergeTree()
+-- ORDER BY (device_id, app_id, updated_at)
+-- PRIMARY KEY (device_id, app_id);
+
+--  In supabase
+-- create foreign table clickhouse_devices (
+--     created_at timestamp,
+--     updated_at timestamp,
+--     device_id text,
+--     app_id text,
+--     platform text,
+--     plugin_version text,
+--     os_version text,
+--     version_build text,
+--     date_id text,
+--     version integer,
+--     is_prod boolean,
+--     is_emulator boolean
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'devices',
+--     rowid_column '(device_id, app_id)'
+--   );
+
 
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1480,6 +1520,38 @@ CREATE TABLE "public"."plans" (
 );
 
 ALTER TABLE "public"."plans" OWNER TO "postgres";
+
+-- Clickhouse table for stats
+-- CREATE TABLE IF NOT EXISTS logs
+-- (
+--     created_at DateTime,
+--     device_id String,
+--     app_id String,
+--     platform String,
+--     action String,
+--     version_build String,
+--     version Int32,
+-- ) ENGINE = MergeTree()
+-- ORDER BY (device_id, app_id, created_at)
+-- PRIMARY KEY (device_id, app_id, created_at);
+
+--  In supabase
+-- create foreign table clickhouse_logs (
+--     created_at timestamp,
+--     device_id text,
+--     app_id text,
+--     platform text,
+--     action text,
+--     version_build text,
+--     version integer
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'logs',
+--     rowid_column '(device_id, app_id, created_at)'
+--   );
+
+
 
 CREATE TABLE "public"."stats" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1662,33 +1734,23 @@ CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app
 
 CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
-CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
-
-CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
-
-CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
-
-CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
-
-CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
-
-CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
-
-CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
-
 CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
-
-CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
-
-CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btree" ("created_at");
-
-CREATE INDEX "idx_app_versions_deleted" ON "public"."app_versions" USING "btree" ("deleted");
-
-CREATE INDEX "idx_app_versions_name" ON "public"."app_versions" USING "btree" ("name");
 
 CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_at");
 
 CREATE INDEX "idx_device_id_logs" ON "public"."stats" USING "btree" ("device_id");
+
+CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
+
+CREATE INDEX "idx_version_build_logs" ON "public"."stats" USING "btree" ("version_build");
+
+CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
+
+CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
+
+CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
+
+CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
 
 CREATE INDEX "idx_devices_created_at" ON "public"."devices" USING "btree" ("device_id", "created_at" DESC);
 
@@ -1698,7 +1760,21 @@ CREATE INDEX "idx_devices_created_at_updated_at" ON "public"."devices" USING "bt
 
 CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
 
-CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
+CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
+
+CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
+
+CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
+
+CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btree" ("created_at");
+
+CREATE INDEX "idx_app_versions_deleted" ON "public"."app_versions" USING "btree" ("deleted");
+
+CREATE INDEX "idx_app_versions_name" ON "public"."app_versions" USING "btree" ("name");
 
 CREATE INDEX "idx_store_apps" ON "public"."store_apps" USING "btree" ("capacitor");
 
@@ -1719,10 +1795,6 @@ CREATE INDEX "idx_store_apps_react_native" ON "public"."store_apps" USING "btree
 CREATE INDEX "idx_store_capgo" ON "public"."store_apps" USING "btree" ("capgo");
 
 CREATE INDEX "idx_store_on_prem" ON "public"."store_apps" USING "btree" ("onprem");
-
-CREATE INDEX "idx_version_build_logs" ON "public"."stats" USING "btree" ("version_build");
-
-CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
