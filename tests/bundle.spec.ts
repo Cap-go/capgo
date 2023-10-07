@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
+import { BASE_URL, beforeEachTest } from './utils'
 
-const BASE_URL = 'http://localhost:5173'
+test.beforeEach(beforeEachTest)
 
 test('test bundle', async ({ page }) => {
   // Go to the production channel

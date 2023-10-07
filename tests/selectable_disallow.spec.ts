@@ -1,15 +1,10 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { useSupabase } from './utils'
+import { BASE_URL, beforeEachTest, useSupabase } from './utils'
 
-const BASE_URL = 'http://localhost:5173'
-const START_TIMEOUT = 5000
+test.beforeEach(beforeEachTest)
 
 test('test selectable disallow (no AB)', async ({ page }) => {
-  // Allow the router to load
-  await page.goto(`${BASE_URL}/`)
-  await page.waitForTimeout(START_TIMEOUT)
-
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'
