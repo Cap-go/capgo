@@ -172,6 +172,7 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channels`)
 
   // Await for the channel to load
+  expect(page.locator('#versions')).toBeVisible()
   expect(page.locator('button.mr-2 > div:nth-child(1) > svg:nth-child(1)')).toHaveCount(0)
 
   // give this some extra time to load
