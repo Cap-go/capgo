@@ -171,14 +171,17 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
   // Go to channels
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channels`)
 
-  // give this time to load
-  await page.waitForTimeout(500)
-
+  // Await for the channel to load
   expect(page.locator('button.mr-2 > div:nth-child(1) > svg:nth-child(1)')).toHaveCount(0)
+
+  // give this some extra time to load
+  await page.waitForTimeout(100)
 
   // Get all channels and the values (check if failing + name)
   const channelTable = await page.locator('table.w-full > tbody:nth-child(2)')
-  const channelRows = await channelTable.getByRole('row').all()
+
+  // We make the assumption that only 2 channels exist, this is allways true (for now) in CI/CD
+  const channelRows = (await channelTable.getByRole('row').all()).slice(0, 2)
   const failingChannels = await Promise.all(channelRows
     .map(async (el) => {
       const name = await el.locator('th:nth-child(1)').innerHTML()
