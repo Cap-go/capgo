@@ -200,7 +200,7 @@ INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage"
 ("gen_random_uuid"(), 'com.demo.app', '2023-03-30 01:18:54.034372+00', 20, 180948, 2441264, 'day');
 
 -- Create cron jobs
-SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage(5)$$);
+SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage()$$);
 SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
 SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
 -- Set old versions to deleted after retention passed 
