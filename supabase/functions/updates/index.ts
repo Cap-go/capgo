@@ -48,7 +48,7 @@ const headersSchema = z.object({
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = false
+const bypassRedis = true
 
 async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
   const parseResult = jsonRequestSchema.safeParse(body)
