@@ -6,7 +6,7 @@ import type { Order } from '../_utils/tinybird.ts'
 
 interface dataStats {
   appId: string
-  deviceId?: string
+  devicesId?: string[]
   search?: string
   order?: Order[]
   rangeStart?: number
@@ -16,7 +16,7 @@ interface dataStats {
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataStats) {
   try {
     console.log('body', body)
-    return sendRes(await getSStats(headers.authorization || '', body.appId, body.deviceId, body.search, body.order, body.rangeStart, body.rangeEnd))
+    return sendRes(await getSStats(headers.authorization || '', body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd))
   }
   catch (e) {
     return sendRes({

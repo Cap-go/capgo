@@ -76,8 +76,8 @@ async function getData() {
     const req = await supabase.functions.invoke('get_stats', {
       body: {
         appId: props.appId,
-        deviceId: props.deviceId,
-        search: search.value,
+        devicesId: props.deviceId ? [props.deviceId] : undefined,
+        search: search.value ? search.value : undefined,
         order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
         rangeStart: currentVersionsNumber.value,
         rangeEnd: currentVersionsNumber.value + offset - 1,

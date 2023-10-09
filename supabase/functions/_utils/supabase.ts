@@ -285,14 +285,14 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
   `)
     .eq('app_id', appId)
 
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    console.log('range', rangeStart, rangeEnd)
-    req.range(rangeStart, rangeEnd)
-  }
-
   if (versionId) {
     console.log('versionId', versionId)
     req.eq('version', versionId)
+  }
+
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
+    req.range(rangeStart, rangeEnd)
   }
 
   if (deviceIds && deviceIds.length) {
@@ -302,10 +302,12 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
     else
       req.in('device_id', deviceIds)
   }
-
   if (search) {
     console.log('search', search)
-    req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
+    if (deviceIds && deviceIds.length)
+      req.or(`action.like.%${search}%`)
+    else
+      req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
   }
 
   if (order?.length) {
@@ -326,9 +328,9 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
   // }
 }
 
-export function getSStats(auth: string, appId: string, deviceId?: string, search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats appId ${appId} deviceId ${deviceId} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
@@ -355,19 +357,19 @@ export function getSStats(auth: string, appId: string, deviceId?: string, search
     req.range(rangeStart, rangeEnd)
   }
 
-  if (deviceId) {
-    console.log('deviceId', deviceId)
-    req.eq('device_id', deviceId)
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      req.eq('device_id', deviceIds[0])
+    else
+      req.in('device_id', deviceIds)
   }
-
-  if (deviceId && search) {
-    console.log('deviceId and search', deviceId, search)
-    req.or(`device_id.like.%${search}%,action.like.%${search}%`)
-  }
-
-  else if (search) {
+  if (search) {
     console.log('search', search)
-    req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+    if (deviceIds && deviceIds.length)
+      req.or(`action.like.%${search}%`)
+    else
+      req.or(`device_id.like.%${search}%,action.like.%${search}%`)
   }
 
   if (order?.length) {
