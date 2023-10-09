@@ -17,8 +17,7 @@ interface dataDevice {
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataDevice) {
   try {
     console.log('body', body)
-
-    return getSDevice(headers.Authorization || '', body.appId, body.versionId, body.deviceIds, body.search, body.order, body.rangeStart, body.rangeEnd)
+    return sendRes(await getSDevice(headers.authorization || '', body.appId, body.versionId, body.deviceIds, body.search, body.order, body.rangeStart, body.rangeEnd))
   }
   catch (e) {
     return sendRes({

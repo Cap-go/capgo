@@ -5,7 +5,6 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './tinybird.ts'
-import { sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
 
 // import { isTinybirdGetDevicesEnabled, isTinybirdGetLogEnabled, readDevicesInTinyBird, readLogInTinyBird, sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
 
@@ -267,35 +266,59 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
 export function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
-  console.log('getDevice', appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
+  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+
+  const reqCount = supabaseClient(auth)
+    .from('devices')
+    .select('', { count: 'exact' })
+    .eq('app_id', appId)
+    .then(res => res.count || 0)
   const req = supabaseClient(auth)
     .from('devices')
-    .select('device_id,created_at,updated_at,platform,os_version,version', { count: 'exact' })
+    .select(`
+      device_id,
+      created_at,
+      updated_at,
+      platform,
+      os_version,
+      version
+  `)
     .eq('app_id', appId)
 
-  if (rangeStart !== undefined && rangeEnd !== undefined)
-    req.range(rangeStart, rangeEnd)
-
-  if (versionId)
+  if (versionId) {
+    console.log('versionId', versionId)
     req.eq('version', versionId)
+  }
 
-  if (deviceIds)
-    req.in('device_id', deviceIds)
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
+    req.range(rangeStart, rangeEnd)
+  }
 
-  if (search)
-    req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
-
-  if (deviceIds)
-    req.in('device_id', deviceIds)
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      req.eq('device_id', deviceIds[0])
+    else
+      req.in('device_id', deviceIds)
+  }
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      req.or(`action.like.%${search}%`)
+    else
+      req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
+  }
 
   if (order?.length) {
     order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string')
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
         req.order(col.key as any, { ascending: col.sortable === 'asc' })
+      }
     })
   }
-  return req
-    .then(res => res.error ? console.error(res.error) : (res.data || []))
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
 
   // }
   // else {
@@ -305,9 +328,18 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
   // }
 }
 
-export function getSStats(auth: string, appId: string, deviceId?: string, search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log('getStats', appId, deviceId, search, order, rangeStart, rangeEnd)
+  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+  // getStats ee.forgr.captime undefined  [
+  //   { key: "action", sortable: true },
+  //   { key: "created_at", sortable: "desc" }
+  // ] 0 9
+  const reqCount = supabaseClient(auth)
+    .from('stats')
+    .select('', { count: 'exact' })
+    .eq('app_id', appId)
+    .then(res => res.count || 0)
   const req = supabaseClient(auth)
     .from('stats')
     .select(`
@@ -320,26 +352,35 @@ export function getSStats(auth: string, appId: string, deviceId?: string, search
       `)
     .eq('app_id', appId)
 
-  if (rangeStart !== undefined && rangeEnd !== undefined)
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
     req.range(rangeStart, rangeEnd)
+  }
 
-  if (deviceId)
-    req.eq('device_id', deviceId)
-
-  if (deviceId && search)
-    req.like('action', `%${search}%`)
-
-  else if (search)
-    req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      req.eq('device_id', deviceIds[0])
+    else
+      req.in('device_id', deviceIds)
+  }
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      req.or(`action.like.%${search}%`)
+    else
+      req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+  }
 
   if (order?.length) {
     order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string')
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
         req.order(col.key as any, { ascending: col.sortable === 'asc' })
+      }
     })
   }
-  return req
-    .then(res => res.error ? console.error(res.error) : (res.data || []))
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
   // }
   // else {
   //   console.log('getStats enabled')
@@ -351,7 +392,7 @@ export function getSStats(auth: string, appId: string, deviceId?: string, search
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   return Promise.all([supabaseAdmin()
     .from('devices')
-    .upsert(device), sendDeviceToTinybird([device])])
+    .upsert(device as any)])
     .catch((e) => {
       console.log('sendDevice error', e)
     })
@@ -360,7 +401,7 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
 export function sendStats(stats: Database['public']['Tables']['stats']['Insert'][]) {
   return Promise.all([supabaseAdmin()
     .from('stats')
-    .insert(stats), sendLogToTinybird(stats)])
+    .insert(stats)])
     .catch((e) => {
       console.log('sendDevice error', e)
     })

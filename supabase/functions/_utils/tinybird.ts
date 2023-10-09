@@ -17,24 +17,23 @@ export function isTinybirdCountLogEnabled() {
   return !!getEnv('TINYBIRD_TOKEN_COUNT_LOG')
 }
 
-export function sendDeviceToTinybird(devices: Database['public']['Tables']['devices']['Update'][]) {
+export function sendDeviceToTinybird(device: Database['public']['Tables']['devices']['Update']) {
   if (!isTinybirdIngestEnabled())
     return Promise.resolve()
 
   // make log a string with a newline between each log
-  const devicesReady = devices.map(l => ({
-    ...l,
-    custom_id: undefined,
-    created_at: !l.created_at ? new Date() : l.created_at,
-    updated_at: !l.updated_at ? new Date() : l.updated_at,
-  })).map(l => JSON.stringify(l)).join('\n')
-  console.log('sending device to tinybird', devicesReady)
+  const deviceReady = JSON.stringify({
+    ...device,
+    created_at: !device.created_at ? new Date() : device.created_at,
+    updated_at: !device.updated_at ? new Date() : device.updated_at,
+  })
+  console.log('sending device to tinybird', deviceReady)
   return fetch(
     'https://api.tinybird.co/v0/events?name=devices',
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
-      body: devicesReady,
+      body: deviceReady,
       headers: { Authorization: `Bearer ${getEnv('TINYBIRD_TOKEN_INGEST_LOG')}` },
     },
   )

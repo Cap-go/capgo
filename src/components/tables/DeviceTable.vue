@@ -109,14 +109,14 @@ async function getData() {
         // appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number
         appId: props.appId,
         versionId: props.versionId,
-        deviceIds: ids,
-        search: search.value,
+        deviceIds: ids.length ? ids : undefined,
+        search: search.value ? search.value : undefined,
         order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
         rangeStart: currentVersionsNumber.value,
         rangeEnd: currentVersionsNumber.value + offset - 1,
       },
     })
-    const { data } = await req
+    const { data, count } = (await req).data
     if (!data)
       return
 

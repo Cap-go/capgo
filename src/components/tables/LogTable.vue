@@ -76,18 +76,19 @@ async function getData() {
     const req = await supabase.functions.invoke('get_stats', {
       body: {
         appId: props.appId,
-        deviceId: props.deviceId,
-        search: search.value,
+        devicesId: props.deviceId ? [props.deviceId] : undefined,
+        search: search.value ? search.value : undefined,
         order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
         rangeStart: currentVersionsNumber.value,
         rangeEnd: currentVersionsNumber.value + offset - 1,
       },
     })
-    const { data } = await req
+    const { data, count } = (await req).data
     if (!data)
       return
     elements.value.push(...data as any)
     // console.log('count', count)
+    total.value = count || 0
   }
   catch (error) {
     console.error(error)
