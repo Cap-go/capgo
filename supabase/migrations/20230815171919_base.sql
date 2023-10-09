@@ -52,6 +52,7 @@ CREATE TYPE "public"."key_mode" AS ENUM (
 );
 
 CREATE TYPE "public"."usage_mode" AS ENUM (
+    'last_saved', -- This represent the last saved value in the database between the last time app_usage was saved to now ( in case of bug or crash )
     '5min',
     'day',
     'cycle'
@@ -1211,6 +1212,8 @@ CREATE TABLE "public"."app_usage" (
     "mau" bigint DEFAULT '0'::bigint NOT NULL,
     "storage" bigint DEFAULT '0'::bigint NOT NULL,
     "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
+    "downloads" bigint DEFAULT '0'::bigint NOT NULL,
+    "fails" bigint DEFAULT '0'::bigint NOT NULL,
     mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
 );
 
@@ -1798,7 +1801,7 @@ CREATE INDEX "idx_store_on_prem" ON "public"."store_apps" USING "btree" ("onprem
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
-CREATE OR REPLACE FUNCTION public.get_cycle_info()
+CREATE OR REPLACE FUNCTION public.get_cycle_info("userid" "uuid")
 RETURNS TABLE (
     subscription_anchor_start timestamp with time zone,
     subscription_anchor_end timestamp with time zone
@@ -1829,6 +1832,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION public.get_cycle_info()
+RETURNS TABLE (
+    subscription_anchor_start timestamp with time zone,
+    subscription_anchor_end timestamp with time zone
+) AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM get_cycle_info(auth.uid());
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
@@ -1994,6 +2006,9 @@ ALTER TABLE ONLY "public"."channels"
 ALTER TABLE ONLY "public"."devices"
     ADD CONSTRAINT "devices_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
+ALTER TABLE ONLY "public"."devices"
+    ADD CONSTRAINT "devices_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
+
 ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -2005,9 +2020,6 @@ ALTER TABLE ONLY "public"."devices_override"
 
 ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."devices"
-    ADD CONSTRAINT "devices_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."stats"
     ADD CONSTRAINT "logs_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
