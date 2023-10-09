@@ -745,54 +745,82 @@ Begin
 End;                                                           
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION public.update_app_usage(minutes_interval INT) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.get_usage_mode_and_last_saved() RETURNS TABLE(usage_mode public.usage_mode, last_saved TIMESTAMP) AS $$
+BEGIN
+    last_saved := (SELECT MAX(created_at) FROM app_usage);
+    IF EXTRACT(MINUTE FROM (NOW() - last_saved)) > 5 THEN
+        usage_mode := 'last_saved';
+    ELSE
+        usage_mode := '5min';
+    END IF;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.update_app_usage() RETURNS VOID AS $$
 DECLARE
     one_minute_ago TIMESTAMP;
-    n_minutes_ago TIMESTAMP;
+    last_saved TIMESTAMP;
     thirty_days_ago TIMESTAMP;
+    usage_mode public.usage_mode;
 BEGIN
     -- Initialize time variables
     one_minute_ago := NOW() - INTERVAL '1 minute';
-    n_minutes_ago := NOW() - INTERVAL '1 minute' * minutes_interval;
+    SELECT INTO usage_mode, last_saved * FROM public.get_usage_mode_and_last_saved();
     thirty_days_ago := NOW() - INTERVAL '30 days';
 
     WITH bandwidth AS (
-        SELECT stats.app_id, SUM(app_versions_meta.size) AS bandwidth, 0 AS storage, 0 AS mau
+        SELECT stats.app_id, SUM(app_versions_meta.size) AS bandwidth, 0 AS storage, 0 AS mau, 0 AS downloads, 0 AS fails
         FROM stats
         JOIN app_versions_meta ON stats.app_id = app_versions_meta.app_id
-        WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
+        WHERE stats.action = 'get' AND stats.created_at BETWEEN last_saved AND one_minute_ago
         GROUP BY stats.app_id
     ), storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
+        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau, 0 AS downloads, 0 AS fails
         FROM app_versions
         JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
         WHERE app_versions.deleted IS FALSE
         GROUP BY app_versions.app_id
     ), mau AS (
-        SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mau
+        SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mau, 0 AS downloads, 0 AS fails
         FROM devices
-        WHERE (devices.created_at BETWEEN n_minutes_ago AND one_minute_ago OR devices.updated_at BETWEEN n_minutes_ago AND one_minute_ago)
-        AND (devices.last_MAU IS NULL OR devices.last_MAU < thirty_days_ago)
+        WHERE devices.updated_at BETWEEN last_saved AND one_minute_ago
+        AND devices.last_MAU < thirty_days_ago
         GROUP BY devices.app_id
+    ), downloads AS (
+        SELECT stats.app_id, 0 AS bandwidth, 0 AS storage, 0 AS mau, COUNT(*) AS downloads, 0 AS fails
+        FROM stats
+        WHERE stats.action = 'set' AND stats.created_at BETWEEN last_saved AND one_minute_ago
+        GROUP BY stats.app_id
+    ), fails AS (
+        SELECT stats.app_id, 0 AS bandwidth, 0 AS storage, 0 AS mau, 0 AS downloads, COUNT(*) AS fails
+        FROM stats
+        WHERE (stats.action = 'set_fail' OR stats.action = 'update_fail' OR stats.action = 'download_fail') AND stats.created_at BETWEEN last_saved AND one_minute_ago
+        GROUP BY stats.app_id
     ), combined AS (
         SELECT * FROM bandwidth
         UNION ALL
         SELECT * FROM storage
         UNION ALL
         SELECT * FROM mau
+        UNION ALL
+        SELECT * FROM downloads
+        UNION ALL
+        SELECT * FROM fails
     )
-    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau)
-    SELECT app_id, NOW(), SUM(bandwidth), SUM(storage), SUM(mau)
+    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, downloads, fails)
+    SELECT app_id, NOW(), SUM(bandwidth), SUM(storage), SUM(mau), SUM(downloads), SUM(fails)
     FROM combined
     GROUP BY app_id
-    HAVING SUM(bandwidth) > 0 OR SUM(storage) > 0 OR SUM(mau) > 0;
+    HAVING SUM(bandwidth) > 0 OR SUM(mau) > 0 OR SUM(downloads) > 0 OR SUM(fails) > 0;
 
     -- Update last_MAU for counted devices
     UPDATE devices SET last_MAU = NOW()
-    WHERE (created_at BETWEEN n_minutes_ago AND one_minute_ago OR updated_at BETWEEN n_minutes_ago AND one_minute_ago)
-    AND (last_MAU IS NULL OR last_MAU < thirty_days_ago);
+    WHERE updated_at BETWEEN last_saved AND one_minute_ago
+    AND last_MAU < thirty_days_ago;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION public.calculate_daily_app_usage() RETURNS VOID AS $$
 DECLARE
@@ -821,16 +849,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION public.calculate_cycle_usage() RETURNS VOID AS $$
 DECLARE
-    current_cycle_start TIMESTAMP;
-    current_cycle_end TIMESTAMP;
+    current_cycle RECORD;
 BEGIN
     -- Initialize cycle time variables
-    SELECT subscription_anchor_start, subscription_anchor_end INTO current_cycle_start, current_cycle_end
-    FROM stripe_info
-    ORDER BY subscription_anchor_start DESC
+    SELECT * INTO current_cycle
+    FROM public.get_cycle_info()
     LIMIT 1;
 
     WITH cycle_usage AS (
@@ -839,7 +864,7 @@ BEGIN
         JOIN apps ON app_usage.app_id = apps.app_id
         JOIN users ON apps.user_id = users.id
         JOIN stripe_info ON users.customer_id = stripe_info.customer_id
-        WHERE app_usage.created_at BETWEEN current_cycle_start AND current_cycle_end
+        WHERE app_usage.created_at BETWEEN current_cycle.subscription_anchor_start AND current_cycle.subscription_anchor_end
         AND app_usage.mode = 'day'
         GROUP BY apps.app_id
     ), 
@@ -847,7 +872,7 @@ BEGIN
         UPDATE app_usage 
         SET bandwidth = cycle_usage.cycle_bandwidth, storage = cycle_usage.cycle_storage, mau = cycle_usage.cycle_mau
         FROM cycle_usage
-        WHERE app_usage.app_id = cycle_usage.app_id AND app_usage.created_at BETWEEN current_cycle_start AND current_cycle_end AND app_usage.mode = 'cycle'
+        WHERE app_usage.app_id = cycle_usage.app_id AND app_usage.created_at BETWEEN current_cycle.subscription_anchor_start AND current_cycle.subscription_anchor_end AND app_usage.mode = 'cycle'
         RETURNING app_usage.*
     )
     INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
@@ -856,6 +881,7 @@ BEGIN
     WHERE NOT EXISTS (SELECT 1 FROM upsert WHERE upsert.app_id = cycle_usage.app_id);
 END;
 $$ LANGUAGE plpgsql;
+
 
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
@@ -1367,36 +1393,65 @@ CREATE TABLE "public"."deleted_account" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
+
+-- Create clickhouse connection (require for big apps)
+
+-- create foreign data wrapper clickhouse_wrapper
+--   handler click_house_fdw_handler
+--   validator click_house_fdw_validator;
+
+-- Save your ClickHouse credential in Vault and retrieve the `key_id`
+-- insert into vault.secrets (name, secret)
+-- values (
+--   'clickhouse',
+--   'tcp://default:****@****.eu-central-1.aws.clickhouse.cloud:9440/default?connection_timeout=30s&ping_before_query=false&secure=true'
+-- )
+-- returning key_id;
+
+-- create server clickhouse_server
+--   foreign data wrapper clickhouse_wrapper
+--   options (
+--     conn_string_id 'YOUR_KEY_ID' -- The Key ID from above.
+--   );
+
 -- Clickhouse table for device
 -- CREATE TABLE IF NOT EXISTS devices
 -- (
 --     created_at DateTime,
 --     updated_at DateTime,
+--     last_mau DateTime,
 --     device_id String,
+--     custom_id String,
 --     app_id String,
 --     platform String,
 --     plugin_version String,
 --     os_version String,
 --     version_build String,
---     date_id String,
---     version Int32,
---     is_prod boolean,
---     is_emulator boolean,
+--     version Int64,
+--     is_prod UInt8,
+--     is_emulator UInt8,
 -- ) ENGINE = ReplacingMergeTree()
--- ORDER BY (device_id, app_id, updated_at)
--- PRIMARY KEY (device_id, app_id);
+-- ORDER BY (device_id, updated_at)
+-- PRIMARY KEY (device_id);
+
+-- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 1, 1),
+-- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.4', '9', '1.223.0', '', 1, 1);
+-- first value shouldn't be visible in supabase because of ReplacingMergeTree
+
 
 --  In supabase
 -- create foreign table clickhouse_devices (
 --     created_at timestamp,
 --     updated_at timestamp,
+--     last_mau timestamp,
 --     device_id text,
+--     custom_id text,
 --     app_id text,
 --     platform text,
 --     plugin_version text,
 --     os_version text,
 --     version_build text,
---     date_id text,
 --     version integer,
 --     is_prod boolean,
 --     is_emulator boolean
@@ -1404,14 +1459,45 @@ CREATE TABLE "public"."deleted_account" (
 --   server clickhouse_server
 --   options (
 --     table 'devices',
---     rowid_column '(device_id, app_id)'
+--     rowid_column 'device_id'
 --   );
 
+-- TEST COPY existing data from postgres to clickhouse
+-- INSERT INTO clickhouse_devices (
+--     created_at,
+--     updated_at,
+--     last_mau,
+--     device_id,
+--     version,
+--     app_id,
+--     platform,
+--     plugin_version,
+--     os_version,
+--     version_build,
+--     custom_id,
+--     is_prod,
+--     is_emulator
+-- )
+-- SELECT 
+--     date_trunc('second', created_at),
+--     date_trunc('second', updated_at),
+--     date_trunc('second', last_mau),
+--     device_id,
+--     version,
+--     app_id,
+--     platform,
+--     plugin_version,
+--     os_version,
+--     version_build,
+--     custom_id,
+--     is_prod,
+--     is_emulator
+-- FROM public.devices LIMIT 1;
 
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
-    "last_mau" timestamp with time zone DEFAULT "now"(),
+    "last_mau" timestamp with time zone DEFAULT '1900-01-01'::date,
     "device_id" "text" NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL,
@@ -1527,34 +1613,58 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 -- Clickhouse table for stats
 -- CREATE TABLE IF NOT EXISTS logs
 -- (
+--     id Int64,
 --     created_at DateTime,
 --     device_id String,
 --     app_id String,
 --     platform String,
 --     action String,
 --     version_build String,
---     version Int32,
+--     version Int64,
 -- ) ENGINE = MergeTree()
--- ORDER BY (device_id, app_id, created_at)
--- PRIMARY KEY (device_id, app_id, created_at);
+-- ORDER BY (created_at)
+-- PRIMARY KEY (id);
+
+CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
+
+-- TEST COPY existing data from postgres to clickhouse
+-- INSERT INTO clickhouse_logs (
+-- 	id,
+--     created_at,
+--     device_id,
+--     app_id,
+--     platform,
+--     action,
+--     version_build,
+--     version
+-- )
+-- SELECT 
+-- 	nextval('clickhouse_logs_id_seq'),
+--     date_trunc('second', created_at),
+--     device_id,
+--     app_id,
+--     platform,
+--     action,
+--     version_build,
+--     version::integer
+-- FROM public.stats LIMIT 1;
 
 --  In supabase
 -- create foreign table clickhouse_logs (
+--     id bigint,
 --     created_at timestamp,
 --     device_id text,
 --     app_id text,
 --     platform text,
 --     action text,
 --     version_build text,
---     version integer
+--     version bigint
 -- )
 --   server clickhouse_server
 --   options (
 --     table 'logs',
---     rowid_column '(device_id, app_id, created_at)'
+--     rowid_column 'id'
 --   );
-
-
 
 CREATE TABLE "public"."stats" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1737,7 +1847,6 @@ CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app
 
 CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
-CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
 CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_at");
 
@@ -1748,6 +1857,8 @@ CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
 CREATE INDEX "idx_version_build_logs" ON "public"."stats" USING "btree" ("version_build");
 
 CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
+
+CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
 
@@ -1772,6 +1883,8 @@ CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices
 CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
 
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
+
+CREATE INDEX "idx_app_versions_meta_id" ON "public"."app_versions_meta" USING "btree" ("id");
 
 CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btree" ("created_at");
 
