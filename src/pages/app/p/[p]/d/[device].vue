@@ -7,7 +7,6 @@ import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
-import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
@@ -16,12 +15,11 @@ import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
+  customVersion?: Database['public']['Tables']['app_versions']['Row']
+  customChannel?: Database['public']['Tables']['channels']['Row']
 }
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
-}
-interface ChannelDev {
-  channel_id: Database['public']['Tables']['channels']['Row'] & Channel
 }
 
 interface Stat {
@@ -31,7 +29,6 @@ interface Stat {
 }
 const displayStore = useDisplayStore()
 const { t } = useI18n()
-const main = useMainStore()
 const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
@@ -42,10 +39,8 @@ const ActiveTab = ref('info')
 
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
 const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
-const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row'] & Device>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
-const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
 
 const tabs: Tab[] = [
   {
@@ -94,69 +89,6 @@ async function getChannels() {
   }
 }
 
-async function getChannelOverride() {
-  try {
-    const { data, error } = await supabase
-      .from('channel_devices')
-      .select(`
-        device_id,
-        app_id,
-        channel_id (
-          name,
-          version (
-            name
-          )
-        ),
-        created_at,
-        updated_at
-      `)
-      .eq('app_id', packageId.value)
-      .eq('device_id', id.value!)
-      .single()
-      .throwOnError()
-    if (error) {
-      console.error('getChannelOverride', error)
-      return
-    }
-    channelDevice.value = (data || undefined) as Database['public']['Tables']['channel_devices']['Row'] & ChannelDev
-  }
-  catch (_e) {
-    channelDevice.value = undefined
-  }
-}
-async function getDeviceOverride() {
-  try {
-    const { data } = await supabase
-      .from('devices_override')
-      .select(`
-      device_id,
-      app_id,
-      version,
-      created_at,
-      updated_at
-    `)
-      .eq('app_id', packageId.value)
-      .eq('device_id', id.value!)
-      .single()
-      .throwOnError()
-
-    const { data: dataVersion } = await supabase
-      .from('app_versions')
-      .select(`
-          name
-      `)
-      .eq('id', data!.version)
-      .single()
-      .throwOnError()
-
-    const overwriteVersion = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
-    overwriteVersion.version = dataVersion! as any as typeof overwriteVersion.version
-    deviceOverride.value = overwriteVersion
-  }
-  catch (_e) {
-    deviceOverride.value = undefined
-  }
-}
 async function getDevice() {
   if (!id.value)
     return
@@ -175,7 +107,9 @@ async function getDevice() {
           version_build,
           created_at,
           plugin_version,
-          updated_at
+          updated_at,
+          customVersion ( name, id ),
+          customChannel ( name, id )
         `)
       .eq('device_id', id.value)
       .single()
@@ -190,10 +124,9 @@ async function getDevice() {
       .single()
       .throwOnError()
 
-    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
+    const deviceValue = data as any as Database['public']['Tables']['devices']['Row'] & Device
     deviceValue.version = dataVersion! as any as typeof deviceValue.version
     device.value = deviceValue
-    // console.log('device', device.value)
   }
   catch (error) {
     console.error('no devices', error)
@@ -209,8 +142,6 @@ async function loadData() {
   logs.value = []
   await Promise.all([
     getDevice(),
-    getDeviceOverride(),
-    getChannelOverride(),
     getChannels(),
     getVersion(),
   ])
@@ -219,13 +150,9 @@ async function loadData() {
 
 async function upsertDevVersion(device: string, v: Database['public']['Tables']['app_versions']['Row']) {
   return supabase
-    .from('devices_override')
-    .upsert({
-      device_id: device,
-      version: v.id,
-      app_id: packageId.value,
-      created_by: main.user?.id,
-    })
+    .from('devices')
+    .update({ customVersion: v.id })
+    .eq('device_id', device)
 }
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -263,14 +190,16 @@ async function delDevVersion(device: string) {
   if (await didCancel(t('device')))
     return
   return supabase
-    .from('devices_override')
-    .delete()
+    .from('devices')
+    .update({
+      customVersion: null,
+    })
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
 async function updateOverride() {
   const buttons = []
-  if (deviceOverride.value) {
+  if (device.value?.customVersion) {
     buttons.push({
       text: t('button-remove'),
       handler: async () => {
@@ -314,30 +243,23 @@ async function updateOverride() {
   displayStore.showActionSheet = true
 }
 async function upsertDevChannel(device: string, channel: Database['public']['Tables']['channels']['Row']) {
-  if (!main?.user?.id)
-    return
   return supabase
-    .from('channel_devices')
-    .upsert({
-      device_id: device,
-      channel_id: channel.id,
-      app_id: packageId.value,
-      created_by: main.user.id,
-    })
+    .from('devices')
+    .update({ customChannel: channel.id })
+    .eq('device_id', device)
 }
 async function delDevChannel(device: string) {
   if (await didCancel(t('channel')))
     return
   return supabase
-    .from('channel_devices')
-    .delete()
+    .from('devices')
+    .update({ customChannel: null })
     .eq('device_id', device)
-    .eq('app_id', packageId.value)
 }
 
 async function updateChannel() {
   const buttons = []
-  if (channelDevice.value) {
+  if (device.value?.customChannel) {
     buttons.push({
       text: t('button-remove'),
       handler: async () => {
@@ -350,7 +272,7 @@ async function updateChannel() {
       text: t('open-channel'),
       handler: async () => {
         displayStore.showActionSheet = false
-        device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${channelDevice.value?.channel_id}`)
+        device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${device.value?.customChannel}`)
       },
     })
   }
@@ -403,7 +325,7 @@ watchEffect(async () => {
 <template>
   <div v-if="device" class="h-full md:py-4">
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-    <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
+    <div v-if="ActiveTab === 'info'" id="devices" :key="isLoading.toString()" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
@@ -417,8 +339,8 @@ watchEffect(async () => {
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
-          <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
+          <InfoRow :label="t('force-version')" :value="(device.customVersion ? device.customVersion.name : undefined) || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
+          <InfoRow :label="t('channel-link')" :value="(device.customChannel ? device.customChannel.name : undefined) || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
         </dl>
       </div>
     </div>
