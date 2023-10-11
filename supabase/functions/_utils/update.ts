@@ -78,6 +78,17 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
         disableAutoUpdate,
         ios,
         android,
+        secondVersion (
+          id,
+          name,
+          checksum,
+          session_key,
+          user_id,
+          bucket_id,
+          storage_provider,
+          external_url,
+          minUpdateVersion
+        ),
         secondaryVersionPercentage,
         enable_progressive_deploy,
         enableAbTesting,
@@ -89,7 +100,8 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
           user_id,
           bucket_id,
           storage_provider,
-          external_url
+          external_url,
+          minUpdateVersion
         )
       ),
       created_at,
@@ -251,7 +263,10 @@ export async function update(body: AppInfos) {
       plugin_version,
       version_name)
 
-    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(app_id, device_id, version_name)
+    const requestedInto = await requestInfos(app_id, device_id, version_name)
+    const { versionData, channelOverride, devicesOverride } = requestedInto
+    let { channelData } = requestedInto
+
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
       if (versionData)
@@ -262,6 +277,12 @@ export async function update(body: AppInfos) {
         error: 'no_channel',
       }, 200)
     }
+
+    // Trigger only if the channel is overwriten but the version is not
+    if (channelOverride && !devicesOverride)
+      // deno-lint-ignore no-explicit-any
+      channelData = channelOverride.channel_id as any
+
     let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
     const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
