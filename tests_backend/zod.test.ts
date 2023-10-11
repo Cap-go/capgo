@@ -464,7 +464,7 @@ function parseJSON(body: RequestJSON, jsonRequestSchema: any) {
     return NO_ERROR
 }
 
-function assertStatements(response: any, expectedErrorMessage: string, errorIndex: number = 0) {
+function assertStatements(response: any, expectedErrorMessage: string, errorIndex = 0) {
   assertExists(response.error)
   assertStringIncludes(response.error, 'Cannot parse json: ')
   assertExists(response.nestedError)
