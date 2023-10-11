@@ -180,6 +180,7 @@ export interface Database {
           deleted: boolean
           external_url: string | null
           id: number
+          minUpdateVersion: string | null
           name: string
           session_key: string | null
           storage_provider: string
@@ -194,6 +195,7 @@ export interface Database {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          minUpdateVersion?: string | null
           name: string
           session_key?: string | null
           storage_provider?: string
@@ -208,6 +210,7 @@ export interface Database {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          minUpdateVersion?: string | null
           name?: string
           session_key?: string | null
           storage_provider?: string
@@ -450,6 +453,7 @@ export interface Database {
           beta: boolean
           created_at: string
           created_by: string
+          disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
           enable_progressive_deploy: boolean
@@ -472,6 +476,7 @@ export interface Database {
           beta?: boolean
           created_at?: string
           created_by: string
+          disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -494,6 +499,7 @@ export interface Database {
           beta?: boolean
           created_at?: string
           created_by?: string
+          disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -1183,16 +1189,7 @@ export interface Database {
       }
     }
     Views: {
-      hypopg_list_indexes: {
-        Row: {
-          am_name: unknown | null
-          index_name: string | null
-          indexrelid: unknown | null
-          schema_name: unknown | null
-          table_name: unknown | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       calculate_cycle_usage: {
@@ -1560,61 +1557,12 @@ export interface Database {
         }
         Returns: undefined
       }
-      hypopg: {
-        Args: Record<PropertyKey, never>
-        Returns: Record<string, unknown>[]
-      }
-      hypopg_create_index: {
-        Args: {
-          sql_order: string
-        }
-        Returns: Record<string, unknown>[]
-      }
-      hypopg_drop_index: {
-        Args: {
-          indexid: unknown
-        }
-        Returns: boolean
-      }
-      hypopg_get_indexdef: {
-        Args: {
-          indexid: unknown
-        }
-        Returns: string
-      }
-      hypopg_relation_size: {
-        Args: {
-          indexid: unknown
-        }
-        Returns: number
-      }
-      hypopg_reset: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      hypopg_reset_index: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       increment_store: {
         Args: {
           app_id: string
           updates: number
         }
         Returns: undefined
-      }
-      index_advisor: {
-        Args: {
-          query: string
-        }
-        Returns: {
-          startup_cost_before: Json
-          startup_cost_after: Json
-          total_cost_before: Json
-          total_cost_after: Json
-          index_statements: string[]
-          errors: string[]
-        }[]
       }
       insert_device:
         | {
@@ -1894,6 +1842,7 @@ export interface Database {
     }
     Enums: {
       app_mode: "prod" | "dev" | "livereload"
+      disable_update: "major" | "minor" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
