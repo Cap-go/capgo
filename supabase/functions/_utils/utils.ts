@@ -23,7 +23,7 @@ export const corsHeaders = {
 }
 
 // Regex for Zod validation of an app id
-export const reverseDomainRegex = /^[a-z0-9]+(\.[a-z0-9]+)+$/i
+export const reverseDomainRegex = /^[a-z0-9]+(\.[a-z0-9_-]+)+$/i
 
 // Regex for Zod validation of a device id. Examples:
 //    44f128a5-ac7a-4c9a-be4c-224b6bf81b20 (android)

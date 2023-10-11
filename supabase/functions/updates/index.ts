@@ -64,7 +64,10 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
   const redis = await getRedis()
 
   if (!redis || bypassRedis) {
-    console.log('[redis] cannot get redis')
+    if (bypassRedis)
+      console.log('[redis] bypassed')
+    else
+      console.log('[redis] cannot get redis')
     return update(body)
   }
 
