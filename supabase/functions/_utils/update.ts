@@ -9,6 +9,11 @@ import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
+interface Channel {
+  version: Database['public']['Tables']['app_versions']['Row']
+  secondVersion: Database['public']['Tables']['app_versions']['Row']
+}
+
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
     version: version.name,
@@ -31,41 +36,10 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
 }
 
 async function requestInfos(app_id: string, device_id: string, version_name: string) {
-  const recV = supabaseAdmin()
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', app_id)
-    .or(`name.eq.${version_name}`)
-    .single()
-    .then(res => res.data)
   const recD = supabaseAdmin()
-    .from('devices_override')
+    .from('devices')
     .select(`
-      device_id,
-      app_id,
-      created_at,
-      updated_at,
-      version (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url
-      )
-    `)
-    .eq('device_id', device_id)
-    .eq('app_id', app_id)
-    .single()
-    .then(res => res.data)
-  const recCO = supabaseAdmin()
-    .from('channel_devices')
-    .select(`
-      device_id,
-      app_id,
-      channel_id (
+      customChannel (
         id,
         created_at,
         created_by,
@@ -77,6 +51,16 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
         disableAutoUpdateToMajor,
         ios,
         android,
+        secondVersion (
+          id,
+          name,
+          checksum,
+          session_key,
+          user_id,
+          bucket_id,
+          storage_provider,
+          external_url
+        ),
         secondaryVersionPercentage,
         enable_progressive_deploy,
         enableAbTesting,
@@ -91,41 +75,7 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
           external_url
         )
       ),
-      created_at,
-      updated_at
-    `)
-    .eq('device_id', device_id)
-    .eq('app_id', app_id)
-    .single()
-    .then(res => res.data)
-  const recC = supabaseAdmin()
-    .from('channels')
-    .select(`
-      id,
-      created_at,
-      created_by,
-      name,
-      app_id,
-      allow_dev,
-      allow_emulator,
-      disableAutoUpdateUnderNative,
-      disableAutoUpdateToMajor,
-      ios,
-      android,
-      secondVersion (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url
-      ),
-      secondaryVersionPercentage,
-      enable_progressive_deploy,
-      enableAbTesting,
-      version (
+      customVersion (
         id,
         name,
         checksum,
@@ -136,13 +86,14 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
         external_url
       )
     `)
+    .eq('device_id', device_id)
     .eq('app_id', app_id)
-    .eq('public', true)
     .single()
-    .then(res => res.data)
+    .then(res => (!res.error) ? res.data : null)
   // promise all
-  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
-  return { versionData, channelData, channelOverride, devicesOverride }
+  const [deviceData] = await Promise.all([recD])
+  const finalDeviceData = deviceData as any as Database['public']['Tables']['devices']['Row'] & { customChannel: Channel; customVersion: Database['public']['Tables']['app_versions']['Row'] } | null
+  return { deviceData: finalDeviceData }
 }
 
 export async function update(body: AppInfos) {
@@ -166,12 +117,53 @@ export async function update(body: AppInfos) {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
-    const { data: appOwner } = await supabaseAdmin()
+    const { data: appData } = await supabaseAdmin()
       .from('apps')
-      .select('user_id')
+      .select(`
+        user_id,
+        mainChannel (
+          id,
+          created_at,
+          created_by,
+          name,
+          app_id,
+          allow_dev,
+          allow_emulator,
+          disableAutoUpdateUnderNative,
+          disableAutoUpdateToMajor,
+          ios,
+          android,
+          secondVersion (
+            id,
+            name,
+            checksum,
+            session_key,
+            user_id,
+            bucket_id,
+            storage_provider,
+            external_url
+          ),
+          secondaryVersionPercentage,
+          enable_progressive_deploy,
+          enableAbTesting,
+          version (
+            id,
+            name,
+            checksum,
+            session_key,
+            user_id,
+            bucket_id,
+            storage_provider,
+            external_url
+          )
+        )
+      `)
       .eq('app_id', app_id)
       .single()
-    if (!appOwner) {
+
+    const castedAppData = appData as any as Database['public']['Tables']['apps']['Row'] & { mainChannel: Channel } | null
+
+    if (!appData) {
       if (app_id) {
         await supabaseAdmin()
           .from('store_apps')
@@ -197,13 +189,13 @@ export async function update(body: AppInfos) {
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.user_id, '0 0 * * 1', 'red')
+      }, appData.user_id, '0 0 * * 1', 'red')
       if (sent) {
         await logsnag.track({
           channel: 'updates',
           event: 'semver issue',
           icon: '⚠️',
-          user_id: appOwner.user_id,
+          user_id: appData.user_id,
           notify: false,
         }).catch()
       }
@@ -219,13 +211,13 @@ export async function update(body: AppInfos) {
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.user_id, '0 0 * * 1', 'red')
+      }, appData.user_id, '0 0 * * 1', 'red')
       if (sent) {
         await logsnag.track({
           channel: 'updates',
           event: 'plugin issue',
           icon: '⚠️',
-          user_id: appOwner.user_id,
+          user_id: appData.user_id,
           notify: false,
         } as any).catch()
       }
@@ -256,42 +248,54 @@ export async function update(body: AppInfos) {
       version_build,
       version: 0,
     }
-    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(app_id, device_id, version_name)
-    if (!channelData && !channelOverride && !devicesOverride) {
+    const { deviceData } = await requestInfos(app_id, device_id, version_name)
+    if ((!deviceData || !deviceData.customChannel || !deviceData!.customVersion) && !castedAppData?.mainChannel) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
-      if (versionData) {
-        await Promise.all([sendDevice({
-          app_id,
-          device_id,
-          version: versionData.id,
-        }), sendStats([{
-          ...stat,
-          action: 'NoChannelOrOverride',
-          version: versionData.id,
-        }])])
-      }
+      // No versions so version is 0 right?
+      await Promise.all([sendDevice({
+        app_id,
+        device_id,
+        version: 0,
+      }), sendStats([{
+        ...stat,
+        action: 'NoChannelOrOverride',
+        version: 0,
+      }])])
       return sendResWithStatus('fail', {
         message: 'no default channel or override',
         error: 'no_channel',
       }, 200)
     }
-    let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
-    const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
-    const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
+    // deno-lint-ignore no-explicit-any
+    const channel = (deviceData?.customChannel || castedAppData?.mainChannel) as any as Database['public']['Tables']['channels']['Row'] & Channel | null
+    let enableAbTesting: boolean = channel?.enableAbTesting || false
 
-    const updateOverwritten = devicesOverride !== null || channelOverride !== null
-    // console.log(`OVER: ${updateOverwritten}, --- ${devicesOverride} --- ${channelOverride}`)
+    const enableProgressiveDeploy: boolean = channel?.enableAbTesting || false
 
-    let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    const updateOverwritten = deviceData?.customVersion !== null || deviceData?.customChannel !== null
 
-    const planValid = await isAllowedAction(appOwner.user_id)
-    stat.version = versionData ? versionData.id : version.id
+    let version = deviceData?.customVersion || (deviceData?.customChannel ? deviceData.customChannel.version : undefined) || castedAppData?.mainChannel.version || null
+    const secondVersion = (deviceData?.customChannel ? deviceData.customChannel.secondVersion : undefined) || castedAppData?.mainChannel.secondVersion || null
+
+    if (!version) {
+      console.log(id, 'Cannot get version', app_id)
+      await sendStats([{
+        ...stat,
+        action: 'noVersion',
+      }])
+      return sendResWithStatus('fail', {
+        message: 'Cannot get version',
+        error: 'no_version',
+      }, 200)
+    }
+
+    const planValid = await isAllowedAction(appData.user_id)
+    stat.version = version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        const secondVersionPercentage: number = channel?.secondaryVersionPercentage ?? 0
         // eslint-disable-next-line max-statements-per-line
         if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
@@ -362,7 +366,7 @@ export async function update(body: AppInfos) {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(version.storage_provider, `apps/${appOwner.user_id}/${app_id}/versions`, version.bucket_id)
+      const res = await getBundleUrl(version.storage_provider, `apps/${appData.user_id}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
     }
@@ -379,9 +383,9 @@ export async function update(body: AppInfos) {
       }, 200, updateOverwritten)
     }
 
-    if (!devicesOverride && channelData) {
+    if (channel) {
     // console.log('check disableAutoUpdateToMajor', device_id)
-      if (!channelData.ios && platform === 'ios') {
+      if (!channel.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id)
         await sendStats([{
           ...stat,
@@ -394,7 +398,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (!channelData.android && platform === 'android') {
+      if (!channel.android && platform === 'android') {
         console.log(id, 'Cannot update, android is disabled', device_id)
         await sendStats([{
           ...stat,
@@ -407,7 +411,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (channelData.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
+      if (channel.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id)
         await sendStats([{
           ...stat,
@@ -423,7 +427,7 @@ export async function update(body: AppInfos) {
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
-      if (channelData.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+      if (channel.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
         console.log(id, 'Cannot revert under native version', device_id)
         await sendStats([{
           ...stat,
@@ -437,7 +441,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (!channelData.allow_dev && !is_prod) {
+      if (!channel.allow_dev && !is_prod) {
         console.log(id, 'Cannot update dev build is disabled', device_id)
         await sendStats([{
           ...stat,
@@ -450,7 +454,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (!channelData.allow_emulator && is_emulator) {
+      if (!channel.allow_emulator && is_emulator) {
         console.log(id, 'Cannot update emulator is disabled', device_id)
         await sendStats([{
           ...stat,

@@ -272,7 +272,7 @@ async function updateChannel() {
       text: t('open-channel'),
       handler: async () => {
         displayStore.showActionSheet = false
-        device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${device.value?.customChannel}`)
+        device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${device.value?.customChannel.id}`)
       },
     })
   }
