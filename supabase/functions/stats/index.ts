@@ -58,12 +58,12 @@ export const jsonRequestSchema = z.object({
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppStats) {
   try {
     console.log('body', body)
-    if (body.app_id === 'com.kick.mobile') {
-      return sendRes({
-        message: 'App not found',
-        error: 'app_not_found',
-      }, 200)
-    }
+    // if (body.app_id === 'com.kick.mobile') {
+    //   return sendRes({
+    //     message: 'App not found',
+    //     error: 'app_not_found',
+    //   }, 200)
+    // }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success)
       return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
