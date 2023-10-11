@@ -140,6 +140,8 @@ export interface Database {
           app_id: string
           bandwidth: number
           created_at: string | null
+          downloads: number
+          fails: number
           id: string
           mau: number
           mode: Database["public"]["Enums"]["usage_mode"]
@@ -149,6 +151,8 @@ export interface Database {
           app_id: string
           bandwidth?: number
           created_at?: string | null
+          downloads?: number
+          fails?: number
           id?: string
           mau?: number
           mode?: Database["public"]["Enums"]["usage_mode"]
@@ -158,6 +162,8 @@ export interface Database {
           app_id?: string
           bandwidth?: number
           created_at?: string | null
+          downloads?: number
+          fails?: number
           id?: string
           mau?: number
           mode?: Database["public"]["Enums"]["usage_mode"]
@@ -555,7 +561,7 @@ export interface Database {
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
-          last_mau: string
+          last_mau: string | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
@@ -571,7 +577,7 @@ export interface Database {
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string
+          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -587,7 +593,7 @@ export interface Database {
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string
+          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
@@ -595,20 +601,7 @@ export interface Database {
           version?: number
           version_build?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "devices_app_id_fkey"
-            columns: ["app_id"]
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "devices_version_fkey"
-            columns: ["version"]
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       devices_override: {
         Row: {
@@ -701,6 +694,36 @@ export interface Database {
           trial?: number | null
           updates?: number
           users?: number | null
+        }
+        Relationships: []
+      }
+      logs: {
+        Row: {
+          action: string
+          app_id: string
+          created_at: string | null
+          device_id: string
+          platform: Database["public"]["Enums"]["platform_os"]
+          version: number
+          version_build: string
+        }
+        Insert: {
+          action: string
+          app_id: string
+          created_at?: string | null
+          device_id: string
+          platform: Database["public"]["Enums"]["platform_os"]
+          version: number
+          version_build: string
+        }
+        Update: {
+          action?: string
+          app_id?: string
+          created_at?: string | null
+          device_id?: string
+          platform?: Database["public"]["Enums"]["platform_os"]
+          version?: number
+          version_build?: string
         }
         Relationships: []
       }
@@ -941,26 +964,7 @@ export interface Database {
           version?: number
           version_build?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "logs_app_id_fkey"
-            columns: ["app_id"]
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "logs_device_id_fkey"
-            columns: ["device_id"]
-            referencedRelation: "devices"
-            referencedColumns: ["device_id"]
-          },
-          {
-            foreignKeyName: "logs_version_fkey"
-            columns: ["version"]
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       store_apps: {
         Row: {
@@ -1179,7 +1183,16 @@ export interface Database {
       }
     }
     Views: {
-      [_ in never]: never
+      hypopg_list_indexes: {
+        Row: {
+          am_name: unknown | null
+          index_name: string | null
+          indexrelid: unknown | null
+          schema_name: unknown | null
+          table_name: unknown | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_cycle_usage: {
@@ -1194,7 +1207,6 @@ export interface Database {
         | {
             Args: {
               min_right: Database["public"]["Enums"]["user_min_right"]
-              user_id: string
               org_id: string
               app_id: string
               channel_id: number
@@ -1204,6 +1216,7 @@ export interface Database {
         | {
             Args: {
               min_right: Database["public"]["Enums"]["user_min_right"]
+              user_id: string
               org_id: string
               app_id: string
               channel_id: number
@@ -1350,22 +1363,32 @@ export interface Database {
           }
       get_current_plan_name:
         | {
+            Args: Record<PropertyKey, never>
+            Returns: string
+          }
+        | {
             Args: {
               userid: string
             }
             Returns: string
           }
+      get_cycle_info:
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              subscription_anchor_start: string
+              subscription_anchor_end: string
+            }[]
+          }
         | {
             Args: Record<PropertyKey, never>
-            Returns: string
+            Returns: {
+              subscription_anchor_start: string
+              subscription_anchor_end: string
+            }[]
           }
-      get_cycle_info: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          subscription_anchor_start: string
-          subscription_anchor_end: string
-        }[]
-      }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1381,7 +1404,27 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_infos: {
+        Args: {
+          appid: string
+          deviceid: string
+          versionname: string
+        }
+        Returns: {
+          current_version_id: number
+          versiondata: Json
+          channel: Json
+        }[]
+      }
       get_max_plan:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
         | {
             Args: {
               userid: string
@@ -1392,35 +1435,27 @@ export interface Database {
               bandwidth: number
             }[]
           }
+      get_metered_usage:
         | {
             Args: Record<PropertyKey, never>
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
+            Returns: number
           }
-      get_metered_usage:
         | {
             Args: {
               userid: string
             }
             Returns: Database["public"]["CompositeTypes"]["stats_table"]
           }
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
       get_plan_usage_percent:
         | {
             Args: {
-              userid: string
               dateid: string
             }
             Returns: number
           }
         | {
             Args: {
+              userid: string
               dateid: string
             }
             Returns: number
@@ -1428,7 +1463,6 @@ export interface Database {
       get_total_stats_v2:
         | {
             Args: {
-              userid: string
               dateid: string
             }
             Returns: {
@@ -1439,6 +1473,7 @@ export interface Database {
           }
         | {
             Args: {
+              userid: string
               dateid: string
             }
             Returns: {
@@ -1484,11 +1519,28 @@ export interface Database {
             }
             Returns: number
           }
+      get_usage_mode_and_last_saved: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          usage_mode: Database["public"]["Enums"]["usage_mode"]
+          last_saved: string
+        }[]
+      }
       get_user_id: {
         Args: {
           apikey: string
         }
         Returns: string
+      }
+      get_weekly_stats: {
+        Args: {
+          app_id: string
+        }
+        Returns: {
+          all_updates: number
+          failed_updates: number
+          open_app: number
+        }[]
       }
       has_min_right: {
         Args: {
@@ -1508,6 +1560,42 @@ export interface Database {
         }
         Returns: undefined
       }
+      hypopg: {
+        Args: Record<PropertyKey, never>
+        Returns: Record<string, unknown>[]
+      }
+      hypopg_create_index: {
+        Args: {
+          sql_order: string
+        }
+        Returns: Record<string, unknown>[]
+      }
+      hypopg_drop_index: {
+        Args: {
+          indexid: unknown
+        }
+        Returns: boolean
+      }
+      hypopg_get_indexdef: {
+        Args: {
+          indexid: unknown
+        }
+        Returns: string
+      }
+      hypopg_relation_size: {
+        Args: {
+          indexid: unknown
+        }
+        Returns: number
+      }
+      hypopg_reset: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      hypopg_reset_index: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       increment_store: {
         Args: {
           app_id: string
@@ -1515,15 +1603,88 @@ export interface Database {
         }
         Returns: undefined
       }
+      index_advisor: {
+        Args: {
+          query: string
+        }
+        Returns: {
+          startup_cost_before: Json
+          startup_cost_after: Json
+          total_cost_before: Json
+          total_cost_after: Json
+          index_statements: string[]
+          errors: string[]
+        }[]
+      }
+      insert_device:
+        | {
+            Args: {
+              created_at: string
+              updated_at: string
+              last_mau: string
+              device_id: string
+              version: number
+              app_id: string
+              platform: string
+              plugin_version: string
+              os_version: string
+              version_build: string
+              custom_id: string
+              is_prod: boolean
+              is_emulator: boolean
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              created_at: string
+              updated_at: string
+              device_id: string
+              version: number
+              app_id: string
+              platform: string
+              plugin_version: string
+              os_version: string
+              version_build: string
+              custom_id: string
+              is_prod: boolean
+              is_emulator: boolean
+            }
+            Returns: undefined
+          }
+      insert_stats:
+        | {
+            Args: {
+              device_id: string
+              app_id: string
+              platform: string
+              action: string
+              version_build: string
+              version: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              created_at: string
+              device_id: string
+              app_id: string
+              platform: string
+              action: string
+              version_build: string
+              version: number
+            }
+            Returns: undefined
+          }
       is_admin:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
         | {
             Args: {
               userid: string
             }
-            Returns: boolean
-          }
-        | {
-            Args: Record<PropertyKey, never>
             Returns: boolean
           }
       is_allowed_action: {
@@ -1534,13 +1695,13 @@ export interface Database {
       }
       is_allowed_action_user:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: boolean
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: boolean
           }
       is_allowed_capgkey:
@@ -1562,13 +1723,13 @@ export interface Database {
       is_app_owner:
         | {
             Args: {
-              userid: string
               appid: string
             }
             Returns: boolean
           }
         | {
             Args: {
+              userid: string
               appid: string
             }
             Returns: boolean
@@ -1576,37 +1737,37 @@ export interface Database {
       is_app_shared:
         | {
             Args: {
-              userid: string
               appid: string
             }
             Returns: boolean
           }
         | {
             Args: {
+              userid: string
               appid: string
             }
             Returns: boolean
           }
       is_canceled:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: boolean
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: boolean
           }
       is_free_usage:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: boolean
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: boolean
           }
       is_good_plan_v3:
@@ -1622,25 +1783,25 @@ export interface Database {
           }
       is_good_plan_v4:
         | {
+            Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
             Args: {
               userid: string
             }
             Returns: boolean
           }
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
       is_in_channel:
         | {
             Args: {
-              userid: string
               ownerid: string
             }
             Returns: boolean
           }
         | {
             Args: {
+              userid: string
               ownerid: string
             }
             Returns: boolean
@@ -1659,58 +1820,58 @@ export interface Database {
       }
       is_onboarded:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: boolean
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: boolean
           }
       is_onboarding_needed:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: boolean
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: boolean
           }
       is_paying:
         | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
             Args: {
               userid: string
             }
             Returns: boolean
           }
+      is_trial:
         | {
             Args: Record<PropertyKey, never>
-            Returns: boolean
+            Returns: number
           }
-      is_trial:
         | {
             Args: {
               userid: string
             }
             Returns: number
           }
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
       is_version_shared:
         | {
             Args: {
-              userid: string
               versionid: number
             }
             Returns: boolean
           }
         | {
             Args: {
+              userid: string
               versionid: number
             }
             Returns: boolean
@@ -1719,19 +1880,17 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      remove_enum_value: {
-        Args: {
-          enum_type: unknown
-          enum_value: string
-        }
-        Returns: undefined
-      }
-      update_app_usage: {
-        Args: {
-          minutes_interval: number
-        }
-        Returns: undefined
-      }
+      update_app_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: undefined
+          }
+        | {
+            Args: {
+              minutes_interval: number
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       app_mode: "prod" | "dev" | "livereload"
@@ -1745,7 +1904,7 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle"
+      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
       user_min_right: "read" | "upload" | "write" | "admin"
       user_role: "read" | "upload" | "write" | "admin"
     }

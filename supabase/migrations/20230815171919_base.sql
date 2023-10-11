@@ -1434,9 +1434,16 @@ CREATE TABLE "public"."deleted_account" (
 -- ORDER BY (device_id, updated_at)
 -- PRIMARY KEY (device_id);
 
+-- CREATE VIEW device_unic AS SELECT * from devices final; -- materialized view to get unique devices
+
+-- insert in click house
 -- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 1, 1),
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.4', '9', '1.223.0', '', 1, 1);
+-- insert in supabase
+-- INSERT INTO clickhouse_devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- ('2023-01-29 08:09:32+00', TIMESTAMP '2023-01-29 08:09:32.324+00', TIMESTAMP '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.5', '9', '1.223.0', '', true, true);
+
 -- first value shouldn't be visible in supabase because of ReplacingMergeTree
 
 
@@ -1459,6 +1466,27 @@ CREATE TABLE "public"."deleted_account" (
 --   server clickhouse_server
 --   options (
 --     table 'devices',
+--     rowid_column 'device_id'
+--   );
+
+-- create foreign table clickhouse_devices_u (
+--     created_at timestamp,
+--     updated_at timestamp,
+--     last_mau timestamp,
+--     device_id text,
+--     custom_id text,
+--     app_id text,
+--     platform text,
+--     plugin_version text,
+--     os_version text,
+--     version_build text,
+--     version integer,
+--     is_prod boolean,
+--     is_emulator boolean
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'devices_u',
 --     rowid_column 'device_id'
 --   );
 
@@ -1493,6 +1521,108 @@ CREATE TABLE "public"."deleted_account" (
 --     is_prod,
 --     is_emulator
 -- FROM public.devices LIMIT 1;
+
+CREATE OR REPLACE FUNCTION insert_device(
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    last_mau TIMESTAMP,
+    device_id UUID,
+    version INT,
+    app_id TEXT,
+    platform TEXT,
+    plugin_version TEXT,
+    os_version TEXT,
+    version_build TEXT,
+    custom_id TEXT,
+    is_prod BOOLEAN,
+    is_emulator BOOLEAN
+)
+RETURNS VOID AS $$
+DECLARE
+    table_exists BOOLEAN;
+BEGIN
+    SELECT to_regclass('public.clickhouse_devices') IS NOT NULL INTO table_exists;
+
+    IF table_exists THEN
+        INSERT INTO clickhouse_devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") 
+        VALUES (date_trunc('second', created_at), date_trunc('second', updated_at), date_trunc('second', last_mau), device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator);
+    ELSE
+        INSERT INTO "public"."devices" ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") 
+        VALUES (created_at, updated_at, last_mau, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+        ON CONFLICT (device_id) DO UPDATE SET
+        "created_at" = EXCLUDED.created_at,
+        "updated_at" = EXCLUDED.updated_at,
+        "version" = EXCLUDED.version,
+        "last_mau" = EXCLUDED.last_mau,
+        "app_id" = EXCLUDED.app_id,
+        "platform" = EXCLUDED.platform,
+        "plugin_version" = EXCLUDED.plugin_version,
+        "os_version" = EXCLUDED.os_version,
+        "version_build" = EXCLUDED.version_build,
+        "custom_id" = EXCLUDED.custom_id,
+        "is_prod" = EXCLUDED.is_prod,
+        "is_emulator" = EXCLUDED.is_emulator;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
+REVOKE EXECUTE ON FUNCTION public.insert_device(
+    TIMESTAMP,
+    TIMESTAMP,
+    UUID,
+    INT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BOOLEAN,
+    BOOLEAN
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.insert_device(
+    TIMESTAMP,
+    TIMESTAMP,
+    UUID,
+    INT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BOOLEAN,
+    BOOLEAN
+) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.insert_device(
+    TIMESTAMP,
+    TIMESTAMP,
+    UUID,
+    INT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BOOLEAN,
+    BOOLEAN
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.insert_device(
+    TIMESTAMP,
+    TIMESTAMP,
+    UUID,
+    INT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BOOLEAN,
+    BOOLEAN
+) TO postgres;
 
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1649,6 +1779,15 @@ CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
 --     version::integer
 -- FROM public.stats LIMIT 1;
 
+-- insert in supabase
+-- INSERT INTO clickhouse_logs ("id", "created_at", "device_id", "app_id", "platform", "action", "version_build", "version") VALUES
+-- (nextval('clickhouse_logs_id_seq'), date_trunc('second', CURRENT_TIMESTAMP), '00009a6b-eefe-490a-9c60-8e965132ae51', 'com.demo.app', 'android', 'get', '4.15.5', 9654);
+
+-- insert in click house
+-- INSERT INTO logs ("id", "created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
+-- (1, now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
+
+
 --  In supabase
 -- create foreign table clickhouse_logs (
 --     id bigint,
@@ -1665,6 +1804,65 @@ CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
 --     table 'logs',
 --     rowid_column 'id'
 --   );
+
+CREATE OR REPLACE FUNCTION insert_stats(
+    created_at TIMESTAMP,
+    device_id TEXT,
+    app_id TEXT,
+    platform TEXT,
+    action TEXT,
+    version_build TEXT,
+    version BIGINT
+)
+RETURNS VOID AS $$
+DECLARE
+    table_exists BOOLEAN;
+BEGIN
+    SELECT to_regclass('public.clickhouse_logs') IS NOT NULL INTO table_exists;
+
+    IF table_exists THEN
+        INSERT INTO clickhouse_logs ("id", "created_at", "device_id", "app_id", "platform", "action", "version_build", "version") 
+        VALUES (nextval('clickhouse_logs_id_seq'), date_trunc('second', created_at), device_id, app_id, platform, action, version_build, version);
+    ELSE
+        INSERT INTO "public"."stats" ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") 
+        VALUES (created_at, platform, action, device_id, version_build, version, app_id);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+REVOKE EXECUTE ON FUNCTION public.insert_stats(
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BIGINT
+) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.insert_stats(
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BIGINT
+) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.insert_stats(
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BIGINT
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.insert_stats(
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    TEXT,
+    BIGINT
+) TO postgres;
+
 
 CREATE TABLE "public"."stats" (
     "created_at" timestamp with time zone DEFAULT "now"(),
