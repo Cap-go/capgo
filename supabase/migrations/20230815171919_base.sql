@@ -1625,7 +1625,7 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 -- ORDER BY (created_at)
 -- PRIMARY KEY (id);
 
-CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
+-- CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
 
 -- TEST COPY existing data from postgres to clickhouse
 -- INSERT INTO clickhouse_logs (
@@ -2716,10 +2716,10 @@ REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_valu
 REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
 
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.update_app_usage() TO postgres;
 
 REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
