@@ -6,7 +6,7 @@ import {
   MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS,
   deviceIdRegex, methodJson, reverseDomainRegex, sendRes,
 } from '../_utils/utils.ts'
-import { sendDevice, sendStats, supabaseAdmin, updateOnpremStats } from '../_utils/supabase.ts'
+import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'

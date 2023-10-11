@@ -51,15 +51,18 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
 
   // make log a string with a newline between each log
   return fetch(
-    'https://api.tinybird.co/v0/events?name=stats',
+    `${clickHouseURl()}/?query=INSERT INTO logs FORMAT JSONEachRow`,
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
-      body: log.map(l => ({
+      body: logs.map(l => ({
         ...l,
         created_at: !l.created_at ? new Date() : l.created_at,
       })).map(l => JSON.stringify(l)).join('\n'),
-      headers: { Authorization: `Bearer ${getEnv('CLICKHOUSE_TOKEN_INGEST_LOG')}` },
+      headers: {
+        'Authorization': clickHouseAuth(),
+        'Content-Type': 'text/plain',
+      },
     },
   )
     .then(res => res.json())
