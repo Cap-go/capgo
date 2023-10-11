@@ -58,12 +58,13 @@ export const jsonRequestSchema = z.object({
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppStats) {
   try {
     console.log('body', body)
-    // if (body.app_id === 'com.kick.mobile') {
-    //   return sendRes({
-    //     message: 'App not found',
-    //     error: 'app_not_found',
-    //   }, 200)
-    // }
+    if (body.app_id === 'com.kick.mobile') {
+    // if (Math.random() < 0.75 && body.app_id === 'com.kick.mobile') {
+      return sendRes({
+        message: 'Too many requests',
+        error: 'too_many_requests',
+      }, 200)
+    }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success)
       return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
@@ -92,22 +93,23 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       .eq('app_id', app_id)
       .single()
     if (!appOwner) {
-      if (app_id) {
-        await supabaseAdmin()
-          .from('store_apps')
-          .upsert({
-            app_id,
-            onprem: true,
-            capacitor: true,
-            capgo: true,
-          })
-      }
-      if (action === 'get') {
-        await updateOnpremStats({
-          app_id,
-          updates: 1,
-        })
-      }
+      // TODO: transfer to clickhouse
+      // if (app_id) {
+      //   await supabaseAdmin()
+      //     .from('store_apps')
+      //     .upsert({
+      //       app_id,
+      //       onprem: true,
+      //       capacitor: true,
+      //       capgo: true,
+      //     })
+      // }
+      // if (action === 'get') {
+      //   await updateOnpremStats({
+      //     app_id,
+      //     updates: 1,
+      //   })
+      // }
       return sendRes({
         message: 'App not found',
         error: 'app_not_found',

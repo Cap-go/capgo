@@ -51,12 +51,13 @@ const headersSchema = z.object({
 const bypassRedis = true
 
 async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
-  // if (body.app_id === 'com.kick.mobile') {
-  //   return sendRes({
-  //     message: 'App not found',
-  //     error: 'app_not_found',
-  //   }, 200)
-  // }
+  if (body.app_id === 'com.kick.mobile') {
+  // if (Math.random() < 0.75 && body.app_id === 'com.kick.mobile') {
+    return sendRes({
+      message: 'Too many requests',
+      error: 'too_many_requests',
+    }, 200)
+  }
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success)
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
