@@ -93,7 +93,7 @@ function escapeRegExp(string) {
 }
 const mutationsNode = [
   { from: 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts', to: 'logsnag' },
-  { from: 'https://deno.land/x/upstash_redis/mod.ts', to: '@upstash/redis' },
+  { from: 'https://deno.land/x/upstash_redis@v1.22.0/mod.ts', to: '@upstash/redis' },
   { from: 'const redis = await connect(parseURL(redisEnv))', to: 'const redis = new Redis(redisEnv)' },
   { from: 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts', to: '@upstash/redis/types/pkg/pipeline' },
   { from: 'https://deno.land/x/zod@v3.22.2/mod.ts', to: 'zod' },
