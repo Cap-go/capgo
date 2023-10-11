@@ -7,6 +7,7 @@ import {
   deviceIdRegex, reverseDomainRegex,
 } from '../supabase/functions/_utils/utils.ts'
 
+const NO_ERROR = { error: '' }
 // import { jsonRequestSchema as updateRequestSchema } from '../supabase/functions/updates/index.ts'
 // import { jsonRequestSchema as statsRequestSchema } from '../supabase/functions/stats/index.ts'
 
@@ -121,6 +122,18 @@ for (const schema of schemas) {
         const response = parseJSON(body, schema)
         assertStatements(response, MISSING_STRING_APP_ID)
       })
+      await t.step('app_id with underscore is valid', async () => {
+        const body = getJSON()
+        body.app_id = 'ee.forgr.demo_app'
+        const response = parseJSON(body, schema)
+        assertEquals(response, NO_ERROR)
+      })
+      await t.step('app_id with hyphen is valid', async () => {
+        const body = getJSON()
+        body.app_id = 'ee.forgr.demo-app'
+        const response = parseJSON(body, schema)
+        assertEquals(response, NO_ERROR)
+      })
       await t.step({
         name: 'app_id invalid #1',
         fn: async () => {
@@ -165,6 +178,18 @@ for (const schema of schemas) {
           const response = parseJSON(body, schema)
           assertStatements(response, INVALID_STRING_APP_ID)
         },
+      })
+      await t.step('app_id invalid #6', async () => {
+        const body = getJSON()
+        body.app_id = 'ee.forgr.demo+app'
+        const response = parseJSON(body, schema)
+        assertStatements(response, INVALID_STRING_APP_ID)
+      })
+      await t.step('app_id invalid #7', async () => {
+        const body = getJSON()
+        body.app_id = '[appid]'
+        const response = parseJSON(body, schema)
+        assertStatements(response, INVALID_STRING_APP_ID)
       })
     },
   })
@@ -436,7 +461,7 @@ function parseJSON(body: RequestJSON, jsonRequestSchema: any) {
   if (!parseResult.success)
     return { error: `Cannot parse json: ${parseResult.error}`, nestedError: parseResult.error }
   else
-    return { error: '' }
+    return NO_ERROR
 }
 
 function assertStatements(response: any, expectedErrorMessage: string, errorIndex: number = 0) {
