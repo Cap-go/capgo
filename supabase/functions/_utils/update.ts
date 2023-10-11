@@ -263,6 +263,15 @@ export async function update(body: AppInfos) {
       plugin_version,
       version_name)
 
+    const stat: Database['public']['Tables']['stats']['Insert'] = {
+      platform: platform as Database['public']['Enums']['platform_os'],
+      device_id,
+      action: 'get',
+      app_id,
+      version_build,
+      version: 0,
+    }
+
     const requestedInto = await requestInfos(app_id, device_id, version_name)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
@@ -440,7 +449,10 @@ export async function update(body: AppInfos) {
 
       if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id)
-        await sendStats('disableAutoUpdateToMinor', platform, device_id, app_id, version_build, versionId)
+        await sendStats([{
+          ...stat,
+          action: 'disableAutoUpdateToMinor',
+        }])
         return sendResWithStatus('fail', {
           major: true,
           message: 'Cannot upgrade minor version',
@@ -456,7 +468,10 @@ export async function update(body: AppInfos) {
         // The channel is misconfigured
         if (minUpdateVersion === null) {
           console.log(id, 'Channel is misconfigured', channelData.name)
-          await sendStats('channelMisconfigured', platform, device_id, app_id, version_build, versionId)
+          await sendStats([{
+            ...stat,
+            action: 'channelMisconfigured',
+          }])
           return sendResWithStatus('fail', {
             message: `Channel ${channelData.name} is misconfigured`,
             error: 'misconfigured_channel',
@@ -468,7 +483,10 @@ export async function update(body: AppInfos) {
         // Check if the minVersion is greater then the current version
         if (semver.gt(minUpdateVersion, version_name)) {
           console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name)
-          await sendStats('disableAutoUpdateMetadata', platform, device_id, app_id, version_build, versionId)
+          await sendStats([{
+            ...stat,
+            action: 'disableAutoUpdateMetadata',
+          }])
           return sendResWithStatus('fail', {
             major: true,
             message: 'Cannot upgrade version, min update version > current version',

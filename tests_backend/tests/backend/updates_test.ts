@@ -1,4 +1,4 @@
-import type { RunnableTest, SupabaseType } from '../../utils.ts'
+import type { RunnableTest, SupabaseType, updateAndroidBaseData } from '../../utils.ts'
 import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, getResponseError, responseOk, sendUpdate } from '../../utils.ts'
 
 export function getTest(): RunnableTest {
@@ -199,6 +199,40 @@ async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
       assert(overwriteChannelJson.url !== undefined, `Response ${JSON.stringify(overwriteChannelJson)} has no url`)
       assert(overwriteChannelJson.version !== undefined, `Response ${JSON.stringify(overwriteChannelJson)} has no version`)
       assert(overwriteChannelJson.version === '1.361.0', `Response ${JSON.stringify(overwriteChannelJson)} version is not equal to 1.361.0`)
+
+      // That is not the end. Let's make sure that the channel update will succeed if the overwriten channel as a different update strategy
+      const { error: changeOverwritenChannelStrategyError } = await supabase
+        .from('channels')
+        .update({ disableAutoUpdate: 'none' })
+        .eq('id', 23)
+
+      assert(changeOverwritenChannelStrategyError === null, `Supabase changeOverwritenChannelStrategyError error ${JSON.stringify(changeOverwritenChannelStrategyError)} is not null`)
+
+      // 3 seconds of delay so that supabase can invalidate the data
+      await delay(3000)
+
+      try {
+        const overwrittenChannelData2 = structuredClone(newDeviceData) as typeof updateAndroidBaseData
+        overwrittenChannelData2.version_name = '0.0.0'
+
+        const overwrittenChannelResponse2 = await sendUpdate(backendBaseUrl, overwrittenChannelData2)
+        await responseOk(overwrittenChannelResponse2, 'Overwrite channel version 2')
+        const overwriteChannelJson2 = await overwrittenChannelResponse2.json()
+        assert(overwriteChannelJson2.url !== undefined, `Response ${JSON.stringify(overwriteChannelJson2)} has no url`)
+        assert(overwriteChannelJson2.version !== undefined, `Response ${JSON.stringify(overwriteChannelJson2)} has no version`)
+        assert(overwriteChannelJson2.version === '1.361.0', `Response ${JSON.stringify(overwriteChannelJson2)} version is not equal to 1.361.0`)
+      }
+      finally {
+        const { error: changeOverwritenChannelStrategyError } = await supabase
+          .from('channels')
+          .update({ disableAutoUpdate: 'major' })
+          .eq('id', 23)
+
+        assert(changeOverwritenChannelStrategyError === null, `Supabase changeOverwritenChannelStrategyError error ${JSON.stringify(changeOverwritenChannelStrategyError)} is not null`)
+
+        // 3 seconds of delay so that supabase can invalidate the data
+        await delay(3000)
+      }
     }
     finally {
       const { error: deleteChannelDeviceError } = await supabase.from('channel_devices').delete().eq('device_id', channelOverwriteData.device_id)
