@@ -3,36 +3,57 @@ import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 
 import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
-import { methodJson, sendRes, sendResText } from '../_utils/utils.ts'
+import {
+  INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME,
+  NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, methodJson, reverseDomainRegex, sendRes, sendResText,
+} from '../_utils/utils.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 
 const APP_DOES_NOT_EXIST = { message: 'App not found', error: 'app_not_found' }
 const APP_VERSION_NO_NEW = { message: 'No new version available' }
 const CACHE_NO_NEW_VAL = 'NO_NEW'
 
-const jsonRequestSchema = z.object({
-  device_id: z.string(),
-  version_name: z.string(),
-  version_build: z.string(),
-  app_id: z.string(),
+export const jsonRequestSchema = z.object({
+  app_id: z.string({
+    required_error: MISSING_STRING_APP_ID,
+    invalid_type_error: NON_STRING_APP_ID,
+  }),
+  device_id: z.string({
+    required_error: MISSING_STRING_DEVICE_ID,
+    invalid_type_error: NON_STRING_DEVICE_ID,
+  }).max(36),
+  version_name: z.string({
+    required_error: MISSING_STRING_VERSION_NAME,
+    invalid_type_error: NON_STRING_VERSION_NAME,
+  }),
+  version_build: z.string({
+    required_error: MISSING_STRING_VERSION_BUILD,
+    invalid_type_error: NON_STRING_VERSION_BUILD,
+  }),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
-}).passthrough()
-  .transform((val) => {
-    if (val.version_name === 'builtin')
-      val.version_name = val.version_build
+}).refine(data => reverseDomainRegex.test(data.app_id), {
+  message: INVALID_STRING_APP_ID,
+}).refine(data => deviceIdRegex.test(data.device_id), {
+  message: INVALID_STRING_DEVICE_ID,
+}).transform((val) => {
+  if (val.version_name === 'builtin')
+    val.version_name = val.version_build
 
-    return val
-  })
+  return val
+})
 
 const headersSchema = z.object({
   'x-update-status': z.enum(['app_not_found', 'no_new', 'new_version', 'fail']),
   'x-update-overwritten': z.preprocess(val => val === 'true', z.boolean()),
 })
 
-const bypassRedis = false
+const bypassRedis = true
 
 async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
+  const parseResult = jsonRequestSchema.safeParse(body)
+  if (!parseResult.success)
+    return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
   // const redis = null
   const redis = await getRedis()
 
@@ -40,10 +61,6 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
     console.log('[redis] cannot get redis')
     return update(body)
   }
-
-  const parseResult = jsonRequestSchema.safeParse(body)
-  if (!parseResult.success)
-    return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
 
   const {
     device_id: deviceId,
@@ -108,7 +125,11 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
 
   // We do not cache fails
   if (updateStatus === 'fail') {
-    console.log('[redis] Update failed, not caching')
+    console.log('[redis] Update failed, not caching', parseResult.data, res)
+    if (body.plugin_version === '4.6.10') {
+      console.log('old plugin issue, not caching', parseResult.data, res)
+      return update(body)
+    }
     return res
   }
 

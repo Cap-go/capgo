@@ -102,7 +102,11 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
     },
   })
 
-  const subprocess = playwrightCommand.spawn()
+  await runSubprocess(playwrightCommand, 'Playwright')
+}
+
+export async function runSubprocess(command: Deno.Command, commandName: string) {
+  const subprocess = command.spawn()
 
   const joinedStream = mergeReadableStreams(
     subprocess.stdout,
@@ -123,9 +127,9 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
 
   const stausCode = await subprocess.status
   if (stausCode.code !== 0) {
-    p.log.error('Playwright output:')
+    p.log.error(`${commandName} output:`)
     console.log(finalString)
-    throw new Error('Playwright test failed')
+    throw new Error(`${commandName} failed`)
   }
 }
 

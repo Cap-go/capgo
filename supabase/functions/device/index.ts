@@ -3,6 +3,7 @@ import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { checkKey, fetchLimit, methodJson, sendRes } from '../_utils/utils.ts'
+import { redisDeviceInvalidate } from '../_utils/redis.ts'
 
 interface DeviceLink {
   app_id: string
@@ -151,6 +152,7 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
     if (dbErrorDev)
       return sendRes({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
   }
+  await redisDeviceInvalidate(body.app_id, body.device_id)
   return sendRes()
 }
 
@@ -178,6 +180,7 @@ export async function deleteOverride(body: DeviceLink, apikey: Database['public'
   catch (e) {
     return sendRes({ status: 'Cannot delete override', error: JSON.stringify(e) }, 500)
   }
+  await redisDeviceInvalidate(body.app_id, body.device_id)
   return sendRes()
 }
 
