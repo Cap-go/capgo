@@ -1150,8 +1150,13 @@ Begin
   RETURN (SELECT EXISTS (SELECT 1
   from stripe_info
   where customer_id=(SELECT customer_id from users where id=userid)
-  AND is_good_plan = true
-  AND status = 'succeeded'));
+  AND (
+    (is_good_plan = true AND status = 'succeeded') 
+    OR (subscription_id = 'free')
+    OR (trial_at::date - (now())::date > 0)
+  )
+  )
+);
 End;  
 $$;
 
