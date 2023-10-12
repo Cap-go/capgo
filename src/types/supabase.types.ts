@@ -703,36 +703,6 @@ export interface Database {
         }
         Relationships: []
       }
-      logs: {
-        Row: {
-          action: string
-          app_id: string
-          created_at: string | null
-          device_id: string
-          platform: Database["public"]["Enums"]["platform_os"]
-          version: number
-          version_build: string
-        }
-        Insert: {
-          action: string
-          app_id: string
-          created_at?: string | null
-          device_id: string
-          platform: Database["public"]["Enums"]["platform_os"]
-          version: number
-          version_build: string
-        }
-        Update: {
-          action?: string
-          app_id?: string
-          created_at?: string | null
-          device_id?: string
-          platform?: Database["public"]["Enums"]["platform_os"]
-          version?: number
-          version_build?: string
-        }
-        Relationships: []
-      }
       notifications: {
         Row: {
           created_at: string | null
@@ -1564,66 +1534,6 @@ export interface Database {
         }
         Returns: undefined
       }
-      insert_device:
-        | {
-            Args: {
-              created_at: string
-              updated_at: string
-              last_mau: string
-              device_id: string
-              version: number
-              app_id: string
-              platform: string
-              plugin_version: string
-              os_version: string
-              version_build: string
-              custom_id: string
-              is_prod: boolean
-              is_emulator: boolean
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              created_at: string
-              updated_at: string
-              device_id: string
-              version: number
-              app_id: string
-              platform: string
-              plugin_version: string
-              os_version: string
-              version_build: string
-              custom_id: string
-              is_prod: boolean
-              is_emulator: boolean
-            }
-            Returns: undefined
-          }
-      insert_stats:
-        | {
-            Args: {
-              device_id: string
-              app_id: string
-              platform: string
-              action: string
-              version_build: string
-              version: number
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              created_at: string
-              device_id: string
-              app_id: string
-              platform: string
-              action: string
-              version_build: string
-              version: number
-            }
-            Returns: undefined
-          }
       is_admin:
         | {
             Args: Record<PropertyKey, never>
