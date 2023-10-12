@@ -262,18 +262,37 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return false
 }
 
-export function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
-  const reqCount = supabaseClient(auth)
-    .from('devices')
+  let tableName: 'devices' | 'clickhouse_devices_u' = 'devices'
+  let client = supabaseClient(auth)
+  const reqClickHouse = await client
+    .rpc('clickhouse_exist')
+    .then(res => res.data || false)
+  if (reqClickHouse) {
+    tableName = 'clickhouse_devices_u'
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
+      .then(res => res.data || false)
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
+        .then(res => res.data || false)
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
+    }
+    client = supabaseAdmin()
+  }
+  const reqCount = client
+    .from(tableName)
     .select('', { count: 'exact' })
     .eq('app_id', appId)
     .then(res => res.count || 0)
-  const req = supabaseClient(auth)
-    .from('devices')
+  const req = client
+    .from(tableName)
     .select(`
       device_id,
       created_at,
@@ -327,20 +346,39 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
   // }
 }
 
-export function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
-  const reqCount = supabaseClient(auth)
-    .from('stats')
+  let tableName: 'stats' | 'clickhouse_stats' = 'stats'
+  let client = supabaseClient(auth)
+  const reqClickHouse = await client
+    .rpc('clickhouse_exist')
+    .then(res => res.data || false)
+  if (reqClickHouse) {
+    tableName = 'clickhouse_stats'
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
+      .then(res => res.data || false)
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
+        .then(res => res.data || false)
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
+    }
+    client = supabaseAdmin()
+  }
+  const reqCount = client
+    .from(tableName)
     .select('', { count: 'exact' })
     .eq('app_id', appId)
     .then(res => res.count || 0)
-  const req = supabaseClient(auth)
-    .from('stats')
+  const req = client
+    .from(tableName)
     .select(`
         device_id,
         action,

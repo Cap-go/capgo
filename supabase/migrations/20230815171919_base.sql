@@ -629,7 +629,6 @@ Begin
 End;  
 $$;
 
-
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1419,6 +1418,27 @@ CREATE TABLE "public"."deleted_account" (
 );
 
 -- Create clickhouse connection (require for big apps)
+
+CREATE OR REPLACE FUNCTION clickhouse_exist()
+RETURNS BOOLEAN AS $$
+BEGIN
+   RETURN (
+      (SELECT EXISTS (
+         SELECT 1
+         FROM   information_schema.tables 
+         WHERE  table_schema = 'public'
+         AND    table_name = 'clickhouse_devices'
+      )) 
+      AND 
+      (SELECT EXISTS (
+         SELECT 1
+         FROM   information_schema.tables 
+         WHERE  table_schema = 'public'
+         AND    table_name = 'clickhouse_logs'
+      ))
+   );
+END;
+$$ LANGUAGE plpgsql;
 
 -- create foreign data wrapper clickhouse_wrapper
 --   handler click_house_fdw_handler
