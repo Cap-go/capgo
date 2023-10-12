@@ -1,6 +1,6 @@
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { appendHeaders, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -24,8 +24,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 function sendResWithStatus(status: string, data?: any, statusCode?: number, updateOverwritten?: boolean): Response {
   const response = sendRes(data, 200)
 
-  response.headers.append('x-update-status', status)
-  response.headers.append('x-update-overwritten', (updateOverwritten ?? false).toString())
+  appendHeaders(response, 'x-update-status', status)
+  appendHeaders(response, 'x-update-overwritten', (updateOverwritten ?? false).toString())
 
   return response
 }

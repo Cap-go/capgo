@@ -93,6 +93,10 @@ export function sendRes(data: any = { status: 'ok' }, statusCode = 200) {
   return sendResText(JSON.stringify(data), statusCode)
 }
 
+export function appendHeaders(res: Response, key: string, value: string) {
+  res.headers.append(key, value)
+}
+
 export function sendResText(data: string, statusCode = 200) {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
