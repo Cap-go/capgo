@@ -121,6 +121,25 @@ export function sendOptionsRes() {
   )
 }
 
+interface LimitedApp {
+  id: string
+  ignore: number
+}
+
+export function isLimited(id: string) {
+  const limits = getEnv('LIMITED_APPS')
+  if (!limits)
+    return false
+  const apps = JSON.parse(limits) as LimitedApp[]
+  const app = apps.find(a => a.id === id)
+  if (!app || app.ignore === 0)
+    return false
+  if (app.ignore === 1)
+    return true
+  // check is Math.random() < ignore
+  return Math.random() < app.ignore
+}
+
 export function getEnv(key: string): string {
   const val = Deno.env.get(key)
   return val || ''
