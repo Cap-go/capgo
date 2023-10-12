@@ -40,28 +40,16 @@ async function loadAppInfo() {
     if (cycleStart && cycleEnd) {
       promises.push(
         supabase
-          .from('stats')
-          .select('*', { count: 'exact', head: true })
+          .from('app_usage')
+          .select()
           .eq('app_id', id.value)
-          .eq('action', 'set')
           .gte('created_at', getConvertedDate2(cycleStart))
           .lte('created_at', getConvertedDate2(cycleEnd))
-          .then(({ count: statsCount }) => {
-            if (statsCount)
-              updatesNb.value = statsCount
-          }),
-      )
-    }
-    else {
-      promises.push(
-        supabase
-          .from('stats')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .eq('action', 'set')
-          .then(({ count: statsCountSet }) => {
-            if (statsCountSet)
-              updatesNb.value = statsCountSet
+          .eq('mode', 'cycle')
+          .single()
+          .then(({ data }) => {
+            if (data?.downloads)
+              updatesNb.value = data.downloads
           }),
       )
     }
