@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 dependencies:
   '@capacitor-community/keep-awake':
     specifier: ^4.0.0
@@ -283,8 +287,8 @@ devDependencies:
     specifier: ^5.4.2
     version: 5.4.2
   '@iconify-json/carbon':
-    specifier: 1.1.20
-    version: 1.1.20
+    specifier: 1.1.21
+    version: 1.1.21
   '@iconify-json/heroicons':
     specifier: ^1.1.12
     version: 1.1.12
@@ -3538,8 +3542,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dev: false
 
-  /@iconify-json/carbon@1.1.20:
-    resolution: {integrity: sha512-ed/3FDCjicQARWaSGIDZpaF+rWmxoSqrmHYZV2aEicufp0yciG44y9OEmArxxr/0U6bEC3zJbKMSOSw4CKeBJg==}
+  /@iconify-json/carbon@1.1.21:
+    resolution: {integrity: sha512-bK2cMVM4noBU+FGlay433flpXLRzQu0ED095iAnoO6ka3yb4uz0lvb8acpN5gthyGLJ89C4HpfIbQZLQnMKQww==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
@@ -15099,7 +15103,3 @@ packages:
   /zod@3.22.2:
     resolution: {integrity: sha512-wvWkphh5WQsJbVk1tbx1l1Ly4yg+XecD+Mq280uBGt9wa5BKSWf4Mhp6GmrkPixhMxmabYY7RbzlwVP32pbGCg==}
     dev: false
-
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
