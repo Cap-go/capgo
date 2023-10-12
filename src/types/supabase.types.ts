@@ -1190,6 +1190,14 @@ export interface Database {
             }
             Returns: boolean
           }
+      clickhouse_exist: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      clickhouse_table_exist: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       convert_bytes_to_gb: {
         Args: {
           byt: number
@@ -1699,6 +1707,17 @@ export interface Database {
             Returns: boolean
           }
       is_paying:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_paying_and_good_plan:
         | {
             Args: Record<PropertyKey, never>
             Returns: boolean

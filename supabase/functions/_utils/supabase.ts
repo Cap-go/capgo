@@ -262,6 +262,53 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return false
 }
 
+export async function UpdateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string) {
+  console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
+
+  const client = supabaseClient(auth)
+  const reqClickHouse = await client
+    .rpc('clickhouse_exist')
+    .then(res => res.data || false)
+  if (reqClickHouse) {
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
+      .then(res => res.data || false)
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
+        .then(res => res.data || false)
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
+    }
+    console.log('UpdateDeviceCustomId clickhouse')
+    // get the device from clickhouse
+    const device = await supabaseAdmin()
+      .from('clickhouse_devices_u')
+      .select()
+      .eq('app_id', appId)
+      .eq('device_id', deviceId)
+      .limit(1)
+      .single()
+      .then(res => res.data || null)
+    console.log('UpdateDeviceCustomId get device', device)
+    if (!device)
+      return Promise.reject(new Error('device not found'))
+    // send the device to clickhouse
+    return sendDeviceToClickHouse([{
+      ...device,
+      custom_id: customId,
+    }])
+  }
+  else {
+    // update the device custom_id
+    return supabaseClient(auth)
+      .from('devices')
+      .update({ custom_id: customId })
+      .eq('app_id', appId)
+      .eq('device_id', deviceId)
+  }
+}
+
 export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
@@ -293,14 +340,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
     .then(res => res.count || 0)
   const req = client
     .from(tableName)
-    .select(`
-      device_id,
-      created_at,
-      updated_at,
-      platform,
-      os_version,
-      version
-  `)
+    .select()
     .eq('app_id', appId)
 
   if (versionId) {
@@ -315,10 +355,13 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
-    if (deviceIds.length === 1)
+    if (deviceIds.length === 1) {
       req.eq('device_id', deviceIds[0])
-    else
+      req.limit(1)
+    }
+    else {
       req.in('device_id', deviceIds)
+    }
   }
   if (search) {
     console.log('search', search)

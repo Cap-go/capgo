@@ -48,8 +48,8 @@ async function loadAppInfo() {
           .eq('mode', 'cycle')
           .single()
           .then(({ data }) => {
-            if (data?.downloads)
-              updatesNb.value = data.downloads
+            updatesNb.value = data?.downloads || 0
+            devicesNb.value = data?.mau || 0
           }),
       )
     }
@@ -76,33 +76,6 @@ async function loadAppInfo() {
             channelsNb.value = channelsCount
         }),
     )
-
-    if (cycleStart && cycleEnd) {
-      promises.push(
-        supabase
-          .from('devices')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .gte('created_at', getConvertedDate2(cycleStart))
-          .lte('created_at', getConvertedDate2(cycleEnd))
-          .then(({ count: devicesCount }) => {
-            if (devicesCount)
-              devicesNb.value = devicesCount
-          }),
-      )
-    }
-    else {
-      promises.push(
-        supabase
-          .from('devices')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .then(({ count: devicesCount }) => {
-            if (devicesCount)
-              devicesNb.value = devicesCount
-          }),
-      )
-    }
 
     await Promise.all(promises)
   }
