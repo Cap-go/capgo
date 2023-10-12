@@ -71,7 +71,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     const supabaseRes = await getDevice(baseSupabase)
     console.log('supabaseRes', service, supabaseRes)
     if (!equal(supabaseRes, defaultGetDevicesRes))
-      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service }, 500)
+      return sendRes({ error: '!equal(supabaseRes, netlifyRes)', service, supabaseRes, defaultGetDevicesRes }, 500)
     return sendRes({ status: 'ok', service })
   }
   else if (service === 'device_post') {
