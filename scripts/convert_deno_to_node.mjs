@@ -31,7 +31,7 @@ const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info', 'cron_email']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
-const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis', 'tinybird']
+const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis', 'clickhouse']
 
 const supaTempl = {}
 const netlifyTempl = {}
