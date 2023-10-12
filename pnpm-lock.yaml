@@ -344,8 +344,8 @@ devDependencies:
     specifier: ^0.2.0
     version: 0.2.0
   '@types/uuid':
-    specifier: 9.0.1
-    version: 9.0.1
+    specifier: 9.0.5
+    version: 9.0.5
   '@vitejs/plugin-vue':
     specifier: 4.3.3
     version: 4.3.3(vite@4.4.9)(vue@3.3.4)
@@ -4581,8 +4581,8 @@ packages:
     resolution: {integrity: sha512-PBjIUxZHOuj0R15/xuwJYjFi+KZdNFrehocChv4g5hu6aFroHue8m0lBP0POdK2nKzbw0cgV1mws8+V/JAcEkQ==}
     dev: true
 
-  /@types/uuid@9.0.1:
-    resolution: {integrity: sha512-rFT3ak0/2trgvp4yYZo5iKFEPsET7vKydKF+VRCxlQ9bpheehyAJH89dAkaLEq/j/RZXJIqcgsmPJKUP1Z28HA==}
+  /@types/uuid@9.0.5:
+    resolution: {integrity: sha512-xfHdwa1FMJ082prjSJpoEI57GZITiQz10r3vEJCHa2khEFQjKy91aWKz6+zybzssCvXUwE1LQWgWVwZ4nYUvHQ==}
     dev: true
 
   /@types/web-bluetooth@0.0.17:
