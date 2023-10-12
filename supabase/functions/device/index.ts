@@ -32,10 +32,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
           custom_id,
           is_prod,
           is_emulator,
-          version (
-            name,
-            id
-          ),
+          version,
           app_id,
           platform,
           plugin_version,
@@ -50,6 +47,15 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     if (dbError || !dataDevice)
       return sendRes({ status: 'Cannot find device', error: dbError }, 400)
 
+    // get version from device
+    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin()
+      .from('app_versions')
+      .select('id, name')
+      .eq('id', dataDevice.version)
+      .single()
+    if (dbErrorVersion || !dataVersion)
+      return sendRes({ status: 'Cannot find version', error: dbErrorVersion }, 400)
+    dataDevice.version = dataVersion as any
     return sendRes(dataDevice)
   }
   else {
