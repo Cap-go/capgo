@@ -89,7 +89,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     if (dbError || !dataDevices || !dataDevices.length)
       return sendRes([])
     // get versions from all devices
-    const versionIds = dataDevices.map((device) => device.version)
+    const versionIds = dataDevices.map(device => device.version)
     const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin()
       .from('app_versions')
       .select('id, name')
@@ -98,7 +98,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     if (dbErrorVersions || !dataVersions || !dataVersions.length)
       return sendRes([])
     dataDevices.forEach((device) => {
-      const version = dataVersions.find((version) => version.id === device.version)
+      const version = dataVersions.find(version => version.id === device.version)
       if (version)
         device.version = version as any
     })
