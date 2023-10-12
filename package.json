@@ -161,7 +161,7 @@
     "@types/node": "18.15.11",
     "@types/nprogress": "^0.2.0",
     "@types/uuid": "9.0.5",
-    "@vitejs/plugin-vue": "4.3.3",
+    "@vitejs/plugin-vue": "4.4.0",
     "@vitejs/plugin-vue-jsx": "^3.0.2",
     "@vue/cli-service": "5.0.8",
     "@vue/compiler-sfc": "3.3.4",
