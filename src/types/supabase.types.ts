@@ -43,6 +43,34 @@ export interface Database {
           }
         ]
       }
+      app_live: {
+        Row: {
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_live_id_fkey"
+            columns: ["id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       app_stats: {
         Row: {
           app_id: string
@@ -112,6 +140,8 @@ export interface Database {
           app_id: string
           bandwidth: number
           created_at: string | null
+          downloads: number
+          fails: number
           id: string
           mau: number
           mode: Database["public"]["Enums"]["usage_mode"]
@@ -121,6 +151,8 @@ export interface Database {
           app_id: string
           bandwidth?: number
           created_at?: string | null
+          downloads?: number
+          fails?: number
           id?: string
           mau?: number
           mode?: Database["public"]["Enums"]["usage_mode"]
@@ -130,6 +162,8 @@ export interface Database {
           app_id?: string
           bandwidth?: number
           created_at?: string | null
+          downloads?: number
+          fails?: number
           id?: string
           mau?: number
           mode?: Database["public"]["Enums"]["usage_mode"]
@@ -420,6 +454,7 @@ export interface Database {
           created_at: string
           created_by: string
           disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
+          disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
           enable_progressive_deploy: boolean
           enableAbTesting: boolean
@@ -442,6 +477,7 @@ export interface Database {
           created_at?: string
           created_by: string
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
+          disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
           enableAbTesting?: boolean
@@ -464,6 +500,7 @@ export interface Database {
           created_at?: string
           created_by?: string
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
+          disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
           enableAbTesting?: boolean
@@ -511,7 +548,7 @@ export interface Database {
         }
         Insert: {
           created_at?: string | null
-          email: string
+          email?: string
           id?: string
         }
         Update: {
@@ -570,20 +607,7 @@ export interface Database {
           version?: number
           version_build?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "devices_app_id_fkey"
-            columns: ["app_id"]
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "devices_version_fkey"
-            columns: ["version"]
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       devices_override: {
         Row: {
@@ -916,26 +940,7 @@ export interface Database {
           version?: number
           version_build?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "logs_app_id_fkey"
-            columns: ["app_id"]
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "logs_device_id_fkey"
-            columns: ["device_id"]
-            referencedRelation: "devices"
-            referencedColumns: ["device_id"]
-          },
-          {
-            foreignKeyName: "logs_version_fkey"
-            columns: ["version"]
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       store_apps: {
         Row: {
@@ -1251,6 +1256,13 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      exist_app: {
+        Args: {
+          appid: string
+          apikey: string
+        }
+        Returns: boolean
+      }
       exist_app_v2: {
         Args: {
           appid: string
@@ -1327,13 +1339,23 @@ export interface Database {
             }
             Returns: string
           }
-      get_cycle_info: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          subscription_anchor_start: string
-          subscription_anchor_end: string
-        }[]
-      }
+      get_cycle_info:
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              subscription_anchor_start: string
+              subscription_anchor_end: string
+            }[]
+          }
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              subscription_anchor_start: string
+              subscription_anchor_end: string
+            }[]
+          }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1349,13 +1371,25 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_infos: {
+        Args: {
+          appid: string
+          deviceid: string
+          versionname: string
+        }
+        Returns: {
+          current_version_id: number
+          versiondata: Json
+          channel: Json
+        }[]
+      }
       get_max_plan:
         | {
             Args: Record<PropertyKey, never>
             Returns: {
               mau: number
-              storage: number
               bandwidth: number
+              storage: number
             }[]
           }
         | {
@@ -1436,12 +1470,6 @@ export interface Database {
           }
       get_total_storage_size:
         | {
-            Args: {
-              userid: string
-            }
-            Returns: number
-          }
-        | {
             Args: Record<PropertyKey, never>
             Returns: number
           }
@@ -1452,6 +1480,19 @@ export interface Database {
             }
             Returns: number
           }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: number
+          }
+      get_usage_mode_and_last_saved: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          usage_mode: Database["public"]["Enums"]["usage_mode"]
+          last_saved: string
+        }[]
+      }
       get_user_id: {
         Args: {
           apikey: string
@@ -1600,19 +1641,19 @@ export interface Database {
           }
       is_good_plan_v4:
         | {
+            Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
             Args: {
               userid: string
             }
             Returns: boolean
           }
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
       is_in_channel:
         | {
             Args: {
-              userid: string
+              ownerid: string
             }
             Returns: boolean
           }
@@ -1624,6 +1665,12 @@ export interface Database {
             Returns: boolean
           }
       is_not_deleted: {
+        Args: {
+          email_check: string
+        }
+        Returns: boolean
+      }
+      is_not_deleted_v2: {
         Args: {
           email_check: string
         }
@@ -1691,23 +1738,23 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      remove_enum_value: {
-        Args: {
-          enum_type: unknown
-          enum_value: string
-        }
-        Returns: undefined
-      }
-      update_app_usage: {
-        Args: {
-          minutes_interval: number
-        }
-        Returns: undefined
-      }
+      update_app_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: undefined
+          }
+        | {
+            Args: {
+              minutes_interval: number
+            }
+            Returns: undefined
+          }
     }
     Enums: {
+      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
+      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stripe_status:
         | "created"
@@ -1716,11 +1763,14 @@ export interface Database {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "cycle"
+      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
       user_min_right: "read" | "upload" | "write" | "admin"
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
+      match_plan: {
+        name: string
+      }
       stats_table: {
         mau: number
         bandwidth: number
@@ -1729,4 +1779,3 @@ export interface Database {
     }
   }
 }
-

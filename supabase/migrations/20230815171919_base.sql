@@ -1393,7 +1393,6 @@ CREATE TABLE "public"."deleted_account" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
-
 -- Create clickhouse connection (require for big apps)
 
 -- create foreign data wrapper clickhouse_wrapper
@@ -1434,9 +1433,16 @@ CREATE TABLE "public"."deleted_account" (
 -- ORDER BY (device_id, updated_at)
 -- PRIMARY KEY (device_id);
 
+-- CREATE VIEW device_unic AS SELECT * from devices final; -- materialized view to get unique devices
+
+-- insert in click house
 -- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 1, 1),
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.4', '9', '1.223.0', '', 1, 1);
+-- insert in supabase
+-- INSERT INTO clickhouse_devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- ('2023-01-29 08:09:32+00', TIMESTAMP '2023-01-29 08:09:32.324+00', TIMESTAMP '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.5', '9', '1.223.0', '', true, true);
+
 -- first value shouldn't be visible in supabase because of ReplacingMergeTree
 
 
@@ -1459,6 +1465,27 @@ CREATE TABLE "public"."deleted_account" (
 --   server clickhouse_server
 --   options (
 --     table 'devices',
+--     rowid_column 'device_id'
+--   );
+
+-- create foreign table clickhouse_devices_u (
+--     created_at timestamp,
+--     updated_at timestamp,
+--     last_mau timestamp,
+--     device_id text,
+--     custom_id text,
+--     app_id text,
+--     platform text,
+--     plugin_version text,
+--     os_version text,
+--     version_build text,
+--     version integer,
+--     is_prod boolean,
+--     is_emulator boolean
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'devices_u',
 --     rowid_column 'device_id'
 --   );
 
@@ -1649,6 +1676,15 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 --     version::integer
 -- FROM public.stats LIMIT 1;
 
+-- insert in supabase
+-- INSERT INTO clickhouse_logs ("id", "created_at", "device_id", "app_id", "platform", "action", "version_build", "version") VALUES
+-- (nextval('clickhouse_logs_id_seq'), date_trunc('second', CURRENT_TIMESTAMP), '00009a6b-eefe-490a-9c60-8e965132ae51', 'com.demo.app', 'android', 'get', '4.15.5', 9654);
+
+-- insert in click house
+-- INSERT INTO logs ("id", "created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
+-- (1, now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
+
+
 --  In supabase
 -- create foreign table clickhouse_logs (
 --     id bigint,
@@ -1665,6 +1701,7 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 --     table 'logs',
 --     rowid_column 'id'
 --   );
+
 
 CREATE TABLE "public"."stats" (
     "created_at" timestamp with time zone DEFAULT "now"(),

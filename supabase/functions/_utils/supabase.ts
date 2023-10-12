@@ -5,6 +5,7 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './tinybird.ts'
+import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from "./clickhouse.ts";
 
 // import { isTinybirdGetDevicesEnabled, isTinybirdGetLogEnabled, readDevicesInTinyBird, readLogInTinyBird, sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
 
@@ -390,18 +391,53 @@ export function getSStats(auth: string, appId: string, deviceIds?: string[], sea
 }
 
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
-  return Promise.all([supabaseAdmin()
-    .from('devices')
-    .upsert(device as any)])
+  const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
+    created_at: device.created_at || new Date().toISOString(),
+    updated_at: device.updated_at || new Date().toISOString(),
+    // last_mau if not exist take olded js date
+    last_mau: device.last_mau || new Date(0).toISOString(),
+    platform: device.platform as Database['public']['Enums']['platform_os'],
+    os_version: device.os_version as string,
+    version: device.version as number,
+    version_build: device.version_build as string,
+    device_id: device.device_id as string,
+    app_id: device.app_id as string,
+    plugin_version: device.plugin_version as string,
+    is_emulator: !!device.is_emulator,
+    is_prod: !!device.is_prod,
+    custom_id: device.custom_id as string,
+  }
+  const all = []
+  if (isClickHouseEnabled())
+    all.push(sendDeviceToClickHouse([deviceComplete]))
+  else
+    all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
+
+  return Promise.all(all)
     .catch((e) => {
       console.log('sendDevice error', e)
     })
 }
 
-export function sendStats(stats: Database['public']['Tables']['stats']['Insert'][]) {
-  return Promise.all([supabaseAdmin()
-    .from('stats')
-    .insert(stats)])
+export function sendStats(stats: Database['public']['Tables']['stats']['Update'][]) {
+  const all = []
+  for (const stat of stats) {
+    const statComplete: Database['public']['Tables']['stats']['Insert'] = {
+      created_at: stat.created_at || new Date().toISOString(),
+      device_id: stat.device_id as string,
+      action: stat.action as string,
+      app_id: stat.app_id as string,
+      version_build: stat.version_build as string,
+      version: stat.version as number,
+      platform: stat.platform as Database['public']['Enums']['platform_os'],
+    }
+    if (isClickHouseEnabled())
+      all.push(sendLogToClickHouse([statComplete]))
+    else
+      all.push(supabaseAdmin().from('stats').insert(statComplete))
+  }
+
+  return Promise.all(all)
     .catch((e) => {
       console.log('sendDevice error', e)
     })

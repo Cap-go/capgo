@@ -5,6 +5,7 @@ import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 import { update } from '../_utils/update.ts'
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppInfos) {
+  console.log('updates_debug', { url, headers, method, body })
   return update(body)
 }
 

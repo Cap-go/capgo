@@ -187,16 +187,17 @@ export async function update(body: AppInfos) {
       .eq('app_id', app_id)
       .single()
     if (!appOwner) {
-      if (app_id) {
-        await supabaseAdmin()
-          .from('store_apps')
-          .upsert({
-            app_id,
-            onprem: true,
-            capacitor: true,
-            capgo: true,
-          })
-      }
+      // TODO: transfer to clickhouse
+      // if (app_id) {
+      //   await supabaseAdmin()
+      //     .from('store_apps')
+      //     .upsert({
+      //       app_id,
+      //       onprem: true,
+      //       capacitor: true,
+      //       capgo: true,
+      //     })
+      // }
       return sendResWithStatus('app_not_found', {
         message: 'App not found',
         error: 'app_not_found',
