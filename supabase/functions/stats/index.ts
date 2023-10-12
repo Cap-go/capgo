@@ -6,7 +6,7 @@ import {
   MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS,
   deviceIdRegex, isLimited, methodJson, reverseDomainRegex, sendRes,
 } from '../_utils/utils.ts'
-import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
+import { getSDevice, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -128,7 +128,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       version: version_name || 'unknown' as any,
       is_emulator: is_emulator == null ? false : is_emulator,
       is_prod: is_prod == null ? true : is_prod,
-      ...(custom_id != null ? { custom_id } : {}),
+      custom_id,
     }
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
@@ -151,19 +151,18 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       stat.version = appVersion.id
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
-        const { data: deviceData } = await supabaseAdmin()
-          .from('devices')
-          .select()
-          .eq('app_id', app_id)
-          .eq('device_id', device_id)
-          .single()
-        if (deviceData && deviceData.version !== appVersion.id) {
-          const statUninstall: Database['public']['Tables']['stats']['Insert'] = {
-            ...stat,
-            action: 'uninstall',
-            version: deviceData.version,
+        const res = await getSDevice('', body.app_id, undefined, [body.device_id])
+        if (res && res.data && res.data.length) {
+          const oldDevice = res.data[0]
+          const oldVersion = oldDevice.version
+          if (oldVersion !== appVersion.id) {
+            const statUninstall: Database['public']['Tables']['stats']['Insert'] = {
+              ...stat,
+              action: 'uninstall',
+              version: oldVersion,
+            }
+            rows.push(statUninstall)
           }
-          rows.push(statUninstall)
         }
       }
       else if (failActions.includes(action)) {

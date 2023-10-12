@@ -354,9 +354,9 @@ export async function update(body: AppInfos) {
       plugin_version,
       version: stat.version,
       os_version: version_os,
-      ...(is_emulator != null ? { is_emulator } : {}),
-      ...(is_prod != null ? { is_prod } : {}),
-      ...(custom_id != null ? { custom_id } : {}),
+      is_emulator,
+      is_prod,
+      custom_id,
       version_build,
       updated_at: new Date().toISOString(),
     }

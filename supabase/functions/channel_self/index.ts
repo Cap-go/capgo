@@ -96,27 +96,21 @@ async function post(body: DeviceLink): Promise<Response> {
     }, 400)
   }
   // find device
-  const { data: dataDevice } = await supabaseAdmin()
-    .from('devices')
-    .select()
-    .eq('app_id', app_id)
-    .eq('device_id', device_id)
-    .single()
-  if (!dataDevice) {
-    await sendDevice({
-      app_id,
-      device_id,
-      plugin_version,
-      version: version.id,
-      ...(custom_id != null ? { custom_id } : {}),
-      ...(is_emulator != null ? { is_emulator } : {}),
-      ...(is_prod != null ? { is_prod } : {}),
-      version_build,
-      os_version: version_os,
-      platform: platform as Database['public']['Enums']['platform_os'],
-      updated_at: new Date().toISOString(),
-    })
-  }
+
+  await sendDevice({
+    app_id,
+    device_id,
+    plugin_version,
+    version: version.id,
+    custom_id,
+    is_emulator,
+    is_prod,
+    version_build,
+    os_version: version_os,
+    platform: platform as Database['public']['Enums']['platform_os'],
+    updated_at: new Date().toISOString(),
+  })
+
   const { data: dataChannelOverride } = await supabaseAdmin()
     .from('channel_devices')
     .select(`
@@ -212,30 +206,19 @@ async function put(body: DeviceLink): Promise<Response> {
       error: 'version_error',
     }, 400)
   }
-  // find device
-  const { data: dataDevice } = await supabaseAdmin()
-    .from('devices')
-    .select()
-    .eq('app_id', app_id)
-    .eq('device_id', device_id)
-    .single()
-  if (!dataDevice) {
-    if (!dataDevice) {
-      await sendDevice({
-        app_id,
-        device_id,
-        plugin_version,
-        version: version.id,
-        ...(custom_id != null ? { custom_id } : {}),
-        ...(is_emulator != null ? { is_emulator } : {}),
-        ...(is_prod != null ? { is_prod } : {}),
-        version_build,
-        os_version: version_os,
-        platform: platform as Database['public']['Enums']['platform_os'],
-        updated_at: new Date().toISOString(),
-      })
-    }
-  }
+  await sendDevice({
+    app_id,
+    device_id,
+    plugin_version,
+    version: version.id,
+    custom_id,
+    is_emulator,
+    is_prod,
+    version_build,
+    os_version: version_os,
+    platform: platform as Database['public']['Enums']['platform_os'],
+    updated_at: new Date().toISOString(),
+  })
   const { data: dataChannel, error: errorChannel } = await supabaseAdmin()
     .from('channels')
     .select()

@@ -316,22 +316,27 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
 
   let tableName: 'devices' | 'clickhouse_devices_u' = 'devices'
   let client = supabaseClient(auth)
-  const reqClickHouse = await client
-    .rpc('clickhouse_exist')
-    .then(res => res.data || false)
-  if (reqClickHouse) {
-    tableName = 'clickhouse_devices_u'
-    const reqOwner = await client
-      .rpc('is_app_owner', { appid: appId })
-      .then(res => res.data || false)
-    if (!reqOwner) {
-      const reqAdmin = await client
-        .rpc('is_admin')
-        .then(res => res.data || false)
-      if (!reqAdmin)
-        return Promise.reject(new Error('not allowed'))
-    }
+  if (!auth) {
     client = supabaseAdmin()
+  }
+  else {
+    const reqClickHouse = await client
+      .rpc('clickhouse_exist')
+      .then(res => res.data || false)
+    if (reqClickHouse) {
+      tableName = 'clickhouse_devices_u'
+      const reqOwner = await client
+        .rpc('is_app_owner', { appid: appId })
+        .then(res => res.data || false)
+      if (!reqOwner) {
+        const reqAdmin = await client
+          .rpc('is_admin')
+          .then(res => res.data || false)
+        if (!reqAdmin)
+          return Promise.reject(new Error('not allowed'))
+      }
+      client = supabaseAdmin()
+    }
   }
   const reqCount = client
     .from(tableName)
@@ -398,23 +403,29 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   // ] 0 9
   let tableName: 'stats' | 'clickhouse_stats' = 'stats'
   let client = supabaseClient(auth)
-  const reqClickHouse = await client
-    .rpc('clickhouse_exist')
-    .then(res => res.data || false)
-  if (reqClickHouse) {
-    tableName = 'clickhouse_stats'
-    const reqOwner = await client
-      .rpc('is_app_owner', { appid: appId })
-      .then(res => res.data || false)
-    if (!reqOwner) {
-      const reqAdmin = await client
-        .rpc('is_admin')
-        .then(res => res.data || false)
-      if (!reqAdmin)
-        return Promise.reject(new Error('not allowed'))
-    }
+  if (!auth) {
     client = supabaseAdmin()
   }
+  else {
+    const reqClickHouse = await client
+      .rpc('clickhouse_exist')
+      .then(res => res.data || false)
+    if (reqClickHouse) {
+      tableName = 'clickhouse_stats'
+      const reqOwner = await client
+        .rpc('is_app_owner', { appid: appId })
+        .then(res => res.data || false)
+      if (!reqOwner) {
+        const reqAdmin = await client
+          .rpc('is_admin')
+          .then(res => res.data || false)
+        if (!reqAdmin)
+          return Promise.reject(new Error('not allowed'))
+      }
+      client = supabaseAdmin()
+    }
+  }
+
   const reqCount = client
     .from(tableName)
     .select('', { count: 'exact' })
@@ -520,97 +531,6 @@ export function sendStats(stats: Database['public']['Tables']['stats']['Update']
     .catch((e) => {
       console.log('sendDevice error', e)
     })
-}
-
-function allDateIdOfMonth() {
-  const date_id = new Date().toISOString().slice(0, 7)
-  const lastDay = new Date(new Date().getFullYear(), new Date().getMonth(), 0)
-  const days = []
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    const day = new Date(new Date().getFullYear(), new Date().getMonth(), d).getDate()
-    days.push(`${date_id}-${day}`)
-  }
-  // console.log('days', days)
-  return days
-}
-
-export async function createAppStat(userId: string, appId: string, date_id: string) {
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  // console.log('req', req)
-  const mlu = supabaseAdmin()
-    .from('stats')
-    .select('app_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .lte('created_at', lastDay.toISOString())
-    .gte('created_at', firstDay.toISOString())
-    .eq('action', 'get')
-    .then(res => res.count || 0)
-  const mlu_real = supabaseAdmin()
-    .from('stats')
-    .select('app_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .lte('created_at', lastDay.toISOString())
-    .gte('created_at', firstDay.toISOString())
-    .eq('action', 'set')
-    .then(res => res.count || 0)
-  const devices = supabaseAdmin()
-    .from('devices')
-    .select('device_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .eq('is_emulator', false)
-    .eq('is_prod', true)
-    .lte('updated_at', lastDay.toISOString())
-    .gte('updated_at', firstDay.toISOString())
-    .then(res => res.count || 0)
-  const devices_real = supabaseAdmin()
-    .from('devices')
-    .select('device_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .lte('updated_at', lastDay.toISOString())
-    .gte('updated_at', firstDay.toISOString())
-    .then(res => res.count || 0)
-  const bandwidth = supabaseAdmin()
-    .from('app_stats')
-    .select('bandwidth')
-    .eq('app_id', appId)
-    .in('date_id', allDateIdOfMonth())
-    .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.bandwidth || 0), 0))
-  const version_size = supabaseAdmin()
-    .from('app_versions_meta')
-    .select('size')
-    .eq('app_id', appId)
-    .eq('user_id', userId)
-    .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.size || 0), 0))
-  //  write in SQL select all id of app_versions who match app_id = "toto" and use the result to find all app_versions_meta and sum all size
-  const versions = supabaseAdmin()
-    .from('app_versions')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .eq('user_id', userId)
-    .eq('deleted', false)
-    .then(res => res.count || 0)
-  const shared = supabaseAdmin()
-    .from('channel_users')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
-  const channels = supabaseAdmin()
-    .from('channels')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
-  const all = { mlu, mlu_real, devices, devices_real, bandwidth, version_size, versions, shared, channels }
-  type Keys = keyof typeof all
-  const allAwaited = await allObject<Keys, number>(all)
-  const newData = {
-    app_id: appId,
-    user_id: userId,
-    date_id,
-    ...allAwaited,
-  }
-  return newData
 }
 
 export async function createApiKey(userId: string) {

@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
+import { checkAppOwner, getSDevice, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { checkKey, fetchLimit, methodJson, sendRes } from '../_utils/utils.ts'
@@ -23,30 +23,10 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
 
   // if device_id get one device
   if (body.device_id) {
-    const { data: dataDevice, error: dbError } = await supabaseAdmin()
-      .from('devices')
-      .select(`
-          created_at,
-          updated_at,
-          device_id,
-          custom_id,
-          is_prod,
-          is_emulator,
-          version,
-          app_id,
-          platform,
-          plugin_version,
-          os_version,
-          version_build,
-          is_emulator,
-          is_prod
-      `)
-      .eq('app_id', body.app_id)
-      .eq('device_id', body.device_id)
-      .single()
-    if (dbError || !dataDevice)
-      return sendRes({ status: 'Cannot find device', error: dbError }, 400)
-
+    const res = await getSDevice('', body.app_id, undefined, [body.device_id])
+    if (!res || !res.data || !res.data.length)
+      return sendRes({ status: 'Cannot find device' }, 400)
+    const dataDevice = res.data[0]
     // get version from device
     const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin()
       .from('app_versions')
@@ -63,31 +43,10 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const { data: dataDevices, error: dbError } = await supabaseAdmin()
-      .from('devices')
-      .select(`
-          created_at,
-          updated_at,
-          device_id,
-          custom_id,
-          is_prod,
-          is_emulator,
-          version,
-          app_id,
-          platform,
-          plugin_version,
-          os_version,
-          version_build,
-          is_emulator,
-          is_prod
-      `)
-      .eq('app_id', body.app_id)
-      .range(from, to)
-      .order('created_at', { ascending: true })
-    if (dbError)
-      console.log('dbError', dbError)
-    if (dbError || !dataDevices || !dataDevices.length)
+    const res = await getSDevice('', body.app_id, undefined, undefined, undefined, undefined, from, to)
+    if (!res || !res.data)
       return sendRes([])
+    const dataDevices = res.data
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
     const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin()
@@ -114,14 +73,9 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // find device
-  const { data: dataDevice, error: dbError } = await supabaseAdmin()
-    .from('devices')
-    .select()
-    .eq('app_id', body.app_id)
-    .eq('device_id', body.device_id)
-    .single()
-  if (dbError || !dataDevice)
-    return sendRes({ status: 'Cannot find device', error: dbError, payload: body }, 400)
+  const res = await getSDevice('', body.app_id, undefined, [body.device_id])
+  if (!res || !res.data || !res.data.length)
+    return sendRes({ status: 'Cannot find device' }, 400)
 
   if (!body.channel && body.version_id)
     return sendRes({ status: 'Nothing to update' }, 400)
