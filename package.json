@@ -81,7 +81,7 @@
     "@capgo/capacitor-native-biometric": "^5.0.1",
     "@capgo/capacitor-purchases": "^5.0.8",
     "@capgo/capacitor-screen-recorder": "^5.0.0",
-    "@capgo/capacitor-updater": "5.2.22",
+    "@capgo/capacitor-updater": "5.3.13",
     "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^1.2.12",
     "@capgo/native-audio": "^6.0.18",
