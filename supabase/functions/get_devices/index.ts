@@ -1,8 +1,7 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getSDevice } from '../_utils/supabase.ts'
 import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
-import type { BaseHeaders } from '../_utils/types.ts'
-import type { Order } from '../_utils/tinybird.ts'
+import type { BaseHeaders, Order } from '../_utils/types.ts'
 
 interface dataDevice {
   appId: string
