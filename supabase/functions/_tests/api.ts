@@ -2,7 +2,7 @@ import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv } from '../_utils/utils.ts'
 
-export const baseSupabase = 'https://supabase.capgo.app/'
+export const baseSupabase = 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/'
 export const baseNetlify = 'https://web.capgo.app/api/'
 export const baseNetlifyEdge = 'https://web.capgo.app/api-edge/'
 
