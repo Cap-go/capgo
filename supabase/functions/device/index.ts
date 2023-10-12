@@ -17,6 +17,13 @@ interface GetDevice {
   page?: number
 }
 
+function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'][]) {
+  return devices.map((device) => {
+    const { created_at, updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build } = device
+    return { created_at, updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build }
+  })
+}
+
 async function get(body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
     return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
@@ -26,7 +33,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     const res = await getSDevice('', body.app_id, undefined, [body.device_id])
     if (!res || !res.data || !res.data.length)
       return sendRes({ status: 'Cannot find device' }, 400)
-    const dataDevice = res.data[0]
+    const dataDevice = filterDeviceKeys(res.data)[0]
     // get version from device
     const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin()
       .from('app_versions')
@@ -46,7 +53,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     const res = await getSDevice('', body.app_id, undefined, undefined, undefined, undefined, from, to)
     if (!res || !res.data)
       return sendRes([])
-    const dataDevices = res.data
+    const dataDevices = filterDeviceKeys(res.data)
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
     const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin()
