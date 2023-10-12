@@ -5,7 +5,7 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
-import { Order } from "./types.ts";
+import { Order } from './types.ts'
 
 // Import Supabase client
 
