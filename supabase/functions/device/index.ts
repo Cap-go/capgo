@@ -32,10 +32,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
           custom_id,
           is_prod,
           is_emulator,
-          version (
-            name,
-            id
-          ),
+          version,
           app_id,
           platform,
           plugin_version,
@@ -50,6 +47,15 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     if (dbError || !dataDevice)
       return sendRes({ status: 'Cannot find device', error: dbError }, 400)
 
+    // get version from device
+    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin()
+      .from('app_versions')
+      .select('id, name')
+      .eq('id', dataDevice.version)
+      .single()
+    if (dbErrorVersion || !dataVersion)
+      return sendRes({ status: 'Cannot find version', error: dbErrorVersion }, 400)
+    dataDevice.version = dataVersion as any
     return sendRes(dataDevice)
   }
   else {
@@ -66,10 +72,7 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
           custom_id,
           is_prod,
           is_emulator,
-          version (
-            name,
-            id
-          ),
+          version,
           app_id,
           platform,
           plugin_version,
@@ -81,8 +84,24 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
       .eq('app_id', body.app_id)
       .range(from, to)
       .order('created_at', { ascending: true })
+    if (dbError)
+      console.log('dbError', dbError)
     if (dbError || !dataDevices || !dataDevices.length)
       return sendRes([])
+    // get versions from all devices
+    const versionIds = dataDevices.map(device => device.version)
+    const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin()
+      .from('app_versions')
+      .select('id, name')
+      .in('id', versionIds)
+    // replace version with object from app_versions table
+    if (dbErrorVersions || !dataVersions || !dataVersions.length)
+      return sendRes([])
+    dataDevices.forEach((device) => {
+      const version = dataVersions.find(version => version.id === device.version)
+      if (version)
+        device.version = version as any
+    })
     return sendRes(dataDevices)
   }
 }
