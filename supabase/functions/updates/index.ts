@@ -5,7 +5,7 @@ import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'
 import {
   INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME,
-  NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, methodJson, reverseDomainRegex, sendRes, sendResText,
+  NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, isLimited, methodJson, reverseDomainRegex, sendRes, sendResText,
 } from '../_utils/utils.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
 
@@ -51,6 +51,12 @@ const headersSchema = z.object({
 const bypassRedis = true
 
 async function main(_url: URL, _headers: BaseHeaders, _method: string, body: AppInfos) {
+  if (isLimited(body.app_id)) {
+    return sendRes({
+      message: 'Too many requests',
+      error: 'too_many_requests',
+    }, 200)
+  }
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success)
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
@@ -58,7 +64,10 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
   const redis = await getRedis()
 
   if (!redis || bypassRedis) {
-    console.log('[redis] cannot get redis')
+    if (bypassRedis)
+      console.log('[redis] bypassed')
+    else
+      console.log('[redis] cannot get redis')
     return update(body)
   }
 

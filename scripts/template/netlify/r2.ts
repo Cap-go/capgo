@@ -16,7 +16,7 @@ function initR2() {
   const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
-    useSSL: storageUseSsl,
+    useSSL: accountid ? true : storageUseSsl,
     port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
     accessKey: access_key_id,
     secretKey: access_key_secret,

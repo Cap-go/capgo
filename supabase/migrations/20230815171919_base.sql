@@ -594,7 +594,7 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RE
 Begin
     RETURN is_trial(userid) > 0
       or is_free_usage(userid)
-      or (is_good_plan_v3(userid) and is_paying(userid));
+      or is_paying_and_good_plan(userid);
 End;
 $$;
 
@@ -628,7 +628,6 @@ Begin
   AND mode=ANY(keymode))) AND is_app_owner(get_user_id(apikey), app_id);
 End;  
 $$;
-
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
@@ -1143,6 +1142,31 @@ Begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"("userid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  from stripe_info
+  where customer_id=(SELECT customer_id from users where id=userid)
+  AND (
+    (is_good_plan = true AND status = 'succeeded') 
+    OR (subscription_id = 'free')
+    OR (trial_at::date - (now())::date > 0)
+  )
+  )
+);
+End;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_paying(auth.uid());
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1393,8 +1417,28 @@ CREATE TABLE "public"."deleted_account" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
-
 -- Create clickhouse connection (require for big apps)
+
+CREATE OR REPLACE FUNCTION clickhouse_exist()
+RETURNS BOOLEAN AS $$
+BEGIN
+   RETURN (
+      (SELECT EXISTS (
+         SELECT 1
+         FROM   information_schema.tables 
+         WHERE  table_schema = 'public'
+         AND    table_name = 'clickhouse_devices'
+      )) 
+      AND 
+      (SELECT EXISTS (
+         SELECT 1
+         FROM   information_schema.tables 
+         WHERE  table_schema = 'public'
+         AND    table_name = 'clickhouse_logs'
+      ))
+   );
+END;
+$$ LANGUAGE plpgsql;
 
 -- create foreign data wrapper clickhouse_wrapper
 --   handler click_house_fdw_handler
@@ -1434,11 +1478,17 @@ CREATE TABLE "public"."deleted_account" (
 -- ORDER BY (device_id, updated_at)
 -- PRIMARY KEY (device_id);
 
+-- CREATE VIEW device_unic AS SELECT * from devices final; -- materialized view to get unique devices
+
+-- insert in click house
 -- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 1, 1),
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.4', '9', '1.223.0', '', 1, 1);
--- first value shouldn't be visible in supabase because of ReplacingMergeTree
+-- insert in supabase
+-- INSERT INTO clickhouse_devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- ('2023-01-29 08:09:32+00', TIMESTAMP '2023-01-29 08:09:32.324+00', TIMESTAMP '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.5', '9', '1.223.0', '', true, true);
 
+-- first value shouldn't be visible in supabase because of ReplacingMergeTree
 
 --  In supabase
 -- create foreign table clickhouse_devices (
@@ -1458,8 +1508,27 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
---     table 'devices',
---     rowid_column 'device_id'
+--     table 'devices'
+--   );
+
+-- create foreign table clickhouse_devices_u (
+--     created_at timestamp,
+--     updated_at timestamp,
+--     last_mau timestamp,
+--     device_id text,
+--     custom_id text,
+--     app_id text,
+--     platform text,
+--     plugin_version text,
+--     os_version text,
+--     version_build text,
+--     version integer,
+--     is_prod boolean,
+--     is_emulator boolean
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'devices_u'
 --   );
 
 -- TEST COPY existing data from postgres to clickhouse
@@ -1625,7 +1694,7 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 -- ORDER BY (created_at)
 -- PRIMARY KEY (id);
 
-CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
+-- CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
 
 -- TEST COPY existing data from postgres to clickhouse
 -- INSERT INTO clickhouse_logs (
@@ -1649,6 +1718,15 @@ CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
 --     version::integer
 -- FROM public.stats LIMIT 1;
 
+-- insert in supabase
+-- INSERT INTO clickhouse_logs ("id", "created_at", "device_id", "app_id", "platform", "action", "version_build", "version") VALUES
+-- (nextval('clickhouse_logs_id_seq'), date_trunc('second', CURRENT_TIMESTAMP), '00009a6b-eefe-490a-9c60-8e965132ae51', 'com.demo.app', 'android', 'get', '4.15.5', 9654);
+
+-- insert in click house
+-- INSERT INTO logs ("id", "created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
+-- (1, now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
+
+
 --  In supabase
 -- create foreign table clickhouse_logs (
 --     id bigint,
@@ -1662,9 +1740,9 @@ CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
 -- )
 --   server clickhouse_server
 --   options (
---     table 'logs',
---     rowid_column 'id'
+--     table 'logs'
 --   );
+
 
 CREATE TABLE "public"."stats" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -2716,10 +2794,10 @@ REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_valu
 REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
 
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) TO postgres;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.update_app_usage() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.update_app_usage() TO postgres;
 
 REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;

@@ -83,11 +83,16 @@ export function getTest(): RunnableTest {
         test: testFrontend,
         timesToExecute: 1,
       },
+      {
+        name: 'Test selectable disallow upload',
+        test: testSelectableDisallow,
+        timesToExecute: 1,
+      },
     ],
   }
 }
 
-async function prepareCli(backendBaseUrl: URL, _supabase: SupabaseType) {
+async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
   const path = Deno.env.get('CLI_PATH')
   assert(path !== undefined, 'CLI_PATH is not defined')
 
@@ -127,9 +132,15 @@ async function prepareCli(backendBaseUrl: URL, _supabase: SupabaseType) {
   }
 
   appPath = tempFileFolder
+
+  // We set the channel update scheme to major
+  // id 22 = production
+  const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+
+  assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
 }
 
-async function runCli(params: string[]): Promise<string> {
+async function runCli(params: string[], logOutput = false): Promise<string> {
   const command = new Deno.Command('node', {
     args: [cliPath!, ...params, '--apikey', defaultApiKey],
     cwd: appPath!,
@@ -156,13 +167,15 @@ async function runCli(params: string[]): Promise<string> {
     finalString += string
   }
 
-  console.log(`final CLI output: \n\n${finalString}}`)
+  if (logOutput)
+    console.log(`final CLI output: \n\n${finalString}}`)
   return finalString
 }
 
 async function uploadToCloud(_backendBaseUrl: URL, _supabase: SupabaseType) {
   // We do not care about the output, if it fails the runCli will throw an error
-  await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
+  // Also we log output
+  await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
 }
 
 async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
@@ -191,6 +204,30 @@ async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
   await zipReader.close()
 
   assert(firstEntryText === indexJsCode, `Zip file entry (${firstEntryText}) is not equal to ${indexJsCode}`)
+}
+
+async function testSelectableDisallow(_backendBaseUrl: URL, supabase: SupabaseType) {
+  // We set the channel update scheme to version_number, then will revert it back to major
+  // 22 = channel 'production'
+  const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'version_number' }).eq('id', 22)
+
+  assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
+
+  try {
+    // Test if the cli will fail without metadata
+    const cliOutput1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
+    assert(cliOutput1.includes('to provide a min-update-version'), `CLI output does not include 'to provide a min-update-version'. CLI output:\n${cliOutput1}`)
+
+    // Test if the cli will fail if the metadata does not follow semver
+    const cliOutput2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--min-update-version', 'invalid'])
+    assert(cliOutput2.includes('should follow semver convention'), `CLI output does not include 'should follow semver convention'. CLI output:\n${cliOutput2}`)
+  }
+  finally {
+    // We set the channel update scheme to major
+    const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+
+    assert(error === null, `Supabase channel update error (2) ${JSON.stringify(error)} is not null`)
+  }
 }
 
 async function testFrontend(_backendBaseUrl: URL, _supabase: SupabaseType) {

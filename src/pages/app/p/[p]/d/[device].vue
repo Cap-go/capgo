@@ -161,26 +161,13 @@ async function getDevice() {
   if (!id.value)
     return
   try {
-    const { data } = await supabase
-      .from('devices')
-      .select(`
-          device_id,
-          app_id,
-          platform,
-          os_version,
-          custom_id,
-          version,
-          is_prod,
-          is_emulator,
-          version_build,
-          created_at,
-          plugin_version,
-          updated_at
-        `)
-      .eq('device_id', id.value)
-      .single()
-      .throwOnError()
-
+    const data = await supabase.functions.invoke('get_devices', {
+      body: {
+        appId: packageId.value,
+        deviceIds: [id.value],
+      },
+    }).then(res => res?.data?.data[0])
+    console.log('getDevice', data)
     const { data: dataVersion } = await supabase
       .from('app_versions')
       .select(`
@@ -250,12 +237,17 @@ async function saveCustomId() {
   console.log('saveCustomId', device.value?.custom_id)
   if (!device.value?.device_id)
     return
-  await supabase
-    .from('devices')
-    .update({
-      custom_id: device.value?.custom_id,
-    })
-    .eq('device_id', id.value)
+  const { error } = await supabase.functions.invoke('set_custom_id', {
+    body: {
+      appId: packageId.value,
+      deviceId: id.value,
+      customId: device.value?.custom_id,
+    },
+  })
+  if (error) {
+    console.error('saveCustomId', error)
+    return
+  }
   toast.success(t('custom-id-saved'))
 }
 

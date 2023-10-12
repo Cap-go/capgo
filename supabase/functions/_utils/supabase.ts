@@ -4,9 +4,8 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
-import type { Order } from './tinybird.ts'
-
-// import { isTinybirdGetDevicesEnabled, isTinybirdGetLogEnabled, readDevicesInTinyBird, readLogInTinyBird, sendDeviceToTinybird, sendLogToTinybird } from './tinybird.ts'
+import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
+import type { Order } from './types.ts'
 
 // Import Supabase client
 
@@ -263,26 +262,90 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return false
 }
 
-export function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function UpdateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string) {
+  console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
+
+  const client = supabaseClient(auth)
+  const reqClickHouse = await client
+    .rpc('clickhouse_exist')
+    .then(res => res.data || false)
+  if (reqClickHouse) {
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
+      .then(res => res.data || false)
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
+        .then(res => res.data || false)
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
+    }
+    console.log('UpdateDeviceCustomId clickhouse')
+    // get the device from clickhouse
+    const device = await supabaseAdmin()
+      .from('clickhouse_devices_u')
+      .select()
+      .eq('app_id', appId)
+      .eq('device_id', deviceId)
+      .limit(1)
+      .single()
+      .then(res => res.data || null)
+    console.log('UpdateDeviceCustomId get device', device)
+    if (!device)
+      return Promise.reject(new Error('device not found'))
+    // send the device to clickhouse
+    return sendDeviceToClickHouse([{
+      ...device,
+      custom_id: customId,
+    }])
+  }
+  else {
+    // update the device custom_id
+    return supabaseClient(auth)
+      .from('devices')
+      .update({ custom_id: customId })
+      .eq('app_id', appId)
+      .eq('device_id', deviceId)
+  }
+}
+
+export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
-  const reqCount = supabaseClient(auth)
-    .from('devices')
+  let tableName: 'devices' | 'clickhouse_devices_u' = 'devices'
+  let client = supabaseClient(auth)
+  if (!auth) {
+    client = supabaseAdmin()
+  }
+  else {
+    const reqClickHouse = await client
+      .rpc('clickhouse_exist')
+      .then(res => res.data || false)
+    if (reqClickHouse) {
+      tableName = 'clickhouse_devices_u'
+      const reqOwner = await client
+        .rpc('is_app_owner', { appid: appId })
+        .then(res => res.data || false)
+      if (!reqOwner) {
+        const reqAdmin = await client
+          .rpc('is_admin')
+          .then(res => res.data || false)
+        if (!reqAdmin)
+          return Promise.reject(new Error('not allowed'))
+      }
+      client = supabaseAdmin()
+    }
+  }
+  const reqCount = client
+    .from(tableName)
     .select('', { count: 'exact' })
     .eq('app_id', appId)
     .then(res => res.count || 0)
-  const req = supabaseClient(auth)
-    .from('devices')
-    .select(`
-      device_id,
-      created_at,
-      updated_at,
-      platform,
-      os_version,
-      version
-  `)
+  const req = client
+    .from(tableName)
+    .select()
     .eq('app_id', appId)
 
   if (versionId) {
@@ -297,10 +360,13 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
-    if (deviceIds.length === 1)
+    if (deviceIds.length === 1) {
       req.eq('device_id', deviceIds[0])
-    else
+      req.limit(1)
+    }
+    else {
       req.in('device_id', deviceIds)
+    }
   }
   if (search) {
     console.log('search', search)
@@ -328,20 +394,45 @@ export function getSDevice(auth: string, appId: string, versionId?: string, devi
   // }
 }
 
-export function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
-  const reqCount = supabaseClient(auth)
-    .from('stats')
+  let tableName: 'stats' | 'clickhouse_stats' = 'stats'
+  let client = supabaseClient(auth)
+  if (!auth) {
+    client = supabaseAdmin()
+  }
+  else {
+    const reqClickHouse = await client
+      .rpc('clickhouse_exist')
+      .then(res => res.data || false)
+    if (reqClickHouse) {
+      tableName = 'clickhouse_stats'
+      const reqOwner = await client
+        .rpc('is_app_owner', { appid: appId })
+        .then(res => res.data || false)
+      if (!reqOwner) {
+        const reqAdmin = await client
+          .rpc('is_admin')
+          .then(res => res.data || false)
+        if (!reqAdmin)
+          return Promise.reject(new Error('not allowed'))
+      }
+      client = supabaseAdmin()
+    }
+  }
+
+  const reqCount = client
+    .from(tableName)
     .select('', { count: 'exact' })
     .eq('app_id', appId)
     .then(res => res.count || 0)
-  const req = supabaseClient(auth)
-    .from('stats')
+  const req = client
+    .from(tableName)
     .select(`
         device_id,
         action,
@@ -390,112 +481,56 @@ export function getSStats(auth: string, appId: string, deviceIds?: string[], sea
 }
 
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
-  return Promise.all([supabaseAdmin()
-    .from('devices')
-    .upsert(device as any)])
+  const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
+    created_at: device.created_at || new Date().toISOString(),
+    updated_at: device.updated_at || new Date().toISOString(),
+    // last_mau if not exist take olded js date
+    last_mau: device.last_mau || new Date(0).toISOString(),
+    platform: device.platform as Database['public']['Enums']['platform_os'],
+    os_version: device.os_version as string,
+    version: device.version as number,
+    version_build: device.version_build as string,
+    device_id: device.device_id as string,
+    app_id: device.app_id as string,
+    plugin_version: device.plugin_version as string,
+    is_emulator: !!device.is_emulator,
+    is_prod: !!device.is_prod,
+    custom_id: device.custom_id as string,
+  }
+  const all = []
+  if (isClickHouseEnabled())
+    all.push(sendDeviceToClickHouse([deviceComplete]))
+  else
+    all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
+
+  return Promise.all(all)
     .catch((e) => {
       console.log('sendDevice error', e)
     })
 }
 
-export function sendStats(stats: Database['public']['Tables']['stats']['Insert'][]) {
-  return Promise.all([supabaseAdmin()
-    .from('stats')
-    .insert(stats)])
+export function sendStats(stats: Database['public']['Tables']['stats']['Update'][]) {
+  const all = []
+  for (const stat of stats) {
+    const statComplete: Database['public']['Tables']['stats']['Insert'] = {
+      created_at: stat.created_at || new Date().toISOString(),
+      device_id: stat.device_id as string,
+      action: stat.action as string,
+      app_id: stat.app_id as string,
+      version_build: stat.version_build as string,
+      version: stat.version as number,
+      platform: stat.platform as Database['public']['Enums']['platform_os'],
+    }
+    if (isClickHouseEnabled())
+      all.push(sendLogToClickHouse([statComplete]))
+    else
+      all.push(supabaseAdmin().from('stats').insert(statComplete))
+  }
+
+  return Promise.all(all)
     .catch((e) => {
       console.log('sendDevice error', e)
     })
-}
-
-function allDateIdOfMonth() {
-  const date_id = new Date().toISOString().slice(0, 7)
-  const lastDay = new Date(new Date().getFullYear(), new Date().getMonth(), 0)
-  const days = []
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    const day = new Date(new Date().getFullYear(), new Date().getMonth(), d).getDate()
-    days.push(`${date_id}-${day}`)
-  }
-  // console.log('days', days)
-  return days
-}
-
-export async function createAppStat(userId: string, appId: string, date_id: string) {
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  // console.log('req', req)
-  const mlu = supabaseAdmin()
-    .from('stats')
-    .select('app_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .lte('created_at', lastDay.toISOString())
-    .gte('created_at', firstDay.toISOString())
-    .eq('action', 'get')
-    .then(res => res.count || 0)
-  const mlu_real = supabaseAdmin()
-    .from('stats')
-    .select('app_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .lte('created_at', lastDay.toISOString())
-    .gte('created_at', firstDay.toISOString())
-    .eq('action', 'set')
-    .then(res => res.count || 0)
-  const devices = supabaseAdmin()
-    .from('devices')
-    .select('device_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .eq('is_emulator', false)
-    .eq('is_prod', true)
-    .lte('updated_at', lastDay.toISOString())
-    .gte('updated_at', firstDay.toISOString())
-    .then(res => res.count || 0)
-  const devices_real = supabaseAdmin()
-    .from('devices')
-    .select('device_id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .lte('updated_at', lastDay.toISOString())
-    .gte('updated_at', firstDay.toISOString())
-    .then(res => res.count || 0)
-  const bandwidth = supabaseAdmin()
-    .from('app_stats')
-    .select('bandwidth')
-    .eq('app_id', appId)
-    .in('date_id', allDateIdOfMonth())
-    .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.bandwidth || 0), 0))
-  const version_size = supabaseAdmin()
-    .from('app_versions_meta')
-    .select('size')
-    .eq('app_id', appId)
-    .eq('user_id', userId)
-    .then(res => (res.data ? res.data : []).reduce((acc, cur) => acc + (cur.size || 0), 0))
-  //  write in SQL select all id of app_versions who match app_id = "toto" and use the result to find all app_versions_meta and sum all size
-  const versions = supabaseAdmin()
-    .from('app_versions')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .eq('user_id', userId)
-    .eq('deleted', false)
-    .then(res => res.count || 0)
-  const shared = supabaseAdmin()
-    .from('channel_users')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
-  const channels = supabaseAdmin()
-    .from('channels')
-    .select('id', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
-  const all = { mlu, mlu_real, devices, devices_real, bandwidth, version_size, versions, shared, channels }
-  type Keys = keyof typeof all
-  const allAwaited = await allObject<Keys, number>(all)
-  const newData = {
-    app_id: appId,
-    user_id: userId,
-    date_id,
-    ...allAwaited,
-  }
-  return newData
 }
 
 export async function createApiKey(userId: string) {

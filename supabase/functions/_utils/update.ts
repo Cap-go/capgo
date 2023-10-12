@@ -1,6 +1,6 @@
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { sendRes } from '../_utils/utils.ts'
+import { appendHeaders, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -24,8 +24,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 function sendResWithStatus(status: string, data?: any, statusCode?: number, updateOverwritten?: boolean): Response {
   const response = sendRes(data, 200)
 
-  response.headers.append('x-update-status', status)
-  response.headers.append('x-update-overwritten', (updateOverwritten ?? false).toString())
+  appendHeaders(response, 'x-update-status', status)
+  appendHeaders(response, 'x-update-overwritten', (updateOverwritten ?? false).toString())
 
   return response
 }
@@ -74,9 +74,20 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
         allow_dev,
         allow_emulator,
         disableAutoUpdateUnderNative,
-        disableAutoUpdateToMajor,
+        disableAutoUpdate,
         ios,
         android,
+        secondVersion (
+          id,
+          name,
+          checksum,
+          session_key,
+          user_id,
+          bucket_id,
+          storage_provider,
+          external_url,
+          minUpdateVersion
+        ),
         secondaryVersionPercentage,
         enable_progressive_deploy,
         enableAbTesting,
@@ -88,7 +99,8 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
           user_id,
           bucket_id,
           storage_provider,
-          external_url
+          external_url,
+          minUpdateVersion
         )
       ),
       created_at,
@@ -109,7 +121,7 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
       allow_dev,
       allow_emulator,
       disableAutoUpdateUnderNative,
-      disableAutoUpdateToMajor,
+      disableAutoUpdate,
       ios,
       android,
       secondVersion (
@@ -120,7 +132,8 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
         user_id,
         bucket_id,
         storage_provider,
-        external_url
+        external_url,
+        minUpdateVersion
       ),
       secondaryVersionPercentage,
       enable_progressive_deploy,
@@ -133,7 +146,8 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
         user_id,
         bucket_id,
         storage_provider,
-        external_url
+        external_url,
+        minUpdateVersion
       )
     `)
     .eq('app_id', app_id)
@@ -173,16 +187,17 @@ export async function update(body: AppInfos) {
       .eq('app_id', app_id)
       .single()
     if (!appOwner) {
-      if (app_id) {
-        await supabaseAdmin()
-          .from('store_apps')
-          .upsert({
-            app_id,
-            onprem: true,
-            capacitor: true,
-            capgo: true,
-          })
-      }
+      // TODO: transfer to clickhouse
+      // if (app_id) {
+      //   await supabaseAdmin()
+      //     .from('store_apps')
+      //     .upsert({
+      //       app_id,
+      //       onprem: true,
+      //       capacitor: true,
+      //       capgo: true,
+      //     })
+      // }
       return sendResWithStatus('app_not_found', {
         message: 'App not found',
         error: 'app_not_found',
@@ -258,7 +273,9 @@ export async function update(body: AppInfos) {
       version: 0,
     }
 
-    const { versionData, channelData, channelOverride, devicesOverride } = await requestInfos(platform, app_id, device_id, version_name)
+    const requestedInto = await requestInfos(platform, app_id, device_id, version_name)
+    const { versionData, channelOverride, devicesOverride } = requestedInto
+    let { channelData } = requestedInto
 
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
@@ -278,6 +295,12 @@ export async function update(body: AppInfos) {
         error: 'no_channel',
       }, 200)
     }
+
+    // Trigger only if the channel is overwriten but the version is not
+    if (channelOverride && !devicesOverride)
+      // deno-lint-ignore no-explicit-any
+      channelData = channelOverride.channel_id as any
+
     let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
     const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
@@ -332,9 +355,9 @@ export async function update(body: AppInfos) {
       plugin_version,
       version: stat.version,
       os_version: version_os,
-      ...(is_emulator != null ? { is_emulator } : {}),
-      ...(is_prod != null ? { is_prod } : {}),
-      ...(custom_id != null ? { custom_id } : {}),
+      is_emulator,
+      is_prod,
+      custom_id,
       version_build,
       updated_at: new Date().toISOString(),
     }
@@ -410,7 +433,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (channelData.disableAutoUpdateToMajor && semver.major(version.name) > semver.major(version_name)) {
+      if (channelData.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id)
         await sendStats([{
           ...stat,
@@ -423,6 +446,56 @@ export async function update(body: AppInfos) {
           version: version.name,
           old: version_name,
         }, 200, updateOverwritten)
+      }
+
+      if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
+        console.log(id, 'Cannot upgrade minor version', device_id)
+        await sendStats([{
+          ...stat,
+          action: 'disableAutoUpdateToMinor',
+        }])
+        return sendResWithStatus('fail', {
+          major: true,
+          message: 'Cannot upgrade minor version',
+          error: 'disable_auto_update_to_minor',
+          version: version.name,
+          old: version_name,
+        }, 200, updateOverwritten)
+      }
+
+      if (channelData.disableAutoUpdate === 'version_number') {
+        const minUpdateVersion = version.minUpdateVersion
+
+        // The channel is misconfigured
+        if (minUpdateVersion === null) {
+          console.log(id, 'Channel is misconfigured', channelData.name)
+          await sendStats([{
+            ...stat,
+            action: 'channelMisconfigured',
+          }])
+          return sendResWithStatus('fail', {
+            message: `Channel ${channelData.name} is misconfigured`,
+            error: 'misconfigured_channel',
+            version: version.name,
+            old: version_name,
+          }, 200, updateOverwritten)
+        }
+
+        // Check if the minVersion is greater then the current version
+        if (semver.gt(minUpdateVersion, version_name)) {
+          console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name)
+          await sendStats([{
+            ...stat,
+            action: 'disableAutoUpdateMetadata',
+          }])
+          return sendResWithStatus('fail', {
+            major: true,
+            message: 'Cannot upgrade version, min update version > current version',
+            error: 'disable_auto_update_to_metadata',
+            version: version.name,
+            old: version_name,
+          }, 200, updateOverwritten)
+        }
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)

@@ -1,5 +1,5 @@
-import type { RunnableTest, SupabaseType } from '../../utils.ts'
-import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, responseOk, sendUpdate } from '../../utils.ts'
+import type { RunnableTest, SupabaseType, updateAndroidBaseData } from '../../utils.ts'
+import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, getResponseError, responseOk, sendUpdate } from '../../utils.ts'
 
 export function getTest(): RunnableTest {
   return {
@@ -79,6 +79,41 @@ async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
   await responseOk(failMajorResponse, 'Disable auto update to major')
   const failMajorError = await getResponseError(failMajorResponse)
   assert(failMajorError === 'disable_auto_update_to_major', `Response error ${failMajorError} is not equal to disable_auto_update_to_major`)
+
+  const setDisableUpdateMinor = await supabase.from('channels').update({ disableAutoUpdate: 'minor' }).eq('id', 22)
+  assert(setDisableUpdateMinor.error === null, `Supabase set minor update error ${JSON.stringify(setDisableUpdateMinor.error)} is not null`)
+
+  // 3 seconds of delay so that supabase can invalidate the data
+  await delay(3000)
+
+  try {
+    // Set version to 1.361.0
+    const setVersionResult = await supabase.from('channels').update({ version: 9653 }).eq('id', 22)
+    assert(setVersionResult.error === null, `Supabase version error ${JSON.stringify(setVersionResult.error)} is not null`)
+
+    // Nested becouse it has to be that way
+
+    try {
+      const autoUpdateMinorFailData = getBaseData()
+      autoUpdateMinorFailData.version_name = '1.1.0'
+      const failMinorResponse = await sendUpdate(backendBaseUrl, autoUpdateMinorFailData)
+      await responseOk(failMinorResponse, 'Disable auto update to minor')
+      const failMinorError = await getResponseError(failMinorResponse)
+      assert(failMinorError === 'disable_auto_update_to_minor', `Response error ${failMinorError} is not equal to disable_auto_update_to_minor`)
+    }
+    finally {
+      // Revert version to 1.0.0
+      const setVersionResult = await supabase.from('channels').update({ version: 9654 }).eq('id', 22)
+      assert(setVersionResult.error === null, `Supabase version error ${JSON.stringify(setVersionResult.error)} is not null`)
+    }
+  }
+  finally {
+    const setDisableUpdateMajor = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+    assert(setDisableUpdateMajor.error === null, `Supabase set minor update error ${JSON.stringify(setDisableUpdateMajor.error)} is not null`)
+
+    // 3 seconds of delay so that supabase can invalidate the data
+    await delay(3000)
+  }
 
   const disableAutoUpdateUnderNativeData = getBaseData()
   disableAutoUpdateUnderNativeData.version_build = '2.0.0'
@@ -174,6 +209,40 @@ async function testUpdateEndpoint(backendBaseUrl: URL, supabase: SupabaseType) {
       assert(overwriteChannelJson.url !== undefined, `Response ${JSON.stringify(overwriteChannelJson)} has no url`)
       assert(overwriteChannelJson.version !== undefined, `Response ${JSON.stringify(overwriteChannelJson)} has no version`)
       assert(overwriteChannelJson.version === '1.361.0', `Response ${JSON.stringify(overwriteChannelJson)} version is not equal to 1.361.0`)
+
+      // That is not the end. Let's make sure that the channel update will succeed if the overwriten channel as a different update strategy
+      const { error: changeOverwritenChannelStrategyError } = await supabase
+        .from('channels')
+        .update({ disableAutoUpdate: 'none' })
+        .eq('id', 23)
+
+      assert(changeOverwritenChannelStrategyError === null, `Supabase changeOverwritenChannelStrategyError error ${JSON.stringify(changeOverwritenChannelStrategyError)} is not null`)
+
+      // 3 seconds of delay so that supabase can invalidate the data
+      await delay(3000)
+
+      try {
+        const overwrittenChannelData2 = structuredClone(newDeviceData) as typeof updateAndroidBaseData
+        overwrittenChannelData2.version_name = '0.0.0'
+
+        const overwrittenChannelResponse2 = await sendUpdate(backendBaseUrl, overwrittenChannelData2)
+        await responseOk(overwrittenChannelResponse2, 'Overwrite channel version 2')
+        const overwriteChannelJson2 = await overwrittenChannelResponse2.json()
+        assert(overwriteChannelJson2.url !== undefined, `Response ${JSON.stringify(overwriteChannelJson2)} has no url`)
+        assert(overwriteChannelJson2.version !== undefined, `Response ${JSON.stringify(overwriteChannelJson2)} has no version`)
+        assert(overwriteChannelJson2.version === '1.361.0', `Response ${JSON.stringify(overwriteChannelJson2)} version is not equal to 1.361.0`)
+      }
+      finally {
+        const { error: changeOverwritenChannelStrategyError } = await supabase
+          .from('channels')
+          .update({ disableAutoUpdate: 'major' })
+          .eq('id', 23)
+
+        assert(changeOverwritenChannelStrategyError === null, `Supabase changeOverwritenChannelStrategyError error ${JSON.stringify(changeOverwritenChannelStrategyError)} is not null`)
+
+        // 3 seconds of delay so that supabase can invalidate the data
+        await delay(3000)
+      }
     }
     finally {
       const { error: deleteChannelDeviceError } = await supabase.from('channel_devices').delete().eq('device_id', channelOverwriteData.device_id)
@@ -355,11 +424,4 @@ async function testForIos(backendBaseUrl: URL, supabase: SupabaseType) {
     const { error: deleteDeviceError } = await supabase.from('devices').delete().eq('device_id', baseDataIos.device_id)
     assert(deleteDeviceError === null, `Supabase delete device IOS error ${JSON.stringify(deleteDeviceError)} is not null`)
   }
-}
-
-async function getResponseError(response: Response): Promise<string> {
-  const json = await response.json()
-  assert(json.error !== undefined, `Response ${JSON.stringify(json)} has no error`)
-
-  return json.error
 }

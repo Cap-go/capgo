@@ -113,14 +113,15 @@ async function getChannel() {
             name,
             app_id,
             bucket_id,
-            created_at
+            created_at,
+            minUpdateVersion
           ),
           created_at,
           allow_emulator,
           allow_dev,
           allow_device_self_set,
           disableAutoUpdateUnderNative,
-          disableAutoUpdateToMajor,
+          disableAutoUpdate,
           ios,
           android,
           updated_at,
@@ -129,7 +130,8 @@ async function getChannel() {
           secondaryVersionPercentage,
           secondVersion (
             name,
-            id
+            id,
+            minUpdateVersion
           )
         `)
       .eq('id', id.value)
@@ -301,6 +303,8 @@ async function enableAbTesting() {
     channel.value.enableAbTesting = val
     toast.success(val ? t('enabled-ab-testing') : t('disable-ab-testing'))
   }
+
+  await reload()
 }
 
 async function enableProgressiveDeploy() {
@@ -358,6 +362,26 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
     event.preventDefault()
   }
 }
+
+async function onChangeAutoUpdate(event: Event) {
+  const value = (event.target as HTMLSelectElement).value as Database['public']['Enums']['disable_update']
+
+  if (value === 'version_number') {
+    if (!channel.value?.version.minUpdateVersion)
+      toast.error(t('metadata-min-ver-not-set'))
+  }
+
+  const { error } = await supabase
+    .from('channels')
+    .update({ disableAutoUpdate: value })
+    .eq('id', id.value)
+
+  if (error)
+    console.error(error)
+
+  if (channel.value?.disableAutoUpdate)
+    channel.value.disableAutoUpdate = value
+}
 </script>
 
 <template>
@@ -368,15 +392,26 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
-          <InfoRow v-if="!channel.enableAbTesting && !channel.enable_progressive_deploy" :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle()" />
+          <template v-if="!channel.enableAbTesting && !channel.enable_progressive_deploy">
+            <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle()" />
+            <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="t('min-update-version')" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
+          </template>
           <template v-else-if="channel.enableAbTesting && !channel.enable_progressive_deploy">
-            <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle()" />
             <InfoRow :label="`${t('bundle-number')} B`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
+            <template v-if="channel.disableAutoUpdate === 'version_number'">
+              <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
+              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.secondVersion.minUpdateVersion ?? t('undefined-fail')" />
+            </template>
           </template>
           <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle" />
+            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle()" />
             <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.secondVersion.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
             <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : (channel.secondaryVersionPercentage !== 0 ? `${((channel.secondaryVersionPercentage * 100) | 0)}%` : t('status-failed'))" />
+            <template v-if="channel.disableAutoUpdate === 'version_number'">
+              <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
+              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.secondVersion.minUpdateVersion ?? t('undefined-fail')" />
+            </template>
           </template>
           <!-- Created At -->
           <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
@@ -429,7 +464,7 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg text-gray-700 dark:text-gray-200">
+            <!-- <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
                   class="-my-1 k-color-success"
@@ -437,6 +472,24 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
                   :checked="channel?.disableAutoUpdateToMajor"
                   @change="saveChannelChange('disableAutoUpdateToMajor', !channel?.disableAutoUpdateToMajor)"
                 />
+              </template>
+            </k-list-item> -->
+            <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
+              <template #after>
+                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @change="(event) => onChangeAutoUpdate(event)">
+                  <option value="major">
+                    {{ t('major') }}
+                  </option>
+                  <option value="minor">
+                    {{ t('minor') }}
+                  </option>
+                  <option value="version_number">
+                    {{ t('metadata') }}
+                  </option>
+                  <option value="none">
+                    {{ t('none') }}
+                  </option>
+                </select>
               </template>
             </k-list-item>
             <k-list-item label :title="t('allow-develoment-bui')" class="text-lg text-gray-700 dark:text-gray-200">

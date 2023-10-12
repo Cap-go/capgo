@@ -23,7 +23,7 @@ export const corsHeaders = {
 }
 
 // Regex for Zod validation of an app id
-export const reverseDomainRegex = /^[a-z0-9]+(\.[a-z0-9]+)+$/i
+export const reverseDomainRegex = /^[a-z0-9]+(\.[a-z0-9_-]+)+$/i
 
 // Regex for Zod validation of a device id. Examples:
 //    44f128a5-ac7a-4c9a-be4c-224b6bf81b20 (android)
@@ -93,6 +93,10 @@ export function sendRes(data: any = { status: 'ok' }, statusCode = 200) {
   return sendResText(JSON.stringify(data), statusCode)
 }
 
+export function appendHeaders(res: Response, key: string, value: string) {
+  res.headers.append(key, value)
+}
+
 export function sendResText(data: string, statusCode = 200) {
   if (statusCode >= 400)
     console.error('sendRes error', JSON.stringify(data, null, 2))
@@ -115,6 +119,25 @@ export function sendOptionsRes() {
       },
     },
   )
+}
+
+interface LimitedApp {
+  id: string
+  ignore: number
+}
+
+export function isLimited(id: string) {
+  const limits = getEnv('LIMITED_APPS')
+  if (!limits)
+    return false
+  const apps = JSON.parse(limits) as LimitedApp[]
+  const app = apps.find(a => a.id === id)
+  if (!app || app.ignore === 0)
+    return false
+  if (app.ignore === 1)
+    return true
+  // check is Math.random() < ignore
+  return Math.random() < app.ignore
 }
 
 export function getEnv(key: string): string {

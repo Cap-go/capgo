@@ -4,9 +4,9 @@ import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import {
   INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME,
   MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS,
-  deviceIdRegex, methodJson, reverseDomainRegex, sendRes,
+  deviceIdRegex, isLimited, methodJson, reverseDomainRegex, sendRes,
 } from '../_utils/utils.ts'
-import { sendDevice, sendStats, supabaseAdmin, updateOnpremStats } from '../_utils/supabase.ts'
+import { getSDevice, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
@@ -58,6 +58,12 @@ export const jsonRequestSchema = z.object({
 async function main(url: URL, headers: BaseHeaders, method: string, body: AppStats) {
   try {
     console.log('body', body)
+    if (isLimited(body.app_id)) {
+      return sendRes({
+        message: 'Too many requests',
+        error: 'too_many_requests',
+      }, 200)
+    }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success)
       return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
@@ -85,24 +91,24 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       .select('app_id')
       .eq('app_id', app_id)
       .single()
-
     if (!appOwner) {
-      if (app_id) {
-        await supabaseAdmin()
-          .from('store_apps')
-          .upsert({
-            app_id,
-            onprem: true,
-            capacitor: true,
-            capgo: true,
-          })
-      }
-      if (action === 'get') {
-        await updateOnpremStats({
-          app_id,
-          updates: 1,
-        })
-      }
+      // TODO: transfer to clickhouse
+      // if (app_id) {
+      //   await supabaseAdmin()
+      //     .from('store_apps')
+      //     .upsert({
+      //       app_id,
+      //       onprem: true,
+      //       capacitor: true,
+      //       capgo: true,
+      //     })
+      // }
+      // if (action === 'get') {
+      //   await updateOnpremStats({
+      //     app_id,
+      //     updates: 1,
+      //   })
+      // }
       return sendRes({
         message: 'App not found',
         error: 'app_not_found',
@@ -122,7 +128,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       version: version_name || 'unknown' as any,
       is_emulator: is_emulator == null ? false : is_emulator,
       is_prod: is_prod == null ? true : is_prod,
-      ...(custom_id != null ? { custom_id } : {}),
+      custom_id,
     }
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
@@ -145,19 +151,18 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       stat.version = appVersion.id
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
-        const { data: deviceData } = await supabaseAdmin()
-          .from('devices')
-          .select()
-          .eq('app_id', app_id)
-          .eq('device_id', device_id)
-          .single()
-        if (deviceData && deviceData.version !== appVersion.id) {
-          const statUninstall: Database['public']['Tables']['stats']['Insert'] = {
-            ...stat,
-            action: 'uninstall',
-            version: deviceData.version,
+        const res = await getSDevice('', body.app_id, undefined, [body.device_id])
+        if (res && res.data && res.data.length) {
+          const oldDevice = res.data[0]
+          const oldVersion = oldDevice.version
+          if (oldVersion !== appVersion.id) {
+            const statUninstall: Database['public']['Tables']['stats']['Insert'] = {
+              ...stat,
+              action: 'uninstall',
+              version: oldVersion,
+            }
+            rows.push(statUninstall)
           }
-          rows.push(statUninstall)
         }
       }
       else if (failActions.includes(action)) {
