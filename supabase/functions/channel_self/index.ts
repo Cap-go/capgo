@@ -1,17 +1,52 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import z from 'https://deno.land/x/zod@v3.22.2/index.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
-import { methodJson, sendRes } from '../_utils/utils.ts'
+import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, methodJson, reverseDomainRegex, sendRes } from '../_utils/utils.ts'
 import { redisDeviceInvalidate } from '../_utils/redis.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
 }
 
+export const jsonRequestSchema = z.object({
+  app_id: z.string({
+    required_error: MISSING_STRING_APP_ID,
+    invalid_type_error: NON_STRING_APP_ID,
+  }),
+  device_id: z.string({
+    required_error: MISSING_STRING_DEVICE_ID,
+    invalid_type_error: NON_STRING_DEVICE_ID,
+  }).max(36),
+  version_name: z.string({
+    required_error: MISSING_STRING_VERSION_NAME,
+    invalid_type_error: NON_STRING_VERSION_NAME,
+  }),
+  version_build: z.string({
+    required_error: MISSING_STRING_VERSION_BUILD,
+    invalid_type_error: NON_STRING_VERSION_BUILD,
+  }),
+  is_emulator: z.boolean().default(false),
+  is_prod: z.boolean().default(true),
+}).refine(data => reverseDomainRegex.test(data.app_id), {
+  message: INVALID_STRING_APP_ID,
+}).refine(data => deviceIdRegex.test(data.device_id), {
+  message: INVALID_STRING_DEVICE_ID,
+}).transform((val) => {
+  if (val.version_name === 'builtin')
+    val.version_name = val.version_build
+
+  return val
+})
+
 async function post(body: DeviceLink): Promise<Response> {
   console.log('body', body)
+  const parseResult: any = jsonRequestSchema.safeParse(body)
+  if (!parseResult.success)
+    return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
+
   let {
     version_name,
     version_build,
