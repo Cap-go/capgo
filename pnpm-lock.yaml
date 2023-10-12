@@ -111,8 +111,8 @@ dependencies:
     specifier: ^5.0.0
     version: 5.0.0(@capacitor/core@5.4.2)
   '@capgo/capacitor-updater':
-    specifier: 5.2.22
-    version: 5.2.22(@capacitor/core@5.4.2)
+    specifier: 5.3.13
+    version: 5.3.13(@capacitor/core@5.4.2)
   '@capgo/google-play-scraper':
     specifier: ^9.1.2
     version: 9.1.2
@@ -2375,8 +2375,8 @@ packages:
       '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-updater@5.2.22(@capacitor/core@5.4.2):
-    resolution: {integrity: sha512-M9/wmZbJkgZfQD+KkxEAvnQ2HdK24hps3KH3/KQsEG2Yd34bBKk6YL/8DTyMBdzj0OJROwPNwHOZWK5OF2R74A==}
+  /@capgo/capacitor-updater@5.3.13(@capacitor/core@5.4.2):
+    resolution: {integrity: sha512-3+iDyVnd8cJ2SciEuskBUglJJj1A/BvkwU0W/KgaJHLpV56lopX4CHOonLysHuN+7ZLp6eXIrUVba26i2pq2dA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
