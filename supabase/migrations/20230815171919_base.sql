@@ -1470,7 +1470,6 @@ CREATE TABLE "public"."deleted_account" (
 
 -- first value shouldn't be visible in supabase because of ReplacingMergeTree
 
-
 --  In supabase
 -- create foreign table clickhouse_devices (
 --     created_at timestamp,
@@ -1489,8 +1488,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
---     table 'devices',
---     rowid_column 'device_id'
+--     table 'devices'
 --   );
 
 -- create foreign table clickhouse_devices_u (
@@ -1510,8 +1508,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
---     table 'devices_u',
---     rowid_column 'device_id'
+--     table 'devices_u'
 --   );
 
 -- TEST COPY existing data from postgres to clickhouse
@@ -1723,8 +1720,7 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 -- )
 --   server clickhouse_server
 --   options (
---     table 'logs',
---     rowid_column 'id'
+--     table 'logs'
 --   );
 
 
