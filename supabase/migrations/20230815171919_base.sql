@@ -1419,7 +1419,7 @@ CREATE TABLE "public"."deleted_account" (
 
 -- Create clickhouse connection (require for big apps)
 
-CREATE OR REPLACE FUNCTION clickhouse_exist()
+CREATE OR REPLACE FUNCTION "public".clickhouse_exist()
 RETURNS BOOLEAN AS $$
 BEGIN
    RETURN (
