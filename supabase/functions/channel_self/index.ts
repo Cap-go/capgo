@@ -44,8 +44,10 @@ export const jsonRequestSchema = z.object({
 async function post(body: DeviceLink): Promise<Response> {
   console.log('body', body)
   const parseResult: any = jsonRequestSchema.safeParse(body)
-  if (!parseResult.success)
+  if (!parseResult.success) {
+    console.error('Cannot parse json', { parseResult })
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
+  }
 
   let {
     version_name,
@@ -67,6 +69,7 @@ async function post(body: DeviceLink): Promise<Response> {
     version_build = coerce.version
   }
   else {
+    console.error('Cannot find version', { version_build })
     return sendRes({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
@@ -75,6 +78,7 @@ async function post(body: DeviceLink): Promise<Response> {
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
   if (!device_id || !app_id) {
+    console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
     return sendRes({
       message: 'Cannot find device_id or appi_id',
       error: 'missing_info',
@@ -90,6 +94,7 @@ async function post(body: DeviceLink): Promise<Response> {
     .single()
 
   if (!version) {
+    console.error('Cannot find version', { version_name })
     return sendRes({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
@@ -141,8 +146,13 @@ async function post(body: DeviceLink): Promise<Response> {
       .eq('name', channel)
       .eq('allow_device_self_set', true)
       .single()
-    if (dbError || !dataChannel)
-      return sendRes({ message: `Cannot find channel ${JSON.stringify(dbError)}`, error: 'channel_not_found' }, 400)
+    if (dbError || !dataChannel) {
+      console.error('Cannot find channel', { dbError, dataChannel })
+      return sendRes({
+        message: `Cannot find channel ${JSON.stringify(dbError)}`,
+        error: 'channel_not_found',
+      }, 400)
+    }
 
     const { error: dbErrorDev } = await supabaseAdmin()
       .from('channel_devices')
@@ -152,8 +162,13 @@ async function post(body: DeviceLink): Promise<Response> {
         app_id,
         created_by: dataChannel.created_by,
       })
-    if (dbErrorDev)
-      return sendRes({ message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`, error: 'override_not_allowed' }, 400)
+    if (dbErrorDev) {
+      console.error('Cannot do channel override', { dbErrorDev })
+      return sendRes({
+        message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+        error: 'override_not_allowed',
+      }, 400)
+    }
   }
   await sendStats([{
     action: 'setChannel',
@@ -188,8 +203,10 @@ async function put(body: DeviceLink): Promise<Response> {
   else
     return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-  if (!device_id || !app_id)
+  if (!device_id || !app_id) {
+    console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
     return sendRes({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
+  }
 
   const { data: version } = await supabaseAdmin()
     .from('app_versions')
@@ -201,6 +218,7 @@ async function put(body: DeviceLink): Promise<Response> {
     .single()
 
   if (!version) {
+    console.error('Cannot find version', { version_name })
     return sendRes({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
@@ -250,6 +268,7 @@ async function put(body: DeviceLink): Promise<Response> {
     })
   }
   if (errorChannel) {
+    console.error('Cannot find channel', { errorChannel })
     return sendRes({
       message: `Cannot find channel ${JSON.stringify(errorChannel)}`,
       error: 'channel_not_found',
@@ -269,6 +288,7 @@ async function put(body: DeviceLink): Promise<Response> {
       status: 'default',
     })
   }
+  console.error('Cannot find channel', { dataChannel, errorChannel })
   return sendRes({
     message: 'Cannot find channel',
     error: 'channel_not_found',

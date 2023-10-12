@@ -55,16 +55,6 @@ export function supabaseAdmin() {
   return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
-async function allObject<T extends string, R>(all: { [key in T]: PromiseLike<R> }) {
-  const allAwaited: { [key in T]: number } = await Object
-    .entries(all)
-    .reduce(async (acc, [key, value]) => ({
-      ...await acc,
-      [key]: await value,
-    }), Promise.resolve({} as { [key in T]: number }))
-  return allAwaited
-}
-
 export function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
   console.log('updateOrCreateVersion', update)
   return supabaseAdmin()
