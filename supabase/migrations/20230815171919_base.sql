@@ -594,7 +594,7 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RE
 Begin
     RETURN is_trial(userid) > 0
       or is_free_usage(userid)
-      or (is_good_plan_v3(userid) and is_paying(userid));
+      or is_paying_and_good_plan(userid);
 End;
 $$;
 
@@ -1140,6 +1140,26 @@ CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed"() RETURNS boolean
     AS $$
 Begin
   RETURN is_onboarding_needed(auth.uid());
+End;
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"("userid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  from stripe_info
+  where customer_id=(SELECT customer_id from users where id=userid)
+  AND is_good_plan = true
+  AND status = 'succeeded'));
+End;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_paying(auth.uid());
 End;
 $$;
 
