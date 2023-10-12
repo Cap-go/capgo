@@ -1,0 +1,18 @@
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  test_base_sql:
+    runs-on: ubuntu-latest	
+    name: "Test if base.sql is valid"
+    steps:
+      - name: "Checkout capgo"
+        uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        with:
+          version: 1.100.1
+        uses: supabase/setup-cli@v1
+      - name: Run Supabase Start
+        run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
