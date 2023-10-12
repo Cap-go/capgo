@@ -45,6 +45,7 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
   )
     .then(res => res.text())
     .then(data => console.log('sendDeviceToClickHouse', data))
+    .catch(e => console.log('sendDeviceToClickHouse error', e))
 }
 
 export function sendLogToClickHouse(logs: Database['public']['Tables']['stats']['Insert'][]) {
@@ -72,6 +73,7 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
   )
     .then(res => res.text())
     .then(data => console.log('sendLogToClickHouse', data))
+    .catch(e => console.log('sendLogToClickHouse error', e))
 }
 
 // app_id?: string
