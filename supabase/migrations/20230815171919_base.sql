@@ -592,9 +592,7 @@ CREATE OR REPLACE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RE
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
-    RETURN is_trial(userid) > 0
-      or is_free_usage(userid)
-      or is_paying_and_good_plan(userid);
+    RETURN is_paying_and_good_plan(userid);
 End;
 $$;
 
