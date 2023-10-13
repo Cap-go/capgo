@@ -197,6 +197,7 @@ export async function update(body: AppInfos) {
       //       capgo: true,
       //     })
       // }
+      console.log(id, 'App not found', app_id)
       return sendResWithStatus('app_not_found', {
         message: 'App not found',
         error: 'app_not_found',

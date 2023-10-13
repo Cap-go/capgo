@@ -58,8 +58,10 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
     }, 200)
   }
   const parseResult = jsonRequestSchema.safeParse(body)
-  if (!parseResult.success)
+  if (!parseResult.success) {
+    console.log('parseResult', body, parseResult.error)
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
+  }
   // const redis = null
   const redis = await getRedis()
 

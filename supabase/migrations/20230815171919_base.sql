@@ -1884,6 +1884,9 @@ ALTER TABLE ONLY "public"."deleted_account"
 ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_pkey" PRIMARY KEY ("device_id");
 
+ALTER TABLE ONLY "public"."channel_devices"
+    ADD CONSTRAINT "channel_devices_pkey" PRIMARY KEY ("device_id");
+
 ALTER TABLE ONLY "public"."devices"
     ADD CONSTRAINT "devices_pkey" PRIMARY KEY ("device_id");
 
@@ -2165,9 +2168,6 @@ ALTER TABLE ONLY "public"."channel_devices"
 ALTER TABLE ONLY "public"."channel_devices"
     ADD CONSTRAINT "channel_devices_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id");
 
-ALTER TABLE ONLY "public"."channel_devices"
-    ADD CONSTRAINT "channel_devices_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("device_id") ON DELETE CASCADE;
-
 ALTER TABLE ONLY "public"."channel_users"
     ADD CONSTRAINT "channel_users_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -2195,9 +2195,6 @@ ALTER TABLE ONLY "public"."channels"
 ALTER TABLE ONLY "public"."devices"
     ADD CONSTRAINT "devices_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
-ALTER TABLE ONLY "public"."devices"
-    ADD CONSTRAINT "devices_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
-
 ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -2205,19 +2202,7 @@ ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id");
 
 ALTER TABLE ONLY "public"."devices_override"
-    ADD CONSTRAINT "devices_override_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("device_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."stats"
-    ADD CONSTRAINT "logs_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."stats"
-    ADD CONSTRAINT "logs_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("device_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."stats"
-    ADD CONSTRAINT "logs_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id");
