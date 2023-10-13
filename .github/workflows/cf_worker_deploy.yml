@@ -39,7 +39,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Deploy CF Worker
-        run: npx wranger deploy ./cloudflare_workers/loadbanlancer.js
+        run: npx wrangler deploy ./cloudflare_workers/loadbanlancer.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
