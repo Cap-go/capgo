@@ -306,27 +306,24 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
 
   let tableName: 'devices' | 'clickhouse_devices_u' = 'devices'
   let client = supabaseClient(auth)
-  if (!auth) {
+  if (!auth)
     client = supabaseAdmin()
-  }
-  else {
-    const reqClickHouse = await client
-      .rpc('clickhouse_exist')
+  const reqClickHouse = await client
+    .rpc('clickhouse_exist')
+    .then(res => res.data || false)
+  if (reqClickHouse) {
+    tableName = 'clickhouse_devices_u'
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
       .then(res => res.data || false)
-    if (reqClickHouse) {
-      tableName = 'clickhouse_devices_u'
-      const reqOwner = await client
-        .rpc('is_app_owner', { appid: appId })
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
         .then(res => res.data || false)
-      if (!reqOwner) {
-        const reqAdmin = await client
-          .rpc('is_admin')
-          .then(res => res.data || false)
-        if (!reqAdmin)
-          return Promise.reject(new Error('not allowed'))
-      }
-      client = supabaseAdmin()
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
     }
+    client = supabaseAdmin()
   }
   const reqCount = client
     .from(tableName)
@@ -393,27 +390,25 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   // ] 0 9
   let tableName: 'stats' | 'clickhouse_stats' = 'stats'
   let client = supabaseClient(auth)
-  if (!auth) {
+  if (!auth)
     client = supabaseAdmin()
-  }
-  else {
-    const reqClickHouse = await client
-      .rpc('clickhouse_exist')
+
+  const reqClickHouse = await client
+    .rpc('clickhouse_exist')
+    .then(res => res.data || false)
+  if (reqClickHouse) {
+    tableName = 'clickhouse_stats'
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
       .then(res => res.data || false)
-    if (reqClickHouse) {
-      tableName = 'clickhouse_stats'
-      const reqOwner = await client
-        .rpc('is_app_owner', { appid: appId })
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
         .then(res => res.data || false)
-      if (!reqOwner) {
-        const reqAdmin = await client
-          .rpc('is_admin')
-          .then(res => res.data || false)
-        if (!reqAdmin)
-          return Promise.reject(new Error('not allowed'))
-      }
-      client = supabaseAdmin()
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
     }
+    client = supabaseAdmin()
   }
 
   const reqCount = client
