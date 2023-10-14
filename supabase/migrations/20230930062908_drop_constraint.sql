@@ -1,8 +1,4 @@
 ALTER TABLE devices DROP CONSTRAINT devices_app_id_fkey;
-ALTER TABLE devices DROP CONSTRAINT devices_version_fkey;
-ALTER TABLE stats DROP CONSTRAINT logs_app_id_fkey;
-ALTER TABLE stats DROP CONSTRAINT logs_device_id_fkey;
-ALTER TABLE stats DROP CONSTRAINT logs_version_fkey;
 
 CREATE FUNCTION on_app_delete_sql() RETURNS TRIGGER AS $_$
 BEGIN
