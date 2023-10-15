@@ -8,7 +8,7 @@ import { getSupabaseSecret, getUpdateBaseData, responseOk, sendUpdate, testPlayw
 
 let cliPath: string | null = null
 let appPath: string | null = null
-const semver = `1.0.${Date.now()}`
+let semver = `1.0.${Date.now()}`
 
 // This comes from seed.sql
 const defaultApiKey = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
@@ -16,8 +16,7 @@ const defaultPackageJson = `{
   "name": "test-cli-app",
   "version": "1.0.0",
   "description": "An Amazing Test App",
-  "dependencies": {
-  },
+  "dependencies": %DEPENDENCIES%,
   "devDependencies": {
     "@capacitor/cli": "^5.4.1",
     "typescript": "^5.2.2"
@@ -27,6 +26,9 @@ const defaultPackageJson = `{
 const indexJsCode
 = `console.log('Hello world!!!');
 notifyAppReady();\n`
+
+let tempFileFolder = ''
+let dependencies = {} as Record<string, string>
 
 function generateDefaultJsonCliConfig(baseUrl: URL) {
   return {
@@ -88,6 +90,11 @@ export function getTest(): RunnableTest {
         test: testSelectableDisallow,
         timesToExecute: 1,
       },
+      {
+        name: 'Test compatibility table',
+        test: testCompatibilityTable,
+        timesToExecute: 1,
+      },
     ],
   }
 }
@@ -106,14 +113,26 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
   cliPath = await Deno.realPath(indexPathRelative)
 
   const defaultConfig = generateCliConfig(backendBaseUrl)
-  const tempFileFolder = await Deno.makeTempDir()
+  tempFileFolder = await Deno.makeTempDir()
   const capacitorConfigPath = `${tempFileFolder}/capacitor.config.ts`
   await Deno.writeTextFile(capacitorConfigPath, defaultConfig)
   await Deno.mkdir(`${tempFileFolder}/dist`)
   await Deno.writeTextFile(`${tempFileFolder}/dist/index.js`, indexJsCode)
   await Deno.writeTextFile(`${tempFileFolder}/dist/index.html`, '')
-  await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson)
+  await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson.replace('%DEPENDENCIES%', JSON.stringify(dependencies)))
 
+  appPath = tempFileFolder
+
+  await pnpmInstall()
+
+  // We set the channel update scheme to major
+  // id 22 = production
+  const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+
+  assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
+}
+
+async function pnpmInstall() {
   const pnpmInstallCommand = new Deno.Command('pnpm', {
     args: ['install'],
     cwd: tempFileFolder,
@@ -130,14 +149,6 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
     console.log('stderr', stderr)
     throw new Error('pnpm install failed')
   }
-
-  appPath = tempFileFolder
-
-  // We set the channel update scheme to major
-  // id 22 = production
-  const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
-
-  assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
 }
 
 async function runCli(params: string[], logOutput = false): Promise<string> {
@@ -228,6 +239,64 @@ async function testSelectableDisallow(_backendBaseUrl: URL, supabase: SupabaseTy
 
     assert(error === null, `Supabase channel update error (2) ${JSON.stringify(error)} is not null`)
   }
+}
+
+async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseType) {
+  dependencies = {
+    '@capacitor/android': '^4.5.0',
+  }
+  await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson.replace('%DEPENDENCIES%', JSON.stringify(dependencies)))
+
+  await pnpmInstall()
+
+  let cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
+  let androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
+
+  assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
+  let androidPackageSplit = androidPackage!.split('│').slice(2, -1)
+  assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
+
+  assert(androidPackageSplit[1].includes('4.5.0'), `Android local package version is not 4.5.0 (It is ${androidPackageSplit[1]})`)
+  assert(androidPackageSplit[0].includes('@capacitor/android'), `Android package name is not @capacitor/android (It is ${androidPackageSplit[0]})`)
+  assert(androidPackageSplit[2].includes('None'), `Android remote package version is not none (It is ${androidPackageSplit[2]})`)
+  assert(androidPackageSplit[3].includes('❌'), `Android compatible is not a red cross (It is ${androidPackageSplit[3]})`)
+
+  // Let's upload now a new version
+  const lastNumber = Number.parseInt(semver.charAt(semver.length - 1))
+  const newSemver = `${semver.slice(0, -1)}${(lastNumber + 1).toString()}`
+
+  semver = newSemver
+  const uploadCli = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
+  assert(uploadCli.includes('Time to share your update to the world'), `CLI output does not include 'Time to share your update to the world'. CLI output:\n${uploadCli}`)
+
+  // Let's re run the compatibility table
+  cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
+  androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
+
+  assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
+  androidPackageSplit = androidPackage!.split('│').slice(2, -1)
+  assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
+
+  assert(androidPackageSplit[1].includes('4.5.0'), `Android local package version is not 4.5.0 (It is ${androidPackageSplit[1]})`)
+  assert(androidPackageSplit[0].includes('@capacitor/android'), `Android package name is not @capacitor/android (It is ${androidPackageSplit[0]})`)
+  assert(androidPackageSplit[2].includes('4.5.0'), `Android remote package version is not none (It is ${androidPackageSplit[2]})`)
+  assert(androidPackageSplit[3].includes('✅'), `Android compatible is not a red cross (It is ${androidPackageSplit[3]})`)
+
+  // Now let's remove the package and run the compatibility table again
+  dependencies = {}
+  await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson.replace('%DEPENDENCIES%', JSON.stringify(dependencies)))
+
+  cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
+  androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
+
+  assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
+  androidPackageSplit = androidPackage!.split('│').slice(2, -1)
+  assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
+
+  assert(androidPackageSplit[1].includes('None'), `Android local package version is not 4.5.0 (It is ${androidPackageSplit[1]})`)
+  assert(androidPackageSplit[0].includes('@capacitor/android'), `Android package name is not @capacitor/android (It is ${androidPackageSplit[0]})`)
+  assert(androidPackageSplit[2].includes('4.5.0'), `Android remote package version is not none (It is ${androidPackageSplit[2]})`)
+  assert(androidPackageSplit[3].includes('❌'), `Android compatible is not a red cross (It is ${androidPackageSplit[3]})`)
 }
 
 async function testFrontend(_backendBaseUrl: URL, _supabase: SupabaseType) {
