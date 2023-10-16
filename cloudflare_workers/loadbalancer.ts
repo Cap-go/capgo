@@ -17,6 +17,14 @@ async function fetchWithTimeout(resource: RequestInfo, options: RequestOptions =
   return response
 }
 
+function getPrefixURL(request: Request, urlPrefix: string) {
+  const backupUrl = new URL(request.url)
+  backupUrl.hostname = BACKUP_HOST
+  const end = backupUrl.pathname.split('/').pop()
+  backupUrl.pathname = `/${urlPrefix}/${end}`
+  return backupUrl.toString()
+}
+
 export default {
   async fetch(request: Request) {
     let res: Response
@@ -32,30 +40,24 @@ export default {
       res = await fetchWithTimeout(primaryUrl.toString(), forwardOptions)
     }
     catch (err) {
-      console.log('err', primaryUrl, err)
-      // try the second host
-      const backupUrl = new URL(request.url)
-      backupUrl.hostname = BACKUP_HOST
-      const end = backupUrl.pathname.split('/').pop()
-      // https://web.capgo.app/api-egde/ok
-      backupUrl.pathname = `/api-egde/${end}`
+      console.log(`Error fetching ${primaryUrl}`)
+      console.log(err)
+      // https://web.capgo.app/api-edge/ok
+      const backupUrl = getPrefixURL(request, 'api-egde')
       try {
-        // Use fetchWithTimeout for the backup requests as well
-        res = await fetchWithTimeout(backupUrl.toString(), forwardOptions)
+        res = await fetchWithTimeout(backupUrl, forwardOptions)
       }
-      catch (err) {
-        console.log('err', backupUrl, err)
-        // try the third host
+      catch (err_2) {
+        console.log(`Error fetching ${backupUrl}`)
+        console.log(err_2)
         // https://web.capgo.app/api/ok
-        const backup2Url = new URL(request.url)
-        backup2Url.hostname = BACKUP_HOST
-        const end = backup2Url.pathname.split('/').pop()
-        backup2Url.pathname = `/api/${end}`
+        const backup2Url = getPrefixURL(request, 'api')
         try {
-          res = await fetchWithTimeout(backup2Url.toString(), forwardOptions)
+          res = await fetchWithTimeout(backup2Url, forwardOptions)
         }
-        catch (err) {
-          console.log('err', backup2Url, err)
+        catch (err_3) {
+          console.log(`Error fetching ${backup2Url}`)
+          console.log(err_3)
           return new Response('Error', { status: 500 })
         }
       }
