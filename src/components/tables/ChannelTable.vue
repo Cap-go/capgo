@@ -23,11 +23,20 @@ const props = defineProps<{
   appId: string
 }>()
 
+const emit = defineEmits<{
+  (event: 'misconfigured', misconfigured: boolean): void
+}>()
+
 interface Channel {
   version: {
     name: string
     created_at: string
+    minUpdateVersion: string | null
   }
+  secondVersion: {
+    minUpdateVersion: string | null
+  }
+  misconfigured: boolean | undefined
 }
 const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
 const addChannelModal = ref(false)
@@ -49,6 +58,7 @@ const filters = ref()
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
+
 async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
@@ -119,10 +129,17 @@ async function getData() {
           public,
           version (
             name,
-            created_at
+            created_at,
+            minUpdateVersion
+          ),
+          secondVersion (
+            minUpdateVersion
           ),
           created_at,
-          updated_at
+          updated_at,
+          disableAutoUpdate,
+          enableAbTesting,
+          enable_progressive_deploy
           `, { count: 'exact' })
       .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
@@ -142,6 +159,28 @@ async function getData() {
     elements.value.push(...dataVersions as any)
     // console.log('count', count)
     total.value = count || 0
+
+    // Look for misconfigured channels
+    // This will trigger if the channel disables updates based on metadata + if the metadata is undefined
+    let anyMisconfigured = false
+    const channels = dataVersions
+      .filter(e => e.disableAutoUpdate === 'version_number')
+      .map(e => e as any as typeof element)
+
+    for (const channel of channels) {
+      if (channel.version.minUpdateVersion === null) {
+        channel.misconfigured = true
+        anyMisconfigured = true
+      }
+
+      if ((channel.enable_progressive_deploy || channel.enableAbTesting) && channel.secondVersion.minUpdateVersion === null) {
+        channel.misconfigured = true
+        anyMisconfigured = true
+      }
+    }
+
+    // Inform the parent component if there are any misconfigured channels
+    emit('misconfigured', anyMisconfigured)
   }
   catch (error) {
     console.error(error)
@@ -204,6 +243,12 @@ columns.value = [
     mobile: 'footer',
     sortable: true,
     displayFunction: (elem: typeof element) => elem.version.name,
+  },
+  {
+    label: t('misconfigured'),
+    key: 'misconfigured',
+    mobile: 'footer',
+    displayFunction: (elem: typeof element) => elem.misconfigured ? t('yes') : t('no'),
   },
   {
     label: t('action'),

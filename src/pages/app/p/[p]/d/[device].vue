@@ -111,7 +111,7 @@ async function getChannelOverride() {
         updated_at
       `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value)
+      .eq('device_id', id.value!)
       .single()
       .throwOnError()
     if (error) {
@@ -131,17 +131,27 @@ async function getDeviceOverride() {
       .select(`
       device_id,
       app_id,
-      version (
-          name
-      ),
+      version,
       created_at,
       updated_at
     `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value)
+      .eq('device_id', id.value!)
       .single()
       .throwOnError()
-    deviceOverride.value = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
+
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
+      .select(`
+          name
+      `)
+      .eq('id', data!.version)
+      .single()
+      .throwOnError()
+
+    const overwriteVersion = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
+    overwriteVersion.version = dataVersion! as any as typeof overwriteVersion.version
+    deviceOverride.value = overwriteVersion
   }
   catch (_e) {
     deviceOverride.value = undefined
@@ -151,31 +161,25 @@ async function getDevice() {
   if (!id.value)
     return
   try {
-    const { data } = await supabase
-      .from('devices')
+    const data = await supabase.functions.invoke('get_devices', {
+      body: {
+        appId: packageId.value,
+        deviceIds: [id.value],
+      },
+    }).then(res => res?.data?.data[0])
+    console.log('getDevice', data)
+    const { data: dataVersion } = await supabase
+      .from('app_versions')
       .select(`
-          device_id,
-          app_id,
-          platform,
-          os_version,
-          custom_id,
-          version (
-            name,
-            app_id,
-            bucket_id,
-            created_at
-          ),
-          is_prod,
-          is_emulator,
-          version_build,
-          created_at,
-          plugin_version,
-          updated_at
-        `)
-      .eq('device_id', id.value)
+          name
+      `)
+      .eq('id', data!.version)
       .single()
       .throwOnError()
-    device.value = data as Database['public']['Tables']['devices']['Row'] & Device
+
+    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
+    deviceValue.version = dataVersion! as any as typeof deviceValue.version
+    device.value = deviceValue
     // console.log('device', device.value)
   }
   catch (error) {
@@ -233,12 +237,17 @@ async function saveCustomId() {
   console.log('saveCustomId', device.value?.custom_id)
   if (!device.value?.device_id)
     return
-  await supabase
-    .from('devices')
-    .update({
-      custom_id: device.value?.custom_id,
-    })
-    .eq('device_id', id.value)
+  const { error } = await supabase.functions.invoke('set_custom_id', {
+    body: {
+      appId: packageId.value,
+      deviceId: id.value,
+      customId: device.value?.custom_id,
+    },
+  })
+  if (error) {
+    console.error('saveCustomId', error)
+    return
+  }
   toast.success(t('custom-id-saved'))
 }
 

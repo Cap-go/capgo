@@ -3,7 +3,7 @@ import keys from '../configs.json' assert {type: 'json'}
 
 config()
 
-export const branch = process.env.BRANCH || process.env.GITHUB_HEAD_REF || 'main'
+export const branch = process.env.ENV || process.env.BRANCH || 'main'
 console.log('Branch', branch)
 
 export function getRightKey(keyname) {

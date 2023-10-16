@@ -2,6 +2,9 @@ import { basicHeaders, corsHeaders } from 'supabase/functions/_utils/utils'
 
 // upper is ignored during netlify generation phase
 // import from here
+export function appendHeaders(res: any, key: string, value: string) {
+  res.headers[key] = value
+}
 
 export function sendResText(data: string, statusCode = 200) {
   if (statusCode >= 400)

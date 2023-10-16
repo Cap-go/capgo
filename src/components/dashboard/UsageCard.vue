@@ -13,6 +13,10 @@ const props = defineProps({
     default: () => ({
     }),
   },
+  accumulated: {
+    type: Boolean,
+    default: true,
+  },
   datas: {
     type: Array,
     default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
@@ -24,6 +28,8 @@ function sum(arr: number[]) {
 }
 const total = computed(() => {
   // remove undefined values
+  if (!props.accumulated)
+    return props.datas[props.datas.length - 1] as number
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
   return sum(arrWithoutUndefined as number[])
@@ -31,7 +37,7 @@ const total = computed(() => {
 const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
-  const oldTotal = sum(arrWithoutUndefined.slice(0, -2))
+  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2]
   const diff = total.value - oldTotal
   const res = diff / (arr.length > 2 ? oldTotal : diff) * 100
   return res
@@ -68,7 +74,7 @@ const lastDayEvolution = computed(() => {
 
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <LineChartStats :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" />
+      <LineChartStats :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
     </div>
   </div>
 </template>
