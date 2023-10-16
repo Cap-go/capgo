@@ -3,6 +3,7 @@ import {
   mergeReadableStreams,
 } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import { BlobReader, TextWriter, ZipReader } from 'https://deno.land/x/zipjs/index.js'
+import { inc } from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { type RunnableTest, type SupabaseType, assert } from '../../utils.ts'
 import { getSupabaseSecret, getUpdateBaseData, responseOk, sendUpdate, testPlaywright } from '../../utils.ts'
 
@@ -93,6 +94,11 @@ export function getTest(): RunnableTest {
       {
         name: 'Test compatibility table',
         test: testCompatibilityTable,
+        timesToExecute: 1,
+      },
+      {
+        name: 'Test auto minAutoUpdate flag',
+        test: testAutoMinVersionFlag,
         timesToExecute: 1,
       },
     ],
@@ -241,6 +247,12 @@ async function testSelectableDisallow(_backendBaseUrl: URL, supabase: SupabaseTy
   }
 }
 
+function increaseSemver() {
+  const lastNumber = Number.parseInt(semver.charAt(semver.length - 1))
+  const newSemver = `${semver.slice(0, -1)}${(lastNumber + 1).toString()}`
+  semver = newSemver
+}
+
 async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseType) {
   dependencies = {
     '@capacitor/android': '^4.5.0',
@@ -249,54 +261,95 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
 
   await pnpmInstall()
 
-  let cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
-  let androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
+  async function assertCompatibilityTableColumns(column1: string, column2: string, column3: string, column4: string) {
+    const cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
+    const androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
 
-  assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
-  let androidPackageSplit = androidPackage!.split('│').slice(2, -1)
-  assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
+    assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
+    const androidPackageSplit = androidPackage!.split('│').slice(2, -1)
+    assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
 
-  assert(androidPackageSplit[1].includes('4.5.0'), `Android local package version is not 4.5.0 (It is ${androidPackageSplit[1]})`)
-  assert(androidPackageSplit[0].includes('@capacitor/android'), `Android package name is not @capacitor/android (It is ${androidPackageSplit[0]})`)
-  assert(androidPackageSplit[2].includes('None'), `Android remote package version is not none (It is ${androidPackageSplit[2]})`)
-  assert(androidPackageSplit[3].includes('❌'), `Android compatible is not a red cross (It is ${androidPackageSplit[3]})`)
+    assert(androidPackageSplit[0].includes(column1), `Android package name is not ${column1} (It is ${androidPackageSplit[0]})`)
+    assert(androidPackageSplit[1].includes(column2), `Android local package version is not ${column2} (It is ${androidPackageSplit[1]})`)
+    assert(androidPackageSplit[2].includes(column3), `Android remote package version is not ${column3} (It is ${androidPackageSplit[2]})`)
+    assert(androidPackageSplit[3].includes(column4), `Android compatible is not a ${column4} (It is ${androidPackageSplit[3]})`)
+  }
+
+  await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
 
   // Let's upload now a new version
-  const lastNumber = Number.parseInt(semver.charAt(semver.length - 1))
-  const newSemver = `${semver.slice(0, -1)}${(lastNumber + 1).toString()}`
+  increaseSemver()
 
-  semver = newSemver
+  // Re run the upload
   const uploadCli = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
   assert(uploadCli.includes('Time to share your update to the world'), `CLI output does not include 'Time to share your update to the world'. CLI output:\n${uploadCli}`)
 
   // Let's re run the compatibility table
-  cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
-  androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
-
-  assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
-  androidPackageSplit = androidPackage!.split('│').slice(2, -1)
-  assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
-
-  assert(androidPackageSplit[1].includes('4.5.0'), `Android local package version is not 4.5.0 (It is ${androidPackageSplit[1]})`)
-  assert(androidPackageSplit[0].includes('@capacitor/android'), `Android package name is not @capacitor/android (It is ${androidPackageSplit[0]})`)
-  assert(androidPackageSplit[2].includes('4.5.0'), `Android remote package version is not none (It is ${androidPackageSplit[2]})`)
-  assert(androidPackageSplit[3].includes('✅'), `Android compatible is not a red cross (It is ${androidPackageSplit[3]})`)
+  await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
 
   // Now let's remove the package and run the compatibility table again
   dependencies = {}
   await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson.replace('%DEPENDENCIES%', JSON.stringify(dependencies)))
 
-  cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
-  androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
+  await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
 
-  assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
-  androidPackageSplit = androidPackage!.split('│').slice(2, -1)
-  assert(androidPackageSplit.length === 4, `Android package does not have 4 columns (It has ${androidPackageSplit.length} columns)`)
+  await pnpmInstall()
+}
 
-  assert(androidPackageSplit[1].includes('None'), `Android local package version is not 4.5.0 (It is ${androidPackageSplit[1]})`)
-  assert(androidPackageSplit[0].includes('@capacitor/android'), `Android package name is not @capacitor/android (It is ${androidPackageSplit[0]})`)
-  assert(androidPackageSplit[2].includes('4.5.0'), `Android remote package version is not none (It is ${androidPackageSplit[2]})`)
-  assert(androidPackageSplit[3].includes('❌'), `Android compatible is not a red cross (It is ${androidPackageSplit[3]})`)
+async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseType) {
+  // At this stage the lastest upload has the `@capacitor/android`. We do NOT have this package installed thus the new upload will not be compatible
+  // Let's upload now a new version and check if this statement is correct
+
+  async function uploadWithAutoFlag(expected: string): Promise<string> {
+    const uploadCliOutput = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+    const minUpdateVersion = uploadCliOutput.split('\n').find(l => l.includes('Auto set min-update-version'))
+    assert(minUpdateVersion !== undefined, `Auto min update version not found in the cli output. CLI output:\n${uploadCliOutput}`)
+
+    assert(minUpdateVersion!.includes(expected), `Auto min update version is not ${expected} (It is ${minUpdateVersion})`)
+    return uploadCliOutput
+  }
+
+  // Let's upload now a new version
+  increaseSemver()
+  await uploadWithAutoFlag(semver)
+
+  // Now, the next update SHOULD have the min-update-version set to the previous version
+  const expected = semver
+  increaseSemver()
+  await uploadWithAutoFlag(expected)
+
+  // Let's continue. We can remove the min_update_version from the channel and check if the auto flag will work
+  // PS: It should not
+
+  const { error } = await supabase
+    .from('app_versions')
+    .update({ minUpdateVersion: null })
+    .eq('name', semver)
+
+  assert(error === null, `Supabase set app version error ${JSON.stringify(error)} is not null`)
+
+  // Now let's upload a new version and see if it fails
+  const uploadCliOutput = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+  assert(uploadCliOutput.includes('skipping auto setting compatibility'), `CLI output does not include 'skipping auto setting compatibility'. CLI output:\n${uploadCliOutput}`)
+
+  // Now let's give back the min_update_version to the version but remove the entire manifest to see if this change is backward compatible
+  // 1.0.0 is not important, this is just a placeholder
+  const { error: error2 } = await supabase
+    .from('app_versions')
+    .update({ minUpdateVersion: '1.0.0', native_packages: null })
+    .eq('name', semver)
+
+  assert (error2 === null, `Supabase set app version error 2 ${JSON.stringify(error2)} is not null`)
+
+  // Now let's upload a new version and see if it works, but has the warning
+  // The expected is the new semver, as without the manifest we assume the update to be breaking
+  increaseSemver()
+  const uploadCliOutput2 = await uploadWithAutoFlag(semver)
+
+  assert(uploadCliOutput2.includes(
+    'previous metadata does not exist'),
+    `CLI output does not include \'previous metadata does not exist\'. CLI output:\n${uploadCliOutput2}`,
+  )
 }
 
 async function testFrontend(_backendBaseUrl: URL, _supabase: SupabaseType) {
