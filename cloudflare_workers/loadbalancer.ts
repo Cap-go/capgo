@@ -1,5 +1,5 @@
 const BACKUP_HOST: string = 'web.capgo.app'
-const MAIN_HOST: string = 'xvwzpoazmxkqosrdewyv.functions.supabase.co'
+const MAIN_HOST: string = 'xvwzpoazmxkqosrdewyv.supabase.co'
 
 interface RequestOptions extends RequestInit {
   timeout?: number
@@ -17,9 +17,9 @@ async function fetchWithTimeout(resource: RequestInfo, options: RequestOptions =
   return response
 }
 
-function getPrefixURL(request: Request, urlPrefix: string) {
+function getPrefixURL(request: Request, urlPrefix: string, host = MAIN_HOST) {
   const backupUrl = new URL(request.url)
-  backupUrl.hostname = BACKUP_HOST
+  backupUrl.hostname = host
   const end = backupUrl.pathname.split('/').pop()
   backupUrl.pathname = `/${urlPrefix}/${end}`
   return backupUrl.toString()
@@ -34,8 +34,7 @@ export default {
       method: request.method,
       headers: request.headers,
     }
-    const primaryUrl = new URL(request.url)
-    primaryUrl.hostname = MAIN_HOST
+    const primaryUrl = getPrefixURL(request, 'functions/v1')
     try {
       res = await fetchWithTimeout(primaryUrl.toString(), forwardOptions)
     }
@@ -43,7 +42,7 @@ export default {
       console.log(`Error fetching ${primaryUrl}`)
       console.log(err)
       // https://web.capgo.app/api-edge/ok
-      const backupUrl = getPrefixURL(request, 'api-egde')
+      const backupUrl = getPrefixURL(request, 'api-egde', BACKUP_HOST)
       try {
         res = await fetchWithTimeout(backupUrl, forwardOptions)
       }
@@ -51,7 +50,7 @@ export default {
         console.log(`Error fetching ${backupUrl}`)
         console.log(err_2)
         // https://web.capgo.app/api/ok
-        const backup2Url = getPrefixURL(request, 'api')
+        const backup2Url = getPrefixURL(request, 'api', BACKUP_HOST)
         try {
           res = await fetchWithTimeout(backup2Url, forwardOptions)
         }
