@@ -1,5 +1,5 @@
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis/mod.ts'
+import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis@v1.22.0/mod.ts'
 import { getEnv } from '../../../supabase/functions/_utils/utils.ts'
 import { RedisRedis } from '../../../supabase/functions/_utils/redis.ts'
 

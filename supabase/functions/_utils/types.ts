@@ -34,3 +34,8 @@ export interface Details {
   timestamp: number
   signatures: string[]
 }
+
+export interface Order {
+  key: string
+  sortable?: 'asc' | 'desc'
+}

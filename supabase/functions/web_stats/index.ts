@@ -92,7 +92,7 @@ async function main(url: URL, headers: BaseHeaders, _method: string, _body: any)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
 
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.error('Fail Authorization', { authorizationSecret  })
+    console.error('Fail Authorization', { authorizationSecret })
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
 
