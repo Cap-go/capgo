@@ -1884,9 +1884,6 @@ ALTER TABLE ONLY "public"."deleted_account"
 ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_pkey" PRIMARY KEY ("device_id");
 
-ALTER TABLE ONLY "public"."channel_devices"
-    ADD CONSTRAINT "channel_devices_pkey" PRIMARY KEY ("device_id");
-
 ALTER TABLE ONLY "public"."devices"
     ADD CONSTRAINT "devices_pkey" PRIMARY KEY ("device_id");
 
