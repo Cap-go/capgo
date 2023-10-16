@@ -20,15 +20,16 @@ async function fetchWithTimeout(resource: RequestInfo, options: RequestOptions =
 export default {
   async fetch(request: Request) {
     let res: Response
+    const forwardOptions: RequestOptions = {
+      redirect: 'follow',
+      body: request.body,
+      method: request.method,
+      headers: request.headers,
+    }
     const primaryUrl = new URL(request.url)
     primaryUrl.hostname = MAIN_HOST
     try {
-      res = await fetchWithTimeout(primaryUrl.toString(), {
-        redirect: 'follow',
-        body: request.body,
-        method: request.method,
-        headers: request.headers,
-      })
+      res = await fetchWithTimeout(primaryUrl.toString(), forwardOptions)
     }
     catch (err) {
       console.log('err', primaryUrl, err)
@@ -40,12 +41,7 @@ export default {
       backupUrl.pathname = `/api-egde/${end}`
       try {
         // Use fetchWithTimeout for the backup requests as well
-        res = await fetchWithTimeout(backupUrl.toString(), {
-          redirect: 'follow',
-          body: request.body,
-          method: request.method,
-          headers: request.headers,
-        })
+        res = await fetchWithTimeout(backupUrl.toString(), forwardOptions)
       }
       catch (err) {
         console.log('err', backupUrl, err)
@@ -56,12 +52,7 @@ export default {
         const end = backup2Url.pathname.split('/').pop()
         backup2Url.pathname = `/api/${end}`
         try {
-          res = await fetchWithTimeout(backup2Url.toString(), {
-            redirect: 'follow',
-            body: request.body,
-            method: request.method,
-            headers: request.headers,
-          })
+          res = await fetchWithTimeout(backup2Url.toString(), forwardOptions)
         }
         catch (err) {
           console.log('err', backup2Url, err)
