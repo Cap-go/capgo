@@ -13,6 +13,9 @@ const config: CapacitorConfig = {
       launchAutoHide: false,
       androidScaleType: 'CENTER_CROP',
     },
+    CapacitorUpdater: {
+      updateUrl: 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/updates_debug',
+    },
   },
   android: {
     webContentsDebuggingEnabled: true,
