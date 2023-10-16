@@ -38,8 +38,6 @@ CREATE EXTENSION IF NOT EXISTS "postgres_fdw" WITH SCHEMA "extensions";
 
 CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
 
-CREATE EXTENSION IF NOT EXISTS "supautils" WITH SCHEMA "extensions";
-
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 CREATE EXTENSION IF NOT EXISTS "wrappers" WITH SCHEMA "extensions";
