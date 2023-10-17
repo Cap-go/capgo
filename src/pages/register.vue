@@ -65,7 +65,7 @@ async function submit(form: { first_name: string; last_name: string; password: s
 </script>
 
 <template>
-  <!-- <script async src="https://reflio.com/js/reflio.min.js" data-reflio="hi8q6z93wyt147h" data-domain="https://capgo.app,https://web.capgo.app" /> -->
+  <script async src="https://reflio.com/js/reflio.min.js" data-reflio="hi8q6z93wyt147h" data-domain="https://capgo.app,https://web.capgo.app" />
   <section class="flex w-full min-h-screen py-10 my-auto overflow-y-auto lg:py-8 sm:py-8">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="max-w-2xl mx-auto text-center">
