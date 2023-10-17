@@ -467,8 +467,8 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
-    created_at: device.created_at || new Date().toISOString(),
-    updated_at: device.updated_at || new Date().toISOString(),
+    updated_at: device.created_at || new Date().toISOString(),
+    // created_at is ignored because clickhouse will compute it with the first sent device, and supabase will keep the first value if not set
     // last_mau if not exist take olded js date
     last_mau: device.last_mau || new Date(0).toISOString(),
     platform: device.platform as Database['public']['Enums']['platform_os'],
