@@ -353,3 +353,9 @@ your-api-key: 'Twój klucz API:'
 your-are-a: Twoja okolica
 your-current-plan-is: Twój obecny plan to
 your-current-suggested-plan-is: Twój aktualny sugerowany plan to
+resend-email: Wyślij ponownie email z potwierdzeniem
+confirm-email-sent: >-
+  Wysłano email z potwierdzeniem, kliknij link, aby potwierdzić swój adres
+  email.
+did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
+resend: Ponownie wyślij

@@ -340,3 +340,11 @@ your-api-key: 'La tua chiave API:'
 your-are-a: Sei un
 your-current-plan-is: Il tuo piano attuale è
 your-current-suggested-plan-is: Il tuo attuale piano suggerito è
+resend-email: Reenviar correo electrónico de confirmación
+confirm-email-sent: >-
+  Se envió un correo electrónico de confirmación, haz clic en el enlace para
+  confirmar tu correo electrónico.
+did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
+resend: >-
+  I am sorry, but it seems like you've missed mentioning the language you want
+  me to translate "Resend" into. Could you please clarify?
