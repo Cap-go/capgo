@@ -112,7 +112,7 @@
     "daisyui": "^3.6.3",
     "dayjs": "1.11.9",
     "dompurify": "^3.0.5",
-    "firebase": "10.3.0",
+    "firebase": "10.4.0",
     "flowbite": "^1.8.1",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
