@@ -1,6 +1,6 @@
 {
   "name": "capgo-app",
-  "version": "10.246.0",
+  "version": "10.247.0",
   "private": true,
   "husky": {
     "hooks": {
