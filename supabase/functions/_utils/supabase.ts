@@ -261,7 +261,7 @@ export async function UpdateDeviceCustomId(auth: string, appId: string, deviceId
     .eq('device_id', deviceId)
 }
 
-export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
@@ -270,11 +270,13 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   if (!auth)
     client = supabaseAdmin()
 
-  const reqCount = client
-    .from('devices')
-    .select('', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
+  const reqCount = count
+    ? client
+      .from('devices')
+      .select('', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .then(res => res.count || 0)
+    : 0
   const req = client
     .from('devices')
     .select()
@@ -326,7 +328,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   // }
 }
 
-export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
   // getStats ee.forgr.captime undefined  [
@@ -337,11 +339,13 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   if (!auth)
     client = supabaseAdmin()
 
-  const reqCount = client
-    .from('stats')
-    .select('', { count: 'exact', head: true })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
+  const reqCount = count
+    ? client
+      .from('stats')
+      .select('', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .then(res => res.count || 0)
+    : 0
   const req = client
     .from('stats')
     .select(`
