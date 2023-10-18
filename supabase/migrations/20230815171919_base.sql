@@ -1423,7 +1423,7 @@ BEGIN
          SELECT 1
          FROM   information_schema.tables 
          WHERE  table_schema = 'public'
-         AND    table_name = 'clickhouse_devices'
+         AND    table_name = 'clickhouse_devices_u'
       )) 
       AND 
       (SELECT EXISTS (
@@ -1470,7 +1470,7 @@ $$ LANGUAGE plpgsql;
 --     version Int64,
 --     is_prod UInt8,
 --     is_emulator UInt8,
--- ) ENGINE = ReplacingMergeTree()
+-- ) ENGINE = MergeTree()
 -- ORDER BY (device_id, updated_at)
 -- PRIMARY KEY (device_id);
 
@@ -1480,32 +1480,14 @@ $$ LANGUAGE plpgsql;
 -- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 1, 1),
 -- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.4', '9', '1.223.0', '', 1, 1);
+
 -- insert in supabase
 -- INSERT INTO clickhouse_devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- ('2023-01-29 08:09:32+00', TIMESTAMP '2023-01-29 08:09:32.324+00', TIMESTAMP '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.5', '9', '1.223.0', '', true, true);
 
 -- first value shouldn't be visible in supabase because of ReplacingMergeTree
 
---  In supabase
--- create foreign table clickhouse_devices (
---     created_at timestamp,
---     updated_at timestamp,
---     last_mau timestamp,
---     device_id text,
---     custom_id text,
---     app_id text,
---     platform text,
---     plugin_version text,
---     os_version text,
---     version_build text,
---     version integer,
---     is_prod boolean,
---     is_emulator boolean
--- )
---   server clickhouse_server
---   options (
---     table 'devices'
---   );
+--  In supabase read only view
 
 -- create foreign table clickhouse_devices_u (
 --     created_at timestamp,
@@ -1526,38 +1508,6 @@ $$ LANGUAGE plpgsql;
 --   options (
 --     table 'devices_u'
 --   );
-
--- TEST COPY existing data from postgres to clickhouse
--- INSERT INTO clickhouse_devices (
---     created_at,
---     updated_at,
---     last_mau,
---     device_id,
---     version,
---     app_id,
---     platform,
---     plugin_version,
---     os_version,
---     version_build,
---     custom_id,
---     is_prod,
---     is_emulator
--- )
--- SELECT 
---     date_trunc('second', created_at),
---     date_trunc('second', updated_at),
---     date_trunc('second', last_mau),
---     device_id,
---     version,
---     app_id,
---     platform,
---     plugin_version,
---     os_version,
---     version_build,
---     custom_id,
---     is_prod,
---     is_emulator
--- FROM public.devices LIMIT 1;
 
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1678,7 +1628,6 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 -- Clickhouse table for stats
 -- CREATE TABLE IF NOT EXISTS logs
 -- (
---     id Int64,
 --     created_at DateTime,
 --     device_id String,
 --     app_id String,
@@ -1687,45 +1636,16 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 --     version_build String,
 --     version Int64,
 -- ) ENGINE = MergeTree()
--- ORDER BY (created_at)
--- PRIMARY KEY (id);
-
--- CREATE SEQUENCE clickhouse_logs_id_seq; -- important for indexing in clickhouse;
-
--- TEST COPY existing data from postgres to clickhouse
--- INSERT INTO clickhouse_logs (
--- 	id,
---     created_at,
---     device_id,
---     app_id,
---     platform,
---     action,
---     version_build,
---     version
--- )
--- SELECT 
--- 	nextval('clickhouse_logs_id_seq'),
---     date_trunc('second', created_at),
---     device_id,
---     app_id,
---     platform,
---     action,
---     version_build,
---     version::integer
--- FROM public.stats LIMIT 1;
-
--- insert in supabase
--- INSERT INTO clickhouse_logs ("id", "created_at", "device_id", "app_id", "platform", "action", "version_build", "version") VALUES
--- (nextval('clickhouse_logs_id_seq'), date_trunc('second', CURRENT_TIMESTAMP), '00009a6b-eefe-490a-9c60-8e965132ae51', 'com.demo.app', 'android', 'get', '4.15.5', 9654);
+-- ORDER BY (device_id, created_at)
+-- PRIMARY KEY (device_id);
 
 -- insert in click house
--- INSERT INTO logs ("id", "created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
--- (1, now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
+-- INSERT INTO logs ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
+-- (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
 
 
---  In supabase
+--  In supabase read only
 -- create foreign table clickhouse_logs (
---     id bigint,
 --     created_at timestamp,
 --     device_id text,
 --     app_id text,
