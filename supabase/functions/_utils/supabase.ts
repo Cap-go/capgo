@@ -303,7 +303,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      req.or(`action.like.%${search}%`)
+      req.or(`custom_id.like.%${search}%`)
     else
       req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
   }
