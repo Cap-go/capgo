@@ -272,7 +272,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
 
   const reqCount = client
     .from('devices')
-    .select('', { count: 'exact' })
+    .select('', { count: 'exact', head: true })
     .eq('app_id', appId)
     .then(res => res.count || 0)
   const req = client
@@ -339,7 +339,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
   const reqCount = client
     .from('stats')
-    .select('', { count: 'exact' })
+    .select('', { count: 'exact', head: true })
     .eq('app_id', appId)
     .then(res => res.count || 0)
   const req = client
