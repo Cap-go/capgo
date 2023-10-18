@@ -340,3 +340,7 @@ your-api-key: 'Khóa API của bạn:'
 your-are-a: bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là
+resend-email: Gửi lại email xác nhận
+confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
+did-not-recive-confirm-email: Không nhận được email xác nhận?
+resend: Gửi lại

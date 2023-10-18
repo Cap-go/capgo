@@ -348,3 +348,9 @@ your-api-key: 'Ihr API-Schlüssel:'
 your-are-a: Dein Gebiet
 your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist
+resend-email: Bestätigungs-E-Mail erneut senden
+confirm-email-sent: >-
+  Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
+  E-Mail zu bestätigen.
+did-not-recive-confirm-email: Haben Sie die Bestätigungs-E-Mail nicht erhalten?
+resend: Erneut senden

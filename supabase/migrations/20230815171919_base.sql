@@ -1510,16 +1510,14 @@ $$ LANGUAGE plpgsql;
 --   );
 
 CREATE TABLE "public"."devices" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "last_mau" timestamp with time zone DEFAULT '1900-01-01'::date,
+    "created_at" timestamp with time zone NOT NULL,
+    "updated_at" timestamp with time zone NOT NULL,
     "device_id" "text" NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL,
     "platform" "public"."platform_os",
     "plugin_version" "text" DEFAULT '2.3.3'::"text" NOT NULL,
     "os_version" character varying,
-    "date_id" character varying DEFAULT ''::character varying,
     "version_build" "text" DEFAULT 'builtin'::"text",
     "custom_id" "text" DEFAULT ''::"text" NOT NULL,
     "is_prod" boolean DEFAULT true,
