@@ -210,3 +210,4 @@ SELECT cron.schedule('Update channel for progressive deploy if too many fail', '
 SELECT cron.schedule('Update web stats', '22 1 * * *', $$SELECT http_post_to_function('web_stats-background', 'external', '{}'::jsonb)$$);
 SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_to_function('cron_good_plan-background', 'external', '{}'::jsonb)$$);
 SELECT cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT http_post_to_function('cron_email-background', 'external', '{}'::jsonb)$$);
+SELECT cron.schedule('Create partitions for next year', '0 0 1 12 *', $$SELECT create_partitions((CURRENT_DATE + INTERVAL '1 year' + INTERVAL '30 days')::DATE, 1)$$);
