@@ -261,7 +261,7 @@ export async function UpdateDeviceCustomId(auth: string, appId: string, deviceId
     .eq('device_id', deviceId)
 }
 
-export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
@@ -270,11 +270,13 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   if (!auth)
     client = supabaseAdmin()
 
-  const reqCount = client
-    .from('devices')
-    .select('', { count: 'exact' })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
+  const reqCount = count
+    ? client
+      .from('devices')
+      .select('', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .then(res => res.count || 0)
+    : 0
   const req = client
     .from('devices')
     .select()
@@ -303,7 +305,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      req.or(`action.like.%${search}%`)
+      req.or(`custom_id.like.%${search}%`)
     else
       req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
   }
@@ -326,7 +328,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   // }
 }
 
-export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
   // getStats ee.forgr.captime undefined  [
@@ -337,11 +339,13 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   if (!auth)
     client = supabaseAdmin()
 
-  const reqCount = client
-    .from('stats')
-    .select('', { count: 'exact' })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
+  const reqCount = count
+    ? client
+      .from('stats')
+      .select('', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .then(res => res.count || 0)
+    : 0
   const req = client
     .from('stats')
     .select(`
@@ -394,9 +398,6 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
     updated_at: device.created_at || new Date().toISOString(),
-    // created_at is ignored because clickhouse will compute it with the first sent device, and supabase will keep the first value if not set
-    // last_mau if not exist take olded js date
-    last_mau: device.last_mau || new Date(0).toISOString(),
     platform: device.platform as Database['public']['Enums']['platform_os'],
     os_version: device.os_version as string,
     version: device.version as number,

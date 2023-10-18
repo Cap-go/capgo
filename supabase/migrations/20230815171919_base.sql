@@ -1839,8 +1839,8 @@ CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USIN
 
 CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at");
 
-CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
+CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
 
 CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_at");
 
@@ -1854,8 +1854,6 @@ CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
 
 CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
 
-CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
-
 CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
 
 CREATE INDEX idx_app_id_created_at_devices ON "public"."devices" USING "btree" ("app_id", "created_at");
@@ -1863,6 +1861,8 @@ CREATE INDEX idx_app_id_created_at_devices ON "public"."devices" USING "btree" (
 CREATE INDEX devices_app_id_updated_at_idx ON "public"."devices" USING "btree" ("app_id", "updated_at");
 
 CREATE INDEX devices_app_id_device_id_updated_at_idx ON "public"."devices" USING "btree" ("app_id", "device_id", "updated_at");
+
+CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
 
 CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
 

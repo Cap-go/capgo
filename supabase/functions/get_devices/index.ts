@@ -16,7 +16,7 @@ interface dataDevice {
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataDevice) {
   try {
     console.log('body', body)
-    return sendRes(await getSDevice(headers.authorization || 'MISSING', body.appId, body.versionId, body.deviceIds, body.search, body.order, body.rangeStart, body.rangeEnd))
+    return sendRes(await getSDevice(headers.authorization || 'MISSING', body.appId, body.versionId, body.deviceIds, body.search, body.order, body.rangeStart, body.rangeEnd, true))
   }
   catch (e) {
     return sendRes({
