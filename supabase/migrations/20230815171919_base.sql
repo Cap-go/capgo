@@ -1661,14 +1661,14 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 
 
 CREATE TABLE "public"."stats" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
+    "created_at" timestamp with time zone NOT NULL,
     "platform" "public"."platform_os" NOT NULL,
     "action" "text" NOT NULL,
     "device_id" "text" NOT NULL,
     "version_build" "text" NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL
-);
+) PARTITION BY RANGE (created_at);
 
 CREATE TABLE "public"."store_apps" (
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1839,20 +1839,17 @@ CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USIN
 
 CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at");
 
+CREATE INDEX "idx_stats_app_id_device_id" ON "public"."stats" USING "btree" ("app_id", "device_id");
 
-CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
+CREATE INDEX "idx_stats_app_id_action" ON "public"."stats" USING "btree" ("app_id", "action");
 
-CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_at");
+CREATE INDEX "idx_stats_app_id_created_at" ON "public"."stats" USING "btree" ("app_id", "created_at");
 
-CREATE INDEX "idx_device_id_logs" ON "public"."stats" USING "btree" ("device_id");
+CREATE INDEX "idx_stats_app_id_platform" ON "public"."stats" USING "btree" ("app_id", "platform");
 
-CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
+CREATE INDEX "idx_stats_app_id_version_build" ON "public"."stats" USING "btree" ("app_id", "version_build");
 
-CREATE INDEX "idx_version_build_logs" ON "public"."stats" USING "btree" ("version_build");
-
-CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
-
-CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
+CREATE INDEX "idx_stats_app_id_version" ON "public"."stats" USING "btree" ("app_id", "version");
 
 CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
 
