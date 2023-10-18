@@ -138,8 +138,8 @@ INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "
 (1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),
 (2, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.demo.app', 22, 'admin');
 
-INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "date_id", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
-(now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '', '1.223.0', '', 't', 't');
+INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+(now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
 INSERT INTO "public"."stats" ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app'),
@@ -200,9 +200,9 @@ INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage"
 ("gen_random_uuid"(), 'com.demo.app', '2023-03-30 01:18:54.034372+00', 20, 180948, 2441264, 'day');
 
 -- Create cron jobs
-SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage()$$);
-SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
-SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
+-- SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage()$$);
+-- SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
+-- SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
 -- Set old versions to deleted after retention passed 
 SELECT cron.schedule('Delete old app version', '40 0 * * *', $$CALL update_app_versions_retention()$$);
 -- update channel for progressive deploy if too many fail
