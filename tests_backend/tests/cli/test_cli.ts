@@ -300,7 +300,7 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   // At this stage the lastest upload has the `@capacitor/android`. We do NOT have this package installed thus the new upload will not be compatible
   // Let's upload now a new version and check if this statement is correct
 
-  async function uploadWithAutoFlag(expected: string): Promise<string> {
+  async function uploadWithAutoFlagWithAssert(expected: string): Promise<string> {
     const uploadCliOutput = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
     const minUpdateVersion = uploadCliOutput.split('\n').find(l => l.includes('Auto set min-update-version'))
     assert(minUpdateVersion !== undefined, `Auto min update version not found in the cli output. CLI output:\n${uploadCliOutput}`)
@@ -311,12 +311,12 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
 
   // Let's upload now a new version
   increaseSemver()
-  await uploadWithAutoFlag(semver)
+  await uploadWithAutoFlagWithAssert(semver)
 
   // Now, the next update SHOULD have the min-update-version set to the previous version
   const expected = semver
   increaseSemver()
-  await uploadWithAutoFlag(expected)
+  await uploadWithAutoFlagWithAssert(expected)
 
   // Let's continue. We can remove the min_update_version from the channel and check if the auto flag will work
   // PS: It should not
@@ -344,7 +344,7 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   // Now let's upload a new version and see if it works, but has the warning
   // The expected is the new semver, as without the manifest we assume the update to be breaking
   increaseSemver()
-  const uploadCliOutput2 = await uploadWithAutoFlag(semver)
+  const uploadCliOutput2 = await uploadWithAutoFlagWithAssert(semver)
 
   assert(uploadCliOutput2.includes(
     'previous metadata does not exist'),
