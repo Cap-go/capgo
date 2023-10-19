@@ -1042,6 +1042,7 @@ BEGIN
     SET deleted = true
     FROM apps, app_versions_meta
     WHERE app_versions_meta.app_id = app_versions.app_id
+    AND app_versions.app_id = apps.app_id
     AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
     AND app_versions.deleted = false
     AND apps.retention > 0
