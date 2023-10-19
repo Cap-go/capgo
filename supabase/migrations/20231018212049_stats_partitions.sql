@@ -15,4 +15,9 @@ BEGIN
    END LOOP;
 END $$ LANGUAGE plpgsql;
 
+REVOKE EXECUTE ON FUNCTION public.create_partitions(start_date DATE, num_years INTEGER) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_partitions(start_date DATE, num_years INTEGER) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.create_partitions(start_date DATE, num_years INTEGER) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.create_partitions(start_date DATE, num_years INTEGER) TO postgres;
+
 SELECT create_partitions((CURRENT_DATE - INTERVAL '1 day')::DATE, 1);
