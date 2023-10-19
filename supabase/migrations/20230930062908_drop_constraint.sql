@@ -9,14 +9,14 @@ END $_$ LANGUAGE 'plpgsql';
 
 CREATE FUNCTION on_app_version_delete_sql() RETURNS TRIGGER AS $_$
 BEGIN
-    DELETE FROM "devices" where version=OLD.id;
-    DELETE FROM "stats" where version=OLD.id;
+    DELETE FROM "devices" where app_id=OLD.app_id and version=OLD.id;
+    DELETE FROM "stats" where app_id=OLD.app_id and version=OLD.id;
     RETURN OLD;
 END $_$ LANGUAGE 'plpgsql';
 
-CREATE FUNCTION on_device_delete_sql() RETURNS TRIGGER AS $_$
+CREATE OR REPLACE FUNCTION on_device_delete_sql() RETURNS TRIGGER AS $_$
 BEGIN
-    DELETE FROM "stats" where device_id=OLD.device_id;
+    DELETE FROM "stats" where app_id=OLD.app_id and device_id=OLD.device_id;
     RETURN OLD;
 END $_$ LANGUAGE 'plpgsql';
 

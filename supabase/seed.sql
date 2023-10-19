@@ -16,7 +16,6 @@ select vault.create_secret('testsecret', 'apikey', 'admin user id');
 -- DROP TRIGGER "on_user_update" ON "public"."users";
 -- DROP TRIGGER "on_version_create" ON "public"."app_versions";
 -- DROP TRIGGER "on_version_update" ON "public"."app_versions";
--- DROP TRIGGER "on_version_delete" ON "public"."app_versions";
 
 CREATE TRIGGER on_app_stats_create 
 AFTER INSERT ON public.app_stats 
@@ -38,11 +37,6 @@ AFTER UPDATE ON public.channels
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_post_to_function('on_channel_update');
 
--- CREATE TRIGGER on_log_create 
--- AFTER CREATE ON public.app_stats 
--- FOR EACH ROW 
--- EXECUTE FUNCTION public.http_post_to_function('on_log_create');
-
 CREATE TRIGGER on_shared_create 
 AFTER INSERT ON public.channel_users 
 FOR EACH ROW 
@@ -62,11 +56,6 @@ CREATE TRIGGER on_version_create
 AFTER INSERT ON public.app_versions 
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_create');
-
-CREATE TRIGGER on_version_delete 
-AFTER DELETE ON public.app_versions 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_delete');
 
 CREATE TRIGGER on_version_update 
 AFTER UPDATE ON public.app_versions 

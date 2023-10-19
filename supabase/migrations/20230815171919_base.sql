@@ -1899,6 +1899,12 @@ CREATE INDEX "idx_store_on_prem" ON "public"."store_apps" USING "btree" ("onprem
 
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
+CREATE INDEX "channel_users_app_id_idx" ON "public"."channel_users" USING "btree" ("app_id");
+
+CREATE INDEX "app_stats_app_id_idx" ON "public"."app_stats" USING "btree" ("app_id");
+
+CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
+
 CREATE OR REPLACE FUNCTION public.get_cycle_info("userid" "uuid")
 RETURNS TABLE (
     subscription_anchor_start timestamp with time zone,

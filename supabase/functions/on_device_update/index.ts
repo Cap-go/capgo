@@ -21,6 +21,7 @@ serve(async (event: Request) => {
 
     const body = (await event.json()) as InsertPayload<TableTypes> | UpdatePayload<TableTypes> | DeletePayload<TableTypes>
 
+    console.log('Body', body)
     const record = body.type !== 'DELETE' ? body.record : body.old_record
 
     if (!record) {
@@ -48,6 +49,7 @@ serve(async (event: Request) => {
           continueExecution = true
       }
 
+      console.log('Continue execution', continueExecution)
       // Only updated_at changed, do not remove from cache
       if (!continueExecution)
         return sendRes()
@@ -59,8 +61,9 @@ serve(async (event: Request) => {
         error: 'Invalid request, no device id or app id',
       }, 500)
     }
-
+    console.log('Invalidate cache', appId, deviceId)
     await redisDeviceInvalidate(appId, deviceId)
+    console.log('Invalidate cache done', appId, deviceId)
     return sendRes()
   }
   catch (e) {
