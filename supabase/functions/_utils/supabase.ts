@@ -5,7 +5,7 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
-import { sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
+import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
 
 // Import Supabase client
 
@@ -256,16 +256,13 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
 
   const client = supabaseClient(auth)
-  const reqClickHouse = await client
-    .rpc('clickhouse_exist')
-    .then(res => res.data || false)
   await supabaseClient(auth)
     .from('devices')
     .update({ custom_id: customId })
     .eq('app_id', appId)
     .eq('device_id', deviceId)
     // TODO: to remove if we go 100% clickhouse
-  if (!reqClickHouse) {
+  if (!isClickHouseEnabled()) {
     // update the device custom_id
     return
   }
@@ -300,7 +297,6 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
 }
 
 export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
-  // if (!isTinybirdGetLogEnabled()) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
@@ -309,10 +305,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   if (!auth)
     client = supabaseAdmin()
 
-  const reqClickHouse = await client
-    .rpc('clickhouse_exist')
-    .then(res => res.data || false)
-  if (reqClickHouse) {
+  if (isClickHouseEnabled()) {
     tableName = 'clickhouse_devices'
     const reqOwner = await client
       .rpc('is_app_owner', { appid: appId })
@@ -397,10 +390,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   if (!auth)
     client = supabaseAdmin()
 
-  const reqClickHouse = await client
-    .rpc('clickhouse_exist')
-    .then(res => res.data || false)
-  if (reqClickHouse) {
+  if (isClickHouseEnabled()) {
     tableName = 'clickhouse_stats'
     const reqOwner = await client
       .rpc('is_app_owner', { appid: appId })

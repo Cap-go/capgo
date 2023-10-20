@@ -379,12 +379,6 @@ export interface Database {
             columns: ["created_by"]
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "channel_devices_device_id_fkey"
-            columns: ["device_id"]
-            referencedRelation: "devices"
-            referencedColumns: ["device_id"]
           }
         ]
       }
@@ -648,12 +642,6 @@ export interface Database {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "devices_override_device_id_fkey"
-            columns: ["device_id"]
-            referencedRelation: "devices"
-            referencedColumns: ["device_id"]
-          },
-          {
             foreignKeyName: "devices_override_version_fkey"
             columns: ["version"]
             referencedRelation: "app_versions"
@@ -913,6 +901,36 @@ export interface Database {
         Relationships: []
       }
       stats: {
+        Row: {
+          action: string
+          app_id: string
+          created_at: string
+          device_id: string
+          platform: Database["public"]["Enums"]["platform_os"]
+          version: number
+          version_build: string
+        }
+        Insert: {
+          action: string
+          app_id: string
+          created_at: string
+          device_id: string
+          platform: Database["public"]["Enums"]["platform_os"]
+          version: number
+          version_build: string
+        }
+        Update: {
+          action?: string
+          app_id?: string
+          created_at?: string
+          device_id?: string
+          platform?: Database["public"]["Enums"]["platform_os"]
+          version?: number
+          version_build?: string
+        }
+        Relationships: []
+      }
+      stats_old: {
         Row: {
           action: string
           app_id: string
@@ -1190,14 +1208,6 @@ export interface Database {
             }
             Returns: boolean
           }
-      clickhouse_exist: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      clickhouse_table_exist: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       convert_bytes_to_gb: {
         Args: {
           byt: number
@@ -1259,6 +1269,13 @@ export interface Database {
       count_all_updates: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      create_partitions: {
+        Args: {
+          start_date: string
+          num_years: number
+        }
+        Returns: undefined
       }
       delete_user: {
         Args: Record<PropertyKey, never>
