@@ -6,6 +6,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   return sendRes({
     supaHost: getEnv('SUPABASE_URL'),
     supaKey: getEnv('SUPABASE_ANON_KEY'),
+    signKey: getEnv('DEFAULT_SIGN_KEY'),
   })
 }
 
