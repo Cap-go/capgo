@@ -140,6 +140,9 @@ verify_jwt = false
 [functions.get_top_apk]
 verify_jwt = false
 
+[functions.get_config]
+verify_jwt = false
+
 [functions.ok]
 verify_jwt = false
 
