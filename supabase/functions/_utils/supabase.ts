@@ -463,7 +463,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
-    updated_at: device.created_at || new Date().toISOString(),
+    updated_at: device.updated_at || new Date().toISOString(),
     platform: device.platform as Database['public']['Enums']['platform_os'],
     os_version: device.os_version as string,
     version: device.version as number,

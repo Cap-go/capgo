@@ -27,9 +27,9 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
   const devicesReady = devices.map(device => ({
     ...device,
     date_id: undefined,
-    last_mau: !device.last_mau ? new Date(0).toISOString() : device.last_mau,
-    // remove created_at and updated_at presicion ms use only seconds
-    created_at: !device.created_at ? new Date().toISOString() : device.created_at,
+    created_at: undefined,
+    last_mau: undefined,
+    updated_at: !device.updated_at ? new Date().toISOString() : device.updated_at,
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending device to Clickhouse', devicesReady)
   return fetch(

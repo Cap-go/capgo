@@ -1437,7 +1437,6 @@ CREATE TABLE "public"."deleted_account" (
 -- Clickhouse table for device
 -- CREATE TABLE IF NOT EXISTS devices
 -- (
---     created_at DateTime64(6),
 --     updated_at DateTime64(6),
 --     device_id String,
 --     custom_id String,
@@ -1450,6 +1449,7 @@ CREATE TABLE "public"."deleted_account" (
 --     is_prod UInt8,
 --     is_emulator UInt8,
 -- ) ENGINE = MergeTree()
+-- PARTITION BY toYYYYMM(updated_at)
 -- ORDER BY (app_id, device_id, updated_at)
 -- PRIMARY KEY (app_id, device_id);
 
