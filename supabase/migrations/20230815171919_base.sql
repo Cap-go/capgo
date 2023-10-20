@@ -1147,7 +1147,8 @@ Begin
   where customer_id=(SELECT customer_id from users where id=userid)
   AND (
     (is_good_plan = true AND status = 'succeeded') 
-    OR (subscription_id = 'free')
+    OR (subscription_id = 'free') // TODO: allow free plan again
+    -- OR (subscription_id = 'free' or subscription_id is null)
     OR (trial_at::date - (now())::date > 0)
   )
   )
