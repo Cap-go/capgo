@@ -1458,9 +1458,8 @@ $$ LANGUAGE plpgsql;
 -- Clickhouse table for device
 -- CREATE TABLE IF NOT EXISTS devices
 -- (
---     created_at DateTime,
---     updated_at DateTime,
---     last_mau DateTime,
+--     created_at DateTime64(6),
+--     updated_at DateTime64(6),
 --     device_id String,
 --     custom_id String,
 --     app_id String,
@@ -1472,10 +1471,10 @@ $$ LANGUAGE plpgsql;
 --     is_prod UInt8,
 --     is_emulator UInt8,
 -- ) ENGINE = MergeTree()
--- ORDER BY (device_id, updated_at)
--- PRIMARY KEY (device_id);
+-- ORDER BY (app_id, device_id, updated_at)
+-- PRIMARY KEY (app_id, device_id);
 
--- CREATE VIEW device_unic AS SELECT * from devices final; -- materialized view to get unique devices
+-- CREATE VIEW device_u AS SELECT * from devices final; -- materialized view to get unique devices
 
 -- insert in click house
 -- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
@@ -1490,7 +1489,7 @@ $$ LANGUAGE plpgsql;
 
 --  In supabase read only view
 
--- create foreign table clickhouse_devices_u (
+-- create foreign table clickhouse_devices (
 --     created_at timestamp,
 --     updated_at timestamp,
 --     last_mau timestamp,
@@ -1627,16 +1626,17 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 -- Clickhouse table for stats
 -- CREATE TABLE IF NOT EXISTS logs
 -- (
---     created_at DateTime,
+--     created_at DateTime64(6),
 --     device_id String,
 --     app_id String,
 --     platform String,
 --     action String,
 --     version_build String,
---     version Int64,
--- ) ENGINE = MergeTree()
--- ORDER BY (device_id, created_at)
--- PRIMARY KEY (device_id);
+--     version Int64
+-- ) ENGINE = ReplacingMergeTree()
+-- PARTITION BY toYYYYMM(created_at)
+-- ORDER BY (app_id, device_id, created_at)
+-- PRIMARY KEY (app_id, device_id, created_at);
 
 -- insert in click house
 -- INSERT INTO logs ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
