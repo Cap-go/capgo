@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
-import { supabaseAdmin } from '../_utils/supabase.ts'
+import { sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -135,6 +135,14 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     console.log('Cannot find version meta', record.id)
     return sendRes()
   }
+  await sendStats([{
+    platform: 'ios',
+    device_id: 'deleted',
+    action: 'deleted',
+    app_id: record.app_id,
+    version_build: 'deleted',
+    version: record.id,
+  }])
 
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin()
