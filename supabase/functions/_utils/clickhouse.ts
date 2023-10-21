@@ -2,7 +2,7 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 
 export function isClickHouseEnabled() {
-  return !!clickHouseURL() && clickHouseUser() && clickHousePassword()
+  return !!clickHouseURL() && !!clickHouseUser() && !!clickHousePassword()
 }
 function clickHouseURL() {
   return getEnv('CLICKHOUSE_URL')
@@ -46,6 +46,34 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
     .then(res => res.text())
     .then(data => console.log('sendDeviceToClickHouse', data))
     .catch(e => console.log('sendDeviceToClickHouse error', e))
+}
+
+interface ClickHouseMeta {
+  id: string
+  app_id: string
+  created_at: string
+  size: number
+}
+export function sendMetaToClickHouse(meta: ClickHouseMeta) {
+  if (!isClickHouseEnabled())
+    return Promise.resolve()
+
+  console.log('sending meta to Clickhouse', meta)
+  const metasReady = JSON.stringify(meta)
+  return fetch(
+      `${clickHouseURL()}/?async_insert=1&query=INSERT INTO app_versions_meta FORMAT JSONEachRow`,
+      {
+        method: 'POST',
+        body: metasReady,
+        headers: {
+          'Authorization': clickHouseAuth(),
+          'Content-Type': 'text/plain',
+        },
+      },
+  )
+    .then(res => res.text())
+    .then(data => console.log('sendMetaToClickHouse', data))
+    .catch(e => console.log('sendMetaToClickHouse error', e))
 }
 
 export function sendLogToClickHouse(logs: Database['public']['Tables']['stats']['Insert'][]) {

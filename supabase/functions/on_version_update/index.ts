@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
+import { sendMetaToClickHouse } from '../_utils/clickhouse.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function isUpdate(body: UpdatePayload<'app_versions'>) {
@@ -71,6 +72,12 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
           .eq('id', record.id)
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
+        await sendMetaToClickHouse({
+          id: record.id,
+          created_at: new Date().toISOString(),
+          app_id: record.app_id,
+          size,
+        })
       }
     }
   }
