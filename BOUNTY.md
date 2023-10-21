@@ -2,7 +2,7 @@
 
 💎 @riderx added a bounty to one issue.
 
-📝 Before proceeding, please ensure you can receive payouts in your country.1
+📝 Before proceeding, please ensure you can receive payouts in your country.
 
 ℹ️ If something is not clear, ask before working on it, otherwise your chance to rework it is high.
 
