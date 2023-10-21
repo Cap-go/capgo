@@ -105,6 +105,7 @@ serve(async (event: Request) => {
       created_at: new Date().toISOString(),
       app_id: record.app_id,
       size,
+      action: 'add',
     })
     if (dbError)
       console.error('Cannot create app version meta', dbError)
