@@ -1544,7 +1544,7 @@ CREATE TABLE "public"."deleted_account" (
 --     fail UInt64,
 --     install UInt64,
 --     uninstall UInt64,
---     bandwidth Int64,
+--     bandwidth Int64
 -- ) ENGINE = SummingMergeTree()
 -- PARTITION BY toYYYYMM(date)
 -- ORDER BY (date, app_id, version);
@@ -1581,7 +1581,34 @@ CREATE TABLE "public"."deleted_account" (
 -- LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 -- GROUP BY date, l.app_id, l.version;
 
+-- Calculate mau
 
+-- CREATE TABLE IF NOT EXISTS mau
+-- (
+--     date Date,
+--     app_id String,
+--     mau UInt64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
+
+-- CREATE MATERIALIZED VIEW mau_mv
+-- TO mau
+-- AS
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
+-- FROM logs
+-- GROUP BY date, app_id;
+
+-- INSERT INTO mau
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
+-- FROM logs
+-- GROUP BY date, app_id;
 
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone NOT NULL,
