@@ -1264,6 +1264,48 @@ CREATE TABLE "public"."app_usage" (
     mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
 );
 
+-- clickhouse table for stats aggregation
+
+-- drop table aggregate_daily;
+-- CREATE TABLE IF NOT EXISTS aggregate_daily
+-- (
+--     date Date,
+--     app_id String,
+--     storage_added Int64,
+--     storage_deleted Int64,
+--     bandwidth Int64,
+--     mau UInt64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
+
+-- drop table daily_app_summary_mv;
+-- CREATE MATERIALIZED VIEW aggregate_daily_mv
+-- TO aggregate_daily
+-- AS
+-- SELECT
+--     l.date,
+--     l.app_id,
+--     a.storage_added,
+--     a.storage_deleted,
+--     l.bandwidth,
+--     m.mau
+-- FROM logs_daily AS l
+-- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
+-- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
+
+-- INSERT INTO aggregate_daily
+-- SELECT
+--     l.date,
+--     l.app_id,
+--     a.storage_added,
+--     a.storage_deleted,
+--     l.bandwidth,
+--     m.mau
+-- FROM logs_daily AS l
+-- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
+-- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
+
 CREATE TABLE "public"."app_stats" (
     "app_id" character varying NOT NULL,
     "user_id" "uuid" NOT NULL,
