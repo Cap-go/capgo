@@ -29,7 +29,7 @@
 
 <br>
 
-## Features (TEST CI/CD 2.2)
+## Features (TEST CI/CD 2.3)
 
 - ⚡️ Test webapp directly in your phone with native API
 
