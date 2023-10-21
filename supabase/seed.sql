@@ -7,26 +7,6 @@ select vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
 select vault.create_secret('http://localhost:8881/.netlify/functions/', 'external_function_url', 'external function url'); -- Netlify backend for long runny functions
 select vault.create_secret('testsecret', 'apikey', 'admin user id');
 
--- DROP TRIGGER "on_app_stats_create" ON "public"."app_stats";
--- DROP TRIGGER "on_app_stats_update" ON "public"."app_stats";
--- DROP TRIGGER "on_channel_create" ON "public"."channels";
--- DROP TRIGGER "on_channel_update" ON "public"."channels";
--- DROP TRIGGER "on_shared_create" ON "public"."channel_users";
--- DROP TRIGGER "on_user_create" ON "public"."users";
--- DROP TRIGGER "on_user_update" ON "public"."users";
--- DROP TRIGGER "on_version_create" ON "public"."app_versions";
--- DROP TRIGGER "on_version_update" ON "public"."app_versions";
-
-CREATE TRIGGER on_app_stats_create 
-AFTER INSERT ON public.app_stats 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_app_stats_create');
-
-CREATE TRIGGER on_app_stats_update 
-AFTER UPDATE ON public.app_stats 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_app_stats_update');
-
 CREATE TRIGGER on_channel_create 
 AFTER INSERT ON public.channels 
 FOR EACH ROW 
@@ -136,26 +116,6 @@ INSERT INTO "public"."stats" ("created_at", "platform", "action", "device_id", "
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app'),
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
 
--- TODO: deprecated to remove
-INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at", "channels", "mlu", "versions", "shared", "mlu_real", "devices", "date_id", "version_size", "bandwidth", "devices_real") VALUES
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-01 01:18:54.034372+00', '2023-03-01 01:18:54.034372+00', 1, 65, 4, 0, 34, 1, to_char(now(), 'YYYY-MM'), 1099392048, 14761264, 1),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.269652+00', '2023-03-20 00:29:35.269652+00', 0, 0, 3, 0, 5, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-20'), 3037576, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-19 10:58:12.72939+00', '2023-03-19 10:58:12.72939+00', 0, 1, 0, 0, 1, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-19'), 0, 1186174, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-17 18:36:33.990542+00', '2023-03-17 18:36:33.990542+00', 0, 4, 0, 0, 3, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-18'), 0, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 02:32:52.480687+00', '2023-03-16 02:32:52.480687+00', 0, 0, 8, 0, 2, 0, CONCAT(to_char(now(), 'YYYY-MM'), '-17'), 8082814, 2222800, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-15 10:22:12.093789+00', '2023-03-15 10:22:12.093789+00', 0, 1, 2, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-16'), 2019310, 2297858, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-14 01:10:13.411745+00', '2023-03-14 01:10:13.411745+00', 0, 2, 3, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-15'), 3028777, 2299160, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-13 00:00:29.998369+00', '2023-03-13 00:00:29.998369+00', 0, 2, 12, 0, 12, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-14'), 12116426, 3558522, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-12 12:15:02.435343+00', '2023-03-12 12:15:02.435343+00', 0, 4, 2, 0, 0, 0, CONCAT(to_char(now(), 'YYYY-MM'), '-12'), 2019794, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-10 02:18:56.858159+00', '2023-03-10 02:18:56.858159+00', 0, 1, 3, 0, 3, 3, CONCAT(to_char(now(), 'YYYY-MM'), '-11'), 3029547, 3196750, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-09 01:21:43.772115+00', '2023-03-09 01:21:43.772115+00', 0, 3, 2, 0, 8, 3, CONCAT(to_char(now(), 'YYYY-MM'), '-10'), 2019736, 9196812, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-08 12:51:32.336522+00', '2023-03-08 12:51:32.336522+00', 0, 2, 9, 0, 4, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-09'), 9088532, 1112986, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-07 01:54:52.849452+00', '2023-03-07 01:54:52.849452+00', 0, 0, 7, 0, 0, 0, CONCAT(to_char(now(), 'YYYY-MM'), '-08'), 7066021, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-06 02:35:06.007812+00', '2023-03-06 02:35:06.007812+00', 0, 5, 4, 0, 9, 3, CONCAT(to_char(now(), 'YYYY-MM'), '-07'), 4032908, 9489392, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-05 07:13:11.220198+00', '2023-03-05 07:13:11.220198+00', 0, 2, 0, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-06'), 0, 2372348, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-04 11:15:39.563771+00', '2023-03-04 11:15:39.563771+00', 0, 2, 0, 0, 1, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-04'), 0, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-03 08:40:15.224005+00', '2023-03-03 08:40:15.224005+00', 0, 2, 0, 0, 6, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-01'), 0, 6576705, 0);
-
 INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage", "bandwidth", "mode") VALUES
 ("gen_random_uuid"(), 'com.demo.app', '2023-03-01 01:18:54.034372+00', 1, 10948, 141264, 'day'),
 ("gen_random_uuid"(), 'com.demo.app', '2023-03-02 01:18:54.034372+00', 4, 20948, 441264, 'day'),
@@ -189,9 +149,6 @@ INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage"
 ("gen_random_uuid"(), 'com.demo.app', '2023-03-30 01:18:54.034372+00', 20, 180948, 2441264, 'day');
 
 -- Create cron jobs
--- SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage()$$);
--- SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
--- SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
 -- Set old versions to deleted after retention passed 
 SELECT cron.schedule('Delete old app version', '40 0 * * *', $$CALL update_app_versions_retention()$$);
 -- update channel for progressive deploy if too many fail
@@ -199,4 +156,3 @@ SELECT cron.schedule('Update channel for progressive deploy if too many fail', '
 SELECT cron.schedule('Update web stats', '22 1 * * *', $$SELECT http_post_to_function('web_stats-background', 'external', '{}'::jsonb)$$);
 SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_to_function('cron_good_plan-background', 'external', '{}'::jsonb)$$);
 SELECT cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT http_post_to_function('cron_email-background', 'external', '{}'::jsonb)$$);
-SELECT cron.schedule('Create partitions for next year', '0 0 1 12 *', $$SELECT create_partitions((CURRENT_DATE + INTERVAL '1 year' + INTERVAL '30 days')::DATE, 1)$$);
