@@ -476,8 +476,10 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     custom_id: device.custom_id as string,
   }
   const all = []
-  all.push(sendDeviceToClickHouse([deviceComplete]))
-  all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
+  if (isClickHouseEnabled())
+    all.push(sendDeviceToClickHouse([deviceComplete]))
+  else
+    all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
 
   return Promise.all(all)
     .catch((e) => {
@@ -497,11 +499,10 @@ export function sendStats(stats: Database['public']['Tables']['stats']['Update']
       version: stat.version as number,
       platform: stat.platform as Database['public']['Enums']['platform_os'],
     }
-    // if (isClickHouseEnabled())
-    //   all.push(sendLogToClickHouse([statComplete]))
-    // else
-    all.push(sendLogToClickHouse([statComplete]))
-    all.push(supabaseAdmin().from('stats').insert(statComplete))
+    if (isClickHouseEnabled())
+      all.push(sendLogToClickHouse([statComplete]))
+    else
+      all.push(supabaseAdmin().from('stats').insert(statComplete))
   }
 
   return Promise.all(all)
