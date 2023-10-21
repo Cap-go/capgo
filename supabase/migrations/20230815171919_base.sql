@@ -1179,6 +1179,42 @@ CREATE TABLE "public"."app_usage" (
 -- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
 -- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
 
+-- CREATE TABLE IF NOT EXISTS aggregate_monthly
+-- (
+--     month Date,
+--     app_id String,
+--     storage_added Int64,
+--     storage_deleted Int64,
+--     bandwidth Int64,
+--     mau UInt64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(month)
+-- ORDER BY (month, app_id);
+
+-- CREATE MATERIALIZED VIEW aggregate_monthly_mv
+-- TO aggregate_monthly
+-- AS
+-- SELECT
+--     toStartOfMonth(date) AS month,
+--     app_id,
+--     sum(storage_added) AS storage_added,
+--     sum(storage_deleted) AS storage_deleted,
+--     sum(bandwidth) AS bandwidth,
+--     max(mau) AS mau
+-- FROM aggregate_daily
+-- GROUP BY month, app_id;
+
+-- INSERT INTO aggregate_monthly
+-- SELECT
+--     toStartOfMonth(date) AS month,
+--     app_id,
+--     sum(storage_added) AS storage_added,
+--     sum(storage_deleted) AS storage_deleted,
+--     sum(bandwidth) AS bandwidth,
+--     max(mau) AS mau
+-- FROM aggregate_daily
+-- GROUP BY month, app_id;
+
 CREATE TABLE "public"."app_versions" (
     "id" bigint NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -1677,7 +1713,6 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 --     countIf(action IN ('set_fail', 'update_fail', 'download_fail')) AS fail_actions_count
 -- FROM logs
 -- GROUP BY date, app_id;
-
 
 CREATE TABLE "public"."stats" (
     "created_at" timestamp with time zone NOT NULL,
