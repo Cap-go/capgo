@@ -1542,6 +1542,21 @@ CREATE TABLE "public"."deleted_account" (
 -- FROM logs
 -- GROUP BY date, app_id;
 
+--  Add to supabase the table to get stats from clickhouse
+
+--   create foreign table clickhouse_app_usage (
+--     date timestamp,
+--     app_id text,
+--     storage_added bigint,
+--     storage_deleted bigint,
+--     bandwidth bigint,
+--     mau bigint
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'aggregate_daily'
+--   );
+
 CREATE TABLE "public"."devices" (
     "created_at" timestamp with time zone NOT NULL,
     "updated_at" timestamp with time zone NOT NULL,
