@@ -1164,6 +1164,32 @@ Begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"("userid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  from stripe_info
+  where customer_id=(SELECT customer_id from users where id=userid)
+  AND (
+    (is_good_plan = true AND status = 'succeeded') 
+    OR (subscription_id = 'free') -- TODO: allow free plan again
+    -- OR (subscription_id = 'free' or subscription_id is null)
+    OR (trial_at::date - (now())::date > 0)
+  )
+  )
+);
+End;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_paying(auth.uid());
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
