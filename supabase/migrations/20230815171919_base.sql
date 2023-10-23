@@ -835,7 +835,7 @@ BEGIN
     RETURN QUERY SELECT 
         COALESCE(SUM(app_usage.mau), 0)::bigint AS mau,
         COALESCE(round(convert_bytes_to_gb(SUM(app_usage.bandwidth))::numeric,2), 0)::float AS bandwidth,
-        COALESCE(round(convert_bytes_to_gb(SUM(app_usage.storage))::numeric,2), 0)::float AS storage
+        COALESCE(round(convert_bytes_to_gb(SUM(app_usage.storage_added - app_usage.storage_deleted))::numeric,2), 0)::float AS storage
     FROM app_usage
     WHERE app_id IN (SELECT app_id from apps where user_id=userid)
     AND created_at >= anchor_start
@@ -1130,11 +1130,13 @@ CREATE TABLE "public"."app_usage" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     -- main stats
     "mau" bigint DEFAULT '0'::bigint NOT NULL,
-    "storage" bigint DEFAULT '0'::bigint NOT NULL,
+    "storage_added" bigint DEFAULT '0'::bigint NOT NULL,
+    "storage_deleted" bigint DEFAULT '0'::bigint NOT NULL,
     "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
-    "downloads" bigint DEFAULT '0'::bigint NOT NULL,
-    "fails" bigint DEFAULT '0'::bigint NOT NULL,
-    mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
+    "get" bigint DEFAULT '0'::bigint NOT NULL,
+    "uninstall" bigint DEFAULT '0'::bigint NOT NULL,
+    "fail" bigint DEFAULT '0'::bigint NOT NULL,
+    "install" bigint DEFAULT '0'::bigint NOT NULL
 );
 
 -- clickhouse table for stats aggregation
@@ -1147,12 +1149,16 @@ CREATE TABLE "public"."app_usage" (
 --     storage_added Int64,
 --     storage_deleted Int64,
 --     bandwidth Int64,
---     mau UInt64
+--     mau UInt64,
+--     get UInt64,
+--     fail UInt64,
+--     install UInt64,
+--     uninstall UInt64,
 -- ) ENGINE = SummingMergeTree()
 -- PARTITION BY toYYYYMM(date)
 -- ORDER BY (date, app_id);
 
--- drop table daily_app_summary_mv;
+-- drop table aggregate_daily_mv;
 -- CREATE MATERIALIZED VIEW aggregate_daily_mv
 -- TO aggregate_daily
 -- AS
@@ -1162,7 +1168,11 @@ CREATE TABLE "public"."app_usage" (
 --     a.storage_added,
 --     a.storage_deleted,
 --     l.bandwidth,
---     m.mau
+--     m.mau,
+--     l.get,
+--     l.fail,
+--     l.install,
+--     l.uninstall,
 -- FROM logs_daily AS l
 -- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
 -- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
@@ -1174,7 +1184,11 @@ CREATE TABLE "public"."app_usage" (
 --     a.storage_added,
 --     a.storage_deleted,
 --     l.bandwidth,
---     m.mau
+--     m.mau,
+--     l.get,
+--     l.fail,
+--     l.install,
+--     l.uninstall,
 -- FROM logs_daily AS l
 -- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
 -- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
@@ -1429,6 +1443,45 @@ CREATE TABLE "public"."deleted_account" (
 -- ORDER BY (app_id, device_id, updated_at)
 -- PRIMARY KEY (app_id, device_id);
 
+-- CREATE TABLE IF NOT EXISTS devices_aggregate
+-- (
+--     created_at DateTime64(6),
+--     updated_at DateTime64(6),
+--     device_id String,
+--     custom_id String,
+--     app_id String,
+--     platform String,
+--     plugin_version String,
+--     os_version String,
+--     version_build String,
+--     version Int64,
+--     is_prod UInt8,
+--     is_emulator UInt8
+-- ) ENGINE = MergeTree()
+-- PARTITION BY toYYYYMM(updated_at)
+-- ORDER BY (app_id, device_id, updated_at)
+-- PRIMARY KEY (app_id, device_id);
+
+-- CREATE MATERIALIZED VIEW devices_aggregate_mv
+-- TO devices_aggregate
+-- AS
+-- SELECT
+--     min(updated_at) AS created_at,
+--     max(updated_at) AS updated_at,
+--     device_id,
+--     argMax(custom_id, updated_at) AS custom_id,
+--     argMax(app_id, updated_at) AS app_id,
+--     argMax(platform, updated_at) AS platform,
+--     argMax(plugin_version, updated_at) AS plugin_version,
+--     argMax(os_version, updated_at) AS os_version,
+--     argMax(version_build, updated_at) AS version_build,
+--     argMax(version, updated_at) AS version,
+--     argMax(is_prod, updated_at) AS is_prod,
+--     argMax(is_emulator, updated_at) AS is_emulator
+-- FROM devices
+-- GROUP BY device_id;
+
+
 -- CREATE VIEW device_u AS SELECT * from devices final; -- materialized view to get unique devices
 
 -- insert in click house
@@ -1461,7 +1514,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
---     table 'devices_u'
+--     table '(SELECT DISTINCT device_id FROM devices_u)'
 --   );
 
 --  auto create stats in clickhouse
