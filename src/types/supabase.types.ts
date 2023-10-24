@@ -140,34 +140,40 @@ export interface Database {
           app_id: string
           bandwidth: number
           created_at: string | null
-          downloads: number
           fails: number
+          get: number
           id: string
+          install: number
           mau: number
-          mode: Database["public"]["Enums"]["usage_mode"]
-          storage: number
+          storage_added: number
+          storage_deleted: number
+          uninstall: number
         }
         Insert: {
           app_id: string
           bandwidth?: number
           created_at?: string | null
-          downloads?: number
           fails?: number
+          get?: number
           id?: string
+          install?: number
           mau?: number
-          mode?: Database["public"]["Enums"]["usage_mode"]
-          storage?: number
+          storage_added?: number
+          storage_deleted?: number
+          uninstall?: number
         }
         Update: {
           app_id?: string
           bandwidth?: number
           created_at?: string | null
-          downloads?: number
           fails?: number
+          get?: number
           id?: string
+          install?: number
           mau?: number
-          mode?: Database["public"]["Enums"]["usage_mode"]
-          storage?: number
+          storage_added?: number
+          storage_deleted?: number
+          uninstall?: number
         }
         Relationships: []
       }
@@ -182,6 +188,7 @@ export interface Database {
           id: number
           minUpdateVersion: string | null
           name: string
+          native_packages: Json[] | null
           session_key: string | null
           storage_provider: string
           updated_at: string | null
@@ -197,6 +204,7 @@ export interface Database {
           id?: number
           minUpdateVersion?: string | null
           name: string
+          native_packages?: Json[] | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -212,6 +220,7 @@ export interface Database {
           id?: number
           minUpdateVersion?: string | null
           name?: string
+          native_packages?: Json[] | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -555,49 +564,43 @@ export interface Database {
       devices: {
         Row: {
           app_id: string
-          created_at: string | null
+          created_at: string
           custom_id: string
-          date_id: string | null
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
-          last_mau: string | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
-          updated_at: string | null
+          updated_at: string
           version: number
           version_build: string | null
         }
         Insert: {
           app_id: string
-          created_at?: string | null
+          created_at: string
           custom_id?: string
-          date_id?: string | null
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
-          updated_at?: string | null
+          updated_at: string
           version: number
           version_build?: string | null
         }
         Update: {
           app_id?: string
-          created_at?: string | null
+          created_at?: string
           custom_id?: string
-          date_id?: string | null
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
-          updated_at?: string | null
+          updated_at?: string
           version?: number
           version_build?: string | null
         }
@@ -923,36 +926,6 @@ export interface Database {
           action?: string
           app_id?: string
           created_at?: string
-          device_id?: string
-          platform?: Database["public"]["Enums"]["platform_os"]
-          version?: number
-          version_build?: string
-        }
-        Relationships: []
-      }
-      stats_old: {
-        Row: {
-          action: string
-          app_id: string
-          created_at: string | null
-          device_id: string
-          platform: Database["public"]["Enums"]["platform_os"]
-          version: number
-          version_build: string
-        }
-        Insert: {
-          action: string
-          app_id: string
-          created_at?: string | null
-          device_id: string
-          platform: Database["public"]["Enums"]["platform_os"]
-          version: number
-          version_build: string
-        }
-        Update: {
-          action?: string
-          app_id?: string
-          created_at?: string | null
           device_id?: string
           platform?: Database["public"]["Enums"]["platform_os"]
           version?: number
@@ -1476,9 +1449,7 @@ export interface Database {
           }
       get_total_stats_v3:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: {
               mau: number
               bandwidth: number
@@ -1486,7 +1457,9 @@ export interface Database {
             }[]
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: {
               mau: number
               bandwidth: number

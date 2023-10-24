@@ -73,7 +73,7 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
         await sendMetaToClickHouse({
-          id: record.id,
+          id: record.app_id,
           created_at: new Date().toISOString(),
           app_id: record.app_id,
           size,
@@ -137,7 +137,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   await sendMetaToClickHouse({
-    id: record.id,
+    id: record.app_id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
     size: 0,

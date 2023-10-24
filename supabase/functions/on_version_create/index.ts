@@ -101,7 +101,7 @@ serve(async (event: Request) => {
         size,
       })
     await sendMetaToClickHouse({
-      id: record.id,
+      id: record.app_id,
       created_at: new Date().toISOString(),
       app_id: record.app_id,
       size,
