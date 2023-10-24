@@ -4,6 +4,7 @@ import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 
 interface dataDevice {
+  userId: string
   appId?: string
   rangeStart: number
   rangeEnd: number
@@ -12,7 +13,7 @@ interface dataDevice {
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataDevice) {
   try {
     console.log('body', body)
-    return sendRes(await getSDashboard(headers.authorization || 'MISSING', body.rangeStart, body.rangeEnd, body.appId))
+    return sendRes(await getSDashboard(headers.authorization || 'MISSING', body.userId, body.rangeStart, body.rangeEnd, body.appId))
   }
   catch (e) {
     return sendRes({

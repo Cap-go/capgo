@@ -60,6 +60,7 @@ export const useMainStore = defineStore('main', () => {
 
     const req = await supabase.functions.invoke('get_dashboard', {
       body: {
+        userId: auth.value?.id,
         rangeStart: cycleInfo.value?.subscription_anchor_start || rangeStart,
         rangeEnd: cycleInfo.value?.subscription_anchor_end || rangeEnd,
       },
@@ -67,6 +68,20 @@ export const useMainStore = defineStore('main', () => {
     dashboard.value = (req.data || []) as appUsage[]
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
+  }
+
+  const getTotalStats = () => {
+    return dashboard.value.reduce((acc: any, cur: any) => {
+      acc.mau += cur.mau
+      acc.bandwidth += cur.bandwidth
+      acc.storage += cur.storage_added - cur.storage_deleted
+      return acc
+    }
+    , {
+      mau: 0,
+      bandwidth: 0,
+      storage: 0,
+    })
   }
 
   const filterDashboard = async (appId: string, rangeStart?: Date, rangeEnd?: Date, refetch = false) => {
@@ -81,6 +96,7 @@ export const useMainStore = defineStore('main', () => {
     trialDaysLeft,
     goodPlan,
     getAllDashboard,
+    getTotalStats,
     filterDashboard,
     dashboard,
     canceled,

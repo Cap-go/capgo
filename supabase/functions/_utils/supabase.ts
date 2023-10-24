@@ -296,9 +296,10 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   }])
 }
 
-export async function getSDashboard(auth: string, rangeStart: number, rangeEnd: number, appId?: string) {
-  console.log(`getSDashboard appId ${appId} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`)
+export async function getSDashboard(auth: string, userIdQuery: string, rangeStart: number, rangeEnd: number, appId?: string) {
+  console.log(`getSDashboard userId ${userIdQuery} appId ${appId} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`)
 
+  let isAdmin = false
   let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
   let client = supabaseClient(auth)
   if (!auth)
@@ -314,6 +315,7 @@ export async function getSDashboard(auth: string, rangeStart: number, rangeEnd: 
         const reqAdmin = await client
           .rpc('is_admin')
           .then(res => res.data || false)
+        isAdmin = reqAdmin
         if (!reqAdmin)
           return Promise.reject(new Error('not allowed'))
       }
@@ -329,7 +331,7 @@ export async function getSDashboard(auth: string, rangeStart: number, rangeEnd: 
     req.eq('app_id', appId)
   }
   else {
-    const userId = (await supabaseClient(auth).auth.getUser()).data.user?.id
+    const userId = isAdmin ? userIdQuery : (await supabaseClient(auth).auth.getUser()).data.user?.id
     // get all user apps id
     const appIds = await supabaseClient(auth)
       .from('apps')

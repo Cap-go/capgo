@@ -450,7 +450,7 @@ BEGIN
   -- Get the maximum values for the user's current plan
   current_plan_max := public.get_current_plan_max(userid);
   -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v2(userid, dateid);
+  total_stats := public.get_total_stats_v3(userid);
   -- Calculate the percentage of usage for each stat and return the average
   percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
@@ -827,21 +827,33 @@ AS $$
 DECLARE
     anchor_start date;
     anchor_end date;
+    usage_table_name text;
+    date_column_name text;
 BEGIN
     SELECT subscription_anchor_start, subscription_anchor_end INTO anchor_start, anchor_end
     FROM stripe_info
-       WHERE customer_id=(SELECT customer_id from users where id=userid);
+    WHERE customer_id=(SELECT customer_id from users where id=userid);
 
-    RETURN QUERY SELECT 
-        COALESCE(SUM(app_usage.mau), 0)::bigint AS mau,
-        COALESCE(round(convert_bytes_to_gb(SUM(app_usage.bandwidth))::numeric,2), 0)::float AS bandwidth,
-        COALESCE(round(convert_bytes_to_gb(SUM(app_usage.storage_added - app_usage.storage_deleted))::numeric,2), 0)::float AS storage
-    FROM app_usage
-    WHERE app_id IN (SELECT app_id from apps where user_id=userid)
-    AND created_at >= anchor_start
-    AND created_at <= anchor_end
-    AND mode = 'cycle'
-    LIMIT 1;
+    SELECT to_regclass('clickhouse_app_usage') INTO usage_table_name;
+    IF usage_table_name IS NULL THEN
+        usage_table_name := 'app_usage';
+        date_column_name := 'created_at';
+    ELSE
+        usage_table_name := 'clickhouse_app_usage';
+        date_column_name := 'date';
+    END IF;
+
+    RETURN QUERY EXECUTE format('
+        SELECT 
+            COALESCE(SUM(%I.mau), 0)::bigint AS mau,
+            COALESCE(round(convert_bytes_to_gb(SUM(%I.bandwidth))::numeric,2), 0)::float AS bandwidth,
+            COALESCE(round(convert_bytes_to_gb(SUM(%I.storage_added - %I.storage_deleted))::numeric,2), 0)::float AS storage
+        FROM %I
+        WHERE app_id IN (SELECT app_id from apps where user_id=$1)
+        AND %I >= $2
+        AND %I <= $3
+        LIMIT 1', usage_table_name, usage_table_name, usage_table_name, usage_table_name, usage_table_name, date_column_name, date_column_name)
+    USING userid, anchor_start, anchor_end;
 END;  
 $$;
 
