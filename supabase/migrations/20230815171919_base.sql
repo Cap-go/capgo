@@ -1598,7 +1598,7 @@ CREATE TABLE "public"."deleted_account" (
 --  Add to supabase the table to get stats from clickhouse
 
 --   create foreign table clickhouse_app_usage (
---     date timestamp,
+--     date date,
 --     app_id text,
 --     storage_added bigint,
 --     storage_deleted bigint,
