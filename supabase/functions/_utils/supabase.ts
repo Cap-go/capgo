@@ -296,6 +296,55 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   }])
 }
 
+export async function getSDashboard(auth: string, rangeStart: number, rangeEnd: number, appId?: string) {
+  console.log(`getSDashboard appId ${appId} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`)
+
+  let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
+  let client = supabaseClient(auth)
+  if (!auth)
+    client = supabaseAdmin()
+
+  if (isClickHouseEnabled()) {
+    tableName = 'clickhouse_app_usage'
+    if (appId) {
+      const reqOwner = await client
+        .rpc('is_app_owner', { appid: appId })
+        .then(res => res.data || false)
+      if (!reqOwner) {
+        const reqAdmin = await client
+          .rpc('is_admin')
+          .then(res => res.data || false)
+        if (!reqAdmin)
+          return Promise.reject(new Error('not allowed'))
+      }
+    }
+    client = supabaseAdmin()
+  }
+  console.log('tableName', tableName)
+  const req = client
+    .from(tableName)
+    .select()
+
+  if (appId) {
+    req.eq('app_id', appId)
+  }
+  else {
+    const userId = (await supabaseClient(auth).auth.getUser()).data.user?.id
+    // get all user apps id
+    const appIds = await supabaseClient(auth)
+      .from('apps')
+      .select('app_id')
+      .eq('user_id', userId)
+      .then(res => res.data?.map(app => app.app_id) || [])
+    console.log('appIds', appIds)
+    req.in('app_id', appIds)
+  }
+
+  const res = await req
+  console.log('res', res)
+  return res.data || []
+}
+
 export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)

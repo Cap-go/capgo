@@ -9,7 +9,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { appIdToUrl, getConvertedDate2, urlToAppId } from '~/services/conversion'
+import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
 const id = ref('')
 const { t } = useI18n()
@@ -24,9 +24,6 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
-const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
-
 async function loadAppInfo() {
   try {
     const { data: dataApp } = await supabase
@@ -37,22 +34,9 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
     const promises = []
 
-    if (cycleStart && cycleEnd) {
-      promises.push(
-        supabase
-          .from('app_usage')
-          .select()
-          .eq('app_id', id.value)
-          .gte('created_at', getConvertedDate2(cycleStart))
-          .lte('created_at', getConvertedDate2(cycleEnd))
-          .eq('mode', 'cycle')
-          .single()
-          .then(({ data }) => {
-            updatesNb.value = data?.downloads || 0
-            devicesNb.value = data?.mau || 0
-          }),
-      )
-    }
+    const usageByApp = await main.filterDashboard(id.value)
+    updatesNb.value = usageByApp.reduce((acc, cur) => acc + cur.get, 0)
+    devicesNb.value = usageByApp.reduce((acc, cur) => acc + cur.mau, 0)
 
     promises.push(
       supabase
@@ -97,22 +81,22 @@ async function refreshData() {
 const stats = computed<Stat[]>(() => ([
   {
     label: t('channels'),
-    value: channelsNb,
+    value: channelsNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/channels`,
   },
   {
     label: t('bundles'),
-    value: bundlesNb,
+    value: bundlesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/bundles`,
   },
   {
     label: t('devices'),
-    value: devicesNb,
+    value: devicesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/devices`,
   },
   {
     label: t('plan-updates'),
-    value: updatesNb,
+    value: updatesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/logs`,
   },
 ]))
