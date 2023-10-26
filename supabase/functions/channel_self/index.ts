@@ -30,7 +30,7 @@ export const jsonRequestSchema = z.object({
   }),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
-}).refine(data => reverseDomainRegex.test(data.app_id), {
+}).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
   message: INVALID_STRING_APP_ID,
 }).refine(data => deviceIdRegex.test(data.device_id), {
   message: INVALID_STRING_DEVICE_ID,
@@ -43,7 +43,7 @@ export const jsonRequestSchema = z.object({
 
 async function post(body: DeviceLink): Promise<Response> {
   console.log('body', body)
-  const parseResult: any = jsonRequestSchema.safeParse(body)
+  const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
     console.error('Cannot parse json', { parseResult })
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
@@ -77,13 +77,6 @@ async function post(body: DeviceLink): Promise<Response> {
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
-  if (!device_id || !app_id) {
-    console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
-    return sendRes({
-      message: 'Cannot find device_id or appi_id',
-      error: 'missing_info',
-    }, 400)
-  }
   const { data: version } = await supabaseAdmin()
     .from('app_versions')
     .select('id')

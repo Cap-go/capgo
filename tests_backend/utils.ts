@@ -64,6 +64,11 @@ export async function responseOk(response: Response, requestName: string) {
   assert(cloneResponse.ok, `${requestName} response not ok: ${cloneResponse.status} ${cloneResponse.statusText} ${await cloneResponse.text()}`)
 }
 
+export async function responseStatusCode(response: Response, statusCode: number, requestName: string) {
+  const cloneResponse = response.clone()
+  assert(cloneResponse.status === statusCode, `${requestName} response does not have status code ${statusCode}: ${cloneResponse.status} ${cloneResponse.statusText} ${await cloneResponse.text()}`)
+}
+
 export async function sendUpdate(baseUrl: URL, data: typeof updateAndroidBaseData): Promise<Response> {
   return await fetch(new URL('updates', baseUrl), {
     method: 'POST',

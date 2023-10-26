@@ -1,4 +1,4 @@
-import { type RunnableTest, type SupabaseType, responseOk, assert, getResponseError, getUpdateBaseData } from '../../utils.ts'
+import { type RunnableTest, type SupabaseType, responseOk, assert, getResponseError, getUpdateBaseData, responseStatusCode } from '../../utils.ts'
 
 const baseData = {
   channel: 'production',
@@ -36,6 +36,11 @@ export function getTest(): RunnableTest {
         name: 'Test post without field (app_id)',
         timesToExecute: 1,
         test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id')
+      },
+      {
+        name: 'Test with a version that does not exist (post)',
+        timesToExecute: 1,
+        test: testWithNotExistingVersion,
       }
     ],
   }
@@ -93,11 +98,42 @@ async function testPostWithoutField(backendBaseUrl: URL, _supabase: SupabaseType
   const baseData = getBaseData() as any
   delete baseData[field]
 
-  console.log(baseData)
-
   const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
-  responseOk(response, `Test post without field ${field}`)
+  responseStatusCode(response, 400, `Test post without field ${field}`)
 
   const error = await getResponseError(response)
-  assert(error === 'missing_info', `Response error ${error} is not equal to missing_info`)
+  assert(error.includes('Cannot parse json'), `Response error ${error} is not equal to missing_info`)
+}
+
+// Enough for JSON tests, let's move on
+async function testWithNotExistingVersion(backendBaseUrl: URL, supabase: SupabaseType) {
+  const baseData = getBaseData()
+  baseData.version_name = `1.0.${Math.floor(Math.random() * 10000000)}`
+
+  // We rename the 'buildin' version for a sec, this is to test the "no version" case
+  const { error, data } = await supabase.from('app_versions')
+    .update({ name: 'build_not_in' })
+    .eq('name', 'builtin')
+    .select('id')
+    .single()
+    
+  assert (error === null && !!data, `Error while updating version: ${JSON.stringify(error)}`)
+
+  try {
+    const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
+    responseStatusCode(response, 400, 'Test with not existing version')
+  
+    const responseRrror = await getResponseError(response)
+    assert(responseRrror === 'version_error', `Response error ${error} is not equal to version_error`)
+  } finally {
+      // We rename the 'build_not_in' version back to 'buildin'
+      const { error } = await supabase.from('app_versions')
+        .update({ name: 'builtin' })
+        .eq('id', data!.id)
+        .select('id')
+        .single()
+      
+      assert (error === null, `Error while updating version: ${error}`)
+  }
+
 }
