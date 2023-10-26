@@ -415,7 +415,7 @@ DECLARE
     result stats_table;
 BEGIN
   -- Get the total values for the user's current usage
-  SELECT * INTO current_usage FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
+  SELECT * INTO current_usage FROM public.get_total_stats_v3(userid);
   SELECT * INTO max_plan FROM public.get_current_plan_max(userid);
   result.mau = current_usage.mau::bigint - max_plan.mau::bigint;
   result.mau = (CASE WHEN result.mau > 0 THEN result.mau ELSE 0 END);
@@ -437,7 +437,7 @@ END;
 $$;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE OR REPLACE FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") RETURNS double precision
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
@@ -460,12 +460,12 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_plan_usage_percent(dateid character varying)
+CREATE OR REPLACE FUNCTION public.get_plan_usage_percent()
 RETURNS double precision
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    RETURN get_plan_usage_percent(auth.uid(), dateid);
+    RETURN get_plan_usage_percent(auth.uid());
 END;  
 $$;
 
@@ -907,7 +907,7 @@ BEGIN
 END;  
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_total_storage_size(userid uuid, app_id character varying)
+CREATE OR REPLACE FUNCTION public.get_total_storage_size(app_id character varying)
 RETURNS double precision
 LANGUAGE plpgsql
 AS $$

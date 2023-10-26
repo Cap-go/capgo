@@ -164,7 +164,7 @@ export async function getTotalStorage(): Promise<number> {
 
 export async function isGoodPlan(): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v3', {})
+    .rpc('is_good_plan_v4', {})
     .single()
   if (error)
     throw new Error(error.message)
@@ -229,9 +229,9 @@ export async function isAllowedAction(): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(dateId: string): Promise<number> {
+export async function getPlanUsagePercent(): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent', { dateid: dateId })
+    .rpc('get_plan_usage_percent', { })
     .single()
   if (error)
     throw new Error(error.message)

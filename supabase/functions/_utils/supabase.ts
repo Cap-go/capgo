@@ -118,9 +118,9 @@ export async function getCurrentPlanName(userId: string): Promise<string> {
   return ''
 }
 
-export async function getPlanUsagePercent(userId: string, dateid: string): Promise<number> {
+export async function getPlanUsagePercent(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin()
-    .rpc('get_plan_usage_percent', { userid: userId, dateid })
+    .rpc('get_plan_usage_percent', { userid: userId })
     .single()
   if (error) {
     console.error('getPlanUsagePercent error', error.message)
@@ -133,7 +133,7 @@ export async function getPlanUsagePercent(userId: string, dateid: string): Promi
 export async function isGoodPlan(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
-      .rpc('is_good_plan_v3', { userid: userId })
+      .rpc('is_good_plan_v4', { userid: userId })
       .single()
       .throwOnError()
     return data || false
