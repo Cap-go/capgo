@@ -128,6 +128,30 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
+export interface appUsage {
+  app_id: string
+  bandwidth: number
+  date: string
+  fail: number
+  get: number
+  install: number
+  mau: number
+  storage_added: number
+  storage_deleted: number
+  uninstall: number
+}
+export async function getAllDashboard(userId: string, rangeStart?: Date, rangeEnd?: Date): Promise<appUsage[]> {
+  const supabase = useSupabase()
+
+  const req = await supabase.functions.invoke('get_dashboard', {
+    body: {
+      userId,
+      rangeStart,
+      rangeEnd,
+    },
+  })
+  return (req.data || []) as appUsage[]
+}
 export async function getTotalStorage(): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('get_total_storage_size', {})
