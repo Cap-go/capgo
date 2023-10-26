@@ -812,7 +812,7 @@ $$;
 
 
 CREATE OR REPLACE FUNCTION public.is_good_plan_v4()
-RETURNS double precision
+RETURNS boolean
 LANGUAGE plpgsql
 AS $$
 BEGIN
