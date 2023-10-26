@@ -197,7 +197,10 @@ async function put(body: DeviceLink): Promise<Response> {
   }
   else {
     console.error('Cannot find version', { version_build })
-    return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
+    return sendRes({
+      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
+      error: 'semver_error',
+    }, 400)
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!device_id || !app_id) {
