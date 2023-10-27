@@ -847,8 +847,8 @@ BEGIN
             COALESCE(round(convert_bytes_to_gb(SUM(%I.storage_added - %I.storage_deleted))::numeric,2), 0)::float AS storage
         FROM %I
         WHERE app_id IN (SELECT app_id from apps where user_id=$1)
-        AND %I >= date
-        AND %I <= date
+        AND date >= $2
+        AND date <= $3
         LIMIT 1', usage_table_name, usage_table_name, usage_table_name, usage_table_name, usage_table_name)
     USING userid, anchor_start, anchor_end;
 END;  
