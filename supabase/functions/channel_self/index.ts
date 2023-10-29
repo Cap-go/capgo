@@ -148,20 +148,50 @@ async function post(body: DeviceLink): Promise<Response> {
       }, 400)
     }
 
-    const { error: dbErrorDev } = await supabaseAdmin()
-      .from('channel_devices')
-      .upsert({
-        device_id,
-        channel_id: dataChannel.id,
-        app_id,
-        created_by: dataChannel.created_by,
-      })
-    if (dbErrorDev) {
-      console.error('Cannot do channel override', { dbErrorDev })
-      return sendRes({
-        message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
-        error: 'override_not_allowed',
-      }, 400)
+    // Get the main channel
+    const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin()
+      .from('channels')
+      .select('name')
+      .eq('app_id', app_id)
+      .eq('public', true)
+      .single()
+
+    // We DO NOT return if there is no main channel as it's not a critical error
+    // We will just set the channel_devices as the user requested
+    const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
+    if (dbMainChannelError || !mainChannel)
+      console.error('Cannot find main channel', dbMainChannelError)
+
+    if (mainChannelName && mainChannelName === channel) {
+      const { error: dbErrorDev } = await supabaseAdmin()
+        .from('channel_devices')
+        .delete()
+        .eq('app_id', app_id)
+        .eq('device_id', device_id)
+      if (dbErrorDev) {
+        console.error('Cannot do channel override', { dbErrorDev })
+        return sendRes({
+          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+          error: 'override_not_allowed',
+        }, 400)
+      }
+    }
+    else {
+      const { error: dbErrorDev } = await supabaseAdmin()
+        .from('channel_devices')
+        .upsert({
+          device_id,
+          channel_id: dataChannel.id,
+          app_id,
+          created_by: dataChannel.created_by,
+        })
+      if (dbErrorDev) {
+        console.error('Cannot do channel override', { dbErrorDev })
+        return sendRes({
+          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+          error: 'override_not_allowed',
+        }, 400)
+      }
     }
   }
   await sendStats([{

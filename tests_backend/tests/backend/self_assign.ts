@@ -1,8 +1,8 @@
-import { type RunnableTest, type SupabaseType, responseOk, assert, getResponseError, getUpdateBaseData, responseStatusCode } from '../../utils.ts'
+import { type RunnableTest, type SupabaseType, assert, getResponseError, getUpdateBaseData, responseOk, responseStatusCode } from '../../utils.ts'
 
 const baseData = {
   channel: 'production',
-  ...getUpdateBaseData()
+  ...getUpdateBaseData(),
 }
 
 const getBaseData = (): typeof baseData => structuredClone(baseData)
@@ -32,17 +32,17 @@ export function getTest(): RunnableTest {
       {
         name: 'Test post without field (device_id) (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'POST')
+        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'POST'),
       },
       {
         name: 'Test post without field (app_id) (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'POST')
+        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'POST'),
       },
       {
         name: 'Test with a version that does not exist (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testWithNotExistingVersion(backendBaseUrl, supabase, 'POST')
+        test: (backendBaseUrl, supabase) => testWithNotExistingVersion(backendBaseUrl, supabase, 'POST'),
       },
       {
         name: 'Test without channel (post)',
@@ -64,6 +64,11 @@ export function getTest(): RunnableTest {
         timesToExecute: 1,
         test: testOkPost,
       },
+      {
+        name: 'Test post with default channel',
+        timesToExecute: 1,
+        test: testPostWithDefaultChannel,
+      },
       // Put from this point on
       {
         name: 'Test invalid semver (put)',
@@ -73,17 +78,17 @@ export function getTest(): RunnableTest {
       {
         name: 'Test post without field (device_id) (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'PUT')
+        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'PUT'),
       },
       {
         name: 'Test post without field (app_id) (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'PUT')
+        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'PUT'),
       },
       {
         name: 'Test with a version that does not exist (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testWithNotExistingVersion(backendBaseUrl, supabase, 'PUT')
+        test: (backendBaseUrl, supabase) => testWithNotExistingVersion(backendBaseUrl, supabase, 'PUT'),
       },
       {
         name: 'Test without overwrite (put)',
@@ -93,7 +98,7 @@ export function getTest(): RunnableTest {
       {
         name: 'Test with overwrite (put)',
         timesToExecute: 1,
-        test: testPutWithOverwrite
+        test: testPutWithOverwrite,
       },
       // Delete from this point on
       {
@@ -104,12 +109,12 @@ export function getTest(): RunnableTest {
       {
         name: 'Test post without field (device_id) (delete)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'DELETE')
+        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'DELETE'),
       },
       {
         name: 'Test post without field (app_id) (delete)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'DELETE')
+        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'DELETE'),
       },
       {
         name: 'Test delete with an overwrite that does not exist',
@@ -120,7 +125,7 @@ export function getTest(): RunnableTest {
         name: 'Test delete with an overwrite',
         timesToExecute: 1,
         test: testDeleteWithOverwrite,
-      }
+      },
     ],
   }
 }
@@ -134,13 +139,12 @@ function fetchEndpoint(backendBaseUrl: URL, method: HttpMethod, body: object) {
 
   // DELETE has the body in the url
   if (method === 'DELETE') {
-    for (const [key, value] of Object.entries(body)) {
+    for (const [key, value] of Object.entries(body))
       url.searchParams.append(key, value.toString())
-    }
   }
 
   return fetch(url, {
-    method: method,
+    method,
     headers: {
       'Content-Type': 'application/json',
     },
@@ -160,8 +164,6 @@ async function testPostInvalidJson(backendBaseUrl: URL, _supabase: SupabaseType)
   assert(response.ok === false, `The response should not be ok, response: ${response}`)
 }
 
-
-
 async function testEmptyJson(backendBaseUrl: URL, _supabase: SupabaseType) {
   // This is a simple test, for more please take a look at zod.ts
   const response = await fetchEndpoint(backendBaseUrl, 'POST', {})
@@ -175,8 +177,8 @@ async function testInvalidSemver(backendBaseUrl: URL, _supabase: SupabaseType, m
   baseData.version_build = 'invalid semver'
 
   const response = await fetchEndpoint(backendBaseUrl, method, baseData)
-  //responseOk(response, 'Test invalid semver')
-  
+  // responseOk(response, 'Test invalid semver')
+
   const error = await getResponseError(response)
   assert(error === 'semver_error', `Response error ${error} is not equal to semver_error`)
 }
@@ -205,34 +207,35 @@ async function testWithNotExistingVersion(backendBaseUrl: URL, supabase: Supabas
     .eq('name', 'builtin')
     .select('id')
     .single()
-    
+
   assert (error === null && !!data, `Error while updating version: ${JSON.stringify(error)}`)
 
   try {
     const response = await fetchEndpoint(backendBaseUrl, method, baseData)
     responseStatusCode(response, 400, 'Test with not existing version')
-  
+
     const responseRrror = await getResponseError(response)
     assert(responseRrror === 'version_error', `Response error ${error} is not equal to version_error`)
-  } finally {
-      // We rename the 'build_not_in' version back to 'buildin'
-      const { error } = await supabase.from('app_versions')
-        .update({ name: 'builtin' })
-        .eq('id', data!.id)
-        .select('id')
-        .single()
-      
-      assert (error === null, `Error while updating version: ${error}`)
+  }
+  finally {
+    // We rename the 'build_not_in' version back to 'buildin'
+    const { error } = await supabase.from('app_versions')
+      .update({ name: 'builtin' })
+      .eq('id', data!.id)
+      .select('id')
+      .single()
+
+    assert (error === null, `Error while updating version: ${error}`)
   }
 }
 
 async function testNoChannel(backendBaseUrl: URL, _supabase: SupabaseType) {
   // Dirty, tho should work
   const baseData = getBaseData() as any
-  delete baseData['channel']
+  delete baseData.channel
 
   const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
-  responseStatusCode(response, 400, `Test post without field channel`)
+  responseStatusCode(response, 400, 'Test post without field channel')
 
   const error = await getResponseError(response)
   assert(error === 'cannot_override', `Response error ${error} is not equal to cannot_override`)
@@ -243,7 +246,7 @@ async function testUnexistingChannel(backendBaseUrl: URL, _supabase: SupabaseTyp
   baseData.channel = 'unexisting_channel'
 
   const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
-  responseStatusCode(response, 400, `Test post with unexisting channel`)
+  responseStatusCode(response, 400, 'Test post with unexisting channel')
 
   const error = await getResponseError(response)
   assert(error === 'channel_not_found', `Response error ${error} is not equal to channel_not_found`)
@@ -262,11 +265,12 @@ async function testPostWithChannelDisabledUpdate(backendBaseUrl: URL, supabase: 
 
   try {
     const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
-    responseStatusCode(response, 400, `Test post with channel disabled update`)
+    responseStatusCode(response, 400, 'Test post with channel disabled update')
 
     const error = await getResponseError(response)
     assert(error === 'channel_not_found', `Response error ${error} is not equal to channel_not_found`)
-  } finally {
+  }
+  finally {
     const { error } = await supabase.from('channels')
       .update({ allow_device_self_set: true })
       .eq('name', baseData.channel)
@@ -280,27 +284,43 @@ async function testPostWithChannelDisabledUpdate(backendBaseUrl: URL, supabase: 
 async function testOkPost(backendBaseUrl: URL, supabase: SupabaseType) {
   const baseData = getBaseData()
   baseData.device_id = crypto.randomUUID()
+  baseData.channel = 'no_access'
 
-  const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
-  responseOk(response, 'Test ok post')
+  const { error: channelUpdateError } = await supabase.from('channels')
+    .update({ allow_device_self_set: true })
+    .eq('name', 'no_access')
 
-  const { error, data } = await supabase.from('channel_devices')
-    .select('*')
-    .eq('device_id', baseData.device_id)
-    .eq('app_id', baseData.app_id)
-    .single()
+  assert (channelUpdateError === null, `Error while updating no_access channel: ${channelUpdateError}`)
 
-  assert(!!data && !error, `Error while fetching channel_devices: ${error}`)
+  try {
+    const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
+    responseOk(response, 'Test ok post')
 
-  const { error: error2, data: prodChannelData } = await supabase.from('channels')
-    .select('*')
-    .eq('name', baseData.channel)
-    .eq('app_id', baseData.app_id)
-    .single()
+    const { error, data } = await supabase.from('channel_devices')
+      .select('*')
+      .eq('device_id', baseData.device_id)
+      .eq('app_id', baseData.app_id)
+      .single()
 
-  assert (!!prodChannelData && !error2, `Error while fetching channel: ${error2}`)
+    assert(!!data && !error, `Error while fetching channel_devices: ${error}`)
 
-  assert(data?.channel_id === prodChannelData?.id, `Channel id ${data?.channel_id} is not equal to ${prodChannelData?.id}`)
+    const { error: error2, data: prodChannelData } = await supabase.from('channels')
+      .select('*')
+      .eq('name', baseData.channel)
+      .eq('app_id', baseData.app_id)
+      .single()
+
+    assert (!!prodChannelData && !error2, `Error while fetching channel: ${error2}`)
+
+    assert(data?.channel_id === prodChannelData?.id, `Channel id ${data?.channel_id} is not equal to ${prodChannelData?.id}`)
+  }
+  finally {
+    const { error: channelUpdateError } = await supabase.from('channels')
+      .update({ allow_device_self_set: false })
+      .eq('name', 'no_access')
+
+    assert (channelUpdateError === null, `Error while updating (revert) no_access channel: ${channelUpdateError}`)
+  }
 }
 
 // PUT = GET
@@ -342,7 +362,7 @@ async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType)
       app_id: baseData.app_id,
       channel_id: noAccessId,
       device_id: baseData.device_id,
-      created_by
+      created_by,
     })
 
   assert (error === null, `Error while inserting channel_device: ${error}`)
@@ -350,17 +370,18 @@ async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType)
   try {
     const response = await fetchEndpoint(backendBaseUrl, 'PUT', baseData)
     responseOk(response, 'Test PUT (with overwrite)')
-  
+
     const responseJSON = await response.json()
     const channel = responseJSON.channel
     const status = responseJSON.status
-  
+
     assert(!!channel, `Channel is not defined (${channel})`)
     assert(!!status, `Channel is not defined (${status})`)
-  
+
     assert(status === 'override', `Status is not equal to override (status = ${status})`)
     assert(channel === 'no_access', `Channel is not equal to no_access (Channel = ${channel})`)
-  } finally {
+  }
+  finally {
     const { error } = await supabase.from('channel_devices')
       .delete()
       .eq('device_id', baseData.device_id)
@@ -388,22 +409,22 @@ async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseTy
   const baseData = getBaseData()
   baseData.device_id = crypto.randomUUID()
 
-  const { data: noAccessChannel, error: noAccessChannelError } = await supabase.from('channels')
+  const { data: productionChannel, error: productionChannelError } = await supabase.from('channels')
     .select('id, created_by')
-    .eq('name', 'no_access')
+    .eq('name', 'production')
     .single()
 
-  assert (!!noAccessChannel && !noAccessChannelError, `Error while fetching no_access channel: ${noAccessChannelError}`)
+  assert (!!productionChannel && !productionChannelError, `Error while fetching no_access channel: ${productionChannelError}`)
 
-  const noAccessId = noAccessChannel!.id
-  const created_by = noAccessChannel!.created_by
+  const productionId = productionChannel!.id
+  const created_by = productionChannel!.created_by
 
   const { error } = await supabase.from('channel_devices')
     .upsert({
       app_id: baseData.app_id,
-      channel_id: noAccessId,
+      channel_id: productionId,
       device_id: baseData.device_id,
-      created_by
+      created_by,
     })
 
   assert (error === null, `Error while inserting channel_device: ${error}`)
@@ -411,7 +432,7 @@ async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseTy
   try {
     const response = await fetchEndpoint(backendBaseUrl, 'DELETE', baseData)
     responseOk(response, 'Test DELETE (with overwrite)')
-  
+
     const { data: channelDevice, error: channelDeviceError } = await supabase.from('channel_devices')
       .select('*')
       .eq('device_id', baseData.device_id)
@@ -419,16 +440,74 @@ async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseTy
 
     assert(channelDeviceError === null, `Error while fetching channel_device: ${channelDeviceError}`)
     assert(channelDevice?.length === 0, `Channel device length is not 0 (It is ${channelDevice?.length}). Data: ${JSON.stringify(channelDevice)}`)
-  } catch (e) {
+  }
+  catch (e) {
     const { error } = await supabase.from('channel_devices')
       .delete()
       .eq('device_id', baseData.device_id)
       .eq('app_id', baseData.app_id)
       .eq('created_by', created_by)
-      .eq('channel_id', noAccessId)
+      .eq('channel_id', productionId)
       .single()
 
     assert (error === null, `Error while deleting channel_device: ${error}, ${e}`)
     throw e
+  }
+}
+
+async function testPostWithDefaultChannel(backendBaseUrl: URL, supabase: SupabaseType) {
+  // Couple of steps:
+  // 1. Allow 'no_access' channel to be self assigned
+  // 2. Create a device with 'no_access' channel
+  // 3. Post to the self_channel with the same device BUT the `production` channel
+  // 4. Check if the device was removed from the DB
+
+  const baseData = getBaseData()
+  baseData.device_id = crypto.randomUUID()
+
+  // Step 1
+  const { error: channelUpdateError, data: noAccessData } = await supabase.from('channels')
+    .update({ allow_device_self_set: true })
+    .eq('name', 'no_access')
+    .eq('app_id', baseData.app_id)
+    .select('id, created_by')
+    .single()
+
+  assert (channelUpdateError === null, `Error while updating no_access channel: ${channelUpdateError}`)
+
+  try {
+    // Step 2
+    // We will not bother to revert step 2. It is not needed
+    const { error: overwriteUpsertError } = await supabase.from('channel_devices')
+      .upsert({
+        app_id: baseData.app_id,
+        channel_id: noAccessData!.id,
+        device_id: baseData.device_id,
+        created_by: noAccessData!.created_by,
+      })
+
+    assert(overwriteUpsertError === null, `Error while inserting channel_device: ${overwriteUpsertError}`)
+
+    // Step 3
+    baseData.channel = 'production'
+    const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
+    responseOk(response, 'Test post with default channel')
+
+    // Step 4
+    const { data: channelDevice, error: channelDeviceError } = await supabase.from('channel_devices')
+      .select('*')
+      .eq('device_id', baseData.device_id)
+      .eq('app_id', baseData.app_id)
+
+    assert(channelDeviceError === null, `Error while fetching channel_device: ${channelDeviceError}`)
+    assert(channelDevice?.length === 0, `Channel device length is not 0 (It is ${channelDevice?.length}). Data: ${JSON.stringify(channelDevice)}`)
+  }
+  finally {
+    // Undo step 1
+    const { error: channelUpdateError } = await supabase.from('channels')
+      .update({ allow_device_self_set: false })
+      .eq('name', 'no_access')
+
+    assert (channelUpdateError === null, `Error while updating no_access channel: ${channelUpdateError}`)
   }
 }
