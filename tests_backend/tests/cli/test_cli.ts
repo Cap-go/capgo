@@ -140,7 +140,7 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
 
 async function pnpmInstall() {
   const pnpmInstallCommand = new Deno.Command('pnpm', {
-    args: ['install'],
+    args: ['install', '--no-frozen-lockfile'],
     cwd: tempFileFolder,
   })
 

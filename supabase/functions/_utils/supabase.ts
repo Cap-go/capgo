@@ -525,12 +525,13 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     is_emulator: !!device.is_emulator,
     is_prod: !!device.is_prod,
     custom_id: device.custom_id as string,
+    created_at: device.created_at || new Date().toISOString(),
   }
   const all = []
   if (isClickHouseEnabled())
     all.push(sendDeviceToClickHouse([deviceComplete]))
   else
-    all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
+    all.push(supabaseAdmin().from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
 
   return Promise.all(all)
     .catch((e) => {
