@@ -460,7 +460,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_plan_usage_percent()
+CREATE OR REPLACE FUNCTION "public"."get_plan_usage_percent"()
 RETURNS double precision
 LANGUAGE plpgsql
 AS $$
@@ -637,7 +637,7 @@ Begin
 End;  
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_allowed_action(apikey text, appid character varying)
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action"(apikey text, appid character varying)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -645,9 +645,9 @@ AS $function$
 Begin
   RETURN is_app_owner(get_user_id(apikey), appid);
 End;
-$function$
+$function$;
 
-CREATE OR REPLACE FUNCTION public.is_app_owner(appid character varying)
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"(appid character varying)
 RETURNS boolean
 LANGUAGE plpgsql
 AS $$
@@ -2553,10 +2553,10 @@ GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "anon";
