@@ -5,7 +5,7 @@ import {
   isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin,
 } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { recordUsage } from './stripe.ts'
+import { recordUsage, setTreshold } from './stripe.ts'
 import { trackEvent } from './plunk.ts'
 
 function planToInt(plan: string) {
@@ -91,6 +91,12 @@ async function setMetered(customer_id: string | null, userId: string) {
     .eq('customer_id', customer_id)
     .single()
   if (data && data.subscription_metered) {
+    try {
+      await setTreshold(customer_id)
+    }
+    catch (error) {
+      console.log('error setTreshold', error)
+    }
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(userId)
     if (get_metered_usage.mau > 0 && prices.mau)
@@ -134,6 +140,7 @@ export async function checkPlan(userId: string): Promise<void> {
       if (get_total_stats) {
         const best_plan = await findBestPlan(get_total_stats)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
+        await
         await setMetered(user.customer_id, userId)
         if (best_plan === 'Free' && current_plan === 'Free') {
           await trackEvent(user.email, {}, 'user:need_more_time')
