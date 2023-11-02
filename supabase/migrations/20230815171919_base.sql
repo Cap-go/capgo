@@ -2271,9 +2271,9 @@ ALTER TABLE ONLY "public"."users"
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-CREATE POLICY " allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
+CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
 
-CREATE POLICY "All all to api owner" ON "public"."channels" TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
+CREATE POLICY "All to api owner" ON "public"."channels" TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow all for app owner" ON "public"."channel_users" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -2295,7 +2295,7 @@ CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" US
 
 CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
+CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow app owner or admin" ON "public"."channels" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
