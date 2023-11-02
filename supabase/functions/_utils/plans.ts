@@ -140,7 +140,6 @@ export async function checkPlan(userId: string): Promise<void> {
       if (get_total_stats) {
         const best_plan = await findBestPlan(get_total_stats)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-        await
         await setMetered(user.customer_id, userId)
         if (best_plan === 'Free' && current_plan === 'Free') {
           await trackEvent(user.email, {}, 'user:need_more_time')
