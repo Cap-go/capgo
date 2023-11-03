@@ -81,10 +81,6 @@ async function main(_url: URL, _headers: BaseHeaders, _method: string, body: App
     is_prod: isProd,
   } = parseResult.data
 
-  // if (appId !== 'com.kick.mobile') {
-  //   console.log('[Cache] ignored cache')
-  //   return update(body)
-  // }
   const appCacheKey = `app_${appId}`
   const deviceCacheKey = `device_${deviceId}`
   const versionCacheKey = `ver_${versionName}`
