@@ -47,8 +47,17 @@ BEGIN
             END IF;
 
             IF (current_job.job_type = 'APP_DELETE') THEN
-              --DELETE FROM "devices" where app_id=current_job.payload;
-              --DELETE FROM "stats" where app_id=current_job.payload;
+                DELETE FROM "devices" where app_id=current_job.payload::jsonb->'app_id';
+                DELETE FROM "stats" where app_id=current_job.payload::jsonb->'app_id';
+            END IF;
+
+            IF (current_job.job_type = 'DEVICE_DELETE') THEN
+                DELETE FROM "stats" where app_id=current_job.payload::jsonb->'app_id'::text and device_id=current_job.payload::jsonb->'device_id'::text;
+            END IF;
+
+            IF (current_job.job_type = 'APP_VERSION_DELETE') THEN
+                DELETE FROM "devices" where app_id=current_job.payload::jsonb->'app_id' and version=current_job.payload::jsonb->'id';
+                DELETE FROM "stats" where app_id=current_job.payload::jsonb->'app_id' and version=current_job.payload::jsonb->'id';
             END IF;
 
             -- Delete the job from the queue
@@ -94,6 +103,47 @@ BEGIN
 END;
 $BODY$;
 
+-- Old triggers drop
+drop trigger on_app_delete_sql on apps;
+drop trigger on_app_versions_delete_sql on app_versions;
+drop trigger on_device_delete_sql on devices;
+
+-- Recreate triggers
+CREATE OR REPLACE FUNCTION on_app_delete_sql() RETURNS TRIGGER AS $_$
+BEGIN
+    INSERT INTO job_queue (job_type, payload) VALUES ('APP_DELETE', row_to_json(OLD)::text);
+    RETURN OLD;
+END $_$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION on_app_version_delete_sql() RETURNS TRIGGER AS $_$
+BEGIN
+    INSERT INTO job_queue (job_type, payload) VALUES ('APP_VERSION_DELETE', row_to_json(OLD)::text);
+    RETURN OLD;
+END $_$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION on_device_delete_sql() RETURNS TRIGGER AS $_$
+BEGIN
+    INSERT INTO job_queue (job_type, payload) VALUES ('DEVICE_DELETE', row_to_json(OLD)::text);
+    RETURN OLD;
+END $_$ LANGUAGE 'plpgsql';
+
+-- Readd the triggers
+CREATE TRIGGER on_app_delete_sql 
+BEFORE DELETE ON apps 
+FOR EACH ROW 
+EXECUTE PROCEDURE on_app_delete_sql();
+
+CREATE TRIGGER on_app_versions_delete_sql 
+BEFORE DELETE ON app_versions 
+FOR EACH ROW 
+EXECUTE PROCEDURE on_app_version_delete_sql();
+
+CREATE TRIGGER on_device_delete_sql 
+BEFORE DELETE ON devices 
+FOR EACH ROW 
+EXECUTE PROCEDURE on_device_delete_sql();
+
+-- Create triggers for edge fns
 CREATE TRIGGER on_user_update_queue
 AFTER UPDATE ON public.users 
 FOR EACH ROW 
