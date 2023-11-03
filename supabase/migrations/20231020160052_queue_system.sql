@@ -46,18 +46,24 @@ BEGIN
                 PERFORM http_post_helper(current_job.function_name, current_job.function_type, current_job.payload::jsonb);
             END IF;
 
+            -- Please tell me if this APP_DELETE, DEVICE_DELETE, APP_VERSION_DELETE is even required with clickhouse @riderx
+            -- Also the removal of an app is very expensive. Deleting an app could create a lot of tasks
+            -- First a removal of an app creates an `APP_DELETE` and `APP_VERSION_DELETE` task for every app . `APP_VERSION_DELETE` deletes devices that have that specific `app_id` and that specific `version` as well as stats for that specific version.
+            -- Second the `APP_DELETE` deletes all devices with that `app_id` and all stats with that `app_id`
+            --Third removing a device causes a `DEVICE_DELETE` and that again removes from `stats` for that specific device.
+
             IF (current_job.job_type = 'APP_DELETE') THEN
-                DELETE FROM "devices" where app_id=current_job.payload::jsonb->'app_id';
-                DELETE FROM "stats" where app_id=current_job.payload::jsonb->'app_id';
+                DELETE FROM "devices" where app_id=current_job.payload::jsonb->>'app_id';
+                DELETE FROM "stats" where app_id=current_job.payload::jsonb->>'app_id';
             END IF;
 
             IF (current_job.job_type = 'DEVICE_DELETE') THEN
-                DELETE FROM "stats" where app_id=current_job.payload::jsonb->'app_id'::text and device_id=current_job.payload::jsonb->'device_id'::text;
+                DELETE FROM "stats" where app_id=current_job.payload::jsonb->>'app_id' and device_id=current_job.payload::jsonb->>'device_id';
             END IF;
 
             IF (current_job.job_type = 'APP_VERSION_DELETE') THEN
-                DELETE FROM "devices" where app_id=current_job.payload::jsonb->'app_id' and version=current_job.payload::jsonb->'id';
-                DELETE FROM "stats" where app_id=current_job.payload::jsonb->'app_id' and version=current_job.payload::jsonb->'id';
+                DELETE FROM "devices" where app_id=current_job.payload::jsonb->>'app_id' and "version"=(current_job.payload::jsonb->>'id')::bigint;
+                DELETE FROM "stats" where app_id=current_job.payload::jsonb->>'app_id' and "version"=(current_job.payload::jsonb->>'id')::bigint;
             END IF;
 
             -- Delete the job from the queue
@@ -73,10 +79,38 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+SET statement_timeout TO 0;
+CREATE OR REPLACE FUNCTION schedule_jobs()
+RETURNS VOID
+AS $body$
+BEGIN
+    -- Schedule first job
+    PERFORM cron.schedule(
+        'process_current_jobs_if_unlocked_job_1',
+        '* * * * *',
+        $$ SELECT process_current_jobs_if_unlocked(); $$
+    );
+    -- Schedule second job with a 20-second delay
+    PERFORM pg_sleep(20);
+    PERFORM cron.schedule(
+        'process_current_jobs_if_unlocked_job_2',
+        '* * * * *',
+        $$ SELECT process_current_jobs_if_unlocked(); $$
+    );
+    -- Schedule third job with another 20-second delay
+    PERFORM pg_sleep(20);
+    PERFORM cron.schedule(
+        'process_current_jobs_if_unlocked_job_3',
+        '* * * * *',
+        $$ SELECT process_current_jobs_if_unlocked(); $$
+    );
+END;
+$body$ LANGUAGE plpgsql;
+
 SELECT cron.schedule(
-    'process_current_jobs_if_unlocked_',
+    'process_tasks_subminute',
     '* * * * *',
-    $$ SELECT process_current_jobs_if_unlocked(); $$
+    $$ SELECT schedule_jobs(); $$
 );
 
 CREATE OR REPLACE FUNCTION public.trigger_http_queue_post_to_function() 
@@ -143,8 +177,62 @@ BEFORE DELETE ON devices
 FOR EACH ROW 
 EXECUTE PROCEDURE on_device_delete_sql();
 
--- Create triggers for edge fns
-CREATE TRIGGER on_user_update_queue
-AFTER UPDATE ON public.users 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_queue_post_to_function('demo');
+-- @Martin you can use this for the migration. I had to change seed.sql due to seed.sql being applied after this migration
+-- Drop triggers for trigger_http_post_to_function
+
+-- drop trigger on_channel_create on channels;
+-- drop trigger on_channel_update on channels;
+-- drop trigger on_shared_create on channel_users;
+-- drop trigger on_user_create on users;
+-- drop trigger on_user_update on users;
+-- drop trigger on_version_create on app_versions;
+-- drop trigger on_version_update on app_versions;
+-- drop trigger on_devices_override_update on devices_override;
+-- drop trigger on_channel_devices_update on channel_devices;
+
+-- Create triggers with the new and shiny queue system
+
+-- CREATE TRIGGER on_channel_create 
+-- AFTER INSERT ON public.channels 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_channel_create');
+
+-- CREATE TRIGGER on_channel_update 
+-- AFTER UPDATE ON public.channels 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_channel_update');
+
+-- CREATE TRIGGER on_shared_create 
+-- AFTER INSERT ON public.channel_users 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_shared_create');
+
+-- CREATE TRIGGER on_user_create 
+-- AFTER INSERT ON public.users 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_user_create');
+
+-- CREATE TRIGGER on_user_update 
+-- AFTER UPDATE ON public.users 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_user_update');
+
+-- CREATE TRIGGER on_version_create 
+-- AFTER INSERT ON public.app_versions 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_create');
+
+-- CREATE TRIGGER on_version_update 
+-- AFTER UPDATE ON public.app_versions 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_update');
+
+-- CREATE TRIGGER on_devices_override_update 
+-- AFTER INSERT or UPDATE or DELETE ON public.devices_override 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_device_update');
+
+-- CREATE TRIGGER on_channel_devices_update 
+-- AFTER INSERT or UPDATE or DELETE ON public.channel_devices 
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_device_update');
