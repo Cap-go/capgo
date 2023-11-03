@@ -33,7 +33,7 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending device to Clickhouse', devicesReady)
   return fetch(
-    `${clickHouseURL()}/?async_insert=1&query=INSERT INTO devices FORMAT JSONEachRow`,
+    `${clickHouseURL()}/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       body: devicesReady,
@@ -61,7 +61,7 @@ export function sendMetaToClickHouse(meta: ClickHouseMeta) {
   console.log('sending meta to Clickhouse', meta)
   const metasReady = JSON.stringify(meta)
   return fetch(
-      `${clickHouseURL()}/?async_insert=1&query=INSERT INTO app_versions_meta FORMAT JSONEachRow`,
+      `${clickHouseURL()}/?query=INSERT INTO app_versions_meta SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
       {
         method: 'POST',
         body: metasReady,
@@ -88,7 +88,7 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending log to Clickhouse', logReady)
   return fetch(
-    `${clickHouseURL()}/?async_insert=1&query=INSERT INTO logs FORMAT JSONEachRow`,
+    `${clickHouseURL()}/?query=INSERT INTO logs SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log

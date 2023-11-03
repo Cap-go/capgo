@@ -26,7 +26,7 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
 
   appendHeaders(response, 'x-update-status', status)
   appendHeaders(response, 'x-update-overwritten', (updateOverwritten ?? false).toString())
-
+  console.log('sendResWithStatus', new Date().toISOString())
   return response
 }
 
@@ -163,7 +163,7 @@ export async function update(body: AppInfos) {
   // create random id
   const id = cryptoRandomString({ length: 10 })
   try {
-    console.log(id, 'body', body)
+    console.log(id, 'body', body, new Date().toISOString())
     let {
       version_name,
       version_build,
@@ -197,7 +197,7 @@ export async function update(body: AppInfos) {
       //       capgo: true,
       //     })
       // }
-      console.log(id, 'App not found', app_id)
+      console.log(id, 'App not found', app_id, new Date().toISOString())
       return sendResWithStatus('app_not_found', {
         message: 'App not found',
         error: 'app_not_found',
@@ -262,9 +262,10 @@ export async function update(body: AppInfos) {
       is_emulator,
       is_prod,
       plugin_version,
-      version_name)
+      version_name, new Date().toISOString())
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
+      created_at: new Date().toISOString(),
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       action: 'get',
@@ -278,7 +279,7 @@ export async function update(body: AppInfos) {
     let { channelData } = requestedInto
 
     if (!channelData && !channelOverride && !devicesOverride) {
-      console.log(id, 'Cannot get channel or override', app_id, 'no default channel')
+      console.log(id, 'Cannot get channel or override', app_id, 'no default channel', new Date().toISOString())
       if (versionData) {
         await Promise.all([sendDevice({
           app_id,
@@ -349,6 +350,7 @@ export async function update(body: AppInfos) {
     //   }, 400)
     // }
     const device: Database['public']['Tables']['devices']['Insert'] = {
+      created_at: new Date().toISOString(),
       app_id,
       device_id,
       platform: platform as Database['public']['Enums']['platform_os'],
@@ -395,7 +397,7 @@ export async function update(body: AppInfos) {
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
     if (version_name === version.name) {
-      console.log(id, 'No new version available', device_id, version_name, version.name)
+      console.log(id, 'No new version available', device_id, version_name, version.name, new Date().toISOString())
       await sendStats([{
         ...stat,
         action: 'noNew',
@@ -408,7 +410,7 @@ export async function update(body: AppInfos) {
     if (!devicesOverride && channelData) {
     // console.log('check disableAutoUpdateToMajor', device_id)
       if (!channelData.ios && platform === 'ios') {
-        console.log(id, 'Cannot update, ios is disabled', device_id)
+        console.log(id, 'Cannot update, ios is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disablePlatformIos',
@@ -421,11 +423,12 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
       if (!channelData.android && platform === 'android') {
-        console.log(id, 'Cannot update, android is disabled', device_id)
+        console.log(id, 'Cannot update, android is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disablePlatformAndroid',
         }])
+        console.log(id, 'sendStats', new Date().toISOString())
         return sendResWithStatus('fail', {
           message: 'Cannot update, android is disabled',
           error: 'disabled_platform_android',
@@ -434,7 +437,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
       if (channelData.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
-        console.log(id, 'Cannot upgrade major version', device_id)
+        console.log(id, 'Cannot upgrade major version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableAutoUpdateToMajor',
@@ -449,7 +452,7 @@ export async function update(body: AppInfos) {
       }
 
       if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
-        console.log(id, 'Cannot upgrade minor version', device_id)
+        console.log(id, 'Cannot upgrade minor version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableAutoUpdateToMinor',
@@ -468,7 +471,7 @@ export async function update(body: AppInfos) {
 
         // The channel is misconfigured
         if (minUpdateVersion === null) {
-          console.log(id, 'Channel is misconfigured', channelData.name)
+          console.log(id, 'Channel is misconfigured', channelData.name, new Date().toISOString())
           await sendStats([{
             ...stat,
             action: 'channelMisconfigured',
@@ -483,7 +486,7 @@ export async function update(body: AppInfos) {
 
         // Check if the minVersion is greater then the current version
         if (semver.gt(minUpdateVersion, version_name)) {
-          console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name)
+          console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name, new Date().toISOString())
           await sendStats([{
             ...stat,
             action: 'disableAutoUpdateMetadata',
@@ -500,7 +503,7 @@ export async function update(body: AppInfos) {
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
       if (channelData.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
-        console.log(id, 'Cannot revert under native version', device_id)
+        console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableAutoUpdateUnderNative',
@@ -514,7 +517,7 @@ export async function update(body: AppInfos) {
       }
 
       if (!channelData.allow_dev && !is_prod) {
-        console.log(id, 'Cannot update dev build is disabled', device_id)
+        console.log(id, 'Cannot update dev build is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableDevBuild',
@@ -527,7 +530,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
       if (!channelData.allow_emulator && is_emulator) {
-        console.log(id, 'Cannot update emulator is disabled', device_id)
+        console.log(id, 'Cannot update emulator is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableEmulator',
@@ -542,7 +545,7 @@ export async function update(body: AppInfos) {
     }
     //  check signedURL and if it's url
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
-      console.log(id, 'Cannot get bundle signedURL', signedURL, app_id)
+      console.log(id, 'Cannot get bundle signedURL', signedURL, app_id, new Date().toISOString())
       await sendStats([{
         ...stat,
         action: 'cannotGetBundle',
@@ -557,7 +560,7 @@ export async function update(body: AppInfos) {
       ...stat,
       action: 'get',
     }])
-    console.log(id, 'New version available', app_id, version.name, signedURL)
+    console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
     return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
   }
   catch (e) {
