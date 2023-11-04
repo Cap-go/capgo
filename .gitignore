@@ -40,3 +40,6 @@ scripts/template/netlify/test.gplay.js
 /playwright/.auth/
 CHANGELOG.md
 .history
+
+.env.dev
+cloudflare_workers_deno/*

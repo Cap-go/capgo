@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 
 const baseSupa = 'supabase'
 const baseNetlify = 'netlify'
+const baseCloudflareFolder = 'cloudflare_workers_deno'
 const baseNetlifyConfig = 'netlify.toml'
 const baseNetlifyEgde = 'netlify-edge'
 const baseCloudflare = 'cloudflare'
@@ -24,15 +25,15 @@ const baseCloudflareTemplate = `${baseScripts}/${baseTemplate}/${baseCloudflare}
 const baseSupaFunctions = `${baseSupa}/${baseFunctions}`
 const baseNetlifyFunctions = `${baseNetlify}/${baseFunctions}`
 const baseNetlifyEdgeFunctions = `${baseNetlify}/${baseEdgeFunctions}`
-const baseNetlifyCloudflare = `${baseNetlify}/${baseCloudflare}`
+const baseNetlifyCloudflare = `${baseCloudflareFolder}/${baseCloudflare}`
 const baseSupaUtils = `${baseSupa}/${baseFunctions}/${baseUtils}`
 const baseSupaTests = `${baseSupa}/${baseFunctions}/${baseTests}`
 const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const baseNetlifyEdgeTests = `${baseNetlify}/${baseEdgeFunctions + baseTests}`
 const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
-const baseCloudflareTests = `${baseNetlify}/${baseCloudflare + baseTests}`
-const baseCloudflareUtils = `${baseNetlify}/${baseCloudflare + baseUtils}`
+const baseCloudflareTests = `${baseCloudflareFolder}/${baseCloudflare + baseTests}`
+const baseCloudflareUtils = `${baseCloudflareFolder}/${baseCloudflare + baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info', 'cron_email']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
