@@ -1,9 +1,0 @@
-{
-    "$schema": "https://raw.githubusercontent.com/skymethod/denoflare/v0.5.12/common/config.schema.json",
-    "scripts": {
-        "hello-local": {
-            "path": "./netlify/cloudflare/ok.ts",
-            "localPort": 3030
-        }
-    },
-}
