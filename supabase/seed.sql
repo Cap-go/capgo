@@ -37,6 +37,11 @@ AFTER INSERT ON public.app_versions
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_create');
 
+CREATE TRIGGER on_version_delete
+AFTER DELETE ON public.app_versions 
+FOR EACH ROW 
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_delete');
+
 CREATE TRIGGER on_version_update 
 AFTER UPDATE ON public.app_versions 
 FOR EACH ROW 

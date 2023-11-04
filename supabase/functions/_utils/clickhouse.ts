@@ -53,6 +53,7 @@ interface ClickHouseMeta {
   app_id: string
   created_at: string
   size: number
+  action: 'add' | 'delete'
 }
 export function sendMetaToClickHouse(meta: ClickHouseMeta) {
   if (!isClickHouseEnabled())

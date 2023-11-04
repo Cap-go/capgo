@@ -16,6 +16,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataDe
     return sendRes(await getSDashboard(headers.authorization || 'MISSING', body.userId, body.rangeStart, body.rangeEnd, body.appId))
   }
   catch (e) {
+    console.log('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

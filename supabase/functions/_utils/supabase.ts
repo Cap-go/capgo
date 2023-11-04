@@ -332,6 +332,8 @@ export async function getSDashboard(auth: string, userIdQuery: string, rangeStar
   }
   else {
     const userId = isAdmin ? userIdQuery : (await supabaseClient(auth).auth.getUser()).data.user?.id
+    if (!userId)
+      return []
     // get all user apps id
     const appIds = await supabaseClient(auth)
       .from('apps')
