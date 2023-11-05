@@ -40,3 +40,6 @@ scripts/template/netlify/test.gplay.js
 /playwright/.auth/
 CHANGELOG.md
 .history
+
+tests_backend/gh_actions/ch_data/*
+tests_backend/gh_actions/ch_logs/*
