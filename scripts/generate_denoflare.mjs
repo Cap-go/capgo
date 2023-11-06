@@ -37,10 +37,17 @@ async function generateConfig() {
       return [file, object]
     })
 
-  // .reduce((acc, cur, _i) => {
-  //   acc = Object.assign(acc, cur)
-  //   return acc
-  // }, {})
+  // Generate the functions map
+
+  const imports = scripts.map(([functionName, functionObj]) => {
+    return `import ${functionName} from '${functionObj.path.replace('.ts', '')}'`
+  }).join('\n')
+
+  const functionsMap = scripts.map(([functionName, functionObj]) => {
+    return `  ${functionName}: ${functionName}.fetch,`
+  }).join('\n')
+
+  const finalMapFile = `${imports}\n\nexport const map: Record<string, (request: Request, env: any) => Promise<Response>> = {\n${functionsMap}\n}\n`
 
   const denoFlare = {
     $schema: 'https://raw.githubusercontent.com/skymethod/denoflare/v0.5.12/common/config.schema.json',
@@ -51,6 +58,7 @@ async function generateConfig() {
 
   const denoflareJson = JSON.stringify(denoFlare, null, 2)
   writeFileSync('cloudflare_workers_deno/.denoflare', denoflareJson)
+  writeFileSync('cloudflare_workers_deno/generated_functions_map.ts', finalMapFile)
 }
 
 generateConfig()
