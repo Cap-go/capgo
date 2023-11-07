@@ -11,7 +11,7 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
-import { appIdToUrl, getConvertedDate2 } from '~/services/conversion'
+import { appIdToUrl } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
@@ -28,9 +28,6 @@ const mauNb = ref(0)
 const main = useMainStore()
 const isLoading = ref(true)
 const { t } = useI18n()
-
-const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -103,38 +100,11 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
   }
 }
 
-async function getAppStats(app_id: string) {
-  if (app_id) {
-    if (cycleStart && cycleEnd) {
-      return supabase
-        .from('app_usage')
-        .select()
-        .eq('app_id', app_id)
-        .eq('mode', 'cycle')
-        .gte('created_at', getConvertedDate2(cycleStart))
-        .lte('created_at', getConvertedDate2(cycleEnd))
-        .limit(1)
-        .single()
-    }
-    return supabase
-      .from('app_usage')
-      .select()
-      .eq('app_id', app_id)
-      .eq('mode', 'cycle')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-  }
-}
-
 async function loadData() {
   if (props.app.app_id) {
-    const tmp = await getAppStats(props.app.app_id)
-    if (!tmp)
-      return
-    const { data, error } = tmp
-    if (data && !error)
-      mauNb.value = data.mau
+    mauNb.value = main.dashboard
+      .filter(x => x.app_id === props.app.app_id)
+      .reduce((acc, cur) => acc + cur.mau, 0)
   }
 }
 

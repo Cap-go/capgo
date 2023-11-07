@@ -6,6 +6,8 @@ import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 let supabaseSecret: string | null = null
+let supabaseAnonToken: string | null = null
+let supabaseUrl: string | null = null
 
 export interface Test {
   name: string
@@ -20,8 +22,10 @@ export interface RunnableTest {
   testWithRedis: boolean
 }
 
-export function setSupabaseSecret(secret: string) {
+export function setSupabaseSecrets(secret: string, anonToken: string, url: string) {
   supabaseSecret = secret
+  supabaseAnonToken = anonToken
+  supabaseUrl = url
 }
 
 export function getSupabaseSecret() {
@@ -60,6 +64,11 @@ export async function responseOk(response: Response, requestName: string) {
   assert(cloneResponse.ok, `${requestName} response not ok: ${cloneResponse.status} ${cloneResponse.statusText} ${await cloneResponse.text()}`)
 }
 
+export async function responseStatusCode(response: Response, statusCode: number, requestName: string) {
+  const cloneResponse = response.clone()
+  assert(cloneResponse.status === statusCode, `${requestName} response does not have status code ${statusCode}: ${cloneResponse.status} ${cloneResponse.statusText} ${await cloneResponse.text()}`)
+}
+
 export async function sendUpdate(baseUrl: URL, data: typeof updateAndroidBaseData): Promise<Response> {
   return await fetch(new URL('updates', baseUrl), {
     method: 'POST',
@@ -68,6 +77,13 @@ export async function sendUpdate(baseUrl: URL, data: typeof updateAndroidBaseDat
     },
     body: JSON.stringify(data),
   })
+}
+
+export async function getResponseError(response: Response): Promise<string> {
+  const json = await response.json()
+  assert(json.error !== undefined, `Response ${JSON.stringify(json)} has no error`)
+
+  return json.error
 }
 
 export function getUpdateBaseData(): typeof updateAndroidBaseData {
@@ -85,11 +101,17 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
     stderr: 'piped',
     env: {
       SKIP_BACKEND: 'true',
+      SUPABASE_ANON: supabaseAnonToken!,
+      SUPABASE_URL: supabaseUrl!,
       ...env,
     },
   })
 
-  const subprocess = playwrightCommand.spawn()
+  await runSubprocess(playwrightCommand, 'Playwright')
+}
+
+export async function runSubprocess(command: Deno.Command, commandName: string) {
+  const subprocess = command.spawn()
 
   const joinedStream = mergeReadableStreams(
     subprocess.stdout,
@@ -110,9 +132,9 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
 
   const stausCode = await subprocess.status
   if (stausCode.code !== 0) {
-    p.log.error('Playwright output:')
+    p.log.error(`${commandName} output:`)
     console.log(finalString)
-    throw new Error('Playwright test failed')
+    throw new Error(`${commandName} failed`)
   }
 }
 

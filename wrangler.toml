@@ -1,0 +1,7 @@
+name = "capgoloadbal"
+compatibility_date = "2022-04-05"
+
+[[d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "capgo"
+database_id = "8361491c-b4e0-41e6-a24a-d69892e248dd"

@@ -120,6 +120,20 @@ export async function createCustomer(email: string, userId: string, name: string
   return response.data
 }
 
+export async function setTreshold(subscriptionId: string) {
+  // set treshold to 5000 USD
+  const config = getConfig(true)
+  const checkoutData = {
+    billing_thresholds: {
+      amount_gte: 5000,
+      reset_billing_cycle_anchor: false,
+    },
+  }
+  const data = new URLSearchParams(checkoutData as any)
+  const response = await axios.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, data, config)
+  return response.data
+}
+
 export async function setBillingPeriod(subscriptionId: string) {
   const config = getConfig(true)
   const checkoutData = {

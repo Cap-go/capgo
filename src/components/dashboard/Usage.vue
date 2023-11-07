@@ -4,15 +4,14 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { getPlans, useSupabase } from '~/services/supabase'
+import { getPlans } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { bytesToGb, getConvertedDate, getDaysBetweenDates } from '~/services/conversion'
+import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 
 const props = defineProps<{
   appId?: string
-  apps?: Database['public']['Tables']['apps']['Row'][]
 }>()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -23,7 +22,6 @@ const datas = ref({
   storage: [] as number[],
   bandwidth: [] as number[],
 })
-const supabase = useSupabase()
 const isLoading = ref(true)
 const main = useMainStore()
 
@@ -43,44 +41,17 @@ const allLimits = computed(() => {
   })
 })
 
-async function getAppStat(app_ids: string[]) {
-  if (!main.user)
-    return { data: [], error: 'missing user' }
-  const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-  const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
-  if (cycleStart && cycleEnd) {
-    return supabase
-      .from('app_usage')
-      .select()
-      .in('app_id', app_ids)
-      .eq('mode', 'day')
-      .gte('created_at', getConvertedDate(cycleStart))
-      .lte('created_at', getConvertedDate(cycleEnd))
-  }
-  return supabase
-    .from('app_usage')
-    .select()
-    .in('app_id', app_ids)
-    .eq('mode', 'day')
-}
-
 async function getAppStats() {
   if (props.appId)
-    return await getAppStat([props.appId])
+    return main.filterDashboard(props.appId)
 
-  else if (props.apps && props.apps.length > 0)
-    return await getAppStat(props.apps.map(i => i.app_id))
-
-  return supabase
-    .from('app_usage')
-    .select()
-    .eq('mode', 'day')
+  return main.dashboard
 }
 
 async function getUsages() {
   const currentStorage = 0
-  const { data, error } = await getAppStats()
-  if (data && !error) {
+  const data = await getAppStats()
+  if (data && data.length > 0) {
     const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
     const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
     let graphDays = getDaysInCurrentMonth()
@@ -90,25 +61,22 @@ async function getUsages() {
     datas.value.mau = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
-    data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-      if (item.created_at) {
-        const createdAtDate = new Date(item.created_at)
+    data.forEach((item) => {
+      if (item.date) {
+        const createdAtDate = new Date(item.date)
         const dayNumber = createdAtDate.getDate()
         if (datas.value.mau[dayNumber])
           datas.value.mau[dayNumber] += item.mau
-
         else
           datas.value.mau[dayNumber] = item.mau
 
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += item.storage ? bytesToGb(item.storage) : 0
-
+          datas.value.storage[dayNumber] += bytesToGb(item.storage_added - item.storage_deleted)
         else
-          datas.value.storage[dayNumber] = item.storage ? bytesToGb(item.storage) : 0
+          datas.value.storage[dayNumber] = bytesToGb(item.storage_added - item.storage_deleted)
 
         if (datas.value.bandwidth[dayNumber])
           datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
-
         else
           datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
@@ -150,7 +118,7 @@ loadData()
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" unit="GB"
+      :title="t('Storage')" unit="GB" :accumulated="false"
     />
     <div
       v-else

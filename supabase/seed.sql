@@ -7,27 +7,6 @@ select vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
 select vault.create_secret('http://localhost:8881/.netlify/functions/', 'external_function_url', 'external function url'); -- Netlify backend for long runny functions
 select vault.create_secret('testsecret', 'apikey', 'admin user id');
 
--- DROP TRIGGER "on_app_stats_create" ON "public"."app_stats";
--- DROP TRIGGER "on_app_stats_update" ON "public"."app_stats";
--- DROP TRIGGER "on_channel_create" ON "public"."channels";
--- DROP TRIGGER "on_channel_update" ON "public"."channels";
--- DROP TRIGGER "on_shared_create" ON "public"."channel_users";
--- DROP TRIGGER "on_user_create" ON "public"."users";
--- DROP TRIGGER "on_user_update" ON "public"."users";
--- DROP TRIGGER "on_version_create" ON "public"."app_versions";
--- DROP TRIGGER "on_version_update" ON "public"."app_versions";
--- DROP TRIGGER "on_version_delete" ON "public"."app_versions";
-
-CREATE TRIGGER on_app_stats_create 
-AFTER INSERT ON public.app_stats 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_app_stats_create');
-
-CREATE TRIGGER on_app_stats_update 
-AFTER UPDATE ON public.app_stats 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_app_stats_update');
-
 CREATE TRIGGER on_channel_create 
 AFTER INSERT ON public.channels 
 FOR EACH ROW 
@@ -37,11 +16,6 @@ CREATE TRIGGER on_channel_update
 AFTER UPDATE ON public.channels 
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_post_to_function('on_channel_update');
-
--- CREATE TRIGGER on_log_create 
--- AFTER CREATE ON public.app_stats 
--- FOR EACH ROW 
--- EXECUTE FUNCTION public.http_post_to_function('on_log_create');
 
 CREATE TRIGGER on_shared_create 
 AFTER INSERT ON public.channel_users 
@@ -63,7 +37,7 @@ AFTER INSERT ON public.app_versions
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_create');
 
-CREATE TRIGGER on_version_delete 
+CREATE TRIGGER on_version_delete
 AFTER DELETE ON public.app_versions 
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_delete');
@@ -95,8 +69,8 @@ INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_a
 ('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
 INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
-(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
-(now(), '2023-03-21 03:04:42.120379+00', NULL, 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
+(now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
+(now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
 
 INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
 ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u5', NULL),
@@ -130,12 +104,18 @@ INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "up
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.189367+00', '44913a9f', 1012541, 9652, 30),
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
-INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdateToMajor", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 't', 'f', 't', 't', 'f', 't', 't'),
-(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 't', 'f', 't', 't', 'f', 't', 't');
+INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
+(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
+(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't');
 
-INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "date_id", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
-(now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '', '1.223.0', '', 't', 't');
+-- INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
+INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "org_id", "app_id", "channel_id", "user_right") VALUES
+(1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),
+(2, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.demo.app', 22, 'admin');
+
+INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+(now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
 INSERT INTO "public"."stats" ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app'),
@@ -143,62 +123,39 @@ INSERT INTO "public"."stats" ("created_at", "platform", "action", "device_id", "
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app'),
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
 
--- TODO: deprecated to remove
-INSERT INTO "public"."app_stats" ("app_id", "user_id", "created_at", "updated_at", "channels", "mlu", "versions", "shared", "mlu_real", "devices", "date_id", "version_size", "bandwidth", "devices_real") VALUES
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-01 01:18:54.034372+00', '2023-03-01 01:18:54.034372+00', 1, 65, 4, 0, 34, 1, to_char(now(), 'YYYY-MM'), 1099392048, 14761264, 1),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.269652+00', '2023-03-20 00:29:35.269652+00', 0, 0, 3, 0, 5, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-20'), 3037576, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-19 10:58:12.72939+00', '2023-03-19 10:58:12.72939+00', 0, 1, 0, 0, 1, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-19'), 0, 1186174, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-17 18:36:33.990542+00', '2023-03-17 18:36:33.990542+00', 0, 4, 0, 0, 3, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-18'), 0, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 02:32:52.480687+00', '2023-03-16 02:32:52.480687+00', 0, 0, 8, 0, 2, 0, CONCAT(to_char(now(), 'YYYY-MM'), '-17'), 8082814, 2222800, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-15 10:22:12.093789+00', '2023-03-15 10:22:12.093789+00', 0, 1, 2, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-16'), 2019310, 2297858, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-14 01:10:13.411745+00', '2023-03-14 01:10:13.411745+00', 0, 2, 3, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-15'), 3028777, 2299160, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-13 00:00:29.998369+00', '2023-03-13 00:00:29.998369+00', 0, 2, 12, 0, 12, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-14'), 12116426, 3558522, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-12 12:15:02.435343+00', '2023-03-12 12:15:02.435343+00', 0, 4, 2, 0, 0, 0, CONCAT(to_char(now(), 'YYYY-MM'), '-12'), 2019794, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-10 02:18:56.858159+00', '2023-03-10 02:18:56.858159+00', 0, 1, 3, 0, 3, 3, CONCAT(to_char(now(), 'YYYY-MM'), '-11'), 3029547, 3196750, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-09 01:21:43.772115+00', '2023-03-09 01:21:43.772115+00', 0, 3, 2, 0, 8, 3, CONCAT(to_char(now(), 'YYYY-MM'), '-10'), 2019736, 9196812, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-08 12:51:32.336522+00', '2023-03-08 12:51:32.336522+00', 0, 2, 9, 0, 4, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-09'), 9088532, 1112986, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-07 01:54:52.849452+00', '2023-03-07 01:54:52.849452+00', 0, 0, 7, 0, 0, 0, CONCAT(to_char(now(), 'YYYY-MM'), '-08'), 7066021, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-06 02:35:06.007812+00', '2023-03-06 02:35:06.007812+00', 0, 5, 4, 0, 9, 3, CONCAT(to_char(now(), 'YYYY-MM'), '-07'), 4032908, 9489392, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-05 07:13:11.220198+00', '2023-03-05 07:13:11.220198+00', 0, 2, 0, 0, 2, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-06'), 0, 2372348, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-04 11:15:39.563771+00', '2023-03-04 11:15:39.563771+00', 0, 2, 0, 0, 1, 1, CONCAT(to_char(now(), 'YYYY-MM'), '-04'), 0, 0, 0),
-('com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-03 08:40:15.224005+00', '2023-03-03 08:40:15.224005+00', 0, 2, 0, 0, 6, 2, CONCAT(to_char(now(), 'YYYY-MM'), '-01'), 0, 6576705, 0);
-
-INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage", "bandwidth", "mode") VALUES
-("gen_random_uuid"(), 'com.demo.app', '2023-03-01 01:18:54.034372+00', 1, 10948, 141264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-02 01:18:54.034372+00', 4, 20948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-03 01:18:54.034372+00', 8, 80948, 1441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-04 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-05 01:18:54.034372+00', 40, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-06 01:18:54.034372+00', 41, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-07 01:18:54.034372+00', 49, 180948, 1441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-08 01:18:54.034372+00', 60, 180948, 1441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-09 01:18:54.034372+00', 20, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-10 01:18:54.034372+00', 10, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-11 01:18:54.034372+00', 20, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-12 01:18:54.034372+00', 25, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-13 01:18:54.034372+00', 1, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-14 01:18:54.034372+00', 30, 180948, 1441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-15 01:18:54.034372+00', 90, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-16 01:18:54.034372+00', 30, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-17 01:18:54.034372+00', 200, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-18 01:18:54.034372+00', 20, 180948, 1441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-19 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-20 01:18:54.034372+00', 40, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-21 01:18:54.034372+00', 30, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-22 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-23 01:18:54.034372+00', 20, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-24 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-25 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-26 01:18:54.034372+00', 20, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-27 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-28 01:18:54.034372+00', 20, 180948, 441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-29 01:18:54.034372+00', 20, 180948, 2441264, 'day'),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-30 01:18:54.034372+00', 20, 180948, 2441264, 'day');
+INSERT INTO "public"."app_usage" ("id", "app_id", "date", "mau", "storage_added", "storage_deleted", "bandwidth", "get", "uninstall", "install", "fail") VALUES
+("gen_random_uuid"(), 'com.demo.app', '2023-03-01', 1, 10948, 0, 141264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-02', 4, 20948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-03', 8, 80948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-04', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-05', 40, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-06', 41, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-07', 49, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-08', 60, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-09', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-10', 10, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-11', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-12', 25, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-13', 1, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-14', 30, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-15', 90, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-16', 30, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-17', 200, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-18', 20, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-19', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-20', 40, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-21', 30, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-22', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-23', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-24', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-25', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-26', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-27', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-28', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-29', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-30', 20, 180948, 0, 2441264, 1, 2, 3, 4);
 
 -- Create cron jobs
-SELECT cron.schedule('Update app_usage every 5 minutes', '*/5 * * * *', $$SELECT update_app_usage(5)$$);
-SELECT cron.schedule('Update day app_usage every hour', '42 * * * *', $$SELECT calculate_daily_app_usage()$$);
-SELECT cron.schedule('Update cycle app_usage every day', '42 1 * * *', $$SELECT calculate_cycle_usage()$$);
 -- Set old versions to deleted after retention passed 
 SELECT cron.schedule('Delete old app version', '40 0 * * *', $$CALL update_app_versions_retention()$$);
 -- update channel for progressive deploy if too many fail

@@ -128,6 +128,30 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
+export interface appUsage {
+  app_id: string
+  bandwidth: number
+  date: string
+  fail: number
+  get: number
+  install: number
+  mau: number
+  storage_added: number
+  storage_deleted: number
+  uninstall: number
+}
+export async function getAllDashboard(userId: string, rangeStart?: Date, rangeEnd?: Date): Promise<appUsage[]> {
+  const supabase = useSupabase()
+
+  const req = await supabase.functions.invoke('get_dashboard', {
+    body: {
+      userId,
+      rangeStart,
+      rangeEnd,
+    },
+  })
+  return (req.data || []) as appUsage[]
+}
 export async function getTotalStorage(): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('get_total_storage_size', {})
@@ -140,7 +164,7 @@ export async function getTotalStorage(): Promise<number> {
 
 export async function isGoodPlan(): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v3', {})
+    .rpc('is_good_plan_v4', { })
     .single()
   if (error)
     throw new Error(error.message)
@@ -219,9 +243,9 @@ export async function isAllowedAction(): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(dateId: string): Promise<number> {
+export async function getPlanUsagePercent(): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent', { dateid: dateId })
+    .rpc('get_plan_usage_percent')
     .single()
   if (error)
     throw new Error(error.message)
@@ -236,7 +260,7 @@ export async function getTotalStats(): Promise<Database['public']['Functions']['
     throw new Error(error.message)
   // console.log('getTotalStats', data, error)
 
-  return data as any as Database['public']['Functions']['get_total_stats_v2']['Returns'][0] || {
+  return data as any as Database['public']['Functions']['get_total_stats_v3']['Returns'][0] || {
     mau: 0,
     bandwidth: 0,
     storage: 0,

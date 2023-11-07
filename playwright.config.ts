@@ -25,10 +25,11 @@ else {
 }
 
 webServer.push({
-  command: 'ENV=local pnpm run serve',
+  command: 'pnpm run prebuild-serve-dev',
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,
+  stdout: 'pipe',
 })
 
 /**
@@ -40,10 +41,10 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  /* Never retry, the entire thing is stateful and retries will never succed becouse of the modifications to supabase in the previous attempt */
+  retries: 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.PWDEBUG ? 1 : os.cpus().length,
+  workers: os.cpus().length,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list', { printSteps: true }],
@@ -51,15 +52,26 @@ export default defineConfig({
     ['html', { outputFolder: './test-results/reports/playwright-html-report', open: 'never' }],
   ],
   use: {
-    trace: 'on-first-retry',
     headless,
+    trace: 'on',
+    video: 'on',
+    screenshot: 'on',
+  },
+  expect: {
+    /* CI/CD is VERY slow, I am sorry */
+    timeout: 20_000,
   },
   webServer,
   projects: [
+    { name: 'setup', testMatch: /.*\.setup\.ts/ },
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/user1.json',
+      },
+      dependencies: ['setup'],
     },
   ],
-  timeout: 20_000,
+  timeout: 180 * 1000,
 })

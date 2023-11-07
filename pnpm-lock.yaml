@@ -7,121 +7,121 @@ settings:
 dependencies:
   '@capacitor-community/keep-awake':
     specifier: ^4.0.0
-    version: 4.0.0(@capacitor/core@5.3.0)
+    version: 4.0.0(@capacitor/core@5.4.2)
   '@capacitor/action-sheet':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/android':
-    specifier: ^5.3.0
-    version: 5.3.0(@capacitor/core@5.3.0)
+    specifier: ^5.4.2
+    version: 5.4.2(@capacitor/core@5.4.2)
   '@capacitor/app':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/app-launcher':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/assets':
     specifier: 2.0.4
     version: 2.0.4(@types/node@18.15.11)(typescript@5.0.3)
   '@capacitor/browser':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/camera':
     specifier: ^5.0.7
-    version: 5.0.7(@capacitor/core@5.3.0)
+    version: 5.0.7(@capacitor/core@5.4.2)
   '@capacitor/clipboard':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/device':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/dialog':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/filesystem':
     specifier: ^5.1.2
-    version: 5.1.2(@capacitor/core@5.3.0)
+    version: 5.1.2(@capacitor/core@5.4.2)
   '@capacitor/geolocation':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/haptics':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/ios':
-    specifier: ^5.3.0
-    version: 5.3.0(@capacitor/core@5.3.0)
+    specifier: ^5.4.2
+    version: 5.4.2(@capacitor/core@5.4.2)
   '@capacitor/keyboard':
     specifier: ^5.0.5
-    version: 5.0.5(@capacitor/core@5.3.0)
+    version: 5.0.5(@capacitor/core@5.4.2)
   '@capacitor/local-notifications':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/motion':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/network':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/preferences':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/push-notifications':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/screen-reader':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/share':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/splash-screen':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/status-bar':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/text-zoom':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capacitor/toast':
     specifier: ^5.0.6
-    version: 5.0.6(@capacitor/core@5.3.0)
+    version: 5.0.6(@capacitor/core@5.4.2)
   '@capawesome/capacitor-file-picker':
     specifier: ^5.1.0
-    version: 5.1.0(@capacitor/core@5.3.0)
+    version: 5.1.0(@capacitor/core@5.4.2)
   '@capawesome/capacitor-screen-orientation':
     specifier: ^5.0.0
-    version: 5.0.0(@capacitor/core@5.3.0)
+    version: 5.0.0(@capacitor/core@5.4.2)
   '@capgo/capacitor-crisp':
     specifier: ^2.0.13
-    version: 2.0.13(@capacitor/core@5.3.0)
+    version: 2.0.13(@capacitor/core@5.4.2)
   '@capgo/capacitor-flash':
     specifier: ^2.0.12
-    version: 2.0.12(@capacitor/core@5.3.0)
+    version: 2.0.12(@capacitor/core@5.4.2)
   '@capgo/capacitor-mute':
     specifier: ^2.0.13
-    version: 2.0.13(@capacitor/core@5.3.0)
+    version: 2.0.13(@capacitor/core@5.4.2)
   '@capgo/capacitor-native-biometric':
     specifier: ^5.0.1
     version: 5.0.1
   '@capgo/capacitor-purchases':
     specifier: ^5.0.8
-    version: 5.0.8(@capacitor/core@5.3.0)
+    version: 5.0.8(@capacitor/core@5.4.2)
   '@capgo/capacitor-screen-recorder':
     specifier: ^5.0.0
-    version: 5.0.0(@capacitor/core@5.3.0)
+    version: 5.0.0(@capacitor/core@5.4.2)
   '@capgo/capacitor-updater':
-    specifier: 5.2.22
-    version: 5.2.22(@capacitor/core@5.3.0)
+    specifier: 5.3.14
+    version: 5.3.14(@capacitor/core@5.4.2)
   '@capgo/google-play-scraper':
     specifier: ^9.1.2
     version: 9.1.2
   '@capgo/inappbrowser':
-    specifier: ^1.2.7
-    version: 1.2.7(@capacitor/core@5.3.0)
+    specifier: ^1.2.12
+    version: 1.2.12(@capacitor/core@5.4.2)
   '@capgo/native-audio':
     specifier: ^6.0.18
-    version: 6.0.18(@capacitor/core@5.3.0)
+    version: 6.0.18(@capacitor/core@5.4.2)
   '@capgo/native-market':
     specifier: ^5.0.3
     version: 5.0.3
@@ -141,8 +141,8 @@ dependencies:
     specifier: ^1.6.0
     version: 1.6.0
   '@supabase/supabase-js':
-    specifier: 2.33.1
-    version: 2.33.1
+    specifier: 2.38.0
+    version: 2.38.0
   '@tailwindcss/forms':
     specifier: ^0.5.5
     version: 0.5.5(tailwindcss@3.3.3)
@@ -153,8 +153,8 @@ dependencies:
     specifier: ^10.4.0
     version: 10.4.0(vue@3.3.4)
   '@vueuse/core':
-    specifier: 10.4.0
-    version: 10.4.0(vue@3.3.4)
+    specifier: 10.4.1
+    version: 10.4.1(vue@3.3.4)
   adm-zip:
     specifier: ^0.5.10
     version: 0.5.10
@@ -169,10 +169,10 @@ dependencies:
     version: 1.0.2
   capacitor-rate-app:
     specifier: 4.0.3
-    version: 4.0.3(@capacitor/core@5.3.0)
+    version: 4.0.3(@capacitor/core@5.4.2)
   capacitor-secure-storage-plugin:
     specifier: ^0.9.0
-    version: 0.9.0(@capacitor/core@5.3.0)
+    version: 0.9.0(@capacitor/core@5.4.2)
   chart.js:
     specifier: ^4.4.0
     version: 4.4.0
@@ -281,14 +281,14 @@ devDependencies:
     specifier: 0.41.0
     version: 0.41.0(eslint@8.48.0)(typescript@5.0.3)
   '@capacitor/cli':
-    specifier: ^5.3.0
-    version: 5.3.0
+    specifier: ^5.4.2
+    version: 5.4.2
   '@capacitor/core':
-    specifier: ^5.3.0
-    version: 5.3.0
+    specifier: ^5.4.2
+    version: 5.4.2
   '@iconify-json/carbon':
-    specifier: 1.1.20
-    version: 1.1.20
+    specifier: 1.1.21
+    version: 1.1.21
   '@iconify-json/heroicons':
     specifier: ^1.1.12
     version: 1.1.12
@@ -302,8 +302,8 @@ devDependencies:
     specifier: ^2.2.106
     version: 2.2.106
   '@playwright/test':
-    specifier: ^1.37.1
-    version: 1.37.1
+    specifier: ^1.38.1
+    version: 1.38.1
   '@tailwindcss/aspect-ratio':
     specifier: ^0.4.2
     version: 0.4.2(tailwindcss@3.3.3)
@@ -320,8 +320,8 @@ devDependencies:
     specifier: ^0.5.0
     version: 0.5.0
   '@types/dompurify':
-    specifier: 3.0.2
-    version: 3.0.2
+    specifier: 3.0.3
+    version: 3.0.3
   '@types/emoji-flags':
     specifier: ^1.3.0
     version: 1.3.0
@@ -344,14 +344,14 @@ devDependencies:
     specifier: ^0.2.0
     version: 0.2.0
   '@types/uuid':
-    specifier: 9.0.1
-    version: 9.0.1
+    specifier: 9.0.5
+    version: 9.0.5
   '@vitejs/plugin-vue':
-    specifier: 4.3.3
-    version: 4.3.3(vite@4.4.9)(vue@3.3.4)
+    specifier: 4.4.0
+    version: 4.4.0(vite@4.4.11)(vue@3.3.4)
   '@vitejs/plugin-vue-jsx':
     specifier: ^3.0.2
-    version: 3.0.2(vite@4.4.9)(vue@3.3.4)
+    version: 3.0.2(vite@4.4.11)(vue@3.3.4)
   '@vue/cli-service':
     specifier: 5.0.8
     version: 5.0.8(@babel/core@7.22.11)(@vue/compiler-sfc@3.3.4)(vue@3.3.4)
@@ -379,6 +379,9 @@ devDependencies:
   eslint-plugin-cypress:
     specifier: ^2.14.0
     version: 2.14.0(eslint@8.48.0)
+  http-server:
+    specifier: ^14.1.1
+    version: 14.1.1
   https-localhost:
     specifier: 4.7.1
     version: 4.7.1
@@ -404,35 +407,35 @@ devDependencies:
     specifier: ^0.25.1
     version: 0.25.1(rollup@2.79.1)(vue@3.3.4)
   vite:
-    specifier: 4.4.9
-    version: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+    specifier: 4.4.11
+    version: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
   vite-plugin-environment:
     specifier: 1.1.3
-    version: 1.1.3(vite@4.4.9)
+    version: 1.1.3(vite@4.4.11)
   vite-plugin-inspect:
     specifier: 0.7.28
-    version: 0.7.28(rollup@2.79.1)(vite@4.4.9)
+    version: 0.7.28(rollup@2.79.1)(vite@4.4.11)
   vite-plugin-pages:
     specifier: 0.31.0
-    version: 0.31.0(@vue/compiler-sfc@3.3.4)(vite@4.4.9)
+    version: 0.31.0(@vue/compiler-sfc@3.3.4)(vite@4.4.11)
   vite-plugin-pwa:
     specifier: 0.16.4
-    version: 0.16.4(vite@4.4.9)(workbox-build@7.0.0)(workbox-window@7.0.0)
+    version: 0.16.4(vite@4.4.11)(workbox-build@7.0.0)(workbox-window@7.0.0)
   vite-plugin-vue-inspector:
     specifier: ^3.6.0
-    version: 3.6.0(vite@4.4.9)
+    version: 3.6.0(vite@4.4.11)
   vite-plugin-vue-layouts:
     specifier: 0.8.0
-    version: 0.8.0(vite@4.4.9)(vue-router@4.2.4)(vue@3.3.4)
+    version: 0.8.0(vite@4.4.11)(vue-router@4.2.4)(vue@3.3.4)
   vite-plugin-windicss:
     specifier: 1.9.1
-    version: 1.9.1(vite@4.4.9)
+    version: 1.9.1(vite@4.4.11)
   vitest:
     specifier: 0.34.3
     version: 0.34.3(sass@1.66.1)
   vue-tsc:
-    specifier: 1.8.8
-    version: 1.8.8(typescript@5.0.3)
+    specifier: 1.8.19
+    version: 1.8.19(typescript@5.0.3)
 
 packages:
 
@@ -2020,44 +2023,44 @@ packages:
       '@babel/helper-validator-identifier': 7.22.5
       to-fast-properties: 2.0.0
 
-  /@capacitor-community/keep-awake@4.0.0(@capacitor/core@5.3.0):
+  /@capacitor-community/keep-awake@4.0.0(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-LXL98ojtjirowpkpIEeI3aFVtJVk9C37jSRGkFsOudjq1/qPZPW6+rEtDLPoXbY2y2VmIX48TFu7ugRkB5wrTw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/action-sheet@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/action-sheet@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-WeiHz5KYfqypphd4JwD8DSxhi9QIk9Wh4XZFMlBivZm6tXhlJLjAo0kHzZGNX3J7H+rpn0n0aFVcZylnP34erQ==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/android@5.3.0(@capacitor/core@5.3.0):
-    resolution: {integrity: sha512-5rEwD8u0whGXP+dZ0qXRFP3DWHi4WhZdzcxxZ/D4mLh5eVaQCxPpoHBcrS4FpKtl7PAWNDD2n32D9YrEcfERMA==}
+  /@capacitor/android@5.4.2(@capacitor/core@5.4.2):
+    resolution: {integrity: sha512-PlOTWpInXPnrbjoe59fA/a8wSfcoGxfkQQ+Jg4REZKOQelYHUQUP9CI1kn3YvRYNhFuWxnOC8NjCu+67rX9n8Q==}
     peerDependencies:
-      '@capacitor/core': ^5.3.0
+      '@capacitor/core': ^5.4.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/app-launcher@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/app-launcher@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-iKF0xvBfYYWVBHL1p0Q10ZecrQDtVZ+nE/1MK2gHLE81ffUwLO+ipDPrDLzAs6SbWwqC/3ORBiI36bjQUbZ/Rw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/app@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/app@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-6ZXVdnNmaYILasC/RjQw+yfTmq2ZO7Q3v5lFcDVfq3PFGnybyYQh+RstBrYri+376OmXOXxBD7E6UxBhrMzXGA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /@capacitor/assets@2.0.4(@types/node@18.15.11)(typescript@5.0.3):
@@ -2086,20 +2089,20 @@ packages:
       - typescript
     dev: false
 
-  /@capacitor/browser@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/browser@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-wEI7Na6PVzSP/00ud7pjbBwXwVG7HywCdy2fJT/hzF6yuHn4tDirbOvbr1JKd9LZqKs2Xn+TapV38JhBRhX6YA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/camera@5.0.7(@capacitor/core@5.3.0):
+  /@capacitor/camera@5.0.7(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-1Wk3Dk0UhhNHdBB07UrPvUOSL7Wi5gFZRyLY1LZL2awt34iqy2cnajtfJplFmEZHk8lD0i7NAl3HbkWm4td4OQ==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /@capacitor/cli@3.9.0:
@@ -2127,8 +2130,8 @@ packages:
       - supports-color
     dev: false
 
-  /@capacitor/cli@5.3.0:
-    resolution: {integrity: sha512-ku23HPqUHUnSgo/SyEWxVviEAxb4ieWvAVMI3KfrrBoinAhTOvNSZwT346rIpxZ9Xj3Qp41UjdIz0ME+DYwhfA==}
+  /@capacitor/cli@5.4.2:
+    resolution: {integrity: sha512-ck2DC9hEai2BWsBM08WN98xjC2LDusSzUWQySTNQ81S/cQUpSPXk9YX+KTd3rP/kI/sXpOuDEe7SSS7qkD1a2w==}
     engines: {node: '>=16.0.0'}
     hasBin: true
     dependencies:
@@ -2140,7 +2143,7 @@ packages:
       debug: 4.3.4(supports-color@8.1.1)
       env-paths: 2.2.1
       kleur: 4.1.5
-      native-run: 1.7.2
+      native-run: 1.7.3
       open: 8.4.2
       plist: 3.0.6
       prompts: 2.4.2
@@ -2153,231 +2156,231 @@ packages:
       - supports-color
     dev: true
 
-  /@capacitor/clipboard@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/clipboard@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-VsokRAn+0HVWj6riSRdspczEfqFoHbrhS/XRhGoEPsj0uvYPSufy0Kb2dpnSqkeeElhh2Jvn8jmVAzII2XeR9w==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/core@5.3.0:
-    resolution: {integrity: sha512-mvhh1yJtcUTZ0hUUriBKKpxq47hn75bjxH3tYPRgAFu1z3gowCg+OtG4Rce3W5gr5fSfCjQgOSL0Vp7k9hPUWw==}
+  /@capacitor/core@5.4.2:
+    resolution: {integrity: sha512-XbR1vldJFzBWHeoGPpgfNy3Zhjf0NxXdHEaGNANWVBg0ZWG2gwFr1dcRALUUQtbwrEEkCCNiLYg4YiQPRk7SEQ==}
     dependencies:
       tslib: 2.5.3
 
-  /@capacitor/device@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/device@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-tmjK0H8IKbDLMcmzZzJPbV+9yLkKJ76QOdz4A7fZAOYx2GnFHsFngxldq/wKotGAJuDX/ih3ZzHNrzVguzlv2g==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/dialog@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/dialog@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-/F9aSADswh+5pBE5810vD/N+Ox3KmahLXn1rMqisao8gNVI/Lk4YanWSPqDJCauHwOfZyeZscmDsETizAlSLFA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/filesystem@5.1.2(@capacitor/core@5.3.0):
+  /@capacitor/filesystem@5.1.2(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-5gWcixfRfYXF/iwNQ7t0tDRITHMHgB6KeCXX7wd21cGhJJ4DtbxJa4AdK9qyD/EHD3RRCyb9thSiw7eKwfYrtA==}
     peerDependencies:
       '@capacitor/core': ^5.1.1
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/geolocation@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/geolocation@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-3pB3CBa38aDMk7zouGbjOMBytcaqRMBosMcqNrOQjE5LMBAPUI1cEGrUzmkj+scP0SIyYGA95Tkj0BAnzvNWag==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/haptics@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/haptics@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-UrMcR7p2X10ql4VLlowUuH/VckTeu0lj+RQpekxox14uxDmu5AGIFDK/iDTi8W6QZkxTJRZK6sbCjgwYgNJ7Pw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/ios@5.3.0(@capacitor/core@5.3.0):
-    resolution: {integrity: sha512-AxcW6kp2dOhJ7D6Jz7FAiVi+tq8rv3K3VrfZ0rcGJGlqZfrOJ1m8ImcQ7cO9Fec7wf7a/XSwMOqWemYZFLOO8w==}
+  /@capacitor/ios@5.4.2(@capacitor/core@5.4.2):
+    resolution: {integrity: sha512-KsICm57H7rUOcQ+V7IOIPe87VOiXGWFrsCqAYxDWAS++hxTR7sn8Z0pcq7Ir2xS6as0ct1eZva9BokykpYaUXQ==}
     peerDependencies:
-      '@capacitor/core': ^5.3.0
+      '@capacitor/core': ^5.4.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/keyboard@5.0.5(@capacitor/core@5.3.0):
+  /@capacitor/keyboard@5.0.5(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-pB2o15C8Cz3QqDcToU4H0B/i+LLXYPQVtShukywMlVEJZ6UUy+KSK8XCg/YPDZBY9E0lSprHw4+NBqH0HTYRKQ==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/local-notifications@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/local-notifications@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-DB+ZBjv3Ri/0mtSzjMxLMHNGfg5m615ewDfQxp++mu7pYUM1RkxfSiigw73+PlZXDow1YNQJRlzTkwEKs6Pf+g==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/motion@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/motion@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-refNzgU58i+IRVRkf8yxDxdjA8XJ8BMGe50HcjAT4TYnYXXIN8z3Kc/NiEIraImWF7sCpV4g68U/B+74DfymRg==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/network@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/network@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-E//cq9NEvFFiLyptK0ha4B8OytdWpSqvtUo5L2uiqcoADWUnl5d7aK45M09eyd347HchICeEdIkO31n6CNxyYA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/preferences@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/preferences@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-aDe4wGTVSAIue6XXdUFgyz7SGszxK/Ptt/iWTydMpzc1PlZXw1XTTnciM+S+SLLNZFzXlkpXT3wMnh9t0DojUA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/push-notifications@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/push-notifications@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-o4/EcP13XduazhJkoVWEVrRD07YcqT9Uz0pQ48SItRNjtgDhcQW1vAEo6tSL6FVA5NkxNhJikk8TUeXobgOhEg==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/screen-reader@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/screen-reader@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-zdKEjZbAolG1rQSN2A+/8nnCWYQYcqwjS3NplPyyd6+1PXrsBK9bFWsYRipYjISauvP3hffB/WVe9dZPgETT4A==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/share@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/share@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-/dVOW7kcuuD7hWB9Z1drArIpEk+5JCoMnMrAs2c7CLp3q5PeaXNJjTkGr6RJ1OtMhsHyXc6DAFwQ4frFkmZsgw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/splash-screen@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/splash-screen@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-9B8wSm89D+LlshFw8B+mjPU8pJNf1WOx2mkMjMvcH0/EqxNaE+ZaO8lPCX+9WvWSEZs3O3l11qiSnOFHeK0t9A==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/status-bar@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/status-bar@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-7od8CxsBnot1XMK3IeOkproFL4hgoKoWAc3pwUvmDOkQsXoxwQm4SR9mLwQavv1XfxtHbFV9Ukd7FwMxOPSViw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/text-zoom@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/text-zoom@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-+yaanfMvlp5OEC3luhe7udcMdgOt6YzGJkqiUFlY3+zZ1cZdyTMxSNFk5fTbCqYk4nx3p6VpLRVKEq7Ek23LHg==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capacitor/toast@5.0.6(@capacitor/core@5.3.0):
+  /@capacitor/toast@5.0.6(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-djkRHVT8YtLJC1vvOnDU3EfAHfQYqAD7LYEXmSmhYuTnXRIggX93m/NkazwLnnpr95kDbs2VVPM/J6dqqYuJng==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capawesome/capacitor-file-picker@5.1.0(@capacitor/core@5.3.0):
+  /@capawesome/capacitor-file-picker@5.1.0(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-Yd2RMSZAguYih+m2Ge6opw1VY0kz+sPdw1WMBQ5ZiZ0PlPAVQ9g1N/RXtuvyM/Ub2HsQUFHg5ZshyXw/fZ6F8Q==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capawesome/capacitor-screen-orientation@5.0.0(@capacitor/core@5.3.0):
+  /@capawesome/capacitor-screen-orientation@5.0.0(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-yxkQeI6AX6J4LdX3oFGxabZi3qfk0ej7vcpBtXXpQaTcv2gL9BA4rs/yXlqmihUmJUPT/sGKMK5/OnD/G/DvKw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-crisp@2.0.13(@capacitor/core@5.3.0):
+  /@capgo/capacitor-crisp@2.0.13(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-/yV4//k+p0tVLUFFgsCKtBin63p8ie+vwQe9K9doEuV5YHTEcx8QQLMeNMYGanPWn35URGflN/7IOcgH3PkacA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-flash@2.0.12(@capacitor/core@5.3.0):
+  /@capgo/capacitor-flash@2.0.12(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-k5Qnr83pc1hLn+VOzFoxmbsRspYmxNk3rsYvX7BkyinIPno/TdJpxRCB4bD4Te7oY91jU64x7g5kdbPAceTGZw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-mute@2.0.13(@capacitor/core@5.3.0):
+  /@capgo/capacitor-mute@2.0.13(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-Vn+CXojH9XHdUaZYQjw2KuLiOZXGGCMbpFt/v4lc9K2itciMDxj9J19SL7SN3fW3RP7pfYRQnjsAMdWjUUa9Cw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /@capgo/capacitor-native-biometric@5.0.1:
     resolution: {integrity: sha512-befq1bi12XeHtVifsE7aDP6LUhXP/+pLrNkwy16GfqZyzb6j/wKo7YyCVzeRaAE/QlgSOiH9q00bN394Yyo/JQ==}
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-purchases@5.0.8(@capacitor/core@5.3.0):
+  /@capgo/capacitor-purchases@5.0.8(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-/2XA7UNakOekNm9j6e9wSh77qKrUoXtOW0Oz6pe8QWa7YWqhBeoxWEB227lCguooyZ6iFcL9X4BTJhcywZwpzA==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-screen-recorder@5.0.0(@capacitor/core@5.3.0):
+  /@capgo/capacitor-screen-recorder@5.0.0(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-8MPfVk0fjr4YG5dPzONoP68uObcVxK4ja3lvjokF2q7IeW/BhwyXD87KiopOGiBQ+KYlczOIAm0NPZQ2cJ3wvQ==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-updater@5.2.22(@capacitor/core@5.3.0):
-    resolution: {integrity: sha512-M9/wmZbJkgZfQD+KkxEAvnQ2HdK24hps3KH3/KQsEG2Yd34bBKk6YL/8DTyMBdzj0OJROwPNwHOZWK5OF2R74A==}
+  /@capgo/capacitor-updater@5.3.14(@capacitor/core@5.4.2):
+    resolution: {integrity: sha512-DVVdaOe/xiEiX9PL4VPsjLabHyZ9tuYJS/gDvYRBNjWvexqtATAyKd6qOyrggJd5xBHUomb/uyETsc7b5ifpgw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /@capgo/google-play-scraper@9.1.2:
@@ -2392,26 +2395,26 @@ packages:
       - supports-color
     dev: false
 
-  /@capgo/inappbrowser@1.2.7(@capacitor/core@5.3.0):
-    resolution: {integrity: sha512-ZUEq4aRS8rIoeOP2MaNdaFatz6AVolh1FUnnsrBhJvfb1OV97lfxmeQZISVzHrRQ2obIweCaWr6E46v4HRiakg==}
+  /@capgo/inappbrowser@1.2.12(@capacitor/core@5.4.2):
+    resolution: {integrity: sha512-T1MEbgtqe7mNEUHW9RqZq9GquRxLoWkMec2GtZ6k9kys5y7RRoB+qlkjFUXoG/9d6WLZIDMG2E/x6EbQJo0row==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/native-audio@6.0.18(@capacitor/core@5.3.0):
+  /@capgo/native-audio@6.0.18(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-pZuiQSLET6chfOzgR08g4aa3epPaqncwXQGosZ3iURn89LOhBhDdaAy34LuI90qKmBCiNqs6EQKWu5ku1sdBYw==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /@capgo/native-market@5.0.3:
     resolution: {integrity: sha512-X4hoGOQYlImJMGYZf1vYxesbHQpBKfnK+D/5B6QkuVhQBAmEmw1OLoGR0maOB1trQmQtJ4dqnWgqik9U1f5D/Q==}
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /@colors/colors@1.5.0:
@@ -3539,8 +3542,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dev: false
 
-  /@iconify-json/carbon@1.1.20:
-    resolution: {integrity: sha512-ed/3FDCjicQARWaSGIDZpaF+rWmxoSqrmHYZV2aEicufp0yciG44y9OEmArxxr/0U6bEC3zJbKMSOSw4CKeBJg==}
+  /@iconify-json/carbon@1.1.21:
+    resolution: {integrity: sha512-bK2cMVM4noBU+FGlay433flpXLRzQu0ED095iAnoO6ka3yb4uz0lvb8acpN5gthyGLJ89C4HpfIbQZLQnMKQww==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
@@ -3886,15 +3889,12 @@ packages:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.15.0
 
-  /@playwright/test@1.37.1:
-    resolution: {integrity: sha512-bq9zTli3vWJo8S3LwB91U0qDNQDpEXnw7knhxLM0nwDvexQAwx9tO8iKDZSqqneVq+URd/WIoz+BALMqUTgdSg==}
+  /@playwright/test@1.38.1:
+    resolution: {integrity: sha512-NqRp8XMwj3AK+zKLbZShl0r/9wKgzqI/527bkptKXomtuo+dOjU9NdMASQ8DNC9z9zLOMbG53T4eihYr3XR+BQ==}
     engines: {node: '>=16'}
     hasBin: true
     dependencies:
-      '@types/node': 18.15.11
-      playwright-core: 1.37.1
-    optionalDependencies:
-      fsevents: 2.3.2
+      playwright: 1.38.1
     dev: true
 
   /@polka/url@1.0.0-next.21:
@@ -4068,33 +4068,35 @@ packages:
     resolution: {integrity: sha512-T7VNNlYVM1SgQ+VsMYhnDkcGmWhQdL0bDyGm5TlQ3GBXnJscEClUUOKduWTmm2zCnvNLC1hc3JpuXjs/nFOc5w==}
     dev: true
 
-  /@supabase/functions-js@2.1.1:
-    resolution: {integrity: sha512-bIR1Puae6W+1/MzPfYBWOG/SCWGo4B5CB7c0ZZksvliNEAzhxNBJ0UFKYINcGdGtxG8ZC+1xr3utWpNZNwnoRw==}
+  /@supabase/functions-js@2.1.5:
+    resolution: {integrity: sha512-BNzC5XhCzzCaggJ8s53DP+WeHHGT/NfTsx2wUSSGKR2/ikLFQTBCDzMvGz/PxYMqRko/LwncQtKXGOYp1PkPaw==}
     dependencies:
-      cross-fetch: 3.1.6
-    transitivePeerDependencies:
-      - encoding
+      '@supabase/node-fetch': 2.6.14
     dev: false
 
-  /@supabase/gotrue-js@2.48.1:
-    resolution: {integrity: sha512-jTcqA/iz2crq2b3PbzXZrW3QIoKJ7SfwPWTGJNv//1nDi0i2vCx1mO+BjXwPx+TlOSG8okK0QB2eP8uaF83OvA==}
+  /@supabase/gotrue-js@2.55.0:
+    resolution: {integrity: sha512-wZAP66Lo68iROKo33m8seY30rCeGiR34leMEZ80j9fPm+/ar6h3y43Hb7f9F2STVMwT3Sv+aM+w0yCon5bih4g==}
     dependencies:
-      cross-fetch: 3.1.6
-    transitivePeerDependencies:
-      - encoding
+      '@supabase/node-fetch': 2.6.14
     dev: false
 
-  /@supabase/postgrest-js@1.8.3:
-    resolution: {integrity: sha512-Ox9EOjKpOtijT7GtY/SDvAkbnA/3xqRpbT5NX5zgH4awHeufy17TTZUNy7yOcbiUoPI5a+Btf2hPhcDP23Fh6w==}
+  /@supabase/node-fetch@2.6.14:
+    resolution: {integrity: sha512-w/Tsd22e/5fAeoxqQ4P2MX6EyF+iM6rc9kmlMVFkHuG0rAltt2TLhFbDJfemnHbtvnazWaRfy5KnFU/SYT37dQ==}
+    engines: {node: 4.x || >=6.0.0}
     dependencies:
-      cross-fetch: 3.1.8
-    transitivePeerDependencies:
-      - encoding
+      whatwg-url: 5.0.0
     dev: false
 
-  /@supabase/realtime-js@2.7.4:
-    resolution: {integrity: sha512-FzSzs1k9ruh/uds5AJ95Nc3beiMCCIhougExJ3O98CX1LMLAKUKFy5FivKLvcNhXnNfUEL0XUfGMb4UH2J7alg==}
+  /@supabase/postgrest-js@1.8.5:
+    resolution: {integrity: sha512-XvoqN5e5Z4TsQOYWLQYLW0HIlZtFSzwAcwiuToaSBSTpLOGCg4NaZ7au5GfBzCQJZdZPY5vk5FvwthfDsQK/Jw==}
     dependencies:
+      '@supabase/node-fetch': 2.6.14
+    dev: false
+
+  /@supabase/realtime-js@2.8.0:
+    resolution: {integrity: sha512-j1OP2nRJhqLNEoYSMkIl1+cHK/Ow9fektemazkF2CvrIrmwgfJJGaFGiWGVgwoKtwVcrdknSsYWpxs90hys1EQ==}
+    dependencies:
+      '@supabase/node-fetch': 2.6.14
       '@types/phoenix': 1.6.0
       '@types/websocket': 1.0.5
       websocket: 1.0.34
@@ -4102,25 +4104,22 @@ packages:
       - supports-color
     dev: false
 
-  /@supabase/storage-js@2.5.1:
-    resolution: {integrity: sha512-nkR0fQA9ScAtIKA3vNoPEqbZv1k5B5HVRYEvRWdlP6mUpFphM9TwPL2jZ/ztNGMTG5xT6SrHr+H7Ykz8qzbhjw==}
+  /@supabase/storage-js@2.5.4:
+    resolution: {integrity: sha512-yspHD19I9uQUgfTh0J94+/r/g6hnhdQmw6Y7OWqr/EbnL6uvicGV1i1UDkkmeUHqfF9Mbt2sLtuxRycYyKv2ew==}
     dependencies:
-      cross-fetch: 3.1.6
-    transitivePeerDependencies:
-      - encoding
+      '@supabase/node-fetch': 2.6.14
     dev: false
 
-  /@supabase/supabase-js@2.33.1:
-    resolution: {integrity: sha512-jA00rquPTppPOHpBB6KABW98lfg0gYXcuGqP3TB1iiduznRVsi3GGk2qBKXPDLMYSe0kRlQp5xCwWWthaJr8eA==}
+  /@supabase/supabase-js@2.38.0:
+    resolution: {integrity: sha512-FSkIcz+/+TTBqNqhR8AdtblxEqCF72//CCkmZFIRCa3Xh/aiI0F4cBdL7AB3aIQn2DhE4aGxZ4mGiGR593096Q==}
     dependencies:
-      '@supabase/functions-js': 2.1.1
-      '@supabase/gotrue-js': 2.48.1
-      '@supabase/postgrest-js': 1.8.3
-      '@supabase/realtime-js': 2.7.4
-      '@supabase/storage-js': 2.5.1
-      cross-fetch: 3.1.6
+      '@supabase/functions-js': 2.1.5
+      '@supabase/gotrue-js': 2.55.0
+      '@supabase/node-fetch': 2.6.14
+      '@supabase/postgrest-js': 1.8.5
+      '@supabase/realtime-js': 2.8.0
+      '@supabase/storage-js': 2.5.4
     transitivePeerDependencies:
-      - encoding
       - supports-color
     dev: false
 
@@ -4330,8 +4329,8 @@ packages:
     resolution: {integrity: sha512-amrLbRqTU9bXMCc6uX0sWpxsQzRIo9z6MJPkH1pkez/qOxuqSZVuryJAWoBRq94CeG8JxY+VK4Le9HtjQR5T9A==}
     dev: false
 
-  /@types/dompurify@3.0.2:
-    resolution: {integrity: sha512-YBL4ziFebbbfQfH5mlC+QTJsvh0oJUrWbmxKMyEdL7emlHJqGR2Qb34TEFKj+VCayBvjKy3xczMFNhugThUsfQ==}
+  /@types/dompurify@3.0.3:
+    resolution: {integrity: sha512-odiGr/9/qMqjcBOe5UhcNLOFHSYmKFOyr+bJ/Xu3Qp4k1pNPAlNLUVNNLcLfjQI7+W7ObX58EdD3H+3p3voOvA==}
     dependencies:
       '@types/trusted-types': 2.0.3
     dev: true
@@ -4581,8 +4580,8 @@ packages:
     resolution: {integrity: sha512-PBjIUxZHOuj0R15/xuwJYjFi+KZdNFrehocChv4g5hu6aFroHue8m0lBP0POdK2nKzbw0cgV1mws8+V/JAcEkQ==}
     dev: true
 
-  /@types/uuid@9.0.1:
-    resolution: {integrity: sha512-rFT3ak0/2trgvp4yYZo5iKFEPsET7vKydKF+VRCxlQ9bpheehyAJH89dAkaLEq/j/RZXJIqcgsmPJKUP1Z28HA==}
+  /@types/uuid@9.0.5:
+    resolution: {integrity: sha512-xfHdwa1FMJ082prjSJpoEI57GZITiQz10r3vEJCHa2khEFQjKy91aWKz6+zybzssCvXUwE1LQWgWVwZ4nYUvHQ==}
     dev: true
 
   /@types/web-bluetooth@0.0.17:
@@ -4810,7 +4809,7 @@ packages:
       - encoding
     dev: false
 
-  /@vitejs/plugin-vue-jsx@3.0.2(vite@4.4.9)(vue@3.3.4):
+  /@vitejs/plugin-vue-jsx@3.0.2(vite@4.4.11)(vue@3.3.4):
     resolution: {integrity: sha512-obF26P2Z4Ogy3cPp07B4VaW6rpiu0ue4OT2Y15UxT5BZZ76haUY9guOsZV3uWh/I6xc+VeiW+ZVabRE82FyzWw==}
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
@@ -4820,20 +4819,20 @@ packages:
       '@babel/core': 7.22.11
       '@babel/plugin-transform-typescript': 7.22.11(@babel/core@7.22.11)
       '@vue/babel-plugin-jsx': 1.1.5(@babel/core@7.22.11)
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       vue: 3.3.4
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /@vitejs/plugin-vue@4.3.3(vite@4.4.9)(vue@3.3.4):
-    resolution: {integrity: sha512-ssxyhIAZqB0TrpUg6R0cBpCuMk9jTIlO1GNSKKQD6S8VjnXi6JXKfUXjSsxey9IwQiaRGsO1WnW9Rkl1L6AJVw==}
+  /@vitejs/plugin-vue@4.4.0(vite@4.4.11)(vue@3.3.4):
+    resolution: {integrity: sha512-xdguqb+VUwiRpSg+nsc2HtbAUSGak25DXYvpQQi4RVU1Xq1uworyoH/md9Rfd8zMmPR/pSghr309QNcftUVseg==}
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
       vite: ^4.0.0
       vue: ^3.2.25
     dependencies:
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       vue: 3.3.4
     dev: true
 
@@ -4875,22 +4874,22 @@ packages:
       pretty-format: 29.6.3
     dev: true
 
-  /@volar/language-core@1.10.1:
-    resolution: {integrity: sha512-JnsM1mIPdfGPxmoOcK1c7HYAsL6YOv0TCJ4aW3AXPZN/Jb4R77epDyMZIVudSGjWMbvv/JfUa+rQ+dGKTmgwBA==}
+  /@volar/language-core@1.10.4:
+    resolution: {integrity: sha512-Na69qA6uwVIdA0rHuOc2W3pHtVQQO8hCNim7FOaKNpRJh0oAFnu5r9i7Oopo5C4cnELZkPNjTrbmpcCTiW+CMQ==}
     dependencies:
-      '@volar/source-map': 1.10.1
+      '@volar/source-map': 1.10.4
     dev: true
 
-  /@volar/source-map@1.10.1:
-    resolution: {integrity: sha512-3/S6KQbqa7pGC8CxPrg69qHLpOvkiPHGJtWPkI/1AXCsktkJ6gIk/5z4hyuMp8Anvs6eS/Kvp/GZa3ut3votKA==}
+  /@volar/source-map@1.10.4:
+    resolution: {integrity: sha512-RxZdUEL+pV8p+SMqnhVjzy5zpb1QRZTlcwSk4bdcBO7yOu4rtEWqDGahVCEj4CcXour+0yJUMrMczfSCpP9Uxg==}
     dependencies:
       muggle-string: 0.3.1
     dev: true
 
-  /@volar/typescript@1.10.1:
-    resolution: {integrity: sha512-+iiO9yUSRHIYjlteT+QcdRq8b44qH19/eiUZtjNtuh6D9ailYM7DVR0zO2sEgJlvCaunw/CF9Ov2KooQBpR4VQ==}
+  /@volar/typescript@1.10.4:
+    resolution: {integrity: sha512-BCCUEBASBEMCrz7qmNSi2hBEWYsXD0doaktRKpmmhvb6XntM2sAWYu6gbyK/MluLDgluGLFiFRpWgobgzUqolg==}
     dependencies:
-      '@volar/language-core': 1.10.1
+      '@volar/language-core': 1.10.4
     dev: true
 
   /@vue/babel-helper-vue-transform-on@1.0.2:
@@ -5241,20 +5240,20 @@ packages:
   /@vue/devtools-api@6.5.0:
     resolution: {integrity: sha512-o9KfBeaBmCKl10usN4crU53fYtC1r7jJwdGKjPT24t348rHxgfpZ0xL3Xm/gLUYnc0oTp8LAmrxOeLyu6tbk2Q==}
 
-  /@vue/language-core@1.8.8(typescript@5.0.3):
-    resolution: {integrity: sha512-i4KMTuPazf48yMdYoebTkgSOJdFraE4pQf0B+FTOFkbB+6hAfjrSou/UmYWRsWyZV6r4Rc6DDZdI39CJwL0rWw==}
+  /@vue/language-core@1.8.19(typescript@5.0.3):
+    resolution: {integrity: sha512-nt3dodGs97UM6fnxeQBazO50yYCKBK53waFWB3qMbLmR6eL3aUryZgQtZoBe1pye17Wl8fs9HysV3si6xMgndQ==}
     peerDependencies:
       typescript: '*'
     peerDependenciesMeta:
       typescript:
         optional: true
     dependencies:
-      '@volar/language-core': 1.10.1
-      '@volar/source-map': 1.10.1
+      '@volar/language-core': 1.10.4
+      '@volar/source-map': 1.10.4
       '@vue/compiler-dom': 3.3.4
       '@vue/reactivity': 3.3.4
       '@vue/shared': 3.3.4
-      minimatch: 9.0.1
+      minimatch: 9.0.3
       muggle-string: 0.3.1
       typescript: 5.0.3
       vue-template-compiler: 2.7.14
@@ -5299,11 +5298,11 @@ packages:
   /@vue/shared@3.3.4:
     resolution: {integrity: sha512-7OjdcV8vQ74eiz1TZLzZP4JwqM5fA94K6yntPS5Z25r9HDuGNzaGdgvwKYq6S+MxwF0TFRwe50fIR/MYnakdkQ==}
 
-  /@vue/typescript@1.8.8(typescript@5.0.3):
-    resolution: {integrity: sha512-jUnmMB6egu5wl342eaUH236v8tdcEPXXkPgj+eI/F6JwW/lb+yAU6U07ZbQ3MVabZRlupIlPESB7ajgAGixhow==}
+  /@vue/typescript@1.8.19(typescript@5.0.3):
+    resolution: {integrity: sha512-k/SHeeQROUgqsxyHQ8Cs3Zz5TnX57p7BcBDVYR2E0c61QL2DJ2G8CsaBremmNGuGE6o1R5D50IHIxFmroMz8iw==}
     dependencies:
-      '@volar/typescript': 1.10.1
-      '@vue/language-core': 1.8.8(typescript@5.0.3)
+      '@volar/typescript': 1.10.4
+      '@vue/language-core': 1.8.19(typescript@5.0.3)
     transitivePeerDependencies:
       - typescript
     dev: true
@@ -5335,12 +5334,37 @@ packages:
       - vue
     dev: false
 
+  /@vueuse/core@10.4.1(vue@3.3.4):
+    resolution: {integrity: sha512-DkHIfMIoSIBjMgRRvdIvxsyboRZQmImofLyOHADqiVbQVilP8VVHDhBX2ZqoItOgu7dWa8oXiNnScOdPLhdEXg==}
+    dependencies:
+      '@types/web-bluetooth': 0.0.17
+      '@vueuse/metadata': 10.4.1
+      '@vueuse/shared': 10.4.1(vue@3.3.4)
+      vue-demi: 0.14.5(vue@3.3.4)
+    transitivePeerDependencies:
+      - '@vue/composition-api'
+      - vue
+    dev: false
+
   /@vueuse/metadata@10.4.0:
     resolution: {integrity: sha512-JNf9IR7ZBTDxWPfQlHhqBOv1VLO6ReTZi9HGY7RABjYHVpaEpjlHU7HpZDVOJGDa0gKITAbA2zMkNSBjKMcdaw==}
     dev: false
 
+  /@vueuse/metadata@10.4.1:
+    resolution: {integrity: sha512-2Sc8X+iVzeuMGHr6O2j4gv/zxvQGGOYETYXEc41h0iZXIRnRbJZGmY/QP8dvzqUelf8vg0p/yEA5VpCEu+WpZg==}
+    dev: false
+
   /@vueuse/shared@10.4.0(vue@3.3.4):
     resolution: {integrity: sha512-52asvLf5cbAS/h6xWjqoY4MgjxmFjnVNf/nA8BP7RbeIrIGcf+BZbeOcVo+92byqArXEJiBxptXpufQvbwJL/w==}
+    dependencies:
+      vue-demi: 0.14.5(vue@3.3.4)
+    transitivePeerDependencies:
+      - '@vue/composition-api'
+      - vue
+    dev: false
+
+  /@vueuse/shared@10.4.1(vue@3.3.4):
+    resolution: {integrity: sha512-vz5hbAM4qA0lDKmcr2y3pPdU+2EVw/yzfRsBdu+6+USGa4PxqSQRYIUC9/NcT06y+ZgaTsyURw2I9qOFaaXHAg==}
     dependencies:
       vue-demi: 0.14.5(vue@3.3.4)
     transitivePeerDependencies:
@@ -5871,6 +5895,13 @@ packages:
   /base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
+  /basic-auth@2.0.1:
+    resolution: {integrity: sha512-NF+epuEdnUYVlGuhaxbbq+dvJttwLnGY+YixlXlME5KpQ5W3CnXA5cVTneY3SPbPDRkcjMbifrwmFYcClgOZeg==}
+    engines: {node: '>= 0.8'}
+    dependencies:
+      safe-buffer: 5.1.2
+    dev: true
+
   /batch@0.6.1:
     resolution: {integrity: sha512-x+VAiMRL6UPkx+kudNvxTl6hB2XNNCG2r+7wixVfIYwu/2HKRXimwQyaumLjMveWvT2Hkd/cAJw+QBMfJ/EKVw==}
     dev: true
@@ -6174,20 +6205,20 @@ packages:
     resolution: {integrity: sha512-Jj917pJtYg9HSJBF95HVX3Cdr89JUyLT4IZ8SvM5aDRni95swKgYi3TgYLH5hnGfPE/U1dg6IfZ50UsIlLkwSA==}
     dev: true
 
-  /capacitor-rate-app@4.0.3(@capacitor/core@5.3.0):
+  /capacitor-rate-app@4.0.3(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-HdTftIzBSfcNfbjQFCtvdvFU83MPCt11H/QXV4t7jctLelA8jXu3qee9MiZ4dqDc+kwNoufcQ95ncoCvn5viig==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
-  /capacitor-secure-storage-plugin@0.9.0(@capacitor/core@5.3.0):
+  /capacitor-secure-storage-plugin@0.9.0(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-P5fiC94opcLHu41vceo9weXH+20g0SPYKkeAx+qm9eKNcVFqpcuI4dqwivXlGXYNMDygyjSQuAaFwZ4gW0Y91Q==}
     peerDependencies:
       '@capacitor/core': ^5.0.0
     dependencies:
-      '@capacitor/core': 5.3.0
+      '@capacitor/core': 5.4.2
     dev: false
 
   /case-sensitive-paths-webpack-plugin@2.4.0:
@@ -6968,6 +6999,11 @@ packages:
       vary: 1.1.2
     dev: true
 
+  /corser@2.0.1:
+    resolution: {integrity: sha512-utCYNzRSQIZNPIcGZdQc92UVJYAhtGAteCFg0yRaFm8f0P+CPtyGyHXJcGXnffjCybUCEx3FQ2G7U3/o9eIkVQ==}
+    engines: {node: '>= 0.4.0'}
+    dev: true
+
   /cosmiconfig@7.1.0:
     resolution: {integrity: sha512-AdmX6xUzdNASswsFtmwSt7Vj8po9IuqXm0UXz7QKPuEUmPB4XyjGfaAr2PSuELMwkRMVH1EpIkX5bTZGRB3eCA==}
     engines: {node: '>=10'}
@@ -7013,14 +7049,6 @@ packages:
 
   /cross-fetch@3.1.6:
     resolution: {integrity: sha512-riRvo06crlE8HiqOwIpQhxwdOk4fOeR7FVM/wXoxchFEqMNUjvbs3bfo4OTgMEMHzppd4DxFBDbyySj8Cv781g==}
-    dependencies:
-      node-fetch: 2.7.0
-    transitivePeerDependencies:
-      - encoding
-    dev: false
-
-  /cross-fetch@3.1.8:
-    resolution: {integrity: sha512-cvA+JwZoU0Xq+h6WkMvAUqPEYy92Obet6UdKLfW60qn99ftItKjB5T+BkyWOFWe2pUyfQ+IJHmpOTznqk1M6Kg==}
     dependencies:
       node-fetch: 2.7.0
     transitivePeerDependencies:
@@ -9268,6 +9296,13 @@ packages:
       wbuf: 1.7.3
     dev: true
 
+  /html-encoding-sniffer@3.0.0:
+    resolution: {integrity: sha512-oWv4T4yJ52iKrufjnyZPkrN0CH3QnrUqdB6In1g5Fe1mia8GmF36gnfNySxoZtxD5+NmYw1EElVXiBk93UeskA==}
+    engines: {node: '>=12'}
+    dependencies:
+      whatwg-encoding: 2.0.0
+    dev: true
+
   /html-entities@2.3.5:
     resolution: {integrity: sha512-72TJlcMkYsEJASa/3HnX7VT59htM7iSHbH59NSZbtc+22Ap0Txnlx91sfeB+/A7wNZg7UxtZdhAW4y+/jimrdg==}
     dev: true
@@ -9384,6 +9419,29 @@ packages:
       - debug
     dev: true
 
+  /http-server@14.1.1:
+    resolution: {integrity: sha512-+cbxadF40UXd9T01zUHgA+rlo2Bg1Srer4+B4NwIHdaGxAGGv59nYRnGGDJ9LBk7alpS0US+J+bLLdQOOkJq4A==}
+    engines: {node: '>=12'}
+    hasBin: true
+    dependencies:
+      basic-auth: 2.0.1
+      chalk: 4.1.2
+      corser: 2.0.1
+      he: 1.2.0
+      html-encoding-sniffer: 3.0.0
+      http-proxy: 1.18.1(debug@4.3.4)
+      mime: 1.6.0
+      minimist: 1.2.8
+      opener: 1.5.2
+      portfinder: 1.0.32
+      secure-compare: 3.0.1
+      union: 0.5.0
+      url-join: 4.0.1
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+    dev: true
+
   /http-signature@1.3.6:
     resolution: {integrity: sha512-3adrsD6zqo4GsTqtO7FyrejHNv+NgiIfAfv68+jVlFmSr9OGy7zrxONceFRLKvnnZA5jbxQBX1u9PpB6Wi32Gw==}
     engines: {node: '>=0.10'}
@@ -9446,6 +9504,13 @@ packages:
 
   /iconv-lite@0.4.24:
     resolution: {integrity: sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==}
+    engines: {node: '>=0.10.0'}
+    dependencies:
+      safer-buffer: 2.1.2
+    dev: true
+
+  /iconv-lite@0.6.3:
+    resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
     engines: {node: '>=0.10.0'}
     dependencies:
       safer-buffer: 2.1.2
@@ -10691,6 +10756,13 @@ packages:
       brace-expansion: 2.0.1
     dev: true
 
+  /minimatch@9.0.3:
+    resolution: {integrity: sha512-RHiac9mvaRw0x3AYRgDC1CxAP7HTcNrrECeA8YYJeWnpo+2Q5CegtZjaotWTWxDG3UeGA1coE05iH1mPjT/2mg==}
+    engines: {node: '>=16 || 14 >=14.17'}
+    dependencies:
+      brace-expansion: 2.0.1
+    dev: true
+
   /minimist-options@4.1.0:
     resolution: {integrity: sha512-Q4r8ghd80yhO/0j1O3B2BjweX3fiHg9cdOwjJd2J76Q135c+NDxGCqdYKQ1SKBuFfgWbAUzBfvYjPUEeNgqN1A==}
     engines: {node: '>= 6'}
@@ -10851,6 +10923,27 @@ packages:
       yauzl: 2.10.0
     transitivePeerDependencies:
       - supports-color
+    dev: false
+
+  /native-run@1.7.3:
+    resolution: {integrity: sha512-vEw8X3Yu8TAbP4/uCJV3nCsCrhfHgUecRRDc69ZU9EK0QXHHc7YDzmIeI7SfA08ywzPlC9YcpITcB6bgMbrtwQ==}
+    engines: {node: '>=12.13.0'}
+    hasBin: true
+    dependencies:
+      '@ionic/utils-fs': 3.1.7
+      '@ionic/utils-terminal': 2.3.4
+      bplist-parser: 0.3.2
+      debug: 4.3.4(supports-color@8.1.1)
+      elementtree: 0.1.7
+      ini: 3.0.1
+      plist: 3.0.6
+      split2: 4.2.0
+      through2: 4.0.2
+      tslib: 2.5.3
+      yauzl: 2.10.0
+    transitivePeerDependencies:
+      - supports-color
+    dev: true
 
   /natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
@@ -11492,10 +11585,20 @@ packages:
     engines: {node: '>=10'}
     dev: false
 
-  /playwright-core@1.37.1:
-    resolution: {integrity: sha512-17EuQxlSIYCmEMwzMqusJ2ztDgJePjrbttaefgdsiqeLWidjYz9BxXaTaZWxH1J95SHGk6tjE+dwgWILJoUZfA==}
+  /playwright-core@1.38.1:
+    resolution: {integrity: sha512-tQqNFUKa3OfMf4b2jQ7aGLB8o9bS3bOY0yMEtldtC2+spf8QXG9zvXLTXUeRsoNuxEYMgLYR+NXfAa1rjKRcrg==}
     engines: {node: '>=16'}
     hasBin: true
+    dev: true
+
+  /playwright@1.38.1:
+    resolution: {integrity: sha512-oRMSJmZrOu1FP5iu3UrCx8JEFRIMxLDM0c/3o4bpzU5Tz97BypefWf7TuTNPWeCe279TPal5RtPPZ+9lW/Qkow==}
+    engines: {node: '>=16'}
+    hasBin: true
+    dependencies:
+      playwright-core: 1.38.1
+    optionalDependencies:
+      fsevents: 2.3.2
     dev: true
 
   /plist@3.0.6:
@@ -12552,6 +12655,10 @@ packages:
       ajv: 8.12.0
       ajv-formats: 2.1.1(ajv@8.12.0)
       ajv-keywords: 5.1.0(ajv@8.12.0)
+    dev: true
+
+  /secure-compare@3.0.1:
+    resolution: {integrity: sha512-AckIIV90rPDcBcglUwXPF3kg0P0qmPsPXAj6BBEENQE1p5yA1xfmDJzfi1Tappj37Pv2mVbKpL3Z1T+Nn7k1Qw==}
     dev: true
 
   /select-hose@2.0.0:
@@ -13651,6 +13758,13 @@ packages:
     engines: {node: '>=4'}
     dev: true
 
+  /union@0.5.0:
+    resolution: {integrity: sha512-N6uOhuW6zO95P3Mel2I2zMsbsanvvtgn6jVqJv4vbVcz/JN0OkL9suomjQGmWtxJQXOCqUJvquc1sMeNz/IwlA==}
+    engines: {node: '>= 0.8.0'}
+    dependencies:
+      qs: 6.11.0
+    dev: true
+
   /unique-string@2.0.0:
     resolution: {integrity: sha512-uNaeirEPvpZWSgzwsPGtU2zVSTrn/8L5q/IexZmH0eH6SA73CmAA5U4GwORTxQAZs95TAXLNqeLoPPNO5gZfWg==}
     engines: {node: '>=8'}
@@ -13787,6 +13901,10 @@ packages:
       punycode: 2.3.0
     dev: true
 
+  /url-join@4.0.1:
+    resolution: {integrity: sha512-jk1+QP6ZJqyOiuEI9AEWQfju/nB2Pw466kbA0LEZljHwKeMgd9WrAEgEGxjPDD2+TNbbb37rTyhEfrCXfuKXnA==}
+    dev: true
+
   /utf-8-validate@5.0.10:
     resolution: {integrity: sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ==}
     engines: {node: '>=6.14.2'}
@@ -13860,7 +13978,7 @@ packages:
       mlly: 1.4.1
       pathe: 1.1.1
       picocolors: 1.0.0
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -13872,15 +13990,15 @@ packages:
       - terser
     dev: true
 
-  /vite-plugin-environment@1.1.3(vite@4.4.9):
+  /vite-plugin-environment@1.1.3(vite@4.4.11):
     resolution: {integrity: sha512-9LBhB0lx+2lXVBEWxFZC+WO7PKEyE/ykJ7EPWCq95NEcCpblxamTbs5Dm3DLBGzwODpJMEnzQywJU8fw6XGGGA==}
     peerDependencies:
       vite: '>= 2.7'
     dependencies:
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
     dev: true
 
-  /vite-plugin-inspect@0.7.28(rollup@2.79.1)(vite@4.4.9):
+  /vite-plugin-inspect@0.7.28(rollup@2.79.1)(vite@4.4.11):
     resolution: {integrity: sha512-XRdQGdf+PU6eT0EoL8beUyFQfcCrHr06OyRM71IT8t7rEC9JywdsscehGHEAyFZryfaVBWAI280N63BI2N+1BA==}
     engines: {node: '>=14'}
     peerDependencies:
@@ -13893,13 +14011,13 @@ packages:
       open: 9.1.0
       picocolors: 1.0.0
       sirv: 2.0.3
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
     transitivePeerDependencies:
       - rollup
       - supports-color
     dev: true
 
-  /vite-plugin-pages@0.31.0(@vue/compiler-sfc@3.3.4)(vite@4.4.9):
+  /vite-plugin-pages@0.31.0(@vue/compiler-sfc@3.3.4)(vite@4.4.11):
     resolution: {integrity: sha512-fw3onBfVTXQI7rOzAbSZhmfwvk50+3qNnGZpERjmD93c8nEjrGLyd53eFXYMxcJV4KA1vzi4qIHt2+6tS4dEMw==}
     peerDependencies:
       '@vue/compiler-sfc': ^2.7.0 || ^3.0.0
@@ -13917,13 +14035,13 @@ packages:
       json5: 2.2.3
       local-pkg: 0.4.3
       picocolors: 1.0.0
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       yaml: 2.3.1
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /vite-plugin-pwa@0.16.4(vite@4.4.9)(workbox-build@7.0.0)(workbox-window@7.0.0):
+  /vite-plugin-pwa@0.16.4(vite@4.4.11)(workbox-build@7.0.0)(workbox-window@7.0.0):
     resolution: {integrity: sha512-lmwHFIs9zI2H9bXJld/zVTbCqCQHZ9WrpyDMqosICDV0FVnCJwniX1NMDB79HGTIZzOQkY4gSZaVTJTw6maz/Q==}
     engines: {node: '>=16.0.0'}
     peerDependencies:
@@ -13934,14 +14052,14 @@ packages:
       debug: 4.3.4(supports-color@8.1.1)
       fast-glob: 3.2.12
       pretty-bytes: 6.1.0
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       workbox-build: 7.0.0
       workbox-window: 7.0.0
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /vite-plugin-vue-inspector@3.6.0(vite@4.4.9):
+  /vite-plugin-vue-inspector@3.6.0(vite@4.4.11):
     resolution: {integrity: sha512-Fi+9JaMx/reuic+MWbrdw8g5TwZM5a/BmdBT8OKKZi3rK4Qw3wND9smT+Ld+Daitbgly17uvuCiull2KV/hEBQ==}
     peerDependencies:
       vite: ^3.0.0-0 || ^4.0.0-0
@@ -13955,12 +14073,12 @@ packages:
       kolorist: 1.8.0
       magic-string: 0.30.0
       shell-quote: 1.8.1
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /vite-plugin-vue-layouts@0.8.0(vite@4.4.9)(vue-router@4.2.4)(vue@3.3.4):
+  /vite-plugin-vue-layouts@0.8.0(vite@4.4.11)(vue-router@4.2.4)(vue@3.3.4):
     resolution: {integrity: sha512-UZW2nSV2LraTSe7gsAL46hfdi7a0X1RvkGGoJVtA2O8beu7anzpXFwQLou8+kHy31CzVycT4gIPySBsHhtBN5g==}
     peerDependencies:
       vite: ^2.5.0 || ^3.0.0-0 || ^4.0.0
@@ -13970,14 +14088,14 @@ packages:
       '@vue/compiler-sfc': 3.3.4
       debug: 4.3.4(supports-color@8.1.1)
       fast-glob: 3.2.12
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       vue: 3.3.4
       vue-router: 4.2.4(vue@3.3.4)
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /vite-plugin-windicss@1.9.1(vite@4.4.9):
+  /vite-plugin-windicss@1.9.1(vite@4.4.11):
     resolution: {integrity: sha512-CWm1b/tXVCJTbEGn4oB8B7Gev9xDuY9k4E/KiJqDuLYspBUFQyZKPF2mSZ3DfNdojsfqgzxu9ervqvlb9jJ7fw==}
     peerDependencies:
       vite: ^2.0.1 || ^3.0.0 || ^4.0.0
@@ -13985,14 +14103,14 @@ packages:
       '@windicss/plugin-utils': 1.9.1
       debug: 4.3.4(supports-color@8.1.1)
       kolorist: 1.8.0
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       windicss: 3.5.6
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /vite@4.4.9(@types/node@18.15.11)(sass@1.66.1):
-    resolution: {integrity: sha512-2mbUn2LlUmNASWwSCNSJ/EG2HuSRTnVNaydp6vMCm5VIqJsjMfbIWtbH2kDuwUVW5mMUKKZvGPX/rqeqVvv1XA==}
+  /vite@4.4.11(@types/node@18.15.11)(sass@1.66.1):
+    resolution: {integrity: sha512-ksNZJlkcU9b0lBwAGZGGaZHCMqHsc8OpgtoYhsQ4/I2v5cnpmmmqe5pM4nv/4Hn6G/2GhTdj0DhZh2e+Er1q5A==}
     engines: {node: ^14.18.0 || >=16.0.0}
     hasBin: true
     peerDependencies:
@@ -14080,7 +14198,7 @@ packages:
       strip-literal: 1.0.1
       tinybench: 2.5.0
       tinypool: 0.7.0
-      vite: 4.4.9(@types/node@18.15.11)(sass@1.66.1)
+      vite: 4.4.11(@types/node@18.15.11)(sass@1.66.1)
       vite-node: 0.34.3(@types/node@18.15.11)(sass@1.66.1)
       why-is-node-running: 2.2.2
     transitivePeerDependencies:
@@ -14283,14 +14401,14 @@ packages:
     resolution: {integrity: sha512-4gDntzrifFnCEvyoO8PqyJDmguXgVPxKiIxrBKjIowvL9l+N66196+72XVYR8BBf1Uv1Fgt3bGevJ+sEmxfZzw==}
     dev: true
 
-  /vue-tsc@1.8.8(typescript@5.0.3):
-    resolution: {integrity: sha512-bSydNFQsF7AMvwWsRXD7cBIXaNs/KSjvzWLymq/UtKE36697sboX4EccSHFVxvgdBlI1frYPc/VMKJNB7DFeDQ==}
+  /vue-tsc@1.8.19(typescript@5.0.3):
+    resolution: {integrity: sha512-tacMQLQ0CXAfbhRycCL5sWIy1qujXaIEtP1hIQpzHWOUuICbtTj9gJyFf91PvzG5KCNIkA5Eg7k2Fmgt28l5DQ==}
     hasBin: true
     peerDependencies:
       typescript: '*'
     dependencies:
-      '@vue/language-core': 1.8.8(typescript@5.0.3)
-      '@vue/typescript': 1.8.8(typescript@5.0.3)
+      '@vue/language-core': 1.8.19(typescript@5.0.3)
+      '@vue/typescript': 1.8.19(typescript@5.0.3)
       semver: 7.5.4
       typescript: 5.0.3
     dev: true
@@ -14515,6 +14633,13 @@ packages:
     transitivePeerDependencies:
       - supports-color
     dev: false
+
+  /whatwg-encoding@2.0.0:
+    resolution: {integrity: sha512-p41ogyeMUrw3jWclHWTQg1k05DSVXPLcVxRTYsXUk+ZooOCZLcoYgPZ/HL/D/N+uQPOtcp1me1WhBEaX02mhWg==}
+    engines: {node: '>=12'}
+    dependencies:
+      iconv-lite: 0.6.3
+    dev: true
 
   /whatwg-fetch@3.6.2:
     resolution: {integrity: sha512-bJlen0FcuU/0EMLrdbJ7zOnW6ITZLrZMIarMUVmdKtsGvZna8vxKYaexICWPfZ8qwf9fzNq+UEIZrnSaApt6RA==}

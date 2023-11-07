@@ -338,3 +338,9 @@ your-api-key: 'Ваш ключ API:'
 your-are-a: Вы
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'
+resend-email: Отправить письмо подтверждения еще раз
+confirm-email-sent: >-
+  Подтверждающее письмо было отправлено, нажмите на ссылку, чтобы подтвердить
+  свой электронный адрес.
+did-not-recive-confirm-email: Не получили подтверждающее письмо?
+resend: Повторно отправить
