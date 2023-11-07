@@ -6,24 +6,18 @@ interface RequestOptions extends RequestInit {
 }
 
 async function fetchWithTimeout(resource: RequestInfo, options: RequestOptions = {}): Promise<Response> {
-  console.log('fetch', resource)
-  const { timeout = 5000 } = options
-  const controller = new AbortController()
-  const id = setTimeout(() => {
-    console.log('timeout')
-    controller.abort()
-  }, timeout)
+  // No timeout, denoflare does not support timeout. See https://github.com/skymethod/denoflare/issues/65 for more info
   const response = await fetch(resource, {
     ...options,
-    signal: controller.signal,
   })
-  clearTimeout(id)
   return response
 }
 
 function getPrefixURL(request: Request, urlPrefix: string, host = MAIN_HOST) {
   const backupUrl = new URL(request.url)
   backupUrl.hostname = host
+  backupUrl.port = ''
+  backupUrl.protocol = 'https'
   const end = backupUrl.pathname.split('/').pop()
   backupUrl.pathname = `/${urlPrefix}/${end}`
   return backupUrl.toString()
