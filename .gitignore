@@ -42,4 +42,8 @@ CHANGELOG.md
 .history
 
 .env.dev
-cloudflare_workers_deno/*
+cloudflare_workers_deno/cloudflare/*
+cloudflare_workers_deno/cloudflare_tests/*
+cloudflare_workers_deno/cloudflare_utils/*
+cloudflare_workers_deno/generated_functions_map.ts
+cloudflare_workers_deno/.denoflare
