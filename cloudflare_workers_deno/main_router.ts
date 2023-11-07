@@ -1,3 +1,6 @@
+import { map } from './generated_functions_map.ts'
+import { fallback } from './fallback_loadbalancer.ts'
+
 export default {
   async fetch(request: Request, env: any) {
     try {
@@ -6,7 +9,16 @@ export default {
       if (!functionName || functionName.length === 0)
         return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
 
-      return new Response(functionName)
+      const edgeFunction = map[functionName]
+      if (edgeFunction) {
+        const response = edgeFunction(request, env)
+        return response
+      }
+      else {
+        console.log('falling back to old router')
+        const response = await fallback(request)
+        return response
+      }
     }
     catch (e) {
       console.error(e)

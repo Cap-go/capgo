@@ -40,7 +40,7 @@ async function generateConfig() {
   // Generate the functions map
 
   const imports = scripts.map(([functionName, functionObj]) => {
-    return `import ${functionName} from '${functionObj.path.replace('.ts', '')}'`
+    return `import ${functionName} from '${functionObj.path}'`
   }).join('\n')
 
   const functionsMap = scripts.map(([functionName, functionObj]) => {
@@ -51,7 +51,13 @@ async function generateConfig() {
 
   const denoFlare = {
     $schema: 'https://raw.githubusercontent.com/skymethod/denoflare/v0.5.12/common/config.schema.json',
-    scripts: Object.fromEntries(new Map(scripts)),
+    scripts: {
+      main: {
+        path: './main_router.ts',
+        localPort: 3030,
+        bindings: envFile,
+      },
+    },
   }
 
   // console.log()
