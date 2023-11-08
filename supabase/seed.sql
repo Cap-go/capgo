@@ -1,6 +1,7 @@
 INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at", "invited_at", "confirmation_token", "confirmation_sent_at", "recovery_token", "recovery_sent_at", "email_change_token_new", "email_change", "email_change_sent_at", "last_sign_in_at", "raw_app_meta_data", "raw_user_meta_data", "is_super_admin", "created_at", "updated_at", "phone", "phone_confirmed_at", "phone_change", "phone_change_token", "phone_change_sent_at", "email_change_token_current", "email_change_confirm_status", "banned_until", "reauthentication_token", "reauthentication_sent_at") VALUES
 ('00000000-0000-0000-0000-000000000000', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'authenticated', 'authenticated', 'admin@capgo.app', '$2a$10$I4wgil64s1Kku/7aUnCOVuc1W5nCAeeKvHMiSKk10jo1J5fSVkK1S', now(), now(), 'oljikwwipqrkwilfsyto', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
-('00000000-0000-0000-0000-000000000000', '6aa76066-55ef-4238-ade6-0b32334a4097', 'authenticated', 'authenticated', 'test@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsyty', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
+('00000000-0000-0000-0000-000000000000', '6aa76066-55ef-4238-ade6-0b32334a4097', 'authenticated', 'authenticated', 'test@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsyty', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
+('00000000-0000-0000-0000-000000000000', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'authenticated', 'authenticated', 'test2@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsytt', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
 select vault.create_secret('c591b04e-cf29-4945-b9a0-776d0672061a', 'admin_user', 'admin user id');
 select vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
@@ -70,15 +71,18 @@ INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_a
 
 INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
 (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Lo5enUbshix5u5', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
-(now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
+(now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Lo5enUbshix5u7', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
+(now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Lo5enUbshix5u8', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
 
 INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
 ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u5', NULL),
-('2022-06-03 05:54:15+00', '', 'test', 'Capgo', NULL, 'test@capgo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u7', NULL);
+('2022-06-03 05:54:15+00', '', 'test', 'Capgo', NULL, 'test@capgo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u7', NULL),
+('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Lo5enUbshix5u8', NULL);
 
 INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name") VALUES
 ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Admin org'),
-('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Demo org');
+('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Demo org'),
+('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Test2 org');
 
 INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
 (911, '2022-07-12 12:06:18.822406+00', '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'upload', '2022-07-12 12:06:18.822406+00'),
@@ -110,9 +114,9 @@ INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version"
 
 -- INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
-INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "org_id", "app_id", "channel_id", "user_right") VALUES
-(1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),
-(2, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.demo.app', 22, 'admin');
+-- INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "org_id", "app_id", "channel_id", "user_right") VALUES
+-- (1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),
+-- (2, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'com.demo.app', 22, 'admin');
 
 INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
