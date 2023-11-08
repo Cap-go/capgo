@@ -1345,8 +1345,11 @@ $$BEGIN
 END;$$;
 
 CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS trigger
-   LANGUAGE plpgsql AS
-$$BEGIN
+   LANGUAGE plpgsql AS $$
+DECLARE
+    val RECORD;
+    is_diffrent boolean;
+BEGIN
     -- API key? We do not care
     IF auth.uid() IS NULL THEN
         RETURN NEW;
@@ -1362,66 +1365,21 @@ $$BEGIN
         RETURN NEW;
     END IF;
 
-    IF NEW."id" <> OLD."id" THEN
-        RAISE EXCEPTION 'not allowed id';
-    END IF;
-        IF NEW."name" <> OLD."name" THEN
-        RAISE EXCEPTION 'not allowed name';
-    END IF;
-    IF NEW."app_id" <> OLD."app_id" THEN
-        RAISE EXCEPTION 'not allowed app_id';
-    END IF;
-    IF NEW."created_by" <> OLD."created_by" THEN
-        RAISE EXCEPTION 'not allowed created_by';
-    END IF;
-    IF NEW."public" <> OLD."public" THEN
-        RAISE EXCEPTION 'not allowed public';
-    END IF;
-    IF NEW."disableAutoUpdateUnderNative" <> OLD."disableAutoUpdateUnderNative" THEN
-        RAISE EXCEPTION 'not allowed disableAutoUpdateUnderNative';
-    END IF;
-    IF NEW."enableAbTesting" <> OLD."enableAbTesting" THEN
-        RAISE EXCEPTION 'not allowed enableAbTesting';
-    END IF;
-    IF NEW."enable_progressive_deploy" <> OLD."enable_progressive_deploy" THEN
-        RAISE EXCEPTION 'not allowed enable_progressive_deploy';
-    END IF;
-    IF NEW."secondaryVersionPercentage" <> OLD."secondaryVersionPercentage" THEN
-        RAISE EXCEPTION 'not allowed secondaryVersionPercentage';
-    END IF;
-    IF NEW."disableAutoUpdateToMajor" <> OLD."disableAutoUpdateToMajor" THEN
-        RAISE EXCEPTION 'not allowed disableAutoUpdateToMajor';
-    END IF;
-    IF NEW."ios" <> OLD."ios" THEN
-        RAISE EXCEPTION 'not allowed ios';
-    END IF;
-    IF NEW."android" <> OLD."android" THEN
-        RAISE EXCEPTION 'not allowed android';
-    END IF;
-    IF NEW."allow_device_self_set" <> OLD."allow_device_self_set" THEN
-        RAISE EXCEPTION 'not allowed allow_device_self_set';
-    END IF;
-    IF NEW."allow_emulator" <> OLD."allow_emulator" THEN
-        RAISE EXCEPTION 'not allowed allow_emulator';
-    END IF;
-    IF NEW."allow_dev" <> OLD."allow_dev" THEN
-      RAISE EXCEPTION 'not allowed allow_dev';
-   END IF;
+    for val in
+      select * from json_each_text(row_to_json(NEW))
+    loop
+      -- raise warning '?? % % %', val.key, val.value, format('SELECT (NEW."%s" <> OLD."%s")', val.key, val.key);
+
+      EXECUTE format('SELECT ($1."%s" is distinct from $2."%s")', val.key, val.key) using NEW, OLD
+      INTO is_diffrent;
+
+      IF is_diffrent AND val.key <> 'version' AND val.key <> 'secondVersion' AND key.value <> 'updated_at' THEN
+          RAISE EXCEPTION 'not allowed %', val.key;
+      END IF;
+    end loop;
+
    RETURN NEW;
 END;$$;
-
--- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE OR REPLACE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apps
-  WHERE user_id=userid)) AND (SELECT EXISTS (SELECT 1
-  FROM app_versions
-  WHERE user_id=userid));
-End;
-$$;
 
 CREATE OR REPLACE FUNCTION "public"."is_onboarded"() RETURNS boolean
     LANGUAGE "plpgsql"
