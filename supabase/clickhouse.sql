@@ -60,7 +60,22 @@ GROUP BY device_id;
 
 -- 
 -- Logs table
--- 
+--
+
+CREATE TABLE IF NOT EXISTS logs
+(
+    created_at DateTime64(6),
+    device_id String,
+    app_id String,
+    platform String,
+    action String,
+    version_build String,
+    version Int64
+) ENGINE = ReplacingMergeTree()
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (app_id, device_id, created_at)
+PRIMARY KEY (app_id, device_id, created_at);
+
 
 CREATE TABLE IF NOT EXISTS logs_daily
 (
@@ -87,7 +102,7 @@ GROUP BY date, app_id;
 -- App versions table
 -- 
 
-CREATE TABLE app_versions_meta
+CREATE TABLE IF NOT EXISTS app_versions_meta
 (
     created_at DateTime64(6),
     app_id String,
@@ -99,7 +114,7 @@ PARTITION BY toYYYYMM(created_at)
 ORDER BY (id, app_id, action)
 PRIMARY KEY (id, app_id, action);
 
- Create stats for app_versions_meta
+--  Create stats for app_versions_meta
 
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
@@ -135,7 +150,7 @@ GROUP BY date, app_id;
 -- Stats aggregation
 -- 
 
-drop table aggregate_daily;
+-- drop table aggregate_daily;
 CREATE TABLE IF NOT EXISTS aggregate_daily
 (
     date Date,
@@ -152,7 +167,7 @@ CREATE TABLE IF NOT EXISTS aggregate_daily
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
 
-drop table aggregate_daily_mv;
+-- drop table aggregate_daily_mv;
 CREATE MATERIALIZED VIEW aggregate_daily_mv
 TO aggregate_daily
 AS
@@ -227,10 +242,10 @@ GROUP BY month, app_id;
 -- Sessions stats
 -- 
 
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS avg_session_length;
-DROP VIEW IF EXISTS mv_sessions;
-DROP VIEW IF EXISTS mv_avg_session_length;
+-- DROP TABLE IF EXISTS sessions;
+-- DROP TABLE IF EXISTS avg_session_length;
+-- DROP VIEW IF EXISTS mv_sessions;
+-- DROP VIEW IF EXISTS mv_avg_session_length;
 
 CREATE TABLE IF NOT EXISTS sessions
 (
@@ -277,10 +292,10 @@ GROUP BY device_id, app_id;
 -- Install and fail stats
 -- 
 
-DROP TABLE IF EXISTS daily_aggregate_logs;
-DROP TABLE IF EXISTS version_aggregate_logs;
-DROP VIEW IF EXISTS daily_aggregate_logs_mv;
-DROP VIEW IF EXISTS version_aggregate_logs_mv;
+-- DROP TABLE IF EXISTS daily_aggregate_logs;
+-- DROP TABLE IF EXISTS version_aggregate_logs;
+-- DROP VIEW IF EXISTS daily_aggregate_logs_mv;
+-- DROP VIEW IF EXISTS version_aggregate_logs_mv;
 -- Aggregate table partitioned by day and version
 -- Aggregate table partitioned by year and month
 CREATE TABLE IF NOT EXISTS daily_aggregate_logs
