@@ -1,13 +1,15 @@
 // import type { Page } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { BASE_URL, beforeEachTest, expectPopout, useSupabase } from './utils'
+import type { SupabaseType } from './utils'
+import { BASE_URL, beforeEachTest, expectPopout, useSupabase, useSupabaseAdmin } from './utils'
+import type { Database } from '~/types/supabase.types'
 
 test.beforeEach(beforeEachTest)
 
 test.describe('Test organization invite', () => {
   test.beforeAll(async () => {
-    const supabase = await useSupabase()
+    const supabase = await useSupabaseAdmin()
 
     const { error } = await supabase.from('org_users')
       .delete()
@@ -52,12 +54,20 @@ test.describe('Test organization invite', () => {
     await expectPopout(page, 'Successfully invited user to org')
 
     // Did we invite?
-    const supabase = await useSupabase()
-    const orgName = await getOrgName(page)
+    const supabase = await useSupabaseAdmin()
+    const organization = await getOrgDetails(page, supabase)
 
-    // const { data, error } = await supabase.from('org_users')
-    //   .select()
-    //   .eq('')
+    const { data: orgUsers, error } = await supabase.from('org_users')
+      .select(`
+        user_id ( email ),
+        user_right
+      `)
+      .eq('org_id', organization.id)
+
+    await expect(error).toBeNull()
+    await expect(orgUsers).toBeTruthy()
+    await expect(orgUsers).toHaveLength(1) // 1 because owner is not in this list
+    await expect((orgUsers![0].user_id as any).email).toBe('test2@capgo.app')
   })
 })
 
@@ -83,4 +93,21 @@ async function getOrgName(page: Page): Promise<string> {
   const name = await page.locator('#organization-picker').innerText()
 
   return name
+}
+
+async function getOrgDetails(page: Page, supabase?: SupabaseType): Promise<Database['public']['Tables']['orgs']['Row']> {
+  if (!supabase)
+    supabase = await useSupabase()
+
+  const orgName = await getOrgName(page)
+
+  const { error, data } = await supabase.from('orgs')
+    .select('*')
+    .eq('name', orgName)
+    .single()
+
+  await expect(error).toBeNull()
+  await expect(data).toBeDefined()
+
+  return data!
 }

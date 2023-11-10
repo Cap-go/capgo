@@ -102,6 +102,7 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
     env: {
       SKIP_BACKEND: 'true',
       SUPABASE_ANON: supabaseAnonToken!,
+      SUPABASE_SERVICE: supabaseSecret!,
       SUPABASE_URL: supabaseUrl!,
       ...env,
     },

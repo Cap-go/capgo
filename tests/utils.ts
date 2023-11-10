@@ -6,18 +6,41 @@ import type { Database } from '~/types/supabase.types'
 
 const DEFAULT_EMAIL = 'test@capgo.app'
 const DEFAULT_PASSWORD = 'testtest'
-const START_TIMEOUT = 5000
+const START_TIMEOUT = 3000
 
 export const BASE_URL = 'http://localhost:5173'
 
 const defaultSupabaseUrl = 'http://localhost:54321'
 const defaultSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+const defaultSupabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+
 let supaClient: SupabaseClient<Database> = null as any
+let supaClientAdmin: SupabaseClient<Database> = null as any
+
+export type SupabaseType = SupabaseClient<Database>
 
 export async function beforeEachTest({ page }: { page: Page }) {
   // Allow the router to load
   await page.goto(`${BASE_URL}/`)
   await page.waitForTimeout(START_TIMEOUT)
+}
+
+export async function expectPopout(page: Page, toHave: string) {
+  // Check if the popout has the correct text
+  const popOutLocator = '.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)'
+  await expect(page.locator(popOutLocator)).toContainText(toHave)
+
+  // Close all popouts
+  let popOutVisible = true
+  while (popOutVisible) {
+    // Close the popout
+    await page.click('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > button:nth-child(1)')
+
+    await page.waitForTimeout(250)
+
+    // Check if the popout is still visible
+    popOutVisible = await page.locator(popOutLocator).isVisible()
+  }
 }
 
 export async function useSupabase() {
@@ -42,4 +65,21 @@ export async function useSupabase() {
   expect(error).toBeNull()
 
   return supaClient
+}
+
+export async function useSupabaseAdmin() {
+  const options: SupabaseClientOptions<'public'> = {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
+
+  if (supaClientAdmin)
+    return supaClientAdmin
+  // eslint-disable-next-line n/prefer-global/process
+  supaClientAdmin = createClient<Database>(process.env.SUPABASE_URL ?? defaultSupabaseUrl, process.env.SUPABASE_SERVICE ?? defaultSupabaseServiceKey, options)
+
+  return supaClientAdmin
 }

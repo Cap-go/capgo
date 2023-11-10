@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { BASE_URL, beforeEachTest, useSupabase } from './utils'
+import { BASE_URL, beforeEachTest, expectPopout, useSupabase } from './utils'
 
 test.beforeEach(beforeEachTest)
 
@@ -224,24 +224,6 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
 
   // If valid then misconfigured is 'no', else it is 'yes
   await expect(failingChannels.find(el => el.name === channel && el.failing === (valid ? 'no' : 'yes'))).toBeDefined()
-}
-
-async function expectPopout(page: Page, toHave: string) {
-  // Check if the popout has the correct text
-  const popOutLocator = '.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)'
-  await expect(page.locator(popOutLocator)).toContainText(toHave)
-
-  // Close all popouts
-  let popOutVisible = true
-  while (popOutVisible) {
-    // Close the popout
-    await page.click('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > button:nth-child(1)')
-
-    await page.waitForTimeout(250)
-
-    // Check if the popout is still visible
-    popOutVisible = await page.locator(popOutLocator).isVisible()
-  }
 }
 
 // We have to go around this wierd dev server
