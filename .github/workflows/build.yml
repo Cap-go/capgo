@@ -52,7 +52,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.99.5
+          version: 1.110.1
       - name: 🍜 Prepare Supabase
         run: node scripts/prepare_supabase.mjs
       # - name: Apply Supabase Migrations TODO: make this work 
