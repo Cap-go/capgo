@@ -73,11 +73,11 @@ jobs:
       - name: Create Release Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: create_release_prepro
-        run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+        run: pnpm dlx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
-        run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+        run: pnpm dlx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
 
   build_android:
     runs-on: ubuntu-latest
