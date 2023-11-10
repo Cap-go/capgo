@@ -60,7 +60,22 @@ GROUP BY device_id;
 
 -- 
 -- Logs table
--- 
+--
+
+CREATE TABLE IF NOT EXISTS logs
+(
+    created_at DateTime64(6),
+    device_id String,
+    app_id String,
+    platform String,
+    action String,
+    version_build String,
+    version Int64
+) ENGINE = ReplacingMergeTree()
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (app_id, device_id, created_at)
+PRIMARY KEY (app_id, device_id, created_at);
+
 
 CREATE TABLE IF NOT EXISTS logs_daily
 (
