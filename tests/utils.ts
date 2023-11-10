@@ -83,3 +83,21 @@ export async function useSupabaseAdmin() {
 
   return supaClientAdmin
 }
+
+type Predicate<T> = (item: T, index: number, items: T[]) => Promise<boolean>
+
+export async function firstItemAsync<T>(array: T[], predicate: Predicate<T>): Promise<T | undefined> {
+  for (const [index, item] of array.entries()) {
+    try {
+      if (await predicate(item, index, array))
+        return item
+    }
+    catch (e) {
+      // If we encounter an error, keep searching.
+      console.error(`Error predicate: (ignored)\n${e}`)
+    }
+  }
+
+  // If we do not find any matches, "reject" by raising an error.
+  return undefined
+}

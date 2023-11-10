@@ -2,13 +2,15 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { SupabaseType } from './utils'
-import { BASE_URL, beforeEachTest, expectPopout, useSupabase, useSupabaseAdmin } from './utils'
+import { BASE_URL, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
 
 test.beforeEach(beforeEachTest)
 
 test.describe('Test organization invite', () => {
-  test.beforeAll(async () => {
+  test.describe.configure({ mode: 'serial' })
+
+  test.beforeEach(async () => {
     const supabase = await useSupabaseAdmin()
 
     const { error } = await supabase.from('org_users')
@@ -18,57 +20,66 @@ test.describe('Test organization invite', () => {
     await expect(error).toBeNull()
   })
 
-  test('test invite user to org', async ({ page }) => {
-    // await expect('abc'.length).toBe(3)
+  const inviteTypes = ['read', 'upload', 'write', 'admin']
 
-    await expect(page.locator('.space-x-3 > div:nth-child(1) > div:nth-child(1)')).toBeVisible()
-    await page.locator('#organization-picker').click()
+  for (const inviteType of inviteTypes) {
+    test(`test invite user to org (${inviteType})`, async ({ page }) => {
+      // await expect('abc'.length).toBe(3)
 
-    const allOrgs = (await page.locator('ul.py-2').all())
-    await expect(allOrgs).toHaveLength(1)
+      await expect(page.locator('.space-x-3 > div:nth-child(1) > div:nth-child(1)')).toBeVisible()
+      await page.locator('#organization-picker').click()
 
-    await page.goto(`${BASE_URL}/dashboard/settings/organization/members`)
-    await getAllMembers(page)
+      const allOrgs = (await page.locator('ul.py-2').all())
+      await expect(allOrgs).toHaveLength(1)
 
-    // For now we do not check name, not the point of this test
-    const members = await getAllMembers(page)
-    await expect(members).toHaveLength(1)
+      await page.goto(`${BASE_URL}/dashboard/settings/organization/members`)
+      await getAllMembers(page)
 
-    const member = members[0]
-    await expect(member.email).toBe('test@capgo.app')
-    await expect(member.isDeletable).toBeFalsy()
-    await expect(member.isModifiable).toBeFalsy()
+      // For now we do not check name, not the point of this test
+      const members = await getAllMembers(page)
+      await expect(members).toHaveLength(1)
 
-    // Let's invite shall we?
-    await page.click('button.text-white:nth-child(2)')
-    await expect(page.locator('div.rounded-lg:nth-child(1)')).toBeVisible()
-    await expect(page.locator('h3.text-xl')).toHaveText('Insert email of the user you want to invite')
+      const member = members[0]
+      await expect(member.email).toBe('test@capgo.app')
+      await expect(member.isDeletable).toBeFalsy()
+      await expect(member.isModifiable).toBeFalsy()
 
-    // Type email and click "invite"
-    await page.fill('#dialog-input-field', 'test2@capgo.app')
-    await page.click('div.p-6:nth-child(3) > button:nth-child(2)')
-    await expect(page.locator('h3.text-xl')).toHaveText('Select user\'s permissions')
+      // Let's invite shall we?
+      await page.click('button.text-white:nth-child(2)')
+      await expect(page.locator('div.rounded-lg:nth-child(1)')).toBeVisible()
+      await expect(page.locator('h3.text-xl')).toHaveText('Insert email of the user you want to invite')
 
-    // Click on "read" (TODO: click on all)
-    await page.click('div.p-6:nth-child(3) > button:nth-child(2)')
-    await expectPopout(page, 'Successfully invited user to org')
+      // Type email and click "invite"
+      await page.fill('#dialog-input-field', 'test2@capgo.app')
+      await page.click('div.p-6:nth-child(3) > button:nth-child(2)')
+      await expect(page.locator('h3.text-xl')).toHaveText('Select user\'s permissions')
 
-    // Did we invite?
-    const supabase = await useSupabaseAdmin()
-    const organization = await getOrgDetails(page, supabase)
+      // Click on "read" (TODO: click on all)
 
-    const { data: orgUsers, error } = await supabase.from('org_users')
-      .select(`
-        user_id ( email ),
-        user_right
-      `)
-      .eq('org_id', organization.id)
+      const allButtons = await page.locator('div.p-6:nth-child(3)').getByRole('button').all()
+      const correctButton = await firstItemAsync(allButtons, async button => (await button.innerHTML()).toLowerCase().includes(inviteType))
+      await expect(correctButton).toBeDefined()
+      await correctButton?.click()
 
-    await expect(error).toBeNull()
-    await expect(orgUsers).toBeTruthy()
-    await expect(orgUsers).toHaveLength(1) // 1 because owner is not in this list
-    await expect((orgUsers![0].user_id as any).email).toBe('test2@capgo.app')
-  })
+      await expectPopout(page, 'Successfully invited user to org')
+
+      // Did we invite?
+      const supabase = await useSupabaseAdmin()
+      const organization = await getOrgDetails(page, supabase)
+
+      const { data: orgUsers, error } = await supabase.from('org_users')
+        .select(`
+          user_id ( email ),
+          user_right
+        `)
+        .eq('org_id', organization.id)
+
+      await expect(error).toBeNull()
+      await expect(orgUsers).toBeTruthy()
+      await expect(orgUsers).toHaveLength(1) // 1 because owner is not in this list
+      await expect((orgUsers![0].user_id as any).email).toBe('test2@capgo.app')
+    })
+  }
 })
 
 async function getAllMembers(page: Page) {
