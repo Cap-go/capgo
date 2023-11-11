@@ -23,7 +23,7 @@ const { t } = useI18n()
     <div class="">
       <!-- Table -->
       <div class="hidden overflow-x-auto p-3 md:block">
-        <table class="w-full table-auto" aria-label="Table with your apps">
+        <table id="top_apps" class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="rounded-sm bg-slate-50 text-xs uppercase text-slate-400 dark:bg-gray-800 dark:text-white">
             <tr>

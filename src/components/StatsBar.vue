@@ -12,6 +12,7 @@ const props = defineProps<{ stats: Stat[]; mini?: boolean }>()
     >
       <span class="text-center duration-100 ease-in scale-100" :class="{ 'group-hover:scale-125': s.link }">
         <p
+          id="stats-val"
           class="font-bold dark:text-white font-pj lg:order-1 lg:mt-3"
           :class="{ 'text-5xl': !props.mini, 'text-3xl': props.mini }"
         >

@@ -140,7 +140,7 @@ watchEffect(async () => {
         {{ t('usage-title') }}
       </div>
       <div class="flex items-start">
-        <div class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
+        <div id="bundles-total" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
           {{ bundles.length.toLocaleString() }}
         </div>
       </div>

@@ -311,7 +311,7 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <k-fab class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="openAddChannel">
+    <k-fab id="create_channel" class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="openAddChannel">
       <template #icon>
         <component :is="IconPlus" />
       </template>

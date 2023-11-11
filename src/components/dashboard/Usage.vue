@@ -107,7 +107,8 @@ loadData()
 <template>
   <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard
-      v-if="!isLoading" :limits="allLimits.mau" :colors="colors.emerald" :datas="datas.mau"
+      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
+      :datas="datas.mau"
       :title="t('montly-active')" unit="Users"
     />
     <div

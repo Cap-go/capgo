@@ -1,6 +1,7 @@
 // import type { Page } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
+import { A, E } from 'ios/App/App/public/assets/Account-fa6ef73d'
 import type { SupabaseType } from './utils'
 import { BASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
@@ -107,7 +108,6 @@ test.describe('Test organization invitation accept', () => {
         const { error: error2 } = await supabase.from('org_users')
           .insert({
             user_id: '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
-            app_id: 'com.demo.app',
             user_right: `invite_${inviteType}` as any,
             org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
           })
@@ -165,6 +165,181 @@ test.describe('Test organization invitation accept', () => {
         await expect(orgUserError).toBeFalsy()
         await expect(orgUser).toBeDefined()
         await expect(orgUser?.user_right).toBe(inviteType)
+      })
+    })
+  }
+})
+
+test.describe('Test organization system permissions', () => {
+  test.describe.configure({ mode: 'serial' })
+  // const inviteTypes = ['read', 'upload', 'write', 'admin']
+  const permissionMatrix = {
+    read: {
+      deleteChannel: false,
+      addChannel: false,
+    },
+    upload: {
+      deleteChannel: false,
+      addChannel: false,
+    },
+    write: {
+      deleteChannel: false,
+      addChannel: false,
+    },
+    admin: {
+      deleteChannel: true,
+      addChannel: true,
+    },
+    owner: {
+      deleteChannel: true,
+      addChannel: true,
+    },
+  }
+
+  for (const [inviteType, permission] of new Map(Object.entries(permissionMatrix))) {
+    let channelSnapshots = null as Database['public']['Tables']['channels']['Row'][] | null
+
+    test.describe(`Test organization system permissions (${inviteType})`, () => {
+      test.describe.configure({ mode: 'serial' })
+
+      const testWithInvitedUser = test.extend<object, { workerStorageState: string }>({
+        // User = owner if invite type === owner, otherwise user = invited
+        storageState: inviteType !== 'owner' ? 'playwright/.auth/user2.json' : 'playwright/.auth/user1.json',
+      })
+
+      // Generate invite
+      testWithInvitedUser.beforeAll(async () => {
+        const supabase = await useSupabaseAdmin()
+
+        const { error: error1 } = await supabase.from('org_users')
+          .delete()
+          .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+
+        await expect(error1).toBeFalsy()
+
+        if (inviteType !== 'owner') {
+          const { error: error2 } = await supabase.from('org_users')
+            .insert({
+              user_id: '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
+              user_right: `${inviteType}` as any,
+              org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+            })
+
+          await expect(error2).toBeFalsy()
+        }
+
+        const { data, error: error3 } = await supabase.from('channels')
+          .select('*')
+          .eq('app_id', 'com.demo.app')
+
+        await expect(error3).toBeFalsy()
+        await expect(data).toBeTruthy()
+
+        channelSnapshots = data
+      })
+
+      testWithInvitedUser.afterAll(async () => {
+        await expect(channelSnapshots).toBeTruthy()
+
+        const supabase = await useSupabaseAdmin()
+        const { error } = await supabase.from('channels').delete().eq('app_id', 'com.demo.app')
+
+        expect(error).toBeFalsy()
+
+        const { error: error2 } = await supabase.from('channels').insert(channelSnapshots!)
+        await expect(error2).toBeFalsy()
+      })
+
+      testWithInvitedUser('Test user permissions', async ({ page }) => {
+        const monthlyStatLocator = await (await page.locator('#mau-stat')).locator('#usage_val')
+
+        // We ALLWAYS expect app to be accesible. We are added to the org
+        let users = Number.parseInt((await monthlyStatLocator.innerText()).split(' ')[0])
+        await expect(users).toBeTruthy()
+        await expect(users).toBeGreaterThan(0) // Check if getting stats works
+
+        if (inviteType !== 'owner') {
+          const sharedAppsLocator = await page.locator('#shared')
+
+          const allSharedApps = await sharedAppsLocator.locator('#top_apps > tbody > tr').all()
+          await expect(allSharedApps).toHaveLength(1)
+          await allSharedApps[0].click()
+          await page.waitForURL('**\/com--demo--app')
+        }
+        else {
+          await page.goto(`${BASE_URL}/app/package/com--demo--app`)
+        }
+
+        // Check again. This time for specific app
+        users = Number.parseInt((await monthlyStatLocator.innerText()).split(' ')[0])
+        await expect(users).toBeTruthy()
+        await expect(users).toBeGreaterThan(0) // Check if getting stats works
+
+        const bundlesTotalSelector = await page.locator('#bundles-total')
+        const bundlesTotal = Number.parseInt(await bundlesTotalSelector.innerText())
+        await expect(bundlesTotal).toBeTruthy()
+        await expect(bundlesTotal).toBeGreaterThan(0) // Check if bundles graph work
+
+        // Test this down stripe (channels, bundles, devices, updates)
+        // None of those values should be zero. If it is then something is broken
+        const specificAppStats = await page.locator('#app-stats')
+        await Promise.all((await specificAppStats.locator('#stats-val').all()).map(async (stat) => {
+          const innerText = await stat.innerHTML()
+          const innerNumber = Number.parseInt(innerText)
+
+          await expect(innerNumber).toBeTruthy()
+          await expect(innerNumber).toBeGreaterThan(1)
+        }))
+
+        // go to 'channels'
+        await page.goto(`${BASE_URL}/app/p/com--demo--app/channels`)
+
+        // Get all channels for app from supabase
+        const supabase = await useSupabaseAdmin() // Client supabase
+        const { error: allChannelsSupabaseError, count: allChannelsCount } = await supabase
+          .from('channels')
+          .select('', { count: 'exact' })
+          .eq('app_id', 'com.demo.app')
+        await expect(allChannelsSupabaseError).toBeFalsy()
+
+        // Expect the channel table to have the same count as supabase
+        const allchannelsLocator = await page.locator('#custom_table > tbody > tr')
+        await expect(allchannelsLocator).toHaveCount(2)
+        const allChannels = await allchannelsLocator.all()
+
+        // Attempt to delete a channel. That is based on the permission matrix
+        await allChannels[0].locator('td:nth-child(5)').click()
+
+        if (permission.deleteChannel) {
+          await awaitPopout(page)
+          const cancelButton = await findPopoutButton(page, 'cancel')
+
+          await expect(cancelButton).toBeTruthy()
+          await cancelButton!.click()
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
+        }
+
+        // Attempt to create a channel (again, based on permission matrix)
+        await page.locator('#create_channel').click()
+
+        if (permission.addChannel) {
+          await expect(page.locator('#kdialog-input')).toBeVisible()
+          await page.locator('#kdialog-cancel').click()
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
+        }
+
+        const productionChannel = await firstItemAsync(allChannels, async (locator) => {
+          const innerHtml = await locator.innerHTML()
+          return innerHtml.includes('production')
+        })
+
+        await expect(productionChannel).toBeTruthy()
+        await productionChannel!.click()
+        await page.waitForURL('**\/com--demo--app/channel/22')
       })
     })
   }
