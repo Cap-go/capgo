@@ -82,6 +82,16 @@ test.describe('Test organization invite', () => {
   }
 })
 
+test.describe('Test organization invitation accept', () => {
+  const testWithInvitedUser = test.extend<object, { workerStorageState: string }>({
+    storageState: 'playwright/.auth/user2.json',
+  })
+
+  testWithInvitedUser('Test accept invite', async ({ page }) => {
+    console.log('test')
+  })
+})
+
 async function getAllMembers(page: Page) {
   await page.goto(`${BASE_URL}/dashboard/settings/organization/members`)
   await page.waitForTimeout(500)

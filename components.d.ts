@@ -34,6 +34,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Searchbar: typeof import('./src/components/Searchbar.vue')['default']
+    SharedApps: typeof import('./src/components/dashboard/SharedApps.vue')['default']
     SharedUserTable: typeof import('./src/components/tables/SharedUserTable.vue')['default']
     Sidebar: typeof import('./src/components/Sidebar.vue')['default']
     Spinner: typeof import('./src/components/Spinner.vue')['default']

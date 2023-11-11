@@ -3080,10 +3080,10 @@ GRANT ALL ON FUNCTION "public"."is_not_deleted"("email_check" character varying)
 GRANT ALL ON FUNCTION "public"."is_not_deleted"("email_check" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_not_deleted"("email_check" character varying) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."is_onboarded"("userid" "uuid") TO "postgres";
-GRANT ALL ON FUNCTION "public"."is_onboarded"("userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_onboarded"("userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_onboarded"("userid" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_onboarded"() TO "postgres";
+GRANT ALL ON FUNCTION "public"."is_onboarded"() TO "anon";
+GRANT ALL ON FUNCTION "public"."is_onboarded"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_onboarded"() TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."is_onboarding_needed"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_onboarding_needed"("userid" "uuid") TO "anon";
