@@ -314,6 +314,21 @@ begin
 End;
 $$;
 
+CREATE FUNCTION "public"."get_user_main_org_id_by_app_id"("app_id" text) RETURNS uuid
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  org_id uuid;
+begin
+  select apps.user_id from apps
+  into org_id
+  where ((apps.app_id)::text = (get_user_main_org_id_by_app_id.app_id)::text)
+  limit 1;
+
+  return (select get_user_main_org_id(org_id));
+End;
+$$;
+
 -- This is not important, however is a good example of how to return a setof a custom type
 -- Returns a set of custom type is compicated, and this shows how to do it
 -- CREATE FUNCTION "public"."get_orgs_v2"("userid" "uuid") RETURNS setof "public"."owned_orgs"
@@ -2729,7 +2744,12 @@ WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", auth
 CREATE POLICY "Allow org members to select" ON "public"."devices"
 AS PERMISSIVE FOR SELECT
 TO public
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id"((select user_id from "public"."apps" where apps.app_id=app_id)), app_id, NULL::bigint));
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id_by_app_id"(app_id::TEXT), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org members to select" ON "public"."app_usage"
+AS PERMISSIVE FOR SELECT
+TO public
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", auth.uid(), "public"."get_user_main_org_id_by_app_id"(app_id::TEXT), app_id, NULL::bigint));
 
 CREATE POLICY "Allow org owner to all" ON "public"."org_users"
 AS PERMISSIVE FOR ALL
