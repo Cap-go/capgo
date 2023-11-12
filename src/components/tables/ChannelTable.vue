@@ -323,9 +323,9 @@ watch(props, async () => {
       <template #title>
         {{ t('channel-create') }}
       </template>
-      <input v-model="newChannel" type="text" placeholder="Production" class="w-full p-1 text-lg text-gray-900 rounded-lg">
+      <input id="kdialog-input" v-model="newChannel" type="text" placeholder="Production" class="w-full p-1 text-lg text-gray-900 rounded-lg">
       <template #buttons>
-        <k-dialog-button class="text-red-800" @click="() => (addChannelModal = false)">
+        <k-dialog-button id="kdialog-cancel" class="text-red-800" @click="() => (addChannelModal = false)">
           {{ t('button-cancel') }}
         </k-dialog-button>
         <k-dialog-button @click="addChannel()">

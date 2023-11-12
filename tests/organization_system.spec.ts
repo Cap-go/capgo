@@ -177,22 +177,42 @@ test.describe('Test organization system permissions', () => {
     read: {
       deleteChannel: false,
       addChannel: false,
+      changeChannelToggle: false,
+      makeChannelDefault: false,
+      changeSelectableDisallow: false,
+      changeSecondVersionPercentageSlider: false,
     },
     upload: {
       deleteChannel: false,
       addChannel: false,
+      changeChannelToggle: false,
+      makeChannelDefault: false,
+      changeSelectableDisallow: false,
+      changeSecondVersionPercentageSlider: false,
     },
     write: {
       deleteChannel: false,
       addChannel: false,
+      changeChannelToggle: false,
+      makeChannelDefault: false,
+      changeSelectableDisallow: false,
+      changeSecondVersionPercentageSlider: false,
     },
     admin: {
       deleteChannel: true,
       addChannel: true,
+      changeChannelToggle: true,
+      makeChannelDefault: true,
+      changeSelectableDisallow: true,
+      changeSecondVersionPercentageSlider: true,
     },
     owner: {
       deleteChannel: true,
       addChannel: true,
+      changeChannelToggle: true,
+      makeChannelDefault: true,
+      changeSelectableDisallow: true,
+      changeSecondVersionPercentageSlider: true,
     },
   }
 
@@ -340,6 +360,82 @@ test.describe('Test organization system permissions', () => {
         await expect(productionChannel).toBeTruthy()
         await productionChannel!.click()
         await page.waitForURL('**\/com--demo--app/channel/22')
+
+        // Click on 'settings'
+        await page.click('li.mr-2:nth-child(3) > button:nth-child(1)')
+
+        const ktogglesSelector = await page.locator('#klist').locator('#ktoggle')
+        const ktoggles = await ktogglesSelector.all()
+        await expect(ktoggles.length).toBeGreaterThan(0) // We do not want to test nothing
+
+        // We do a loop, instead of promise.all. This is to prevent a race condition
+
+        for (const toggle of ktoggles) {
+          const oldState = await toggle.isChecked()
+          await toggle.click()
+          const newState = await toggle.isChecked()
+
+          if (permission.changeChannelToggle)
+            expect(newState).toBe(!oldState)
+
+          else
+            await expectPopout(page, 'Insufficient permissions')
+        }
+
+        // We check the 'public' switch. This swich opens up a menu so we cannot add this in the loop
+        const makeDefaultSwitchLocator = await page.locator('#klist').locator('#ktoggle-def')
+        await makeDefaultSwitchLocator.click()
+
+        if (permission.changeChannelToggle) {
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          await page.locator('#action-sheet > div > button:nth-child(3)').click() // Click on 'cancel"
+        }
+        else { await expectPopout(page, 'Insufficient permissions') }
+
+        // Now we try to change selectableDisallow. This should fail for non admin/owner users
+
+        if (permission.changeSelectableDisallow) {
+          await page.locator('#selectableDisallow').selectOption({ value: 'version_number' })
+          const newSelectableDisallowValue = await page.locator('#selectableDisallow').inputValue()
+          await expect(newSelectableDisallowValue).toBe('version_number')
+        }
+        else {
+          // First click
+          await page.locator('#selectableDisallow').click()
+          await expectPopout(page, 'Insufficient permissions')
+
+          // Second force change val
+          const newSelectableDisallowValue = await page.locator('#selectableDisallow').inputValue()
+          await page.locator('#selectableDisallow').selectOption({ value: 'version_number' })
+          const selectableDisallowValue = await page.locator('#selectableDisallow').inputValue()
+
+          // Last check if even force fails
+          await expectPopout(page, 'Insufficient permissions')
+          await expect(newSelectableDisallowValue).toBe(selectableDisallowValue)
+        }
+
+        // Second version percentage slider
+        const sliderLocator = await page.locator('#second-percentage-slider')
+        await page.$eval('#second-percentage-slider', (element) => {
+          element.scrollIntoView()
+        })
+
+        const sliderRect = await sliderLocator.evaluate(slider => slider.getBoundingClientRect())
+        const xToClick = sliderRect.left + sliderRect.width * 0.5
+        const yToClick = sliderRect.bottom - sliderRect.height * 0.5
+
+        // We click in exacly half of the slider thus the % should be 50
+        const oldSliderVal = await sliderLocator.inputValue()
+        await page.mouse.click(xToClick, yToClick)
+        const newSliderVal = await sliderLocator.inputValue()
+
+        if (!permission.changeSecondVersionPercentageSlider) {
+          await expectPopout(page, 'Insufficient permissions')
+          expect(oldSliderVal).toBe(newSliderVal)
+        }
+        else {
+          expect(newSliderVal).toBe('50') // We click exacly in half and we are admin/owner
+        }
       })
     })
   }

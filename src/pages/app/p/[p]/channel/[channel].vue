@@ -59,11 +59,11 @@ const tabs: Tab[] = [
     icon: IconInformations,
     key: 'info',
   },
-  {
-    label: t('shared-users'),
-    icon: IconUsers,
-    key: 'users',
-  },
+  // {
+  //   label: t('shared-users'),
+  //   icon: IconUsers,
+  //   key: 'users',
+  // },
   {
     label: t('channel-forced-devices'),
     icon: IconDevice,
@@ -402,7 +402,23 @@ function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
   }
 }
 
+function guardChangeAutoUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
+
 async function onChangeAutoUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    if (channel?.value?.disableAutoUpdate)
+      (event.target as HTMLSelectElement).value = channel.value.disableAutoUpdate
+
+    return false
+  }
   const value = (event.target as HTMLSelectElement).value as Database['public']['Enums']['disable_update']
 
   if (value === 'version_number') {
@@ -462,10 +478,11 @@ async function onChangeAutoUpdate(event: Event) {
     <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <k-list class="w-full mt-5 list-none border-t border-gray-200">
+          <k-list id="klist" class="w-full mt-5 list-none border-t border-gray-200">
             <k-list-item label :title="t('channel-is-public')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle-def"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.public"
@@ -476,6 +493,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label title="iOS" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.ios"
@@ -486,6 +504,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label title="Android" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.android"
@@ -496,6 +515,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('disable-auto-downgra')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.disableAutoUpdateUnderNative"
@@ -515,7 +535,7 @@ async function onChangeAutoUpdate(event: Event) {
             </k-list-item> -->
             <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
-                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @change="(event) => onChangeAutoUpdate(event)">
+                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
                   <option value="major">
                     {{ t('major') }}
                   </option>
@@ -534,6 +554,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('allow-develoment-bui')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_dev"
@@ -544,6 +565,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('allow-emulator')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_emulator"
@@ -554,6 +576,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('allow-device-to-self')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_device_self_set"
@@ -564,6 +587,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('channel-ab-testing')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.enableAbTesting"
@@ -574,6 +598,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('channel-progressive-deploy')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.enable_progressive_deploy"
@@ -584,6 +609,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-range
+                  id="second-percentage-slider"
                   :value="secondaryVersionPercentage"
                   class="-my-1 k-color-success"
                   component="div"

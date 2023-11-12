@@ -19,7 +19,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'
-  await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
+  await page.click('li.mr-2:nth-child(3) > button:nth-child(1)')
 
   // Click on 'metadata'
   await page.locator('#selectableDisallow').selectOption({ value: 'version_number' })
@@ -82,7 +82,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Click on 'settings'
-  await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
+  await page.click('li.mr-2:nth-child(3) > button:nth-child(1)')
 
   // Enable AB testing
   await page.click('li.text-lg:nth-child(9) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1)')
