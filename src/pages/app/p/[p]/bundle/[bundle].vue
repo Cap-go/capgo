@@ -537,6 +537,21 @@ async function saveCustomId(input: string) {
 //   const fail = version_meta.value?.fails || 1
 //   return `${Math.round((fail / total) * 100).toLocaleString()}%`
 // })
+
+function guardMinAutoUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
+
+function preventInputChangePerm(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    event.preventDefault()
+    return false
+  }
+}
 </script>
 
 <template>
@@ -553,15 +568,15 @@ async function saveCustomId(input: string) {
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- Min update version -->
-            <InfoRow v-if="channel?.disableAutoUpdate === 'version_number'" :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''" @update:value="saveCustomId" />
+            <InfoRow v-if="channel?.disableAutoUpdate === 'version_number'" id="metadata-bundle" :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])" @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm" />
             <!-- meta devices -->
             <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
             <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toLocaleString()" />
             <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="showChannel" :label="t('channel')" :value="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name" :is-link="true" @click="openChannel()" />
-            <InfoRow v-else :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel()" />
+            <InfoRow v-if="showChannel" id="open-channel" :label="t('channel')" :value="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name" :is-link="true" @click="openChannel()" />
+            <InfoRow v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel()" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
             <!-- version.external_url -->

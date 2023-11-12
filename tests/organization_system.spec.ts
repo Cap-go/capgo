@@ -1,5 +1,5 @@
 // import type { Page } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { A, E } from 'ios/App/App/public/assets/Account-fa6ef73d'
 import type { SupabaseType } from './utils'
@@ -181,6 +181,9 @@ test.describe('Test organization system permissions', () => {
       makeChannelDefault: false,
       changeSelectableDisallow: false,
       changeSecondVersionPercentageSlider: false,
+      unlinkBundle: false,
+      setBundleToChannel: false,
+      setBundleMetadata: false,
     },
     upload: {
       deleteChannel: false,
@@ -189,6 +192,9 @@ test.describe('Test organization system permissions', () => {
       makeChannelDefault: false,
       changeSelectableDisallow: false,
       changeSecondVersionPercentageSlider: false,
+      unlinkBundle: false,
+      setBundleToChannel: false,
+      setBundleMetadata: false,
     },
     write: {
       deleteChannel: false,
@@ -197,6 +203,9 @@ test.describe('Test organization system permissions', () => {
       makeChannelDefault: false,
       changeSelectableDisallow: false,
       changeSecondVersionPercentageSlider: false,
+      unlinkBundle: true, // Important: Write HAS unlink bundle
+      setBundleToChannel: true,
+      setBundleMetadata: true,
     },
     admin: {
       deleteChannel: true,
@@ -205,6 +214,9 @@ test.describe('Test organization system permissions', () => {
       makeChannelDefault: true,
       changeSelectableDisallow: true,
       changeSecondVersionPercentageSlider: true,
+      unlinkBundle: true,
+      setBundleToChannel: true,
+      setBundleMetadata: true,
     },
     owner: {
       deleteChannel: true,
@@ -213,11 +225,15 @@ test.describe('Test organization system permissions', () => {
       makeChannelDefault: true,
       changeSelectableDisallow: true,
       changeSecondVersionPercentageSlider: true,
+      unlinkBundle: true,
+      setBundleToChannel: true,
+      setBundleMetadata: true,
     },
   }
 
   for (const [inviteType, permission] of new Map(Object.entries(permissionMatrix))) {
     let channelSnapshots = null as Database['public']['Tables']['channels']['Row'][] | null
+    let bundleSnapshot = null as Database['public']['Tables']['app_versions']['Row'] | null
 
     test.describe(`Test organization system permissions (${inviteType})`, () => {
       test.describe.configure({ mode: 'serial' })
@@ -255,11 +271,20 @@ test.describe('Test organization system permissions', () => {
         await expect(error3).toBeFalsy()
         await expect(data).toBeTruthy()
 
+        const { data: bundleVersion, error: error4 } = await supabase.from('app_versions')
+          .select('*')
+          .eq('id', '9601')
+          .single()
+
+        await expect(error4).toBeFalsy()
+
         channelSnapshots = data
+        bundleSnapshot = bundleVersion
       })
 
       testWithInvitedUser.afterAll(async () => {
         await expect(channelSnapshots).toBeTruthy()
+        await expect(bundleSnapshot).toBeTruthy()
 
         const supabase = await useSupabaseAdmin()
         const { error } = await supabase.from('channels').delete().eq('app_id', 'com.demo.app')
@@ -268,6 +293,12 @@ test.describe('Test organization system permissions', () => {
 
         const { error: error2 } = await supabase.from('channels').insert(channelSnapshots!)
         await expect(error2).toBeFalsy()
+
+        const { error: error3 } = await supabase.from('app_versions').delete().eq('id', '9601')
+        await expect(error3).toBeFalsy()
+
+        const { error: error4 } = await supabase.from('app_versions').insert(bundleSnapshot!)
+        await expect(error4).toBeFalsy()
       })
 
       testWithInvitedUser('Test user permissions', async ({ page }) => {
@@ -389,6 +420,7 @@ test.describe('Test organization system permissions', () => {
         if (permission.changeChannelToggle) {
           await expect(page.locator('#action-sheet')).toBeVisible()
           await page.locator('#action-sheet > div > button:nth-child(3)').click() // Click on 'cancel"
+          await expect(page.locator('action-sheet')).toBeHidden()
         }
         else { await expectPopout(page, 'Insufficient permissions') }
 
@@ -435,6 +467,85 @@ test.describe('Test organization system permissions', () => {
         }
         else {
           expect(newSliderVal).toBe('50') // We click exacly in half and we are admin/owner
+        }
+
+        // Unlink bundle click
+        await page.locator('#unlink-bundle').click()
+
+        if (permission.unlinkBundle) {
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          await page.locator('#action-sheet > div > button:nth-child(2)').click() // Click on 'cancel"
+          await expect(page.locator('#action-sheet')).toBeHidden()
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
+        }
+
+        // So the channel test are FINALY done. Now let's do bundle.
+        await page.goto(`${BASE_URL}/app/p/com--demo--app/bundles`)
+
+        // Make sure we can see the bundles table
+        const allBundles = await page.locator('#custom_table > tbody > tr')
+        await page.waitForTimeout(100)
+        await expect(await allBundles.count()).toBeGreaterThan(0)
+
+        // Set supabase prod channel to 'metadata' disallow strategy
+        const { error: errorSetMetadataOnProd } = await supabase.from('channels')
+          .update({ disableAutoUpdate: 'version_number', version: 9601 })
+          .eq('name', 'production')
+
+        await expect(errorSetMetadataOnProd).toBeFalsy()
+
+        // Go to a specific bundle
+        await page.goto(`${BASE_URL}/app/p/com--demo--app/bundle/9601`)
+
+        // Click on `Channel` to see the options available
+        await page.locator('#open-channel').click()
+        await expect(page.locator('#action-sheet')).toBeVisible()
+
+        // Get all buttons
+        const actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+
+        // Define a function to find a button. Usefull for further testing
+        async function findButtonInActionSheet(actionSheetButtons: Locator[], text: string) {
+          return firstItemAsync(actionSheetButtons, async (button) => {
+            const innerHTML = await button.innerHTML()
+            return innerHTML.toLowerCase().includes(text.toLowerCase())
+          })
+        }
+
+        const setBundleToChannelButton = await findButtonInActionSheet(actionSheetButtons, 'Set bundle to channel')
+        const unlinkButton = await findButtonInActionSheet(actionSheetButtons, 'unlink')
+
+        if (permission.setBundleToChannel) {
+          await expect(setBundleToChannelButton).toBeTruthy()
+          await expect(unlinkButton).toBeTruthy()
+        }
+        else {
+          await expect(setBundleToChannelButton).toBeFalsy()
+          await expect(unlinkButton).toBeFalsy()
+        }
+
+        const cancelButton = await findButtonInActionSheet(actionSheetButtons, 'cancel')
+        await expect(cancelButton).toBeTruthy()
+
+        await cancelButton!.click()
+        await expect(page.locator('action-sheet')).toBeHidden()
+
+        await page.locator('#metadata-bundle').click()
+
+        // If we have the setBundleMetadata perm nothing should happen, but we should be able to input.
+        // This is tested in the `selectable_disallow.spec.ts` so I will not touch it here
+
+        if (!permission.setBundleMetadata) {
+          // See, but if we do not have the permission we should get a popout
+          await expectPopout(page, 'Insufficient permissions')
+
+          const readonly = await page.$eval('#inforow-input', (element) => {
+            return element.hasAttribute('readonly')
+          })
+
+          expect(readonly).toBe(true)
         }
       })
     })

@@ -619,7 +619,7 @@ async function onChangeAutoUpdate(event: Event) {
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
+            <k-list-item id="unlink-bundle" label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
           </k-list>
         </dl>
       </div>
