@@ -284,6 +284,13 @@ async function delDevVersion(device: string) {
     .eq('app_id', packageId.value)
 }
 async function updateOverride() {
+  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])
+
+  if (!hasPerm) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   const buttons = []
   if (deviceOverride.value) {
     buttons.push({
@@ -352,15 +359,25 @@ async function delDevChannel(device: string) {
 
 async function updateChannel() {
   const buttons = []
+  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])
+
+  if (!hasPerm && !channelDevice.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   if (channelDevice.value) {
-    buttons.push({
-      text: t('button-remove'),
-      handler: async () => {
-        device.value?.device_id && await delDevChannel(device.value?.device_id)
-        toast.success(t('unlink-channel'))
-        await loadData()
-      },
-    })
+    if (hasPerm) {
+      buttons.push({
+        text: t('button-remove'),
+        handler: async () => {
+          device.value?.device_id && await delDevChannel(device.value?.device_id)
+          toast.success(t('unlink-channel'))
+          await loadData()
+        },
+      })
+    }
+
     buttons.push({
       text: t('open-channel'),
       handler: async () => {
@@ -369,26 +386,30 @@ async function updateChannel() {
       },
     })
   }
-  for (const channel of channels.value) {
-    buttons.push({
-      text: channel.name,
-      handler: async () => {
-        if (!device.value?.device_id)
-          return
-        isLoading.value = true
-        try {
-          await upsertDevChannel(device.value?.device_id, channel)
-          toast.success(t('channel-linked'))
-          await loadData()
-        }
-        catch (error) {
-          console.error(error)
-          toast.error(t('channel-link-fail'))
-        }
-        isLoading.value = false
-      },
-    })
+
+  if (hasPerm) {
+    for (const channel of channels.value) {
+      buttons.push({
+        text: channel.name,
+        handler: async () => {
+          if (!device.value?.device_id)
+            return
+          isLoading.value = true
+          try {
+            await upsertDevChannel(device.value?.device_id, channel)
+            toast.success(t('channel-linked'))
+            await loadData()
+          }
+          catch (error) {
+            console.error(error)
+            toast.error(t('channel-link-fail'))
+          }
+          isLoading.value = false
+        },
+      })
+    }
   }
+
   buttons.push({
     text: t('button-cancel'),
     role: 'cancel',
@@ -440,8 +461,8 @@ function guardCustomID(event: Event) {
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
-          <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
+          <InfoRow id="update-version" :label="t('force-version')" :value="deviceOverride?.version?.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write']) ? 'no-version-linked' : 'no-version-linked-no-perm')" :is-link="true" @click="updateOverride()" />
+          <InfoRow id="update-channel" :label="t('channel-link')" :value="channelDevice?.channel_id.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write']) ? 'no-channel-linked' : 'no-channel-linked-no-perm')" :is-link="true" @click="updateChannel()" />
         </dl>
       </div>
     </div>

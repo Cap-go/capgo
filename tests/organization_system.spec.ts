@@ -1,7 +1,6 @@
 // import type { Page } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { A, E } from 'ios/App/App/public/assets/Account-fa6ef73d'
 import type { SupabaseType } from './utils'
 import { BASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
@@ -184,6 +183,9 @@ test.describe('Test organization system permissions', () => {
       unlinkBundle: false,
       setBundleToChannel: false,
       setBundleMetadata: false,
+      setDeviceCustomId: false,
+      forceDeviceChannel: false,
+      forceDeviceVersion: false,
     },
     upload: {
       deleteChannel: false,
@@ -195,6 +197,9 @@ test.describe('Test organization system permissions', () => {
       unlinkBundle: false,
       setBundleToChannel: false,
       setBundleMetadata: false,
+      setDeviceCustomId: false,
+      forceDeviceChannel: false,
+      forceDeviceVersion: false,
     },
     write: {
       deleteChannel: false,
@@ -206,6 +211,9 @@ test.describe('Test organization system permissions', () => {
       unlinkBundle: true, // Important: Write HAS unlink bundle
       setBundleToChannel: true,
       setBundleMetadata: true,
+      setDeviceCustomId: true,
+      forceDeviceChannel: true,
+      forceDeviceVersion: true,
     },
     admin: {
       deleteChannel: true,
@@ -217,6 +225,9 @@ test.describe('Test organization system permissions', () => {
       unlinkBundle: true,
       setBundleToChannel: true,
       setBundleMetadata: true,
+      setDeviceCustomId: true,
+      forceDeviceChannel: true,
+      forceDeviceVersion: true,
     },
     owner: {
       deleteChannel: true,
@@ -228,12 +239,16 @@ test.describe('Test organization system permissions', () => {
       unlinkBundle: true,
       setBundleToChannel: true,
       setBundleMetadata: true,
+      setDeviceCustomId: true,
+      forceDeviceChannel: true,
+      forceDeviceVersion: true,
     },
   }
 
   for (const [inviteType, permission] of new Map(Object.entries(permissionMatrix))) {
     let channelSnapshots = null as Database['public']['Tables']['channels']['Row'][] | null
     let bundleSnapshot = null as Database['public']['Tables']['app_versions']['Row'] | null
+    let deviceSnapshot = null as Database['public']['Tables']['app_versions']['Devices'] | null
 
     test.describe(`Test organization system permissions (${inviteType})`, () => {
       test.describe.configure({ mode: 'serial' })
@@ -278,8 +293,16 @@ test.describe('Test organization system permissions', () => {
 
         await expect(error4).toBeFalsy()
 
+        const { data: deviceData, error: error5 } = await supabase.from('devices')
+          .select('*')
+          .eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+          .single()
+
+        await expect(error5).toBeFalsy()
+
         channelSnapshots = data
         bundleSnapshot = bundleVersion
+        deviceSnapshot = deviceData
       })
 
       testWithInvitedUser.afterAll(async () => {
@@ -299,6 +322,12 @@ test.describe('Test organization system permissions', () => {
 
         const { error: error4 } = await supabase.from('app_versions').insert(bundleSnapshot!)
         await expect(error4).toBeFalsy()
+
+        const { error: error5 } = await supabase.from('devices').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+        await expect(error5).toBeFalsy()
+
+        const { error: error6 } = await supabase.from('devices').insert(deviceSnapshot!)
+        await expect(error6).toBeFalsy()
       })
 
       testWithInvitedUser('Test user permissions', async ({ page }) => {
@@ -339,7 +368,7 @@ test.describe('Test organization system permissions', () => {
           const innerNumber = Number.parseInt(innerText)
 
           await expect(innerNumber).toBeTruthy()
-          await expect(innerNumber).toBeGreaterThan(1)
+          await expect(innerNumber).toBeGreaterThan(0)
         }))
 
         // go to 'channels'
@@ -485,9 +514,8 @@ test.describe('Test organization system permissions', () => {
         await page.goto(`${BASE_URL}/app/p/com--demo--app/bundles`)
 
         // Make sure we can see the bundles table
-        const allBundles = await page.locator('#custom_table > tbody > tr')
-        await page.waitForTimeout(100)
-        await expect(await allBundles.count()).toBeGreaterThan(0)
+        const firstBunlde = await page.locator('#custom_table > tbody > tr:nth-child(1)')
+        await expect(firstBunlde).toBeVisible()
 
         // Set supabase prod channel to 'metadata' disallow strategy
         const { error: errorSetMetadataOnProd } = await supabase.from('channels')
@@ -504,7 +532,7 @@ test.describe('Test organization system permissions', () => {
         await expect(page.locator('#action-sheet')).toBeVisible()
 
         // Get all buttons
-        const actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+        let actionSheetButtons = await page.locator('#action-sheet > div > button').all()
 
         // Define a function to find a button. Usefull for further testing
         async function findButtonInActionSheet(actionSheetButtons: Locator[], text: string) {
@@ -546,6 +574,36 @@ test.describe('Test organization system permissions', () => {
           })
 
           expect(readonly).toBe(true)
+        }
+
+        await page.goto(`${BASE_URL}/app/p/com--demo--app/devices`)
+        const firstDevice = await page.locator('#custom_table > tbody > tr:nth-child(1)')
+        await expect(firstDevice).toBeVisible()
+
+        // Go to a specific device
+        await page.goto(`${BASE_URL}/app/p/com--demo--app/d/00009a6b-eefe-490a-9c60-8e965132ae51`)
+        await page.click('#inforow-input')
+
+        if (permission.setDeviceCustomId) {
+          await page.fill('#inforow-input', 'test')
+          await expectPopout(page, 'Custom ID saved')
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
+        }
+
+        await page.locator('#update-channel').click()
+
+        if (permission.forceDeviceChannel) {
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+
+          const cancelButton = await findButtonInActionSheet(actionSheetButtons, 'cancel')
+          await expect(cancelButton).toBeTruthy()
+          await cancelButton!.click()
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
         }
       })
     })

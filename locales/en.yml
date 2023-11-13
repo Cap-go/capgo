@@ -254,10 +254,12 @@ name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
 'no': 'no'
 no-channel-linked: No channel, click to add
+no-channel-linked-no-perm: No channel
 no-devices: No devices
 no-logs: No logs
 no-permission: Insufficient permissions
 no-version-linked: No version, click to add
+no-version-linked-no-perm: No version
 none: None
 not-found: Not found
 notifications: Notifications
