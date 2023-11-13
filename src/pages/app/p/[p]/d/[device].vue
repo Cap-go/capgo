@@ -13,6 +13,8 @@ import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import type { Tab } from '~/components/comp_def'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import type { OrganizationRole } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -39,6 +41,7 @@ const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
 const ActiveTab = ref('info')
+const organizationStore = useOrganizationStore()
 
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
 const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
@@ -46,6 +49,7 @@ const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
+const role = ref<OrganizationRole | null>(null)
 
 const tabs: Tab[] = [
   {
@@ -187,6 +191,24 @@ async function getDevice() {
   }
 }
 
+async function getOrgRole() {
+  const supabaseAppFetch = supabase.from('apps')
+    .select('user_id')
+    .eq('app_id', packageId.value)
+    .single()
+
+  const orgFetch = organizationStore.dedupFetchOrganizations()
+  const allFetch = await Promise.all([supabaseAppFetch, orgFetch])
+  const { data, error } = allFetch[0]
+
+  if (error || !data) {
+    console.error(`Cannot get role, error:\n${error}`)
+    return
+  }
+
+  role.value = organizationStore.getCurrentRole(data.user_id, packageId.value, undefined)
+}
+
 function minVersion(val: string, min = '4.6.99') {
   return gt(val, min)
 }
@@ -200,6 +222,7 @@ async function loadData() {
     getChannelOverride(),
     getChannels(),
     getVersion(),
+    getOrgRole(),
   ])
   isLoading.value = false
 }
@@ -390,6 +413,14 @@ watchEffect(async () => {
     displayStore.defaultBack = `/app/package/${route.params.p}/devices`
   }
 })
+
+function guardCustomID(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
 </script>
 
 <template>
@@ -399,7 +430,7 @@ watchEffect(async () => {
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
-          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
+          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])" @update:value="saveCustomId" @click="guardCustomID" />
           <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
           <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
           <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
