@@ -49,7 +49,7 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
 }
 
 interface ClickHouseMeta {
-  id: string
+  id: number
   app_id: string
   created_at: string
   size: number

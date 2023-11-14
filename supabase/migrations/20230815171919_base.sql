@@ -625,6 +625,16 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" text, "appid" character varying)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+Begin
+  RETURN is_app_owner(get_user_id(apikey), appid);
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -637,17 +647,17 @@ Begin
 End;  
 $$;
 
-CREATE OR REPLACE FUNCTION "public"."is_allowed_action"(apikey text, appid character varying)
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("apikey" text, "appid" character varying)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+AS $$
 Begin
   RETURN is_app_owner(get_user_id(apikey), appid);
 End;
-$function$;
+$$;
 
-CREATE OR REPLACE FUNCTION "public"."is_app_owner"(appid character varying)
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("appid" character varying)
 RETURNS boolean
 LANGUAGE plpgsql
 AS $$
