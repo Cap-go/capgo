@@ -3,7 +3,6 @@ import {
   mergeReadableStreams,
 } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import { BlobReader, TextWriter, ZipReader } from 'https://deno.land/x/zipjs/index.js'
-import { inc } from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { type RunnableTest, type SupabaseType, assert } from '../../utils.ts'
 import { getSupabaseSecret, getUpdateBaseData, responseOk, sendUpdate, testPlaywright } from '../../utils.ts'
 
@@ -263,6 +262,7 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
 
   async function assertCompatibilityTableColumns(column1: string, column2: string, column3: string, column4: string) {
     const cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
+    console.log(cliTableOutput)
     const androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
 
     assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
@@ -347,8 +347,8 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   const uploadCliOutput2 = await uploadWithAutoFlagWithAssert(semver)
 
   assert(uploadCliOutput2.includes(
-    'previous metadata does not exist'),
-    `CLI output does not include \'previous metadata does not exist\'. CLI output:\n${uploadCliOutput2}`,
+    'first upload with compatibility'),
+    `CLI output does not include \'first upload with compatibility\'. CLI output:\n${uploadCliOutput2}`,
   )
 }
 
