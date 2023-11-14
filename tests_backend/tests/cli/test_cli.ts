@@ -262,7 +262,6 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
 
   async function assertCompatibilityTableColumns(column1: string, column2: string, column3: string, column4: string) {
     const cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
-    console.log(cliTableOutput)
     const androidPackage = cliTableOutput.split('\n').find(l => l.includes('@capacitor/android'))
 
     assert(androidPackage !== undefined, 'Android package is not found in compatibility table')
