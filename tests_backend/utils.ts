@@ -104,6 +104,7 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
       SUPABASE_ANON: supabaseAnonToken!,
       SUPABASE_SERVICE: supabaseSecret!,
       SUPABASE_URL: supabaseUrl!,
+      START_FRONTEND: true,
       ...env,
     },
   })

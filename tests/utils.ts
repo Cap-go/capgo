@@ -30,16 +30,10 @@ export async function expectPopout(page: Page, toHave: string) {
   const popOutLocator = '.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)'
   await expect(page.locator(popOutLocator)).toContainText(toHave)
 
-  // Close all popouts
-  let popOutVisible = true
-  while (popOutVisible) {
-    // Close the popout
+  const a = '.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > button:nth-child(1)'
+  if (await page.locator(a).isVisible()) {
     await page.click('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > button:nth-child(1)')
-
-    await page.waitForTimeout(250)
-
-    // Check if the popout is still visible
-    popOutVisible = await page.locator(popOutLocator).isVisible()
+    await expect(page.locator(popOutLocator)).toBeHidden()
   }
 }
 
@@ -101,3 +95,5 @@ export async function firstItemAsync<T>(array: T[], predicate: Predicate<T>): Pr
   // If we do not find any matches, "reject" by raising an error.
   return undefined
 }
+
+export const awaitPopout = (page: Page) => expect(page.locator('#popout')).toBeVisible()

@@ -132,7 +132,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const dedupFetchOrganizations = async () => {
     if (_organizations.value.size === 0)
-      fetchOrganizations()
+      await fetchOrganizations()
   }
 
   const createOrganization = (name: string, logo?: string) => {
