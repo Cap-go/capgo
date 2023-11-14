@@ -11,7 +11,7 @@ function useSupabase() {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(Deno.env.get('SUPABASE_URL') || '***', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '***', options)
+  return createClient<Database>(Deno.env.get('S_SUPABASE_URL') || '***', Deno.env.get('S_SUPABASE_SERVICE_ROLE_KEY') || '***', options)
 }
 
 function getEnv(env: string) {
@@ -75,6 +75,14 @@ async function main() {
         const split = s3Obj.key.split('/')
         return { orginalName: s3Obj.key, name: split[split.length - 1].replace('.zip', '') }
       }))
+
+    const r2VersionsOld = r2.listObjects()
+    const r2VersionsArrOld = (await gen2array(r2VersionsOld)).filter(object => object.key.split('/')[0] !== 'apps')
+
+    if (r2VersionsArrOld.length > 0) {
+      console.log(r2VersionsArrOld)
+      Deno.exit(0)
+    }
 
     const supabaseVersions = await supabase.from('app_versions')
       .select('name, deleted')
