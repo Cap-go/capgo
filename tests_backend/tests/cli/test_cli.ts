@@ -346,8 +346,8 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   const uploadCliOutput2 = await uploadWithAutoFlagWithAssert(semver)
 
   assert(uploadCliOutput2.includes(
-    'first upload with compatibility'),
-    `CLI output does not include \'first upload with compatibility\'. CLI output:\n${uploadCliOutput2}`,
+    'it\'s your first upload with compatibility check'),
+    `CLI output does not include \"it\'s your first upload with compatibility check\". CLI output:\n${uploadCliOutput2}`,
   )
 }
 
