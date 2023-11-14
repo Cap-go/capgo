@@ -45,11 +45,7 @@ async function getUsage() {
   if (!apps.data)
     return
 
-  const usage = await supabase.from('app_usage')
-    .select('mau, storage, bandwidth')
-    .gte('created_at', main.cycleInfo?.subscription_anchor_start)
-    .lte('created_at', main.cycleInfo?.subscription_anchor_end)
-    .in('app_id', apps.data.map(app => app.app_id))
+  const usage = main.dashboard
 
   const plan = plans.value.find(p => p.name === 'Pay as you go')!
 
@@ -57,9 +53,9 @@ async function getUsage() {
   let totalStorage = 0
   let totalBandwidth = 0
 
-  usage?.data?.forEach((item) => {
+  usage?.forEach((item) => {
     totalMau += item.mau
-    totalStorage += bytesToGb(item.storage)
+    totalStorage += bytesToGb(item.storage_added) - bytesToGb(item.storage_deleted)
     totalBandwidth += bytesToGb(item.bandwidth)
   })
 

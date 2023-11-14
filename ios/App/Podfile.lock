@@ -73,7 +73,7 @@ PODS:
     - RevenueCat (>= 4.16.0)
   - CapgoCapacitorScreenRecorder (5.0.0):
     - Capacitor
-  - CapgoCapacitorUpdater (5.2.22):
+  - CapgoCapacitorUpdater (5.3.14):
     - Alamofire
     - Capacitor
     - SSZipArchive
@@ -130,7 +130,7 @@ DEPENDENCIES:
   - "CapgoCapacitorNativeBiometric (from `../../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric`)"
   - "CapgoCapacitorPurchases (from `../../node_modules/.pnpm/@capgo+capacitor-purchases@5.0.8_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-purchases`)"
   - "CapgoCapacitorScreenRecorder (from `../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-screen-recorder`)"
-  - "CapgoCapacitorUpdater (from `../../node_modules/.pnpm/@capgo+capacitor-updater@5.2.22_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater`)"
+  - "CapgoCapacitorUpdater (from `../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.14_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater`)"
   - "CapgoInappbrowser (from `../../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.4.2/node_modules/@capgo/inappbrowser`)"
   - "CapgoNativeAudio (from `../../node_modules/.pnpm/@capgo+native-audio@6.0.18_@capacitor+core@5.4.2/node_modules/@capgo/native-audio`)"
   - "CapgoNativeMarket (from `../../node_modules/.pnpm/@capgo+native-market@5.0.3/node_modules/@capgo/native-market`)"
@@ -217,7 +217,7 @@ EXTERNAL SOURCES:
   CapgoCapacitorScreenRecorder:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-screen-recorder"
   CapgoCapacitorUpdater:
-    :path: "../../node_modules/.pnpm/@capgo+capacitor-updater@5.2.22_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater"
+    :path: "../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.14_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater"
   CapgoInappbrowser:
     :path: "../../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.4.2/node_modules/@capgo/inappbrowser"
   CapgoNativeAudio:
@@ -262,7 +262,7 @@ SPEC CHECKSUMS:
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
   CapgoCapacitorPurchases: 8351f236aaa2329c1a172d8f762d7f6faddaaea9
   CapgoCapacitorScreenRecorder: a4e60b4b73b9797055c3dc9e4b3b7933a2ee1d8e
-  CapgoCapacitorUpdater: f770b425f534cb7f3c9da9b0c8064b1afc8ba1e7
+  CapgoCapacitorUpdater: 0fad7f219e1d9fdccbf794a3ed4e6fa8196a900f
   CapgoInappbrowser: de1f9003a378ddbeb1d10c44ca74d778b34b8a77
   CapgoNativeAudio: e54234f12c308fd53202223f5036ca68b117944f
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
@@ -273,6 +273,6 @@ SPEC CHECKSUMS:
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: 9f83b04b3bdb1cdd138f07a0ca6f8284214f613a
+PODFILE CHECKSUM: e5be960b1fb447189455dcd779ac430d11c280ee
 
 COCOAPODS: 1.13.0

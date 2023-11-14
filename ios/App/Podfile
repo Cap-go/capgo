@@ -42,7 +42,7 @@ def capacitor_pods
   pod 'CapgoCapacitorNativeBiometric', :path => '../../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric'
   pod 'CapgoCapacitorPurchases', :path => '../../node_modules/.pnpm/@capgo+capacitor-purchases@5.0.8_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-purchases'
   pod 'CapgoCapacitorScreenRecorder', :path => '../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-screen-recorder'
-  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@5.2.22_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater'
+  pod 'CapgoCapacitorUpdater', :path => '../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.14_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater'
   pod 'CapgoInappbrowser', :path => '../../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.4.2/node_modules/@capgo/inappbrowser'
   pod 'CapgoNativeAudio', :path => '../../node_modules/.pnpm/@capgo+native-audio@6.0.18_@capacitor+core@5.4.2/node_modules/@capgo/native-audio'
   pod 'CapgoNativeMarket', :path => '../../node_modules/.pnpm/@capgo+native-market@5.0.3/node_modules/@capgo/native-market'

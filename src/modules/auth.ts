@@ -43,6 +43,7 @@ async function guard(next: any, to: string, from: string) {
         return next('/onboarding/verify_email')
       }
     }
+    await main.updateDashboard()
     initStunning(main.user?.customer_id)
     isTrial().then((res) => {
       // console.log('isTrial', res)

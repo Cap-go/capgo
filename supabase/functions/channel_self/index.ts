@@ -30,7 +30,7 @@ export const jsonRequestSchema = z.object({
   }),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
-}).refine(data => reverseDomainRegex.test(data.app_id), {
+}).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
   message: INVALID_STRING_APP_ID,
 }).refine(data => deviceIdRegex.test(data.device_id), {
   message: INVALID_STRING_DEVICE_ID,
@@ -43,7 +43,7 @@ export const jsonRequestSchema = z.object({
 
 async function post(body: DeviceLink): Promise<Response> {
   console.log('body', body)
-  const parseResult: any = jsonRequestSchema.safeParse(body)
+  const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
     console.error('Cannot parse json', { parseResult })
     return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
@@ -77,13 +77,6 @@ async function post(body: DeviceLink): Promise<Response> {
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
-  if (!device_id || !app_id) {
-    console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
-    return sendRes({
-      message: 'Cannot find device_id or appi_id',
-      error: 'missing_info',
-    }, 400)
-  }
   const { data: version } = await supabaseAdmin()
     .from('app_versions')
     .select('id')
@@ -131,6 +124,7 @@ async function post(body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
+    console.error('Cannot change device override current channel don\t allow it', { channel, dataChannelOverride })
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
@@ -154,20 +148,50 @@ async function post(body: DeviceLink): Promise<Response> {
       }, 400)
     }
 
-    const { error: dbErrorDev } = await supabaseAdmin()
-      .from('channel_devices')
-      .upsert({
-        device_id,
-        channel_id: dataChannel.id,
-        app_id,
-        created_by: dataChannel.created_by,
-      })
-    if (dbErrorDev) {
-      console.error('Cannot do channel override', { dbErrorDev })
-      return sendRes({
-        message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
-        error: 'override_not_allowed',
-      }, 400)
+    // Get the main channel
+    const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin()
+      .from('channels')
+      .select('name')
+      .eq('app_id', app_id)
+      .eq('public', true)
+      .single()
+
+    // We DO NOT return if there is no main channel as it's not a critical error
+    // We will just set the channel_devices as the user requested
+    const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
+    if (dbMainChannelError || !mainChannel)
+      console.error('Cannot find main channel', dbMainChannelError)
+
+    if (mainChannelName && mainChannelName === channel) {
+      const { error: dbErrorDev } = await supabaseAdmin()
+        .from('channel_devices')
+        .delete()
+        .eq('app_id', app_id)
+        .eq('device_id', device_id)
+      if (dbErrorDev) {
+        console.error('Cannot do channel override', { dbErrorDev })
+        return sendRes({
+          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+          error: 'override_not_allowed',
+        }, 400)
+      }
+    }
+    else {
+      const { error: dbErrorDev } = await supabaseAdmin()
+        .from('channel_devices')
+        .upsert({
+          device_id,
+          channel_id: dataChannel.id,
+          app_id,
+          created_by: dataChannel.created_by,
+        })
+      if (dbErrorDev) {
+        console.error('Cannot do channel override', { dbErrorDev })
+        return sendRes({
+          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+          error: 'override_not_allowed',
+        }, 400)
+      }
     }
   }
   await sendStats([{
@@ -198,10 +222,16 @@ async function put(body: DeviceLink): Promise<Response> {
     version_os,
   } = body
   const coerce = semver.coerce(version_build)
-  if (coerce)
+  if (coerce) {
     version_build = coerce.version
-  else
-    return sendRes({ message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number` }, 400)
+  }
+  else {
+    console.error('Cannot find version', { version_build })
+    return sendRes({
+      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
+      error: 'semver_error',
+    }, 400)
+  }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!device_id || !app_id) {
     console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
@@ -309,6 +339,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
     version_build = coerce.version
   }
   else {
+    console.error('Cannot find version', { version_build })
     return sendRes({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
@@ -316,6 +347,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
   }
 
   if (!device_id || !app_id) {
+    console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
     return sendRes({
       message: 'Cannot find device_id or appi_id',
       error: 'missing_info',
@@ -336,6 +368,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
+    console.error('Cannot change device override current channel don\t allow it', { dataChannelOverride })
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
@@ -347,6 +380,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
   if (error) {
+    console.error('Cannot delete channel override', { error })
     return sendRes({
       message: `Cannot delete channel override ${JSON.stringify(error)}`,
       error: 'override_not_allowed',
@@ -365,8 +399,10 @@ function main(url: URL, headers: BaseHeaders, method: string, body: any) {
       return deleteOverride(body)
   }
   catch (error) {
+    console.error('Error', { error })
     return sendRes({ message: `Error ${JSON.stringify(error)}`, error: 'general_error' }, 400)
   }
+  console.error('Method now allowed', { method })
   return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
 }
 

@@ -149,6 +149,10 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
+resend-email: Resend Confirmation Email
+confirm-email-sent: A confirmation email was sent click to link to confirm your email
+did-not-recive-confirm-email: Didn't receive confirmation email?
+resend: Resend
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles

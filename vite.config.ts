@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import path from 'node:path'
 import Vue from '@vitejs/plugin-vue'
+
 // import veauryVitePlugins from 'veaury/vite/index'
 import { defineConfig } from 'vite'
 import Pages from 'vite-plugin-pages'
@@ -32,7 +33,7 @@ readdirSync('./locales/')
       locales.push(file.split('.')[0])
   })
 // const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
-const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
+const guestPath = ['/login', '/register', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
 export default defineConfig({
   resolve: {

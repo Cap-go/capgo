@@ -342,3 +342,9 @@ your-api-key: 'Kunci API Anda:'
 your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
+resend-email: Kirim Ulang Email Konfirmasi
+confirm-email-sent: >-
+  Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
+  Anda
+did-not-recive-confirm-email: Tidak menerima email konfirmasi?
+resend: Kirim ulang

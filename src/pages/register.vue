@@ -60,7 +60,7 @@ async function submit(form: { first_name: string; last_name: string; password: s
     setErrors('register-account', [error?.message || 'user not found'], {})
     return
   }
-  router.push('/onboarding/confirm_email')
+  router.push(`/onboarding/confirm_email?email=${form.email}`)
 }
 </script>
 

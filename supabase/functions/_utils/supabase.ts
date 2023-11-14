@@ -4,8 +4,8 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
-import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
 import type { Order } from './types.ts'
+import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
 
 // Import Supabase client
 
@@ -118,9 +118,9 @@ export async function getCurrentPlanName(userId: string): Promise<string> {
   return ''
 }
 
-export async function getPlanUsagePercent(userId: string, dateid: string): Promise<number> {
+export async function getPlanUsagePercent(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin()
-    .rpc('get_plan_usage_percent', { userid: userId, dateid })
+    .rpc('get_plan_usage_percent', { userid: userId })
     .single()
   if (error) {
     console.error('getPlanUsagePercent error', error.message)
@@ -133,7 +133,7 @@ export async function getPlanUsagePercent(userId: string, dateid: string): Promi
 export async function isGoodPlan(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
-      .rpc('is_good_plan_v3', { userid: userId })
+      .rpc('is_good_plan_v4', { userid: userId })
       .single()
       .throwOnError()
     return data || false
@@ -252,14 +252,114 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return false
 }
 
-export async function UpdateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string) {
+export async function updateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string) {
   console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
 
   const client = supabaseClient(auth)
-  const reqClickHouse = await client
-    .rpc('clickhouse_exist')
+  await supabaseClient(auth)
+    .from('devices')
+    .update({ custom_id: customId })
+    .eq('app_id', appId)
+    .eq('device_id', deviceId)
+    // TODO: to remove if we go 100% clickhouse
+  if (!isClickHouseEnabled()) {
+    // update the device custom_id
+    return
+  }
+  const reqOwner = await client
+    .rpc('is_app_owner', { appid: appId })
     .then(res => res.data || false)
-  if (reqClickHouse) {
+  if (!reqOwner) {
+    const reqAdmin = await client
+      .rpc('is_admin')
+      .then(res => res.data || false)
+    if (!reqAdmin)
+      return Promise.reject(new Error('not allowed'))
+  }
+  console.log('UpdateDeviceCustomId clickhouse')
+  // get the device from clickhouse
+  const device = await supabaseAdmin()
+    .from('clickhouse_devices')
+    .select()
+    .eq('app_id', appId)
+    .eq('device_id', deviceId)
+    .limit(1)
+    .single()
+    .then(res => res.data || null)
+  console.log('UpdateDeviceCustomId get device', device)
+  if (!device)
+    return Promise.reject(new Error('device not found'))
+    // send the device to clickhouse
+  return sendDeviceToClickHouse([{
+    ...device,
+    custom_id: customId,
+  }])
+}
+
+export async function getSDashboard(auth: string, userIdQuery: string, rangeStart: number, rangeEnd: number, appId?: string) {
+  console.log(`getSDashboard userId ${userIdQuery} appId ${appId} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`)
+
+  let isAdmin = false
+  let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
+  let client = supabaseClient(auth)
+  if (!auth)
+    client = supabaseAdmin()
+
+  if (isClickHouseEnabled()) {
+    tableName = 'clickhouse_app_usage'
+    if (appId) {
+      const reqOwner = await client
+        .rpc('is_app_owner', { appid: appId })
+        .then(res => res.data || false)
+      if (!reqOwner) {
+        const reqAdmin = await client
+          .rpc('is_admin')
+          .then(res => res.data || false)
+        isAdmin = reqAdmin
+        if (!reqAdmin)
+          return Promise.reject(new Error('not allowed'))
+      }
+    }
+    client = supabaseAdmin()
+  }
+  console.log('tableName', tableName)
+  const req = client
+    .from(tableName)
+    .select()
+
+  if (appId) {
+    req.eq('app_id', appId)
+  }
+  else {
+    const userId = isAdmin ? userIdQuery : (await supabaseClient(auth).auth.getUser()).data.user?.id
+    if (!userId)
+      return []
+    // get all user apps id
+    const appIds = await supabaseClient(auth)
+      .from('apps')
+      .select('app_id')
+      .eq('user_id', userId)
+      .then(res => res.data?.map(app => app.app_id) || [])
+    console.log('appIds', appIds)
+    req.in('app_id', appIds)
+  }
+
+  const res = await req
+  console.log('res', res)
+  return res.data || []
+}
+
+export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+  // do the request to supabase
+  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+
+  let tableName: 'devices' | 'clickhouse_devices' = 'devices'
+  let client = supabaseClient(auth)
+  if (!auth)
+    client = supabaseAdmin()
+
+  if (isClickHouseEnabled()) {
+    tableName = 'clickhouse_devices'
     const reqOwner = await client
       .rpc('is_app_owner', { appid: appId })
       .then(res => res.data || false)
@@ -270,69 +370,16 @@ export async function UpdateDeviceCustomId(auth: string, appId: string, deviceId
       if (!reqAdmin)
         return Promise.reject(new Error('not allowed'))
     }
-    console.log('UpdateDeviceCustomId clickhouse')
-    // get the device from clickhouse
-    const device = await supabaseAdmin()
-      .from('clickhouse_devices_u')
-      .select()
-      .eq('app_id', appId)
-      .eq('device_id', deviceId)
-      .limit(1)
-      .single()
-      .then(res => res.data || null)
-    console.log('UpdateDeviceCustomId get device', device)
-    if (!device)
-      return Promise.reject(new Error('device not found'))
-    // send the device to clickhouse
-    return sendDeviceToClickHouse([{
-      ...device,
-      custom_id: customId,
-    }])
-  }
-  else {
-    // update the device custom_id
-    return supabaseClient(auth)
-      .from('devices')
-      .update({ custom_id: customId })
-      .eq('app_id', appId)
-      .eq('device_id', deviceId)
-  }
-}
-
-export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
-  // if (!isTinybirdGetLogEnabled()) {
-  // do the request to supabase
-  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
-
-  let tableName: 'devices' | 'clickhouse_devices_u' = 'devices'
-  let client = supabaseClient(auth)
-  if (!auth) {
     client = supabaseAdmin()
   }
-  else {
-    const reqClickHouse = await client
-      .rpc('clickhouse_exist')
-      .then(res => res.data || false)
-    if (reqClickHouse) {
-      tableName = 'clickhouse_devices_u'
-      const reqOwner = await client
-        .rpc('is_app_owner', { appid: appId })
-        .then(res => res.data || false)
-      if (!reqOwner) {
-        const reqAdmin = await client
-          .rpc('is_admin')
-          .then(res => res.data || false)
-        if (!reqAdmin)
-          return Promise.reject(new Error('not allowed'))
-      }
-      client = supabaseAdmin()
-    }
-  }
-  const reqCount = client
-    .from(tableName)
-    .select('', { count: 'exact' })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
+
+  const reqCount = count
+    ? client
+      .from(tableName)
+      .select('', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .then(res => res.count || 0)
+    : 0
   const req = client
     .from(tableName)
     .select()
@@ -361,7 +408,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      req.or(`action.like.%${search}%`)
+      req.or(`custom_id.like.%${search}%`)
     else
       req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
   }
@@ -384,7 +431,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   // }
 }
 
-export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
   // getStats ee.forgr.captime undefined  [
@@ -393,34 +440,31 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   // ] 0 9
   let tableName: 'stats' | 'clickhouse_stats' = 'stats'
   let client = supabaseClient(auth)
-  if (!auth) {
+  if (!auth)
+    client = supabaseAdmin()
+
+  if (isClickHouseEnabled()) {
+    tableName = 'clickhouse_stats'
+    const reqOwner = await client
+      .rpc('is_app_owner', { appid: appId })
+      .then(res => res.data || false)
+    if (!reqOwner) {
+      const reqAdmin = await client
+        .rpc('is_admin')
+        .then(res => res.data || false)
+      if (!reqAdmin)
+        return Promise.reject(new Error('not allowed'))
+    }
     client = supabaseAdmin()
   }
-  else {
-    const reqClickHouse = await client
-      .rpc('clickhouse_exist')
-      .then(res => res.data || false)
-    if (reqClickHouse) {
-      tableName = 'clickhouse_stats'
-      const reqOwner = await client
-        .rpc('is_app_owner', { appid: appId })
-        .then(res => res.data || false)
-      if (!reqOwner) {
-        const reqAdmin = await client
-          .rpc('is_admin')
-          .then(res => res.data || false)
-        if (!reqAdmin)
-          return Promise.reject(new Error('not allowed'))
-      }
-      client = supabaseAdmin()
-    }
-  }
 
-  const reqCount = client
-    .from(tableName)
-    .select('', { count: 'exact' })
-    .eq('app_id', appId)
-    .then(res => res.count || 0)
+  const reqCount = count
+    ? client
+      .from(tableName)
+      .select('', { count: 'exact', head: true })
+      .eq('app_id', appId)
+      .then(res => res.count || 0)
+    : 0
   const req = client
     .from(tableName)
     .select(`
@@ -472,10 +516,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
 export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
   const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
-    created_at: device.created_at || new Date().toISOString(),
     updated_at: device.updated_at || new Date().toISOString(),
-    // last_mau if not exist take olded js date
-    last_mau: device.last_mau || new Date(0).toISOString(),
     platform: device.platform as Database['public']['Enums']['platform_os'],
     os_version: device.os_version as string,
     version: device.version as number,
@@ -486,12 +527,13 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     is_emulator: !!device.is_emulator,
     is_prod: !!device.is_prod,
     custom_id: device.custom_id as string,
+    created_at: device.created_at || new Date().toISOString(),
   }
   const all = []
   if (isClickHouseEnabled())
     all.push(sendDeviceToClickHouse([deviceComplete]))
   else
-    all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
+    all.push(supabaseAdmin().from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
 
   return Promise.all(all)
     .catch((e) => {

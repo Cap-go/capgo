@@ -63,7 +63,7 @@ const lastDayEvolution = computed(() => {
       </div>
       <div class="flex items-start">
         <div class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
-          {{ total.toLocaleString() }} {{ unit }}
+          {{ total?.toLocaleString() }} {{ unit }}
         </div>
         <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
           {{ lastDayEvolution < 0 ? '-' : '+' }}{{ lastDayEvolution.toFixed(2) }}%

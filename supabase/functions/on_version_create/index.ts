@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { redisAppVersionInvalidate } from '../_utils/redis.ts'
+import { sendMetaToClickHouse } from '../_utils/clickhouse.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
@@ -28,6 +29,11 @@ serve(async (event: Request) => {
     }
     const record = body.record
     console.log('record', record)
+
+    if (!record.id) {
+      console.log('No id')
+      return sendRes()
+    }
 
     const { error: errorUpdate } = await supabaseAdmin()
       .from('apps')
@@ -99,6 +105,13 @@ serve(async (event: Request) => {
         checksum,
         size,
       })
+    await sendMetaToClickHouse({
+      id: record.id,
+      created_at: new Date().toISOString(),
+      app_id: record.app_id,
+      size,
+      action: 'add',
+    })
     if (dbError)
       console.error('Cannot create app version meta', dbError)
     if (record.storage_provider === 'r2-direct')

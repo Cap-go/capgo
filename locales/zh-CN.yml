@@ -332,3 +332,7 @@ your-api-key: 您的 API 密钥：
 your-are-a: 你是一个
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是
+resend-email: 重新发送确认邮件
+confirm-email-sent: 已发送确认邮件，请点击链接确认您的电子邮件。
+did-not-recive-confirm-email: 没有收到确认邮件吗？
+resend: 重新发送

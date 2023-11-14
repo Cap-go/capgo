@@ -5,6 +5,17 @@ import { BASE_URL, beforeEachTest, useSupabase } from './utils'
 test.beforeEach(beforeEachTest)
 
 test('test selectable disallow (no AB)', async ({ page }) => {
+  // Get supabase (auth + create client)
+  const supabase = await useSupabase()
+
+  // Prepare test
+  const { error: bundleErrorPrepare } = await supabase
+    .from('channels')
+    .update({ version: 9601 })
+    .eq('id', 22)
+
+  await expect(bundleErrorPrepare).toBeNull()
+
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'

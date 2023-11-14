@@ -2,16 +2,16 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 
 export function isClickHouseEnabled() {
-  return !!clickHouseURl() && clickHouseUser() && clickHousePassword()
+  return !!clickHouseURL() && !!clickHouseUser() && !!clickHousePassword()
 }
-function clickHouseURl() {
-  return getEnv('CLICKHOUSE_URL') || 'https://gui1899riv.eu-central-1.aws.clickhouse.cloud:8443'
+function clickHouseURL() {
+  return getEnv('CLICKHOUSE_URL')
 }
 function clickHouseUser() {
-  return getEnv('CLICKHOUSE_USER') || 'default'
+  return getEnv('CLICKHOUSE_USER')
 }
 function clickHousePassword() {
-  return getEnv('CLICKHOUSE_PASSWORD') || '6FDfroNAL_llY'
+  return getEnv('CLICKHOUSE_PASSWORD')
 }
 function clickHouseAuth() {
   return `Basic ${btoa(`${clickHouseUser()}:${clickHousePassword()}`)}`
@@ -27,13 +27,13 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
   const devicesReady = devices.map(device => ({
     ...device,
     date_id: undefined,
-    last_mau: !device.last_mau ? new Date(0).toISOString() : device.last_mau,
-    // remove created_at and updated_at presicion ms use only seconds
-    created_at: !device.created_at ? new Date().toISOString() : device.created_at,
+    created_at: undefined,
+    last_mau: undefined,
+    updated_at: !device.updated_at ? new Date().toISOString() : device.updated_at,
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending device to Clickhouse', devicesReady)
   return fetch(
-    `${clickHouseURl()}/?query=INSERT INTO devices FORMAT JSONEachRow`,
+    `${clickHouseURL()}/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       body: devicesReady,
@@ -48,6 +48,35 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
     .catch(e => console.log('sendDeviceToClickHouse error', e))
 }
 
+interface ClickHouseMeta {
+  id: number
+  app_id: string
+  created_at: string
+  size: number
+  action: 'add' | 'delete'
+}
+export function sendMetaToClickHouse(meta: ClickHouseMeta) {
+  if (!isClickHouseEnabled())
+    return Promise.resolve()
+
+  console.log('sending meta to Clickhouse', meta)
+  const metasReady = JSON.stringify(meta)
+  return fetch(
+      `${clickHouseURL()}/?query=INSERT INTO app_versions_meta SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
+      {
+        method: 'POST',
+        body: metasReady,
+        headers: {
+          'Authorization': clickHouseAuth(),
+          'Content-Type': 'text/plain',
+        },
+      },
+  )
+    .then(res => res.text())
+    .then(data => console.log('sendMetaToClickHouse', data))
+    .catch(e => console.log('sendMetaToClickHouse error', e))
+}
+
 export function sendLogToClickHouse(logs: Database['public']['Tables']['stats']['Insert'][]) {
   if (!isClickHouseEnabled())
     return Promise.resolve()
@@ -60,7 +89,7 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending log to Clickhouse', logReady)
   return fetch(
-    `${clickHouseURl()}/?query=INSERT INTO logs FORMAT JSONEachRow`,
+    `${clickHouseURL()}/?query=INSERT INTO logs SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
@@ -75,51 +104,3 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
     .then(data => console.log('sendLogToClickHouse', data))
     .catch(e => console.log('sendLogToClickHouse error', e))
 }
-
-// app_id?: string
-// created_at?: string | null
-// custom_id?: string
-// date_id?: string | null
-// device_id?: string
-// is_emulator?: boolean | null
-// is_prod?: boolean | null
-// last_mau?: string | null
-// os_version?: string | null
-// platform?: Database["public"]["Enums"]["platform_os"] | null
-// plugin_version?: string
-// updated_at?: string | null
-// version?: number
-// version_build?: string | null
-// sendDeviceToClickHouse([{
-//   app_id: '1',
-//   created_at: new Date().toISOString(),
-//   custom_id: '',
-//   date_id: '1',
-//   device_id: '1',
-//   is_emulator: false,
-//   is_prod: true,
-//   last_mau: new Date(0).toISOString(),
-//   os_version: '',
-//   platform: 'android',
-//   plugin_version: '1',
-//   updated_at: new Date().toISOString(),
-//   version: 1,
-//   version_build: '1',
-// }])
-
-// action: string
-// app_id: string
-// created_at?: string | null
-// device_id: string
-// platform: Database["public"]["Enums"]["platform_os"]
-// version: number
-// version_build: string
-// sendLogToClickHouse([{
-//   action: 'set',
-//   app_id: '1',
-//   created_at: new Date().toISOString(),
-//   device_id: '1',
-//   platform: 'android',
-//   version: 1,
-//   version_build: '1',
-// }])

@@ -332,3 +332,7 @@ your-api-key: 'API キー:'
 your-are-a: あなたは
 your-current-plan-is: 現在のプランは
 your-current-suggested-plan-is: 現在お勧めのプランは
+resend-email: 確認メールを再送してください
+confirm-email-sent: 確認メールが送信されました。リンクをクリックしてメールアドレスを確認してください。
+did-not-recive-confirm-email: 確認メールが届きませんでしたか？
+resend: 再送信してください

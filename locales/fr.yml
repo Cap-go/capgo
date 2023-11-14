@@ -344,3 +344,9 @@ your-api-key: "Votre clé API\_:"
 your-are-a: Vous êtes un
 your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré est
+resend-email: Renvoyer l'email de confirmation
+confirm-email-sent: >-
+  Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
+  votre email.
+did-not-recive-confirm-email: Vous n'avez pas reçu d'email de confirmation?
+resend: Renvoyer

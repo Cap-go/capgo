@@ -39,3 +39,4 @@ scripts/template/netlify/test.gplay.js
 /playwright/.cache/
 /playwright/.auth/
 CHANGELOG.md
+.history

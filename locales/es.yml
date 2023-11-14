@@ -348,3 +348,9 @@ your-api-key: 'Su clave API:'
 your-are-a: Tu area
 your-current-plan-is: Su plan actual es
 your-current-suggested-plan-is: Su plan sugerido actual es
+resend-email: Reenviar Correo Electrónico de Confirmación
+confirm-email-sent: >-
+  Se envió un correo electrónico de confirmación, haz clic en el enlace para
+  confirmar tu correo electrónico.
+did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
+resend: Reenviar

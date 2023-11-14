@@ -340,3 +340,7 @@ your-api-key: 'API anahtarınız:'
 your-are-a: Senin alanın
 your-current-plan-is: Mevcut planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'
+resend-email: Yeniden Onay E-postası Gönder
+confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
+did-not-recive-confirm-email: Onay e-postası almadınız mı?
+resend: Tekrar gönder

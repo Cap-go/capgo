@@ -140,34 +140,40 @@ export interface Database {
           app_id: string
           bandwidth: number
           created_at: string | null
-          downloads: number
           fails: number
+          get: number
           id: string
+          install: number
           mau: number
-          mode: Database["public"]["Enums"]["usage_mode"]
-          storage: number
+          storage_added: number
+          storage_deleted: number
+          uninstall: number
         }
         Insert: {
           app_id: string
           bandwidth?: number
           created_at?: string | null
-          downloads?: number
           fails?: number
+          get?: number
           id?: string
+          install?: number
           mau?: number
-          mode?: Database["public"]["Enums"]["usage_mode"]
-          storage?: number
+          storage_added?: number
+          storage_deleted?: number
+          uninstall?: number
         }
         Update: {
           app_id?: string
           bandwidth?: number
           created_at?: string | null
-          downloads?: number
           fails?: number
+          get?: number
           id?: string
+          install?: number
           mau?: number
-          mode?: Database["public"]["Enums"]["usage_mode"]
-          storage?: number
+          storage_added?: number
+          storage_deleted?: number
+          uninstall?: number
         }
         Relationships: []
       }
@@ -182,6 +188,7 @@ export interface Database {
           id: number
           minUpdateVersion: string | null
           name: string
+          native_packages: Json[] | null
           session_key: string | null
           storage_provider: string
           updated_at: string | null
@@ -197,6 +204,7 @@ export interface Database {
           id?: number
           minUpdateVersion?: string | null
           name: string
+          native_packages?: Json[] | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -212,6 +220,7 @@ export interface Database {
           id?: number
           minUpdateVersion?: string | null
           name?: string
+          native_packages?: Json[] | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -379,12 +388,6 @@ export interface Database {
             columns: ["created_by"]
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "channel_devices_device_id_fkey"
-            columns: ["device_id"]
-            referencedRelation: "devices"
-            referencedColumns: ["device_id"]
           }
         ]
       }
@@ -561,49 +564,43 @@ export interface Database {
       devices: {
         Row: {
           app_id: string
-          created_at: string | null
+          created_at: string
           custom_id: string
-          date_id: string | null
           device_id: string
           is_emulator: boolean | null
           is_prod: boolean | null
-          last_mau: string | null
           os_version: string | null
           platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
-          updated_at: string | null
+          updated_at: string
           version: number
           version_build: string | null
         }
         Insert: {
           app_id: string
-          created_at?: string | null
+          created_at: string
           custom_id?: string
-          date_id?: string | null
           device_id: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
-          updated_at?: string | null
+          updated_at: string
           version: number
           version_build?: string | null
         }
         Update: {
           app_id?: string
-          created_at?: string | null
+          created_at?: string
           custom_id?: string
-          date_id?: string | null
           device_id?: string
           is_emulator?: boolean | null
           is_prod?: boolean | null
-          last_mau?: string | null
           os_version?: string | null
           platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
-          updated_at?: string | null
+          updated_at?: string
           version?: number
           version_build?: string | null
         }
@@ -646,12 +643,6 @@ export interface Database {
             columns: ["created_by"]
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "devices_override_device_id_fkey"
-            columns: ["device_id"]
-            referencedRelation: "devices"
-            referencedColumns: ["device_id"]
           },
           {
             foreignKeyName: "devices_override_version_fkey"
@@ -916,7 +907,7 @@ export interface Database {
         Row: {
           action: string
           app_id: string
-          created_at: string | null
+          created_at: string
           device_id: string
           platform: Database["public"]["Enums"]["platform_os"]
           version: number
@@ -925,7 +916,7 @@ export interface Database {
         Insert: {
           action: string
           app_id: string
-          created_at?: string | null
+          created_at: string
           device_id: string
           platform: Database["public"]["Enums"]["platform_os"]
           version: number
@@ -934,7 +925,7 @@ export interface Database {
         Update: {
           action?: string
           app_id?: string
-          created_at?: string | null
+          created_at?: string
           device_id?: string
           platform?: Database["public"]["Enums"]["platform_os"]
           version?: number
@@ -1190,14 +1181,6 @@ export interface Database {
             }
             Returns: boolean
           }
-      clickhouse_exist: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      clickhouse_table_exist: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       convert_bytes_to_gb: {
         Args: {
           byt: number
@@ -1259,6 +1242,13 @@ export interface Database {
       count_all_updates: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      create_partitions: {
+        Args: {
+          start_date: string
+          num_years: number
+        }
+        Returns: undefined
       }
       delete_user: {
         Args: Record<PropertyKey, never>
@@ -1459,9 +1449,7 @@ export interface Database {
           }
       get_total_stats_v3:
         | {
-            Args: {
-              userid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: {
               mau: number
               bandwidth: number
@@ -1469,7 +1457,9 @@ export interface Database {
             }[]
           }
         | {
-            Args: Record<PropertyKey, never>
+            Args: {
+              userid: string
+            }
             Returns: {
               mau: number
               bandwidth: number
