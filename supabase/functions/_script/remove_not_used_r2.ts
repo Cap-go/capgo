@@ -18,6 +18,8 @@ function getEnv(env: string) {
   return Deno.env.get(env) ?? ''
 }
 
+const UUID_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+
 function initR2() {
   const accountid = getEnv('R2_ACCOUNT_ID')
   const access_key_id = getEnv('R2_ACCESS_KEY_ID')
@@ -75,14 +77,6 @@ async function main() {
         const split = s3Obj.key.split('/')
         return { orginalName: s3Obj.key, name: split[split.length - 1].replace('.zip', '') }
       }))
-
-    const r2VersionsOld = r2.listObjects()
-    const r2VersionsArrOld = (await gen2array(r2VersionsOld)).filter(object => object.key.split('/')[0] !== 'apps')
-
-    if (r2VersionsArrOld.length > 0) {
-      console.log(r2VersionsArrOld)
-      Deno.exit(0)
-    }
 
     const supabaseVersions = await supabase.from('app_versions')
       .select('name, deleted')
@@ -150,6 +144,48 @@ async function main() {
       // Now delete the file from r2
       await r2.deleteObject(missingVersion.orginalName)
     }))
+  }
+
+  const r2VersionsOld = r2.listObjects()
+  const r2VersionsArrOld = (await gen2array(r2VersionsOld)).filter(object => object.key.split('/')[0] !== 'apps')
+
+  // We have SOME old s3 versions
+  if (r2VersionsArrOld.length > 0) {
+    console.log('Found legacy versions. Checking!')
+
+    for (const legacyVersion of r2VersionsArrOld) {
+      const { data: _, error } = await supabase
+        .from('app_versions')
+        .select('id')
+        .eq('bucket_id', legacyVersion.key)
+        .single()
+
+      if (!error)
+        continue
+
+      if (error && error.code !== 'PGRST116') {
+        console.log('Error found!')
+        console.log(error)
+        Deno.exit(0)
+      }
+
+      console.log(`Download legacy version ${legacyVersion.key}`)
+      const downloadFile = await Deno.open(`${tmpFolder}/${legacyVersion.key}`, { create: true, write: true })
+      const downloadObjectResponse = await r2.getObject(legacyVersion.key)
+
+      if (!downloadObjectResponse.body) {
+        console.error('Body null for download for legacy download')
+        Deno.exit(1)
+      }
+
+      const toPipe = downloadFile.writable
+      await downloadObjectResponse.body.pipeTo(toPipe)
+
+      console.log('Download legacy version! Deleating')
+      await r2.deleteObject(legacyVersion.key)
+    }
+
+    Deno.exit(0)
   }
 }
 
