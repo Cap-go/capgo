@@ -62,7 +62,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   await sendMetaToClickHouse({
-    id: record.app_id,
+    id: record.id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
     size: 0,
