@@ -248,7 +248,7 @@ test.describe('Test organization system permissions', () => {
   for (const [inviteType, permission] of new Map(Object.entries(permissionMatrix))) {
     let channelSnapshots = null as Database['public']['Tables']['channels']['Row'][] | null
     let bundleSnapshot = null as Database['public']['Tables']['app_versions']['Row'] | null
-    let deviceSnapshot = null as Database['public']['Tables']['app_versions']['Devices'] | null
+    let deviceSnapshot = null as Database['public']['Tables']['devices']['Row'] | null
 
     test.describe(`Test organization system permissions (${inviteType})`, () => {
       test.describe.configure({ mode: 'serial' })
@@ -592,7 +592,8 @@ test.describe('Test organization system permissions', () => {
           await expectPopout(page, 'Insufficient permissions')
         }
 
-        await page.locator('#update-channel').click()
+        const updateVersionLocator = page.locator('#update-version')
+        await updateVersionLocator.click()
 
         if (permission.forceDeviceChannel) {
           await expect(page.locator('#action-sheet')).toBeVisible()
@@ -604,6 +605,23 @@ test.describe('Test organization system permissions', () => {
         }
         else {
           await expectPopout(page, 'Insufficient permissions')
+        }
+
+        const updateChannelLocator = page.locator('#update-channel')
+        await updateChannelLocator.click()
+
+        if (permission.forceDeviceVersion) {
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+
+          const cancelButton = await findButtonInActionSheet(actionSheetButtons, 'cancel')
+          await expect(cancelButton).toBeTruthy()
+          await cancelButton!.click()
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
+          const innerHtml = await updateChannelLocator.innerHTML()
+          expect(innerHtml.includes('click to add')).toBe(false)
         }
       })
     })
