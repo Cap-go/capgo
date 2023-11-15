@@ -1,4 +1,5 @@
 // import type { Page } from '@playwright/test'
+import { count } from 'node:console'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { SupabaseType } from './utils'
@@ -300,6 +301,12 @@ test.describe('Test organization system permissions', () => {
 
         await expect(error5).toBeFalsy()
 
+        const { error: error6 } = await supabase.from('channel_devices').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+        await expect(error6).toBeFalsy()
+
+        const { error: error7 } = await supabase.from('devices_override').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+        await expect(error7).toBeFalsy()
+
         channelSnapshots = data
         bundleSnapshot = bundleVersion
         deviceSnapshot = deviceData
@@ -595,13 +602,46 @@ test.describe('Test organization system permissions', () => {
         const updateVersionLocator = page.locator('#update-version')
         await updateVersionLocator.click()
 
-        if (permission.forceDeviceChannel) {
+        if (permission.forceDeviceVersion) {
           await expect(page.locator('#action-sheet')).toBeVisible()
           actionSheetButtons = await page.locator('#action-sheet > div > button').all()
 
-          const cancelButton = await findButtonInActionSheet(actionSheetButtons, 'cancel')
-          await expect(cancelButton).toBeTruthy()
-          await cancelButton!.click()
+          // Now let's add an overwrite
+          const specificVersion = await findButtonInActionSheet(actionSheetButtons, '1.0.0')
+          await expect(specificVersion).toBeTruthy()
+          await specificVersion!.click()
+
+          await expectPopout(page, 'Version link')
+          const { error: versionOverwriteError } = await supabase.from('devices_override')
+            .select('version')
+            .eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+            .single()
+
+          await expect(versionOverwriteError).toBeFalsy()
+
+          await expect(page.locator('#action-sheet')).toBeHidden()
+
+          // Now let's delete this version
+          await updateVersionLocator.click()
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+
+          const removeButton = await findButtonInActionSheet(actionSheetButtons, 'remove')
+          await expect(removeButton).toBeTruthy()
+          await removeButton!.click()
+
+          await awaitPopout(page)
+          const finalRemoveButton = await findPopoutButton(page, 'delete')
+
+          await expect(finalRemoveButton).toBeTruthy()
+          await finalRemoveButton!.click()
+
+          const { error: versionOverwriteRemoveError, count: versionOverwritesCount } = await supabase.from('devices_override')
+            .select('version', { count: 'exact' })
+            .eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+
+          await expect(versionOverwriteRemoveError).toBeFalsy()
+          await expect(versionOverwritesCount).toBe(0)
         }
         else {
           await expectPopout(page, 'Insufficient permissions')
@@ -610,7 +650,7 @@ test.describe('Test organization system permissions', () => {
         const updateChannelLocator = page.locator('#update-channel')
         await updateChannelLocator.click()
 
-        if (permission.forceDeviceVersion) {
+        if (permission.forceDeviceChannel) {
           await expect(page.locator('#action-sheet')).toBeVisible()
           actionSheetButtons = await page.locator('#action-sheet > div > button').all()
 

@@ -2673,7 +2673,19 @@ CREATE POLICY "Allow app owner to read" ON "public"."stats" FOR SELECT TO "authe
 
 CREATE POLICY "Allow org admin to all" ON "public"."org_users" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "org_id", NULL::character varying, NULL::bigint));
 
-CREATE POLICY "Allow org member (write) to update" ON "public"."app_versions" TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id"(user_id), NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id"(user_id), NULL::character varying, NULL::bigint));
+CREATE POLICY "Allow org member (write) to update" ON "public"."app_versions" FOR UPDATE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id"(user_id), NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id"(user_id), NULL::character varying, NULL::bigint));
+
+CREATE POLICY "Allow org member (write) to insert" ON "public"."devices_override" FOR INSERT TO "authenticated" WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org member (write) to delete" ON "public"."devices_override" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org member to read" ON "public"."devices_override" FOR SELECT TO "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org member (write) to insert" ON "public"."channel_devices" FOR INSERT TO "authenticated" WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org member (write) to delete" ON "public"."channel_devices" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
+
+CREATE POLICY "Allow org member to read" ON "public"."channel_devices" FOR SELECT TO "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
 
 CREATE POLICY "Allow owner to all" ON "public"."app_versions" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
