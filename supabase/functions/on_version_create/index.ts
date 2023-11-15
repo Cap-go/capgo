@@ -30,6 +30,11 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
+    if (!record.id) {
+      console.log('No id')
+      return sendRes()
+    }
+
     const { error: errorUpdate } = await supabaseAdmin()
       .from('apps')
       .update({
@@ -101,7 +106,7 @@ serve(async (event: Request) => {
         size,
       })
     await sendMetaToClickHouse({
-      id: record.app_id,
+      id: record.id,
       created_at: new Date().toISOString(),
       app_id: record.app_id,
       size,
