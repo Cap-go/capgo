@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { getCurrentInstance, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { gt } from 'semver'
@@ -50,6 +50,7 @@ const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
 const role = ref<OrganizationRole | null>(null)
+const reloadCount = ref(0)
 
 const tabs: Tab[] = [
   {
@@ -224,6 +225,7 @@ async function loadData() {
     getVersion(),
     getOrgRole(),
   ])
+  reloadCount.value += 1
   isLoading.value = false
 }
 
@@ -297,7 +299,7 @@ async function updateOverride() {
       text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && await delDevVersion(device.value?.device_id)
-        toast.error(t('unlink-version'))
+        toast.success(t('unlink-version'))
         await loadData()
       },
     })
@@ -311,7 +313,7 @@ async function updateOverride() {
         isLoading.value = true
         try {
           await upsertDevVersion(device.value?.device_id, version)
-          toast.error(t('version-linked'))
+          toast.success(t('version-linked'))
           await loadData()
         }
         catch (error) {
@@ -449,7 +451,7 @@ function guardCustomID(event: Event) {
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <dl class="divide-y divide-gray-500">
+        <dl :key="reloadCount" class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
           <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])" @update:value="saveCustomId" @click="guardCustomID" />
           <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
