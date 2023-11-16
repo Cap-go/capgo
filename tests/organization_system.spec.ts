@@ -1,5 +1,4 @@
 // import type { Page } from '@playwright/test'
-import { count } from 'node:console'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import type { SupabaseType } from './utils'
@@ -126,7 +125,7 @@ test.describe('Test organization invitation accept', () => {
         const allOrgs = await allOrgsLocator.all()
 
         // Check the name of the 'demo org' (We invite user to this org above)
-        let supabase = await useSupabase()
+        let supabase = await useSupabase(page)
         const { data: demoOrgName, error } = await supabase.from('orgs')
           .select()
           .eq('id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
@@ -654,15 +653,64 @@ test.describe('Test organization system permissions', () => {
           await expect(page.locator('#action-sheet')).toBeVisible()
           actionSheetButtons = await page.locator('#action-sheet > div > button').all()
 
-          const cancelButton = await findButtonInActionSheet(actionSheetButtons, 'cancel')
-          await expect(cancelButton).toBeTruthy()
-          await cancelButton!.click()
+          // Now let's add an overwrite
+          const specificChannel = await findButtonInActionSheet(actionSheetButtons, 'no_access')
+          await expect(specificChannel).toBeTruthy()
+          await specificChannel!.click()
+
+          const { error: channelOverwriteError } = await supabase.from('channel_devices')
+            .select('app_id')
+            .eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+            .single()
+
+          await expect(channelOverwriteError).toBeFalsy()
+
+          await expect(page.locator('#action-sheet')).toBeHidden()
+
+          // Now let's delete this channel overwrite
+          await updateChannelLocator.click()
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+
+          const removeButton = await findButtonInActionSheet(actionSheetButtons, 'remove')
+          await expect(removeButton).toBeTruthy()
+          await removeButton!.click()
+
+          await awaitPopout(page)
+          const finalRemoveButton = await findPopoutButton(page, 'delete')
+
+          await expect(finalRemoveButton).toBeTruthy()
+          await finalRemoveButton!.click()
+
+          const { error: channelOverwriteRemoveError, count: channelOverwritesCount } = await supabase.from('channel_devices')
+            .select('app_id', { count: 'exact' })
+            .eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+
+          await expect(channelOverwriteRemoveError).toBeFalsy()
+          await expect(channelOverwritesCount).toBe(0)
         }
         else {
           await expectPopout(page, 'Insufficient permissions')
           const innerHtml = await updateChannelLocator.innerHTML()
           expect(innerHtml.includes('click to add')).toBe(false)
         }
+
+        // TODO: Once stats are no longer a total mess test stats
+        // Test org settings
+
+        await page.goto(`${BASE_URL}/dashboard/settings/account`)
+
+        // Get supabase client user id and the current org owner
+        const currentOrgDetails = await getOrgDetails(page, supabase)
+        const clientSupabase = await useSupabase(page)
+
+        const clientSupabaseUser = await clientSupabase.auth.getUser()
+        await expect(clientSupabaseUser.error).toBeFalsy()
+        await expect(clientSupabaseUser.data).toBeTruthy()
+        await expect(clientSupabaseUser.data.user).toBeTruthy()
+
+        const currentUserId = clientSupabaseUser!.data!.user!.id
+        await expect(currentOrgDetails.created_by).toBe(currentUserId)
       })
     })
   }
@@ -694,7 +742,7 @@ async function getOrgName(page: Page): Promise<string> {
 
 async function getOrgDetails(page: Page, supabase?: SupabaseType): Promise<Database['public']['Tables']['orgs']['Row']> {
   if (!supabase)
-    supabase = await useSupabase()
+    supabase = await useSupabase(page)
 
   const orgName = await getOrgName(page)
 
