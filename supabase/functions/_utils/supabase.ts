@@ -438,13 +438,13 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
-  let tableName: 'stats' | 'clickhouse_stats' = 'stats'
+  let tableName: 'stats' | 'clickhouse_logs' = 'stats'
   let client = supabaseClient(auth)
   if (!auth)
     client = supabaseAdmin()
 
   if (isClickHouseEnabled()) {
-    tableName = 'clickhouse_stats'
+    tableName = 'clickhouse_logs'
     const reqOwner = await client
       .rpc('is_app_owner', { appid: appId })
       .then(res => res.data || false)
