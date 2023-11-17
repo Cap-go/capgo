@@ -1,6 +1,7 @@
 // import type { Page } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
+import { diff } from 'deep-diff'
 import type { SupabaseType } from './utils'
 import { BASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
@@ -306,6 +307,9 @@ test.describe('Test organization system permissions', () => {
         const { error: error7 } = await supabase.from('devices_override').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
         await expect(error7).toBeFalsy()
 
+        // const { error: error8 } = await supabase.from('channel_devices').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
+        // await expect(error8).toBeFalsy()
+
         channelSnapshots = data
         bundleSnapshot = bundleVersion
         deviceSnapshot = deviceData
@@ -438,14 +442,37 @@ test.describe('Test organization system permissions', () => {
 
         for (const toggle of ktoggles) {
           const oldState = await toggle.isChecked()
+
+          async function getSupabaseProdChannelState(supabase: SupabaseType): Database['public']['Tables']['channels']['Row'] {
+            const { data, error } = await supabase.from('channels')
+              .select('*')
+              .eq('name', 'production')
+              .single()
+
+            await expect(error).toBeFalsy()
+            await expect(data).toBeTruthy()
+
+            return data!
+          }
+
+          const oldSupabaseState = await getSupabaseProdChannelState(supabase)
+
           await toggle.click()
           const newState = await toggle.isChecked()
 
-          if (permission.changeChannelToggle)
-            expect(newState).toBe(!oldState)
+          const newSupabaseState = await getSupabaseProdChannelState(supabase)
+          const diffArr = diff(oldSupabaseState, newSupabaseState)
 
-          else
+          if (permission.changeChannelToggle) {
+            expect(newState).toBe(!oldState)
+            await expect(diffArr).toBeTruthy()
+            await expect(diffArr?.length).toBeGreaterThanOrEqual(2)
+          }
+
+          else {
+            await expect(diffArr).toBeFalsy()
             await expectPopout(page, 'Insufficient permissions')
+          }
         }
 
         // We check the 'public' switch. This swich opens up a menu so we cannot add this in the loop
@@ -634,6 +661,7 @@ test.describe('Test organization system permissions', () => {
 
           await expect(finalRemoveButton).toBeTruthy()
           await finalRemoveButton!.click()
+          await expectPopout(page, 'Unlink version')
 
           const { error: versionOverwriteRemoveError, count: versionOverwritesCount } = await supabase.from('devices_override')
             .select('version', { count: 'exact' })
@@ -658,6 +686,8 @@ test.describe('Test organization system permissions', () => {
           await expect(specificChannel).toBeTruthy()
           await specificChannel!.click()
 
+          await expectPopout(page, 'Channel override setted')
+
           const { error: channelOverwriteError } = await supabase.from('channel_devices')
             .select('app_id')
             .eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
@@ -681,6 +711,8 @@ test.describe('Test organization system permissions', () => {
 
           await expect(finalRemoveButton).toBeTruthy()
           await finalRemoveButton!.click()
+
+          await expectPopout(page, 'Unlink channel')
 
           const { error: channelOverwriteRemoveError, count: channelOverwritesCount } = await supabase.from('channel_devices')
             .select('app_id', { count: 'exact' })

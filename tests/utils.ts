@@ -37,7 +37,7 @@ export async function expectPopout(page: Page, toHave: string) {
   }
 }
 
-export async function useSupabase() {
+export async function useSupabase(page: Page) {
   const options: SupabaseClientOptions<'public'> = {
     auth: {
       autoRefreshToken: false,
@@ -51,8 +51,11 @@ export async function useSupabase() {
   // eslint-disable-next-line n/prefer-global/process
   supaClient = createClient<Database>(process.env.SUPABASE_URL ?? defaultSupabaseUrl, process.env.SUPABASE_ANON ?? defaultSupabaseAnonKey, options)
 
+  const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))
+  await expect(supabaseEmail).toBeTruthy()
+
   const { error } = await supaClient.auth.signInWithPassword({
-    email: DEFAULT_EMAIL,
+    email: supabaseEmail!,
     password: DEFAULT_PASSWORD,
   })
 
