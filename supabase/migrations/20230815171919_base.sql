@@ -814,6 +814,37 @@ Begin
 End;
 $$;
 
+-- TODO: Add grant and revoke for this fn
+CREATE FUNCTION "public"."change_org_logo"("logo" "varchar", "org_id" "uuid") RETURNS "varchar"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Declare  
+  org record;
+  invited_user record;
+  current_record record;
+Begin
+  SELECT * FROM ORGS
+  INTO org
+  WHERE id=change_org_logo.org_id;
+
+  IF org IS NULL THEN
+    return 'NO_ORG';
+  END IF;
+
+  IF NOT (org.created_by=auth.uid()) THEN
+      if NOT (check_min_rights('admin'::user_min_right, auth.uid(), change_org_logo.org_id, NULL::character varying, NULL::bigint)) THEN
+          return 'NO_RIGHTS';
+      END IF;
+  END IF;
+
+  UPDATE orgs
+  SET logo = change_org_logo.logo
+  WHERE id = change_org_logo.org_id;
+
+  RETURN 'OK';
+End;
+$$;
+
 CREATE FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") RETURNS varchar
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$

@@ -64,6 +64,9 @@ export async function useSupabase(page: Page) {
   return supaClient
 }
 
+// eslint-disable-next-line n/prefer-global/process
+export const SUPABASE_URL = process.env.SUPABASE_URL ?? defaultSupabaseUrl
+
 export async function useSupabaseAdmin() {
   const options: SupabaseClientOptions<'public'> = {
     auth: {

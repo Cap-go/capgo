@@ -598,6 +598,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('channel-progressive-deploy')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.enable_progressive_deploy"

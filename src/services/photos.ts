@@ -62,11 +62,26 @@ async function updloadPhotoOrg(data: string, fileName: string, contentType: stri
     if (!success)
       return
 
+    const gid = organizationStore.currentOrganization?.gid
+    const userId = main.user?.id
+
+    if (!gid || !userId) {
+      console.error('No current org id or user id', gid, userId)
+      return
+    }
+
+    const { data: status, error: setLogoError } = await supabase.rpc('change_org_logo', {
+      logo: url,
+      org_id: gid,
+    })
+
+    if (setLogoError)
+      console.error('Cannot set org avatar', setLogoError)
+
     const { data: usr, error: dbError } = await supabase
       .from('orgs')
-      .update({ logo: url })
-      .eq('created_by', main.user?.id)
       .select()
+      .eq('created_by', userId)
       .single()
 
     if (!usr || dbError) {

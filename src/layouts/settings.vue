@@ -59,8 +59,8 @@ const organizationTabs = ref<Tab[]>([
   },
 ])
 
-const type: 'user' | 'organization' = ref('user')
 const router = useRouter()
+const type = ref<'user' | 'organization'>(router.currentRoute.value.path.includes('organization') ? 'organization' : 'user')
 
 watch(type, (val) => {
   let key
@@ -100,6 +100,14 @@ if (main.user?.id) {
   }
 }
 
+async function gotoOrgSettings() {
+  type.value = 'organization'
+}
+
+function gotoMainSettings() {
+  type.value = 'user'
+}
+
 displayStore.NavTitle = t('settings')
 </script>
 
@@ -115,19 +123,19 @@ displayStore.NavTitle = t('settings')
         <ul class="flex flex-wrap -mb-px">
           <li class="mr-2">
             <a
-              href="#" class="inline-block p-4 border-b-2 rounded-t-lg"
+              class="inline-block p-4 border-b-2 rounded-t-lg cursor-pointer"
               :class="type === 'user' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
               aria-current="page"
-              @click="type = 'user'"
+              @click="gotoMainSettings"
             >Your settings</a>
           </li>
           <li class="mr-2">
             <a
-              href="#" class="inline-block p-4 border-b-2 rounded-t-lg"
+              class="inline-block p-4 border-b-2 rounded-t-lg cursor-pointer"
               :class="type === 'organization' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
               aria-current="page"
-              @click="type = 'organization'"
-            >{{ currentOrganization ? `${currentOrganization.name}'s settings'` : 'Organization settings' }} </a>
+              @click="gotoOrgSettings"
+            >{{ 'Organization settings' }} </a>
           </li>
         </ul>
       </div>

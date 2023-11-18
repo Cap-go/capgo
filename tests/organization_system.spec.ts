@@ -1,9 +1,11 @@
 // import type { Page } from '@playwright/test'
+import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { diff } from 'deep-diff'
 import type { SupabaseType } from './utils'
-import { BASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
+import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
 
 test.beforeEach(beforeEachTest)
@@ -187,6 +189,7 @@ test.describe('Test organization system permissions', () => {
       setDeviceCustomId: false,
       forceDeviceChannel: false,
       forceDeviceVersion: false,
+      changeOrgPicture: false,
     },
     upload: {
       deleteChannel: false,
@@ -201,6 +204,7 @@ test.describe('Test organization system permissions', () => {
       setDeviceCustomId: false,
       forceDeviceChannel: false,
       forceDeviceVersion: false,
+      changeOrgPicture: false,
     },
     write: {
       deleteChannel: false,
@@ -215,6 +219,7 @@ test.describe('Test organization system permissions', () => {
       setDeviceCustomId: true,
       forceDeviceChannel: true,
       forceDeviceVersion: true,
+      changeOrgPicture: false,
     },
     admin: {
       deleteChannel: true,
@@ -229,6 +234,7 @@ test.describe('Test organization system permissions', () => {
       setDeviceCustomId: true,
       forceDeviceChannel: true,
       forceDeviceVersion: true,
+      changeOrgPicture: true,
     },
     owner: {
       deleteChannel: true,
@@ -243,6 +249,7 @@ test.describe('Test organization system permissions', () => {
       setDeviceCustomId: true,
       forceDeviceChannel: true,
       forceDeviceVersion: true,
+      changeOrgPicture: true,
     },
   }
 
@@ -306,6 +313,9 @@ test.describe('Test organization system permissions', () => {
 
         const { error: error7 } = await supabase.from('devices_override').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
         await expect(error7).toBeFalsy()
+
+        const { error: error8 } = await supabase.from('orgs').update({ logo: null }).eq('id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+        expect(error8).toBeFalsy()
 
         // const { error: error8 } = await supabase.from('channel_devices').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
         // await expect(error8).toBeFalsy()
@@ -443,7 +453,7 @@ test.describe('Test organization system permissions', () => {
         for (const toggle of ktoggles) {
           const oldState = await toggle.isChecked()
 
-          async function getSupabaseProdChannelState(supabase: SupabaseType): Database['public']['Tables']['channels']['Row'] {
+          async function getSupabaseProdChannelState(supa1base: SupabaseType): Promise<Database['public']['Tables']['channels']['Row']> {
             const { data, error } = await supabase.from('channels')
               .select('*')
               .eq('name', 'production')
@@ -458,7 +468,10 @@ test.describe('Test organization system permissions', () => {
           const oldSupabaseState = await getSupabaseProdChannelState(supabase)
 
           await toggle.click()
-          const newState = await toggle.isChecked()
+          let newState = await toggle.isChecked()
+
+          if (permission.changeChannelToggle)
+            await page.waitForRequest(`${SUPABASE_URL}\/**`)
 
           const newSupabaseState = await getSupabaseProdChannelState(supabase)
           const diffArr = diff(oldSupabaseState, newSupabaseState)
@@ -467,6 +480,10 @@ test.describe('Test organization system permissions', () => {
             expect(newState).toBe(!oldState)
             await expect(diffArr).toBeTruthy()
             await expect(diffArr?.length).toBeGreaterThanOrEqual(2)
+
+            await toggle.click()
+            newState = await toggle.isChecked()
+            expect(newState).toBe(oldState)
           }
 
           else {
@@ -730,7 +747,7 @@ test.describe('Test organization system permissions', () => {
         // TODO: Once stats are no longer a total mess test stats
         // Test org settings
 
-        await page.goto(`${BASE_URL}/dashboard/settings/account`)
+        await page.goto(`${BASE_URL}/dashboard/settings/organization/general`)
 
         // Get supabase client user id and the current org owner
         const currentOrgDetails = await getOrgDetails(page, supabase)
@@ -743,6 +760,63 @@ test.describe('Test organization system permissions', () => {
 
         const currentUserId = clientSupabaseUser!.data!.user!.id
         await expect(currentOrgDetails.created_by).toBe(currentUserId)
+
+        // Let's select the 'demo org'
+
+        await page.click('#organization-picker')
+        const allOrgsLocator = await page.locator('#dropdown-org > ul > li')
+
+        await expect(allOrgsLocator).toHaveCount(2)
+        const demoOrgButton = await firstItemAsync(await allOrgsLocator.all(), async (orgName) => {
+          return (await orgName.innerHTML()).includes('Demo org')
+        })
+
+        expect(demoOrgButton).toBeTruthy()
+        await demoOrgButton?.click()
+
+        expect(await getOrgName(page)).toBe('Demo org')
+        // Start by trying to change the picture. Might be a bit hard to test for
+
+        await page.locator('#change-org-pic').click()
+
+        if (permission.changeOrgPicture) {
+          await expect(page.locator('#action-sheet')).toBeVisible()
+          actionSheetButtons = await page.locator('#action-sheet > div > button').all()
+
+          const browseFilesButton = await findButtonInActionSheet(actionSheetButtons, 'browse')
+          await expect(browseFilesButton).toBeTruthy()
+          const cameraInputLocator = page.locator('#_capacitor-camera-input-multiple')
+
+          await browseFilesButton?.click()
+          await expect(cameraInputLocator).toHaveCount(1)
+          await cameraInputLocator.setInputFiles(path.join(__dirname, 'smile.png'))
+
+          // Check if the avatar exists
+          const avatarLocator = page.locator('#org-avatar')
+          await expect(avatarLocator).toHaveCount(1)
+
+          // Download the new avatar
+          const avatarUrl = await avatarLocator.getAttribute('src')
+          expect(avatarUrl).toBeTruthy()
+
+          const avatarResponse = await fetch(avatarUrl!)
+          expect(avatarResponse.status).toBe(200)
+
+          const avatarRemoteData = new Uint8Array(await avatarResponse.arrayBuffer())
+          expect(avatarRemoteData.length).toBeGreaterThan(0)
+
+          // Read the local file
+          const localAvatarData = new Uint8Array(readFileSync(path.join(__dirname, 'smile.png')))
+          expect(localAvatarData.length).toBeGreaterThan(0)
+
+          // Compare local avatar and the remote versions
+          expect(localAvatarData.length).toBe(avatarRemoteData.length)
+          const avatarsMatch = avatarRemoteData.every((v, i) => v === localAvatarData[i])
+          expect(avatarsMatch).toBe(true)
+        }
+        else {
+          // await expectPopout(page, 'Insufficient permissions')
+        }
       })
     })
   }

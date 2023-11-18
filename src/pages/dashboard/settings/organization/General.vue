@@ -108,14 +108,15 @@ function onInputKeyDown(event: Event) {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="currentOrganization?.logo" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
+                v-if="currentOrganization?.logo"
+                id="org-avatar" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
                 width="80" height="80" alt="User upload"
               >
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
                 <p>{{ 'N/A' }}</p>
               </div>
             </div>
-            <button type="button" class="px-3 py-2 text-xs font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="presentActionSheet">
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="presentActionSheet">
               {{ t('change') }}
             </button>
           </div>

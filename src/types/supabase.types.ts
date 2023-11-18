@@ -1071,6 +1071,13 @@ export interface Database {
         }
         Returns: string
       }
+      change_org_logo: {
+        Args: {
+          logo: string
+          org_id: string
+        }
+        Returns: string
+      }
       check_min_rights:
         | {
             Args: {
@@ -1431,6 +1438,12 @@ export interface Database {
         }
         Returns: string
       }
+      get_user_main_org_id_by_app_id: {
+        Args: {
+          app_id: string
+        }
+        Returns: string
+      }
       get_weekly_stats: {
         Args: {
           app_id: string
@@ -1684,17 +1697,10 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_onboarded:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
+      is_onboarded: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_onboarding_needed:
         | {
             Args: Record<PropertyKey, never>
