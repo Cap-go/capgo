@@ -467,11 +467,17 @@ test.describe('Test organization system permissions', () => {
 
           const oldSupabaseState = await getSupabaseProdChannelState(supabase)
 
-          await toggle.click()
-          let newState = await toggle.isChecked()
+          if (permission.changeChannelToggle) {
+            await Promise.all([
+              page.waitForRequest(`${SUPABASE_URL}\/**`),
+              await toggle.click(),
+            ])
+          }
+          else {
+            await toggle.click()
+          }
 
-          if (permission.changeChannelToggle)
-            await page.waitForRequest(`${SUPABASE_URL}\/**`)
+          let newState = await toggle.isChecked()
 
           const newSupabaseState = await getSupabaseProdChannelState(supabase)
           const diffArr = diff(oldSupabaseState, newSupabaseState)
@@ -787,6 +793,33 @@ test.describe('Test organization system permissions', () => {
           await expect(browseFilesButton).toBeTruthy()
           const cameraInputLocator = page.locator('#_capacitor-camera-input-multiple')
 
+          // Add an event listener to prevent file open from accually opening
+          await page.evaluate(() => {
+            const onClick = (event: MouseEvent) => {
+              if (!event.target)
+                return
+
+              console.log('tar', event.target)
+
+              if ('getAttribute' in event.target) {
+                const element = event.target as any as Element
+                const id = element.getAttribute('id')
+                if (!id)
+                  return
+
+                if (!id.includes('camera-input'))
+                  return
+
+                event.preventDefault()
+                document.removeEventListener('click', onClick, true)
+              }
+            }
+
+            document.addEventListener('click', onClick, true)
+          })
+
+          // await page.evaluate(eventClickFunction => document.addEventListener('click', eventClickFunction), eventClickFunction)
+
           await browseFilesButton?.click()
           await expect(cameraInputLocator).toHaveCount(1)
           await cameraInputLocator.setInputFiles(path.join(__dirname, 'smile.png'))
@@ -815,7 +848,7 @@ test.describe('Test organization system permissions', () => {
           expect(avatarsMatch).toBe(true)
         }
         else {
-          // await expectPopout(page, 'Insufficient permissions')
+          await expectPopout(page, 'Insufficient permissions')
         }
       })
     })
