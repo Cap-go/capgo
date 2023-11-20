@@ -1,7 +1,7 @@
-import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis@v1.22.0/mod.ts'
-import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts'
+import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.32.0/mod.ts'
+import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis@v1.25.1/mod.ts'
+import { connect, parseURL } from 'https://deno.land/x/redis@v0.32.0/mod.ts'
+import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.25.1/pkg/pipeline.ts'
 import { getEnv } from './utils.ts'
 
 type RedisValue = string | number | Uint8Array

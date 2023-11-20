@@ -1,5 +1,5 @@
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
+import { serve } from 'https://deno.land/std@0.207.0/http/server.ts'
 
 import { getRedis } from '../_utils/redis.ts'
 import { update } from '../_utils/update.ts'

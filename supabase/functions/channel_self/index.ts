@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.207.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import z from 'https://deno.land/x/zod@v3.22.2/index.ts'
+import z from 'https://deno.land/x/zod@v3.22.4/index.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'

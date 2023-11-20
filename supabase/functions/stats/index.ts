@@ -1,5 +1,5 @@
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
+import { serve } from 'https://deno.land/std@0.207.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import {
   INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME,

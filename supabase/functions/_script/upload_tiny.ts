@@ -1,4 +1,4 @@
-import * as postgres from 'https://deno.land/x/postgres@v0.14.2/mod.ts'
+import * as postgres from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
 
 const databaseUrl = Deno.env.get('SUPABASE_DB_URL') ?? ''
 const pool = new postgres.Pool(databaseUrl, 3, true)

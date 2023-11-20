@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.207.0/http/server.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { redisDeviceInvalidate } from '../_utils/redis.ts'
 import type { Database } from '../_utils/supabase.types.ts'
