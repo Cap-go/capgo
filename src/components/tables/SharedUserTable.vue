@@ -60,7 +60,7 @@ async function didCancel(name: string) {
 async function getData() {
   isLoading.value = true
   try {
-    const req = supabase
+    let req = supabase
       .from('channel_users')
       .select(`
           id,
@@ -78,15 +78,15 @@ async function getData() {
       .throwOnError()
 
     if (props.channelId)
-      req.eq('channel_id', props.channelId)
+      req = req.eq('channel_id', props.channelId)
 
     if (search.value)
-      req.like('name', `%${search.value}%`)
+      req = req.like('name', `%${search.value}%`)
 
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
-          req.order(col.key as any, { ascending: col.sortable === 'asc' })
+          req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
       })
     }
     const { data, count } = await req

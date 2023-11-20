@@ -323,12 +323,12 @@ export async function getSDashboard(auth: string, userIdQuery: string, rangeStar
     client = supabaseAdmin()
   }
   console.log('tableName', tableName)
-  const req = client
+  let req = client
     .from(tableName)
     .select()
 
   if (appId) {
-    req.eq('app_id', appId)
+    req = req.eq('app_id', appId)
   }
   else {
     const userId = isAdmin ? userIdQuery : (await supabaseClient(auth).auth.getUser()).data.user?.id
@@ -341,7 +341,13 @@ export async function getSDashboard(auth: string, userIdQuery: string, rangeStar
       .eq('user_id', userId)
       .then(res => res.data?.map(app => app.app_id) || [])
     console.log('appIds', appIds)
-    req.in('app_id', appIds)
+    req = req.in('app_id', appIds)
+  }
+
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
+    // req range for start and end date for created_at
+    req = req.in('created_at', [rangeStart, rangeEnd])
   }
 
   const res = await req
@@ -380,44 +386,44 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
       .eq('app_id', appId)
       .then(res => res.count || 0)
     : 0
-  const req = client
+  let req = client
     .from(tableName)
     .select()
     .eq('app_id', appId)
 
   if (versionId) {
     console.log('versionId', versionId)
-    req.eq('version', versionId)
+    req = req.eq('version', versionId)
   }
 
   if (rangeStart !== undefined && rangeEnd !== undefined) {
     console.log('range', rangeStart, rangeEnd)
-    req.range(rangeStart, rangeEnd)
+    req = req.in('created_at', [rangeStart, rangeEnd])
   }
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
     if (deviceIds.length === 1) {
-      req.eq('device_id', deviceIds[0])
-      req.limit(1)
+      req = req.eq('device_id', deviceIds[0])
+      req = req.limit(1)
     }
     else {
-      req.in('device_id', deviceIds)
+      req = req.in('device_id', deviceIds)
     }
   }
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      req.or(`custom_id.like.%${search}%`)
+      req = req.or(`custom_id.like.%${search}%`)
     else
-      req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
+      req = req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
   }
 
   if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         console.log('order', col.key, col.sortable)
-        req.order(col.key as any, { ascending: col.sortable === 'asc' })
+        req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
       }
     })
   }
@@ -465,7 +471,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
       .eq('app_id', appId)
       .then(res => res.count || 0)
     : 0
-  const req = client
+  let req = client
     .from(tableName)
     .select(`
         device_id,
@@ -479,29 +485,30 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
   if (rangeStart !== undefined && rangeEnd !== undefined) {
     console.log('range', rangeStart, rangeEnd)
-    req.range(rangeStart, rangeEnd)
+    // req range for start and end date for created_at
+    req = req.in('created_at', [rangeStart, rangeEnd])
   }
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
     if (deviceIds.length === 1)
-      req.eq('device_id', deviceIds[0])
+      req = req.eq('device_id', deviceIds[0])
     else
-      req.in('device_id', deviceIds)
+      req = req.in('device_id', deviceIds)
   }
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      req.or(`action.like.%${search}%`)
+      req = req.or(`action.like.%${search}%`)
     else
-      req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+      req = req.or(`device_id.like.%${search}%,action.like.%${search}%`)
   }
 
   if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         console.log('order', col.key, col.sortable)
-        req.order(col.key as any, { ascending: col.sortable === 'asc' })
+        req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
       }
     })
   }

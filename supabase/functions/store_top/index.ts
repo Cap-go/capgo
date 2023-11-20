@@ -16,7 +16,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: TopSto
       .select('*', { count: 'exact', head: true })
     const total = count || 0
 
-    const req = supabaseAdmin()
+    let req = supabaseAdmin()
       .from('store_apps')
       .select('url, title, icon, summary, installs, category')
       .order('installs', { ascending: false })
@@ -26,19 +26,19 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: TopSto
       .select('*', { count: 'exact', head: true })
 
     if (body.mode === 'cordova') {
-      req.eq('cordova', true)
+      req = req.eq('cordova', true)
         .eq('capacitor', false)
       // get toal categ
       reqTotal.eq('cordova', true)
         .eq('capacitor', false)
     }
     else if (body.mode === 'flutter') {
-      req.eq('flutter', true)
+      req = req.eq('flutter', true)
       // get toal categ
       reqTotal.eq('flutter', true)
     }
     else if (body.mode === 'reactNative') {
-      req.eq('react_native', true)
+      req = req.eq('react_native', true)
       // get toal categ
       reqTotal.eq('react_native', true)
     }
@@ -48,7 +48,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: TopSto
       reqTotal.eq('native_script', true)
     }
     else {
-      req.eq('capacitor', true)
+      req = req.eq('capacitor', true)
       // get toal categ
       reqTotal.eq('capacitor', true)
     }
