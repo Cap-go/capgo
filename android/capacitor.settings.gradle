@@ -89,14 +89,11 @@ project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.pnpm/@c
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric/android')
 
-include ':capgo-capacitor-purchases'
-project(':capgo-capacitor-purchases').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-purchases@5.0.8_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-purchases/android')
-
 include ':capgo-capacitor-screen-recorder'
 project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-screen-recorder/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@5.2.22_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-updater@5.3.26_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater/android')
 
 include ':capgo-inappbrowser'
 project(':capgo-inappbrowser').projectDir = new File('../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.4.2/node_modules/@capgo/inappbrowser/android')
@@ -106,6 +103,9 @@ project(':capgo-native-audio').projectDir = new File('../node_modules/.pnpm/@cap
 
 include ':capgo-native-market'
 project(':capgo-native-market').projectDir = new File('../node_modules/.pnpm/@capgo+native-market@5.0.3/node_modules/@capgo/native-market/android')
+
+include ':revenuecat-purchases-capacitor'
+project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.pnpm/@revenuecat+purchases-capacitor@7.1.1_@capacitor+core@5.4.2/node_modules/@revenuecat/purchases-capacitor/android')
 
 include ':capacitor-rate-app'
 project(':capacitor-rate-app').projectDir = new File('../node_modules/.pnpm/capacitor-rate-app@4.0.3_@capacitor+core@5.4.2/node_modules/capacitor-rate-app/android')

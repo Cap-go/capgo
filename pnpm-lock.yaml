@@ -104,9 +104,6 @@ dependencies:
   '@capgo/capacitor-native-biometric':
     specifier: ^5.0.1
     version: 5.0.1
-  '@capgo/capacitor-purchases':
-    specifier: ^5.0.8
-    version: 5.0.8(@capacitor/core@5.4.2)
   '@capgo/capacitor-screen-recorder':
     specifier: ^5.0.0
     version: 5.0.0(@capacitor/core@5.4.2)
@@ -140,6 +137,9 @@ dependencies:
   '@netlify/functions':
     specifier: ^1.6.0
     version: 1.6.0
+  '@revenuecat/purchases-capacitor':
+    specifier: ^7.1.1
+    version: 7.1.1(@capacitor/core@5.4.2)
   '@supabase/supabase-js':
     specifier: 2.38.0
     version: 2.38.0
@@ -2359,14 +2359,6 @@ packages:
       '@capacitor/core': 5.4.2
     dev: false
 
-  /@capgo/capacitor-purchases@5.0.8(@capacitor/core@5.4.2):
-    resolution: {integrity: sha512-/2XA7UNakOekNm9j6e9wSh77qKrUoXtOW0Oz6pe8QWa7YWqhBeoxWEB227lCguooyZ6iFcL9X4BTJhcywZwpzA==}
-    peerDependencies:
-      '@capacitor/core': ^5.0.0
-    dependencies:
-      '@capacitor/core': 5.4.2
-    dev: false
-
   /@capgo/capacitor-screen-recorder@5.0.0(@capacitor/core@5.4.2):
     resolution: {integrity: sha512-8MPfVk0fjr4YG5dPzONoP68uObcVxK4ja3lvjokF2q7IeW/BhwyXD87KiopOGiBQ+KYlczOIAm0NPZQ2cJ3wvQ==}
     peerDependencies:
@@ -3954,6 +3946,19 @@ packages:
 
   /@protobufjs/utf8@1.1.0:
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
+    dev: false
+
+  /@revenuecat/purchases-capacitor@7.1.1(@capacitor/core@5.4.2):
+    resolution: {integrity: sha512-m7fTzFtGq0YaK2M3U0ygkzk53uHeY/JLoy6+gpJtgmrctQPWOkRTEQhCJ74l0LmWpai6j72XFTPPt6GMkV0bBw==}
+    peerDependencies:
+      '@capacitor/core': ^5.0.0
+    dependencies:
+      '@capacitor/core': 5.4.2
+      '@revenuecat/purchases-typescript-internal-esm': 7.3.3
+    dev: false
+
+  /@revenuecat/purchases-typescript-internal-esm@7.3.3:
+    resolution: {integrity: sha512-Vfwj49iQunqxiuy/EDMVdDfqR2LM5BKfAOfFyzV3oDCHpXIsBjSUZT2/zdsoPVreeylVwf4alHf0U2ivA9OHPQ==}
     dev: false
 
   /@rollup/plugin-babel@5.3.1(@babel/core@7.22.11)(rollup@2.79.1):
