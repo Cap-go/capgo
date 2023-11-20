@@ -43,7 +43,7 @@ const allLimits = computed(() => {
 
 async function getAppStats() {
   if (props.appId)
-    return main.filterDashboard(props.appId)
+    return main.filterDashboard(props.appId, main.cycleInfo?.subscription_anchor_start, main.cycleInfo?.subscription_anchor_end)
 
   return main.dashboard
 }
