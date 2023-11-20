@@ -72,23 +72,23 @@ const columns = ref<TableColumn[]>([
 ])
 
 async function getDevicesID() {
-  const req = supabase
+  let req = supabase
     .from('channel_devices')
     .select('device_id')
     .eq('app_id', props.appId)
 
   if (props.ids)
-    req.in('device_id', props.ids)
+    req = req.in('device_id', props.ids)
 
   const { data } = await req
 
-  const reqq = supabase
+  let reqq = supabase
     .from('devices_override')
     .select('device_id')
     .eq('app_id', props.appId)
 
   if (props.ids)
-    reqq.eq('device_id', props.ids)
+    reqq = reqq.eq('device_id', props.ids)
 
   const { data: dataOverride } = await reqq
 

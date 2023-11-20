@@ -978,7 +978,18 @@ Begin
   FROM apikeys
   WHERE key=apikey
   AND mode=ANY(keymode))) AND (is_app_owner(get_user_id(apikey), app_id) OR check_min_rights(is_allowed_capgkey.right, get_user_id(apikey), get_user_main_org_id(user_id), app_id, "is_allowed_capgkey"."channel_id"));
-End;  
+End;
+$$;
+
+
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" text, "appid" character varying)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+Begin
+  RETURN is_app_owner(get_user_id(apikey), appid);
+End;
 $$;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
@@ -993,17 +1004,17 @@ Begin
 End;  
 $$;
 
-CREATE OR REPLACE FUNCTION "public"."is_allowed_action"(apikey text, appid character varying)
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("apikey" text, "appid" character varying)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+AS $$
 Begin
   RETURN is_app_owner(get_user_id(apikey), appid);
 End;
-$function$;
+$$;
 
-CREATE OR REPLACE FUNCTION "public"."is_app_owner"(appid character varying)
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("appid" character varying)
 RETURNS boolean
 LANGUAGE plpgsql
 AS $$
@@ -2025,6 +2036,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
+    -- table '(SELECT DISTINCT ON (date,app_id) * FROM aggregate_daily)'
 --     table 'aggregate_daily'
 --   );
 

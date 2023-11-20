@@ -1,5 +1,5 @@
 PODS:
-  - Alamofire (5.8.0)
+  - Alamofire (5.8.1)
   - Capacitor (5.4.2):
     - CapacitorCordova
   - CapacitorActionSheet (5.0.6):
@@ -67,13 +67,9 @@ PODS:
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorPurchases (5.0.8):
-    - Capacitor
-    - PurchasesHybridCommon (= 4.8.0)
-    - RevenueCat (>= 4.16.0)
   - CapgoCapacitorScreenRecorder (5.0.0):
     - Capacitor
-  - CapgoCapacitorUpdater (5.3.14):
+  - CapgoCapacitorUpdater (5.3.26):
     - Alamofire
     - Capacitor
     - SSZipArchive
@@ -87,9 +83,12 @@ PODS:
   - Crisp (2.4.3):
     - Crisp/Crisp (= 2.4.3)
   - Crisp/Crisp (2.4.3)
-  - PurchasesHybridCommon (4.8.0):
-    - RevenueCat (= 4.16.0)
-  - RevenueCat (4.16.0)
+  - PurchasesHybridCommon (7.3.3):
+    - RevenueCat (= 4.30.5)
+  - RevenueCat (4.30.5)
+  - RevenuecatPurchasesCapacitor (7.1.1):
+    - Capacitor
+    - PurchasesHybridCommon (= 7.3.3)
   - SSZipArchive (2.4.3)
   - SwiftKeychainWrapper (4.0.1)
   - Version (0.8.0)
@@ -128,12 +127,12 @@ DEPENDENCIES:
   - "CapgoCapacitorFlash (from `../../node_modules/.pnpm/@capgo+capacitor-flash@2.0.12_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-flash`)"
   - "CapgoCapacitorMute (from `../../node_modules/.pnpm/@capgo+capacitor-mute@2.0.13_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-mute`)"
   - "CapgoCapacitorNativeBiometric (from `../../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric`)"
-  - "CapgoCapacitorPurchases (from `../../node_modules/.pnpm/@capgo+capacitor-purchases@5.0.8_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-purchases`)"
   - "CapgoCapacitorScreenRecorder (from `../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-screen-recorder`)"
-  - "CapgoCapacitorUpdater (from `../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.14_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater`)"
+  - "CapgoCapacitorUpdater (from `../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.26_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater`)"
   - "CapgoInappbrowser (from `../../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.4.2/node_modules/@capgo/inappbrowser`)"
   - "CapgoNativeAudio (from `../../node_modules/.pnpm/@capgo+native-audio@6.0.18_@capacitor+core@5.4.2/node_modules/@capgo/native-audio`)"
   - "CapgoNativeMarket (from `../../node_modules/.pnpm/@capgo+native-market@5.0.3/node_modules/@capgo/native-market`)"
+  - "RevenuecatPurchasesCapacitor (from `../../node_modules/.pnpm/@revenuecat+purchases-capacitor@7.1.1_@capacitor+core@5.4.2/node_modules/@revenuecat/purchases-capacitor`)"
 
 SPEC REPOS:
   trunk:
@@ -212,21 +211,21 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-mute@2.0.13_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-mute"
   CapgoCapacitorNativeBiometric:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-native-biometric@5.0.1/node_modules/@capgo/capacitor-native-biometric"
-  CapgoCapacitorPurchases:
-    :path: "../../node_modules/.pnpm/@capgo+capacitor-purchases@5.0.8_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-purchases"
   CapgoCapacitorScreenRecorder:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-screen-recorder@5.0.0_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-screen-recorder"
   CapgoCapacitorUpdater:
-    :path: "../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.14_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater"
+    :path: "../../node_modules/.pnpm/@capgo+capacitor-updater@5.3.26_@capacitor+core@5.4.2/node_modules/@capgo/capacitor-updater"
   CapgoInappbrowser:
     :path: "../../node_modules/.pnpm/@capgo+inappbrowser@1.2.12_@capacitor+core@5.4.2/node_modules/@capgo/inappbrowser"
   CapgoNativeAudio:
     :path: "../../node_modules/.pnpm/@capgo+native-audio@6.0.18_@capacitor+core@5.4.2/node_modules/@capgo/native-audio"
   CapgoNativeMarket:
     :path: "../../node_modules/.pnpm/@capgo+native-market@5.0.3/node_modules/@capgo/native-market"
+  RevenuecatPurchasesCapacitor:
+    :path: "../../node_modules/.pnpm/@revenuecat+purchases-capacitor@7.1.1_@capacitor+core@5.4.2/node_modules/@revenuecat/purchases-capacitor"
 
 SPEC CHECKSUMS:
-  Alamofire: 0e92e751b3e9e66d7982db43919d01f313b8eb91
+  Alamofire: 3ca42e259043ee0dc5c0cdd76c4bc568b8e42af7
   Capacitor: 8a9db42d105f55843cd8ed2a3cb54e2b78e7f102
   CapacitorActionSheet: ffcdc28d01d731661745efd5cb75f9117e18530e
   CapacitorApp: 024e1b1bea5f883d79f6330d309bc441c88ad04a
@@ -260,19 +259,19 @@ SPEC CHECKSUMS:
   CapgoCapacitorFlash: cc36f1a6c1f6615fec11b0e4d99ff2d4d9d03782
   CapgoCapacitorMute: 9b7b7d82c7645914da5477a037cb30da9f85b59c
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
-  CapgoCapacitorPurchases: 8351f236aaa2329c1a172d8f762d7f6faddaaea9
   CapgoCapacitorScreenRecorder: a4e60b4b73b9797055c3dc9e4b3b7933a2ee1d8e
-  CapgoCapacitorUpdater: 0fad7f219e1d9fdccbf794a3ed4e6fa8196a900f
+  CapgoCapacitorUpdater: 3d4120b5df80b95b930fc80e3d9e5a62ce785a01
   CapgoInappbrowser: de1f9003a378ddbeb1d10c44ca74d778b34b8a77
   CapgoNativeAudio: e54234f12c308fd53202223f5036ca68b117944f
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
   Crisp: 43df6c8f312464119f2ca2d56edce769f4fb73c4
-  PurchasesHybridCommon: bd1e1d3476afd3f95332b0ae160e4ce1bd1efd99
-  RevenueCat: c12e14f5e3dc5732db6d5095ac4ce6ff08d7eeb0
+  PurchasesHybridCommon: 347eab2636e0f03e3001d3aaad1ba1d9d0481b12
+  RevenueCat: c1e33f4e1f1fd239ba461652f02928e220becc31
+  RevenuecatPurchasesCapacitor: 74aed0f69964862a615f5e78698b86b7145bc7cc
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: e5be960b1fb447189455dcd779ac430d11c280ee
+PODFILE CHECKSUM: ad3f35e36ad39cc0e78451f5b9c4e890acf09f52
 
-COCOAPODS: 1.13.0
+COCOAPODS: 1.14.2
