@@ -70,12 +70,17 @@ async function saveChanges() {
     return
   }
 
-  const main = useMainStore()
+  const gid = currentOrganization.value.gid
+
+  if (!gid) {
+    console.error('No current org id')
+    return
+  }
 
   const { error } = await supabase
     .from('orgs')
     .update({ name: name.value })
-    .eq('created_by', (main.auth?.id ?? ''))
+    .eq('id', gid)
 
   if (error) {
     // TODO: INFORM USER THAT HE IS NOT ORG OWNER
@@ -126,8 +131,8 @@ function onInputKeyDown(event: Event) {
         </h2>
         <div>{{ 'You can modify the organization\'s informations here.' }}</div>
         <div class="mb-6">
-          <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ 'Organization Name' }}</label>
-          <input id="base-input" v-model="name " type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
+          <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-name') }}</label>
+          <input id="base-input" v-model="name " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
         </div>
       </div>
       <footer style="margin-top: auto">
@@ -137,6 +142,7 @@ function onInputKeyDown(event: Event) {
               {{ t('cancel') }}
             </button>
             <button
+              id="save-changes"
               class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
               type="submit"
               color="secondary"

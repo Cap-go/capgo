@@ -1,6 +1,7 @@
 // import type { Page } from '@playwright/test'
 import path from 'node:path'
 import { readFileSync } from 'node:fs'
+import exp from 'node:constants'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { diff } from 'deep-diff'
@@ -190,6 +191,7 @@ test.describe('Test organization system permissions', () => {
       forceDeviceChannel: false,
       forceDeviceVersion: false,
       changeOrgPicture: false,
+      changeOrgName: false,
     },
     upload: {
       deleteChannel: false,
@@ -205,6 +207,7 @@ test.describe('Test organization system permissions', () => {
       forceDeviceChannel: false,
       forceDeviceVersion: false,
       changeOrgPicture: false,
+      changeOrgName: false,
     },
     write: {
       deleteChannel: false,
@@ -220,6 +223,7 @@ test.describe('Test organization system permissions', () => {
       forceDeviceChannel: true,
       forceDeviceVersion: true,
       changeOrgPicture: false,
+      changeOrgName: false,
     },
     admin: {
       deleteChannel: true,
@@ -235,6 +239,7 @@ test.describe('Test organization system permissions', () => {
       forceDeviceChannel: true,
       forceDeviceVersion: true,
       changeOrgPicture: true,
+      changeOrgName: true,
     },
     owner: {
       deleteChannel: true,
@@ -250,6 +255,7 @@ test.describe('Test organization system permissions', () => {
       forceDeviceChannel: true,
       forceDeviceVersion: true,
       changeOrgPicture: true,
+      changeOrgName: true,
     },
   }
 
@@ -314,7 +320,7 @@ test.describe('Test organization system permissions', () => {
         const { error: error7 } = await supabase.from('devices_override').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
         await expect(error7).toBeFalsy()
 
-        const { error: error8 } = await supabase.from('orgs').update({ logo: null }).eq('id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+        const { error: error8 } = await supabase.from('orgs').update({ logo: null, name: 'Demo org' }).eq('id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
         expect(error8).toBeFalsy()
 
         // const { error: error8 } = await supabase.from('channel_devices').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
@@ -467,6 +473,7 @@ test.describe('Test organization system permissions', () => {
 
           const oldSupabaseState = await getSupabaseProdChannelState(supabase)
 
+          // https://github.com/microsoft/playwright/issues/5470
           if (permission.changeChannelToggle) {
             await Promise.all([
               page.waitForRequest(`${SUPABASE_URL}\/**`),
@@ -824,6 +831,9 @@ test.describe('Test organization system permissions', () => {
           await expect(cameraInputLocator).toHaveCount(1)
           await cameraInputLocator.setInputFiles(path.join(__dirname, 'smile.png'))
 
+          // I had a bug where the current org changed after upload. Make sure this does not happen again
+          expect(await getOrgName(page)).toBe('Demo org')
+
           // Check if the avatar exists
           const avatarLocator = page.locator('#org-avatar')
           await expect(avatarLocator).toHaveCount(1)
@@ -850,6 +860,64 @@ test.describe('Test organization system permissions', () => {
         else {
           await expectPopout(page, 'Insufficient permissions')
         }
+
+        // Let's go and change the org's name
+        await page.locator('#base-input').click()
+
+        if (permission.changeOrgName) {
+          await page.fill('#base-input', 'Demo org temp')
+          await page.locator('#save-changes').click()
+          await expectPopout(page, 'Organization updated successfully')
+
+          const { data: orgSupabaseData, error: orgSupabaseError } = await supabase.from('orgs')
+            .select('name')
+            .eq('id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+            .single()
+
+          expect(orgSupabaseError).toBeFalsy()
+          expect(orgSupabaseData).toBeTruthy()
+          expect(orgSupabaseData!.name).toBe('Demo org temp')
+
+          expect(await getOrgName(page)).toBe('Demo org temp')
+        }
+        else {
+          await expectPopout(page, 'Insufficient permissions')
+          expect(await page.locator('#base-input').getAttribute('readonly')).toBeTruthy()
+        }
+
+        // Now let's go test members. This is hopefuly the last thing to test
+        await page.click('#tab-Members')
+
+        // member-card
+        // After page switch make sure we are still at the same org
+        expect(await getOrgName(page)).toBe('Demo org temp')
+        const allMembersLocator = await page.locator('#member-card')
+
+        const { error: allMembersSupabaseError, count: allMembersSupaCount } = await supabase.from('org_users')
+          .select('*', { count: 'exact' })
+          .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+
+        expect(allChannelsSupabaseError).toBeFalsy()
+        expect(allMembersSupaCount).toBeTruthy
+        expect(allChannelsCount).toBeGreaterThan(0)
+
+        await expect(allMembersLocator).toHaveCount(allMembersSupaCount! + 1)
+
+        const mappedMembers = await Promise.all((await allMembersLocator.all()).map(async (memberLocator) => {
+          const canEdit = await memberLocator.locator('wrench-button').isVisible()
+          const canRemove = await memberLocator.locator('trash-button').isVisible()
+          const email = await memberLocator.locator('#user-email').innerText()
+
+          return { canEdit, canRemove, email }
+        }))
+
+        expect(clientSupabaseUser.data?.user?.email).toBeTruthy()
+        const selfSupabaseUserEmail = clientSupabaseUser.data!.user!.email
+
+        const selfMember = await mappedMembers.find(user => user.email === selfSupabaseUserEmail)
+        expect(selfMember).toBeTruthy()
+        expect(selfMember?.canEdit).toBeFalsy()
+        expect(selfMember?.canRemove).toBeFalsy()
       })
     })
   }

@@ -245,7 +245,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
     <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-full md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
       <dl class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
-          <div class="flex justify-between mt-2 mb-2 ml-2">
+          <div id="member-card" class="flex justify-between mt-2 mb-2 ml-2">
             <div class="flex">
               <img
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
@@ -255,14 +255,14 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
                 <p>{{ 'N/A' }}</p>
               </div>
             </div>
-            <div class="mt-auto mb-auto ml-auto mr-auto text-center">
+            <div id="user-email" class="mt-auto mb-auto ml-auto mr-auto text-center">
               {{ member.email }}
             </div>
             <div class="mt-auto mb-auto mr-4">
-              <button :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
+              <button id="wrench-button" :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">
+              <button id="trash-button" :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>

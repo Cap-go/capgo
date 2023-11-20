@@ -125,6 +125,7 @@ check-on-web: Check on website
 checksum: Checksum
 commands: commands
 confirm-email: Confirm your email
+confirm-email-sent: A confirmation email was sent click to link to confirm your email
 confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
@@ -151,6 +152,7 @@ device: Device
 device-id: Device ID
 devices: Devices
 devices-using-this-b: Devices using this bundle
+did-not-recive-confirm-email: Didn't receive confirmation email?
 disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
@@ -165,10 +167,6 @@ download: Download
 email: Email
 email-address: Email address
 email-does-not-exist: This user does not exist
-resend-email: Resend Confirmation Email
-confirm-email-sent: A confirmation email was sent click to link to confirm your email
-did-not-recive-confirm-email: Didn't receive confirmation email?
-resend: Resend
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
@@ -201,8 +199,8 @@ install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
 invalid-email: Passed email is not valid
-invite-accepted: Successfully accepted oranization inviation
 invalid-version: Invalid semver version
+invite-accepted: Successfully accepted oranization inviation
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-admin: Admin
@@ -272,6 +270,7 @@ open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
 org-changes-saved: Organization updated successfully
 org-invited-user: Successfully invited user to org
+organization-name: Organization Name
 os-version: OS version
 pages: Pages
 password: Password
@@ -320,6 +319,8 @@ register-heading: Registration
 register-next: Register
 reload: Reload
 removed-apikey: API key has been successfully deleted
+resend: Resend
+resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves

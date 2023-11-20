@@ -814,37 +814,6 @@ Begin
 End;
 $$;
 
--- TODO: Add grant and revoke for this fn
-CREATE FUNCTION "public"."change_org_logo"("logo" "varchar", "org_id" "uuid") RETURNS "varchar"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Declare  
-  org record;
-  invited_user record;
-  current_record record;
-Begin
-  SELECT * FROM ORGS
-  INTO org
-  WHERE id=change_org_logo.org_id;
-
-  IF org IS NULL THEN
-    return 'NO_ORG';
-  END IF;
-
-  IF NOT (org.created_by=auth.uid()) THEN
-      if NOT (check_min_rights('admin'::user_min_right, auth.uid(), change_org_logo.org_id, NULL::character varying, NULL::bigint)) THEN
-          return 'NO_RIGHTS';
-      END IF;
-  END IF;
-
-  UPDATE orgs
-  SET logo = change_org_logo.logo
-  WHERE id = change_org_logo.org_id;
-
-  RETURN 'OK';
-End;
-$$;
-
 CREATE FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") RETURNS varchar
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -1427,13 +1396,21 @@ BEGIN
    RETURN NEW;
 END;$$;
 
-CREATE OR REPLACE FUNCTION "public"."is_onboarded"() RETURNS boolean
-    LANGUAGE "plpgsql"
-    AS $$
-Begin
-  RETURN is_onboarded(auth.uid());
-End;
-$$;
+CREATE OR REPLACE FUNCTION "public"."prevent_steal_org"() RETURNS trigger
+   LANGUAGE plpgsql AS
+$$BEGIN
+   IF NEW.created_by IS DISTINCT FROM OLD.created_by
+   THEN
+      RAISE EXCEPTION '"created_by" must not be updated';
+   END IF;
+
+    IF NEW.id IS DISTINCT FROM OLD.id
+   THEN
+      RAISE EXCEPTION '"id" must not be updated';
+   END IF;
+
+   RETURN NEW;
+END;$$;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed"("userid" "uuid") RETURNS boolean
@@ -2577,6 +2554,18 @@ CREATE TRIGGER force_valid_user_id
    BEFORE INSERT ON "public"."app_versions" FOR EACH ROW
    EXECUTE PROCEDURE "public"."force_valid_user_id"();
 
+CREATE TRIGGER prevent_steal_org
+   BEFORE UPDATE ON "public"."orgs" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."prevent_steal_org"();
+
+CREATE OR REPLACE FUNCTION "public"."is_onboarded"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_onboarded(auth.uid());
+End;
+$$;
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
@@ -2704,6 +2693,8 @@ CREATE POLICY "Allow app owner to read" ON "public"."stats" FOR SELECT TO "authe
 
 CREATE POLICY "Allow org admin to all" ON "public"."org_users" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "org_id", NULL::character varying, NULL::bigint));
 
+CREATE POLICY "Allow org admin to update (name and logo)" ON "public"."orgs" FOR UPDATE TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "id", NULL::character varying, NULL::bigint));
+
 CREATE POLICY "Allow org member (write) to update" ON "public"."app_versions" FOR UPDATE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id"(user_id), NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id"(user_id), NULL::character varying, NULL::bigint));
 
 CREATE POLICY "Allow org member (write) to insert" ON "public"."devices_override" FOR INSERT TO "authenticated" WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(app_id), app_id, NULL::bigint));
@@ -2720,7 +2711,7 @@ CREATE POLICY "Allow org member to read" ON "public"."channel_devices" FOR SELEC
 
 CREATE POLICY "Allow owner to all" ON "public"."app_versions" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
-CREATE POLICY "Allow owner to all" ON "public"."orgs" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "id", NULL::character varying, NULL::bigint));
+CREATE POLICY "Allow owner to all" ON "public"."orgs" TO "authenticated" USING ("auth"."uid"() = created_by) WITH CHECK ("auth"."uid"() = created_by);
 
 CREATE POLICY "Allow owner to listen insert" ON "public"."app_versions" FOR INSERT TO "authenticated" WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
