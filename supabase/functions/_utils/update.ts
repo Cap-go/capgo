@@ -575,7 +575,7 @@ export async function update(body: AppInfos) {
       device_id,
       platform: platform as Database['public']['Enums']['platform_os'],
       plugin_version,
-      version: versionId,
+      version: stat.version,
       os_version: version_os,
       ...(is_emulator != null ? { is_emulator } : {}),
       ...(is_prod != null ? { is_prod } : {}),
