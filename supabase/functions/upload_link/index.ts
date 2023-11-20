@@ -47,16 +47,16 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     // check if object exist in r2
     const exist = await r2.checkIfExist(filePath)
     if (exist)
-      return sendRes({ status: 'Error already exist' }, 500)
+      return sendRes({ status: 'Error: bundle zip already exists in object storage.' }, 500)
     const url = await r2.getUploadUrl(filePath)
     if (!url)
-      return sendRes({ status: 'Error unknow' }, 500)
+      return sendRes({ status: 'Error: the upload URL returned is invalid (null).' }, 500)
     console.log('url', filePath, url)
     return sendRes({ url })
   }
   catch (e) {
     return sendRes({
-      status: 'Error unknow',
+      status: 'Error unknown',
       error: JSON.stringify(e),
     }, 500)
   }
