@@ -8,10 +8,15 @@ CREATE TABLE job_queue (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE job_queue ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE workers (
     id SERIAL PRIMARY KEY,
     locked BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+
+ALTER TABLE workers ENABLE ROW LEVEL SECURITY;
 
 do $$
 begin
@@ -79,6 +84,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+REVOKE ALL PRIVILEGES ON FUNCTION process_current_jobs_if_unlocked
+  FROM anon, authenticated;
+
 SET statement_timeout TO 0;
 CREATE OR REPLACE FUNCTION schedule_jobs()
 RETURNS VOID
@@ -106,6 +114,9 @@ BEGIN
     );
 END;
 $body$ LANGUAGE plpgsql;
+
+REVOKE ALL PRIVILEGES ON FUNCTION schedule_jobs
+  FROM anon, authenticated;
 
 SELECT cron.schedule(
     'process_tasks_subminute',
@@ -136,6 +147,9 @@ BEGIN
   RETURN NEW;
 END;
 $BODY$;
+
+REVOKE ALL PRIVILEGES ON FUNCTION trigger_http_queue_post_to_function
+  FROM anon, authenticated;
 
 -- Old triggers drop
 drop trigger on_app_delete_sql on apps;
