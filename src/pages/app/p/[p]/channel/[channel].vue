@@ -193,12 +193,18 @@ watchEffect(async () => {
 })
 
 async function makeDefault(val = true) {
+  const buttonMessage = channel.value?.ios && !channel.value.android
+    ? t('make-default-ios')
+    : channel.value?.android && !channel.value.ios
+      ? t('make-default-android')
+      : t('channel-make-now')
+
   displayStore.actionSheetOption = {
     header: t('are-u-sure'),
     message: val ? t('confirm-public-desc') : t('making-this-channel-'),
     buttons: [
       {
-        text: val ? t('channel-make-now') : t('make-normal'),
+        text: val ? buttonMessage : t('make-normal'),
         id: 'confirm-button',
         handler: async () => {
           if (!channel.value || !id.value)

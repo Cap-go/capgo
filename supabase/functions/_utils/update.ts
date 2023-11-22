@@ -30,7 +30,7 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function requestInfos(app_id: string, device_id: string, version_name: string) {
+async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
   const recV = supabaseAdmin()
     .from('app_versions')
     .select('id')
@@ -152,6 +152,7 @@ async function requestInfos(app_id: string, device_id: string, version_name: str
     `)
     .eq('app_id', app_id)
     .eq('public', true)
+    .eq(platform, true)
     .single()
     .then(res => res.data)
   // promise all
@@ -274,7 +275,7 @@ export async function update(body: AppInfos) {
       version: 0,
     }
 
-    const requestedInto = await requestInfos(app_id, device_id, version_name)
+    const requestedInto = await requestInfos(platform, app_id, device_id, version_name)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
