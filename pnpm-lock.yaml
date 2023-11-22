@@ -178,7 +178,7 @@ dependencies:
     version: 4.4.0
   chartjs-adapter-dayjs:
     specifier: ^1.0.0
-    version: 1.0.0(chart.js@4.4.0)(dayjs@1.11.9)
+    version: 1.0.0(chart.js@4.4.0)(dayjs@1.11.10)
   chartjs-plugin-annotation:
     specifier: ^3.0.1
     version: 3.0.1(chart.js@4.4.0)
@@ -198,8 +198,8 @@ dependencies:
     specifier: ^3.6.3
     version: 3.6.3
   dayjs:
-    specifier: 1.11.9
-    version: 1.11.9
+    specifier: 1.11.10
+    version: 1.11.10
   dompurify:
     specifier: ^3.0.5
     version: 3.0.5
@@ -6303,14 +6303,14 @@ packages:
       '@kurkle/color': 0.3.2
     dev: false
 
-  /chartjs-adapter-dayjs@1.0.0(chart.js@4.4.0)(dayjs@1.11.9):
+  /chartjs-adapter-dayjs@1.0.0(chart.js@4.4.0)(dayjs@1.11.10):
     resolution: {integrity: sha512-EnbVqTJGFKLpg1TROLdCEufrzbmIa2oeLGx8O2Wdjw2EoMudoOo9+YFu+6CM0Z0hQ/v3yq/e/Y6efQMu22n8Jg==}
     peerDependencies:
       chart.js: '>= 2.8.0 < 3'
       dayjs: ^1.8.15
     dependencies:
       chart.js: 4.4.0
-      dayjs: 1.11.9
+      dayjs: 1.11.10
     dev: false
 
   /chartjs-plugin-annotation@3.0.1(chart.js@4.4.0):
@@ -7299,7 +7299,7 @@ packages:
       cli-table3: 0.6.3
       commander: 5.1.0
       common-tags: 1.8.2
-      dayjs: 1.11.9
+      dayjs: 1.11.10
       debug: 4.3.4(supports-color@8.1.1)
       enquirer: 2.3.6
       eventemitter2: 6.4.7
@@ -7363,8 +7363,8 @@ packages:
     resolution: {integrity: sha512-jyCETtSl3VMZMWeRo7iY1FL19ges1t55hMo5yaam4Jrsm5EPL89UQkoQRyiI+Yf4k8r2ZpdngkV8hr1lIdjb3Q==}
     dev: false
 
-  /dayjs@1.11.9:
-    resolution: {integrity: sha512-QvzAURSbQ0pKdIye2txOzNaHmxtUBXerpY0FJsFXUMKbIZeFm5ht1LS/jFsrncjnmtv8HsG0W2g6c0zUjZWmpA==}
+  /dayjs@1.11.10:
+    resolution: {integrity: sha512-vjAczensTgRcqDERK0SR2XMwsF/tSvnvlv6VcF2GIhg6Sx4yOIt/irsr1RDJsKiIyBzJDpCoXiWWq28MqH2cnQ==}
 
   /de-indent@1.0.2:
     resolution: {integrity: sha512-e/1zu3xH5MQryN2zdVaF0OrdNLUbvWxzMbi+iNA6Bky7l1RoP8a2fIbRocyHclXt/arDrrR6lL3TqFD9pMQTsg==}

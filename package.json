@@ -110,7 +110,7 @@
     "cron-schedule": "^4.0.0",
     "crypto-random-string": "^5.0.0",
     "daisyui": "^3.6.3",
-    "dayjs": "1.11.9",
+    "dayjs": "1.11.10",
     "dompurify": "^3.0.5",
     "firebase": "10.3.0",
     "flowbite": "^1.8.1",
