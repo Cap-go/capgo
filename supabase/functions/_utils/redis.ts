@@ -228,9 +228,14 @@ export async function redisAppVersionInvalidate(app_id: string) {
 }
 
 export async function redisDeviceInvalidate(appId: string, deviceId: string) {
-  const redis = await getRedis()
-  if (!redis)
-    return
-  console.log(`[redis] redisDeviceInvalidate: ${appId} ${deviceId}`)
-  await redis.hdel(`app_${appId}`, `device_${deviceId}`)
+  try {
+    const redis = await getRedis()
+    if (!redis)
+      return
+    console.log(`[redis] redisDeviceInvalidate: ${appId} ${deviceId}`)
+    await redis.hdel(`app_${appId}`, `device_${deviceId}`)
+  }
+  catch (e) {
+    console.error('[redis] redisDeviceInvalidate', e)
+  }
 }

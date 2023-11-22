@@ -297,14 +297,9 @@ async function put(body: DeviceLink): Promise<Response> {
       allowSet: channelId.allow_device_self_set,
     })
   }
-  if (errorChannel) {
-    console.error('Cannot find channel', { errorChannel })
-    return sendRes({
-      message: `Cannot find channel ${JSON.stringify(errorChannel)}`,
-      error: 'channel_not_found',
-    }, 400)
-  }
-  else if (dataChannel) {
+  if (errorChannel)
+    console.error('Cannot find channel default', { errorChannel })
+  if (dataChannel) {
     await sendStats([{
       action: 'getChannel',
       platform: platform as Database['public']['Enums']['platform_os'],
