@@ -140,6 +140,8 @@ export function isLimited(id: string) {
   return Math.random() < app.ignore
 }
 
+export function setEnv(env: any) {}
+
 export function getAllEnv() {
   return Deno.env.toObject()
 }

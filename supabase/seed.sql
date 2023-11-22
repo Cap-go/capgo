@@ -105,8 +105,9 @@ INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "up
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
 INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
-(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't');
+(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
+(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
+(24, now(), 'two_default', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
 
 INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "org_id", "app_id", "channel_id", "user_right") VALUES
 (1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),

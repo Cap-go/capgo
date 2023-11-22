@@ -1637,6 +1637,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
+    -- table '(SELECT DISTINCT ON (date,app_id) * FROM aggregate_daily)'
 --     table 'aggregate_daily'
 --   );
 
