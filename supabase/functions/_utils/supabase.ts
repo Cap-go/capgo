@@ -118,9 +118,9 @@ export async function getCurrentPlanName(userId: string): Promise<string> {
   return ''
 }
 
-export async function getPlanUsagePercent(userId: string, dateid: string): Promise<number> {
+export async function getPlanUsagePercent(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin()
-    .rpc('get_plan_usage_percent', { userid: userId, dateid })
+    .rpc('get_plan_usage_percent', { userid: userId })
     .single()
   if (error) {
     console.error('getPlanUsagePercent error', error.message)
@@ -133,7 +133,7 @@ export async function getPlanUsagePercent(userId: string, dateid: string): Promi
 export async function isGoodPlan(userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin()
-      .rpc('is_good_plan_v3', { userid: userId })
+      .rpc('is_good_plan_v4', { userid: userId })
       .single()
       .throwOnError()
     return data || false
@@ -332,6 +332,8 @@ export async function getSDashboard(auth: string, userIdQuery: string, rangeStar
   }
   else {
     const userId = isAdmin ? userIdQuery : (await supabaseClient(auth).auth.getUser()).data.user?.id
+    if (!userId)
+      return []
     // get all user apps id
     const appIds = await supabaseClient(auth)
       .from('apps')
@@ -436,13 +438,13 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
-  let tableName: 'stats' | 'clickhouse_stats' = 'stats'
+  let tableName: 'stats' | 'clickhouse_logs' = 'stats'
   let client = supabaseClient(auth)
   if (!auth)
     client = supabaseAdmin()
 
   if (isClickHouseEnabled()) {
-    tableName = 'clickhouse_stats'
+    tableName = 'clickhouse_logs'
     const reqOwner = await client
       .rpc('is_app_owner', { appid: appId })
       .then(res => res.data || false)
@@ -525,12 +527,13 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     is_emulator: !!device.is_emulator,
     is_prod: !!device.is_prod,
     custom_id: device.custom_id as string,
+    created_at: device.created_at || new Date().toISOString(),
   }
   const all = []
   if (isClickHouseEnabled())
     all.push(sendDeviceToClickHouse([deviceComplete]))
   else
-    all.push(supabaseAdmin().from('devices').upsert(deviceComplete))
+    all.push(supabaseAdmin().from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
 
   return Promise.all(all)
     .catch((e) => {

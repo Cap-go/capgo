@@ -37,6 +37,11 @@ AFTER INSERT ON public.app_versions
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_create');
 
+CREATE TRIGGER on_version_delete
+AFTER DELETE ON public.app_versions 
+FOR EACH ROW 
+EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_delete');
+
 CREATE TRIGGER on_version_update 
 AFTER UPDATE ON public.app_versions 
 FOR EACH ROW 
@@ -100,8 +105,9 @@ INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "up
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
 INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 'f', 't', 't'),
-(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 'f', 't', 't');
+(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
+(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
+(24, now(), 'two_default', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
 
 INSERT INTO "public"."org_users" ("id", "created_at", "updated_at", "user_id", "org_id", "app_id", "channel_id", "user_right") VALUES
 (1, '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app', NULL, 'admin'),
@@ -116,37 +122,37 @@ INSERT INTO "public"."stats" ("created_at", "platform", "action", "device_id", "
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app'),
 (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
 
-INSERT INTO "public"."app_usage" ("id", "app_id", "created_at", "mau", "storage_added", "storage_deleted", "bandwidth", "get", "uninstall", "install", "fail") VALUES
-("gen_random_uuid"(), 'com.demo.app', '2023-03-01 01:18:54.034372+00', 1, 10948, 0, 141264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-02 01:18:54.034372+00', 4, 20948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-03 01:18:54.034372+00', 8, 80948, 0, 1441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-04 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-05 01:18:54.034372+00', 40, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-06 01:18:54.034372+00', 41, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-07 01:18:54.034372+00', 49, 180948, 0, 1441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-08 01:18:54.034372+00', 60, 180948, 0, 1441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-09 01:18:54.034372+00', 20, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-10 01:18:54.034372+00', 10, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-11 01:18:54.034372+00', 20, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-12 01:18:54.034372+00', 25, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-13 01:18:54.034372+00', 1, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-14 01:18:54.034372+00', 30, 180948, 0, 1441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-15 01:18:54.034372+00', 90, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-16 01:18:54.034372+00', 30, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-17 01:18:54.034372+00', 200, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-18 01:18:54.034372+00', 20, 180948, 0, 1441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-19 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-20 01:18:54.034372+00', 40, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-21 01:18:54.034372+00', 30, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-22 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-23 01:18:54.034372+00', 20, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-24 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-25 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-26 01:18:54.034372+00', 20, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-27 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-28 01:18:54.034372+00', 20, 180948, 0, 441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-29 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4),
-("gen_random_uuid"(), 'com.demo.app', '2023-03-30 01:18:54.034372+00', 20, 180948, 0, 2441264, 1, 2, 3, 4);
+INSERT INTO "public"."app_usage" ("id", "app_id", "date", "mau", "storage_added", "storage_deleted", "bandwidth", "get", "uninstall", "install", "fail") VALUES
+("gen_random_uuid"(), 'com.demo.app', '2023-03-01', 1, 10948, 0, 141264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-02', 4, 20948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-03', 8, 80948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-04', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-05', 40, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-06', 41, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-07', 49, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-08', 60, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-09', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-10', 10, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-11', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-12', 25, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-13', 1, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-14', 30, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-15', 90, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-16', 30, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-17', 200, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-18', 20, 180948, 0, 1441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-19', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-20', 40, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-21', 30, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-22', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-23', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-24', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-25', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-26', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-27', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-28', 20, 180948, 0, 441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-29', 20, 180948, 0, 2441264, 1, 2, 3, 4),
+("gen_random_uuid"(), 'com.demo.app', '2023-03-30', 20, 180948, 0, 2441264, 1, 2, 3, 4);
 
 -- Create cron jobs
 -- Set old versions to deleted after retention passed 

@@ -193,6 +193,8 @@ login-to-your-accoun: Melde dich in deinem Konto an
 logout: Ausloggen
 logs: Protokolle
 lowerCaseError: Sollte Kleinbuchstaben enthalten
+make-default-android: Als Standard für Android festlegen
+make-default-ios: Als Standard für iOS festlegen
 make-normal: Normal machen
 making-this-channel-: >-
   Wenn Sie diesen Kanal „normal“ machen, müssen Sie einen anderen Standardkanal

@@ -40,3 +40,12 @@ scripts/template/netlify/test.gplay.js
 /playwright/.auth/
 CHANGELOG.md
 .history
+
+tests_backend/gh_actions/ch_data/*
+tests_backend/gh_actions/ch_logs/*
+.env.dev
+cloudflare_workers_deno/cloudflare/*
+cloudflare_workers_deno/cloudflare_tests/*
+cloudflare_workers_deno/cloudflare_utils/*
+cloudflare_workers_deno/generated_functions_map.ts
+cloudflare_workers_deno/.denoflare

@@ -1,25 +1,16 @@
 import type { User } from '@supabase/supabase-js'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { appUsage } from './../services/supabase'
 import {
+  getAllDashboard,
+  getTotalStorage,
   unspoofUser,
 } from './../services/supabase'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { reset } from '~/services/chatwoot'
 
-interface appUsage {
-  app_id: string
-  bandwidth: number
-  date: string
-  fail: number
-  get: number
-  install: number
-  mau: number
-  storage_added: number
-  storage_deleted: number
-  uninstall: number
-}
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
   const path = ref('')
@@ -35,6 +26,8 @@ export const useMainStore = defineStore('main', () => {
   const canUseMore = ref<boolean>(false)
   const dashboard = ref<appUsage[]>([])
   const totalDevices = ref<number>(0)
+  const totalStorage = ref<number>(0)
+
   const totalDownload = ref<number>(0)
 
   const logout = () => {
@@ -55,19 +48,11 @@ export const useMainStore = defineStore('main', () => {
       }, 300)
     })
   }
-  const getAllDashboard = async (rangeStart?: Date, rangeEnd?: Date) => {
-    const supabase = useSupabase()
-
-    const req = await supabase.functions.invoke('get_dashboard', {
-      body: {
-        userId: auth.value?.id,
-        rangeStart: cycleInfo.value?.subscription_anchor_start || rangeStart,
-        rangeEnd: cycleInfo.value?.subscription_anchor_end || rangeEnd,
-      },
-    })
-    dashboard.value = (req.data || []) as appUsage[]
+  const updateDashboard = async (rangeStart?: Date, rangeEnd?: Date) => {
+    dashboard.value = await getAllDashboard(auth.value?.id || '', rangeStart, rangeEnd)
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
+    totalStorage.value = await getTotalStorage()
   }
 
   const getTotalStats = () => {
@@ -86,7 +71,7 @@ export const useMainStore = defineStore('main', () => {
 
   const filterDashboard = async (appId: string, rangeStart?: Date, rangeEnd?: Date, refetch = false) => {
     if (refetch)
-      await getAllDashboard(rangeStart, rangeEnd)
+      await updateDashboard(rangeStart, rangeEnd)
 
     return dashboard.value.filter(d => d.app_id === appId)
   }
@@ -95,7 +80,10 @@ export const useMainStore = defineStore('main', () => {
     auth,
     trialDaysLeft,
     goodPlan,
-    getAllDashboard,
+    totalStorage,
+    totalDevices,
+    totalDownload,
+    updateDashboard,
     getTotalStats,
     filterDashboard,
     dashboard,

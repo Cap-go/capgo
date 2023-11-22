@@ -139,7 +139,7 @@ export interface Database {
         Row: {
           app_id: string
           bandwidth: number
-          created_at: string | null
+          date: string | null
           fails: number
           get: number
           id: string
@@ -152,7 +152,7 @@ export interface Database {
         Insert: {
           app_id: string
           bandwidth?: number
-          created_at?: string | null
+          date?: string | null
           fails?: number
           get?: number
           id?: string
@@ -165,7 +165,7 @@ export interface Database {
         Update: {
           app_id?: string
           bandwidth?: number
-          created_at?: string | null
+          date?: string | null
           fails?: number
           get?: number
           id?: string
@@ -1414,15 +1414,12 @@ export interface Database {
       get_plan_usage_percent:
         | {
             Args: {
-              dateid: string
+              userid: string
             }
             Returns: number
           }
         | {
-            Args: {
-              userid: string
-              dateid: string
-            }
+            Args: Record<PropertyKey, never>
             Returns: number
           }
       get_total_stats_v2:
@@ -1467,6 +1464,12 @@ export interface Database {
             }[]
           }
       get_total_storage_size:
+        | {
+            Args: {
+              app_id: string
+            }
+            Returns: number
+          }
         | {
             Args: Record<PropertyKey, never>
             Returns: number
@@ -1543,12 +1546,20 @@ export interface Database {
             }
             Returns: boolean
           }
-      is_allowed_action: {
-        Args: {
-          apikey: string
-        }
-        Returns: boolean
-      }
+      is_allowed_action:
+        | {
+            Args: {
+              apikey: string
+              appid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              apikey: string
+            }
+            Returns: boolean
+          }
       is_allowed_action_user:
         | {
             Args: Record<PropertyKey, never>
@@ -1639,13 +1650,13 @@ export interface Database {
           }
       is_good_plan_v4:
         | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
-        | {
             Args: {
               userid: string
             }
+            Returns: boolean
+          }
+        | {
+            Args: Record<PropertyKey, never>
             Returns: boolean
           }
       is_in_channel:

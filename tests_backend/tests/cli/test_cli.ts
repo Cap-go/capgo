@@ -3,7 +3,6 @@ import {
   mergeReadableStreams,
 } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import { BlobReader, TextWriter, ZipReader } from 'https://deno.land/x/zipjs/index.js'
-import { inc } from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { type RunnableTest, type SupabaseType, assert } from '../../utils.ts'
 import { getSupabaseSecret, getUpdateBaseData, responseOk, sendUpdate, testPlaywright } from '../../utils.ts'
 
@@ -140,7 +139,7 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
 
 async function pnpmInstall() {
   const pnpmInstallCommand = new Deno.Command('pnpm', {
-    args: ['install'],
+    args: ['install', '--no-frozen-lockfile'],
     cwd: tempFileFolder,
   })
 
@@ -347,8 +346,8 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   const uploadCliOutput2 = await uploadWithAutoFlagWithAssert(semver)
 
   assert(uploadCliOutput2.includes(
-    'previous metadata does not exist'),
-    `CLI output does not include \'previous metadata does not exist\'. CLI output:\n${uploadCliOutput2}`,
+    'it\'s your first upload with compatibility check'),
+    `CLI output does not include \"it\'s your first upload with compatibility check\". CLI output:\n${uploadCliOutput2}`,
   )
 }
 

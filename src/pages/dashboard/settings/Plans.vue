@@ -26,7 +26,7 @@ const stats = ref({
   mau: 0,
   storage: 0,
   bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v2']['Returns'][0])
+} as Database['public']['Functions']['get_total_stats_v3']['Returns'][0])
 const planSuggest = ref('')
 const planCurrrent = ref('')
 const planPercent = ref(0)
@@ -99,11 +99,9 @@ async function loadData() {
     plans.value.push(...pls)
   })
   await getUsages()
-
-  const date_id = new Date().toISOString().slice(0, 7)
   await getCurrentPlanName().then(res => planCurrrent.value = res)
   try {
-    await getPlanUsagePercent(date_id).then(res => planPercent.value = res)
+    await getPlanUsagePercent().then(res => planPercent.value = res)
   }
   catch (error) {
     console.log(error)

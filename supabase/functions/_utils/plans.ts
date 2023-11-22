@@ -5,7 +5,7 @@ import {
   isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin,
 } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { recordUsage } from './stripe.ts'
+import { recordUsage, setTreshold } from './stripe.ts'
 import { trackEvent } from './plunk.ts'
 
 function planToInt(plan: string) {
@@ -41,9 +41,9 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
   return data || 'Team'
 }
 
-export async function getTotalStats(userId: string, dateId: string): Promise<Database['public']['Functions']['get_total_stats_v2']['Returns'][0]> {
+export async function getTotalStats(userId: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
   const { data, error } = await supabaseAdmin()
-    .rpc('get_total_stats_v2', { userid: userId, dateid: dateId })
+    .rpc('get_total_stats_v3', { userid: userId })
     .single()
 
   if (error) {
@@ -91,6 +91,12 @@ async function setMetered(customer_id: string | null, userId: string) {
     .eq('customer_id', customer_id)
     .single()
   if (data && data.subscription_metered) {
+    try {
+      await setTreshold(customer_id)
+    }
+    catch (error) {
+      console.log('error setTreshold', error)
+    }
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(userId)
     if (get_metered_usage.mau > 0 && prices.mau)
@@ -121,16 +127,15 @@ export async function checkPlan(userId: string): Promise<void> {
         console.error('error.message', error.message)
       return Promise.resolve()
     }
-    const dateid = new Date().toISOString().slice(0, 7)
     const is_good_plan = await isGoodPlan(userId)
     const is_onboarded = await isOnboarded(userId)
     const is_onboarding_needed = await isOnboardingNeeded(userId)
     const is_free_usage = await isFreeUsage(userId)
-    const percentUsage = await getPlanUsagePercent(userId, dateid)
+    const percentUsage = await getPlanUsagePercent(userId)
     if (!is_good_plan && is_onboarded && !is_free_usage) {
-      console.log('is_good_plan_v3', userId, is_good_plan)
+      console.log('is_good_plan_v4', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
-      const get_total_stats = await getTotalStats(userId, dateid)
+      const get_total_stats = await getTotalStats(userId)
       const current_plan = await getCurrentPlanName(userId)
       if (get_total_stats) {
         const best_plan = await findBestPlan(get_total_stats)

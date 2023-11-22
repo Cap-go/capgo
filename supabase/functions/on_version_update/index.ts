@@ -22,6 +22,10 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
     console.log('no user_id')
     return sendRes()
   }
+  if (!record.id) {
+    console.log('no id')
+    return sendRes()
+  }
   const exist = await r2.checkIfExist(record.bucket_id)
   console.log('exist ?', record.app_id, record.bucket_id, exist)
   if (!exist && !record.bucket_id.endsWith('.zip')) {
@@ -73,7 +77,7 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
         await sendMetaToClickHouse({
-          id: record.app_id,
+          id: record.id,
           created_at: new Date().toISOString(),
           app_id: record.app_id,
           size,
@@ -92,7 +96,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     console.log('no bucket_id')
     return sendRes()
   }
-  if (!record.app_id || !record.user_id) {
+  if (!record.app_id || !record.user_id || !record.id) {
     console.log('no app_id or user_id')
     return sendRes()
   }
@@ -137,7 +141,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     return sendRes()
   }
   await sendMetaToClickHouse({
-    id: record.app_id,
+    id: record.id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
     size: 0,

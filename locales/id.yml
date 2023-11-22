@@ -187,6 +187,8 @@ login-to-your-accoun: masuk ke akun Anda
 logout: Keluar
 logs: Log
 lowerCaseError: Harus berisi huruf kecil
+make-default-android: Jadikan default untuk Android
+make-default-ios: Jadikan default untuk iOS
 make-normal: Jadikan normal
 making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain

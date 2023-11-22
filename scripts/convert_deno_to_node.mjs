@@ -7,8 +7,10 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 
 const baseSupa = 'supabase'
 const baseNetlify = 'netlify'
+const baseCloudflareFolder = 'cloudflare_workers_deno'
 const baseNetlifyConfig = 'netlify.toml'
 const baseNetlifyEgde = 'netlify-edge'
+const baseCloudflare = 'cloudflare'
 const baseUtils = '_utils'
 const baseTests = '_tests'
 const baseFunctions = 'functions'
@@ -19,15 +21,19 @@ const splitNetlifyConfig = '# auto egde generate'
 const baseSupaTemplate = `${baseScripts}/${baseTemplate}/${baseSupa}`
 const baseNetlifyTemplate = `${baseScripts}/${baseTemplate}/${baseNetlify}`
 const baseNetlifyEdgeTemplate = `${baseScripts}/${baseTemplate}/${baseNetlifyEgde}`
+const baseCloudflareTemplate = `${baseScripts}/${baseTemplate}/${baseCloudflare}`
 const baseSupaFunctions = `${baseSupa}/${baseFunctions}`
 const baseNetlifyFunctions = `${baseNetlify}/${baseFunctions}`
 const baseNetlifyEdgeFunctions = `${baseNetlify}/${baseEdgeFunctions}`
+const baseNetlifyCloudflare = `${baseCloudflareFolder}/${baseCloudflare}`
 const baseSupaUtils = `${baseSupa}/${baseFunctions}/${baseUtils}`
 const baseSupaTests = `${baseSupa}/${baseFunctions}/${baseTests}`
 const baseNetlifyTests = `${baseNetlify}/${baseTests}`
 const baseNetlifyUtils = `${baseNetlify}/${baseUtils}`
 const baseNetlifyEdgeTests = `${baseNetlify}/${baseEdgeFunctions + baseTests}`
 const baseNetlifyEgdeUtils = `${baseNetlify}/${baseEdgeFunctions + baseUtils}`
+const baseCloudflareTests = `${baseCloudflareFolder}/${baseCloudflare + baseTests}`
+const baseCloudflareUtils = `${baseCloudflareFolder}/${baseCloudflare + baseUtils}`
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info', 'cron_email']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
@@ -36,10 +42,13 @@ const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types
 const supaTempl = {}
 const netlifyTempl = {}
 const netlifyEdgeTempl = {}
+const cloudflareTempl = {}
 // list files in baseSupaTemplate
 const supaTemplFiles = readdirSync(baseSupaTemplate)
 const netlifyTemplFiles = readdirSync(baseNetlifyTemplate)
 const netlifyEdgeTemplFiles = readdirSync(baseNetlifyEdgeTemplate)
+const cloudflareTemplFiles = readdirSync(baseCloudflareTemplate)
+
 // open file and copy content in supaTempl with key = filename without extension
 supaTemplFiles.forEach((file) => {
   try {
@@ -70,6 +79,17 @@ netlifyEdgeTemplFiles.forEach((file) => {
     const key = file.replace('.ts', '')
     // split content at "// import from here" and use only second part
     netlifyEdgeTempl[key] = content.split('// import from here')[1]
+  }
+  catch (e) {
+    console.error(e)
+  }
+})
+cloudflareTemplFiles.forEach((file) => {
+  try {
+    const content = readFileSync(`${baseCloudflareTemplate}/${file}`, 'utf8')
+    const key = file.replace('.ts', '') // Big question mark here
+    // split content at "// import from here" and use only second part
+    cloudflareTempl[key] = content.split('// import from here')[1]
   }
   catch (e) {
     console.error(e)
@@ -143,6 +163,15 @@ const mutationsBg = [
   { from: '{ sendRes', to: '{ sendResBg' },
   { from: 'Handler', to: 'BackgroundHandler' },
 ]
+
+const mutationCloudflare = [
+  { from: supaTempl.handler, to: cloudflareTempl.handler },
+  { from: '../_utils/', to: `../${baseCloudflare}_utils/` },
+  { from: '../_tests/', to: `../${baseCloudflare}_tests/` },
+  { from: 'export function setEnv(env: any) {}', to: '' },
+  { from: supaTempl.getEnv, to: cloudflareTempl.getEnv },
+  { from: '// importSetEnvHere', to: 'import { setEnv } from \'../cloudflare_utils/utils.ts\'' },
+]
 // list deno functions folder and filter by allowed
 
 const folders = readdirSync(baseSupaFunctions).filter(f => allowed.includes(f) || background.includes(f))
@@ -161,6 +190,7 @@ const netlifyFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNe
 const netlifyBgFiles = filesBg.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyFunctions}/`).replace('/index.ts', '-background.ts'))
 // const onlyNodeNetlify = onlyNode.map(f => `${baseNetlifyFunctions}/${f}.ts`)
 const netlifyEdgeFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyEdgeFunctions}/`).replace('/index.ts', '.ts'))
+const cloudflareFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyCloudflare}/`).replace('/index.ts', '.ts'))
 // create netlify/functions folder if not exists
 try {
   readdirSync(baseNetlifyFunctions)
@@ -177,30 +207,50 @@ catch (e) {
   mkdirSync(baseNetlifyEdgeFunctions, { recursive: true })
 }
 
+try {
+  readdirSync(baseNetlifyCloudflare)
+}
+catch (e) {
+  console.log(`Creating folder: ${baseNetlifyCloudflare}`)
+  mkdirSync(baseNetlifyCloudflare, { recursive: true })
+}
+
 for (let i = 0; i < files.length; i++) {
   const file = files[i]
   const netlifyFile = netlifyFiles[i]
   const netlifyEdgeFile = netlifyEdgeFiles[i]
   const netlifyBgFile = netlifyBgFiles[i]
+  const cloudflareFile = cloudflareFiles[i]
+
   // console.log('file', file)
   // console.log('netlifyFile', netlifyFile)
   // replace imports
   const content = readFileSync(file, 'utf8')
+
   let newContent = `// This code is generated don't modify it\n${content}`
   mutationsNode.forEach((m) => {
     const { from, to } = m
     newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
+
   let newContentEdge = `// This code is generated don't modify it\n${content}`
   mutationsEgde.forEach((m) => {
     const { from, to } = m
     newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
+
   let newContentBg = `${newContent}`
   mutationsBg.forEach((m) => {
     const { from, to } = m
     newContentBg = newContentBg.replace(new RegExp(escapeRegExp(from), 'g'), to)
   })
+
+  let newContentCloudflare = `// This code is generated don't modify it\n${content}`
+  mutationCloudflare.forEach((m) => {
+    const { from, to } = m
+    newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+  })
+
   // write in new path
   console.log('Generate :', netlifyFile)
   if (background.includes(folders[i])) {
@@ -209,6 +259,7 @@ for (let i = 0; i < files.length; i++) {
   else {
     writeFileSync(netlifyFile, newContent)
     writeFileSync(netlifyEdgeFile, newContentEdge)
+    writeFileSync(cloudflareFile, newContentCloudflare)
   }
 }
 
@@ -222,6 +273,7 @@ catch (e) {
   console.log(`Creating folder: ${baseNetlifyUtils}`)
   mkdirSync(baseNetlifyUtils, { recursive: true })
   mkdirSync(baseNetlifyEgdeUtils, { recursive: true })
+  mkdirSync(baseCloudflareUtils, { recursive: true })
   const utilsFiles = readdirSync(baseSupaUtils)
   utilsFiles.forEach((f) => {
     const fileName = f.split('.')[0]
@@ -232,14 +284,23 @@ catch (e) {
         const { from, to } = m
         newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
       })
+
       let newContentEdge = `// This code is generated don't modify it\n${content}`
       mutationsEgde.forEach((m) => {
         const { from, to } = m
         newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
       })
+
+      let newContentCloudfare = `// This code is generated don't modify it\n${content}`
+      mutationCloudflare.forEach((m) => {
+        const { from, to } = m
+        newContentCloudfare = newContentCloudfare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+      })
+
       console.log('Generate :', `${baseNetlifyUtils}/${f}`)
       writeFileSync(`${baseNetlifyUtils}/${f}`, newContent)
       writeFileSync(`${baseNetlifyEgdeUtils}/${f}`, newContentEdge)
+      writeFileSync(`${baseCloudflareUtils}/${f}`, newContentCloudfare)
     }
   })
 }
@@ -253,6 +314,7 @@ catch (e) {
   console.log(`Creating folder: ${baseNetlifyTests}`)
   mkdirSync(baseNetlifyTests, { recursive: true })
   mkdirSync(baseNetlifyEdgeTests, { recursive: true })
+  mkdirSync(baseCloudflareTests, { recursive: true })
   const testFiles = readdirSync(baseSupaTests)
   testFiles.forEach((f) => {
     // if allowedUtil file copy to netlify/_utils
@@ -267,9 +329,16 @@ catch (e) {
       const { from, to } = m
       newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
     })
+
+    let newContentCloudflare = `// This code is generated don't modify it\n${content}`
+    mutationCloudflare.forEach((m) => {
+      const { from, to } = m
+      newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+    })
     console.log('Generate :', `${baseNetlifyTests}/${f}`)
     writeFileSync(`${baseNetlifyTests}/${f}`, newContent)
     writeFileSync(`${baseNetlifyEdgeTests}/${f}`, newContentEdge)
+    writeFileSync(`${baseCloudflareTests}/${f}`, newContentCloudflare)
   })
 }
 
