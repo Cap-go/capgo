@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import path from 'node:path'
+import { readdirSync } from 'node:fs'
 import Vue from '@vitejs/plugin-vue'
 
 // import veauryVitePlugins from 'veaury/vite/index'
@@ -15,7 +16,6 @@ import Inspector from 'vite-plugin-vue-inspector'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import { readdirSync } from 'fs-extra'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
