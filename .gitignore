@@ -41,6 +41,8 @@ scripts/template/netlify/test.gplay.js
 CHANGELOG.md
 .history
 
+tests_backend/gh_actions/ch_data/*
+tests_backend/gh_actions/ch_logs/*
 .env.dev
 cloudflare_workers_deno/cloudflare/*
 cloudflare_workers_deno/cloudflare_tests/*
