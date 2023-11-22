@@ -129,6 +129,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       is_emulator: is_emulator == null ? false : is_emulator,
       is_prod: is_prod == null ? true : is_prod,
       custom_id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
@@ -138,6 +140,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       app_id,
       version_build,
       version: 0,
+      created_at: new Date().toISOString(),
     }
     const rows: Database['public']['Tables']['stats']['Insert'][] = []
     const { data: appVersion } = await supabaseAdmin()
