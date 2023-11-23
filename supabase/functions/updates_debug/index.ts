@@ -178,6 +178,7 @@ serve(async (event: Request) => {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
     const method: string = event.method
+    console.log('headers', headers)
     const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
     return main(url, headers, method, body)
   }

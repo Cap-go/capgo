@@ -56,7 +56,7 @@ async function didCancel(name: string) {
 async function getData() {
   isLoading.value = true
   try {
-    const req = supabase
+    let req = supabase
       .from('apps')
       .select(`
           id,
@@ -73,12 +73,12 @@ async function getData() {
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
-      req.like('name', `%${search.value}%`)
+      req = req.like('name', `%${search.value}%`)
 
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
-          req.order(col.key as any, { ascending: col.sortable === 'asc' })
+          req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
       })
     }
     const { data: dataVersions, count } = await req

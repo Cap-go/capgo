@@ -6,14 +6,14 @@ import type { BaseHeaders } from '../_utils/types.ts'
 interface dataDevice {
   userId: string
   appId?: string
-  rangeStart: number
-  rangeEnd: number
+  startDate: string
+  endDate: string
 }
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataDevice) {
   try {
     console.log('body', body)
-    return sendRes(await getSDashboard(headers.authorization || 'MISSING', body.userId, body.rangeStart, body.rangeEnd, body.appId))
+    return sendRes(await getSDashboard(headers.authorization || 'MISSING', body.userId, body.startDate, body.endDate, body.appId))
   }
   catch (e) {
     console.log('Error', e)

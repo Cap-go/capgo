@@ -69,24 +69,24 @@ async function enhenceVersionElems(dataVersions: Database['public']['Tables']['a
 async function getData() {
   isLoading.value = true
   try {
-    const req = supabase
+    let req = supabase
       .from('app_versions')
       .select('*', { count: 'exact' })
       .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
-      req.like('name', `%${search.value}%`)
+      req = req.like('name', `%${search.value}%`)
 
-    req.eq('deleted', filters.value.deleted)
+    req = req.eq('deleted', filters.value.deleted)
     if (filters.value['external-storage'])
-      req.neq('external_url', null)
+      req = req.neq('external_url', null)
     if (filters.value.encrypted)
-      req.neq('session_key', null)
+      req = req.neq('session_key', null)
     if (columns.value.length) {
       columns.value.forEach((col) => {
         if (col.sortable && typeof col.sortable === 'string')
-          req.order(col.key as any, { ascending: col.sortable === 'asc' })
+          req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
       })
     }
     const { data: dataVersions, count } = await req
