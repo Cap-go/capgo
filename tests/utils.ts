@@ -4,7 +4,6 @@ import type { Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 import type { Database } from '~/types/supabase.types'
 
-const DEFAULT_EMAIL = 'test@capgo.app'
 const DEFAULT_PASSWORD = 'testtest'
 const START_TIMEOUT = 3000
 
@@ -14,7 +13,6 @@ const defaultSupabaseUrl = 'http://localhost:54321'
 const defaultSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 const defaultSupabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
 
-let supaClient: SupabaseClient<Database> = null as any
 let supaClientAdmin: SupabaseClient<Database> = null as any
 
 export type SupabaseType = SupabaseClient<Database>
@@ -45,11 +43,9 @@ export async function useSupabase(page: Page) {
       detectSessionInUrl: false,
     },
   }
-  // return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
-  if (supaClient)
-    return supaClient
+
   // eslint-disable-next-line n/prefer-global/process
-  supaClient = createClient<Database>(process.env.SUPABASE_URL ?? defaultSupabaseUrl, process.env.SUPABASE_ANON ?? defaultSupabaseAnonKey, options)
+  const supaClient = createClient<Database>(process.env.SUPABASE_URL ?? defaultSupabaseUrl, process.env.SUPABASE_ANON ?? defaultSupabaseAnonKey, options)
 
   const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))
   await expect(supabaseEmail).toBeTruthy()

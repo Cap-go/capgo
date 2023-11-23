@@ -1,13 +1,17 @@
 // import type { Page } from '@playwright/test'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs'
-import exp from 'node:constants'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { diff } from 'deep-diff'
+import pkg from 'deep-diff';
+const { diff } = pkg;
 import type { SupabaseType } from './utils'
 import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
+
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test.beforeEach(beforeEachTest)
 
@@ -407,10 +411,11 @@ test.describe('Test organization system permissions', () => {
           .select('', { count: 'exact' })
           .eq('app_id', 'com.demo.app')
         await expect(allChannelsSupabaseError).toBeFalsy()
+        expect (allChannelsCount).toBeTruthy()
 
         // Expect the channel table to have the same count as supabase
         const allchannelsLocator = await page.locator('#custom_table > tbody > tr')
-        await expect(allchannelsLocator).toHaveCount(2)
+        await expect(allchannelsLocator).toHaveCount(allChannelsCount!)
         const allChannels = await allchannelsLocator.all()
 
         // Attempt to delete a channel. That is based on the permission matrix
@@ -476,7 +481,7 @@ test.describe('Test organization system permissions', () => {
           // https://github.com/microsoft/playwright/issues/5470
           if (permission.changeChannelToggle) {
             await Promise.all([
-              page.waitForRequest(`${SUPABASE_URL}\/**`),
+              page.waitForResponse(`${SUPABASE_URL}\/**`),
               await toggle.click(),
             ])
           }
@@ -779,7 +784,7 @@ test.describe('Test organization system permissions', () => {
         await page.click('#organization-picker')
         const allOrgsLocator = await page.locator('#dropdown-org > ul > li')
 
-        await expect(allOrgsLocator).toHaveCount(2)
+        await expect(allOrgsLocator).toHaveCount(inviteType === 'owner' ? 1 : 2)
         const demoOrgButton = await firstItemAsync(await allOrgsLocator.all(), async (orgName) => {
           return (await orgName.innerHTML()).includes('Demo org')
         })
