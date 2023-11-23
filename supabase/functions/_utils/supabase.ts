@@ -308,8 +308,8 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   }])
 }
 
-export async function getSDashboard(auth: string, userIdQuery: string, rangeStart: number, rangeEnd: number, appId?: string) {
-  console.log(`getSDashboard userId ${userIdQuery} appId ${appId} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`)
+export async function getSDashboard(auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
+  console.log(`getSDashboard userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let isAdmin = false
   let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
@@ -356,10 +356,10 @@ export async function getSDashboard(auth: string, userIdQuery: string, rangeStar
     req = req.in('app_id', appIds)
   }
 
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    console.log('range', rangeStart, rangeEnd)
+  if (startDate !== undefined && endDate !== undefined) {
+    console.log('range', startDate, endDate)
     // req range for start and end date for created_at
-    req = req.in('created_at', [rangeStart, rangeEnd])
+    req = req.in('created_at', [startDate, endDate])
   }
 
   const res = await req
@@ -410,7 +410,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
 
   if (rangeStart !== undefined && rangeEnd !== undefined) {
     console.log('range', rangeStart, rangeEnd)
-    req = req.in('created_at', [rangeStart, rangeEnd])
+    req = req.range(rangeStart, rangeEnd)
   }
 
   if (deviceIds && deviceIds.length) {
@@ -497,8 +497,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
   if (rangeStart !== undefined && rangeEnd !== undefined) {
     console.log('range', rangeStart, rangeEnd)
-    // req range for start and end date for created_at
-    req = req.in('created_at', [rangeStart, rangeEnd])
+    req = req.range(rangeStart, rangeEnd)
   }
 
   if (deviceIds && deviceIds.length) {

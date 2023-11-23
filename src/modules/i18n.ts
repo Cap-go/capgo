@@ -1,6 +1,6 @@
 import type { Locale } from 'vue-i18n'
 import { createI18n } from 'vue-i18n'
-import { type UserModule } from '~/types'
+import type { UserModule } from '~/types'
 
 // Import i18n resources
 // https://vitejs.dev/guide/features.html#glob-import
@@ -12,7 +12,12 @@ export const i18n = createI18n({
   messages: {},
 })
 
-export const availableLocales = (import.meta.env.locales).split(',')
+const localesMap = Object.fromEntries(
+  Object.entries(import.meta.glob('../../locales/*.yml'))
+    .map(([path, loadLocale]) => [path.match(/([\w-]*)\.yml$/)?.[1], loadLocale]),
+) as Record<Locale, () => Promise<{ default: Record<string, string> }>>
+
+export const availableLocales = Object.keys(localesMap)
 export const languages = {
   'de': 'Deutsch',
   'en': 'English',
@@ -29,6 +34,7 @@ export const languages = {
   'vi': 'Tiếng Việt',
   'zh-CN': '简体中文',
 }
+
 const loadedLanguages: string[] = []
 
 function setI18nLanguage(lang: Locale) {
@@ -37,24 +43,20 @@ function setI18nLanguage(lang: Locale) {
   return lang
 }
 
-export function loadLanguageAsync(lang: string) {
+export async function loadLanguageAsync(lang: string): Promise<Locale> {
   // If the same language
   if (i18n.global.locale.value === lang)
-    return Promise.resolve(setI18nLanguage(lang))
+    return setI18nLanguage(lang)
 
   // If the language was already loaded
   if (loadedLanguages.includes(lang))
-    return Promise.resolve(setI18nLanguage(lang))
+    return setI18nLanguage(lang)
 
   // If the language hasn't been loaded yet
-  return import(`../../locales/${lang}.yml`).then(
-    (messages) => {
-      i18n.global.setLocaleMessage(lang, messages.default)
-      loadedLanguages.push(lang)
-      localStorage.setItem('lang', lang)
-      return setI18nLanguage(lang)
-    },
-  )
+  const messages = await localesMap[lang]()
+  i18n.global.setLocaleMessage(lang, messages.default)
+  loadedLanguages.push(lang)
+  return setI18nLanguage(lang)
 }
 
 export const install: UserModule = ({ app }) => {

@@ -1,7 +1,3 @@
--- 
--- Devices table
--- 
-
 CREATE TABLE IF NOT EXISTS devices
 (
     updated_at DateTime64(6),
@@ -43,8 +39,8 @@ CREATE MATERIALIZED VIEW devices_aggregate_mv
 TO devices_aggregate
 AS
 SELECT
-    min(updated_at) AS created_at,
-    max(updated_at) AS updated_at,
+    (select min(updated_at) from devices) AS created_at,
+    (select max(updated_at) from devices) AS updated_at,
     device_id,
     argMax(custom_id, updated_at) AS custom_id,
     argMax(app_id, updated_at) AS app_id,
@@ -57,10 +53,6 @@ SELECT
     argMax(is_emulator, updated_at) AS is_emulator
 FROM devices
 GROUP BY device_id;
-
--- 
--- Logs table
---
 
 CREATE TABLE IF NOT EXISTS logs
 (
@@ -76,31 +68,62 @@ PARTITION BY toYYYYMM(created_at)
 ORDER BY (app_id, device_id, created_at)
 PRIMARY KEY (app_id, device_id, created_at);
 
-
 CREATE TABLE IF NOT EXISTS logs_daily
 (
     date Date,
     app_id String,
-    get_actions_count UInt64,
-    fail_actions_count UInt64
+    version Int64,
+    get UInt64,
+    fail UInt64,
+    install UInt64,
+    uninstall UInt64,
+    bandwidth Int64
 ) ENGINE = SummingMergeTree()
 PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
+ORDER BY (date, app_id, version);
 
 CREATE MATERIALIZED VIEW logs_daily_mv
 TO logs_daily
 AS
 SELECT
+    toDate(l.created_at) AS date,
+    l.app_id,
+    l.version,
+    countIf(l.action = 'get') AS get,
+    countIf(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
+    countIf(l.action = 'set') AS install,
+    countIf(l.action = 'uninstall') AS uninstall,
+    countIf(l.action = 'get') * maxIf(a.size, a.action = 'add') AS bandwidth
+FROM logs AS l
+LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
+GROUP BY date, l.app_id, l.version;
+
+CREATE TABLE IF NOT EXISTS mau
+(
+    date Date,
+    app_id String,
+    mau UInt64
+) ENGINE = SummingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_id);
+
+CREATE MATERIALIZED VIEW mau_mv
+TO mau
+AS
+SELECT
     toDate(created_at) AS date,
     app_id,
-    countIf(action = 'get') AS get_actions_count,
-    countIf(action IN ('set_fail', 'update_fail', 'download_fail')) AS fail_actions_count
+    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
 FROM logs
 GROUP BY date, app_id;
 
--- 
--- App versions table
--- 
+INSERT INTO mau
+SELECT
+    toDate(created_at) AS date,
+    app_id,
+    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
+FROM logs
+GROUP BY date, app_id;
 
 CREATE TABLE IF NOT EXISTS app_versions_meta
 (
@@ -113,8 +136,6 @@ CREATE TABLE IF NOT EXISTS app_versions_meta
 PARTITION BY toYYYYMM(created_at)
 ORDER BY (id, app_id, action)
 PRIMARY KEY (id, app_id, action);
-
---  Create stats for app_versions_meta
 
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
@@ -129,15 +150,6 @@ ORDER BY (date, app_id);
 CREATE MATERIALIZED VIEW app_storage_daily_mv
 TO app_storage_daily
 AS
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    sumIf(size, action = 'add') AS storage_added,
-    sumIf(size, action = 'delete') AS storage_deleted
-FROM app_versions_meta
-GROUP BY date, app_id;
-
-INSERT INTO app_storage_daily
 SELECT
     toDate(created_at) AS date,
     app_id,
@@ -167,38 +179,21 @@ CREATE TABLE IF NOT EXISTS aggregate_daily
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
 
--- drop table aggregate_daily_mv;
-CREATE MATERIALIZED VIEW aggregate_daily_mv
+-- Recreate the aggregate_daily Materialized View
+CREATE MATERIALIZED VIEW IF NOT EXISTS aggregate_daily_mv
 TO aggregate_daily
 AS
 SELECT
-    logs_daily.date as date,
-    logs_daily.app_id as app_id,
-    app_storage_daily.storage_added as storage_added,
-    app_storage_daily.storage_deleted as storage_deleted,
-    logs_daily.bandwidth as bandwidth,
-    mau.mau AS mau, -- Use the actual column name from the mau table
-    logs_daily.get as get,
-    logs_daily.fail as fail,
-    logs_daily.install as install,
-    logs_daily.uninstall as uninstall
-FROM logs_daily
-FULL JOIN app_storage_daily ON logs_daily.date = app_storage_daily.date AND logs_daily.app_id = app_storage_daily.app_id
-FULL JOIN mau ON logs_daily.date = mau.date AND logs_daily.app_id = mau.app_id;
-
-
-INSERT INTO aggregate_daily
-SELECT
-    l.date,
-    l.app_id,
-    a.storage_added,
-    a.storage_deleted,
-    l.bandwidth,
-    m.mau,
-    l.get,
-    l.fail,
-    l.install,
-    l.uninstall,
+    l.date as date,
+    l.app_id as app_id,
+    a.storage_added as storage_added,
+    a.storage_deleted as storage_deleted,
+    l.bandwidth as bandwidth,
+    m.count AS mau, -- Use the actual column name from the mau table
+    l.get as get,
+    l.fail as fail,
+    l.install as install,
+    l.uninstall as uninstall
 FROM logs_daily AS l
 FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
 FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
@@ -228,25 +223,9 @@ SELECT
 FROM aggregate_daily
 GROUP BY month, app_id;
 
-INSERT INTO aggregate_monthly
-SELECT
-    toStartOfMonth(date) AS month,
-    app_id,
-    sum(storage_added) AS storage_added,
-    sum(storage_deleted) AS storage_deleted,
-    sum(bandwidth) AS bandwidth,
-    max(mau) AS mau
-FROM aggregate_daily
-GROUP BY month, app_id;
-
 -- 
 -- Sessions stats
 -- 
-
--- DROP TABLE IF EXISTS sessions;
--- DROP TABLE IF EXISTS avg_session_length;
--- DROP VIEW IF EXISTS mv_sessions;
--- DROP VIEW IF EXISTS mv_avg_session_length;
 
 CREATE TABLE IF NOT EXISTS sessions
 (
@@ -293,12 +272,6 @@ GROUP BY device_id, app_id;
 -- Install and fail stats
 -- 
 
--- DROP TABLE IF EXISTS daily_aggregate_logs;
--- DROP TABLE IF EXISTS version_aggregate_logs;
--- DROP VIEW IF EXISTS daily_aggregate_logs_mv;
--- DROP VIEW IF EXISTS version_aggregate_logs_mv;
--- Aggregate table partitioned by day and version
--- Aggregate table partitioned by year and month
 CREATE TABLE IF NOT EXISTS daily_aggregate_logs
 (
     date Date,
@@ -312,7 +285,6 @@ CREATE TABLE IF NOT EXISTS daily_aggregate_logs
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, version);
 
--- Aggregate table partitioned by version only
 CREATE TABLE IF NOT EXISTS version_aggregate_logs
 (
     version Int64,
@@ -325,7 +297,6 @@ CREATE TABLE IF NOT EXISTS version_aggregate_logs
 PARTITION BY version
 ORDER BY version;
 
--- Create a Materialized View that aggregates data daily
 CREATE MATERIALIZED VIEW daily_aggregate_logs_mv TO daily_aggregate_logs AS
 SELECT 
     toDate(created_at) AS date,
@@ -338,7 +309,6 @@ SELECT
 FROM logs
 GROUP BY date, version;
 
--- Create a Materialized View that aggregates data by version
 CREATE MATERIALIZED VIEW version_aggregate_logs_mv TO version_aggregate_logs AS
 SELECT 
     version,
@@ -350,30 +320,23 @@ SELECT
 FROM logs
 GROUP BY version;
 
--- Create a Materialized View that aggregates mau by app_id and date
 CREATE TABLE IF NOT EXISTS mau
 (
     date Date,
     app_id String,
-    mau_count UInt64
+    count UInt64
 ) ENGINE = SummingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
 
-CREATE MATERIALIZED VIEW mau_mv
+-- Recreate the mau Materialized View
+CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
 TO mau
 AS
 SELECT
     toDate(created_at) AS date,
     app_id,
-    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau_count
+    countDistinct(device_id) AS count
 FROM logs
-GROUP BY date, app_id;
-
-INSERT INTO mau
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau_count
-FROM logs
+WHERE created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)
 GROUP BY date, app_id;

@@ -3,7 +3,6 @@ import {
   mergeReadableStreams,
 } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import { BlobReader, TextWriter, ZipReader } from 'https://deno.land/x/zipjs/index.js'
-import { inc } from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { type RunnableTest, type SupabaseType, assert } from '../../utils.ts'
 import { getSupabaseSecret, getUpdateBaseData, responseOk, sendUpdate, testPlaywright } from '../../utils.ts'
 

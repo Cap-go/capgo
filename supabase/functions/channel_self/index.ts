@@ -123,7 +123,7 @@ async function post(body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
-  if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
+  if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
     console.error('Cannot change device override current channel don\t allow it', { channel, dataChannelOverride })
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',
@@ -288,7 +288,7 @@ async function put(body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (dataChannelOverride && dataChannelOverride.channel_id) {
-    const channelId = dataChannelOverride.channel_id as Database['public']['Tables']['channels']['Row']
+    const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
 
     await redisDeviceInvalidate(app_id, device_id)
     return sendRes({
@@ -297,14 +297,9 @@ async function put(body: DeviceLink): Promise<Response> {
       allowSet: channelId.allow_device_self_set,
     })
   }
-  if (errorChannel) {
-    console.error('Cannot find channel', { errorChannel })
-    return sendRes({
-      message: `Cannot find channel ${JSON.stringify(errorChannel)}`,
-      error: 'channel_not_found',
-    }, 400)
-  }
-  else if (dataChannel) {
+  if (errorChannel)
+    console.error('Cannot find channel default', { errorChannel })
+  if (dataChannel) {
     await sendStats([{
       action: 'getChannel',
       platform: platform as Database['public']['Enums']['platform_os'],
@@ -367,7 +362,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
-  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
+  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
     console.error('Cannot change device override current channel don\t allow it', { dataChannelOverride })
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',

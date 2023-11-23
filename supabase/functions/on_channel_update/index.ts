@@ -27,8 +27,41 @@ serve(async (event: Request) => {
     const record = body.record
     console.log('record', record)
 
-    if (record.public) {
-      // find all other channels with same app_i with public true and update them to false
+    if (record.public && record.ios) {
+      const { error: iosError } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('ios', true)
+        .neq('id', record.id)
+      const { error: hiddenError } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('android', false)
+        .eq('ios', false)
+      if (iosError || hiddenError)
+        console.log('error', iosError || hiddenError)
+    }
+
+    if (record.public && record.android) {
+      const { error: androidError } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('android', true)
+        .neq('id', record.id)
+      const { error: hiddenError } = await supabaseAdmin()
+        .from('channels')
+        .update({ public: false })
+        .eq('app_id', record.app_id)
+        .eq('android', false)
+        .eq('ios', false)
+      if (androidError || hiddenError)
+        console.log('error', androidError || hiddenError)
+    }
+
+    if (record.public && (record.ios === record.android)) {
       const { error } = await supabaseAdmin()
         .from('channels')
         .update({ public: false })

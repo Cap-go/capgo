@@ -187,6 +187,8 @@ login-to-your-accoun: đăng nhập vào tài khoản của bạn
 logout: Đăng xuất
 logs: Nhật ký
 lowerCaseError: Nên chứa chữ thường
+make-default-android: Đặt làm mặc định cho Android
+make-default-ios: Đặt làm mặc định cho iOS
 make-normal: làm cho bình thường
 making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho

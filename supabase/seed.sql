@@ -11,32 +11,32 @@ select vault.create_secret('testsecret', 'apikey', 'admin user id');
 CREATE TRIGGER on_channel_create 
 AFTER INSERT ON public.channels 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_channel_create');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_channel_create');
 
 CREATE TRIGGER on_channel_update 
 AFTER UPDATE ON public.channels 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_channel_update');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_channel_update');
 
 CREATE TRIGGER on_shared_create 
 AFTER INSERT ON public.channel_users 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_shared_create');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_shared_create');
 
 CREATE TRIGGER on_user_create 
 AFTER INSERT ON public.users 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_user_create');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_user_create');
 
 CREATE TRIGGER on_user_update 
 AFTER UPDATE ON public.users 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_user_update');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_user_update');
 
 CREATE TRIGGER on_version_create 
 AFTER INSERT ON public.app_versions 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_create');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_create');
 
 CREATE TRIGGER on_version_delete
 AFTER DELETE ON public.app_versions 
@@ -46,17 +46,17 @@ EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_delete');
 CREATE TRIGGER on_version_update 
 AFTER UPDATE ON public.app_versions 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_version_update');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_update');
 
 CREATE TRIGGER on_devices_override_update 
 AFTER INSERT or UPDATE or DELETE ON public.devices_override 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_device_update');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_device_update');
 
 CREATE TRIGGER on_channel_devices_update 
 AFTER INSERT or UPDATE or DELETE ON public.channel_devices 
 FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_post_to_function('on_device_update');
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_device_update');
 
 INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "app", "channel", "update", "version", "shared", "abtest", "progressive_deploy", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
 ('2022-06-05 12:25:28+00', '2022-10-05 16:00:46.563382+00', 'Free', 'plan.free.desc', 0, 0, 'free', 1, 1, 500, 10, 0, 'f', 'f', 'c2f582d7-7dcb-4a65-b8da-82cc74a0645d', 'free', 'free', 0.1, 0.5, 50, 'Best for discover', 0, 0, 0, NULL, NULL, NULL),
@@ -109,8 +109,9 @@ INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "up
 (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
 INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
-(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't');
+(22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
+(23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
+(24, now(), 'two_default', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
 
 -- INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
 -- (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
