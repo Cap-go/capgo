@@ -1,3 +1,4 @@
+-- https://github.com/Cap-go/capgo/blob/3dd137350d8485a3dcadd30397c0638bbea9a517/supabase/migrations/20230815171919_base.sql
 CREATE TYPE "public"."orgs_table" AS (
     id uuid,
     created_by uuid,

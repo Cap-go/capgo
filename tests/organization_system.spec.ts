@@ -882,7 +882,7 @@ test.describe('Test organization system permissions', () => {
         }
         else {
           await expectPopout(page, 'Insufficient permissions')
-          expect(await page.locator('#base-input').getAttribute('readonly')).toBeTruthy()
+          expect(await page.locator('#base-input').getAttribute('readonly') === null).toBe(false)
         }
 
         // Now let's go test members. This is hopefuly the last thing to test
@@ -890,7 +890,8 @@ test.describe('Test organization system permissions', () => {
 
         // member-card
         // After page switch make sure we are still at the same org
-        expect(await getOrgName(page)).toBe('Demo org temp')
+        const expectedOrgName = permission.changeOrgName ? 'Demo org temp' : 'Demo org'
+        expect(await getOrgName(page)).toBe(expectedOrgName)
         const allMembersLocator = await page.locator('#member-card')
 
         const { error: allMembersSupabaseError, count: allMembersSupaCount } = await supabase.from('org_users')
