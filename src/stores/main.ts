@@ -49,7 +49,7 @@ export const useMainStore = defineStore('main', () => {
     })
   }
   const updateDashboard = async (rangeStart?: string, rangeEnd?: string) => {
-    dashboard.value = await getAllDashboard(auth.value?.id || '', rangeStart, rangeEnd)
+    dashboard.value = await getAllDashboard(user.value?.id || '', rangeStart, rangeEnd)
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
     totalStorage.value = await getTotalStorage()
