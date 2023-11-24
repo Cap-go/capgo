@@ -39,6 +39,42 @@ PARTITION BY toYYYYMM(updated_at)
 ORDER BY (app_id, device_id, updated_at)
 PRIMARY KEY (app_id, device_id);
 
+CREATE TABLE IF NOT EXISTS devices_u
+(
+    created_at DateTime64(6),
+    updated_at DateTime64(6),  -- This column is used to determine the latest record
+    device_id String,
+    custom_id String,
+    app_id String,
+    platform String,
+    plugin_version String,
+    os_version String,
+    version_build String,
+    version Int64,
+    is_prod UInt8,
+    is_emulator UInt8,
+) ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY toYYYYMM(updated_at)
+ORDER BY (device_id);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS devices_u_mv
+TO devices_u
+AS
+SELECT
+    argMin(updated_at, updated_at) AS created_at,  -- Get the earliest updated_at as created_at
+    device_id,
+    argMax(custom_id, updated_at) AS custom_id,
+    argMax(app_id, updated_at) AS app_id,
+    argMax(platform, updated_at) AS platform,
+    argMax(plugin_version, updated_at) AS plugin_version,
+    argMax(os_version, updated_at) AS os_version,
+    argMax(version_build, updated_at) AS version_build,
+    argMax(version, updated_at) AS version,
+    argMax(is_prod, updated_at) AS is_prod,
+    argMax(is_emulator, updated_at) AS is_emulator
+FROM devices
+GROUP BY device_id;
+
 CREATE MATERIALIZED VIEW devices_aggregate_mv
 TO devices_aggregate
 AS
