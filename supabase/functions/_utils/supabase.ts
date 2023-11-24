@@ -305,20 +305,19 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   if (!auth)
     client = supabaseAdmin()
 
+  const reqAdmin = await client
+    .rpc('is_admin')
+    .then(res => res.data || false)
+  isAdmin = reqAdmin
+
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_app_usage'
     if (appId) {
       const reqOwner = await client
         .rpc('is_app_owner', { appid: appId })
         .then(res => res.data || false)
-      if (!reqOwner) {
-        const reqAdmin = await client
-          .rpc('is_admin')
-          .then(res => res.data || false)
-        isAdmin = reqAdmin
-        if (!reqAdmin)
-          return Promise.reject(new Error('not allowed'))
-      }
+      if (!reqOwner && !reqAdmin)
+        return Promise.reject(new Error('not allowed'))
     }
     client = supabaseAdmin()
   }
