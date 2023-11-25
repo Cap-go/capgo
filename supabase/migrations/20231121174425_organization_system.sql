@@ -517,6 +517,7 @@ GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user
 
 
 -- Minor change over base.sql. this versions returns "bigint"
+DROP FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb);
 CREATE OR REPLACE FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) 
 RETURNS bigint 
 LANGUAGE plpgsql 
