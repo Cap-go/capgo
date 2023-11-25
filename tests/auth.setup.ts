@@ -7,7 +7,7 @@ const authFile2 = 'playwright/.auth/user2.json'
 setup('authenticate as test1', async ({ page }) => {
   await page.goto(`${BASE_URL}/`)
   
-  const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))\
+  const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))
   if (supabaseEmail)
     return
 
@@ -30,7 +30,7 @@ setup('authenticate as test1', async ({ page }) => {
 setup('authenticate as test2', async ({ page }) => {
   await page.goto(`${BASE_URL}/`)
 
-  const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))\
+  const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))
   if (supabaseEmail)
     return
 
