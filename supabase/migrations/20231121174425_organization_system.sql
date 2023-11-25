@@ -514,3 +514,37 @@ GRANT ALL ON FUNCTION "public"."get_orgs"("userid" "uuid") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO anon;
 GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO authenticated;
+
+
+-- Minor change over base.sql. this versions returns "bigint"
+CREATE OR REPLACE FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) 
+RETURNS bigint 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+AS $BODY$
+DECLARE 
+  request_id text;
+  url text;
+BEGIN 
+  -- Determine the URL based on the function_type
+  IF function_type = 'external' THEN
+    url := get_external_function_url() || function_name;
+  ELSE
+    url := get_db_url() || '/functions/v1/' || function_name;
+  END IF;
+
+  -- Make an async HTTP POST request using pg_net
+  SELECT INTO request_id net.http_post(
+    url := url,
+    headers := jsonb_build_object(
+      'Content-Type',
+      'application/json',
+      'apisecret',
+      get_apikey()
+    ),
+    body := body,
+    timeout_milliseconds := 15000
+  );
+  return request_id;
+END;
+$BODY$;
