@@ -6,7 +6,7 @@ test.beforeEach(beforeEachTest)
 
 test('test selectable disallow (no AB)', async ({ page }) => {
   // Get supabase (auth + create client)
-  const supabase = await useSupabase()
+  const supabase = await useSupabase(page)
 
   // Prepare test
   const { error: bundleErrorPrepare } = await supabase
@@ -69,7 +69,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
 
 test('test selectable disallow (with AB)', async ({ page }) => {
   // Get supabase (auth + create client)
-  const supabase = await useSupabase()
+  const supabase = await useSupabase(page)
 
   // Prepare test
   const { error: bundleErrorPrepare } = await supabase
