@@ -315,7 +315,7 @@ async function forceSupabaseTaskQueueFlush(_supabase: SupabaseType) {
     while (shouldPool) {
       await delay(50)
       const poolResult = await connection.queryArray('SELECT * FROM net._http_response WHERE id=$1', [reqId])
-      shouldPool = poolResult.rowCount !== 1
+      shouldPool = poolResult.rows.length !== 1
     }
   })
 
