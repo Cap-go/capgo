@@ -43,13 +43,13 @@ const ActiveTab = ref('info')
 const secondaryVersionPercentage = ref(50)
 
 const role = ref<OrganizationRole | null>(null)
-watch(channel, (channel) => {
+watch(channel, async (channel) => {
   if (!channel) {
     role.value = null
     return
   }
 
-  role.value = organizationStore.getCurrentRole(channel.created_by, channel.app_id, channel.id)
+  role.value = await organizationStore.getCurrentRole(channel.created_by, channel.app_id, channel.id)
   console.log(role.value)
 })
 

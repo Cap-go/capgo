@@ -206,7 +206,7 @@ async function refreshData() {
 }
 async function deleteOne(one: typeof element) {
   // console.log('deleteBundle', bundle)
-  if (!organizationStore.hasPermisisonsInRole(organizationStore.getCurrentRole(one.created_by, one.app_id, one.id), ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(one.created_by, one.app_id, one.id), ['admin', 'owner'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -282,7 +282,7 @@ async function reload() {
 }
 
 async function openAddChannel() {
-  if (organizationStore.hasPermisisonsInRole(organizationStore.getCurrentRole(props.appOwner, props.appId), ['admin', 'owner']))
+  if (organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(props.appOwner, props.appId), ['admin', 'owner']))
     addChannelModal.value = true
 
   else

@@ -207,7 +207,7 @@ async function getOrgRole() {
     return
   }
 
-  role.value = organizationStore.getCurrentRole(data.user_id, packageId.value, undefined)
+  role.value = await organizationStore.getCurrentRole(data.user_id, packageId.value, undefined)
 }
 
 function minVersion(val: string, min = '4.6.99') {

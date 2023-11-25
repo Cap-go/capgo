@@ -50,7 +50,9 @@ export const useOrganizationStore = defineStore('organization', () => {
     currentOrganization.value = value
   }
 
-  const getCurrentRole = (appOwner: string, appId?: string, channelId?: number): OrganizationRole => {
+  const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
+    if (_organizations.value.size === 0)
+      await fetchOrganizations()
     for (const org of _organizations.value.values()) {
       if (org.created_by === appOwner)
         return org.role as OrganizationRole

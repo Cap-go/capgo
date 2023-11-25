@@ -51,13 +51,13 @@ const showChannel = computed(() => {
 })
 
 const role = ref<OrganizationRole | null>(null)
-watch(version, (version) => {
+watch(version, async (version) => {
   if (!version) {
     role.value = null
     return
   }
 
-  role.value = organizationStore.getCurrentRole(version.user_id, version.app_id, undefined)
+  role.value = await organizationStore.getCurrentRole(version.user_id, version.app_id, undefined)
   console.log(role.value)
 })
 
