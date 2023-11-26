@@ -31,14 +31,14 @@ export const useOrganizationStore = defineStore('organization', () => {
   const currentOrganization = ref<Organization>()
   const currentRole = ref<OrganizationRole | null>(null)
 
-  watch(currentOrganization, (currentOrganization) => {
+  watch(currentOrganization, async (currentOrganization) => {
     if (!currentOrganization) {
       currentRole.value = null
       return
     }
 
     // eslint-disable-next-line @typescript-eslint/no-use-before-define
-    currentRole.value = getCurrentRole(currentOrganization.created_by, undefined, undefined)
+    currentRole.value = await getCurrentRole(currentOrganization.created_by, undefined, undefined)
     console.log('current role', currentRole.value)
   })
 
