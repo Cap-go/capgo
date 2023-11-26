@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import { BASE_URL, beforeEachTest, expectPopout, useSupabase } from './utils'
 
 test.beforeEach(beforeEachTest)
+test.describe.configure({ mode: 'serial' })
 
 test('test selectable disallow (no AB)', async ({ page }) => {
   // Get supabase (auth + create client)
