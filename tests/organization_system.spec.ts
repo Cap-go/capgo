@@ -408,7 +408,7 @@ test.describe('Test organization system permissions', () => {
         const supabase = await useSupabaseAdmin() // Client supabase
         const { error: allChannelsSupabaseError, count: allChannelsCount } = await supabase
           .from('channels')
-          .select('', { count: 'exact' })
+          .select('*', { count: 'exact' })
           .eq('app_id', 'com.demo.app')
         await expect(allChannelsSupabaseError).toBeFalsy()
         expect (allChannelsCount).toBeTruthy()
