@@ -4,11 +4,13 @@ const BASE_URL = 'http://localhost:5173'
 const authFile1 = 'playwright/.auth/user1.json'
 const authFile2 = 'playwright/.auth/user2.json'
 
+setup.describe.configure({ mode: 'serial' })
+
 setup('authenticate as test1', async ({ page }) => {
   await page.goto(`${BASE_URL}/`)
   
   const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))
-  if (supabaseEmail)
+  if (supabaseEmail !== null)
     return
 
   const email = 'test@capgo.app'
@@ -31,7 +33,7 @@ setup('authenticate as test2', async ({ page }) => {
   await page.goto(`${BASE_URL}/`)
 
   const supabaseEmail = await page.evaluate(() => localStorage.getItem('supabase-email'))
-  if (supabaseEmail)
+  if (supabaseEmail !== null)
     return
 
   const email = 'test2@capgo.app'
