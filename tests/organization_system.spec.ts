@@ -335,7 +335,7 @@ test.describe('Test organization system permissions', () => {
         deviceSnapshot = deviceData
       })
 
-      testWithInvitedUser.afterAll(async () => {
+      testWithInvitedUser.afterEach(async () => {
         await expect(channelSnapshots).toBeTruthy()
         await expect(bundleSnapshot).toBeTruthy()
 
