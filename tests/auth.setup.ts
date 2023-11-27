@@ -1,5 +1,4 @@
 import { expect, test as setup } from '@playwright/test'
-import { existsSync } from 'node:fs';
 
 const BASE_URL = 'http://localhost:5173'
 const authFile1 = 'playwright/.auth/user1.json'
@@ -9,9 +8,6 @@ setup.describe.configure({ mode: 'serial' })
 
 setup('authenticate as test1', async ({ page }) => {
   await page.goto(`${BASE_URL}/`)
-  
-  if (existsSync(authFile2))
-    return
 
   const email = 'test@capgo.app'
 
@@ -31,9 +27,6 @@ setup('authenticate as test1', async ({ page }) => {
 
 setup('authenticate as test2', async ({ page }) => {
   await page.goto(`${BASE_URL}/`)
-
-  if (existsSync(authFile2))
-    return
 
   const email = 'test2@capgo.app'
 
