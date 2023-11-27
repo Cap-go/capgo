@@ -344,14 +344,14 @@ test.describe('Test organization system permissions', () => {
 
         expect(error).toBeFalsy()
 
-        const { error: error2 } = await supabase.from('channels').insert(channelSnapshots!)
-        await expect(error2).toBeFalsy()
-
         const { error: error3 } = await supabase.from('app_versions').delete().eq('id', '9601')
         await expect(error3).toBeFalsy()
 
         const { error: error4 } = await supabase.from('app_versions').insert(bundleSnapshot!)
         await expect(error4).toBeFalsy()
+
+        const { error: error2 } = await supabase.from('channels').insert(channelSnapshots!)
+        await expect(error2).toBeFalsy()
 
         const { error: error5 } = await supabase.from('devices').delete().eq('device_id', '00009a6b-eefe-490a-9c60-8e965132ae51')
         await expect(error5).toBeFalsy()
