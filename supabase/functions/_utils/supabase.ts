@@ -436,9 +436,9 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   // }
 }
 
-export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
@@ -485,6 +485,11 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   if (rangeStart !== undefined && rangeEnd !== undefined) {
     console.log('range', rangeStart, rangeEnd)
     req = req.range(rangeStart, rangeEnd)
+  }
+
+  if (after) {
+    console.log('after', after)
+    req = req.gt('created_at', after)
   }
 
   if (deviceIds && deviceIds.length) {

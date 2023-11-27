@@ -11,6 +11,7 @@ interface dataStats {
   order?: Order[]
   rangeStart?: number
   rangeEnd?: number
+  after?: string
 }
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataStats) {
@@ -19,13 +20,13 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataSt
     const apikey_string = headers.capgkey
     const authorization = headers.authorization || apikey_string || 'MISSING'
     if (apikey_string) {
-      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(headers.authorization, supabaseAdmin(), ['all', 'write'])
+      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
       if (!apikey)
         return sendRes({ status: 'Missing apikey' }, 400)
       if (!body.appId || !(await checkAppOwner(apikey.user_id, body.appId)))
         return sendRes({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }
-    return sendRes(await getSStats(authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, true))
+    return sendRes(await getSStats(authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
   }
   catch (e) {
     return sendRes({
