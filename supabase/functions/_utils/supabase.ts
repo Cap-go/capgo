@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
@@ -438,7 +438,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
 
 export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
+  console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
@@ -450,9 +450,11 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_logs'
-    const reqOwner = await client
-      .rpc('is_app_owner', { appid: appId })
-      .then(res => res.data || false)
+    const reqOwner = auth
+      ? (await client
+          .rpc('is_app_owner', { appid: appId })
+          .then(res => res.data || false))
+      : true
     if (!reqOwner) {
       const reqAdmin = await client
         .rpc('is_admin')

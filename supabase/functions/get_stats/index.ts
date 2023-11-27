@@ -18,7 +18,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataSt
   try {
     console.log('body', body)
     const apikey_string = headers.capgkey
-    const authorization = headers.authorization || apikey_string || 'MISSING'
+    const authorization = apikey_string || headers.authorization || 'MISSING'
     if (apikey_string) {
       const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
       if (!apikey)
@@ -26,9 +26,10 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataSt
       if (!body.appId || !(await checkAppOwner(apikey.user_id, body.appId)))
         return sendRes({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }
-    return sendRes(await getSStats(authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
+    return sendRes(await getSStats(apikey_string === authorization ? '' : authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
   }
   catch (e) {
+    console.error('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

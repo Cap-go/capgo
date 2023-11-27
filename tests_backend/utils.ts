@@ -1,4 +1,4 @@
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import { isEqual } from 'https://esm.sh/lodash-es@^4.17.21'
 import { mergeReadableStreams } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import * as p from 'npm:@clack/prompts@0.7.0'
