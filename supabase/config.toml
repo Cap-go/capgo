@@ -205,3 +205,6 @@ verify_jwt = false
 
 [functions.website_stats]
 verify_jwt = false
+
+[functions.get_stats]
+verify_jwt = false
