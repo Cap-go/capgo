@@ -293,8 +293,8 @@ devDependencies:
     specifier: ^1.1.13
     version: 1.1.13
   '@iconify-json/ion':
-    specifier: 1.1.12
-    version: 1.1.12
+    specifier: 1.1.13
+    version: 1.1.13
   '@iconify-json/ls':
     specifier: 1.1.5
     version: 1.1.5
@@ -3099,8 +3099,8 @@ packages:
       '@iconify/types': 2.0.0
     dev: true
 
-  /@iconify-json/ion@1.1.12:
-    resolution: {integrity: sha512-YvVxa9pVUJFEp7S5n97VIYZv1/qU/aX1RSehDBQRfI0YsZCZhBQY77SxYXGCb/Gc0fP4//b9wtx8UE4hfwr0eQ==}
+  /@iconify-json/ion@1.1.13:
+    resolution: {integrity: sha512-wiTseSqxRJRKsi9wJWtfjMIIDiwTWELRFfMV+b6TPdA2XUR+NnlUC/4MH7XEd9fC3Rcj7Tp9Wlpm2pFM/+flLQ==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
