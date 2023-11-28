@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import Sidebar from '../components/Sidebar.vue'
@@ -12,7 +12,6 @@ import IconBilling from '~icons/mingcute/bill-fill'
 import IconNotification from '~icons/mdi/message-notification'
 import IconAdmin from '~icons/eos-icons/admin'
 import type { Tab } from '~/components/comp_def'
-import { isAdmin, isSpoofed } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { openPortal } from '~/services/stripe'
 
@@ -52,24 +51,28 @@ if (!Capacitor.isNativePlatform()) {
     onClick: openPortal,
   })
 }
-if (main.user?.id) {
-  isAdmin().then((res) => {
-    if (!!res || isSpoofed()) {
-      tabs.value.push({
-        label: 'admin',
-        icon: shallowRef(IconAdmin) as any,
-        key: '/dashboard/settings/admin',
-      })
-    }
-  })
-  if (main.paying) {
+watchEffect(() => {
+  if (main.paying && !tabs.value.find(tab => tab.label === 'usage')) {
     tabs.value.push({
       label: 'usage',
       icon: shallowRef(IconPlans) as any,
       key: '/dashboard/settings/usage',
     })
   }
-}
+  else if (!main.paying && tabs.value.find(tab => tab.label === 'usage')) {
+    tabs.value = tabs.value.filter(tab => tab.label !== 'usage')
+  }
+  if (main.isAdmin && !tabs.value.find(tab => tab.label === 'admin')) {
+    tabs.value.push({
+      label: 'admin',
+      icon: shallowRef(IconAdmin) as any,
+      key: '/dashboard/settings/admin',
+    })
+  }
+  else if (!main.isAdmin && tabs.value.find(tab => tab.label === 'admin')) {
+    tabs.value = tabs.value.filter(tab => tab.label !== 'admin')
+  }
+})
 
 displayStore.NavTitle = t('settings')
 </script>

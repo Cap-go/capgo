@@ -88,7 +88,7 @@ async function getUsages() {
   // get aapp_stats
   if (!main.user?.id)
     return
-  stats.value = await getTotalStats()
+  stats.value = await getTotalStats(main.auth?.id)
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
@@ -99,9 +99,9 @@ async function loadData() {
     plans.value.push(...pls)
   })
   await getUsages()
-  await getCurrentPlanName().then(res => planCurrrent.value = res)
+  await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
   try {
-    await getPlanUsagePercent().then(res => planPercent.value = res)
+    await getPlanUsagePercent(main.auth?.id).then(res => planPercent.value = res)
   }
   catch (error) {
     console.log(error)
@@ -120,7 +120,8 @@ watch(
     else if (prevMyPlan && !myPlan) {
       isLoading.value = true
     }
-  })
+  },
+)
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
@@ -146,7 +147,7 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: main.paying ? t('Current') : t('failed'),
+    label: (main.paying || main.trialDaysLeft > 0) ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {

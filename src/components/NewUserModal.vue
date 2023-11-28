@@ -56,7 +56,7 @@ function close() {
   clearErrors('create-user')
 }
 
-async function submit(form: { first_name: string; last_name: string; email: string }) {
+async function submit(form: { first_name: string, last_name: string, email: string }) {
   isLoading.value = true
   try {
     if (!main.canUseMore) {
@@ -120,7 +120,8 @@ async function submit(form: { first_name: string; last_name: string; email: stri
             first_name: user.user?.user_metadata.first_name,
             last_name: user.user?.user_metadata.last_name,
             email: user.user?.email,
-          })
+          },
+        )
       isLoading.value = false
       if (error || userTableError)
         setErrors('create-user', [userTableError!.message], {})

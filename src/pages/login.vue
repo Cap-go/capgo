@@ -24,7 +24,7 @@ async function nextLogin() {
   }, 500)
 }
 
-async function submit(form: { email: string; password: string }) {
+async function submit(form: { email: string, password: string }) {
   isLoading.value = true
   const { error } = await supabase.auth.signInWithPassword({
     email: form.email,

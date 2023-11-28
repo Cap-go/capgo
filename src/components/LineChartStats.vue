@@ -177,8 +177,7 @@ const chartData = ref<ChartData<'line'>>({
     tension: 0.3,
     pointRadius: 2,
     pointBorderWidth: 0,
-  },
-  {
+  }, {
     label: t('prediction'),
     data: projectionData.value,
     borderColor: 'transparent',
@@ -186,8 +185,7 @@ const chartData = ref<ChartData<'line'>>({
     tension: 0.9,
     pointRadius: 2,
     pointBorderWidth: 0,
-  },
-  ],
+  }],
 })
 const chartOptions = {
   scales: {

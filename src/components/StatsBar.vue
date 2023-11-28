@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Stat } from './comp_def'
 
-const props = defineProps<{ stats: Stat[]; mini?: boolean }>()
+const props = defineProps<{ stats: Stat[], mini?: boolean }>()
 </script>
 
 <template>

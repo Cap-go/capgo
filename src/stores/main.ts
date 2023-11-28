@@ -21,6 +21,7 @@ export const useMainStore = defineStore('main', () => {
   }>()
   const trialDaysLeft = ref<number>(0)
   const paying = ref<boolean>(false)
+  const isAdmin = ref<boolean>(false)
   const canceled = ref<boolean>(false)
   const goodPlan = ref<boolean>(false)
   const canUseMore = ref<boolean>(false)
@@ -61,8 +62,7 @@ export const useMainStore = defineStore('main', () => {
       acc.bandwidth += cur.bandwidth
       acc.storage += cur.storage_added - cur.storage_deleted
       return acc
-    }
-    , {
+    }, {
       mau: 0,
       bandwidth: 0,
       storage: 0,
@@ -80,6 +80,7 @@ export const useMainStore = defineStore('main', () => {
     auth,
     trialDaysLeft,
     goodPlan,
+    isAdmin,
     totalStorage,
     totalDevices,
     totalDownload,
