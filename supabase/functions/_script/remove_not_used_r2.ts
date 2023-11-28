@@ -1,7 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
 import { config } from 'https://deno.land/x/dotenv/mod.ts'
+import { load } from "https://deno.land/std@0.207.0/dotenv/mod.ts";
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
+
+const env = await load();
+
+function getEnv(envName: string) {
+  return Deno.env.get(envName) ?? env[envName] ?? ''
+}
 
 function useSupabase() {
   const options = {
@@ -11,14 +18,9 @@ function useSupabase() {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(Deno.env.get('S_SUPABASE_URL') || '***', Deno.env.get('S_SUPABASE_SERVICE_ROLE_KEY') || '***', options)
+  return createClient<Database>(getEnv('SUPABASE_URL') || '***', getEnv('SUPABASE_SERVICE_ROLE_KEY') || '***', options)
 }
 
-function getEnv(env: string) {
-  return Deno.env.get(env) ?? ''
-}
-
-const UUID_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
 
 function initR2() {
   const accountid = getEnv('R2_ACCOUNT_ID')
