@@ -3,6 +3,7 @@ import { useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
 import { z } from 'zod'
 import { expect } from './zodUtils'
+import * as crypto from 'node:crypto'
 
 const functionUrl = process.env.BACKEND_URL || 'http://localhost:54321/functions/v1/'
 const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
