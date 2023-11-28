@@ -162,27 +162,27 @@ export async function getTotalStorage(): Promise<number> {
   return data || 0
 }
 
-export async function isGoodPlan(): Promise<boolean> {
+export async function isGoodPlan(userid?: string): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v4', { })
+    .rpc('is_good_plan_v4', { userid })
     .single()
   if (error)
     throw new Error(error.message)
 
   return data || false
 }
-export async function isTrial(): Promise<number> {
+export async function isTrial(userid?: string): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('is_trial', { })
+    .rpc('is_trial', { userid })
     .single()
   if (error)
     throw new Error(error.message)
 
   return data || 0
 }
-export async function isAdmin(): Promise<boolean> {
+export async function isAdmin(userid?: string): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_admin', {})
+    .rpc('is_admin', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -190,9 +190,9 @@ export async function isAdmin(): Promise<boolean> {
   return data || false
 }
 
-export async function isCanceled(): Promise<boolean> {
+export async function isCanceled(userid?: string): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_canceled', {})
+    .rpc('is_canceled', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -200,9 +200,9 @@ export async function isCanceled(): Promise<boolean> {
   return data || false
 }
 
-export async function isPaying(): Promise<boolean> {
+export async function isPaying(userid?: string): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_paying', {})
+    .rpc('is_paying', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -219,9 +219,9 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
   return plans || []
 }
 
-export async function isAllowedAction(): Promise<boolean> {
+export async function isAllowedAction(userid?: string): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_allowed_action_user', {})
+    .rpc('is_allowed_action_user', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -229,18 +229,18 @@ export async function isAllowedAction(): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(): Promise<number> {
+export async function getPlanUsagePercent(userid?: string): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent')
+    .rpc('get_plan_usage_percent', { userid })
     .single()
   if (error)
     throw new Error(error.message)
   return data || 0
 }
 
-export async function getTotalStats(): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
+export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
   const { data, error } = await useSupabase()
-    .rpc('get_total_stats_v3', { })
+    .rpc('get_total_stats_v3', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -253,9 +253,9 @@ export async function getTotalStats(): Promise<Database['public']['Functions']['
   }
 }
 
-export async function getCurrentPlanName(): Promise<string> {
+export async function getCurrentPlanName(userid?: string): Promise<string> {
   const { data, error } = await useSupabase()
-    .rpc('get_current_plan_name', {})
+    .rpc('get_current_plan_name', { userid })
     .single()
   if (error)
     throw new Error(error.message)

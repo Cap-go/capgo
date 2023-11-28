@@ -12,7 +12,7 @@ const supabase = useSupabase()
 
 const { t } = useI18n()
 
-async function submit(form: { password: string; password_confirm: string }) {
+async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)
   if (isLoading.value)
     return

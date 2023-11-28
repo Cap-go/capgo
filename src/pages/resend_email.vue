@@ -14,7 +14,7 @@ const supabase = useSupabase()
 const isLoading = ref(false)
 const isLoadingMain = ref(false)
 
-async function submit(form: { email: string; password: string }) {
+async function submit(form: { email: string, password: string }) {
   isLoading.value = true
   const { error } = await supabase.auth.resend({
     type: 'signup',

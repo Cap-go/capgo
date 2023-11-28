@@ -1,4 +1,4 @@
-import { isSpoofed, spoofUser } from './../services/supabase'
+import { isAdmin, isSpoofed, spoofUser } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
@@ -45,21 +45,24 @@ async function guard(next: any, to: string, from: string) {
     }
     await main.updateDashboard()
     initStunning(main.user?.customer_id)
-    isTrial().then((res) => {
+    isTrial(main.auth?.id).then((res) => {
       // console.log('isTrial', res)
       main.trialDaysLeft = res
     })
-    isPaying().then((res) => {
+    isPaying(main.auth?.id).then((res) => {
       main.paying = res
     })
-    isAllowedAction().then((res) => {
+    isAllowedAction(main.auth?.id).then((res) => {
       main.canUseMore = res
     })
-    isGoodPlan().then((res) => {
+    isGoodPlan(main.auth?.id).then((res) => {
       main.goodPlan = res
     })
-    isCanceled().then((res) => {
+    isCanceled(main.auth?.id).then((res) => {
       main.canceled = res
+    })
+    isAdmin().then((res) => {
+      main.isAdmin = res
     })
 
     snag.track({

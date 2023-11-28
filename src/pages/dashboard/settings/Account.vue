@@ -256,7 +256,7 @@ function getEmoji(country: string) {
   return countryCodeToFlagEmoji(countryCode)
 }
 
-async function submit(form: { first_name: string; last_name: string; email: string; country: string }) {
+async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
   if (isLoading.value || !main.user?.id)
     return
   isLoading.value = true

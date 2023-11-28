@@ -4,7 +4,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useMainStore } from '~/stores/main'
-import { useSupabase } from '~/services/supabase'
+import { getPlans, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
@@ -98,9 +98,18 @@ function roundNumber(number: number) {
 
 const planUsage = ref<Awaited<ReturnType<typeof getUsage>>>()
 
-getUsage().then((res) => {
-  planUsage.value = res
-})
+async function loadData() {
+  isLoading.value = true
+  await getPlans().then((pls) => {
+    plans.value.length = 0
+    plans.value.push(...pls)
+  })
+  getUsage().then((res) => {
+    planUsage.value = res
+  })
+  isLoading.value = false
+}
+loadData()
 </script>
 
 <template>
@@ -121,7 +130,7 @@ getUsage().then((res) => {
               Included in plan
             </div>
             <div class="font-semibold">
-              {{ planUsage?.plan.mau }}
+              {{ planUsage?.plan.mau.toLocaleString() }}
             </div>
           </div>
 
@@ -131,7 +140,7 @@ getUsage().then((res) => {
               Used in period
             </div>
             <div class="font-semibold">
-              {{ planUsage?.totalMau }}
+              {{ planUsage?.totalMau.toLocaleString() }}
             </div>
           </div>
         </div>
@@ -146,7 +155,7 @@ getUsage().then((res) => {
               Included in plan
             </div>
             <div class="font-semibold">
-              {{ planUsage?.plan.storage }} GB
+              {{ planUsage?.plan.storage.toLocaleString() }} GB
             </div>
           </div>
 
@@ -171,7 +180,7 @@ getUsage().then((res) => {
               Included in plan
             </div>
             <div class="font-semibold">
-              {{ planUsage?.plan.bandwidth }} GB
+              {{ planUsage?.plan.bandwidth.toLocaleString() }} GB
             </div>
           </div>
 
@@ -191,7 +200,7 @@ getUsage().then((res) => {
             Total estimated bill (Base + Overage)
           </div>
           <div class="font-semibold">
-            ${{ planUsage?.totalPrice }}
+            ${{ planUsage?.totalPrice.toLocaleString() }}
           </div>
         </div>
       </div>
