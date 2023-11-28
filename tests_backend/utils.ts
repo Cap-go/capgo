@@ -96,7 +96,7 @@ export function getUpdateBaseData(): typeof updateAndroidBaseData {
   return structuredClone(updateAndroidBaseData)
 }
 
-export async function testPlaywright(spec: string, env: { [key: string]: string }) {
+export async function testPlaywright(spec: string, backendUrl: URL, env: { [key: string]: string }) {
   const playwrightCommand = new Deno.Command('npx', {
     args: [
       'playwright',
@@ -111,6 +111,7 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
       SUPABASE_SERVICE: supabaseSecret!,
       SUPABASE_URL: supabaseUrl!,
       START_FRONTEND: 'true',
+      BACKEND_URL: backendUrl.toString(),
       ...env,
     },
   })

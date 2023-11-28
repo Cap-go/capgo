@@ -14,5 +14,5 @@ export function getTest(): RunnableTest {
 }
 
 async function runFrontendTests(backendBaseUrl: URL, supabase: SupabaseType) {
-  await testPlaywright('organization_system.spec.ts', {})
+  await testPlaywright('organization_system.spec.ts', backendBaseUrl, {})
 }

@@ -351,8 +351,8 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   )
 }
 
-async function testFrontend(_backendBaseUrl: URL, _supabase: SupabaseType) {
-  await testPlaywright('bundle.spec.ts', {
+async function testFrontend(backendBaseUrl: URL, _supabase: SupabaseType) {
+  await testPlaywright('bundle.spec.ts', backendBaseUrl, {
     BUNDLE: semver,
   })
 }
