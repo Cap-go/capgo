@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
-import { config } from 'https://deno.land/x/dotenv/mod.ts'
 import { load } from "https://deno.land/std@0.207.0/dotenv/mod.ts";
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -53,11 +52,36 @@ async function gen2array<T>(gen: AsyncIterable<T>): Promise<T[]> {
   return out
 }
 
+async function main2() {
+ 
+  
+  const supabase = useSupabase()
+  const { data: apps, error: appError } = await supabase.from('apps').select('app_id, user_id')
+
+  if (appError) {
+    console.error('app error')
+    throw appError
+  }
+
+  const r2 = initR2()
+
+  const r2Versions = r2.listObjects({})
+  const r2VersionsArr = await gen2array(r2Versions)
+  const all = []
+  for (const obj of r2VersionsArr) {
+    const key = obj.key
+    if (!key.startsWith('apps/')) {
+      console.log('key', key)
+      all.push(r2.deleteObject(obj.key))
+    }
+  }
+  console.log('all', all.length)
+  await Promise.all(all)
+  console.log('done')
+  // r2.
+}
 async function main() {
-  config({
-    path: 'supabase/.env.local',
-    export: true,
-  })
+
 
   // console.log(Deno.env.toObject())
 
@@ -191,4 +215,5 @@ async function main() {
   }
 }
 
-main()
+// main2()
+// main()
