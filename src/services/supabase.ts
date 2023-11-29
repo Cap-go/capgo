@@ -1,3 +1,4 @@
+import axios from 'axios';
 import type { SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -5,11 +6,43 @@ import { createClient } from '@supabase/supabase-js'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-const supbaseId = supabaseUrl.split('//')[1].split('.')[0]
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
-
 let supaClient: SupabaseClient<Database> = null as any
+
+export const defaultApiHost = 'https://api.capgo.app'
+
+interface CapgoConfig {
+  supaHost: string
+  supaKey: string
+  supbaseId: string
+  host: string
+  hostWeb: string
+}
+
+const getLocalConfig = () => {
+  return {
+    supaHost: import.meta.env.VITE_SUPABASE_URL as string,
+    supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0] as string,
+    host: import.meta.env.VITE_APP_URL as string,
+    hostWeb: import.meta.env.LANDING_URL as string,
+  } as CapgoConfig
+}
+
+let config: CapgoConfig = getLocalConfig()
+
+export const getRemoteConfig = async () => {
+  // call host + /api/get_config and parse the result as json using axios
+  const localConfig = await getLocalConfig()
+  const data = await axios
+  .get(`${defaultApiHost}/get_config`)
+  .then((res) => res.data as CapgoConfig)
+  .then(data => ({...data, ...localConfig} as CapgoConfig))
+  .catch(() => {
+      console.log('Local config', localConfig);
+      return localConfig as CapgoConfig
+  })
+  config = data
+}
 
 export function useSupabase() {
   const options: SupabaseClientOptions<'public'> = {
@@ -41,7 +74,8 @@ export function useSupabase() {
   // return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
   if (supaClient)
     return supaClient
-  supaClient = createClient<Database>(supabaseUrl, supabaseAnonKey, options)
+
+  supaClient = createClient<Database>(config.supaHost, config.supaKey, options)
   return supaClient
 }
 
@@ -53,13 +87,13 @@ export function saveSpoof(id: string) {
 }
 
 export function spoofUser() {
-  const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
+  const textData = localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
   if (!textData)
     return false
 
   const data = JSON.parse(textData)
   data.user.id = localStorage.getItem('supabase.spoof_id')
-  localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
+  localStorage.setItem(`sb-${config.supbaseId}-auth-token`, JSON.stringify(data))
   return data.user.id
 }
 export async function deleteUser() {
@@ -70,13 +104,13 @@ export async function deleteUser() {
     throw new Error(error.message)
 }
 export function deleteSupabaseToken() {
-  return localStorage.removeItem(`sb-${supbaseId}-auth-token`)
+  return localStorage.removeItem(`sb-${config.supbaseId}-auth-token`)
 }
 export function getSupabaseToken() {
-  return localStorage.getItem(`sb-${supbaseId}-auth-token`)
+  return localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
 }
 export function unspoofUser() {
-  const textData = localStorage.getItem(`sb-${supbaseId}-auth-token`)
+  const textData = localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
   if (!textData || !isSpoofed())
     return false
 
@@ -86,7 +120,7 @@ export function unspoofUser() {
     return false
 
   data.user.id = oldId
-  localStorage.setItem(`sb-${supbaseId}-auth-token`, JSON.stringify(data))
+  localStorage.setItem(`sb-${config.supbaseId}-auth-token`, JSON.stringify(data))
   localStorage.removeItem('supabase.spoof_id')
   return true
 }

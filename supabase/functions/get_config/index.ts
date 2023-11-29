@@ -5,6 +5,7 @@ import type { BaseHeaders } from '../_utils/types.ts'
 async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   return sendRes({
     supaHost: getEnv('SUPABASE_URL'),
+    supbaseId: getEnv('SUPABASE_URL')?.split('//')[1].split('.')[0],
     supaKey: getEnv('SUPABASE_ANON_KEY'),
     signKey: getEnv('DEFAULT_SIGN_KEY'),
   })
