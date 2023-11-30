@@ -296,6 +296,53 @@ $$BEGIN
     RETURN NEW;
 END;$$;
 
+6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5
+CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_id" "text") RETURNS text
+   LANGUAGE plpgsql SECURITY DEFINER AS $$
+Declare  
+  apikey_user_id uuid;
+  app_owner uuid;
+  org_id uuid;
+  user_perm "public"."user_min_right";
+BEGIN
+  SELECT get_user_id(apikey) into apikey_user_id;
+
+  IF apikey_user_id IS NULL THEN
+    return 'INVALID_APIKEY';
+  END IF;
+
+  SELECT user_id from apps
+  INTO app_owner
+  WHERE apps.app_id=app_id
+  limit 1;
+
+  IF app_owner IS NULL THEN
+    return 'NO_APP';
+  END IF;
+
+  SELECT get_user_main_org_id(app_owner) INTO org_id;
+
+  IF org_id IS NULL THEN
+    return 'NO_ORG';
+  END IF;
+
+  IF is_owner_of_org(apikey_user_id, org_id) THEN
+    return 'PERM_OWNER';
+  END IF;
+
+  SELECT user_right from org_users
+  INTO user_perm
+  WHERE user_id=apikey_user_id
+  AND org_users.org_id=org_id;
+
+  IF user_right IS NULL THEN
+    return 'PERM_NONE';
+  END IF;
+
+  RETURN format('PERM_%s', user_right);
+END;$$;
+
+
 CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS trigger
    LANGUAGE plpgsql AS $$
 DECLARE
