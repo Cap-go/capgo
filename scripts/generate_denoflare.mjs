@@ -14,6 +14,7 @@ async function generateConfig() {
     .toString('utf8')
     .trim()
     .split('\n')
+    .filter((val) => !val.startsWith('#'))
     .map((val) => {
       const split = val.split('=')
       if (split.length !== 2)
