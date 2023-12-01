@@ -296,9 +296,9 @@ $$BEGIN
     RETURN NEW;
 END;$$;
 
-6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5
 CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_id" "text") RETURNS text
    LANGUAGE plpgsql SECURITY DEFINER AS $$
+<<get_org_perm_for_apikey>>
 Declare  
   apikey_user_id uuid;
   app_owner uuid;
@@ -313,7 +313,7 @@ BEGIN
 
   SELECT user_id from apps
   INTO app_owner
-  WHERE apps.app_id=app_id
+  WHERE apps.app_id=get_org_perm_for_apikey.app_id
   limit 1;
 
   IF app_owner IS NULL THEN
@@ -327,21 +327,20 @@ BEGIN
   END IF;
 
   IF is_owner_of_org(apikey_user_id, org_id) THEN
-    return 'PERM_OWNER';
+    return 'perm_owner';
   END IF;
 
   SELECT user_right from org_users
   INTO user_perm
   WHERE user_id=apikey_user_id
-  AND org_users.org_id=org_id;
+  AND org_users.org_id=get_org_perm_for_apikey.org_id;
 
-  IF user_right IS NULL THEN
-    return 'PERM_NONE';
+  IF user_perm IS NULL THEN
+    return 'perm_none';
   END IF;
 
-  RETURN format('PERM_%s', user_right);
+  RETURN format('perm_%s', user_perm);
 END;$$;
-
 
 CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS trigger
    LANGUAGE plpgsql AS $$
