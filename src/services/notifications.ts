@@ -62,22 +62,18 @@ export function initNotif() {
   }
   else {
     // On success, we should be able to receive notifications
-    PushNotifications.addListener('registration',
-      async (token: Token) => {
-        try {
-          await registerToken(token.value)
-        }
-        catch (e) {
-          console.error(e)
-        }
-      },
-    )
+    PushNotifications.addListener('registration', async (token: Token) => {
+      try {
+        await registerToken(token.value)
+      }
+      catch (e) {
+        console.error(e)
+      }
+    })
     // Some issue with our setup and push will not work
-    PushNotifications.addListener('registrationError',
-      (error: any) => {
-        console.error(`Error on registration: ${JSON.stringify(error)}`)
-      },
-    )
+    PushNotifications.addListener('registrationError', (error: any) => {
+      console.error(`Error on registration: ${JSON.stringify(error)}`)
+    })
     PushNotifications.checkPermissions().then(({ receive }) => {
       // console.log('checkPermissions', receive)
       if (receive === 'granted')
@@ -108,19 +104,15 @@ export function listenNotif(router: Router) {
   }
   else {
     // Show us the notification payload if the app is open on our device
-    PushNotifications.addListener('pushNotificationReceived',
-      (notification: PushNotificationSchema) => {
-        console.log(`Push received: ${JSON.stringify(notification)}`)
-      },
-    )
+    PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+      console.log(`Push received: ${JSON.stringify(notification)}`)
+    })
 
     // Method called when tapping on a notification
-    PushNotifications.addListener('pushNotificationActionPerformed',
-      (notification: ActionPerformed) => {
-        console.log(`Push action performed: ${JSON.stringify(notification)}`)
-        if (notification.notification.data.link)
-          router.push(notification.notification.data.link)
-      },
-    )
+    PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+      console.log(`Push action performed: ${JSON.stringify(notification)}`)
+      if (notification.notification.data.link)
+        router.push(notification.notification.data.link)
+    })
   }
 }

@@ -3,7 +3,8 @@ import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  kList, kListItem,
+  kList,
+  kListItem,
   kRange,
   kToggle,
 } from 'konsta/vue'

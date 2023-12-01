@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
@@ -317,20 +317,19 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   if (!auth)
     client = supabaseAdmin()
 
+  const reqAdmin = await client
+    .rpc('is_admin')
+    .then(res => res.data || false)
+  isAdmin = reqAdmin
+
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_app_usage'
     if (appId) {
       const reqOwner = await client
         .rpc('is_app_owner', { appid: appId })
         .then(res => res.data || false)
-      if (!reqOwner) {
-        const reqAdmin = await client
-          .rpc('is_admin')
-          .then(res => res.data || false)
-        isAdmin = reqAdmin
-        if (!reqAdmin)
-          return Promise.reject(new Error('not allowed'))
-      }
+      if (!reqOwner && !reqAdmin)
+        return Promise.reject(new Error('not allowed'))
     }
     client = supabaseAdmin()
   }
@@ -449,9 +448,9 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   // }
 }
 
-export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+  console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
@@ -463,9 +462,11 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
 
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_logs'
-    const reqOwner = await client
-      .rpc('is_app_owner', { appid: appId })
-      .then(res => res.data || false)
+    const reqOwner = auth
+      ? (await client
+          .rpc('is_app_owner', { appid: appId })
+          .then(res => res.data || false))
+      : true
     if (!reqOwner) {
       const reqAdmin = await client
         .rpc('is_admin')
@@ -498,6 +499,11 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   if (rangeStart !== undefined && rangeEnd !== undefined) {
     console.log('range', rangeStart, rangeEnd)
     req = req.range(rangeStart, rangeEnd)
+  }
+
+  if (after) {
+    console.log('after', after)
+    req = req.gt('created_at', after)
   }
 
   if (deviceIds && deviceIds.length) {

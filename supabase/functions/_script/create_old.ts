@@ -1,5 +1,5 @@
 import { crc32 } from 'https://deno.land/x/crc32@v0.2.2/mod.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import 'https://deno.land/x/dotenv/load.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 

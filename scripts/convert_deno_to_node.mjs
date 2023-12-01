@@ -127,7 +127,7 @@ const mutationsNode = [
   { from: 'return await this.pipeline.hdel(key, ...fields)', to: 'this.pipeline.hdel(key, ...fields)\n return Promise.resolve(0)' },
   { from: '.hscan(key, cursor, opts)', to: '.hscan(key, cursor, \'MATCH\', opts?.pattern ?? \'\', \'COUNT\', opts?.count ?? \'\')' },
   { from: 'import { connect, parseURL } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: 'import { Redis } from \'ioredis\'' },
-  { from: 'https://esm.sh/@supabase/supabase-js@^2.2.3', to: '@supabase/supabase-js' },
+  { from: 'https://esm.sh/@supabase/supabase-js@^2.38.5', to: '@supabase/supabase-js' },
   { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
   { from: 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts', to: 'minio' },
   { from: '{ S3Client }', to: '{ Client }' },

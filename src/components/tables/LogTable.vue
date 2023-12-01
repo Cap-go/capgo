@@ -38,7 +38,7 @@ const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
 
-function findVersion(id: number, versions: { name: string; id: number }[]) {
+function findVersion(id: number, versions: { name: string, id: number }[]) {
   return versions.find(elem => elem.id === id)
 }
 

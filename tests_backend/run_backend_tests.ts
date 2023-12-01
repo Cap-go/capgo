@@ -6,8 +6,8 @@ import {
   mergeReadableStreams,
 } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 
 import * as p from 'npm:@clack/prompts@0.7.0'
 

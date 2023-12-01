@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-import { getSStats } from '../_utils/supabase.ts'
-import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
+import { checkAppOwner, getSStats, supabaseAdmin } from '../_utils/supabase.ts'
+import { checkKey, methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders, Order } from '../_utils/types.ts'
+import type { Database } from '../_utils/supabase.types.ts'
 
 interface dataStats {
   appId: string
@@ -10,14 +11,25 @@ interface dataStats {
   order?: Order[]
   rangeStart?: number
   rangeEnd?: number
+  after?: string
 }
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: dataStats) {
   try {
     console.log('body', body)
-    return sendRes(await getSStats(headers.authorization || 'MISSING', body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, true))
+    const apikey_string = headers.capgkey
+    const authorization = apikey_string || headers.authorization || 'MISSING'
+    if (apikey_string) {
+      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
+      if (!apikey)
+        return sendRes({ status: 'Missing apikey' }, 400)
+      if (!body.appId || !(await checkAppOwner(apikey.user_id, body.appId)))
+        return sendRes({ status: 'You can\'t access this app', app_id: body.appId }, 400)
+    }
+    return sendRes(await getSStats(apikey_string === authorization ? '' : authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
   }
   catch (e) {
+    console.error('Error', e)
     return sendRes({
       status: 'Error unknow',
       error: JSON.stringify(e),

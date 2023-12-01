@@ -1,31 +1,37 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "module": "ESNext",
-    "target": "es2016",
-    "lib": ["DOM", "ESNext", "WebWorker"],
-    "strict": true,
-    "allowJs": true,
-    "jsx": "preserve",
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "incremental": false,
-    "skipLibCheck": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "noUnusedLocals": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": [
-      "cypress",
-      "vite/client",
-      "vite-plugin-pages/client",
-      "vite-plugin-vue-layouts/client",
-      "unplugin-icons/types/vue",
-    ],
-    "paths": {
-      "~/*": ["src/*"]
-    }
+  "target": "ESNext",
+  "jsx": "preserve",
+  "lib": ["DOM", "ESNext"],
+  "baseUrl": ".",
+  "module": "ESNext",
+  "moduleResolution": "node",
+  "paths": {
+    "~/*": ["src/*"]
   },
-  "exclude": ["dist", "node_modules", "**/*.worker.ts"]
+  "resolveJsonModule": true,
+  "types": [
+    "vitest",
+    "vite/client",
+    "vue/ref-macros",
+    "vite-plugin-vue-layouts/client",
+    "vite-plugin-pwa/client",
+    "unplugin-vue-macros/macros-global"
+  ],
+  "allowJs": true,
+  "strict": true,
+  "strictNullChecks": true,
+  "noUnusedLocals": true,
+  "esModuleInterop": true,
+  "forceConsistentCasingInFileNames": true,
+  "isolatedModules": true,
+  "skipLibCheck": true
+},
+"vueCompilerOptions": {
+  "plugins": [
+    "@vue-macros/volar/define-models",
+    "@vue-macros/volar/define-slots"
+  ]
+},
+"exclude": ["dist", "node_modules", "cypress"]
 }

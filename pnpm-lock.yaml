@@ -287,14 +287,14 @@ devDependencies:
     specifier: ^5.5.1
     version: 5.5.1
   '@iconify-json/carbon':
-    specifier: 1.1.21
-    version: 1.1.21
+    specifier: 1.1.22
+    version: 1.1.22
   '@iconify-json/heroicons':
     specifier: ^1.1.13
     version: 1.1.13
   '@iconify-json/ion':
-    specifier: 1.1.12
-    version: 1.1.12
+    specifier: 1.1.13
+    version: 1.1.13
   '@iconify-json/ls':
     specifier: 1.1.5
     version: 1.1.5
@@ -3244,8 +3244,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dev: false
 
-  /@iconify-json/carbon@1.1.21:
-    resolution: {integrity: sha512-bK2cMVM4noBU+FGlay433flpXLRzQu0ED095iAnoO6ka3yb4uz0lvb8acpN5gthyGLJ89C4HpfIbQZLQnMKQww==}
+  /@iconify-json/carbon@1.1.22:
+    resolution: {integrity: sha512-kQqCxiRkXtT7RO612GosIgvmQ8M8Ltgwl8LZZ4LKO8jip77W4rLK2PFjuS1uXRM1Lu879uzH73mMUClqFLsA0Q==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true
@@ -3256,8 +3256,8 @@ packages:
       '@iconify/types': 2.0.0
     dev: true
 
-  /@iconify-json/ion@1.1.12:
-    resolution: {integrity: sha512-YvVxa9pVUJFEp7S5n97VIYZv1/qU/aX1RSehDBQRfI0YsZCZhBQY77SxYXGCb/Gc0fP4//b9wtx8UE4hfwr0eQ==}
+  /@iconify-json/ion@1.1.13:
+    resolution: {integrity: sha512-wiTseSqxRJRKsi9wJWtfjMIIDiwTWELRFfMV+b6TPdA2XUR+NnlUC/4MH7XEd9fC3Rcj7Tp9Wlpm2pFM/+flLQ==}
     dependencies:
       '@iconify/types': 2.0.0
     dev: true

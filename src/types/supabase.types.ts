@@ -599,6 +599,33 @@ export interface Database {
         }
         Relationships: []
       }
+      job_queue: {
+        Row: {
+          created_at: string | null
+          function_name: string | null
+          function_type: string | null
+          job_id: number
+          job_type: string
+          payload: string
+        }
+        Insert: {
+          created_at?: string | null
+          function_name?: string | null
+          function_type?: string | null
+          job_id?: number
+          job_type: string
+          payload: string
+        }
+        Update: {
+          created_at?: string | null
+          function_name?: string | null
+          function_type?: string | null
+          job_id?: number
+          job_type?: string
+          payload?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -1060,6 +1087,21 @@ export interface Database {
           }
         ]
       }
+      workers: {
+        Row: {
+          id: number
+          locked: boolean
+        }
+        Insert: {
+          id?: number
+          locked?: boolean
+        }
+        Update: {
+          id?: number
+          locked?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1067,13 +1109,6 @@ export interface Database {
     Functions: {
       accept_invitation_to_org: {
         Args: {
-          org_id: string
-        }
-        Returns: string
-      }
-      change_org_logo: {
-        Args: {
-          logo: string
           org_id: string
         }
         Returns: string
@@ -1313,6 +1348,13 @@ export interface Database {
           image_url: string
         }[]
       }
+      get_org_perm_for_apikey: {
+        Args: {
+          apikey: string
+          app_id: string
+        }
+        Returns: string
+      }
       get_orgs: {
         Args: {
           userid: string
@@ -1422,13 +1464,13 @@ export interface Database {
         | {
             Args: {
               apikey: string
-              app_id: string
             }
             Returns: string
           }
         | {
             Args: {
               apikey: string
+              app_id: string
             }
             Returns: string
           }
@@ -1470,38 +1512,7 @@ export interface Database {
           function_type: string
           body: Json
         }
-        Returns: undefined
-      }
-      increment_stats: {
-        Args: {
-          app_id: string
-          date_id: string
-          bandwidth: number
-          version_size: number
-          channels: number
-          shared: number
-          mlu: number
-          mlu_real: number
-          versions: number
-          devices: number
-        }
-        Returns: undefined
-      }
-      increment_stats_v2: {
-        Args: {
-          app_id: string
-          date_id: string
-          bandwidth: number
-          version_size: number
-          channels: number
-          shared: number
-          mlu: number
-          mlu_real: number
-          versions: number
-          devices: number
-          devices_real: number
-        }
-        Returns: undefined
+        Returns: number
       }
       increment_store: {
         Args: {
@@ -1540,13 +1551,13 @@ export interface Database {
         | {
             Args: {
               apikey: string
-              appid: string
             }
             Returns: boolean
           }
         | {
             Args: {
               apikey: string
+              appid: string
             }
             Returns: boolean
           }
@@ -1562,6 +1573,21 @@ export interface Database {
             Returns: boolean
           }
       is_allowed_capgkey:
+        | {
+            Args: {
+              apikey: string
+              keymode: Database["public"]["Enums"]["key_mode"][]
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              apikey: string
+              keymode: Database["public"]["Enums"]["key_mode"][]
+              app_id: string
+            }
+            Returns: boolean
+          }
         | {
             Args: {
               apikey: string
@@ -1583,22 +1609,14 @@ export interface Database {
             }
             Returns: boolean
           }
-        | {
-            Args: {
-              apikey: string
-              keymode: Database["public"]["Enums"]["key_mode"][]
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              apikey: string
-              keymode: Database["public"]["Enums"]["key_mode"][]
-              app_id: string
-            }
-            Returns: boolean
-          }
       is_app_owner:
+        | {
+            Args: {
+              apikey: string
+              appid: string
+            }
+            Returns: boolean
+          }
         | {
             Args: {
               appid: string
@@ -1697,10 +1715,17 @@ export interface Database {
         }
         Returns: boolean
       }
-      is_onboarded: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_onboarded:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: boolean
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_onboarding_needed:
         | {
             Args: Record<PropertyKey, never>
@@ -1770,11 +1795,19 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      process_current_jobs_if_unlocked: {
+        Args: Record<PropertyKey, never>
+        Returns: number[]
+      }
       remove_enum_value: {
         Args: {
           enum_type: unknown
           enum_value: string
         }
+        Returns: undefined
+      }
+      schedule_jobs: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
     }
