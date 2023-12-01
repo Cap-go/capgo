@@ -289,11 +289,9 @@ $$;
 CREATE OR REPLACE FUNCTION "public"."force_valid_user_id"() RETURNS trigger
    LANGUAGE plpgsql AS
 $$BEGIN
-    IF NEW."user_id" <> (select user_id from apps where app_id=NEW."app_id") THEN
-        RAISE EXCEPTION 'INVALID_USER_ID';
-    END IF;
+  NEW."user_id" = (select user_id from apps where app_id=NEW."app_id");
 
-    RETURN NEW;
+  RETURN NEW;
 END;$$;
 
 CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_id" "text") RETURNS text

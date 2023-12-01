@@ -100,6 +100,11 @@ export function getTest(): RunnableTest {
         test: testAutoMinVersionFlag,
         timesToExecute: 1,
       },
+      {
+        name: 'Test upload with organization (upload)',
+        test: testUploadWithOrganization,
+        timesToExecute: 1
+      }
     ],
   }
 }
@@ -156,9 +161,9 @@ async function pnpmInstall() {
   }
 }
 
-async function runCli(params: string[], logOutput = false): Promise<string> {
+async function runCli(params: string[], logOutput = false, overwriteApiKey?: string): Promise<string> {
   const command = new Deno.Command('node', {
-    args: [cliPath!, ...params, '--apikey', defaultApiKey],
+    args: [cliPath!, ...params, '--apikey', overwriteApiKey ?? defaultApiKey],
     cwd: appPath!,
     stdout: 'piped',
     stderr: 'piped',
@@ -355,4 +360,56 @@ async function testFrontend(backendBaseUrl: URL, _supabase: SupabaseType) {
   await testPlaywright('bundle.spec.ts', backendBaseUrl, {
     BUNDLE: semver,
   })
+}
+
+async function testUploadWithOrganization(_backendBaseUrl: URL, supabase: SupabaseType) {
+  const testApiKey = crypto.randomUUID()
+  const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
+
+  const { error: apikeyError } = await supabase.from('apikeys')
+    .insert({ key: testApiKey, user_id: testUserId, mode: 'upload' })
+
+  assert(apikeyError === null, `Insert test api key error not null. Error: ${apikeyError}`)
+
+  try {
+    const { data: orgMembers, error: getOrgMembersError } = await supabase.from('org_users')
+      .delete()
+      .eq('user_id', testUserId)
+      .select('*')
+
+    assert(!!orgMembers, `Org members is null. Org members: ${orgMembers}`)
+    assert(getOrgMembersError === null, `Get orgs memers error is not null. Error: ${getOrgMembersError}`)
+
+    try {
+      const { error: insertTempUserError } = await supabase.from('org_users')
+        .insert({ user_id: testUserId, org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', user_right: 'upload' })
+
+      assert(insertTempUserError === null, `Insert temp organization user error is not null. Error: ${insertTempUserError}`)
+
+      try{
+        increaseSemver()
+
+        const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], false, testApiKey)
+        assert(output.includes('Bundle Uploaded'), `The upload propably failed. Output:\n${output}`)
+      } finally {
+        const { error: deleteTempUserError } = await supabase.from('org_users')
+          .delete()
+          .eq('user_id', testUserId)
+          .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+          .eq('user_right', 'upload')
+
+        assert(deleteTempUserError === null, `Delete temp user error is not null ${deleteTempUserError}`)
+      }
+    } finally {
+      const { error: insertOrgUsers } = await supabase.from('org_users').insert(orgMembers!)
+      assert(insertOrgUsers === null, `Insert org users error not null: ${insertOrgUsers}`)
+    }
+  } finally {
+    const { error: deleteApiKeyError } = await supabase.from('apikeys')
+      .delete()
+      .eq('key', testApiKey)
+      .eq('user_id', testUserId)
+
+    assert(deleteApiKeyError === null, `Delete API key error not null. Error: ${defaultApiKey}`)
+  }
 }
