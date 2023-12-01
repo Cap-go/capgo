@@ -1,18 +1,19 @@
 import { Buffer } from 'node:buffer'
 import { Client } from 'minio'
+import { getEnv } from './getEnv'
 
-const accountid = ''
-const access_key_id = ''
-const access_key_secret = ''
 const bucket = 'capgo'
-const storageEndpoint = ''
-const storageRegion = ''
-const storageUseSsl = false
-const storagePort = 9000
 // upper is ignored during netlify generation phase
 // import from here
 
 function initR2() {
+  const accountid = getEnv('R2_ACCOUNT_ID')
+  const access_key_id = getEnv('R2_ACCESS_KEY_ID')
+  const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
+  const storageEndpoint = getEnv('S3_ENDPOINT')
+  const storageRegion = getEnv('S3_REGION')
+  const storagePort = Number.parseInt(getEnv('S3_PORT'))
+  const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
   const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',

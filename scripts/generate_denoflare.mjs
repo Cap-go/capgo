@@ -1,12 +1,5 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 
-const baseDenoFlare = JSON.stringify({
-  $schema: 'https://raw.githubusercontent.com/skymethod/denoflare/v0.5.12/common/config.schema.json',
-  scripts: {
-
-  },
-}, null, 4)
-
 async function generateConfig() {
   const files = readdirSync('cloudflare_workers_deno/cloudflare').map(file => file.replace('.ts', ''))
 
@@ -17,10 +10,12 @@ async function generateConfig() {
     .filter((val) => !val.startsWith('#'))
     .map((val) => {
       const split = val.split('=')
-      if (split.length !== 2)
+      if (split.length < 2)
         throw new Error('invald env file!')
 
-      return { name: split[0], value: split[1] }
+      // save the rest after the first = as the value
+      const rest = val.substring(val.indexOf('=') + 1)
+      return { name: split[0], value: rest }
     })
     .reduce((acc, cur, _i) => {
       acc[cur.name] = { value: cur.value }
@@ -32,7 +27,11 @@ async function generateConfig() {
       const object = {
         path: `./cloudflare/${file}.ts`,
         localPort: 3030,
-        bindings: envFile,
+        bindings: {
+          ...envFile,
+          bucket: { bucketName: "capgo" },
+        },
+        customDomains: [ "api2.capgo.app" ],
       }
 
       return [file, object]
@@ -53,12 +52,18 @@ async function generateConfig() {
   const denoFlare = {
     $schema: 'https://raw.githubusercontent.com/skymethod/denoflare/v0.5.12/common/config.schema.json',
     scripts: {
-      main: {
+      capgo_functions: {
         path: './main_router.ts',
         localPort: 3030,
         bindings: envFile,
       },
     },
+    profiles: {
+      main: {
+        accountId: envFile['CF_ACCOUNT_ID'].value,
+        apiToken: envFile['CF_API_TOKEN'].value,
+    }
+    }
   }
 
   // console.log()
