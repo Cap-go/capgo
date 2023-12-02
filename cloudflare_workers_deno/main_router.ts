@@ -1,7 +1,6 @@
 import { map } from './generated_functions_map.ts'
 import { fallback } from './fallback_loadbalancer.ts'
 
-const specialFunctions = ['updates', 'stats']
 export default {
   async fetch(request: Request, env: any) {
     try {
@@ -11,7 +10,7 @@ export default {
         return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
 
       const edgeFunction = map[functionName]
-      if (edgeFunction && specialFunctions.includes(functionName)) {
+      if (edgeFunction) {
         const response = edgeFunction(request, env)
         return response
       }
