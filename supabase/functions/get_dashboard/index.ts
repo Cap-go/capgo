@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getSDashboard } from '../_utils/supabase.ts'
 import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
@@ -24,7 +23,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataDe
   }
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
   try {

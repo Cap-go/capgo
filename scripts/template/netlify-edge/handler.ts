@@ -1,4 +1,3 @@
-import type { Context } from 'https://edge.netlify.com'
 import type { BaseHeaders } from '../../../supabase/functions/_utils/types.ts'
 import { methodJson, sendRes } from '../../../supabase/functions/_utils/utils.ts'
 
@@ -9,6 +8,8 @@ function main(url: URL, headers: BaseHeaders, method: string, body: any) {
 
 // upper is ignored during netlify generation phase
 // import from here
+
+import type { Context } from 'https://edge.netlify.com'
 export default async (request: Request, _context: Context): Promise<Response> => {
   try {
     const url: URL = new URL(request.url)

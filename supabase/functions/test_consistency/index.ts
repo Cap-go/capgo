@@ -1,16 +1,13 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
-
 import {
   baseNetlify, baseNetlifyEdge, baseSupabase, deleteBundle,
   deleteDevice, getBundle, getChannels, getDevice,
   getOk, postDevice, postStats, postUpdate, putChannel,
   setChannel, setChannelSelf,
 } from '../_tests/api.ts'
-
 import { sendRes } from '../_utils/utils.ts'
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   // check if netlify and supbase send same
   // check if they send updates
   try {

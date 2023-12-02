@@ -139,7 +139,6 @@ const mutationsNode = [
   { from: 'https://esm.sh/google-play-scraper?target=deno', to: 'google-play-scraper' },
   { from: 'import { hmac } from \'https://deno.land/x/hmac@v2.0.1/mod.ts\'', to: 'import crypto from \'crypto\'' },
   { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
-  { from: 'import { serve } from \'https://deno.land/std@0.200.0/http/server.ts\'', to: 'import type { Handler } from \'@netlify/functions\'' },
   { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
   { from: '{ match: \'ver\*\', count: 5000 }', to: '{ pattern: \'ver\*\', count: 5000 })' },
@@ -154,7 +153,6 @@ const mutationsNode = [
 const mutationsEgde = [
   { from: '../_tests/', to: `../${baseEdgeFunctions}_tests/` },
   { from: '../_utils/', to: `../${baseEdgeFunctions}_utils/` },
-  { from: 'import { serve } from \'https://deno.land/std@0.200.0/http/server.ts\'', to: 'import type { Context } from \'https://edge.netlify.com\'' },
   { from: supaTempl.handler, to: netlifyEdgeTempl.handler },
 ]
 const mutationsBg = [

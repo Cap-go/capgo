@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import z from 'https://deno.land/x/zod@v3.22.2/index.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -401,7 +400,7 @@ function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
