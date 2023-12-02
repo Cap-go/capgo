@@ -47,7 +47,8 @@ async function generateConfig() {
         localPort: 3030,
         bindings: {
           ...envFile,
-          bucket: { bucketName: "capgo" },
+          capgo_db: { d1DatabaseUuid: envFile['D1_DATABASE_UUID'].value },
+          capgo_storage: { bucketName: envFile['R2_BUCKET'].value },
         },
         customDomains: [ "api.capgo.app" ],
       },
