@@ -24,26 +24,16 @@ async function generateConfig() {
 
   const scripts = files
     .map((file) => {
-      const object = {
-        path: `./cloudflare/${file}.ts`,
-        localPort: 3030,
-        bindings: {
-          ...envFile,
-          bucket: { bucketName: "capgo" },
-        },
-        customDomains: [ "api2.capgo.app" ],
-      }
-
-      return [file, object]
+      return [file, `./cloudflare/${file}.ts`]
     })
 
   // Generate the functions map
 
-  const imports = scripts.map(([functionName, functionObj]) => {
-    return `import ${functionName} from '${functionObj.path}'`
+  const imports = scripts.map(([functionName, functionPath]) => {
+    return `import ${functionName} from '${functionPath}'`
   }).join('\n')
 
-  const functionsMap = scripts.map(([functionName, functionObj]) => {
+  const functionsMap = scripts.map(([functionName, functionPath]) => {
     return `  ${functionName}: ${functionName}.fetch,`
   }).join('\n')
 
@@ -55,7 +45,11 @@ async function generateConfig() {
       capgo_functions: {
         path: './main_router.ts',
         localPort: 3030,
-        bindings: envFile,
+        bindings: {
+          ...envFile,
+          bucket: { bucketName: "capgo" },
+        },
+        customDomains: [ "api2.capgo.app" ],
       },
     },
     profiles: {
