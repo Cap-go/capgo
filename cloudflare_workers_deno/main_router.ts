@@ -1,8 +1,10 @@
 import { map } from './generated_functions_map.ts'
+import OnPgChange from './on_postgres_change.ts'
 import { fallback } from './fallback_loadbalancer.ts'
+import { WorkerEnv } from './worker_env.d.ts'
 
 export default {
-  async fetch(request: Request, env: any) {
+  async fetch(request: Request, env: WorkerEnv) {
     try {
       const requestUrl = new URL(request.url)
       const functionName = requestUrl.pathname.split('/').pop()
@@ -12,6 +14,10 @@ export default {
       const edgeFunction = map[functionName]
       if (edgeFunction) {
         const response = edgeFunction(request, env)
+        return response
+      }
+      else if (functionName === 'on_postgres_change') {
+        const response = await OnPgChange.fetch(request, env)
         return response
       }
       else {
