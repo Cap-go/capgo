@@ -206,7 +206,7 @@ export async function isGoodPlan(userid?: string): Promise<boolean> {
   return data || false
 }
 
-export async function getOrgs(): Promise<[]> {
+export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['Row'][]> {
   const { data, error } = await useSupabase()
     .from('orgs')
     .select('*')
@@ -216,7 +216,7 @@ export async function getOrgs(): Promise<[]> {
     throw error
   }
 
-  return data || ['asd']
+  return data || []
 }
 
 export async function isTrial(userid?: string): Promise<number> {
