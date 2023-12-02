@@ -42,14 +42,14 @@ async function generateConfig() {
   const denoFlare = {
     $schema: 'https://raw.githubusercontent.com/skymethod/denoflare/v0.5.12/common/config.schema.json',
     scripts: {
-      capgo_functions: {
+      capgoloadbal: {
         path: './main_router.ts',
         localPort: 3030,
         bindings: {
           ...envFile,
           bucket: { bucketName: "capgo" },
         },
-        customDomains: [ "api2.capgo.app" ],
+        customDomains: [ "api.capgo.app" ],
       },
     },
     profiles: {
