@@ -33,10 +33,11 @@ const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
+const bundleChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const secondaryChannel = ref<boolean>(false)
 
-const showChannel = computed(() => {
+const showChannel = computed((channel) => {
   // channel.value && ((!channel.value.enableAbTesting && !channel.value.enable_progressive_deploy && channel.value.version === version.value.id) || ((channel.value.enableAbTesting || channel.value.enable_progressive_deploy) && channel.value.secondVersion === version.value.id))
   if (!channel.value || !version.value)
     return false
@@ -83,6 +84,7 @@ async function getChannels() {
   if (!version.value)
     return
   channel.value = undefined
+  bundleChannels.value = []
   const { data: dataChannel } = await supabase
     .from('channels')
     .select()
@@ -93,7 +95,7 @@ async function getChannels() {
   channels.value.forEach((chan) => {
     const v: number = chan.version as any
     if (version.value && (v === version.value.id || version.value.id === chan.secondVersion)) {
-      channel.value = chan
+      bundleChannels.value.push(chan)
       secondaryChannel.value = (version.value.id === chan.secondVersion)
     }
   })
@@ -169,7 +171,7 @@ async function setChannelSkipProgressive(channel: Database['public']['Tables']['
 async function ASChannelChooser() {
   if (!version.value)
     return
-  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+    if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
     toast.error(t('no-permission'))
     return
   }
@@ -323,7 +325,9 @@ async function ASChannelChooser() {
   }
   displayStore.showActionSheet = true
 }
-async function openChannel() {
+
+async function openChannel(selChannel: Database['public']['Tables']['channels']['Row']) {
+  channel.value = selChannel
   if (!version.value || !main.auth)
     return
   if (!channel.value)
@@ -575,8 +579,14 @@ function preventInputChangePerm(event: Event) {
             <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="showChannel" id="open-channel" :label="t('channel')" :value="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name" :is-link="true" @click="openChannel()" />
-            <InfoRow v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel()" />
+            <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
+              <span v-for="channel in bundleChannels"
+              class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
+              @click="openChannel(channel)">
+                {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name }}
+              </span>
+            </InfoRow>
+            <InfoRow v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel(channel!)" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
             <!-- version.external_url -->
