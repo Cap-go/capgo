@@ -26,6 +26,7 @@
     "test:selectable_disallow": "deno run --allow-all tests_backend/run_backend_tests.ts selectable_disallow",
     "test:all": "deno run --allow-all tests_backend/run_backend_tests.ts all",
     "test:zod": "deno test --allow-all tests_backend/zod.test.ts",
+    "test:organization": "deno run --allow-all tests_backend/run_backend_tests.ts organization",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
@@ -145,7 +146,7 @@
     "@iconify-json/ion": "1.1.13",
     "@iconify-json/ls": "1.1.5",
     "@iconify/json": "^2.2.145",
-    "@playwright/test": "^1.40.0",
+    "@playwright/test": "next",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/line-clamp": "^0.4.4",
@@ -189,7 +190,9 @@
     "vite-plugin-vue-layouts": "0.8.0",
     "vite-plugin-windicss": "1.9.2",
     "vitest": "0.34.6",
-    "vue-tsc": "1.8.22"
+    "vue-tsc": "1.8.22",
+    "deep-diff": "1.0.2",
+    "@types/deep-diff": "1.0.5"
   },
   "husky": {
     "hooks": {

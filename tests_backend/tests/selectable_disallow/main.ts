@@ -127,6 +127,6 @@ async function testDisableUpdateBasedOnMetadataPresent(backendBaseUrl: URL, _sup
   assert(responseSuccessJson.version === '1.359.0', `Response ${JSON.stringify(responseSuccessJson)} version is not equal to 1.0.0`)
 }
 
-async function testSelectableDisallowFront(_backendBaseUrl: URL, _supabase: SupabaseType) {
-  await testPlaywright('selectable_disallow.spec', {})
+async function testSelectableDisallowFront(backendBaseUrl: URL, _supabase: SupabaseType) {
+  await testPlaywright('selectable_disallow.spec', backendBaseUrl, {})
 }

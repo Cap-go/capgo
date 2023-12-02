@@ -30,10 +30,11 @@ $$;
 
 SET statement_timeout TO 0;
 CREATE OR REPLACE FUNCTION process_current_jobs_if_unlocked()
-RETURNS VOID AS $$
+RETURNS setof BIGINT AS $$
 DECLARE
     worker RECORD;
     current_job RECORD;
+    request_id bigint;
 BEGIN
     -- Find an unlocked worker
     SELECT * INTO worker FROM workers FOR UPDATE SKIP LOCKED LIMIT 1;
@@ -48,7 +49,8 @@ BEGIN
             RAISE NOTICE 'Processing job_id: %, payload: %', current_job.job_id, current_job.payload;
 
             IF (current_job.job_type = 'TRIGGER' AND current_job.function_name IS NOT NULL) THEN
-                PERFORM http_post_helper(current_job.function_name, current_job.function_type, current_job.payload::jsonb);
+                SELECT http_post_helper(current_job.function_name, current_job.function_type, current_job.payload::jsonb) INTO request_id;
+                return next request_id;
             END IF;
 
             -- Please tell me if this APP_DELETE, DEVICE_DELETE, APP_VERSION_DELETE is even required with clickhouse @riderx
@@ -96,21 +98,21 @@ BEGIN
     PERFORM cron.schedule(
         'process_current_jobs_if_unlocked_job_1',
         '* * * * *',
-        $$ SELECT process_current_jobs_if_unlocked(); $$
+        $$ PERFORM process_current_jobs_if_unlocked(); $$
     );
     -- Schedule second job with a 20-second delay
     PERFORM pg_sleep(20);
     PERFORM cron.schedule(
         'process_current_jobs_if_unlocked_job_2',
         '* * * * *',
-        $$ SELECT process_current_jobs_if_unlocked(); $$
+        $$ PERFORM process_current_jobs_if_unlocked(); $$
     );
     -- Schedule third job with another 20-second delay
     PERFORM pg_sleep(20);
     PERFORM cron.schedule(
         'process_current_jobs_if_unlocked_job_3',
         '* * * * *',
-        $$ SELECT process_current_jobs_if_unlocked(); $$
+        $$ PERFORM process_current_jobs_if_unlocked(); $$
     );
 END;
 $body$ LANGUAGE plpgsql;

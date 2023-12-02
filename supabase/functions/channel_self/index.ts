@@ -10,6 +10,8 @@ interface DeviceLink extends AppInfos {
   channel?: string
 }
 
+const devicePlatformScheme = z.union([z.literal('ios'), z.literal('android')])
+
 export const jsonRequestSchema = z.object({
   app_id: z.string({
     required_error: MISSING_STRING_APP_ID,
@@ -29,6 +31,7 @@ export const jsonRequestSchema = z.object({
   }),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
+  platform: devicePlatformScheme,
 }).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
   message: INVALID_STRING_APP_ID,
 }).refine(data => deviceIdRegex.test(data.device_id), {
@@ -140,6 +143,7 @@ async function post(body: DeviceLink): Promise<Response> {
       .eq('allow_device_self_set', true)
       .single()
     if (dbError || !dataChannel) {
+      console.log(channel, app_id)
       console.error('Cannot find channel', { dbError, dataChannel })
       return sendRes({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
@@ -150,14 +154,20 @@ async function post(body: DeviceLink): Promise<Response> {
     // Get the main channel
     const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin()
       .from('channels')
-      .select('name')
+      .select('name, ios, android')
       .eq('app_id', app_id)
       .eq('public', true)
-      .single()
 
     // We DO NOT return if there is no main channel as it's not a critical error
     // We will just set the channel_devices as the user requested
-    const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
+    let mainChannelName = null as string | null
+    if (!dbMainChannelError) {
+      const devicePlatform = parseResult.data.platform
+      const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
+      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null 
+    }
+
+    // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
     if (dbMainChannelError || !mainChannel)
       console.error('Cannot find main channel', dbMainChannelError)
 
@@ -271,7 +281,7 @@ async function put(body: DeviceLink): Promise<Response> {
     .select()
     .eq('app_id', app_id)
     .eq('public', true)
-    .single()
+
   const { data: dataChannelOverride } = await supabaseAdmin()
     .from('channel_devices')
     .select(`
@@ -307,8 +317,27 @@ async function put(body: DeviceLink): Promise<Response> {
       version_build,
       version: version.id,
     }])
+
+    const devicePlatform = devicePlatformScheme.safeParse(platform)
+    if (!devicePlatform.success) {
+      return sendRes({
+        message: 'Invalid device platform',
+        error: 'invalid_platform',
+      }, 400)
+    }
+
+    const finalChannel = dataChannel.find(channel => channel[devicePlatform.data] === true)
+
+    if (!finalChannel) {
+      console.error('Cannot find channel', { dataChannel, errorChannel })
+      return sendRes({
+        message: 'Cannot find channel',
+        error: 'channel_not_found',
+      }, 400)
+    }
+
     return sendRes({
-      channel: dataChannel.name,
+      channel: finalChannel.name,
       status: 'default',
     })
   }

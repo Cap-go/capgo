@@ -24,7 +24,7 @@ let backendType: 'none' | 'local' | 'upstash' | null = null
 const noRedisEnvFilePath = await getEnvFile('none')
 const localRedisEnvFilePath = await getEnvFile('local')
 
-async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string; anonToken: string }> {
+async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string; anonToken: string, postgressRawUrl: string }> {
   const command = new Deno.Command('supabase', {
     args: [
       'status',
@@ -40,8 +40,9 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
   let adminToken = separateLines.find(line => line.includes('service_role'))
   let url = separateLines.find(line => line.includes('API URL'))
   let anonToken = separateLines.find(line => line.includes('anon'))
+  let postgressRawUrl = separateLines.find(line => line.includes('DB URL'))
 
-  if (!adminToken || !url || !anonToken) {
+  if (!adminToken || !url || !anonToken || !postgressRawUrl) {
     p.log.error('Cannot get supabase tokens')
     console.log('output\n', output)
     Deno.exit(1)
@@ -50,11 +51,13 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
   adminToken = adminToken.replace('service_role key: ', '').trim()
   url = url.replace('API URL: ', '').trim()
   anonToken = anonToken.replace('anon key: ', '').trim()
+  postgressRawUrl = postgressRawUrl.replace('DB URL: ', '').trim()
 
   return {
     serviceKey: adminToken,
     url,
     anonToken,
+    postgressRawUrl
   }
 }
 
@@ -89,8 +92,8 @@ async function getEnvFile(redis: 'none' | 'local') {
 
 export async function connectToSupabase() {
   try {
-    const { serviceKey, url, anonToken } = await getAdminSupabaseTokens()
-    setSupabaseSecrets(serviceKey, anonToken, url)
+    const { serviceKey, url, anonToken, postgressRawUrl } = await getAdminSupabaseTokens()
+    setSupabaseSecrets(serviceKey, anonToken, url, postgressRawUrl)
     const options = {
       auth: {
         autoRefreshToken: false,
@@ -311,6 +314,7 @@ else {
   await runTestsForFolder('./tests_backend/tests/backend', 'backend', firstArg)
   await runTestsForFolder('./tests_backend/tests/cli', 'cli', firstArg)
   await runTestsForFolder('./tests_backend/tests/selectable_disallow', 'selectable_disallow', firstArg)
+  await runTestsForFolder('./tests_backend/tests/organization', 'organization', firstArg)
   Deno.exit(0)
 }
 

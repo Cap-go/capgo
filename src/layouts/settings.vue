@@ -2,6 +2,7 @@
 import { ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
+import { useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import Navbar from '../components/Navbar.vue'
 import { useDisplayStore } from '~/stores/display'
@@ -43,6 +44,34 @@ const tabs = ref<Tab[]>([
     key: '/dashboard/settings/plans',
   },
 ])
+
+const organizationTabs = ref<Tab[]>([
+  {
+    label: t('general-information'),
+    icon: shallowRef(IconAcount),
+    key: '/dashboard/settings/organization/general',
+  },
+  {
+    label: t('members'),
+    icon: shallowRef(IconPassword),
+    key: '/dashboard/settings/organization/members',
+  },
+])
+
+const router = useRouter()
+const type = ref<'user' | 'organization'>(router.currentRoute.value.path.includes('organization') ? 'organization' : 'user')
+
+watch(type, (val) => {
+  let key
+  if (val === 'user')
+    key = tabs.value[0].key
+
+  else
+    key = organizationTabs.value[0].key
+
+  router.push(key)
+})
+
 if (!Capacitor.isNativePlatform()) {
   tabs.value.push({
     label: 'billing',
@@ -74,6 +103,14 @@ watchEffect(() => {
   }
 })
 
+async function gotoOrgSettings() {
+  type.value = 'organization'
+}
+
+function gotoMainSettings() {
+  type.value = 'user'
+}
+
 displayStore.NavTitle = t('settings')
 </script>
 
@@ -85,8 +122,28 @@ displayStore.NavTitle = t('settings')
     <div class="flex flex-col flex-1 h-full overflow-hidden">
       <!-- Site header -->
       <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+      <div class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700">
+        <ul class="flex flex-wrap -mb-px">
+          <li class="mr-2">
+            <a
+              class="inline-block p-4 border-b-2 rounded-t-lg cursor-pointer"
+              :class="type === 'user' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
+              aria-current="page"
+              @click="gotoMainSettings"
+            >Your settings</a>
+          </li>
+          <li class="mr-2">
+            <a
+              class="inline-block p-4 border-b-2 rounded-t-lg cursor-pointer"
+              :class="type === 'organization' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
+              aria-current="page"
+              @click="gotoOrgSettings"
+            >{{ 'Organization settings' }} </a>
+          </li>
+        </ul>
+      </div>
       <main class="w-full h-full overflow-hidden">
-        <TabSidebar v-model:active-tab="ActiveTab" :tabs="tabs" class="w-full h-full mx-auto md:px-4 md:py-8 lg:px-8 max-w-9xl">
+        <TabSidebar v-model:active-tab="ActiveTab" :tabs="type === 'user' ? tabs : organizationTabs" class="w-full h-full mx-auto md:px-4 md:py-8 lg:px-8 max-w-9xl">
           <template #default>
             <RouterView class="h-full overflow-y-auto" />
           </template>

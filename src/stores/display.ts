@@ -11,6 +11,7 @@ export interface ActionSheetOptionButton {
 export interface ActionSheetOption {
   header?: string
   message?: string
+  input?: boolean
   buttons?: ActionSheetOptionButton[]
 }
 
