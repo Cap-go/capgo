@@ -19,7 +19,7 @@ import { initPlausible } from './services/plausible'
 import formkit from './styles/formkit'
 import { getRemoteConfig } from './services/supabase'
 
-await getRemoteConfig()
+getRemoteConfig()
 const app = createApp(App)
 app.use(plugin, defaultConfig({
   config: {
