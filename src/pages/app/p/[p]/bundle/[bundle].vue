@@ -326,7 +326,7 @@ async function ASChannelChooser() {
   displayStore.showActionSheet = true
 }
 
-async function openChannel(selChannel: Database['public']['Tables']['channels']['Row']) {
+async function openChannel(selChannel: Database['public']['Tables']['channels']['Row'], canHaveSecondVersion: boolean) {
   channel.value = selChannel
   if (!version.value || !main.auth)
     return
@@ -378,7 +378,7 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
             const id = await getUnknowBundleId()
             if (!id)
               return
-            if (!secondaryChannel.value)
+            if (!canHaveSecondVersion)
               await setChannel(channel.value, id)
             else
               await setSecondChannel(channel.value, id)
@@ -580,13 +580,30 @@ function preventInputChangePerm(event: Event) {
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
-              <span v-for="channel in bundleChannels"
-              class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
-              @click="openChannel(channel)">
-                {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name }}
-              </span>
+              <template #start>
+                <span v-for="channel in bundleChannels">
+                  <span
+                  v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (channel!.secondVersion == version.id) : false"
+                  class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
+                  @click="openChannel(channel, true)">
+                    {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? ((channel!.secondVersion == version.id) ? `${channel!.name}-B` : ``) : channel!.name }}
+                  </span>
+                  <span
+                  v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (channel!.version == version.id) : false"
+                  class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
+                  @click="openChannel(channel, false)">
+                    {{ `${channel!.name}-A` }}
+                  </span>
+                  <span
+                  v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? false : true"
+                  class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
+                  @click="openChannel(channel, false)">
+                    {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? ((channel!.secondVersion == version.id) ? `${channel!.name}-B` : ``) : channel!.name }}
+                  </span>
+                </span>
+              </template>
             </InfoRow>
-            <InfoRow v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel(channel!)" />
+            <InfoRow v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel(channel!, false)" />
             <!-- session_key -->
             <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
             <!-- version.external_url -->

@@ -37,6 +37,9 @@ watch(rowInput, debounce(() => {
       <div class="flex flex-row">
         <input v-if="editable" id="inforow-input" v-model="rowInput" class="block w-full p-1 text-gray-900 bg-white border border-gray-300 rounded-lg dark:bg-gray-50 md:w-1/2 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 sm:text-xs dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :readonly="!!props.readonly">
         <span v-else> {{ computedValue.value }} </span>
+        <div style="margin-left: 0">
+          <slot name="start" />
+        </div>
         <div style="margin-left: auto">
           <slot />
         </div>
