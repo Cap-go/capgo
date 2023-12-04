@@ -140,7 +140,7 @@
     "@iconify-json/carbon": "1.1.22",
     "@iconify-json/heroicons": "^1.1.13",
     "@iconify-json/ion": "1.1.13",
-    "@iconify-json/ls": "1.1.5",
+    "@iconify-json/ls": "1.1.7",
     "@iconify/json": "^2.2.145",
     "@playwright/test": "^1.40.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
