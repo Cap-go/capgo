@@ -55,6 +55,7 @@ export default {
             return new Response(JSON.stringify(errorJ, null, 2), { status: 400 });
         }
 
+        console.log('sql', sql)
         const db = env.DB
         if (!env.DB) {
             return new Response(`No database configured`, { status: 500 }) 
@@ -89,6 +90,7 @@ export default {
             return new Response(JSON.stringify(errorJ, null, 2), { status: 500 });
         }
         
+        console.log('ok', JSON.stringify(result))
         return new Response(JSON.stringify({errors: [], messages: true, success: true, ...result}, null, 2)) 
     } 
 }

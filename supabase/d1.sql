@@ -48,7 +48,7 @@ CREATE TABLE channels (
     enable_progressive_deploy boolean not null default false,
     secondaryVersionPercentage double precision not null,
     secondVersion bigint NULL,
-    disableAutoUpdateToMajor boolean DEFAULT true NOT NULL,
+    disableAutoUpdate character varying NOT NULL,
     beta boolean DEFAULT false NOT NULL,
     ios boolean DEFAULT true NOT NULL,
     android boolean DEFAULT true NOT NULL,
