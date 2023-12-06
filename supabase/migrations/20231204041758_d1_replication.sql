@@ -7,7 +7,7 @@ DECLARE
   request_id text;
 BEGIN 
   SELECT INTO request_id net.http_post(
-    url := 'http://5.tcp.eu.ngrok.io:18409',
+    url := 'http://2.tcp.eu.ngrok.io:15256',
     headers := jsonb_build_object(
       'Content-Type',
       'application/json'
@@ -58,15 +58,16 @@ CREATE OR REPLACE FUNCTION "public"."replicate_drop"() RETURNS trigger
 DECLARE
   sql_query character varying;
   request_id text;
+  filter_value text;
 BEGIN
-    SELECT format ('DELETE FROM %s WHERE %s=%s', TG_ARGV[0], TG_ARGV[1], (EXECUTE format('SELECT ($1."%s")', TG_ARGV[1]) using NEW)) INTO sql_query
-    RAISE EXCEPTION '%', sql_query;
+  EXECUTE format('SELECT ($1."%s")::text', 'id') using OLD into filter_value;
+  SELECT format ('DELETE FROM %s WHERE %s=%s', TG_ARGV[0], TG_ARGV[1], filter_value) INTO sql_query;
 
-  -- PERFORM post_replication_sql(sql_query);
-  RETURN NEW;
+  PERFORM post_replication_sql(sql_query);
+  RETURN OLD;
 END;$$;
 
-EXECUTE format('SELECT ($1."%s" is distinct from $2."%s")', val.key, val.key) using NEW, OLD
+-- EXECUTE format('SELECT ($1."%s" is distinct from $2."%s")', val.key, val.key) using NEW, OLD
 
 CREATE TRIGGER replicate_channel_insert
    BEFORE INSERT ON "public"."channels" FOR EACH ROW
@@ -75,6 +76,10 @@ CREATE TRIGGER replicate_channel_insert
 CREATE TRIGGER replicate_channel_update
    BEFORE UPDATE ON "public"."channels" FOR EACH ROW
    EXECUTE PROCEDURE "public"."replicate_update"('channels', 'id');
+
+CREATE TRIGGER replicate_channel_drop
+   BEFORE DELETE ON "public"."channels" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."replicate_drop"('channels', 'id');
 
 
 -- INSERT INTO apps (id, created_at, name, app_id, version, created_by, updated_at, public, disableAutoUpdateUnderNative, enableAbTesting, enable_progressive_deploy, secondaryVersionPercentage, beta, ios, android, allow_device_self_set, allow_emulator, allow_dev, disableAutoUpdate) VALUES('22', '2023-12-04T04:31:09.255645+00:00', 'productionn', 'com.demo.app', '9654', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-12-04T06:41:27.420552+00:00', 'true', 'true', 'false', 'false', '0', 'false', 'false', 'true', 'true', 'true', 'true', 'major')
