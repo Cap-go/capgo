@@ -10,7 +10,9 @@ CREATE TABLE app_versions (
     external_url character varying,
     checksum character varying,
     session_key character varying,
-    storage_provider text NOT NULL
+    storage_provider text NOT NULL,
+    minUpdateVersion character varying null,
+    native_packages array null
 );
 
 CREATE TABLE apps (

@@ -7,7 +7,7 @@ DECLARE
   request_id text;
 BEGIN 
   SELECT INTO request_id net.http_post(
-    url := 'http://2.tcp.eu.ngrok.io:15256',
+    url := 'http://5.tcp.eu.ngrok.io:18082',
     headers := jsonb_build_object(
       'Content-Type',
       'application/json'
@@ -80,6 +80,18 @@ CREATE TRIGGER replicate_channel_update
 CREATE TRIGGER replicate_channel_drop
    BEFORE DELETE ON "public"."channels" FOR EACH ROW
    EXECUTE PROCEDURE "public"."replicate_drop"('channels', 'id');
+
+CREATE TRIGGER replicate_version_insert
+   BEFORE INSERT ON "public"."app_versions" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."replicate_insert"('app_versions');
+
+CREATE TRIGGER replicate_version_update
+   BEFORE UPDATE ON "public"."app_versions" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."replicate_update"('app_versions', 'id');
+
+CREATE TRIGGER replicate_version_drop
+   BEFORE DELETE ON "public"."app_versions" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."replicate_drop"('app_versions', 'id');
 
 
 -- INSERT INTO apps (id, created_at, name, app_id, version, created_by, updated_at, public, disableAutoUpdateUnderNative, enableAbTesting, enable_progressive_deploy, secondaryVersionPercentage, beta, ios, android, allow_device_self_set, allow_emulator, allow_dev, disableAutoUpdate) VALUES('22', '2023-12-04T04:31:09.255645+00:00', 'productionn', 'com.demo.app', '9654', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-12-04T06:41:27.420552+00:00', 'true', 'true', 'false', 'false', '0', 'false', 'false', 'true', 'true', 'true', 'true', 'major')
