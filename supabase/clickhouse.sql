@@ -136,33 +136,6 @@ FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 GROUP BY date, l.app_id;
 
-CREATE TABLE IF NOT EXISTS mau
-(
-    date Date,
-    app_id String,
-    mau UInt64
-) ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
-
-CREATE MATERIALIZED VIEW mau_mv
-TO mau
-AS
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
-FROM logs
-GROUP BY date, app_id;
-
-INSERT INTO mau
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
-FROM logs
-GROUP BY date, app_id;
-
 CREATE TABLE IF NOT EXISTS app_versions_meta
 (
     created_at DateTime64(6),
@@ -200,27 +173,27 @@ GROUP BY date, app_id;
 -- MAU aggregation
 -- 
 
-CREATE TABLE IF NOT EXISTS mau
-(
-    date Date,
-    app_id String,
-    total UInt64,
-    version UInt64 -- This column is used to determine the latest record
-) ENGINE = ReplacingMergeTree(version) -- Specify the version column for deduplication
-PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
+-- CREATE TABLE IF NOT EXISTS mau
+-- (
+--     date Date,
+--     app_id String,
+--     total UInt64,
+--     version UInt64 -- This column is used to determine the latest record
+-- ) ENGINE = ReplacingMergeTree(version) -- Specify the version column for deduplication
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
 
--- Recreate the mau_mv materialized view
-CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
-TO mau
-AS
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    countDistinct(device_id) AS total,
-    maxState(created_at) AS version -- Use the maximum created_at as the version
-FROM logs
-GROUP BY date, app_id;
+-- -- Recreate the mau_mv materialized view
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
+-- TO mau
+-- AS
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     countDistinct(device_id) AS total,
+--     maxState(created_at) AS version -- Use the maximum created_at as the version
+-- FROM logs
+-- GROUP BY date, app_id;
 
 -- 
 -- Stats aggregation
@@ -269,45 +242,45 @@ GROUP BY ld.date, ld.app_id, a.storage_added, a.storage_deleted, ld.bandwidth, m
 -- Sessions stats
 -- 
 
-CREATE TABLE IF NOT EXISTS sessions
-(
-    device_id String,
-    app_id String,
-    session_start DateTime64(6),
-    session_end DateTime64(6)
-) ENGINE = ReplacingMergeTree()
-ORDER BY (app_id, device_id, session_start)
-PRIMARY KEY (app_id, device_id, session_start);
+-- CREATE TABLE IF NOT EXISTS sessions
+-- (
+--     device_id String,
+--     app_id String,
+--     session_start DateTime64(6),
+--     session_end DateTime64(6)
+-- ) ENGINE = ReplacingMergeTree()
+-- ORDER BY (app_id, device_id, session_start)
+-- PRIMARY KEY (app_id, device_id, session_start);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sessions
-TO sessions AS
-SELECT
-    device_id,
-    app_id,
-    anyIf(created_at, action = 'app_moved_to_foreground') as session_start,
-    anyIf(created_at, action = 'app_moved_to_background') as session_end
-FROM logs
-WHERE (action = 'app_moved_to_foreground' OR action = 'app_moved_to_background')
-GROUP BY device_id, app_id
-HAVING session_start < session_end;
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sessions
+-- TO sessions AS
+-- SELECT
+--     device_id,
+--     app_id,
+--     anyIf(created_at, action = 'app_moved_to_foreground') as session_start,
+--     anyIf(created_at, action = 'app_moved_to_background') as session_end
+-- FROM logs
+-- WHERE (action = 'app_moved_to_foreground' OR action = 'app_moved_to_background')
+-- GROUP BY device_id, app_id
+-- HAVING session_start < session_end;
 
-CREATE TABLE IF NOT EXISTS avg_session_length
-(
-    device_id String,
-    app_id String,
-    avg_length Float64
-) ENGINE = AggregatingMergeTree()
-ORDER BY (app_id, device_id)
-PRIMARY KEY (app_id, device_id);
+-- CREATE TABLE IF NOT EXISTS avg_session_length
+-- (
+--     device_id String,
+--     app_id String,
+--     avg_length Float64
+-- ) ENGINE = AggregatingMergeTree()
+-- ORDER BY (app_id, device_id)
+-- PRIMARY KEY (app_id, device_id);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS mv_avg_session_length
-TO avg_session_length AS
-SELECT
-    device_id,
-    app_id,
-    avg(toUnixTimestamp(session_end) - toUnixTimestamp(session_start)) as avg_length
-FROM sessions
-GROUP BY device_id, app_id;
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mv_avg_session_length
+-- TO avg_session_length AS
+-- SELECT
+--     device_id,
+--     app_id,
+--     avg(toUnixTimestamp(session_end) - toUnixTimestamp(session_start)) as avg_length
+-- FROM sessions
+-- GROUP BY device_id, app_id;
 
 
 -- 
