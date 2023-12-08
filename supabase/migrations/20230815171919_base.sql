@@ -1630,15 +1630,33 @@ CREATE TABLE "public"."deleted_account" (
 --   create foreign table clickhouse_app_usage (
 --     date date,
 --     app_id text,
---     storage_added bigint,
---     storage_deleted bigint,
 --     bandwidth bigint,
---     mau bigint
+--     mau bigint,
+--     get bigint,
+--     fail bigint,
+--     uninstall bigint,
+--     install bigint,
+--     storage_added bigint,
+--     storage_deleted bigint
 -- )
 --   server clickhouse_server
 --   options (
-    -- table '(SELECT DISTINCT ON (date,app_id) * FROM aggregate_daily)'
---     table 'aggregate_daily'
+--     -- table 'aggregate_daily'
+--     table '(SELECT DISTINCT ON (m.date,m.app_id) 
+--     m.date AS date,
+--     m.app_id AS app_id,
+--     m.mau AS mau,
+--     l.version AS version,
+--     l.get AS get,
+--     l.fail AS fail,
+--     l.install AS install,
+--     l.uninstall AS uninstall,
+--     l.bandwidth AS bandwidth,
+--     s.storage_added AS storage_added,
+--     s.storage_deleted AS storage_deleted
+--     FROM mau m
+--     INNER JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
+--     INNER JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id)'
 --   );
 
 CREATE TABLE "public"."devices" (
