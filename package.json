@@ -35,6 +35,8 @@
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "types": "node ./scripts/getTypes.mjs",
     "generate:node_serverless": "rm -rf netlify && node ./scripts/convert_deno_to_node.mjs",
+    "generate:cf_serverless": "npm run generate:node_serverless && node scripts/generate_denoflare.mjs",
+    "deploy:cf_serverless": "cd cloudflare_workers_deno && denoflare push capgoloadbal && cd .. ",
     "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit",
     "ionic:build": "vite build",
