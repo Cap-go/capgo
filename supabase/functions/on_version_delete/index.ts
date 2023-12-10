@@ -65,7 +65,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     id: record.id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
-    size: 0,
+    size: data.size,
     action: 'delete',
   })
   // set app_versions_meta versionSize = 0
