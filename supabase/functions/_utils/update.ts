@@ -9,6 +9,14 @@ import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
+// Drizze orm
+import { drizzle } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js';
+import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
+// import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
+import postgres from 'https://deno.land/x/postgresjs/mod.js'
+import * as schema from './postgress_schema.ts'
+import { alias } from 'https://esm.sh/drizzle-orm@0.29.1/pg-core';
+
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
     version: version.name,
@@ -30,137 +38,104 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
+async function test() {
+  const supaUrl = Deno.env.get('SUPABASE_DB_URL')!
+  const pgClient = postgres(supaUrl)
+  const drizzleCient = drizzle(pgClient as any) //Wish me luck ;-)
+
+  const data = await drizzleCient.execute(sql`select * from apps`)
+  console.log(data)
+}
+
 async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
-  const recV = supabaseAdmin()
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', app_id)
-    .or(`name.eq.${version_name}`)
-    .single()
-    .then(res => res.data)
-  const recD = supabaseAdmin()
-    .from('devices_override')
-    .select(`
-      device_id,
-      app_id,
-      created_at,
-      updated_at,
-      version (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url
-      )
-    `)
-    .eq('device_id', device_id)
-    .eq('app_id', app_id)
-    .single()
-    .then(res => res.data)
-  const recCO = supabaseAdmin()
-    .from('channel_devices')
-    .select(`
-      device_id,
-      app_id,
-      channel_id (
-        id,
-        created_at,
-        created_by,
-        name,
-        app_id,
-        allow_dev,
-        allow_emulator,
-        disableAutoUpdateUnderNative,
-        disableAutoUpdate,
-        ios,
-        android,
-        secondVersion (
-          id,
-          name,
-          checksum,
-          session_key,
-          user_id,
-          bucket_id,
-          storage_provider,
-          external_url,
-          minUpdateVersion
-        ),
-        secondaryVersionPercentage,
-        enable_progressive_deploy,
-        enableAbTesting,
-        version (
-          id,
-          name,
-          checksum,
-          session_key,
-          user_id,
-          bucket_id,
-          storage_provider,
-          external_url,
-          minUpdateVersion
-        )
-      ),
-      created_at,
-      updated_at
-    `)
-    .eq('device_id', device_id)
-    .eq('app_id', app_id)
-    .single()
-    .then(res => res.data)
-  const recC = supabaseAdmin()
-    .from('channels')
-    .select(`
-      id,
-      created_at,
-      created_by,
-      name,
-      app_id,
-      allow_dev,
-      allow_emulator,
-      disableAutoUpdateUnderNative,
-      disableAutoUpdate,
-      ios,
-      android,
-      secondVersion (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url,
-        minUpdateVersion
-      ),
-      secondaryVersionPercentage,
-      enable_progressive_deploy,
-      enableAbTesting,
-      version (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url,
-        minUpdateVersion
-      )
-    `)
-    .eq('app_id', app_id)
-    .eq('public', true)
-    .eq(platform, true)
-    .single()
-    .then(res => res.data)
+  const supaUrl = Deno.env.get('SUPABASE_DB_URL')!
+  const pgClient = postgres(supaUrl)
+  const drizzleCient = drizzle(pgClient as any) //Wish me luck ;-)
+
+  const appVersions = drizzleCient
+    .select({
+      id: schema.app_versions.id
+    })
+    .from(schema.app_versions)
+    .where(or(eq(schema.app_versions.name, version_name), eq(schema.app_versions.app_id, app_id)))
+    .limit(1)
+    .then(data => data[0])
+
+  const deviceOverwrite = drizzleCient
+    .select({
+      device_id: schema.devices_override.device_id,
+      app_id: schema.devices_override.app_id,
+      created_at: schema.devices_override.created_at,
+      updated_at: schema.devices_override.updated_at,
+      version: {
+        id: schema.app_versions.id,
+        name: schema.app_versions.name,
+        checksum: schema.app_versions.checksum,
+        session_key: schema.app_versions.session_key,
+        user_id: schema.app_versions.user_id,
+        bucket_id: schema.app_versions.bucket_id,
+        storage_provider: schema.app_versions.storage_provider,
+        external_url: schema.app_versions.external_url
+      }
+    })
+    .from(schema.devices_override)
+    .innerJoin(schema.app_versions, eq(schema.devices_override.version, schema.app_versions.id))
+    .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
+    .limit(1)
+    .then(data => data[0])
+
+  const aliass = alias(schema.channel_devices, 'secondVersion')
+  const channelDevice = drizzleCient
+    .select(// {
+      // channel_id: {
+      //   id: schema.channels.id,
+      //   created_at: schema.channels.created_at,
+      //   created_by: schema.channels.created_by,
+      //   name: schema.channels.name,
+      //   app_id: schema.channels.app_id,
+      //   allow_dev: schema.channels.allow_dev,
+      //   allow_emulator: schema.channels.allow_emulator,
+      //   disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
+      //   ios: schema.channels.ios,
+      //   android: schema.channels.android,
+      //   disableAutoUpdate: schema.channels.disableAutoUpdate,
+      //   secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+      //   enable_progressive_deploy: schema.channels.enable_progressive_deploy,
+      //   enableAbTesting: schema.channels.enableAbTesting,
+      //   secondVersion: {
+
+      //   }
+      // }
+    //})
+    )
+    .from(schema.channel_devices)
+    .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
+    .innerJoin(schema.app_versions, eq(schema.channels.version, schema.app_versions.id))
+    .innerJoin(schema.channel_devices, eq(schema.channels.secondVersion, schema.app_versions.id))
+    .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
+    .limit(1)
+    .then(data => data[0]);
+
+  const channel = drizzleCient
+    .select()
+    .from(schema.channels)
+    .innerJoin(schema.app_versions, eq(schema.channels.version, schema.app_versions.id))
+    .innerJoin(schema.app_versions, eq(schema.channels.secondVersion, schema.app_versions.id))
+    .where(and(
+      eq(schema.channels.public, true), 
+      eq(schema.channels.app_id, app_id),
+      eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true)
+    ))
+    .limit(1)
+    .then(data => data[0])
+
   // promise all
-  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
+  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
   return { versionData, channelData, channelOverride, devicesOverride }
 }
 
 export async function update(body: AppInfos) {
+  await test()
   // create random id
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -300,19 +275,19 @@ export async function update(body: AppInfos) {
 
     // Trigger only if the channel is overwriten but the version is not
     if (channelOverride && !devicesOverride)
-      // deno-lint-ignore no-explicit-any
-      channelData = channelOverride.channel_id as any
+      channelData = channelOverride
 
-    let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+    let enableAbTesting: boolean = channelOverride.channels.enableAbTesting || channelData.channels.enableAbTesting
+    const enableProgressiveDeploy: boolean = channelOverride.channels.enable_progressive_deploy || channelData.channels.enable_progressive_deploy
+    // let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
-    const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
 
     const updateOverwritten = devicesOverride !== null || channelOverride !== null
     // console.log(`OVER: ${updateOverwritten}, --- ${devicesOverride} --- ${channelOverride}`)
 
-    let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    let version = devicesOverride?.version || channelOverride.channels.version || channelData.version
+    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
     stat.version = versionData ? versionData.id : version.id
