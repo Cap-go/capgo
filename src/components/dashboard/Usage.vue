@@ -4,7 +4,7 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { getPlans } from '~/services/supabase'
+import { getPlans, getTotalStorage } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
@@ -49,7 +49,7 @@ async function getAppStats() {
 }
 
 async function getUsages() {
-  const currentStorage = 0
+  const currentStorage = bytesToGb(await getTotalStorage(main.auth?.id, props.appId))
   const data = await getAppStats()
   if (data && data.length > 0) {
     const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
@@ -70,10 +70,11 @@ async function getUsages() {
         else
           datas.value.mau[dayNumber] = item.mau
 
+        const storageVal = parseFloat(bytesToGb(item.storage_added - item.storage_deleted).toFixed(2))
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += bytesToGb(item.storage_added - item.storage_deleted)
+          datas.value.storage[dayNumber] += storageVal
         else
-          datas.value.storage[dayNumber] = bytesToGb(item.storage_added - item.storage_deleted)
+          datas.value.storage[dayNumber] = storageVal
 
         if (datas.value.bandwidth[dayNumber])
           datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
@@ -83,7 +84,7 @@ async function getUsages() {
     })
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    datas.value.storage[0] = currentStorage - storageVariance
+    datas.value.storage[0] = parseFloat((currentStorage - storageVariance).toFixed(2))
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
