@@ -4,7 +4,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useMainStore } from '~/stores/main'
-import { getPlans, useSupabase } from '~/services/supabase'
+import { getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
@@ -50,12 +50,12 @@ async function getUsage() {
   const plan = plans.value.find(p => p.name === 'Pay as you go')!
 
   let totalMau = 0
-  let totalStorage = 0
+  let totalStorage = bytesToGb(await getTotalStorage(main.auth?.id))
   let totalBandwidth = 0
 
   usage?.forEach((item) => {
     totalMau += item.mau
-    totalStorage += bytesToGb(item.storage_added) - bytesToGb(item.storage_deleted)
+    // totalStorage += bytesToGb(item.storage_added) - bytesToGb(item.storage_deleted)
     totalBandwidth += bytesToGb(item.bandwidth)
   })
 
@@ -165,7 +165,7 @@ loadData()
               Used in period
             </div>
             <div class="font-semibold">
-              {{ planUsage?.totalStorage.toFixed(3) }} GB
+              {{ planUsage?.totalStorage.toLocaleString() }} GB
             </div>
           </div>
         </div>
@@ -190,7 +190,7 @@ loadData()
               Used in period
             </div>
             <div class="font-semibold">
-              {{ planUsage?.totalBandwidth.toFixed(3) }} GB
+              {{ planUsage?.totalBandwidth.toLocaleString() }} GB
             </div>
           </div>
         </div>
