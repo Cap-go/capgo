@@ -343,10 +343,17 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
     req = req.in('app_id', appIds)
   }
 
-  if (startDate !== undefined && endDate !== undefined) {
-    console.log('range', startDate, endDate)
-    // req range for start and end date for created_at
-    req = req.in('created_at', [startDate, endDate])
+  if (startDate) {
+    console.log('startDate', startDate)
+    // convert date string startDate to YYYY-MM-DD
+    const startDateStr = new Date(startDate).toISOString().split('T')[0]
+    req = req.gt('date', startDateStr)
+  }
+  if (endDate) {
+    console.log('endDate', endDate)
+    // convert date string endDate to YYYY-MM-DD
+    const endDateStr = new Date(endDate).toISOString().split('T')[0]
+    req = req.lt('date', endDateStr)
   }
 
   const res = await req
