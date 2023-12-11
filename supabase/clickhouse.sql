@@ -191,23 +191,23 @@ CREATE TABLE IF NOT EXISTS mau
 (
     date Date,
     app_id String,
-    total UInt64,
-    version UInt64 -- This column is used to determine the latest record
-) ENGINE = ReplacingMergeTree(version) -- Specify the version column for deduplication
+    mau UInt64
+) ENGINE = SummingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
 
--- Recreate the mau_mv materialized view
 CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
 TO mau
 AS
 SELECT
     toDate(created_at) AS date,
     app_id,
-    countDistinct(device_id) AS total,
-    maxState(created_at) AS version -- Use the maximum created_at as the version
+    countDistinct(device_id) AS mau
 FROM logs
+WHERE created_at >= toStartOfMonth(toDate(created_at)) 
+  AND created_at < toStartOfMonth(toDate(created_at) + INTERVAL 1 MONTH)
 GROUP BY date, app_id;
+
 
 -- 
 -- Stats aggregation
