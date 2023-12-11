@@ -32,7 +32,7 @@ async function guard(next: any, to: string, from: string) {
         else
           return next('/onboarding/verify_email')
         const { data: dataCycle, error: errorCycle } = await supabase
-          .rpc('get_cycle_info')
+          .rpc('get_cycle_info', { userid: main.auth?.id })
           .select()
           .single()
         if (!errorCycle && dataCycle)

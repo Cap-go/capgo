@@ -2063,8 +2063,7 @@ RETURNS TABLE (
 DECLARE
     customer_id_var text;
 BEGIN
-    -- Get the customer_id using auth.uid()
-    SELECT customer_id INTO customer_id_var FROM users WHERE id = auth.uid();
+    SELECT customer_id INTO customer_id_var FROM users WHERE id = userid;
 
     -- Get the stripe_info using the customer_id
     RETURN QUERY
