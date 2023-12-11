@@ -137,7 +137,7 @@
     "@antfu/eslint-config": "2.1.0",
     "@capacitor/cli": "^5.5.1",
     "@capacitor/core": "^5.5.1",
-    "@iconify-json/carbon": "1.1.24",
+    "@iconify-json/carbon": "1.1.25",
     "@iconify-json/heroicons": "^1.1.13",
     "@iconify-json/ion": "1.1.14",
     "@iconify-json/ls": "1.1.7",
