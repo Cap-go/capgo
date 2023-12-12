@@ -38,17 +38,6 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function test() {
-  const supaUrl = Deno.env.get('SUPABASE_DB_URL')!
-  const pgClient = postgres(supaUrl)
-  const drizzleCient = drizzle(pgClient as any) //Wish me luck ;-)
-
-  const data = await drizzleCient.execute(sql`select * from apps`)
-  console.log(data)
-
-  console.log(Deno.env.toObject())
-}
-
 async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
   const supaUrl = Deno.env.get('SUPABASE_DB_URL')!
   const pgClient = postgres(supaUrl)
@@ -91,39 +80,100 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     .then(data => data.at(0))
 
   const channelDevice = drizzleCient
-    .select(// {
-      // channel_id: {
-      //   id: schema.channels.id,
-      //   created_at: schema.channels.created_at,
-      //   created_by: schema.channels.created_by,
-      //   name: schema.channels.name,
-      //   app_id: schema.channels.app_id,
-      //   allow_dev: schema.channels.allow_dev,
-      //   allow_emulator: schema.channels.allow_emulator,
-      //   disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
-      //   ios: schema.channels.ios,
-      //   android: schema.channels.android,
-      //   disableAutoUpdate: schema.channels.disableAutoUpdate,
-      //   secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
-      //   enable_progressive_deploy: schema.channels.enable_progressive_deploy,
-      //   enableAbTesting: schema.channels.enableAbTesting,
-      //   secondVersion: {
-
-      //   }
-      // }
-    //})
+    .select({
+        channel_devices: {
+          device_id: schema.channel_devices.device_id,
+          app_id: schema.channel_devices.app_id,
+        },
+        version: {
+          id: versionAlias.id,
+          name: versionAlias.name,
+          checksum: versionAlias.checksum,
+          session_key: versionAlias.session_key,
+          user_id: versionAlias.user_id,
+          bucket_id: versionAlias.bucket_id,
+          storage_provider: versionAlias.storage_provider,
+          external_url: versionAlias.external_url,
+          minUpdateVersion: versionAlias.minUpdateVersion
+        },
+        secondVersion: {
+          id: secondVersionAlias.id,
+          name: secondVersionAlias.name,
+          checksum: secondVersionAlias.checksum,
+          session_key: secondVersionAlias.session_key,
+          user_id: secondVersionAlias.user_id,
+          bucket_id: secondVersionAlias.bucket_id,
+          storage_provider: secondVersionAlias.storage_provider,
+          external_url: secondVersionAlias.external_url,
+          minUpdateVersion: secondVersionAlias.minUpdateVersion
+        },
+        channels: {
+          id: schema.channels.id,
+          created_at: schema.channels.created_at,
+          created_by: schema.channels.created_by,
+          name: schema.channels.name,
+          app_id: schema.channels.app_id,
+          allow_dev: schema.channels.allow_dev,
+          allow_emulator: schema.channels.allow_emulator,
+          disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
+          disableAutoUpdate: schema.channels.disableAutoUpdate,
+          ios: schema.channels.ios,
+          android: schema.channels.android,
+          secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+          enable_progressive_deploy: schema.channels.enable_progressive_deploy,
+          enableAbTesting: schema.channels.enableAbTesting,
+        }
+      }
     )
     .from(schema.channel_devices)
     .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-    // .innerJoin(schema.channel_devices, eq(schema.channels.secondVersion, schema.app_versions.id))
     .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0));
 
   const channel = drizzleCient
-    .select()
+    .select({
+      version: {
+        id: versionAlias.id,
+        name: versionAlias.name,
+        checksum: versionAlias.checksum,
+        session_key: versionAlias.session_key,
+        user_id: versionAlias.user_id,
+        bucket_id: versionAlias.bucket_id,
+        storage_provider: versionAlias.storage_provider,
+        external_url: versionAlias.external_url,
+        minUpdateVersion: versionAlias.minUpdateVersion
+      },
+      secondVersion: {
+        id: secondVersionAlias.id,
+        name: secondVersionAlias.name,
+        checksum: secondVersionAlias.checksum,
+        session_key: secondVersionAlias.session_key,
+        user_id: secondVersionAlias.user_id,
+        bucket_id: secondVersionAlias.bucket_id,
+        storage_provider: secondVersionAlias.storage_provider,
+        external_url: secondVersionAlias.external_url,
+        minUpdateVersion: secondVersionAlias.minUpdateVersion
+      },
+      channels: {
+        id: schema.channels.id,
+        created_at: schema.channels.created_at,
+        created_by: schema.channels.created_by,
+        name: schema.channels.name,
+        app_id: schema.channels.app_id,
+        allow_dev: schema.channels.allow_dev,
+        allow_emulator: schema.channels.allow_emulator,
+        disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
+        disableAutoUpdate: schema.channels.disableAutoUpdate,
+        ios: schema.channels.ios,
+        android: schema.channels.android,
+        secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+        enable_progressive_deploy: schema.channels.enable_progressive_deploy,
+        enableAbTesting: schema.channels.enableAbTesting,
+      }
+    })
     .from(schema.channels)
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
@@ -133,18 +183,16 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
       eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true)
     ))
     .limit(1)
-    .then(data => {
-      console.log('d', data)
-      return data.at(0)
-    })
+    .then(data => data.at(0))
 
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
+  await pgClient.end()
   return { versionData, channelData, channelOverride, devicesOverride }
 }
 
 export async function update(body: AppInfos) {
-  await test()
+  // await test()
   // create random id
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -262,7 +310,6 @@ export async function update(body: AppInfos) {
     const requestedInto = await requestInfos(platform, app_id, device_id, version_name)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
-    console.log(channelData, channelOverride, devicesOverride, versionData )
 
     if (!versionData) {
       console.log('No version data found')
