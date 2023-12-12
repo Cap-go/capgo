@@ -12,7 +12,7 @@ import { appIdToUrl } from './../_utils/conversion.ts'
 // Drizze orm
 import { drizzle } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js';
 import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
-// import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
+//\import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
 import * as schema from './postgress_schema.ts'
 import { alias } from 'https://esm.sh/drizzle-orm@0.29.1/pg-core';
@@ -45,6 +45,8 @@ async function test() {
 
   const data = await drizzleCient.execute(sql`select * from apps`)
   console.log(data)
+
+  console.log(Deno.env.toObject())
 }
 
 async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
@@ -59,7 +61,10 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     .from(schema.app_versions)
     .where(or(eq(schema.app_versions.name, version_name), eq(schema.app_versions.app_id, app_id)))
     .limit(1)
-    .then(data => data[0])
+    .then(data => data.at(0))
+
+  const versionAlias = alias(schema.app_versions, 'version')
+  const secondVersionAlias = alias(schema.app_versions, 'secondVersion')
 
   const deviceOverwrite = drizzleCient
     .select({
@@ -68,23 +73,23 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
       created_at: schema.devices_override.created_at,
       updated_at: schema.devices_override.updated_at,
       version: {
-        id: schema.app_versions.id,
-        name: schema.app_versions.name,
-        checksum: schema.app_versions.checksum,
-        session_key: schema.app_versions.session_key,
-        user_id: schema.app_versions.user_id,
-        bucket_id: schema.app_versions.bucket_id,
-        storage_provider: schema.app_versions.storage_provider,
-        external_url: schema.app_versions.external_url
+        id: versionAlias.id,
+        name: versionAlias.name,
+        checksum: versionAlias.checksum,
+        session_key: versionAlias.session_key,
+        user_id: versionAlias.user_id,
+        bucket_id: versionAlias.bucket_id,
+        storage_provider: versionAlias.storage_provider,
+        external_url: versionAlias.external_url,
+        minUpdateVersion: versionAlias.minUpdateVersion
       }
     })
     .from(schema.devices_override)
-    .innerJoin(schema.app_versions, eq(schema.devices_override.version, schema.app_versions.id))
+    .innerJoin(versionAlias, eq(schema.devices_override.version, versionAlias.id))
     .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
     .limit(1)
-    .then(data => data[0])
+    .then(data => data.at(0))
 
-  const aliass = alias(schema.channel_devices, 'secondVersion')
   const channelDevice = drizzleCient
     .select(// {
       // channel_id: {
@@ -110,24 +115,28 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     )
     .from(schema.channel_devices)
     .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
-    .innerJoin(schema.app_versions, eq(schema.channels.version, schema.app_versions.id))
-    .innerJoin(schema.channel_devices, eq(schema.channels.secondVersion, schema.app_versions.id))
-    .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
+    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
+    // .innerJoin(schema.channel_devices, eq(schema.channels.secondVersion, schema.app_versions.id))
+    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
     .limit(1)
-    .then(data => data[0]);
+    .then(data => data.at(0));
 
   const channel = drizzleCient
     .select()
     .from(schema.channels)
-    .innerJoin(schema.app_versions, eq(schema.channels.version, schema.app_versions.id))
-    .innerJoin(schema.app_versions, eq(schema.channels.secondVersion, schema.app_versions.id))
+    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
     .where(and(
       eq(schema.channels.public, true), 
       eq(schema.channels.app_id, app_id),
       eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true)
     ))
     .limit(1)
-    .then(data => data[0])
+    .then(data => {
+      console.log('d', data)
+      return data.at(0)
+    })
 
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
@@ -253,6 +262,15 @@ export async function update(body: AppInfos) {
     const requestedInto = await requestInfos(platform, app_id, device_id, version_name)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
+    console.log(channelData, channelOverride, devicesOverride, versionData )
+
+    if (!versionData) {
+      console.log('No version data found')
+      return sendResWithStatus('fail', {
+        message: 'Couldn\'t find version data',
+        error: 'no-version_data',
+      }, 200)
+    }
 
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel', new Date().toISOString())
@@ -277,8 +295,15 @@ export async function update(body: AppInfos) {
     if (channelOverride && !devicesOverride)
       channelData = channelOverride
 
-    let enableAbTesting: boolean = channelOverride.channels.enableAbTesting || channelData.channels.enableAbTesting
-    const enableProgressiveDeploy: boolean = channelOverride.channels.enable_progressive_deploy || channelData.channels.enable_progressive_deploy
+    if (!channelData) {
+      return sendResWithStatus('fail', {
+        message: 'channel data still null',
+        error: 'null_channel_data',
+      }, 200)
+    }
+
+    let enableAbTesting: boolean = channelData.channels.enableAbTesting
+    const enableProgressiveDeploy: boolean = channelData.channels.enable_progressive_deploy
     // let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
@@ -286,15 +311,16 @@ export async function update(body: AppInfos) {
     const updateOverwritten = devicesOverride !== null || channelOverride !== null
     // console.log(`OVER: ${updateOverwritten}, --- ${devicesOverride} --- ${channelOverride}`)
 
-    let version = devicesOverride?.version || channelOverride.channels.version || channelData.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    let version = devicesOverride?.version || channelOverride?.version || channelData.version
+    const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
+    // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
     stat.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        const secondVersionPercentage: number = channelData.channels.secondaryVersionPercentage // ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
         // eslint-disable-next-line max-statements-per-line
         if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
@@ -385,7 +411,7 @@ export async function update(body: AppInfos) {
 
     if (!devicesOverride && channelData) {
     // console.log('check disableAutoUpdateToMajor', device_id)
-      if (!channelData.ios && platform === 'ios') {
+      if (!channelData.channels.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -398,7 +424,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (!channelData.android && platform === 'android') {
+      if (!channelData.channels.android && platform === 'android') {
         console.log(id, 'Cannot update, android is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -412,7 +438,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (channelData.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
+      if (channelData.channels.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -427,7 +453,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
+      if (channelData.channels.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -442,18 +468,18 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (channelData.disableAutoUpdate === 'version_number') {
+      if (channelData.channels.disableAutoUpdate === 'version_number') {
         const minUpdateVersion = version.minUpdateVersion
 
         // The channel is misconfigured
         if (minUpdateVersion === null) {
-          console.log(id, 'Channel is misconfigured', channelData.name, new Date().toISOString())
+          console.log(id, 'Channel is misconfigured', channelData.channels.name, new Date().toISOString())
           await sendStats([{
             ...stat,
             action: 'channelMisconfigured',
           }])
           return sendResWithStatus('fail', {
-            message: `Channel ${channelData.name} is misconfigured`,
+            message: `Channel ${channelData.channels.name} is misconfigured`,
             error: 'misconfigured_channel',
             version: version.name,
             old: version_name,
@@ -478,7 +504,7 @@ export async function update(body: AppInfos) {
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
-      if (channelData.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+      if (channelData.channels.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
         console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -492,7 +518,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (!channelData.allow_dev && !is_prod) {
+      if (!channelData.channels.allow_dev && !is_prod) {
         console.log(id, 'Cannot update dev build is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -505,7 +531,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (!channelData.allow_emulator && is_emulator) {
+      if (!channelData.channels.allow_emulator && is_emulator) {
         console.log(id, 'Cannot update emulator is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -537,7 +563,8 @@ export async function update(body: AppInfos) {
       action: 'get',
     }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
-    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
+    // TODO: i have no idea why "as any"
+    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version as any), 200, updateOverwritten)
   }
   catch (e) {
     console.error('e', e)
