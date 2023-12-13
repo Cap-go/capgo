@@ -50,7 +50,7 @@ async function getUsage() {
   const plan = plans.value.find(p => p.name === 'Pay as you go')!
 
   let totalMau = 0
-  let totalStorage = bytesToGb(await getTotalStorage(main.auth?.id))
+  const totalStorage = bytesToGb(await getTotalStorage(main.auth?.id))
   let totalBandwidth = 0
 
   usage?.forEach((item) => {

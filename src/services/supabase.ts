@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from 'axios'
 import type { SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -18,7 +18,7 @@ interface CapgoConfig {
   hostWeb: string
 }
 
-const getLocalConfig = () => {
+function getLocalConfig() {
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
@@ -30,17 +30,17 @@ const getLocalConfig = () => {
 
 let config: CapgoConfig = getLocalConfig()
 
-export const getRemoteConfig = async () => {
+export async function getRemoteConfig() {
   // call host + /api/get_config and parse the result as json using axios
   const localConfig = await getLocalConfig()
   const data = await axios
-  .get(`${defaultApiHost}/get_config`)
-  .then((res) => res.data as CapgoConfig)
-  .then(data => ({...data, ...localConfig} as CapgoConfig))
-  .catch(() => {
-      console.log('Local config', localConfig);
+    .get(`${defaultApiHost}/get_config`)
+    .then(res => res.data as CapgoConfig)
+    .then(data => ({ ...data, ...localConfig } as CapgoConfig))
+    .catch(() => {
+      console.log('Local config', localConfig)
       return localConfig as CapgoConfig
-  })
+    })
   config = data
 }
 
@@ -188,7 +188,7 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
 }
 export async function getTotalStorage(userid?: string, app_id?: string): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('get_total_storage_size', {userid, appid: app_id})
+    .rpc('get_total_storage_size', { userid, appid: app_id })
     .single()
   if (error)
     throw new Error(error.message)

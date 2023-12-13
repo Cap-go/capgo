@@ -70,7 +70,7 @@ async function getUsages() {
         else
           datas.value.mau[dayNumber] = item.mau
 
-        const storageVal = parseFloat(bytesToGb(item.storage_added - item.storage_deleted).toFixed(2))
+        const storageVal = Number.parseFloat(bytesToGb(item.storage_added - item.storage_deleted).toFixed(2))
         if (datas.value.storage[dayNumber])
           datas.value.storage[dayNumber] += storageVal
         else
@@ -84,7 +84,7 @@ async function getUsages() {
     })
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    datas.value.storage[0] = parseFloat((currentStorage - storageVariance).toFixed(2))
+    datas.value.storage[0] = Number.parseFloat((currentStorage - storageVariance).toFixed(2))
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
