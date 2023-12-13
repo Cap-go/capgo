@@ -1,4 +1,4 @@
-/* eslint-disable n/prefer-global/buffer */
+/* eslint-disable node/prefer-global/buffer */
 import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import AdmZip from 'https://esm.sh/adm-zip?target=deno'
 import { supabaseAdmin } from '../_utils/supabase.ts'

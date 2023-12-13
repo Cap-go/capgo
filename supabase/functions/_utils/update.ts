@@ -254,15 +254,7 @@ export async function update(body: AppInfos) {
       }, 400)
     }
 
-    console.log(id, 'vals', platform,
-      app_id,
-      device_id,
-      custom_id,
-      version_build,
-      is_emulator,
-      is_prod,
-      plugin_version,
-      version_name, new Date().toISOString())
+    console.log(id, 'vals', platform, app_id, device_id, custom_id, version_build, is_emulator, is_prod, plugin_version, version_name, new Date().toISOString())
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
       created_at: new Date().toISOString(),
@@ -319,8 +311,10 @@ export async function update(body: AppInfos) {
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
         const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
-        // eslint-disable-next-line max-statements-per-line
-        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
+
+        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) {
+          version = secondVersion
+        }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
         else if (version.name !== version_name) {
           const randomChange = Math.random()

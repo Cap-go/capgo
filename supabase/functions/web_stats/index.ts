@@ -120,16 +120,7 @@ async function main(url: URL, headers: BaseHeaders, _method: string, _body: any)
       res.plans,
     ])
     const not_paying = users - paying
-    console.log('All Promises',
-      apps,
-      updates,
-      users,
-      stars,
-      trial,
-      paying,
-      onboarded,
-      need_upgrade,
-      plans)
+    console.log('All Promises', apps, updates, users, stars, trial, paying, onboarded, need_upgrade, plans)
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)

@@ -611,7 +611,8 @@ export async function createApiKey(userId: string) {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'read',
-        }])
+        },
+      ])
   }
   return Promise.resolve()
 }
@@ -633,7 +634,8 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
           created_by: userId,
           logo: 'https://res.cloudinary.com/dz3vsv9pg/image/upload/v1623349123/capgo/logo.png',
           name: `${name} organization`,
-        })
+        },
+      )
       .select()
       .single()
       // create org_users admin from data.id
@@ -648,7 +650,8 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
             org_id: data.id,
             user_id: userId,
             role: 'admin',
-          }])
+          },
+        ])
     }
   }
   return Promise.resolve()
@@ -679,8 +682,7 @@ export async function saveStoreInfo(apps: (Database['public']['Tables']['store_a
     console.error('saveStoreInfo error', error)
 }
 
-export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
-  plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
   const segments: Segments = {
     capgo: true,
     onboarded: await isOnboarded(userId),
