@@ -91,7 +91,7 @@ export function getUpdateBaseData(): typeof updateAndroidBaseData {
 }
 
 export async function testPlaywright(spec: string, env: { [key: string]: string }) {
-  const playwrightCommand = new Deno.Command('npx', {
+  const playwrightCommand = new Deno.Command('bunx', {
     args: [
       'playwright',
       'test',
