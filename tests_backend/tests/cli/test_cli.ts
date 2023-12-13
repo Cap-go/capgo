@@ -129,7 +129,7 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
 
   appPath = tempFileFolder
 
-  await pnpmInstall()
+  await bunInstall()
 
   // We set the channel update scheme to major
   // id 22 = production
@@ -138,13 +138,13 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
   assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
 }
 
-async function pnpmInstall() {
-  const pnpmInstallCommand = new Deno.Command('pnpm', {
+async function bunInstall() {
+  const bunInstallCommand = new Deno.Command('bun', {
     args: ['install', '--no-frozen-lockfile'],
     cwd: tempFileFolder,
   })
 
-  const result = await pnpmInstallCommand.output()
+  const result = await bunInstallCommand.output()
 
   if (result.code !== 0) {
     const textDecoder = new TextDecoder()
@@ -153,7 +153,7 @@ async function pnpmInstall() {
 
     console.log('stdout', stdout)
     console.log('stderr', stderr)
-    throw new Error('pnpm install failed')
+    throw new Error('bun install failed')
   }
 }
 
@@ -259,7 +259,7 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
   }
   await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson.replace('%DEPENDENCIES%', JSON.stringify(dependencies)))
 
-  await pnpmInstall()
+  await bunInstall()
 
   async function assertCompatibilityTableColumns(column1: string, column2: string, column3: string, column4: string) {
     const cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
@@ -293,7 +293,7 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
 
   await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
 
-  await pnpmInstall()
+  await bunInstall()
 }
 
 async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseType) {
