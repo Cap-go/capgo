@@ -15,7 +15,7 @@ There exists some requirements to run the tests:
  ```
  * Have redis running (see `tests_backend/gh_actions` for referance, only if `USE_LOCAL_REDIS` env variable is set to true, tests run fine without it)
  * Having the `UPSTASH_TOKEN` and `UPSTASH_URL` env variables set (Only if you want to test upstash, tests run fine without it)
- * Having `node`, `npx`, `bun` installed (Only for CLI tests)
+ * Having `bun` installed (Only for CLI tests)
  * Having the [supabase cli](https://supabase.com/docs/guides/cli) installed
  * Having a running supabase (`supabase start`)
 

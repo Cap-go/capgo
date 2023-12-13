@@ -11,7 +11,7 @@ brew link node@20
 node -v
 npm -v
 
-# Install yarn
+# Install bun
 echo "📦 Install bun"
 brew install bun 
 

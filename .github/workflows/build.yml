@@ -36,7 +36,7 @@ jobs:
         with:
           version: 1.110.1
       - name: 🍜 Prepare Supabase
-        run: node scripts/prepare_supabase.mjs
+        run: bun scripts/prepare_supabase.mjs
       # - name: Apply Supabase Migrations TODO: make this work 
       #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
       - name: Update functions Alpha
