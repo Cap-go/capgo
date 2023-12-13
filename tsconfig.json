@@ -5,12 +5,13 @@
   "lib": ["DOM", "ESNext"],
   "baseUrl": ".",
   "module": "ESNext",
-  "moduleResolution": "node",
+  "moduleResolution": "nodenext",
   "paths": {
     "~/*": ["src/*"]
   },
   "resolveJsonModule": true,
   "types": [
+    "bun-types",
     "vitest",
     "vite/client",
     "vue/ref-macros",
