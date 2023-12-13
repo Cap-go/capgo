@@ -23,11 +23,10 @@ export const app_versions = pgTable('app_versions', {
     updated_at: timestamp('updated_at').defaultNow(),
     deleted: boolean('deleted').default(false),
     external_url: varchar('external_url'),
-    checksum: varchar('checksums'),
+    checksum: varchar('checksum'),
     session_key: varchar('session_key'),
-    storage_provider: text('storage_provider').default('r2'),
+    storage_provider: text('storage_provider').default('r2').notNull(),
     minUpdateVersion: varchar('minUpdateVersion'),
-    native_packages: jsonb('native_packages').array()
 })
 
 export const channels = pgTable('channels', {
