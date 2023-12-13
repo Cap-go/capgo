@@ -14,7 +14,7 @@ To generate translations, follow these steps:
 1. Add your English text to be translated in `translate-data.json` file.
 2. If you haven't installed TSX, install it by running 
 ```bash
- npm install -g tsx
+ bun install -g tsx
  ```
 3. Run the `translate.ts` script by using the command 
 ```bash
