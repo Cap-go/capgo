@@ -306,6 +306,19 @@ FROM sessions
 GROUP BY device_id, app_id;
 
 
+-- Aggregate table partitioned by version only
+CREATE TABLE IF NOT EXISTS version_aggregate_logs
+(
+    version Int64,
+    total_installs Int64,
+    total_failures Int64,
+    unique_devices Int64,
+    install_percent Float64,
+    failure_percent Float64
+) ENGINE = AggregatingMergeTree()
+PARTITION BY version
+ORDER BY version;
+
 -- 
 -- Install and fail stats
 -- 
@@ -322,19 +335,6 @@ CREATE TABLE IF NOT EXISTS daily_aggregate_logs
 ) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, version);
-
--- Aggregate table partitioned by version only
-CREATE TABLE IF NOT EXISTS version_aggregate_logs
-(
-    version Int64,
-    total_installs Int64,
-    total_failures Int64,
-    unique_devices Int64,
-    install_percent Float64,
-    failure_percent Float64
-) ENGINE = AggregatingMergeTree()
-PARTITION BY version
-ORDER BY version;
 
 -- Create a Materialized View that aggregates data daily
 CREATE MATERIALIZED VIEW daily_aggregate_logs_mv TO daily_aggregate_logs AS
