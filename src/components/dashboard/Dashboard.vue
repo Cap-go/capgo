@@ -6,7 +6,7 @@ import {
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import WelcomeBanner from './WelcomeBanner.vue'
-import Usage from '~/components/dashboard/Usage.vue'
+// import Usage from '~/components/dashboard/Usage.vue'
 import TopApps from '~/components/dashboard/TopApps.vue'
 import SharedApps from '~/components/dashboard/SharedApps.vue'
 import type { Database } from '~/types/supabase.types'
