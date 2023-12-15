@@ -30,10 +30,10 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create bump and changelog
         if: github.ref == 'refs/heads/main'
-        run: bun dlx capacitor-standard-version
+        run: bun x capacitor-standard-version
       - name: Create bump and changelog
         if: github.ref != 'refs/heads/main'
-        run: bun dlx capacitor-standard-version --prerelease alpha
+        run: bun x capacitor-standard-version --prerelease alpha
       - name: Push to origin
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -56,6 +56,6 @@ jobs:
         id: install_code
         run: bun install --frozen-lockfile
       - name: CLI capgo install
-        run: bun dlx @capgo/cli@latest --version
+        run: bun x @capgo/cli@latest --version
       - name: CLI capacitor-standard-version install
-        run: bun dlx capacitor-standard-version --version
+        run: bun x capacitor-standard-version --version
