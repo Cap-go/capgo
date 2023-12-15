@@ -5,7 +5,10 @@
   "lib": ["DOM", "ESNext"],
   "baseUrl": ".",
   "module": "ESNext",
-  "moduleResolution": "nodenext",
+  "moduleResolution": "bundler",
+  "allowImportingTsExtensions": true,
+  "noEmit": true,
+  "moduleDetection": "force",
   "paths": {
     "~/*": ["src/*"]
   },
