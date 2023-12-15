@@ -3,7 +3,7 @@
 
 [build]
   publish = "dist"
-  command = "bun build && bun generate:node_serverless"
+  command = "bun run build && bun generate:node_serverless"
 
 [dev]
   framework = "vite"
