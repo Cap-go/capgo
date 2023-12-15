@@ -11,23 +11,23 @@ brew link node@20
 node -v
 npm -v
 
-# Install yarn
-echo "📦 Install pnpm"
-brew install pnpm 
+# Install bun
+echo "📦 Install bun"
+brew install bun 
 
 # Install dependencies
 echo "📦 Install dependencies"
-pnpm install --frozen-lockfile
+bun install --frozen-lockfile
 
 # create assets
 echo "🌆 Create Assets"
-pnpm run capacitor-assets
+bun run capacitor-assets
 
 # Build the app
 echo "🚀 Build code"
-pnpm run mobile
+bun run mobile
 
 # install native dependencies
 echo "📦 Install native dependencies "
-pnpm run sync:ios
+bun run sync:ios
 pod install

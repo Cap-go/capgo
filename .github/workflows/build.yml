@@ -13,38 +13,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Node.js
-        uses: actions/setup-node@v3
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: 18
-
-      - uses: pnpm/action-setup@v2
-        name: Install pnpm
-        with:
-          version: 8
-          run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          bun-version: latest
 
       - name: Install dependencies
-        run: pnpm install
+        run: bun install
 
       - name: Lint
         id: lint_code
-        run: pnpm lint && pnpm lint-backend
+        run: bun lint && bun lint-backend
       - name: Build
         id: build_code
-        run: pnpm mobile
+        run: bun mobile
         env:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
@@ -54,7 +36,7 @@ jobs:
         with:
           version: 1.110.1
       - name: 🍜 Prepare Supabase
-        run: node scripts/prepare_supabase.mjs
+        run: bun scripts/prepare_supabase.mjs
       # - name: Apply Supabase Migrations TODO: make this work 
       #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
       - name: Update functions Alpha
@@ -73,33 +55,28 @@ jobs:
       - name: Create Release Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: create_release_prepro
-        run: pnpm dlx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+        run: bun dlx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
-        run: pnpm dlx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+        run: bun dlx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
 
   build_android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1
         with:
-          version: 8
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'pnpm'
+          bun-version: latest
       - name: Install dependencies
         id: install_code
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
       - name: Build
         id: build_code
-        run: pnpm mobile
+        run: bun mobile
       - name: Sync
         id: sync_code
-        run: pnpm --package=@capacitor/cli dlx cap sync
+        run: bun --package=@capacitor/cli dlx cap sync
       - name: Setup java
         uses: actions/setup-java@v3
         with:
