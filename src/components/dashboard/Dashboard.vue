@@ -6,7 +6,7 @@ import {
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import WelcomeBanner from './WelcomeBanner.vue'
-// import Usage from '~/components/dashboard/Usage.vue'
+import Usage from '~/components/dashboard/Usage.vue'
 import TopApps from '~/components/dashboard/TopApps.vue'
 import SharedApps from '~/components/dashboard/SharedApps.vue'
 import type { Database } from '~/types/supabase.types'
@@ -47,7 +47,7 @@ watchEffect(async () => {
       <!-- Welcome banner -->
       <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
       <!-- Cards -->
-      <!-- <Usage v-if="!isLoading" :apps="props.apps" /> -->
+      <Usage v-if="!isLoading" :apps="props.apps" />
 
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->

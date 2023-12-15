@@ -200,12 +200,21 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
 TO mau
 AS
 SELECT
-    toDate(created_at) AS date,
+    minDate AS date,
     app_id,
     countDistinct(device_id) AS mau
-FROM logs
-WHERE created_at >= toStartOfMonth(toDate(created_at)) 
-  AND created_at < toStartOfMonth(toDate(created_at) + INTERVAL 1 MONTH)
+FROM
+    (
+    SELECT
+        min(toDate(created_at)) AS minDate,
+        app_id,
+        device_id
+    FROM logs
+    WHERE 
+        created_at >= toStartOfMonth(toDate(now())) 
+        AND created_at < toStartOfMonth(toDate(now()) + INTERVAL 1 MONTH)
+    GROUP BY device_id, app_id
+    )
 GROUP BY date, app_id;
 
 

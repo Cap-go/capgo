@@ -7,7 +7,7 @@ import Spinner from '~/components/Spinner.vue'
 import type { Stat } from '~/components/comp_def'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
-// import Usage from '~/components/dashboard/Usage.vue'
+import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
@@ -117,7 +117,7 @@ watchEffect(async () => {
     <Spinner size="w-40 h-40" />
   </div>
   <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6">
-    <!-- <Usage :app-id="id" /> -->
+    <Usage :app-id="id" />
 
     <BlurBg class="mb-10">
       <template #default>
