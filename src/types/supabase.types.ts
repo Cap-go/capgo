@@ -14,7 +14,7 @@ export interface Database {
           created_at: string | null
           id: number
           key: string
-          mode: Database['public']['Enums']['key_mode']
+          mode: Database["public"]["Enums"]["key_mode"]
           updated_at: string | null
           user_id: string
         }
@@ -22,7 +22,7 @@ export interface Database {
           created_at?: string | null
           id?: number
           key: string
-          mode: Database['public']['Enums']['key_mode']
+          mode: Database["public"]["Enums"]["key_mode"]
           updated_at?: string | null
           user_id: string
         }
@@ -30,17 +30,18 @@ export interface Database {
           created_at?: string | null
           id?: number
           key?: string
-          mode?: Database['public']['Enums']['key_mode']
+          mode?: Database["public"]["Enums"]["key_mode"]
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'apikeys_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "apikeys_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       app_live: {
@@ -64,11 +65,12 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'app_live_id_fkey'
-            columns: ['id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "app_live_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       app_stats: {
@@ -122,24 +124,26 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'app_stats_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "app_stats_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'app_stats_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "app_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       app_usage: {
         Row: {
           app_id: string
           bandwidth: number
-          created_at: string | null
+          date: string | null
           fails: number
           get: number
           id: string
@@ -152,7 +156,7 @@ export interface Database {
         Insert: {
           app_id: string
           bandwidth?: number
-          created_at?: string | null
+          date?: string | null
           fails?: number
           get?: number
           id?: string
@@ -165,7 +169,7 @@ export interface Database {
         Update: {
           app_id?: string
           bandwidth?: number
-          created_at?: string | null
+          date?: string | null
           fails?: number
           get?: number
           id?: string
@@ -228,17 +232,19 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'app_versions_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "app_versions_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'app_versions_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "app_versions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       app_versions_meta: {
@@ -283,23 +289,26 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'app_versions_meta_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "app_versions_meta_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'app_versions_meta_id_fkey'
-            columns: ['id']
-            referencedRelation: 'app_versions'
-            referencedColumns: ['id']
+            foreignKeyName: "app_versions_meta_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'app_versions_meta_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "app_versions_meta_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       apps: {
@@ -338,11 +347,12 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'apps_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "apps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       channel_devices: {
@@ -372,23 +382,26 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'channel_devices_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "channel_devices_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'channel_devices_channel_id_fkey'
-            columns: ['channel_id']
-            referencedRelation: 'channels'
-            referencedColumns: ['id']
+            foreignKeyName: "channel_devices_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'channel_devices_created_by_fkey'
-            columns: ['created_by']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "channel_devices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       channel_users: {
@@ -421,29 +434,33 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'channel_users_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "channel_users_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'channel_users_channel_id_fkey'
-            columns: ['channel_id']
-            referencedRelation: 'channels'
-            referencedColumns: ['id']
+            foreignKeyName: "channel_users_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'channel_users_created_by_fkey'
-            columns: ['created_by']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
+            foreignKeyName: "channel_users_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'channel_users_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "channel_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       channels: {
@@ -456,7 +473,7 @@ export interface Database {
           beta: boolean
           created_at: string
           created_by: string
-          disableAutoUpdate: Database['public']['Enums']['disable_update']
+          disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateToMajor: boolean
           disableAutoUpdateUnderNative: boolean
           enable_progressive_deploy: boolean
@@ -479,7 +496,7 @@ export interface Database {
           beta?: boolean
           created_at?: string
           created_by: string
-          disableAutoUpdate?: Database['public']['Enums']['disable_update']
+          disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -502,7 +519,7 @@ export interface Database {
           beta?: boolean
           created_at?: string
           created_by?: string
-          disableAutoUpdate?: Database['public']['Enums']['disable_update']
+          disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateToMajor?: boolean
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -518,29 +535,33 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'channels_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "channels_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'channels_created_by_fkey'
-            columns: ['created_by']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
+            foreignKeyName: "channels_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'channels_secondVersion_fkey'
-            columns: ['secondVersion']
-            referencedRelation: 'app_versions'
-            referencedColumns: ['id']
+            foreignKeyName: "channels_secondVersion_fkey"
+            columns: ["secondVersion"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'channels_version_fkey'
-            columns: ['version']
-            referencedRelation: 'app_versions'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "channels_version_fkey"
+            columns: ["version"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          }
         ]
       }
       deleted_account: {
@@ -570,7 +591,7 @@ export interface Database {
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
-          platform: Database['public']['Enums']['platform_os'] | null
+          platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
           updated_at: string
           version: number
@@ -584,7 +605,7 @@ export interface Database {
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
-          platform?: Database['public']['Enums']['platform_os'] | null
+          platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
           updated_at: string
           version: number
@@ -598,7 +619,7 @@ export interface Database {
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
-          platform?: Database['public']['Enums']['platform_os'] | null
+          platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
           updated_at?: string
           version?: number
@@ -633,23 +654,26 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'devices_override_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "devices_override_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'devices_override_created_by_fkey'
-            columns: ['created_by']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
+            foreignKeyName: "devices_override_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'devices_override_version_fkey'
-            columns: ['version']
-            referencedRelation: 'app_versions'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "devices_override_version_fkey"
+            columns: ["version"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          }
         ]
       }
       global_stats: {
@@ -721,11 +745,12 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'notifications_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       org_users: {
@@ -737,7 +762,7 @@ export interface Database {
           org_id: string
           updated_at: string | null
           user_id: string
-          user_right: Database['public']['Enums']['user_min_right'] | null
+          user_right: Database["public"]["Enums"]["user_min_right"] | null
         }
         Insert: {
           app_id?: string | null
@@ -747,7 +772,7 @@ export interface Database {
           org_id: string
           updated_at?: string | null
           user_id: string
-          user_right?: Database['public']['Enums']['user_min_right'] | null
+          user_right?: Database["public"]["Enums"]["user_min_right"] | null
         }
         Update: {
           app_id?: string | null
@@ -757,33 +782,37 @@ export interface Database {
           org_id?: string
           updated_at?: string | null
           user_id?: string
-          user_right?: Database['public']['Enums']['user_min_right'] | null
+          user_right?: Database["public"]["Enums"]["user_min_right"] | null
         }
         Relationships: [
           {
-            foreignKeyName: 'org_users_app_id_fkey'
-            columns: ['app_id']
-            referencedRelation: 'apps'
-            referencedColumns: ['app_id']
+            foreignKeyName: "org_users_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: 'org_users_channel_id_fkey'
-            columns: ['channel_id']
-            referencedRelation: 'channels'
-            referencedColumns: ['id']
+            foreignKeyName: "org_users_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_users_org_id_fkey'
-            columns: ['org_id']
-            referencedRelation: 'orgs'
-            referencedColumns: ['id']
+            foreignKeyName: "org_users_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_users_user_id_fkey'
-            columns: ['user_id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "org_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       orgs: {
@@ -909,7 +938,7 @@ export interface Database {
           app_id: string
           created_at: string
           device_id: string
-          platform: Database['public']['Enums']['platform_os']
+          platform: Database["public"]["Enums"]["platform_os"]
           version: number
           version_build: string
         }
@@ -918,7 +947,7 @@ export interface Database {
           app_id: string
           created_at: string
           device_id: string
-          platform: Database['public']['Enums']['platform_os']
+          platform: Database["public"]["Enums"]["platform_os"]
           version: number
           version_build: string
         }
@@ -927,7 +956,7 @@ export interface Database {
           app_id?: string
           created_at?: string
           device_id?: string
-          platform?: Database['public']['Enums']['platform_os']
+          platform?: Database["public"]["Enums"]["platform_os"]
           version?: number
           version_build?: string
         }
@@ -1040,7 +1069,7 @@ export interface Database {
           plan_usage: number | null
           price_id: string | null
           product_id: string
-          status: Database['public']['Enums']['stripe_status'] | null
+          status: Database["public"]["Enums"]["stripe_status"] | null
           subscription_anchor_end: string
           subscription_anchor_start: string
           subscription_id: string | null
@@ -1055,7 +1084,7 @@ export interface Database {
           plan_usage?: number | null
           price_id?: string | null
           product_id?: string
-          status?: Database['public']['Enums']['stripe_status'] | null
+          status?: Database["public"]["Enums"]["stripe_status"] | null
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
@@ -1070,7 +1099,7 @@ export interface Database {
           plan_usage?: number | null
           price_id?: string | null
           product_id?: string
-          status?: Database['public']['Enums']['stripe_status'] | null
+          status?: Database["public"]["Enums"]["stripe_status"] | null
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
@@ -1080,11 +1109,12 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'stripe_info_product_id_fkey'
-            columns: ['product_id']
-            referencedRelation: 'plans'
-            referencedColumns: ['stripe_id']
-          },
+            foreignKeyName: "stripe_info_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["stripe_id"]
+          }
         ]
       }
       users: {
@@ -1135,17 +1165,19 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'users_customer_id_fkey'
-            columns: ['customer_id']
-            referencedRelation: 'stripe_info'
-            referencedColumns: ['customer_id']
+            foreignKeyName: "users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
           },
           {
-            foreignKeyName: 'users_id_fkey'
-            columns: ['id']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            foreignKeyName: "users_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
     }
@@ -1163,24 +1195,24 @@ export interface Database {
       }
       check_min_rights:
         | {
-          Args: {
-            min_right: Database['public']['Enums']['user_min_right']
-            org_id: string
-            app_id: string
-            channel_id: number
+            Args: {
+              min_right: Database["public"]["Enums"]["user_min_right"]
+              org_id: string
+              app_id: string
+              channel_id: number
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
         | {
-          Args: {
-            min_right: Database['public']['Enums']['user_min_right']
-            user_id: string
-            org_id: string
-            app_id: string
-            channel_id: number
+            Args: {
+              min_right: Database["public"]["Enums"]["user_min_right"]
+              user_id: string
+              org_id: string
+              app_id: string
+              channel_id: number
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
       convert_bytes_to_gb: {
         Args: {
           byt: number
@@ -1313,47 +1345,47 @@ export interface Database {
       }
       get_current_plan_max:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: string
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: string
           }
-          Returns: {
-            mau: number
-            bandwidth: number
-            storage: number
-          }[]
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
       get_current_plan_name:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: string
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: string
           }
-          Returns: string
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: string
+          }
       get_cycle_info:
         | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: {
+              subscription_anchor_start: string
+              subscription_anchor_end: string
+            }[]
           }
-          Returns: {
-            subscription_anchor_start: string
-            subscription_anchor_end: string
-          }[]
-        }
         | {
-          Args: Record<PropertyKey, never>
-          Returns: {
-            subscription_anchor_start: string
-            subscription_anchor_end: string
-          }[]
-        }
+            Args: {
+              userid: string
+            }
+            Returns: {
+              subscription_anchor_start: string
+              subscription_anchor_end: string
+            }[]
+          }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1383,111 +1415,114 @@ export interface Database {
       }
       get_max_plan:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: {
-            mau: number
-            bandwidth: number
-            storage: number
-          }[]
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
           }
-          Returns: {
-            mau: number
-            storage: number
-            bandwidth: number
-          }[]
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
       get_metered_usage:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: number
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: number
           }
-          Returns: Database['public']['CompositeTypes']['stats_table']
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: Database["public"]["CompositeTypes"]["stats_table"]
+          }
       get_plan_usage_percent:
         | {
-          Args: {
-            dateid: string
+            Args: Record<PropertyKey, never>
+            Returns: number
           }
-          Returns: number
-        }
         | {
-          Args: {
-            userid: string
-            dateid: string
+            Args: {
+              userid: string
+            }
+            Returns: number
           }
-          Returns: number
-        }
       get_total_stats_v2:
         | {
-          Args: {
-            dateid: string
+            Args: {
+              dateid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
           }
-          Returns: {
-            mau: number
-            bandwidth: number
-            storage: number
-          }[]
-        }
         | {
-          Args: {
-            userid: string
-            dateid: string
+            Args: {
+              userid: string
+              dateid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
           }
-          Returns: {
-            mau: number
-            bandwidth: number
-            storage: number
-          }[]
-        }
       get_total_stats_v3:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: {
-            mau: number
-            bandwidth: number
-            storage: number
-          }[]
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
           }
-          Returns: {
-            mau: number
-            bandwidth: number
-            storage: number
-          }[]
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+            }[]
+          }
       get_total_storage_size:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: number
-        }
-        | {
-          Args: {
-            userid: string
-            app_id: string
+            Args: Record<PropertyKey, never>
+            Returns: number
           }
-          Returns: number
-        }
         | {
-          Args: {
-            userid: string
+            Args: {
+              appid: string
+            }
+            Returns: number
           }
-          Returns: number
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
+            }
+            Returns: number
+          }
       get_usage_mode_and_last_saved: {
         Args: Record<PropertyKey, never>
         Returns: {
-          usage_mode: Database['public']['Enums']['usage_mode']
+          usage_mode: Database["public"]["Enums"]["usage_mode"]
           last_saved: string
         }[]
       }
@@ -1511,7 +1546,7 @@ export interface Database {
         Args: {
           _userid: string
           _orgid: string
-          _right: Database['public']['Enums']['user_min_right']
+          _right: Database["public"]["Enums"]["user_min_right"]
           _appid?: string
           _channelid?: number
         }
@@ -1534,134 +1569,149 @@ export interface Database {
       }
       is_admin:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
-      is_allowed_action: {
-        Args: {
-          apikey: string
-        }
-        Returns: boolean
-      }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
+      is_allowed_action:
+        | {
+            Args: {
+              apikey: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              apikey: string
+              appid: string
+            }
+            Returns: boolean
+          }
       is_allowed_action_user:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_allowed_capgkey:
         | {
-          Args: {
-            apikey: string
-            keymode: Database['public']['Enums']['key_mode'][]
+            Args: {
+              apikey: string
+              keymode: Database["public"]["Enums"]["key_mode"][]
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
         | {
-          Args: {
-            apikey: string
-            keymode: Database['public']['Enums']['key_mode'][]
-            app_id: string
+            Args: {
+              apikey: string
+              keymode: Database["public"]["Enums"]["key_mode"][]
+              app_id: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
       is_app_owner:
         | {
-          Args: {
-            appid: string
+            Args: {
+              apikey: string
+              appid: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
         | {
-          Args: {
-            userid: string
-            appid: string
+            Args: {
+              appid: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+              appid: string
+            }
+            Returns: boolean
+          }
       is_app_shared:
         | {
-          Args: {
-            appid: string
+            Args: {
+              appid: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
         | {
-          Args: {
-            userid: string
-            appid: string
+            Args: {
+              userid: string
+              appid: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
       is_canceled:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_free_usage:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_good_plan_v3:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_good_plan_v4:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: number
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_in_channel:
         | {
-          Args: {
-            ownerid: string
+            Args: {
+              ownerid: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
         | {
-          Args: {
-            userid: string
-            ownerid: string
+            Args: {
+              userid: string
+              ownerid: string
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
       is_not_deleted: {
         Args: {
           email_check: string
@@ -1676,105 +1726,105 @@ export interface Database {
       }
       is_onboarded:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_onboarding_needed:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_paying:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_paying_and_good_plan:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: boolean
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: boolean
           }
-          Returns: boolean
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: boolean
+          }
       is_trial:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: number
-        }
-        | {
-          Args: {
-            userid: string
+            Args: Record<PropertyKey, never>
+            Returns: number
           }
-          Returns: number
-        }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: number
+          }
       is_version_shared:
         | {
-          Args: {
-            versionid: number
+            Args: {
+              userid: string
+              versionid: number
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
         | {
-          Args: {
-            userid: string
-            versionid: number
+            Args: {
+              versionid: number
+            }
+            Returns: boolean
           }
-          Returns: boolean
-        }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
       update_app_usage:
         | {
-          Args: Record<PropertyKey, never>
-          Returns: undefined
-        }
-        | {
-          Args: {
-            minutes_interval: number
+            Args: Record<PropertyKey, never>
+            Returns: undefined
           }
-          Returns: undefined
-        }
+        | {
+            Args: {
+              minutes_interval: number
+            }
+            Returns: undefined
+          }
     }
     Enums: {
-      app_mode: 'prod' | 'dev' | 'livereload'
-      disable_update: 'major' | 'minor' | 'version_number' | 'none'
-      key_mode: 'read' | 'write' | 'all' | 'upload'
-      pay_as_you_go_type: 'base' | 'units'
-      platform_os: 'ios' | 'android'
+      app_mode: "prod" | "dev" | "livereload"
+      disable_update: "major" | "minor" | "version_number" | "none"
+      key_mode: "read" | "write" | "all" | "upload"
+      pay_as_you_go_type: "base" | "units"
+      platform_os: "ios" | "android"
       stripe_status:
-        | 'created'
-        | 'succeeded'
-        | 'updated'
-        | 'failed'
-        | 'deleted'
-        | 'canceled'
-      usage_mode: '5min' | 'day' | 'month' | 'cycle' | 'last_saved'
-      user_min_right: 'read' | 'upload' | 'write' | 'admin'
-      user_role: 'read' | 'upload' | 'write' | 'admin'
+        | "created"
+        | "succeeded"
+        | "updated"
+        | "failed"
+        | "deleted"
+        | "canceled"
+      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      user_min_right: "read" | "upload" | "write" | "admin"
+      user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
       match_plan: {
@@ -1788,3 +1838,83 @@ export interface Database {
     }
   }
 }
+
+export type Tables<
+  PublicTableNameOrOptions extends
+    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
+      Database["public"]["Views"])
+  ? (Database["public"]["Tables"] &
+      Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : never
+
+export type TablesInsert<
+  PublicTableNameOrOptions extends
+    | keyof Database["public"]["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : never
+
+export type TablesUpdate<
+  PublicTableNameOrOptions extends
+    | keyof Database["public"]["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : never
+
+export type Enums<
+  PublicEnumNameOrOptions extends
+    | keyof Database["public"]["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    : never = never
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
+  ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+  : never
