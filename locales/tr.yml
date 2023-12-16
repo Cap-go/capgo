@@ -46,12 +46,10 @@ app-not-found: Uygulama bulunamadı
 are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
+base: Temel
 best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
 billing: Faturalandırma
-current-billing-cycle: Güncel Fatura Döngüsü
-from: Kimden
-to: için
 build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
 build-your-code-and-: Kodunuzu Capgo'ya yükleyin
 bulk-upload: toplu yükleme
@@ -103,6 +101,7 @@ check-on-web: Web sitesinde kontrol edin
 checksum: sağlama toplamı
 commands: komutlar
 confirm-email: e-postanızı onaylayın
+confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
 confirm-password: Şifreyi Onayla
 confirm-public-desc: >-
   Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler göndermesini
@@ -116,6 +115,7 @@ copy-your: kopyala
 country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
 created-at: oluşturuldu
+current-billing-cycle: Güncel Fatura Döngüsü
 custom-domain: Özel alan
 custom-id: özel kimlik
 custom-id-saved: Özel kimlik kaydedildi
@@ -131,6 +131,7 @@ device: Cihaz
 device-id: Cihaz Kimliği
 devices: Cihazlar
 devices-using-this-b: Bu paketi kullanan cihazlar
+did-not-recive-confirm-email: Onay e-postası almadınız mı?
 disable-auto-downgra: Yerel altında otomatik düşürmeyi devre dışı bırak
 disable-auto-upgrade: Binbaşının üzerinde otomatik yükseltmeyi devre dışı bırak
 discord: Anlaşmazlık
@@ -155,11 +156,13 @@ force-version: Kuvvet versiyonu
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
+from: Kimden
 from-device: cihazdan
 good: İyi
 id: İD
 in-your-main-file: ana dosyanızda
 in-your-project-fold: proje klasörünüzde
+included-in-plan: Plana dahil
 info: Bilgi
 informations: bilgiler
 init-capgo-in-your-a: Uygulamanızda Capgo'yu Başlatın
@@ -251,6 +254,7 @@ please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
 prediction: Tahmin
+price-per-unit-above: Planın üzerindeki birim başına fiyat
 pro-tip-you-can-copy: 'Profesyonel ipucu: kopyalayabilirsiniz'
 projection: Projeksiyonlar
 recommended: Tavsiye edilen
@@ -260,6 +264,8 @@ register-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
 register-heading: Kayıt
 register-next: Kayıt olmak
 reload: Tekrar yükle
+resend: Tekrar gönder
+resend-email: Yeniden Onay E-postası Gönder
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
 save: kaydeder
@@ -300,6 +306,7 @@ thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
 title: başlık
+to: için
 to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
@@ -321,6 +328,7 @@ usage: Kullanım
 usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
 usage-title: Toplam
 use-the-command: 'Şu komutu kullanın:'
+used-in-period: Döneminde kullanıldı
 user: kullanıcı
 validate: Doğrula
 version: Sürüm
@@ -338,7 +346,3 @@ your-api-key: 'API anahtarınız:'
 your-are-a: Senin alanın
 your-current-plan-is: Mevcut planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'
-resend-email: Yeniden Onay E-postası Gönder
-confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
-did-not-recive-confirm-email: Onay e-postası almadınız mı?
-resend: Tekrar gönder

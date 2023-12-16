@@ -50,12 +50,10 @@ app-not-found: Không tìm thấy ứng dụng
 are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
+base: Căn cứ
 best-plan: kế hoạch tốt nhất
 bigger-app-size: Kích thước ứng dụng lớn hơn
 billing: thanh toán
-current-billing-cycle: Chu kỳ thanh toán hiện tại
-from: Từ
-to: ĐẾN
 build-your-app-and-s: xây dựng ứng dụng của bạn và đồng bộ hóa
 build-your-code-and-: Tải lên Capgo mã của bạn
 bulk-upload: Tải lên hàng loạt
@@ -107,6 +105,7 @@ check-on-web: Kiểm tra trên trang web
 checksum: tổng kiểm tra
 commands: mệnh lệnh
 confirm-email: Xác nhận email của bạn
+confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
 confirm-password: Xác nhận mật khẩu
 confirm-public-desc: |-
   Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
@@ -118,6 +117,7 @@ copy-your: Sao chép của bạn
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
 created-at: tạo tại
+current-billing-cycle: Chu kỳ thanh toán hiện tại
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
 custom-id-saved: Đã lưu ID tùy chỉnh
@@ -133,6 +133,7 @@ device: Thiết bị
 device-id: ID thiết bị
 devices: thiết bị
 devices-using-this-b: Thiết bị sử dụng gói này
+did-not-recive-confirm-email: Không nhận được email xác nhận?
 disable-auto-downgra: Vô hiệu hóa tự động hạ cấp theo bản địa
 disable-auto-upgrade: Vô hiệu hóa nâng cấp tự động trên chính
 discord: bất hòa
@@ -157,11 +158,13 @@ force-version: Phiên bản bắt buộc
 forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công
+from: Từ
 from-device: từ thiết bị
 good: Tốt
 id: NHẬN DẠNG
 in-your-main-file: Trong tập tin chính của bạn
 in-your-project-fold: Trong thư mục dự án của bạn
+included-in-plan: Bao gồm trong kế hoạch
 info: Thông tin
 informations: thông tin
 init-capgo-in-your-a: Khởi tạo Capgo trong ứng dụng của bạn
@@ -251,6 +254,7 @@ please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
 prediction: Sự dự đoán
+price-per-unit-above: Giá mỗi căn trên kế hoạch
 pro-tip-you-can-copy: 'Mẹo chuyên nghiệp: bạn có thể sao chép'
 projection: dự đoán
 recommended: Khuyến khích
@@ -260,6 +264,8 @@ register-desc: Điền vào các trường sau để hoàn thành đăng ký c�
 register-heading: Sự đăng ký
 register-next: Đăng ký
 reload: tải lại
+resend: Gửi lại
+resend-email: Gửi lại email xác nhận
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
 save: tiết kiệm
@@ -300,6 +306,7 @@ thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
 title: tiêu đề
+to: ĐẾN
 to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
@@ -323,6 +330,7 @@ usage-success: >-
   nữa
 usage-title: Tổng cộng
 use-the-command: 'Sử dụng lệnh:'
+used-in-period: Được sử dụng trong kỳ
 user: Người dùng
 validate: xác thực
 version: Phiên bản
@@ -340,7 +348,3 @@ your-api-key: 'Khóa API của bạn:'
 your-are-a: bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là
-resend-email: Gửi lại email xác nhận
-confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
-did-not-recive-confirm-email: Không nhận được email xác nhận?
-resend: Gửi lại
