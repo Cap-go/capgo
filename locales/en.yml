@@ -52,6 +52,7 @@ app-not-found: App not found
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
+base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billing: Billing
@@ -110,6 +111,7 @@ check-on-web: Check on website
 checksum: Checksum
 commands: commands
 confirm-email: Confirm your email
+confirm-email-sent: A confirmation email was sent click to link to confirm your email
 confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
@@ -136,6 +138,7 @@ device: Device
 device-id: Device ID
 devices: Devices
 devices-using-this-b: Devices using this bundle
+did-not-recive-confirm-email: Didn't receive confirmation email?
 disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
@@ -149,10 +152,6 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
-resend-email: Resend Confirmation Email
-confirm-email-sent: A confirmation email was sent click to link to confirm your email
-did-not-recive-confirm-email: Didn't receive confirmation email?
-resend: Resend
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
@@ -175,6 +174,7 @@ good: Good
 id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
+included-in-plan: Included in plan
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
@@ -276,6 +276,7 @@ please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
+price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 progressive-bundle-number: Progressive bundle number
 progressive-deploy-option: Select progressive deploy option
@@ -290,6 +291,8 @@ register-heading: Registration
 register-next: Register
 reload: Reload
 removed-apikey: API key has been successfully deleted
+resend: Resend
+resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves
@@ -331,7 +334,7 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
-to: To
+to: to
 to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
@@ -356,6 +359,7 @@ usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
+used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate
 user: User
 validate: Validate
