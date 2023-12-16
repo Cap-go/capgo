@@ -50,9 +50,9 @@ async function getUsage() {
   }
 
   const payg_units = {
-    mau: plan.mau_unit,
-    storage: plan.storage_unit,
-    bandwidth: plan.bandwidth_unit,
+    mau: currentPlan?.mau_unit,
+    storage: currentPlan?.storage_unit,
+    bandwidth: currentPlan?.bandwidth_unit,
   }
   
   let totalMau = 0
@@ -65,12 +65,11 @@ async function getUsage() {
     totalBandwidth += bytesToGb(item.bandwidth)
   })
 
-
-
-  const basePrice = plan.price_m
+  const basePrice = currentPlan?.price_m || 0
 
   const calculatePrice = (total: number, base: number, unit: number) => total <= base ? 0 : (total - base) * unit
 
+  const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
   const totalUsagePrice = computed(() => {
     if (currentPlan?.name !== 'Pay as you go') {
       return 0
@@ -87,6 +86,8 @@ async function getUsage() {
   })
 
   return {
+    isPayAsYouGo,
+    currentPlan,
     totalPrice,
     totalUsagePrice,
     totalMau,
@@ -142,7 +143,7 @@ loadData()
               {{ t('included-in-plan') }}
             </div>
             <div class="font-semibold">
-              {{ planUsage?.plan.mau.toLocaleString() }}
+              {{ planUsage?.currentPlan?.mau.toLocaleString() }}
             </div>
           </div>
 
@@ -155,14 +156,17 @@ loadData()
               {{ planUsage?.totalMau.toLocaleString() }}
             </div>
           </div>
+          <div v-if="planUsage?.isPayAsYouGo">
+
           <hr class="my-1 border-t border-gray-300 opacity-50">
           <div class="flex justify-between row">
             <div>
               {{ t('price-per-unit-above') }}
             </div>
             <div class="font-semibold">
-              $ {{ planUsage?.payg_units?.mau.toLocaleString() }}
+              $ {{ planUsage?.payg_units?.mau?.toLocaleString() }}
             </div>
+          </div>
           </div>
         </div>
 
@@ -176,7 +180,7 @@ loadData()
               {{ t('included-in-plan') }}
             </div>
             <div class="font-semibold">
-              {{ planUsage?.plan.storage.toLocaleString() }} GB
+              {{ planUsage?.currentPlan?.storage.toLocaleString() }} GB
             </div>
           </div>
 
@@ -189,15 +193,18 @@ loadData()
               {{ planUsage?.totalStorage.toLocaleString() }} GB
             </div>
           </div>
+          <div v-if="planUsage?.isPayAsYouGo">
           <hr class="my-1 border-t border-gray-300 opacity-50">
           <div class="flex justify-between row">
             <div>
               {{ t('price-per-unit-above') }}
             </div>
             <div class="font-semibold">
-              $ {{ planUsage?.payg_units?.storage.toLocaleString() }} GB
+              $ {{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
             </div>
           </div>
+        </div>
+
         </div>
 
         <div class="my-2">
@@ -210,7 +217,7 @@ loadData()
               {{ t('included-in-plan') }}
             </div>
             <div class="font-semibold">
-              {{ planUsage?.plan.bandwidth.toLocaleString() }} GB
+              {{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB
             </div>
           </div>
 
@@ -223,15 +230,18 @@ loadData()
               {{ planUsage?.totalBandwidth.toLocaleString() }} GB
             </div>
           </div>
+          <div v-if="planUsage?.isPayAsYouGo">
           <hr class="my-1 border-t border-gray-300 opacity-50">
           <div class="flex justify-between row">
             <div>
               {{ t('price-per-unit-above') }}
             </div>
             <div class="font-semibold">
-              $ {{ planUsage?.payg_units?.bandwidth.toLocaleString() }} GB
+              $ {{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
             </div>
           </div>
+        </div>
+
         </div>
         <div class="my-2">
           <div class="text-lg font-bold">
@@ -243,9 +253,11 @@ loadData()
               {{ t('base') }}
             </div>
             <div class="font-semibold">
-              $ {{ planUsage?.plan.price_m.toLocaleString() }}
+              $ {{ planUsage?.currentPlan?.price_m.toLocaleString() }}
             </div>
           </div>
+
+          <div v-if="planUsage?.isPayAsYouGo">
 
           <hr class="my-1 border-t border-gray-300 opacity-50">
           <div class="flex justify-between row">
@@ -265,6 +277,8 @@ loadData()
               $ {{ planUsage?.totalPrice.toLocaleString() }}
             </div>
           </div>
+        </div>
+
         </div>
       </div>
     </div>
