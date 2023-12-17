@@ -1,4 +1,13 @@
-import { sqliteTable, integer, text, real } from 'https://esm.sh/drizzle-orm@^0.29.1/sqlite-core';
+import { sqliteTable, integer, text, real, customType } from 'drizzle-orm/sqlite-core';
+
+const boolean = customType<{ data: boolean }>({
+    dataType() {
+        return 'boolean';
+    },
+    toDriver(value: boolean): string {
+        return value ? 'true' : 'false';
+    },
+})
 
 export const apps = sqliteTable('apps', {
     created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -19,7 +28,7 @@ export const app_versions = sqliteTable('app_versions', {
     bucket_id: text('bucket_id'),
     user_id: text('user_id'),
     updated_at: integer('updated_at', { mode: 'timestamp' }),
-    deleted: integer('deleted', { mode: 'boolean' }).default(false),
+    deleted: boolean('deleted').default(false),
     external_url: text('external_url'),
     checksum: text('checksum'),
     session_key: text('session_key'),
@@ -35,19 +44,19 @@ export const channels = sqliteTable('channels', {
     version: integer('version', { mode: 'number' }).notNull().references(() => app_versions.id),
     created_by: text('created_by').notNull(),
     updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
-    public: integer('public', { mode: 'boolean' }).notNull().default(false),
-    disableAutoUpdateUnderNative: integer('disableAutoUpdateUnderNative', { mode: 'boolean' }).notNull().default(true),
+    public: boolean('public').notNull().default(false),
+    disableAutoUpdateUnderNative: boolean('disableAutoUpdateUnderNative').notNull().default(true),
     disableAutoUpdate: text('disableAutoUpdate', { enum: ["major", "minor", "version_number", "none"] }).default('major').notNull(),
-    enableAbTesting: integer('enableAbTesting', { mode: 'boolean' }).notNull().default(false),
-    enable_progressive_deploy: integer('enable_progressive_deploy', { mode: 'boolean' }).default(false).notNull(),
+    enableAbTesting: boolean('enableAbTesting').notNull().default(false),
+    enable_progressive_deploy: boolean('enable_progressive_deploy').default(false).notNull(),
     secondaryVersionPercentage: real('secondaryVersionPercentage').default(0).notNull(),
     secondVersion: integer('secondVersion', { mode: 'number' }).references(() => app_versions.id),
-    beta: integer('beta', { mode: 'boolean' }).notNull().default(false),
-    ios: integer('ios', { mode: 'boolean' }).default(true).notNull(),
-    android: integer('android', { mode: 'boolean' }).notNull().default(true),
-    allow_device_self_set: integer('allow_device_self_set', { mode: 'boolean' }).default(false).notNull(),
-    allow_emulator:  integer('allow_emulator', { mode: 'boolean' }).notNull().default(true),
-    allow_dev: integer('allow_dev', { mode: 'boolean' }).notNull().default(true), 
+    beta: boolean('beta').notNull().default(false),
+    ios: boolean('ios').default(true).notNull(),
+    android: boolean('android').notNull().default(true),
+    allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
+    allow_emulator:  boolean('allow_emulator').notNull().default(true),
+    allow_dev: boolean('allow_dev').notNull().default(true), 
 })
 
 

@@ -45,9 +45,15 @@
     "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
     "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\"",
     "d1:clear": "rm -rf .wrangler",
-    "d1:seed": "npx wrangler d1 execute --local --command \"$(cat ./supabase/d1.sql)\" capgo"
+    "d1:seed": "npx wrangler d1 execute --local --command \"$(cat ./supabase/d1.sql)\" capgo",
+    "d1:local-srv": "npx wrangler dev ./cloudflare_workers/d1.js --ip 0.0.0.0",
+    "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:8787' deno run --allow-all supabase/functions/_script/duplicate_in_d1.ts",
+    "d1:reset": "pnpm d1:clear && pnpm d1:seed",
+    "cf-edge:run": "npx wrangler dev --port 7777"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.474.0",
+    "@aws-sdk/s3-request-presigner": "^3.474.0",
     "@capacitor-community/keep-awake": "^4.0.0",
     "@capacitor/action-sheet": "^5.0.6",
     "@capacitor/android": "^5.5.1",
@@ -114,6 +120,7 @@
     "daisyui": "^4.4.2",
     "dayjs": "1.11.10",
     "dompurify": "^3.0.6",
+    "drizzle-orm": "^0.29.1",
     "firebase": "10.6.0",
     "flowbite": "^2.2.0",
     "generate-password-browser": "^1.1.0",
@@ -143,6 +150,7 @@
     "@antfu/eslint-config": "2.1.0",
     "@capacitor/cli": "^5.5.1",
     "@capacitor/core": "^5.5.1",
+    "@cloudflare/workers-types": "^4.20231121.0",
     "@iconify-json/carbon": "1.1.22",
     "@iconify-json/heroicons": "^1.1.13",
     "@iconify-json/ion": "1.1.13",
@@ -196,7 +204,7 @@
     "vite-plugin-windicss": "1.9.2",
     "vitest": "0.34.6",
     "vue-tsc": "1.8.22",
-    "wrangler": "^3.18.0"
+    "wrangler": "3.18.0"
   },
   "husky": {
     "hooks": {

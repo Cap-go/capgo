@@ -1,8 +1,16 @@
 import { map } from './generated_functions_map.ts'
-import { fallback } from './fallback_loadbalancer.ts'
+import { ExecutionContext, Database } from "@cloudflare/workers-types";
+
+// import { fallback } from './fallback_loadbalancer.ts'
+// import * as d1 from './d1_facade.js'
+
+export interface Env {
+  DB: Database
+}
 
 export default {
-  async fetch(request: Request, env: any) {
+  // deno-lint-ignore no-explicit-any
+  async fetch(request: Request, env: Env) {
     try {
       const requestUrl = new URL(request.url)
       const functionName = requestUrl.pathname.split('/').pop()
@@ -14,11 +22,13 @@ export default {
         const response = edgeFunction(request, env)
         return response
       }
-      else {
-        console.log('falling back to old router')
-        const response = await fallback(request)
-        return response
-      }
+      // Perhaps enable this, idk
+      
+      // else {
+      //   console.log('falling back to old router')
+      //   const response = await fallback(request)
+      //   return response
+      // }
     }
     catch (e) {
       console.error(e)

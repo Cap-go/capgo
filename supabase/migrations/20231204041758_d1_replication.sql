@@ -7,7 +7,7 @@ DECLARE
   request_id text;
 BEGIN 
   SELECT INTO request_id net.http_post(
-    url := 'http://0.tcp.eu.ngrok.io:15717',
+    url := 'http://host.docker.internal:8787',
     headers := jsonb_build_object(
       'Content-Type',
       'application/json'

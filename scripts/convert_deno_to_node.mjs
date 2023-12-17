@@ -37,7 +37,7 @@ const baseCloudflareUtils = `${baseCloudflareFolder}/${baseCloudflare + baseUtil
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info', 'cron_email']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
-const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis', 'clickhouse']
+const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis', 'clickhouse', 'postgress_schema', 'sqlite_schema']
 
 const supaTempl = {}
 const netlifyTempl = {}
@@ -166,9 +166,47 @@ const mutationCloudflare = [
   { from: supaTempl.handler, to: cloudflareTempl.handler },
   { from: '../_utils/', to: `../${baseCloudflare}_utils/` },
   { from: '../_tests/', to: `../${baseCloudflare}_tests/` },
+  { from: supaTempl.redis, to: cloudflareTempl.getRedis },
+  { from: supaTempl.reidsInvalidate, to: cloudflareTempl.reidsInvalidate },
+  { from: supaTempl.reidsPipelines, to: '' },
+  { from: supaTempl.r2, to: cloudflareTempl.r2 },
   { from: 'export function setEnv(env: any) {}', to: '' },
   { from: supaTempl.getEnv, to: cloudflareTempl.getEnv },
   { from: '// importSetEnvHere', to: 'import { setEnv } from \'../cloudflare_utils/utils.ts\'' },
+  { from: 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts', to: 'logsnag' },
+  { from: 'import { Redis as RedisUpstash } from \'https://deno.land/x/upstash_redis@v1.22.0/mod.ts\'', to: '// Removed import' },
+  { from: 'import type { Pipeline as UpstashPipeline } from \'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts\'', to: '// Removed import' },
+  { from: 'https://deno.land/x/zod@v3.22.2/mod.ts', to: 'zod' },
+  { from: 'import type { Redis, RedisPipeline } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: '// Removed import' },
+  { from: 'bypassRedis = false', to: 'bypassRedis = true' },
+  { from: 'import { connect, parseURL } from \'https://deno.land/x/redis@v0.24.0/mod.ts\'', to: '// Removed import' },
+  { from: 'https://esm.sh/@supabase/supabase-js@^2.38.5', to: '@supabase/supabase-js' },
+  { from: 'https://deno.land/x/axiod@0.26.2/mod.ts', to: 'axios' },
+  { from: 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts', to: '@aws-sdk/client-s3' },
+  { from: '{ S3Client }', to: '{ S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand }' },
+  { from: 'https://cdn.skypack.dev/cron-schedule@3.0.6?dts', to: 'cron-schedule' },
+  { from: 'https://cdn.skypack.dev/dayjs@1.11.6?dts', to: 'dayjs' },
+  { from: 'https://deno.land/x/semver@v1.4.1/mod.ts', to: 'semver' },
+  { from: 'https://deno.land/x/equal@v1.5.0/mod.ts', to: 'lauqe' },
+  { from: 'https://esm.sh/adm-zip?target=deno', to: 'adm-zip' },
+  { from: 'https://esm.sh/google-play-scraper?target=deno', to: 'google-play-scraper' },
+  { from: 'import { hmac } from \'https://deno.land/x/hmac@v2.0.1/mod.ts\'', to: 'import crypto from \'crypto\'' },
+  { from: 'import { cryptoRandomString } from \'https://deno.land/x/crypto_random_string@1.1.0/mod.ts\'', to: 'import cryptoRandomString from \'crypto-random-string\'' },
+  { from: 'Promise<Response>', to: 'Promise<any>' },
+  { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
+  { from: '{ match: \'ver\*\', count: 5000 }', to: '{ pattern: \'ver\*\', count: 5000 })' },
+  { from: 'https://esm.sh/drizzle-orm@^0.29.1', to: 'drizzle-orm' },
+  { from: 'import postgres from \'https://deno.land/x/postgresjs/mod.js\'', to: '' },
+  { from: 'drizzle-orm/pg-core', to: 'drizzle-orm/sqlite-core' },
+  { from: './postgress_schema.ts', to: './sqlite_schema.ts' },
+  { from: 'drizzle-orm/postgres-js', to: 'drizzle-orm/d1' },
+  { from: 'const pgClient = postgres(supaUrl)', to: '' },
+  { from: 'drizzle(pgClient as any)', to: 'drizzle(getEnv(\'DB\') as any)' },
+  { from: 'await pgClient.end()', to: '' },
+  { from: '//import presign s3', to: 'import { getSignedUrl as s3GetSignedUrl } from "@aws-sdk/s3-request-presigner";' }
+  // { from: 'const bucket = \'capgo\'', to: 'const bucket = \'capgo\'\nimport { Buffer } from \'node:buffer\'' }
+  // { from: supaTempl.redis, to: netlifyTempl.redis },
+  // { from: '.ts\'', to: '\'' },
 ]
 // list deno functions folder and filter by allowed
 

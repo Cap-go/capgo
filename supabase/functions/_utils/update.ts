@@ -1,6 +1,6 @@
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { appendHeaders, sendRes } from '../_utils/utils.ts'
+import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -15,7 +15,8 @@ import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
 //\import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
 import * as schema from './postgress_schema.ts'
-import { alias } from 'https://esm.sh/drizzle-orm@0.29.1/pg-core';
+// import * as schema from './sqlite_schema.ts'
+import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core';
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
@@ -39,9 +40,12 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
 }
 
 async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
-  const supaUrl = Deno.env.get('SUPABASE_DB_URL')!
+  const supaUrl = getEnv('SUPABASE_DB_URL')!
+
+  // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)
   const drizzleCient = drizzle(pgClient as any) //Wish me luck ;-)
+  // DO NOT CHANGE END
 
   const appVersions = drizzleCient
     .select({
@@ -83,29 +87,29 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     .select({
         channel_devices: {
           device_id: schema.channel_devices.device_id,
-          app_id: schema.channel_devices.app_id,
+          app_id: sql<string>`${schema.channel_devices.app_id}`.as('cd_app_id'),
         },
         version: {
-          id: versionAlias.id,
-          name: versionAlias.name,
-          checksum: versionAlias.checksum,
-          session_key: versionAlias.session_key,
-          user_id: versionAlias.user_id,
-          bucket_id: versionAlias.bucket_id,
-          storage_provider: versionAlias.storage_provider,
-          external_url: versionAlias.external_url,
-          minUpdateVersion: versionAlias.minUpdateVersion
+          id: sql<number>`${versionAlias.id}`.as('vid'),
+          name: sql<string>`${versionAlias.name}`.as('vname'),
+          checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+          session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+          user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+          bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
+          storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+          external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+          minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion')
         },
         secondVersion: {
-          id: secondVersionAlias.id,
-          name: secondVersionAlias.name,
-          checksum: secondVersionAlias.checksum,
-          session_key: secondVersionAlias.session_key,
-          user_id: secondVersionAlias.user_id,
-          bucket_id: secondVersionAlias.bucket_id,
-          storage_provider: secondVersionAlias.storage_provider,
-          external_url: secondVersionAlias.external_url,
-          minUpdateVersion: secondVersionAlias.minUpdateVersion
+          id: sql<number>`${secondVersionAlias.id}`.as('svid'),
+          name: sql<string>`${secondVersionAlias.name}`.as('svname'),
+          checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
+          session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
+          user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+          bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
+          storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
+          external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
+          minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion')
         },
         channels: {
           id: schema.channels.id,
@@ -133,29 +137,32 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
     .limit(1)
     .then(data => data.at(0));
 
+
+  // v => version
+  // sv => secondversion
   const channel = drizzleCient
     .select({
       version: {
-        id: versionAlias.id,
-        name: versionAlias.name,
-        checksum: versionAlias.checksum,
-        session_key: versionAlias.session_key,
-        user_id: versionAlias.user_id,
-        bucket_id: versionAlias.bucket_id,
-        storage_provider: versionAlias.storage_provider,
-        external_url: versionAlias.external_url,
-        minUpdateVersion: versionAlias.minUpdateVersion
+        id: sql<number>`${versionAlias.id}`.as('vid'),
+        name: sql<string>`${versionAlias.name}`.as('vname'),
+        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+        user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+        bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
+        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion')
       },
       secondVersion: {
-        id: secondVersionAlias.id,
-        name: secondVersionAlias.name,
-        checksum: secondVersionAlias.checksum,
-        session_key: secondVersionAlias.session_key,
-        user_id: secondVersionAlias.user_id,
-        bucket_id: secondVersionAlias.bucket_id,
-        storage_provider: secondVersionAlias.storage_provider,
-        external_url: secondVersionAlias.external_url,
-        minUpdateVersion: secondVersionAlias.minUpdateVersion
+        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
+        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
+        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
+        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
+        user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
+        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
+        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
+        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion')
       },
       channels: {
         id: schema.channels.id,

@@ -60,7 +60,7 @@ async function migrationTable(client: Client, table: string) {
       const keys = Object.keys(row)
   
       const values = Object.entries(row).map(([_, value]) => {
-        return (value !== undefined && value !== null) ? value.toString() : 'NULL' 
+        return (value !== undefined && value !== null) ? value.toString() : null
       })
   
       const sqlQuery = `INSERT INTO ${table} ("${keys.join('", "')}") VALUES (${values.map((_) => `?`)})`

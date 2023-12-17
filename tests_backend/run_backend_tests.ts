@@ -143,12 +143,22 @@ async function startSupabaseBackend(
   joined = first
 
   const reader = second.getReader()
+  let totalOut = ''
   while (true) {
     const chunk = await reader.read()
-    if (chunk.done)
+    if (chunk.done) {
+      if (!functionsUrl) {
+        p.log.error('Something went wrong, functions url are not defined!')
+        const string = new TextDecoder('utf-8').decode(chunk.value)
+        console.log(`Last output: ${string}`)
+      }
       break
+    }
+      
 
     const string = new TextDecoder('utf-8').decode(chunk.value)
+    console.log('out', string)
+    totalOut = `${totalOut}|${string}`
     if (string.includes('Serving functions on')) {
       p.log.success('Supabase backend started')
       const split = string.split(' ')
@@ -260,6 +270,7 @@ async function runTestsForFolder(folder: string, shortName: string, firstArg: st
     }
 
     p.log.info(`Running tests \"${importedTest.fullName}\" (${dirEntry.name})`)
+    //let ok = await testLoop(new URL('http://localhost:7777'), supabase, importedTest.tests)
     let ok = await testLoop(functionsUrl, supabase, importedTest.tests)
 
     // This is likely unreacheble
