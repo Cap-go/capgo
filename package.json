@@ -146,7 +146,7 @@
     "@iconify-json/ion": "1.1.13",
     "@iconify-json/ls": "1.1.5",
     "@iconify/json": "^2.2.145",
-    "@playwright/test": "next",
+    "@playwright/test": "^1.40.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/line-clamp": "^0.4.4",
