@@ -14,6 +14,39 @@ const { t } = useI18n()
 
 const isLoading = ref(false)
 
+async function signInWithGoogle() {
+const { data, error } = await supabase.auth.signInWithOAuth({
+  provider: 'google',
+  options: {
+    queryParams: {
+      access_type: 'offline',
+      prompt: 'consent',
+    },
+  },
+})
+    if (error) {
+    console.error('error', error)
+    setErrors('login-account', [error.message], {})
+    toast.error(t('invalid-auth'))
+  }
+  else{
+     router.push('/app/home')
+  }
+}
+async function signInWithGithub() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+  })
+    if (error) {
+    console.error('error', error)
+    setErrors('login-account', [error.message], {})
+    toast.error(t('invalid-auth'))
+  }
+  else{
+     router.push('/app/home')
+  }
+}
+
 async function submit(form: { first_name: string; last_name: string; password: string; email: string }) {
   if (isLoading.value)
     return
@@ -158,6 +191,23 @@ async function submit(form: { first_name: string; last_name: string; password: s
                     </span>
                     <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
                   </button>
+                </div>
+                                <div class="text-center">
+                      <div class="relative flex items-center justify-center gap-x-4 py-2 text-xs uppercase">
+        <div class="bg-gray-300 h-px flex-1" />
+        <span class="text-gray-600 bg-transparent">Or continue with</span>
+        <div class="bg-gray-300 h-px flex-1" />
+      </div>
+                <div class="grid grid-cols-2 gap-2 mt-2 py-2">
+                <div class="flex justify-center cursor-pointer bg-gray-300 text-muted-foreground border rounded-md py-1.5 items-center gap-1">
+                <span v-html="iconGithub" @click="signInWithGithub"/>
+                <p class="text-gray-600">Github</p>
+                </div>
+                <div class="flex justify-center cursor-pointer bg-gray-300 text-muted-foreground border rounded-md py-1.5 items-center gap-1">
+                <span v-html="iconGoogle" @click="signInWithGoogle"/>
+                <p class="text-gray-600">Google</p>
+                </div>
+                </div>
                 </div>
 
                 <div class="col-span-2 text-center">

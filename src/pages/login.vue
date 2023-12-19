@@ -7,7 +7,7 @@ import { FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
-import { iconEmail, iconPassword } from '~/services/icons'
+import { iconEmail, iconPassword, iconGithub, iconGoogle } from '~/services/icons'
 
 const route = useRoute()
 const supabase = useSupabase()
@@ -22,6 +22,38 @@ async function nextLogin() {
   setTimeout(async () => {
     isLoading.value = false
   }, 500)
+}
+
+async function signInWithGithub() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+  })
+    if (error) {
+    console.error('error', error)
+    setErrors('login-account', [error.message], {})
+    toast.error(t('invalid-auth'))
+  }
+  else{
+    await nextLogin()
+  }
+}
+async function signInWithGoogle() {
+const { data, error } = await supabase.auth.signInWithOAuth({
+  provider: 'google',
+  options: {
+    queryParams: {
+      access_type: 'offline',
+    },
+  },
+})
+    if (error) {
+    console.error('error', error)
+    setErrors('login-account', [error.message], {})
+    toast.error(t('invalid-auth'))
+  }
+  else{
+     await nextLogin()
+  }
 }
 
 async function submit(form: { email: string; password: string }) {
@@ -164,6 +196,24 @@ onMounted(checkLogin)
                       {{ t('log-in') }}
                     </button>
                   </div>
+                </div>
+
+                <div class="text-center">
+                      <div className="relative flex items-center justify-center gap-x-4 py-2 text-xs uppercase">
+        <div class="bg-gray-300 h-px flex-1" />
+        <span class="text-gray-600 bg-transparent">Or continue with</span>
+        <div class="bg-gray-300 h-px flex-1" />
+      </div>
+                <div class="grid grid-cols-2 gap-2 mt-2 py-2">
+                <div class="flex justify-center cursor-pointer bg-gray-300 text-muted-foreground border rounded-md py-1.5 items-center gap-1">
+                <span v-html="iconGithub" @click="signInWithGithub"/>
+                <p class="text-gray-600">Github</p>
+                </div>
+                <div class="flex justify-center cursor-pointer bg-gray-300 text-muted-foreground border rounded-md py-1.5 items-center gap-1">
+                <span v-html="iconGoogle" @click="signInWithGoogle"/>
+                <p class="text-gray-600">Google</p>
+                </div>
+                </div>
                 </div>
 
                 <div class="text-center">
