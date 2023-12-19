@@ -13,10 +13,10 @@ export async function getBundleUrl(platform: string, path: string, bucket_id: st
     return data?.signedUrl
   }
   else if (platform === 'r2' && bucket_id.endsWith('.zip')) {
-    return (await r2.getSignedUrl(`${path}/${bucket_id}`, EXPIRATION_SECONDS)).replace('http://', 'https://')
+    return await r2.getSignedUrl(`${path}/${bucket_id}`, EXPIRATION_SECONDS)
   }
   else if (platform === 'r2' && !bucket_id.endsWith('.zip')) {
-    return (await r2.getSignedUrl(bucket_id, EXPIRATION_SECONDS)).replace('http://', 'https://')
+    return await r2.getSignedUrl(bucket_id, EXPIRATION_SECONDS)
   }
   return null
 }

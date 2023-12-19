@@ -50,12 +50,10 @@ app-not-found: Application introuvable
 are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
+base: Base
 best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
 billing: Facturation
-current-billing-cycle: Cycle de facturation en cours
-from: Du
-to: Au
 build-your-app-and-s: créer votre application et synchroniser
 build-your-code-and-: Télécharger sur Capgo votre code
 bulk-upload: Transfert groupé
@@ -93,6 +91,7 @@ changed-password-suc: Le mot de passe a été changé avec succès
 channel: Canaux
 channel-create: Créer un canal
 channel-deleted: Canal supprimé
+channel-forced-devices: Appareils forcés
 channel-invit: Tapez l'e-mail pour inviter
 channel-is-public: Chaîne par défaut
 channel-link: Remplacement de canal
@@ -106,6 +105,9 @@ check-on-web: Vérifier sur le site Web
 checksum: checksum
 commands: commandes
 confirm-email: confirmez votre email
+confirm-email-sent: >-
+  Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
+  votre email.
 confirm-password: Confirmez le mot de passe
 confirm-public-desc: >-
   Si vous définissez ce canal par défaut, il enverra des mises à jour à tous vos
@@ -119,6 +121,7 @@ copy-your: Copiez votre
 country: Pays
 create-a-free-accoun: Créer un compte gratuit
 created-at: Créé à
+current-billing-cycle: Cycle de facturation en cours
 custom-domain: Domaine personnalisé
 custom-id: Identifiant personnalisé
 custom-id-saved: Identifiant personnalisé enregistré
@@ -134,6 +137,7 @@ device: Appareil
 device-id: Identifiant de l'appareil
 devices: Appareils
 devices-using-this-b: Appareils utilisant cette version
+did-not-recive-confirm-email: Vous n'avez pas reçu d'email de confirmation?
 disable-auto-downgra: Désactiver la rétrogradation automatique en natif
 disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus d'une version majeure
 discord: Discord
@@ -160,11 +164,13 @@ forgot-check-email: >-
   Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
   passe
 forgot-success: Mot de passe mis à jour avec succès
+from: Du
 from-device: depuis l'appareil
 good: Bien
 id: Identifiant
 in-your-main-file: Dans votre fichier principal
 in-your-project-fold: Dans votre dossier de projet
+included-in-plan: Inclus dans le forfait
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo dans votre application
@@ -256,6 +262,7 @@ please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 plugin-version: Version du plug-in
 prediction: Prédiction
+price-per-unit-above: Prix ​​par unité au-dessus du plan
 pro-tip-you-can-copy: "Conseil de pro\_: vous pouvez copier le"
 projection: Projections
 recommended: Recommandé
@@ -265,6 +272,8 @@ register-desc: Remplissez les champs suivants pour finaliser votre inscription
 register-heading: Inscription
 register-next: Enregistrer
 reload: Recharger
+resend: Renvoyer
+resend-email: Renvoyer l'email de confirmation
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
 save: Économisez
@@ -303,6 +312,7 @@ thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: Le
 this-page-will-self-: Cette page s'actualisera automatiquement
 title: titre
+to: Au
 to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
@@ -324,6 +334,7 @@ usage: Usage
 usage-success: Votre plan a été configuré, cette page sera mise à jour dans quelques minutes
 usage-title: Total
 use-the-command: "Utilisez la commande\_:"
+used-in-period: Utilisé pendant la période
 user: Utilisateur
 validate: Valider
 version: Version

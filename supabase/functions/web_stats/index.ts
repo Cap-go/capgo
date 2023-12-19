@@ -92,7 +92,7 @@ async function main(url: URL, headers: BaseHeaders, _method: string, _body: any)
     return sendRes({ status: 'Cannot find authorization secret' }, 400)
 
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET) {
-    console.error('Fail Authorization', { authorizationSecret, API_SECRET })
+    console.error('Fail Authorization', { authorizationSecret })
     return sendRes({ message: 'Fail Authorization', authorizationSecret }, 400)
   }
 
@@ -120,16 +120,7 @@ async function main(url: URL, headers: BaseHeaders, _method: string, _body: any)
       res.plans,
     ])
     const not_paying = users - paying
-    console.log('All Promises',
-      apps,
-      updates,
-      users,
-      stars,
-      trial,
-      paying,
-      onboarded,
-      need_upgrade,
-      plans)
+    console.log('All Promises', apps, updates, users, stars, trial, paying, onboarded, need_upgrade, plans)
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)

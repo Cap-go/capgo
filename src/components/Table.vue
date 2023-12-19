@@ -3,7 +3,8 @@ import debounce from 'lodash.debounce'
 import { computed, onMounted, ref, watch } from 'vue'
 import { initDropdowns } from 'flowbite'
 import {
-  kList, kListItem,
+  kList,
+  kListItem,
 } from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
 import type { MobileColType, TableColumn } from './comp_def'
@@ -34,9 +35,20 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits([
-  'reload', 'reset', 'next', 'prev', 'fastForward', 'fastBackward',
-  'update:search', 'update:filters', 'update:columns', 'update:currentPage',
-  'filterClick', 'rowClick', 'sortClick'])
+  'reload',
+  'reset',
+  'next',
+  'prev',
+  'fastForward',
+  'fastBackward',
+  'update:search',
+  'update:filters',
+  'update:columns',
+  'update:currentPage',
+  'filterClick',
+  'rowClick',
+  'sortClick',
+])
 const { t } = useI18n()
 const searchVal = ref(props.search || '')
 // const sorts = ref<TableSort>({})

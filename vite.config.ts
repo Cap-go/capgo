@@ -1,6 +1,8 @@
 /// <reference types="vitest" />
 import path from 'node:path'
+import { readdirSync } from 'node:fs'
 import Vue from '@vitejs/plugin-vue'
+
 // import veauryVitePlugins from 'veaury/vite/index'
 import { defineConfig } from 'vite'
 import Pages from 'vite-plugin-pages'
@@ -14,7 +16,6 @@ import Inspector from 'vite-plugin-vue-inspector'
 import Inspect from 'vite-plugin-inspect'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import { readdirSync } from 'fs-extra'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
@@ -32,7 +33,7 @@ readdirSync('./locales/')
       locales.push(file.split('.')[0])
   })
 // const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
-const guestPath = ['/login', '/register', '/forgot_password', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
+const guestPath = ['/login', '/register', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
 export default defineConfig({
   resolve: {

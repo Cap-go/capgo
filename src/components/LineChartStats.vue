@@ -17,6 +17,10 @@ import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps({
+  accumulated: {
+    type: Boolean,
+    default: true,
+  },
   title: { type: String, default: '' },
   colors: { type: Object, default: () => ({}) },
   limits: { type: Object, default: () => ({}) },
@@ -43,6 +47,8 @@ Chart.register(
 
 const accumulateData = computed(() => {
   const monthDay = getCurrentDayMonth()
+  if (!props.accumulated)
+    return props.data as number[]
   return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
     const last = acc[acc.length - 1] || 0
     let newVal
@@ -171,8 +177,7 @@ const chartData = ref<ChartData<'line'>>({
     tension: 0.3,
     pointRadius: 2,
     pointBorderWidth: 0,
-  },
-  {
+  }, {
     label: t('prediction'),
     data: projectionData.value,
     borderColor: 'transparent',
@@ -180,8 +185,7 @@ const chartData = ref<ChartData<'line'>>({
     tension: 0.9,
     pointRadius: 2,
     pointBorderWidth: 0,
-  },
-  ],
+  }],
 })
 const chartOptions = {
   scales: {

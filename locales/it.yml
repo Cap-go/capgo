@@ -48,12 +48,10 @@ app-not-found: App non trovata
 are-u-sure: Sei sicuro ?
 available-in-the-san: Disponibile nell'app sandbox
 back-to-login-page: Torna alla pagina di accesso
+base: Base
 best-plan: Miglior piano
 bigger-app-size: Dimensioni dell'app maggiori
 billing: Fatturazione
-current-billing-cycle: Ciclo di fatturazione corrente
-from: Da
-to: A
 build-your-app-and-s: crea la tua app e sincronizza
 build-your-code-and-: Carica su Capgo il tuo codice
 bulk-upload: Caricamento collettivo
@@ -91,6 +89,7 @@ changed-password-suc: password cambiata con successo
 channel: Canale
 channel-create: Crea canale
 channel-deleted: Canale eliminato
+channel-forced-devices: Dispositivi forzati
 channel-invit: Digita l'e-mail per invitare
 channel-is-public: Canale di default
 channel-link: Override del canale
@@ -104,6 +103,9 @@ check-on-web: Controlla sul sito web
 checksum: Somma di controllo
 commands: comandi
 confirm-email: conferma la tua email
+confirm-email-sent: >-
+  Se envió un correo electrónico de confirmación, haz clic en el enlace para
+  confirmar tu correo electrónico.
 confirm-password: Conferma password
 confirm-public-desc: >-
   Impostando questo canale come predefinito, invierà aggiornamenti a tutti i
@@ -117,6 +119,7 @@ copy-your: Copia il tuo
 country: Paese
 create-a-free-accoun: Crea un account gratis
 created-at: Creato a
+current-billing-cycle: Ciclo di fatturazione corrente
 custom-domain: Dominio personalizzato
 custom-id: ID personalizzato
 custom-id-saved: ID personalizzato salvato
@@ -132,6 +135,7 @@ device: Dispositivo
 device-id: ID del dispositivo
 devices: Dispositivi
 devices-using-this-b: Dispositivi che utilizzano questo pacchetto
+did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable-auto-downgra: Disabilita il downgrade automatico in modalità nativa
 disable-auto-upgrade: Disabilita l'aggiornamento automatico sopra major
 discord: Discordia
@@ -156,11 +160,13 @@ force-version: Versione forzata
 forgot: Dimenticato
 forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
 forgot-success: Password aggiornata con successo
+from: Da
 from-device: dal dispositivo
 good: Bene
 id: ID
 in-your-main-file: Nel tuo file principale
 in-your-project-fold: Nella cartella del tuo progetto
+included-in-plan: Incluso nel piano
 info: Informazione
 informations: Informazioni
 init-capgo-in-your-a: Avvia Capgo nella tua app
@@ -252,6 +258,7 @@ please-choose-your-p: Scegli le tue preferenze
 please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
 prediction: Predizione
+price-per-unit-above: Prezzo per unità sopra il piano
 pro-tip-you-can-copy: 'Suggerimento pro: puoi copiare il file'
 projection: Proiezioni
 recommended: Consigliato
@@ -261,6 +268,10 @@ register-desc: Compila i seguenti campi per completare la tua registrazione
 register-heading: Registrazione
 register-next: Registrati
 reload: Ricaricare
+resend: >-
+  I am sorry, but it seems like you've missed mentioning the language you want
+  me to translate "Resend" into. Could you please clarify?
+resend-email: Reenviar correo electrónico de confirmación
 reset-password: Resetta la password
 reset-your-password: reimposta la tua password
 save: Salva
@@ -301,6 +312,7 @@ thank-you-for-choosi: Grazie per aver scelto Capgo!
 the: IL
 this-page-will-self-: Questa pagina si aggiornerà automaticamente
 title: titolo
+to: A
 to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
 top-apps: Le mie applicazioni
@@ -322,6 +334,7 @@ usage: Utilizzo
 usage-success: Il tuo piano è stato impostato questa pagina sarà aggiornata, in pochi minuti
 usage-title: Totale
 use-the-command: 'Usa il comando:'
+used-in-period: Usato nel periodo
 user: Utente
 validate: Convalidare
 version: Versione

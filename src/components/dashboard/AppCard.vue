@@ -11,7 +11,7 @@ import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
-import { appIdToUrl, getConvertedDate2 } from '~/services/conversion'
+import { appIdToUrl } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
@@ -27,9 +27,6 @@ const mauNb = ref(0)
 const main = useMainStore()
 const isLoading = ref(true)
 const { t } = useI18n()
-
-const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
 
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -51,15 +48,20 @@ async function didCancel(name: string) {
 }
 
 async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
-  // console.log('deleteApp', app)
   if (await didCancel(t('app')))
     return
+
   try {
-    const { error: errorIcon } = await supabase.storage
-      .from(`images/${app.user_id}`)
-      .remove([app.app_id])
-    if (errorIcon)
-      toast.error(t('cannot-delete-app-icon'))
+    const { data: _data, error: _error } = await supabase
+      .storage
+      .getBucket(`images/${app.user_id}`)
+    if (_data && _data.id) {
+      const { error: errorIcon } = await supabase.storage
+        .from(`images/${app.user_id}`)
+        .remove([app.app_id])
+      if (errorIcon)
+        toast.error(t('cannot-delete-app-icon'))
+    }
 
     const { data, error: vError } = await supabase
       .from('app_versions')
@@ -84,50 +86,24 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
       .delete()
       .eq('app_id', app.app_id)
       .eq('user_id', app.user_id)
-    if (vError || dbAppError) {
+    if (vError || dbAppError)
       toast.error(t('cannot-delete-app'))
-    }
-    else {
+
+    else
       toast.success(t('app-deleted'))
-      await emit('reload')
-    }
+
+    await emit('reload')
   }
   catch (error) {
     toast.error(t('cannot-delete-app'))
   }
 }
 
-async function getAppStats(app_id: string) {
-  if (app_id) {
-    if (cycleStart && cycleEnd) {
-      return supabase
-        .from('app_usage')
-        .select()
-        .eq('app_id', app_id)
-        .eq('mode', 'day')
-        .gte('created_at', getConvertedDate2(cycleStart))
-        .lte('created_at', getConvertedDate2(cycleEnd))
-    }
-    return supabase
-      .from('app_usage')
-      .select()
-      .eq('app_id', app_id)
-      .eq('mode', 'day')
-  }
-}
-
 async function loadData() {
   if (props.app.app_id) {
-    const tmp = await getAppStats(props.app.app_id)
-    if (!tmp)
-      return
-    const { data, error } = tmp
-    if (data && !error) {
-      data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-        if (item.created_at)
-          mauNb.value += item.mau
-      })
-    }
+    mauNb.value = main.dashboard
+      .filter(x => x.app_id === props.app.app_id)
+      .reduce((acc, cur) => acc + cur.mau, 0)
   }
 }
 

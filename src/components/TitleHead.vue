@@ -18,7 +18,7 @@ function back() {
   else
     router.push(props.defaultBack)
 }
-const defaultColor = 'bg-neutral-focus'
+const defaultColor = 'bg-neutral'
 const konstaColors = ref({
   bgIos: defaultColor,
   bgMaterial: defaultColor,

@@ -9,7 +9,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
-import { appIdToUrl, getConvertedDate2, urlToAppId } from '~/services/conversion'
+import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
 const id = ref('')
 const { t } = useI18n()
@@ -24,9 +24,6 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
-const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
-
 async function loadAppInfo() {
   try {
     const { data: dataApp } = await supabase
@@ -37,34 +34,9 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
     const promises = []
 
-    if (cycleStart && cycleEnd) {
-      promises.push(
-        supabase
-          .from('stats')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .eq('action', 'set')
-          .gte('created_at', getConvertedDate2(cycleStart))
-          .lte('created_at', getConvertedDate2(cycleEnd))
-          .then(({ count: statsCount }) => {
-            if (statsCount)
-              updatesNb.value = statsCount
-          }),
-      )
-    }
-    else {
-      promises.push(
-        supabase
-          .from('stats')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .eq('action', 'set')
-          .then(({ count: statsCountSet }) => {
-            if (statsCountSet)
-              updatesNb.value = statsCountSet
-          }),
-      )
-    }
+    const usageByApp = await main.filterDashboard(id.value, main.cycleInfo?.subscription_anchor_start, main.cycleInfo?.subscription_anchor_end)
+    updatesNb.value = usageByApp.reduce((acc, cur) => acc + cur.get, 0)
+    devicesNb.value = usageByApp.reduce((acc, cur) => acc + cur.mau, 0)
 
     promises.push(
       supabase
@@ -89,33 +61,6 @@ async function loadAppInfo() {
         }),
     )
 
-    if (cycleStart && cycleEnd) {
-      promises.push(
-        supabase
-          .from('devices')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .gte('created_at', getConvertedDate2(cycleStart))
-          .lte('created_at', getConvertedDate2(cycleEnd))
-          .then(({ count: devicesCount }) => {
-            if (devicesCount)
-              devicesNb.value = devicesCount
-          }),
-      )
-    }
-    else {
-      promises.push(
-        supabase
-          .from('devices')
-          .select('*', { count: 'exact', head: true })
-          .eq('app_id', id.value)
-          .then(({ count: devicesCount }) => {
-            if (devicesCount)
-              devicesNb.value = devicesCount
-          }),
-      )
-    }
-
     await Promise.all(promises)
   }
   catch (error) {
@@ -136,22 +81,22 @@ async function refreshData() {
 const stats = computed<Stat[]>(() => ([
   {
     label: t('channels'),
-    value: channelsNb,
+    value: channelsNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/channels`,
   },
   {
     label: t('bundles'),
-    value: bundlesNb,
+    value: bundlesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/bundles`,
   },
   {
     label: t('devices'),
-    value: devicesNb,
+    value: devicesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/devices`,
   },
   {
     label: t('plan-updates'),
-    value: updatesNb,
+    value: updatesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/logs`,
   },
 ]))

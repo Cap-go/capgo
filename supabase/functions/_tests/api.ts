@@ -2,9 +2,9 @@ import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv } from '../_utils/utils.ts'
 
-export const baseSupabase = 'https://supabase.capgo.app/'
-export const baseNetlify = 'https://netlify.capgo.app/'
-export const baseNetlifyEdge = 'https://netlify-edge.capgo.app/'
+export const baseSupabase = 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/'
+export const baseNetlify = 'https://web.capgo.app/api/'
+export const baseNetlifyEdge = 'https://web.capgo.app/api-edge/'
 
 const defaultAppId = 'unknow.unknow'
 const defaultVersion = '1.2.3'
@@ -191,8 +191,7 @@ export async function setChannel(baseUrl: string) {
   const url = `${baseUrl}/channel`
   const response = await axios.post<typeof defaultRes>(url, {
 
-  },
-  {
+  }, {
     headers,
   })
   return response.data

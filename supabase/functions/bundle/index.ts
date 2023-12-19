@@ -10,8 +10,7 @@ interface GetLatest {
   page?: number
 }
 
-export async function deleteBundle(body: GetLatest,
-  apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function deleteBundle(body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id)
     return sendRes({ status: 'Missing app_id' }, 400)
   if (!body.version)
@@ -49,8 +48,7 @@ export async function deleteBundle(body: GetLatest,
   return sendRes()
 }
 
-export async function get(body: GetLatest,
-  apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function get(body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   try {
     if (!body.app_id)
       return sendRes({ status: 'Missing app_id' }, 400)
@@ -88,8 +86,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
     return sendRes({ status: 'Missing apikey' }, 400)
 
   try {
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string,
-      supabaseAdmin(), ['all', 'write'])
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
     if (!apikey)
       return sendRes({ status: 'Missing apikey' }, 400)
 

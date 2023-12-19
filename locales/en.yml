@@ -52,12 +52,10 @@ app-not-found: App not found
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
+base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billing: Billing
-current-billing-cycle: Current Billing Cycle
-from: From
-to: To
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
@@ -98,6 +96,7 @@ channel-ab-testing: Enable AB testing
 channel-ab-testing-percentage: Percentage of users recving secondary version
 channel-create: Create channel
 channel-deleted: Channel deleted
+channel-forced-devices: Forced devices
 channel-invit: Type email to invite
 channel-is-public: Default channel
 channel-link: Channel override
@@ -112,6 +111,7 @@ check-on-web: Check on website
 checksum: Checksum
 commands: commands
 confirm-email: Confirm your email
+confirm-email-sent: A confirmation email was sent click to link to confirm your email
 confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
@@ -122,6 +122,7 @@ copy-your: Copy your
 country: Country
 create-a-free-accoun: Create a free account
 created-at: Created at
+current-billing-cycle: Current Billing Cycle
 custom-domain: Custom domain
 custom-id: Custom ID
 custom-id-saved: Custom ID saved
@@ -131,17 +132,18 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
-used-to-create: Account with this email used to exist, cannot recreate
 deleted: deleted
 details-and-logs: Details and logs
 device: Device
 device-id: Device ID
 devices: Devices
 devices-using-this-b: Devices using this bundle
+did-not-recive-confirm-email: Didn't receive confirmation email?
 disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
 disable-progressive-deploy: Disabled progressive deploy
+disableAutoUpdateToMajor: Disable auto update
 discord: Discord
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
@@ -165,12 +167,14 @@ force-version-change: Skip progressive deploy
 forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
+from: From
 from-device: from device
 generated-new-apikey: Generated new API key!
 good: Good
 id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
+included-in-plan: Included in plan
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
@@ -178,6 +182,7 @@ install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
+invalid-version: Invalid semver version
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-all: All
@@ -200,11 +205,18 @@ logout: Logout
 logs: Logs
 lowerCaseError: Should contain lowercase letters
 main-bundle-number: Main bundle number
+major: Major
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+metadata: Metadata
+metadata-min-ver-not-set: Minimal update version for current bundle is undefined
+min-update-version: Minimal update version
+minor: Minor
+misconfigured: Misconfigured
+misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -216,10 +228,12 @@ my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+'no': 'no'
 no-channel-linked: No channel, click to add
 no-devices: No devices
 no-logs: No logs
 no-version-linked: No version, click to add
+none: None
 not-found: Not found
 notifications: Notifications
 old-onboarding-mode: old onboarding
@@ -262,6 +276,7 @@ please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
+price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 progressive-bundle-number: Progressive bundle number
 progressive-deploy-option: Select progressive deploy option
@@ -276,6 +291,8 @@ register-heading: Registration
 register-next: Register
 reload: Reload
 removed-apikey: API key has been successfully deleted
+resend: Resend
+resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves
@@ -317,12 +334,15 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
+to: to
 to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
+undefined: undefined
+undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
@@ -330,6 +350,7 @@ unlink-channel: Unlink channel
 unlink-version: Unlink version
 update: Update
 updated-at: Updated at
+updated-min-version: Updated minimal version
 upgrade: Upgrade
 upgrade-now: Upgrade now
 upperCaseError: Should contain uppercase letters
@@ -338,6 +359,8 @@ usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
+used-in-period: Used in period
+used-to-create: Account with this email used to exist, cannot recreate
 user: User
 validate: Validate
 version: Version
@@ -349,6 +372,7 @@ versions: Versions
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 yearly: Yearly
+'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-api-key: 'Your API key:'

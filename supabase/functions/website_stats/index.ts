@@ -16,9 +16,9 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       return sendRes(data)
     console.log('Supabase error:', error)
     return sendRes({
-      apps: 190,
-      updates: 130000,
-      stars: 125,
+      apps: 750,
+      updates: 23500638,
+      stars: 358,
     })
   }
   catch (e) {

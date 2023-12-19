@@ -1,5 +1,5 @@
 import type { Redis, RedisPipeline } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
-import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis/mod.ts'
+import { Redis as RedisUpstash } from 'https://deno.land/x/upstash_redis@v1.22.0/mod.ts'
 import { connect, parseURL } from 'https://deno.land/x/redis@v0.24.0/mod.ts'
 import type { Pipeline as UpstashPipeline } from 'https://deno.land/x/upstash_redis@v1.22.0/pkg/pipeline.ts'
 import { getEnv } from './utils.ts'
@@ -10,7 +10,7 @@ interface RedisInterface {
   hdel(key: string, ...fields: string[]): Promise<number>
   pipeline(): RedisPipelineInterface
   tx(): RedisPipelineInterface
-  hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]>
+  hscan(key: string, cursor: number, opts?: { pattern: string, count: number }): Promise<[string, string[]]>
   hset(key: string, field: string, value: RedisValue): Promise<void>
   hmget(key: string, ...fields: string[]): Promise<(string | null | undefined)[]>
 }
@@ -42,18 +42,23 @@ class RedisRedisPipeline implements RedisPipelineInterface {
 }
 
 class RedisUpstashPipeline implements RedisPipelineInterface {
+  size: number
   pipeline: UpstashPipeline<[]>
 
   constructor(pipeline: UpstashPipeline<[]>) {
     this.pipeline = pipeline
+    this.size = 0
   }
 
   async hdel(key: string, ...fields: string[]): Promise<number> {
     await this.pipeline.hdel(key, ...fields)
+    this.size++
     return 0
   }
 
   async flush(): Promise<void> {
+    if (this.size === 0)
+      return
     await this.pipeline.exec()
   }
 
@@ -61,6 +66,7 @@ class RedisUpstashPipeline implements RedisPipelineInterface {
     const object: { [field: string]: RedisValue } = {}
     object[field] = value
     await this.pipeline.hset(key, object)
+    this.size++
   }
 }
 
@@ -83,7 +89,7 @@ export class RedisRedis implements RedisInterface {
     return new RedisRedisPipeline(this.redis.tx())
   }
 
-  async hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]> {
+  async hscan(key: string, cursor: number, opts?: { pattern: string, count: number }): Promise<[string, string[]]> {
     return await this.redis.hscan(key, cursor, opts)
   }
 
@@ -107,7 +113,7 @@ export class RedisUpstashImpl implements RedisInterface {
     return await this.redis.hdel(key, ...fields)
   }
 
-  async hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]> {
+  async hscan(key: string, cursor: number, opts?: { pattern: string, count: number }): Promise<[string, string[]]> {
     const [resultCursor, result] = await this.redis.hscan(
       key,
       cursor,
@@ -222,9 +228,14 @@ export async function redisAppVersionInvalidate(app_id: string) {
 }
 
 export async function redisDeviceInvalidate(appId: string, deviceId: string) {
-  const redis = await getRedis()
-  if (!redis)
-    return
-  console.log(`[redis] redisDeviceInvalidate: ${appId} ${deviceId}`)
-  await redis.hdel(`app_${appId}`, `device_${deviceId}`)
+  try {
+    const redis = await getRedis()
+    if (!redis)
+      return
+    console.log(`[redis] redisDeviceInvalidate: ${appId} ${deviceId}`)
+    await redis.hdel(`app_${appId}`, `device_${deviceId}`)
+  }
+  catch (e) {
+    console.error('[redis] redisDeviceInvalidate', e)
+  }
 }

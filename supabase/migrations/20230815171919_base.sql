@@ -38,8 +38,6 @@ CREATE EXTENSION IF NOT EXISTS "postgres_fdw" WITH SCHEMA "extensions";
 
 CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
 
-CREATE EXTENSION IF NOT EXISTS "supautils" WITH SCHEMA "extensions";
-
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 CREATE EXTENSION IF NOT EXISTS "wrappers" WITH SCHEMA "extensions";
@@ -52,6 +50,7 @@ CREATE TYPE "public"."key_mode" AS ENUM (
 );
 
 CREATE TYPE "public"."usage_mode" AS ENUM (
+    'last_saved', -- This represent the last saved value in the database between the last time app_usage was saved to now ( in case of bug or crash )
     '5min',
     'day',
     'cycle'
@@ -91,7 +90,7 @@ CREATE TYPE "public"."user_role" AS ENUM (
     'admin'
 );
 
-CREATE FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
@@ -114,8 +113,16 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "org_id" "uuid", "app_id" character varying, "channel_id" bigint)
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN check_min_rights(auth.uid(), min_right, org_id, app_id, channel_id);
+END;  
+$$;
 
-CREATE FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) RETURNS double precision
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -124,7 +131,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."convert_bytes_to_mb"("byt" double precision) RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_mb"("byt" double precision) RETURNS double precision
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -133,7 +140,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."convert_gb_to_bytes"("gb" double precision) RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."convert_gb_to_bytes"("gb" double precision) RETURNS double precision
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -142,7 +149,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."convert_mb_to_bytes"("gb" double precision) RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."convert_mb_to_bytes"("gb" double precision) RETURNS double precision
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -151,7 +158,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."convert_number_to_percent"("val" double precision, "max_val" double precision) RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."convert_number_to_percent"("val" double precision, "max_val" double precision) RETURNS double precision
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
@@ -160,7 +167,7 @@ END;
 $$;
 
 
-CREATE FUNCTION "public"."count_all_apps"() RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."count_all_apps"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -172,8 +179,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -181,8 +187,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."count_all_onboarded"() RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."count_all_onboarded"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -190,8 +195,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."count_all_paying"() RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."count_all_paying"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -199,8 +203,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."count_all_plans"() RETURNS TABLE("product_id" character varying, "count" bigint)
+CREATE OR REPLACE FUNCTION "public"."count_all_plans"() RETURNS TABLE("product_id" character varying, "count" bigint)
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -210,8 +213,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."count_all_trial"() RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."count_all_trial"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -219,8 +221,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."count_all_updates"() RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."count_all_updates"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -232,8 +233,7 @@ AS SumCount);
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."exist_app_v2"("appid" character varying) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."exist_app_v2"("appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -244,7 +244,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -257,7 +257,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."exist_user"("e_mail" character varying) RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."exist_user"("e_mail" character varying) RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -268,7 +268,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."find_best_plan_v3"("mau" bigint, "bandwidth" double precision, "storage" double precision) RETURNS character varying
+CREATE OR REPLACE FUNCTION "public"."find_best_plan_v3"("mau" bigint, "bandwidth" double precision, "storage" double precision) RETURNS character varying
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -284,7 +284,7 @@ End;
 $$;
 
 
-CREATE FUNCTION "public"."find_fit_plan_v3"("mau" bigint, "bandwidth" double precision, "storage" double precision) RETURNS TABLE("name" character varying)
+CREATE OR REPLACE FUNCTION "public"."find_fit_plan_v3"("mau" bigint, "bandwidth" double precision, "storage" double precision) RETURNS TABLE("name" character varying)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
@@ -303,7 +303,7 @@ END;
 $$;
 
 
-CREATE FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -315,8 +315,8 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."get_current_plan_max"("userid" "uuid") RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION "public"."get_current_plan_max"("userid" "uuid") RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -334,7 +334,17 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."get_current_plan_name"("userid" "uuid") RETURNS character varying
+CREATE OR REPLACE FUNCTION public.get_current_plan_max()
+RETURNS character varying
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN get_current_plan_max(auth.uid());
+END;  
+$$;
+
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION "public"."get_current_plan_name"("userid" "uuid") RETURNS character varying
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -348,7 +358,16 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."get_devices_version"("app_id" character varying, "version_id" bigint) RETURNS bigint
+CREATE OR REPLACE FUNCTION public.get_current_plan_name()
+RETURNS character varying
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN get_current_plan_name(auth.uid());
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."get_devices_version"("app_id" character varying, "version_id" bigint) RETURNS bigint
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -357,7 +376,8 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."get_max_plan"("userid" "uuid") RETURNS TABLE("mau" bigint, "storage" bigint, "bandwidth" bigint)
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION "public"."get_max_plan"("userid" "uuid") RETURNS TABLE("mau" bigint, "storage" bigint, "bandwidth" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -376,7 +396,17 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."get_metered_usage"("userid" "uuid") RETURNS "public"."stats_table"
+CREATE OR REPLACE FUNCTION public.get_max_plan()
+RETURNS TABLE("mau" bigint, "storage" bigint, "bandwidth" bigint)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM get_max_plan(auth.uid());
+END;  
+$$;
+
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION "public"."get_metered_usage"("userid" "uuid") RETURNS "public"."stats_table"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
@@ -385,7 +415,7 @@ DECLARE
     result stats_table;
 BEGIN
   -- Get the total values for the user's current usage
-  SELECT * INTO current_usage FROM public.get_total_stats_v2(userid, to_char(now(), 'YYYY-MM'));
+  SELECT * INTO current_usage FROM public.get_total_stats_v3(userid);
   SELECT * INTO max_plan FROM public.get_current_plan_max(userid);
   result.mau = current_usage.mau::bigint - max_plan.mau::bigint;
   result.mau = (CASE WHEN result.mau > 0 THEN result.mau ELSE 0 END);
@@ -397,7 +427,17 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) RETURNS double precision
+CREATE OR REPLACE FUNCTION public.get_metered_usage()
+RETURNS double precision
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN get_metered_usage(auth.uid());
+END;  
+$$;
+
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") RETURNS double precision
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
@@ -410,7 +450,7 @@ BEGIN
   -- Get the maximum values for the user's current plan
   current_plan_max := public.get_current_plan_max(userid);
   -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v2(userid, dateid);
+  total_stats := public.get_total_stats_v3(userid);
   -- Calculate the percentage of usage for each stat and return the average
   percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
@@ -420,7 +460,18 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
+CREATE OR REPLACE FUNCTION "public"."get_plan_usage_percent"()
+RETURNS double precision
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN get_plan_usage_percent(auth.uid());
+END;  
+$$;
+
+-- TODO: use auth.uid() instead of passing it as argument for better security
+CREATE OR REPLACE FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying)
+RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -434,7 +485,16 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."get_user_id"("apikey" "text") RETURNS "uuid"
+CREATE OR REPLACE FUNCTION public.get_total_stats_v2(dateid character varying)
+RETURNS TABLE("mau" bigint, "bandwidth" double precision, "storage" double precision)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM get_total_stats_v2(auth.uid(), dateid);
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."get_user_id"("apikey" "text") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Declare  
@@ -448,7 +508,7 @@ Begin
 End;  
 $$;
 
-CREATE FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying DEFAULT NULL::character varying, "_channelid" bigint DEFAULT NULL::bigint) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying DEFAULT NULL::character varying, "_channelid" bigint DEFAULT NULL::bigint) RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
 DECLARE 
@@ -500,7 +560,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -508,9 +568,16 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_admin(auth.uid());
+END;  
+$$;
 
--- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_allowed_action"("apikey" "text") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" "text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -519,18 +586,24 @@ End;
 $$;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action_user"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
-    RETURN is_trial(userid) > 0
-      or is_free_usage(userid)
-      or (is_good_plan_v3(userid) and is_paying(userid));
+    RETURN is_paying_and_good_plan(userid);
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_allowed_action_user()
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_allowed_action_user(auth.uid());
+END;  
+$$;
 
-CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -541,8 +614,7 @@ Begin
 End;  
 $$;
 
-
-CREATE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -553,9 +625,18 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" text, "appid" character varying)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+Begin
+  RETURN is_app_owner(get_user_id(apikey), appid);
+End;
+$$;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -566,8 +647,27 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("apikey" text, "appid" character varying)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+Begin
+  RETURN is_app_owner(get_user_id(apikey), appid);
+End;
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_app_owner"("appid" character varying)
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_app_owner(auth.uid(), appid);
+END;  
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -578,115 +678,102 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_app_shared(appid character varying)
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_app_shared(auth.uid(), appid);
+END;  
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
 CREATE OR REPLACE FUNCTION public.is_canceled(userid uuid)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+AS $$
 Begin
   RETURN (SELECT EXISTS (SELECT 1
   from stripe_info
   where customer_id=(SELECT customer_id from users where id=userid)
   AND status = 'canceled'));
 End;  
-$function$;
+$$;
 
-CREATE OR REPLACE FUNCTION public.update_app_usage(minutes_interval INT) RETURNS VOID AS $$
-DECLARE
-    one_minute_ago TIMESTAMP;
-    n_minutes_ago TIMESTAMP;
-    thirty_days_ago TIMESTAMP;
+CREATE OR REPLACE FUNCTION public.is_canceled()
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
 BEGIN
-    -- Initialize time variables
-    one_minute_ago := NOW() - INTERVAL '1 minute';
-    n_minutes_ago := NOW() - INTERVAL '1 minute' * minutes_interval;
-    thirty_days_ago := NOW() - INTERVAL '30 days';
+    RETURN is_canceled(auth.uid());
+END;  
+$$;
 
-    WITH bandwidth AS (
-        SELECT stats.app_id, SUM(app_versions_meta.size) AS bandwidth, 0 AS storage, 0 AS mau
-        FROM stats
-        JOIN app_versions_meta ON stats.app_id = app_versions_meta.app_id
-        WHERE stats.action = 'get' AND stats.created_at BETWEEN n_minutes_ago AND one_minute_ago
-        GROUP BY stats.app_id
-    ), storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
-        FROM app_versions
-        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
-        WHERE app_versions.created_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS FALSE
-        GROUP BY app_versions.app_id
-    ), deleted_storage AS (
-        SELECT app_versions.app_id, 0 AS bandwidth, SUM(app_versions_meta.size) AS storage, 0 AS mau
-        FROM app_versions
-        JOIN app_versions_meta ON app_versions.app_id = app_versions_meta.app_id
-        WHERE app_versions.updated_at BETWEEN n_minutes_ago AND one_minute_ago AND app_versions.deleted IS TRUE
-        GROUP BY app_versions.app_id
-    ), mau AS (
-        SELECT devices.app_id, 0 AS bandwidth, 0 AS storage, COUNT(*) AS mau
-        FROM devices
-        WHERE (devices.created_at BETWEEN n_minutes_ago AND one_minute_ago OR devices.updated_at BETWEEN n_minutes_ago AND one_minute_ago)
-        AND (devices.last_MAU IS NULL OR devices.last_MAU < thirty_days_ago)
-        GROUP BY devices.app_id
-    ), combined AS (
-        SELECT * FROM bandwidth
-        UNION ALL
-        SELECT * FROM storage
-        UNION ALL
-        SELECT * FROM mau
-        UNION ALL
-        SELECT app_id, bandwidth, -storage, mau FROM deleted_storage
-    )
-    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau)
-    SELECT app_id, NOW(), SUM(bandwidth), SUM(storage), SUM(mau)
-    FROM combined
-    GROUP BY app_id;
+CREATE or replace FUNCTION "public"."get_weekly_stats"("app_id" character varying) RETURNS TABLE(all_updates integer, failed_updates integer, open_app integer) AS $$
+Declare
+ seven_days_ago TIMESTAMP;
+ all_updates integer;
+ failed_updates integer;
+ -- open_app integer;
+ -- open_time_array TABLE ("device_id" uuid, "created_at" timestamp)[];
+Begin
+  seven_days_ago := NOW() - INTERVAL '7 days';
+  
+  SELECT count(*)
+  INTO all_updates
+  FROM public.stats
+  WHERE stats.action='set'
+  AND stats.created_at BETWEEN seven_days_ago AND now()
+  AND stats.app_id = get_weekly_stats.app_id;
 
-    -- Update last_MAU for counted devices
-    UPDATE devices SET last_MAU = NOW()
-    WHERE (created_at BETWEEN n_minutes_ago AND one_minute_ago OR updated_at BETWEEN n_minutes_ago AND one_minute_ago)
-    AND (last_MAU IS NULL OR last_MAU < thirty_days_ago);
-END;
+  SELECT count(*)
+  INTO failed_updates
+  FROM public.stats
+  WHERE (
+    stats.action='set_fail'
+    OR stats.action='update_fail'
+    OR stats.action='download_fail'
+  )
+  AND stats.created_at BETWEEN seven_days_ago AND now()
+  AND stats.app_id = get_weekly_stats.app_id;
+
+  SELECT count(*)
+  INTO open_app
+  FROM public.stats
+  WHERE stats.action='get'
+  AND stats.created_at BETWEEN seven_days_ago AND now()
+  AND stats.app_id = get_weekly_stats.app_id;
+
+  --SELECT ARRAY (
+  --  SELECT ROW (stats.device_id, stats.created_at)
+  --  FROM public.stats
+  --  WHERE stats.action='app_moved_to_foreground'
+  --  AND stats.created_at BETWEEN seven_days_ago AND now()
+  --  AND stats.app_id = get_weekly_stats.app_id
+  --)
+  -- INTO open_time_array;
+
+  -- RAISE NOTICE '%', open_time_array;
+
+  RETURN query (select all_updates, failed_updates, open_app); 
+End;                                                           
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION public.calculate_daily_app_usage() RETURNS VOID AS $$
-DECLARE
-    twenty_four_hours_ago TIMESTAMP;
+CREATE OR REPLACE FUNCTION public.get_usage_mode_and_last_saved() RETURNS TABLE(usage_mode public.usage_mode, last_saved TIMESTAMP) AS $$
 BEGIN
-    -- Initialize time variable
-    twenty_four_hours_ago := NOW() - INTERVAL '24 hours';
-
-    WITH daily_usage AS (
-        SELECT app_id, SUM(bandwidth) AS daily_bandwidth, SUM(storage) AS daily_storage, SUM(mau) AS daily_mau
-        FROM app_usage
-        WHERE created_at >= twenty_four_hours_ago AND mode = '5min'
-        GROUP BY app_id
-    )
-    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
-    SELECT app_id, NOW(), daily_bandwidth, daily_storage, daily_mau, 'day'
-    FROM daily_usage;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION public.calculate_cycle_usage() RETURNS VOID AS $$
-BEGIN
-    WITH cycle_usage AS (
-        SELECT apps.app_id, SUM(app_usage.bandwidth) AS cycle_bandwidth, SUM(app_usage.storage) AS cycle_storage, SUM(app_usage.mau) AS cycle_mau
-        FROM app_usage
-        JOIN apps ON app_usage.app_id = apps.app_id
-        JOIN users ON apps.user_id = users.id
-        JOIN stripe_info ON users.customer_id = stripe_info.customer_id
-        WHERE app_usage.created_at BETWEEN stripe_info.subscription_anchor_start AND stripe_info.subscription_anchor_end
-        AND app_usage.mode = 'day'
-        GROUP BY apps.app_id
-    )
-    INSERT INTO app_usage (app_id, created_at, bandwidth, storage, mau, mode)
-    SELECT app_id, NOW(), cycle_bandwidth, cycle_storage, cycle_mau, 'cycle'
-    FROM cycle_usage;
+    last_saved := (SELECT MAX(created_at) FROM app_usage);
+    IF EXTRACT(MINUTE FROM (NOW() - last_saved)) > 5 THEN
+        usage_mode := 'last_saved';
+    ELSE
+        usage_mode := '5min';
+    END IF;
+    RETURN;
 END;
 $$ LANGUAGE plpgsql;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_free_usage"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -694,8 +781,17 @@ Begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_free_usage()
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_free_usage(auth.uid());
+END;  
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_good_plan_v3"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_good_plan_v3"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 DECLARE
@@ -710,9 +806,169 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_good_plan_v3()
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_good_plan_v3(auth.uid());
+END;  
+$$;
 
--- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_good_plan_v4"("userid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    current_plan_total stats_table;
+BEGIN
+  -- Get the total values for the user's current usage
+  SELECT * INTO current_plan_total FROM public.get_total_stats_v3(userid);
+  RETURN (select 1 from  find_fit_plan_v3(
+    current_plan_total.mau,
+    current_plan_total.bandwidth,
+    current_plan_total.storage) where find_fit_plan_v3.name = (SELECT get_current_plan_name(userid)));
+END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.is_good_plan_v4()
+RETURNS boolean
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN is_good_plan_v4(auth.uid());
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_stats_v3(userid uuid)
+RETURNS TABLE(mau bigint, bandwidth double precision, storage double precision)
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    anchor_start date;
+    anchor_end date;
+    usage_table_name text;
+BEGIN
+    SELECT subscription_anchor_start, subscription_anchor_end INTO anchor_start, anchor_end
+    FROM stripe_info
+    WHERE customer_id=(SELECT customer_id from users where id=userid);
+
+    SELECT to_regclass('clickhouse_app_usage') INTO usage_table_name;
+    IF usage_table_name IS NULL THEN
+        usage_table_name := 'app_usage';
+    ELSE
+        usage_table_name := 'clickhouse_app_usage';
+    END IF;
+
+    RETURN QUERY EXECUTE format('
+        SELECT 
+            COALESCE(SUM(%I.mau), 0)::bigint AS mau,
+            COALESCE(round(convert_bytes_to_gb(SUM(%I.bandwidth))::numeric,2), 0)::float AS bandwidth,
+            COALESCE(round(convert_bytes_to_gb(SUM(%I.storage_added - %I.storage_deleted))::numeric,2), 0)::float AS storage
+        FROM %I
+        WHERE app_id IN (SELECT app_id from apps where user_id=$1)
+        AND date >= $2
+        AND date <= $3
+        LIMIT 1', usage_table_name, usage_table_name, usage_table_name, usage_table_name, usage_table_name)
+    USING userid, anchor_start, anchor_end;
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_stats_v3()
+RETURNS TABLE(mau bigint, bandwidth double precision, storage double precision)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM get_total_stats_v3(auth.uid());
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_storage_size(userid uuid)
+RETURNS double precision
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    total_size double precision := 0;
+BEGIN
+    SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
+    FROM app_versions
+    INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
+    WHERE app_versions.user_id = userid
+    AND app_versions.deleted = false;
+
+    RETURN total_size;
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_storage_size()
+RETURNS double precision
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN get_total_storage_size(auth.uid());
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_app_storage_size(userid uuid, app_id character varying)
+RETURNS double precision
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    total_size double precision := 0;
+BEGIN
+    SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
+    FROM app_versions
+    INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
+    WHERE app_versions.user_id = userid
+    AND app_versions.app_id = app_id
+    AND app_versions.deleted = false;
+
+    RETURN total_size;
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_app_storage_size(app_id character varying)
+RETURNS double precision
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN get_total_app_storage_size(auth.uid(), app_id);
+END;  
+$$;
+
+CREATE OR REPLACE PROCEDURE public.update_app_versions_retention()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE app_versions
+    SET deleted = true
+    FROM apps, app_versions_meta
+    WHERE app_versions_meta.app_id = app_versions.app_id
+    AND app_versions.app_id = apps.app_id
+    AND app_versions.id not in (select app_versions.id from app_versions join channels on app_versions.id = channels.version)
+    AND app_versions.deleted = false
+    AND apps.retention > 0
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.created_at) > apps.retention
+    AND extract(epoch from now()) - extract(epoch from app_versions_meta.updated_at) > apps.retention;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE public.update_channels_progressive_deploy()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE channels
+    SET "secondaryVersionPercentage" = CASE 
+        WHEN channels."secondVersion" not in (select version from stats where stats.action='update_fail' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) 
+        THEN "secondaryVersionPercentage" + 0.1 
+        ELSE 0 
+    END
+    WHERE channels.enable_progressive_deploy = true
+    AND channels."secondaryVersionPercentage" between 0 AND 0.9;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_in_channel"("userid" "uuid", "ownerid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
 Begin
@@ -725,8 +981,15 @@ Begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_in_channel"(userid uuid) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_in_channel(userid, auth.uid());
+End;
+$$;
 
-CREATE FUNCTION "public"."is_not_deleted"("email_check" character varying) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_not_deleted"("email_check" character varying) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Declare  
@@ -741,7 +1004,7 @@ End;
 $$;
 
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_onboarded"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -753,8 +1016,16 @@ Begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_onboarded"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_onboarded(auth.uid());
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_onboarding_needed"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -762,8 +1033,42 @@ Begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_onboarding_needed"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_onboarding_needed(auth.uid());
+End;
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"("userid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  from stripe_info
+  where customer_id=(SELECT customer_id from users where id=userid)
+  AND (
+    (is_good_plan = true AND status = 'succeeded') 
+    OR (subscription_id = 'free') -- TODO: allow free plan again
+    -- OR (subscription_id = 'free' or subscription_id is null)
+    OR (trial_at::date - (now())::date > 0)
+  )
+  )
+);
+End;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_paying(auth.uid());
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_paying"("userid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -774,8 +1079,16 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_paying"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_paying(auth.uid());
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_trial"("userid" "uuid") RETURNS integer
+CREATE OR REPLACE FUNCTION "public"."is_trial"("userid" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -785,8 +1098,16 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_trial"() RETURNS integer
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_trial(auth.uid());
+End;
+$$;
+
 -- TODO: use auth.uid() instead of passing it as argument for better security
-CREATE FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
@@ -802,6 +1123,13 @@ Begin
 End;  
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_version_shared"(versionid bigint) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_version_shared(auth.uid(), versionid);
+End;
+$$;
 
 SET default_tablespace = '';
 
@@ -829,32 +1157,107 @@ ALTER TABLE "public"."apikeys" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDE
 CREATE TABLE "public"."app_usage" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "app_id" character varying NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
+    "date" date DEFAULT CURRENT_DATE,
     -- main stats
     "mau" bigint DEFAULT '0'::bigint NOT NULL,
-    "storage" bigint DEFAULT '0'::bigint NOT NULL,
+    "storage_added" bigint DEFAULT '0'::bigint NOT NULL,
+    "storage_deleted" bigint DEFAULT '0'::bigint NOT NULL,
     "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
-    mode "public"."usage_mode" not null default '5min'::"public"."usage_mode"
+    "get" bigint DEFAULT '0'::bigint NOT NULL,
+    "uninstall" bigint DEFAULT '0'::bigint NOT NULL,
+    "fail" bigint DEFAULT '0'::bigint NOT NULL,
+    "install" bigint DEFAULT '0'::bigint NOT NULL
 );
 
-CREATE TABLE "public"."app_stats" (
-    "app_id" character varying NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "channels" smallint DEFAULT '0'::smallint NOT NULL,
-    "mlu" bigint DEFAULT '0'::bigint NOT NULL,
-    "versions" bigint DEFAULT '0'::bigint NOT NULL,
-    "shared" bigint DEFAULT '0'::bigint NOT NULL,
-    "mlu_real" bigint DEFAULT '0'::bigint NOT NULL,
-    "devices" bigint DEFAULT '0'::bigint NOT NULL,
-    "date_id" character varying DEFAULT '2022-05'::character varying NOT NULL,
-    "version_size" bigint DEFAULT '0'::bigint NOT NULL,
-    "bandwidth" bigint DEFAULT '0'::bigint NOT NULL,
-    "devices_real" bigint DEFAULT '0'::bigint NOT NULL
-);
+-- clickhouse table for stats aggregation
 
-ALTER TABLE "public"."app_stats" OWNER TO "postgres";
+-- drop table aggregate_daily;
+-- CREATE TABLE IF NOT EXISTS aggregate_daily
+-- (
+--     date Date,
+--     app_id String,
+--     storage_added Int64,
+--     storage_deleted Int64,
+--     bandwidth Int64,
+--     mau UInt64,
+--     get UInt64,
+--     fail UInt64,
+--     install UInt64,
+--     uninstall UInt64,
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
+
+-- drop table aggregate_daily_mv;
+-- CREATE MATERIALIZED VIEW aggregate_daily_mv
+-- TO aggregate_daily
+-- AS
+-- SELECT
+--     l.date,
+--     l.app_id,
+--     a.storage_added,
+--     a.storage_deleted,
+--     l.bandwidth,
+--     m.mau,
+--     l.get,
+--     l.fail,
+--     l.install,
+--     l.uninstall,
+-- FROM logs_daily AS l
+-- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
+-- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
+
+-- INSERT INTO aggregate_daily
+-- SELECT
+--     l.date,
+--     l.app_id,
+--     a.storage_added,
+--     a.storage_deleted,
+--     l.bandwidth,
+--     m.mau,
+--     l.get,
+--     l.fail,
+--     l.install,
+--     l.uninstall,
+-- FROM logs_daily AS l
+-- FULL JOIN app_storage_daily AS a ON l.date = a.date AND l.app_id = a.app_id
+-- FULL JOIN mau AS m ON l.date = m.date AND l.app_id = m.app_id;
+
+-- CREATE TABLE IF NOT EXISTS aggregate_monthly
+-- (
+--     month Date,
+--     app_id String,
+--     storage_added Int64,
+--     storage_deleted Int64,
+--     bandwidth Int64,
+--     mau UInt64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(month)
+-- ORDER BY (month, app_id);
+
+-- CREATE MATERIALIZED VIEW aggregate_monthly_mv
+-- TO aggregate_monthly
+-- AS
+-- SELECT
+--     toStartOfMonth(date) AS month,
+--     app_id,
+--     sum(storage_added) AS storage_added,
+--     sum(storage_deleted) AS storage_deleted,
+--     sum(bandwidth) AS bandwidth,
+--     max(mau) AS mau
+-- FROM aggregate_daily
+-- GROUP BY month, app_id;
+
+-- INSERT INTO aggregate_monthly
+-- SELECT
+--     toStartOfMonth(date) AS month,
+--     app_id,
+--     sum(storage_added) AS storage_added,
+--     sum(storage_deleted) AS storage_deleted,
+--     sum(bandwidth) AS bandwidth,
+--     max(mau) AS mau
+-- FROM aggregate_daily
+-- GROUP BY month, app_id;
 
 CREATE TABLE "public"."app_versions" (
     "id" bigint NOT NULL,
@@ -895,6 +1298,50 @@ CREATE TABLE "public"."app_versions_meta" (
     "uninstalls" bigint DEFAULT '0'::bigint
 );
 
+-- clickhouse table
+-- CREATE TABLE app_versions_meta
+-- (
+--     created_at DateTime64(6),
+--     app_id String,
+--     size Int64,
+--     id Int64,
+--     action String
+-- ) ENGINE = MergeTree()
+-- PARTITION BY toYYYYMM(created_at)
+-- ORDER BY (id, app_id, action)
+-- PRIMARY KEY (id, app_id, action);
+
+--  Create stats for app_versions_meta
+
+-- CREATE TABLE IF NOT EXISTS app_storage_daily
+-- (
+--     date Date,
+--     app_id String,
+--     storage_added Int64,
+--     storage_deleted Int64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
+
+-- CREATE MATERIALIZED VIEW app_storage_daily_mv
+-- TO app_storage_daily
+-- AS
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     sumIf(size, action = 'add') AS storage_added,
+--     sumIf(size, action = 'delete') AS storage_deleted
+-- FROM app_versions_meta
+-- GROUP BY date, app_id;
+
+-- INSERT INTO app_storage_daily
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     sumIf(size, action = 'add') AS storage_added,
+--     sumIf(size, action = 'delete') AS storage_deleted
+-- FROM app_versions_meta
+-- GROUP BY date, app_id;
 
 ALTER TABLE "public"."app_versions_meta" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."app_versions_meta_id_seq"
@@ -914,7 +1361,7 @@ CREATE TABLE "public"."apps" (
     "last_version" character varying,
     "updated_at" timestamp with time zone,
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"(),
-    "retention" bigint NOT NULL DEFAULT '0'::bigint
+    "retention" bigint NOT NULL DEFAULT '2592000'::bigint
 );
 
 
@@ -987,18 +1434,238 @@ CREATE TABLE "public"."deleted_account" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL
 );
 
+-- Create clickhouse connection (require for big apps)
+
+-- create foreign data wrapper clickhouse_wrapper
+--   handler click_house_fdw_handler
+--   validator click_house_fdw_validator;
+
+-- Save your ClickHouse credential in Vault and retrieve the `key_id`
+-- insert into vault.secrets (name, secret)
+-- values (
+--   'clickhouse',
+--   'tcp://default:****@****.eu-central-1.aws.clickhouse.cloud:9440/default?connection_timeout=30s&ping_before_query=false&secure=true'
+-- )
+-- returning key_id;
+
+-- create server clickhouse_server
+--   foreign data wrapper clickhouse_wrapper
+--   options (
+--     conn_string_id 'YOUR_KEY_ID' -- The Key ID from above.
+--   );
+
+-- Clickhouse table for device
+-- CREATE TABLE IF NOT EXISTS devices
+-- (
+--     updated_at DateTime64(6),
+--     device_id String,
+--     custom_id String,
+--     app_id String,
+--     platform String,
+--     plugin_version String,
+--     os_version String,
+--     version_build String,
+--     version Int64,
+--     is_prod UInt8,
+--     is_emulator UInt8,
+-- ) ENGINE = MergeTree()
+-- PARTITION BY toYYYYMM(updated_at)
+-- ORDER BY (app_id, device_id, updated_at)
+-- PRIMARY KEY (app_id, device_id);
+
+-- CREATE TABLE IF NOT EXISTS devices_aggregate
+-- (
+--     created_at DateTime64(6),
+--     updated_at DateTime64(6),
+--     device_id String,
+--     custom_id String,
+--     app_id String,
+--     platform String,
+--     plugin_version String,
+--     os_version String,
+--     version_build String,
+--     version Int64,
+--     is_prod UInt8,
+--     is_emulator UInt8
+-- ) ENGINE = MergeTree()
+-- PARTITION BY toYYYYMM(updated_at)
+-- ORDER BY (app_id, device_id, updated_at)
+-- PRIMARY KEY (app_id, device_id);
+
+-- CREATE MATERIALIZED VIEW devices_aggregate_mv
+-- TO devices_aggregate
+-- AS
+-- SELECT
+--     min(updated_at) AS created_at,
+--     max(updated_at) AS updated_at,
+--     device_id,
+--     argMax(custom_id, updated_at) AS custom_id,
+--     argMax(app_id, updated_at) AS app_id,
+--     argMax(platform, updated_at) AS platform,
+--     argMax(plugin_version, updated_at) AS plugin_version,
+--     argMax(os_version, updated_at) AS os_version,
+--     argMax(version_build, updated_at) AS version_build,
+--     argMax(version, updated_at) AS version,
+--     argMax(is_prod, updated_at) AS is_prod,
+--     argMax(is_emulator, updated_at) AS is_emulator
+-- FROM devices
+-- GROUP BY device_id;
+
+
+-- CREATE VIEW device_u AS SELECT * from devices final; -- materialized view to get unique devices
+
+-- insert in click house
+-- INSERT INTO devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 1, 1),
+-- (now(), '2023-01-29 08:09:32.324+00', '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.4', '9', '1.223.0', '', 1, 1);
+
+-- insert in supabase
+-- INSERT INTO clickhouse_devices ("created_at", "updated_at", "last_mau", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
+-- ('2023-01-29 08:09:32+00', TIMESTAMP '2023-01-29 08:09:32.324+00', TIMESTAMP '1900-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.5', '9', '1.223.0', '', true, true);
+
+-- first value shouldn't be visible in supabase because of ReplacingMergeTree
+
+--  In supabase read only view
+
+-- create foreign table clickhouse_devices (
+--     created_at timestamp,
+--     updated_at timestamp,
+--     last_mau timestamp,
+--     device_id text,
+--     custom_id text,
+--     app_id text,
+--     platform text,
+--     plugin_version text,
+--     os_version text,
+--     version_build text,
+--     version integer,
+--     is_prod boolean,
+--     is_emulator boolean
+-- )
+--   server clickhouse_server
+--   options (
+--     table '(SELECT DISTINCT device_id FROM devices_u)'
+--   );
+
+--  auto create stats in clickhouse
+
+-- drop TABLE logs_daily;
+-- CREATE TABLE IF NOT EXISTS logs_daily
+-- (
+--     date Date,
+--     app_id String,
+--     version Int64,
+--     get UInt64,
+--     fail UInt64,
+--     install UInt64,
+--     uninstall UInt64,
+--     bandwidth Int64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id, version);
+
+-- drop view logs_daily_mv;
+-- CREATE MATERIALIZED VIEW logs_daily_mv
+-- TO logs_daily
+-- AS
+-- SELECT
+--     toDate(l.created_at) AS date,
+--     l.app_id,
+--     l.version,
+--     countIf(l.action = 'get') AS get,
+--     countIf(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
+--     countIf(l.action = 'set') AS install,
+--     countIf(l.action = 'uninstall') AS uninstall,
+--     countIf(l.action = 'get') * maxIf(a.size, a.action = 'add') AS bandwidth
+-- FROM logs AS l
+-- LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
+-- GROUP BY date, l.app_id, l.version;
+
+-- -- Insert in clickhouse old data
+-- INSERT INTO logs_daily
+-- SELECT
+--     toDate(l.created_at) AS date,
+--     l.app_id,
+--     l.version,
+--     countIf(l.action = 'get') AS get,
+--     countIf(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
+--     countIf(l.action = 'set') AS install,
+--     countIf(l.action = 'uninstall') AS uninstall,
+--     countIf(l.action = 'get') * maxIf(a.size, a.action = 'add') AS bandwidth
+-- FROM logs AS l
+-- LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
+-- GROUP BY date, l.app_id, l.version;
+
+-- Calculate mau
+
+-- CREATE TABLE IF NOT EXISTS mau
+-- (
+--     date Date,
+--     app_id String,
+--     mau UInt64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
+
+-- CREATE MATERIALIZED VIEW mau_mv
+-- TO mau
+-- AS
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
+-- FROM logs
+-- GROUP BY date, app_id;
+
+-- INSERT INTO mau
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
+-- FROM logs
+-- GROUP BY date, app_id;
+
+--  Add to supabase the table to get stats from clickhouse
+
+--   create foreign table clickhouse_app_usage (
+--     date date,
+--     app_id text,
+--     bandwidth bigint,
+--     mau bigint,
+--     get bigint,
+--     fail bigint,
+--     uninstall bigint,
+--     install bigint,
+--     storage_added bigint,
+--     storage_deleted bigint
+-- )
+--   server clickhouse_server
+--   options (
+--     table '(SELECT DISTINCT ON (m.date,m.app_id) 
+    -- m.date AS date,
+    -- m.app_id AS app_id,
+    -- m.mau AS mau,
+    -- COALESCE(l.get, 0) AS get,
+    -- COALESCE(l.fail, 0) AS fail,
+    -- COALESCE(l.install, 0) AS install,
+    -- COALESCE(l.uninstall, 0) AS uninstall,
+    -- COALESCE(l.bandwidth, 0) AS bandwidth,
+    -- COALESCE(s.storage_added, 0) AS storage_added,
+    -- COALESCE(s.storage_deleted, 0) AS storage_deleted
+    -- FROM mau m
+    -- LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
+    -- LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id)'
+--   );
 
 CREATE TABLE "public"."devices" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "last_mau" timestamp with time zone DEFAULT "now"(),
+    "created_at" timestamp with time zone NOT NULL,
+    "updated_at" timestamp with time zone NOT NULL,
     "device_id" "text" NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL,
     "platform" "public"."platform_os",
     "plugin_version" "text" DEFAULT '2.3.3'::"text" NOT NULL,
     "os_version" character varying,
-    "date_id" character varying DEFAULT ''::character varying,
     "version_build" "text" DEFAULT 'builtin'::"text",
     "custom_id" "text" DEFAULT ''::"text" NOT NULL,
     "is_prod" boolean DEFAULT true,
@@ -1104,8 +1771,66 @@ CREATE TABLE "public"."plans" (
 
 ALTER TABLE "public"."plans" OWNER TO "postgres";
 
+-- Clickhouse table for stats
+-- CREATE TABLE IF NOT EXISTS logs
+-- (
+--     created_at DateTime64(6),
+--     device_id String,
+--     app_id String,
+--     platform String,
+--     action String,
+--     version_build String,
+--     version Int64
+-- ) ENGINE = ReplacingMergeTree()
+-- PARTITION BY toYYYYMM(created_at)
+-- ORDER BY (app_id, device_id, created_at)
+-- PRIMARY KEY (app_id, device_id, created_at);
+
+-- insert in click house
+-- INSERT INTO logs ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES
+-- (now(), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
+
+
+--  In supabase read only
+-- create foreign table clickhouse_logs (
+--     created_at timestamp,
+--     device_id text,
+--     app_id text,
+--     platform text,
+--     action text,
+--     version_build text,
+--     version bigint
+-- )
+--   server clickhouse_server
+--   options (
+--     table 'logs'
+--   );
+
+-- Clickhouse table for automatic stats calculation
+
+-- CREATE TABLE IF NOT EXISTS logs_daily
+-- (
+--     date Date,
+--     app_id String,
+--     get_actions_count UInt64,
+--     fail_actions_count UInt64
+-- ) ENGINE = SummingMergeTree()
+-- PARTITION BY toYYYYMM(date)
+-- ORDER BY (date, app_id);
+
+-- CREATE MATERIALIZED VIEW logs_daily_mv
+-- TO logs_daily
+-- AS
+-- SELECT
+--     toDate(created_at) AS date,
+--     app_id,
+--     countIf(action = 'get') AS get_actions_count,
+--     countIf(action IN ('set_fail', 'update_fail', 'download_fail')) AS fail_actions_count
+-- FROM logs
+-- GROUP BY date, app_id;
+
 CREATE TABLE "public"."stats" (
-    "created_at" timestamp with time zone DEFAULT "now"(),
+    "created_at" timestamp with time zone NOT NULL,
     "platform" "public"."platform_os" NOT NULL,
     "action" "text" NOT NULL,
     "device_id" "text" NOT NULL,
@@ -1150,7 +1875,7 @@ CREATE TABLE "public"."store_apps" (
 CREATE OR REPLACE FUNCTION public.remove_enum_value(enum_type regtype, enum_value text)
  RETURNS void
  LANGUAGE plpgsql
-AS $function$
+AS $$
 DECLARE
     _enum_value text;
 BEGIN
@@ -1161,7 +1886,7 @@ BEGIN
     EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value, enum_value || '_old');
     EXECUTE format('ALTER TYPE %s RENAME VALUE %L TO %L', enum_type, enum_value || '_old', enum_value);
 END;
-$function$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.one_month_ahead()
 RETURNS timestamp AS 
@@ -1215,9 +1940,6 @@ ALTER TABLE ONLY "public"."app_usage"
 
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
-
-ALTER TABLE ONLY "public"."app_stats"
-    ADD CONSTRAINT "app_stats_pkey" PRIMARY KEY ("app_id", "date_id");
 
 ALTER TABLE ONLY "public"."app_versions_meta"
     ADD CONSTRAINT "app_versions_meta_pkey" PRIMARY KEY ("id");
@@ -1281,17 +2003,31 @@ ALTER TABLE ONLY "public"."users"
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
 
-CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "created_at");
+CREATE INDEX "idx_app_id_created_at" ON "public"."app_usage" USING "btree" ("app_id", "date");
 
-CREATE INDEX "idx_action_logs" ON "public"."stats" USING "btree" ("action");
+CREATE INDEX "idx_stats_app_id_device_id" ON "public"."stats" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_stats_app_id_action" ON "public"."stats" USING "btree" ("app_id", "action");
+
+CREATE INDEX "idx_stats_app_id_created_at" ON "public"."stats" USING "btree" ("app_id", "created_at");
+
+CREATE INDEX "idx_stats_app_id_platform" ON "public"."stats" USING "btree" ("app_id", "platform");
+
+CREATE INDEX "idx_stats_app_id_version_build" ON "public"."stats" USING "btree" ("app_id", "version_build");
+
+CREATE INDEX "idx_stats_app_id_version" ON "public"."stats" USING "btree" ("app_id", "version");
+
+CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
+
+CREATE INDEX idx_app_id_created_at_devices ON "public"."devices" USING "btree" ("app_id", "created_at");
+
+CREATE INDEX devices_app_id_updated_at_idx ON "public"."devices" USING "btree" ("app_id", "updated_at");
+
+CREATE INDEX devices_app_id_device_id_updated_at_idx ON "public"."devices" USING "btree" ("app_id", "device_id", "updated_at");
 
 CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
 
-CREATE INDEX "idx_app_id_devices" ON "public"."devices" USING "btree" ("app_id");
-
 CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
-
-CREATE INDEX "idx_app_id_device_id_devices" ON "public"."devices" USING "btree" ("app_id", "device_id");
 
 CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
 
@@ -1299,29 +2035,15 @@ CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices
 
 CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_override" USING "btree" ("app_id", "device_id");
 
-CREATE INDEX "idx_app_id_logs" ON "public"."stats" USING "btree" ("app_id");
-
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
+
+CREATE INDEX "idx_app_versions_meta_id" ON "public"."app_versions_meta" USING "btree" ("id");
 
 CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btree" ("created_at");
 
 CREATE INDEX "idx_app_versions_deleted" ON "public"."app_versions" USING "btree" ("deleted");
 
 CREATE INDEX "idx_app_versions_name" ON "public"."app_versions" USING "btree" ("name");
-
-CREATE INDEX "idx_created_at_logs" ON "public"."stats" USING "btree" ("created_at");
-
-CREATE INDEX "idx_device_id_logs" ON "public"."stats" USING "btree" ("device_id");
-
-CREATE INDEX "idx_devices_created_at" ON "public"."devices" USING "btree" ("device_id", "created_at" DESC);
-
-CREATE INDEX "idx_devices_last_mau" ON "public"."devices" USING "btree" ("last_mau");
-
-CREATE INDEX "idx_devices_created_at_updated_at" ON "public"."devices" USING "btree" ("created_at", "updated_at");
-
-CREATE INDEX idx_app_id_version_devices ON "public"."devices" USING "btree" ("app_id", "version");
-
-CREATE INDEX "idx_platform_logs" ON "public"."stats" USING "btree" ("platform");
 
 CREATE INDEX "idx_store_apps" ON "public"."store_apps" USING "btree" ("capacitor");
 
@@ -1343,13 +2065,13 @@ CREATE INDEX "idx_store_capgo" ON "public"."store_apps" USING "btree" ("capgo");
 
 CREATE INDEX "idx_store_on_prem" ON "public"."store_apps" USING "btree" ("onprem");
 
-CREATE INDEX "idx_version_build_logs" ON "public"."stats" USING "btree" ("version_build");
-
-CREATE INDEX "idx_version_logs" ON "public"."stats" USING "btree" ("version");
-
 CREATE UNIQUE INDEX "store_app_pkey" ON "public"."store_apps" USING "btree" ("app_id");
 
-CREATE OR REPLACE FUNCTION public.get_cycle_info()
+CREATE INDEX "channel_users_app_id_idx" ON "public"."channel_users" USING "btree" ("app_id");
+
+CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
+
+CREATE OR REPLACE FUNCTION public.get_cycle_info("userid" "uuid")
 RETURNS TABLE (
     subscription_anchor_start timestamp with time zone,
     subscription_anchor_end timestamp with time zone
@@ -1357,8 +2079,7 @@ RETURNS TABLE (
 DECLARE
     customer_id_var text;
 BEGIN
-    -- Get the customer_id using auth.uid()
-    SELECT customer_id INTO customer_id_var FROM users WHERE id = auth.uid();
+    SELECT customer_id INTO customer_id_var FROM users WHERE id = userid;
 
     -- Get the stripe_info using the customer_id
     RETURN QUERY
@@ -1380,9 +2101,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION public.get_cycle_info()
+RETURNS TABLE (
+    subscription_anchor_start timestamp with time zone,
+    subscription_anchor_end timestamp with time zone
+) AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM get_cycle_info(auth.uid());
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.get_db_url() RETURNS TEXT LANGUAGE SQL AS $$
     SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='db_url';
+$$ SECURITY DEFINER STABLE PARALLEL SAFE;
+
+CREATE OR REPLACE FUNCTION public.get_external_function_url() RETURNS TEXT LANGUAGE SQL AS $$
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='external_function_url';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
 CREATE OR REPLACE FUNCTION public.get_apikey() RETURNS TEXT LANGUAGE SQL AS $$
@@ -1394,13 +2128,43 @@ REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_apikey() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.get_apikey() TO postgres;
 
-CREATE OR REPLACE FUNCTION public.http_post_to_function() 
-RETURNS trigger 
+CREATE OR REPLACE FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) 
+RETURNS void 
 LANGUAGE plpgsql 
 SECURITY DEFINER
 AS $BODY$
 DECLARE 
   request_id text;
+  url text;
+BEGIN 
+  -- Determine the URL based on the function_type
+  IF function_type = 'external' THEN
+    url := get_external_function_url() || function_name;
+  ELSE
+    url := get_db_url() || '/functions/v1/' || function_name;
+  END IF;
+
+  -- Make an async HTTP POST request using pg_net
+  SELECT INTO request_id net.http_post(
+    url := url,
+    headers := jsonb_build_object(
+      'Content-Type',
+      'application/json',
+      'apisecret',
+      get_apikey()
+    ),
+    body := body,
+    timeout_milliseconds := 15000
+  );
+END;
+$BODY$;
+
+CREATE OR REPLACE FUNCTION public.trigger_http_post_to_function() 
+RETURNS trigger 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+AS $BODY$
+DECLARE 
   payload jsonb;
 BEGIN 
   -- Build the payload
@@ -1412,97 +2176,12 @@ BEGIN
     'schema', TG_TABLE_SCHEMA
   );
 
-  -- Make an async HTTP POST request using pg_net
-  SELECT INTO request_id net.http_post(
-    url := get_db_url() || '/functions/v1/' || TG_ARGV[0],
-    headers := jsonb_build_object(
-      'Content-Type',
-      'application/json',
-      'apisecret',
-      get_apikey()
-    ),
-    body := payload,
-    timeout_milliseconds := 15000
-  );
+  -- Call the helper function
+  PERFORM http_post_helper(TG_ARGV[0], TG_ARGV[1], payload);
 
   RETURN NEW;
 END;
 $BODY$;
-
-REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.http_post_to_function() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.http_post_to_function() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.get_current_plan_max(userid uuid) TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.update_app_usage(minutes_interval INT) TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.calculate_daily_app_usage() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.calculate_daily_app_usage() TO postgres;
-
-REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.calculate_cycle_usage() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.calculate_cycle_usage() TO postgres;
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."apikeys" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
@@ -1518,8 +2197,6 @@ CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."channel_users" FOR
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
-CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."devices" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
-
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."devices_override" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
 CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."org_users" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
@@ -1532,12 +2209,6 @@ CREATE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."users" FOR EACH RO
 
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."app_stats"
-    ADD CONSTRAINT "app_stats_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."app_stats"
-    ADD CONSTRAINT "app_stats_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."app_versions"
     ADD CONSTRAINT "app_versions_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
@@ -1565,9 +2236,6 @@ ALTER TABLE ONLY "public"."channel_devices"
 
 ALTER TABLE ONLY "public"."channel_devices"
     ADD CONSTRAINT "channel_devices_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id");
-
-ALTER TABLE ONLY "public"."channel_devices"
-    ADD CONSTRAINT "channel_devices_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("device_id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."channel_users"
     ADD CONSTRAINT "channel_users_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
@@ -1603,22 +2271,7 @@ ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id");
 
 ALTER TABLE ONLY "public"."devices_override"
-    ADD CONSTRAINT "devices_override_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("device_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."devices"
-    ADD CONSTRAINT "devices_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."stats"
-    ADD CONSTRAINT "logs_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."stats"
-    ADD CONSTRAINT "logs_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("device_id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."stats"
-    ADD CONSTRAINT "logs_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id");
@@ -1644,11 +2297,9 @@ ALTER TABLE ONLY "public"."users"
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-CREATE POLICY " allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
+CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
 
-CREATE POLICY "All all to api owner" ON "public"."channels" TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
-
-CREATE POLICY "All self to select" ON "public"."app_stats" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "All to api owner" ON "public"."channels" TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow all for app owner" ON "public"."channel_users" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -1670,7 +2321,7 @@ CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" US
 
 CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
+CREATE POLICY "Allow apikey to update they app" ON "public"."apps" FOR UPDATE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "Allow app owner or admin" ON "public"."channels" TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -1709,8 +2360,6 @@ CREATE POLICY "Disable for all" ON "public"."store_apps" USING (false) WITH CHEC
 CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
-
---CREATE POLICY "Enable update for users based on email" ON "public"."deleted_account" FOR INSERT TO "authenticated" WITH CHECK  (encode(digest(auth.email(), 'sha256'::text), 'hex'::text) = (email)::text)
 
 CREATE POLICY "Select if app is shared with you or api" ON "public"."channels" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read}'::"public"."key_mode"[], "app_id")));
 
@@ -1762,8 +2411,6 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."apikeys" ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE "public"."app_stats" ENABLE ROW LEVEL SECURITY;
-
 ALTER TABLE "public"."app_usage" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."app_versions" ENABLE ROW LEVEL SECURITY;
@@ -1806,11 +2453,6 @@ REVOKE USAGE ON SCHEMA "public" FROM PUBLIC;
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "postgres";
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "postgres";
 GRANT ALL ON FUNCTION "public"."convert_bytes_to_gb"("byt" double precision) TO "anon";
@@ -1872,6 +2514,26 @@ GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "anon";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."count_all_updates"() TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "postgres";
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "postgres";
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "postgres";
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "service_role";
+
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."exist_app_v2"("appid" character varying) TO "authenticated";
@@ -1917,30 +2579,15 @@ GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_metered_usage"("userid" "uuid") TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid", "dateid" character varying) TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_plan_usage_percent"("userid" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "postgres";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_total_stats_v2"("userid" "uuid", "dateid" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "postgres";
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_user_id"("apikey" "text") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "postgres";
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."has_min_right"("_userid" "uuid", "_orgid" "uuid", "_right" "public"."user_min_right", "_appid" character varying, "_channelid" bigint) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "postgres";
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."increment_store"("app_id" character varying, "updates" integer) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "anon";
@@ -2036,10 +2683,6 @@ GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "postgres";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "service_role";
-
-GRANT ALL ON TABLE "public"."app_stats" TO "anon";
-GRANT ALL ON TABLE "public"."app_stats" TO "authenticated";
-GRANT ALL ON TABLE "public"."app_stats" TO "service_role";
 
 GRANT ALL ON TABLE "public"."app_versions" TO "postgres";
 GRANT ALL ON TABLE "public"."app_versions" TO "anon";
@@ -2145,25 +2788,10 @@ GRANT ALL ON TABLE "public"."store_apps" TO "anon";
 GRANT ALL ON TABLE "public"."store_apps" TO "authenticated";
 GRANT ALL ON TABLE "public"."store_apps" TO "service_role";
 
--- GRANT ALL ON TABLE "public"."stripe_customers" TO "postgres";
--- GRANT ALL ON TABLE "public"."stripe_customers" TO "anon";
--- GRANT ALL ON TABLE "public"."stripe_customers" TO "authenticated";
--- GRANT ALL ON TABLE "public"."stripe_customers" TO "service_role";
-
 GRANT ALL ON TABLE "public"."stripe_info" TO "postgres";
 GRANT ALL ON TABLE "public"."stripe_info" TO "anon";
 GRANT ALL ON TABLE "public"."stripe_info" TO "authenticated";
 GRANT ALL ON TABLE "public"."stripe_info" TO "service_role";
-
--- GRANT ALL ON TABLE "public"."stripe_products" TO "postgres";
--- GRANT ALL ON TABLE "public"."stripe_products" TO "anon";
--- GRANT ALL ON TABLE "public"."stripe_products" TO "authenticated";
--- GRANT ALL ON TABLE "public"."stripe_products" TO "service_role";
-
--- GRANT ALL ON TABLE "public"."stripe_subscriptions" TO "postgres";
--- GRANT ALL ON TABLE "public"."stripe_subscriptions" TO "anon";
--- GRANT ALL ON TABLE "public"."stripe_subscriptions" TO "authenticated";
--- GRANT ALL ON TABLE "public"."stripe_subscriptions" TO "service_role";
 
 GRANT ALL ON TABLE "public"."users" TO "postgres";
 GRANT ALL ON TABLE "public"."users" TO "anon";
@@ -2184,5 +2812,70 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
+
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM anon;
+REVOKE EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb)  TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.trigger_http_post_to_function() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.trigger_http_post_to_function() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.get_devices_version("app_id" character varying, "version_id" bigint) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_store("app_id" character varying, "updates" integer) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.remove_enum_value(enum_type regtype, enum_value text) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM anon;
+REVOKE EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM authenticated;
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_apps() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_apps() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_need_upgrade() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_need_upgrade() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_onboarded() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_onboarded() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_paying() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_paying() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_plans() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_plans() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_trial() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_trial() TO postgres;
+
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.count_all_updates() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.count_all_updates() TO postgres;
 
 RESET ALL;

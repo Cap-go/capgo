@@ -4,7 +4,6 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { Capacitor } from '@capacitor/core'
-import dayjs from 'dayjs'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
@@ -26,7 +25,7 @@ const stats = ref({
   mau: 0,
   storage: 0,
   bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v2']['Returns'][0])
+} as Database['public']['Functions']['get_total_stats_v3']['Returns'][0])
 const planSuggest = ref('')
 const planCurrrent = ref('')
 const planPercent = ref(0)
@@ -39,11 +38,26 @@ const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
-  return [
+  const features = [
   `${plan.mau.toLocaleString()} ${t('mau')}`,
   `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
   `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
-  ].filter(Boolean)
+  ]
+  if (plan.name.toLowerCase().includes('as you go')) {
+    if (plan.mau_unit)
+      features[0] += ` included, then $${plan.mau_unit}/user`
+
+    if (plan.storage_unit)
+      features[1] += ` included, then $${plan.storage_unit} per GB`
+
+    if (plan.bandwidth_unit)
+      features[2] += ` included, then $${plan.bandwidth_unit} per GB`
+
+    features.push('API Access')
+    features.push('Dedicated support')
+    features.push('Custom Domain')
+  }
+  return features.filter(Boolean)
 }
 
 function convertKey(key: string) {
@@ -73,8 +87,7 @@ async function getUsages() {
   // get aapp_stats
   if (!main.user?.id)
     return
-  const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getTotalStats(main.user?.id, date_id)
+  stats.value = await getTotalStats(main.auth?.id)
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
@@ -85,11 +98,12 @@ async function loadData() {
     plans.value.push(...pls)
   })
   await getUsages()
-
-  if (main.user?.id) {
-    const date_id = new Date().toISOString().slice(0, 7)
-    await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
-    await getPlanUsagePercent(main.user?.id, date_id).then(res => planPercent.value = res)
+  await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
+  try {
+    await getPlanUsagePercent(main.auth?.id).then(res => planPercent.value = res)
+  }
+  catch (error) {
+    console.log(error)
   }
   isLoading.value = false
 }
@@ -105,7 +119,8 @@ watch(
     else if (prevMyPlan && !myPlan) {
       isLoading.value = true
     }
-  })
+  },
+)
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
@@ -131,7 +146,7 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: main.paying ? t('Current') : t('failed'),
+    label: (main.paying || main.trialDaysLeft > 0) ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {
@@ -147,39 +162,6 @@ const hightLights = computed<Stat[]>(() => ([
 
 <template>
   <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
-    <div v-if="currentPlan?.name !== 'free'" class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
-      <div class="sm:align-center sm:flex sm:flex-col">
-        <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
-          {{ t('billing') }}
-        </h1>
-        <div class="flex justify-center my-8">
-          <div class="bg-gray-100 p-4 rounded-lg shadow-md w-[500px]">
-            <h2 class="text-2xl font-bold text-gray-900">
-              {{ t('current-billing-cycle') }}
-            </h2>
-            <div class="flex justify-between mt-2">
-              <div>
-                <h3 class="text-lg font-semibold text-gray-700">
-                  {{ t('from') }}
-                </h3>
-                <p class="text-gray-600">
-                  {{ dayjs(main.cycleInfo?.subscription_anchor_end).format('MMMM D YYYY') }}
-                </p>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-700">
-                  {{ t('to') }}
-                </h3>
-                <p class="text-gray-600">
-                  {{ dayjs(main.cycleInfo?.subscription_anchor_start).format('MMMM D YYYY') }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">

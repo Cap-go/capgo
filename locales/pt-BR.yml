@@ -48,12 +48,10 @@ app-not-found: Aplicativo não encontrado
 are-u-sure: Tem certeza ?
 available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
+base: Base
 best-plan: melhor plano
 bigger-app-size: Tamanho maior do aplicativo
 billing: Cobrança
-current-billing-cycle: Ciclo de faturamento atual
-from: De
-to: Até
 build-your-app-and-s: crie seu aplicativo e sincronize
 build-your-code-and-: Envie para o Capgo seu código
 bulk-upload: upload em massa
@@ -91,6 +89,7 @@ changed-password-suc: Senha alterada com sucesso
 channel: Canal
 channel-create: Criar canal
 channel-deleted: Canal deletado
+channel-forced-devices: Dispositivos forçados
 channel-invit: Digite o e-mail para convidar
 channel-is-public: Canal padrão
 channel-link: Substituição de canal
@@ -104,6 +103,7 @@ check-on-web: Verifique no site
 checksum: soma de verificação
 commands: comandos
 confirm-email: confirme seu email
+confirm-email-sent: Um email de confirmação foi enviado, clique no link para confirmar seu email.
 confirm-password: Confirme sua senha
 confirm-public-desc: >-
   Tornar este canal padrão fará com que ele envie atualizações para todos os
@@ -117,6 +117,7 @@ copy-your: Copie o seu
 country: País
 create-a-free-accoun: Criar uma conta gratuita
 created-at: Criado em
+current-billing-cycle: Ciclo de faturamento atual
 custom-domain: Domínio personalizado
 custom-id: ID personalizado
 custom-id-saved: ID personalizado salvo
@@ -132,6 +133,7 @@ device: Dispositivo
 device-id: ID de dispositivo
 devices: Dispositivos
 devices-using-this-b: Dispositivos que usam este pacote
+did-not-recive-confirm-email: Não recebeu o email de confirmação?
 disable-auto-downgra: Desativar o downgrade automático no nativo
 disable-auto-upgrade: Desativar atualização automática acima da principal
 discord: Discórdia
@@ -154,11 +156,13 @@ force-version: Forçar versão
 forgot: Esquecido
 forgot-check-email: Verifique seu e-mail para obter o link para redefinir sua senha
 forgot-success: Senha atualizada com sucesso
+from: De
 from-device: do dispositivo
 good: Bom
 id: EU IA
 in-your-main-file: No seu arquivo principal
 in-your-project-fold: Na pasta do seu projeto
+included-in-plan: Incluído no plano
 info: Informação
 informations: Informações
 init-capgo-in-your-a: Inicie o Capgo em seu aplicativo
@@ -248,6 +252,7 @@ please-choose-your-p: Escolha suas preferências
 please-upgrade: Atualize seu plano para adicionar mais usuários
 plugin-version: Versão do plug-in
 prediction: Predição
+price-per-unit-above: Preço por unidade acima do plano
 pro-tip-you-can-copy: 'Dica profissional: você pode copiar o'
 projection: Projeções
 recommended: Recomendado
@@ -257,6 +262,8 @@ register-desc: Preencha os campos a seguir para concluir seu cadastro
 register-heading: Cadastro
 register-next: Registro
 reload: recarregar
+resend: Reenviar
+resend-email: Reenviar Email de Confirmação
 reset-password: Redefinir senha
 reset-your-password: Redefina sua senha
 save: Economizar
@@ -297,6 +304,7 @@ thank-you-for-choosi: Obrigado por escolher a Capgo!
 the: O
 this-page-will-self-: Esta página será atualizada automaticamente
 title: título
+to: Até
 to-live-reload: para recarregar ao vivo.
 to-open-encrypted-bu: 'Para abrir o pacote criptografado, use o comando:'
 top-apps: Meus aplicativos
@@ -318,6 +326,7 @@ usage: Uso
 usage-success: Seu plano foi configurado esta página será atualizada, em alguns minutos
 usage-title: Total
 use-the-command: 'Use o comando:'
+used-in-period: Usado no período
 user: Do utilizador
 validate: Validar
 version: Versão

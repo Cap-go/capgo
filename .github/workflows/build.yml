@@ -10,24 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     name: "Build code and release"
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1
         with:
-          version: 8
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'pnpm'
+          bun-version: latest
+
       - name: Install dependencies
-        id: install_code
-        run: pnpm install --frozen-lockfile
+        run: bun install
+
       - name: Lint
         id: lint_code
-        run: pnpm lint && pnpm lint-backend
+        run: bun lint && bun lint-backend
       - name: Build
         id: build_code
-        run: pnpm mobile
+        run: bun mobile
         env:
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
@@ -35,49 +34,49 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.68.6
+          version: 1.110.1
+      - name: 🍜 Prepare Supabase
+        run: bun scripts/prepare_supabase.mjs
+      # - name: Apply Supabase Migrations TODO: make this work 
+      #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
       - name: Update functions Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: update_functions_preprod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
           BRANCH: development
-        run: node scripts/deploy_functions.mjs  
+        run: supabase functions deploy
       - name: Update functions
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: update_functions_prod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-        run: node scripts/deploy_functions.mjs 
+        run: supabase functions deploy
       - name: Create Release Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         id: create_release_prepro
-        run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
-        run: pnpm dlx @capgo/cli@latest upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+
   build_android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1
         with:
-          version: 8
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: 'pnpm'
+          bun-version: latest
       - name: Install dependencies
         id: install_code
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
       - name: Build
         id: build_code
-        run: pnpm mobile
+        run: bun mobile
       - name: Sync
         id: sync_code
-        run: pnpm --package=@capacitor/cli dlx cap sync
+        run: bun x cap sync
       - name: Setup java
         uses: actions/setup-java@v3
         with:
@@ -98,9 +97,9 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+            ~/android/.gradle/*
+            ~/android/gradle/wrapper/*
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - uses: maierj/fastlane-action@v2.3.0
@@ -145,7 +144,7 @@ jobs:
       #     run: pnpm mobile
       #   - name: Sync
       #     id: sync_code
-      #     run: pnpm --package=@capacitor/cli dlx cap sync
+      #     run: bun x @capacitor/cli cap sync
       #   - uses: ruby/setup-ruby@v1
       #     with:
       #       ruby-version: '2.7.2'

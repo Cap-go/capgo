@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
+import { sendMetaToClickHouse } from '../_utils/clickhouse.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function isUpdate(body: UpdatePayload<'app_versions'>) {
@@ -19,6 +20,10 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
   }
   if (!record.user_id) {
     console.log('no user_id')
+    return sendRes()
+  }
+  if (!record.id) {
+    console.log('no id')
     return sendRes()
   }
   const exist = await r2.checkIfExist(record.bucket_id)
@@ -60,7 +65,8 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
       // pdate size and checksum
       console.log('V2', record.bucket_id)
       const { size, checksum } = await r2.getSizeChecksum(v2Path)
-      if (size && checksum) {
+      if (size) {
+        // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
         const { error: errorUpdate } = await supabaseAdmin()
           .from('app_versions_meta')
           .update({
@@ -70,6 +76,13 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
           .eq('id', record.id)
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
+        await sendMetaToClickHouse({
+          id: record.id,
+          created_at: new Date().toISOString(),
+          app_id: record.app_id,
+          size,
+          action: 'add',
+        })
       }
     }
   }
@@ -83,7 +96,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     console.log('no bucket_id')
     return sendRes()
   }
-  if (!record.app_id || !record.user_id) {
+  if (!record.app_id || !record.user_id || !record.id) {
     console.log('no app_id or user_id')
     return sendRes()
   }
@@ -127,7 +140,13 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     console.log('Cannot find version meta', record.id)
     return sendRes()
   }
-
+  await sendMetaToClickHouse({
+    id: record.id,
+    created_at: new Date().toISOString(),
+    app_id: record.app_id,
+    size: data.size,
+    action: 'delete',
+  })
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin()
     .from('app_versions_meta')

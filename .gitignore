@@ -37,3 +37,6 @@ scripts/template/netlify/test.gplay.js
 /test-results/
 /playwright-report/
 /playwright/.cache/
+/playwright/.auth/
+CHANGELOG.md
+.history

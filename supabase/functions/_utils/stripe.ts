@@ -26,7 +26,7 @@ export async function createPortal(customerId: string, callbackUrl: string) {
   return response.data
 }
 
-async function getPriceIds(planId: string, reccurence: string): Promise<{ priceId: string | null; meteredIds: string[] }> {
+async function getPriceIds(planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
   try {
@@ -49,7 +49,7 @@ export interface MeteredData {
   [key: string]: string
 }
 
-export function parsePriceIds(prices: any): { priceId: string | null; productId: string | null; meteredData: MeteredData } {
+export function parsePriceIds(prices: any): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
   let priceId: string | null = null
   let productId: string | null = null
   const meteredData: { [key: string]: string } = {}
@@ -117,6 +117,20 @@ export async function createCustomer(email: string, userId: string, name: string
   const data = new URLSearchParams(customerData as any)
   data.append('metadata[user_id]', userId)
   const response = await axios.post('https://api.stripe.com/v1/customers', data, config)
+  return response.data
+}
+
+export async function setTreshold(subscriptionId: string) {
+  // set treshold to 5000 USD
+  const config = getConfig(true)
+  const checkoutData = {
+    billing_thresholds: {
+      amount_gte: 5000,
+      reset_billing_cycle_anchor: false,
+    },
+  }
+  const data = new URLSearchParams(checkoutData as any)
+  const response = await axios.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, data, config)
   return response.data
 }
 

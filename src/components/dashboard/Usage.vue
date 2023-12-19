@@ -4,34 +4,24 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getPlans, getTotalStats, useSupabase } from '~/services/supabase'
+import { getPlans, getTotalStorage } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { getConvertedDate, getDaysBetweenDates, octetsToGb } from '~/services/conversion'
+import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 
 const props = defineProps<{
   appId?: string
-  apps?: Database['public']['Tables']['apps']['Row'][]
 }>()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
 
-const stats = ref({
-  mau: 0,
-  storage: 0,
-  bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v2']['Returns'][0])
-
-const planSuggest = ref('')
-const planCurrrent = ref('')
 const datas = ref({
   mau: [] as number[],
   storage: [] as number[],
   bandwidth: [] as number[],
 })
-const supabase = useSupabase()
 const isLoading = ref(true)
 const main = useMainStore()
 
@@ -51,58 +41,17 @@ const allLimits = computed(() => {
   })
 })
 
-async function getAppStat(app_id: string) {
-  if (!main.user)
-    return { data: [], error: 'missing user' }
-  const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-  const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
-  if (cycleStart && cycleEnd) {
-    return supabase
-      .from('app_usage')
-      .select()
-      .eq('app_id', app_id)
-      .eq('mode', 'day')
-      .gte('created_at', getConvertedDate(cycleStart))
-      .lte('created_at', getConvertedDate(cycleEnd))
-  }
-  return supabase
-    .from('app_usage')
-    .select()
-    .eq('app_id', app_id)
-    .eq('mode', 'day')
-}
-
 async function getAppStats() {
-  if (props.appId) {
-    const t = await getAppStat(props.appId)
-    return t
-  }
-  else if (props.apps && props.apps.length > 0) {
-    const t = (await Promise.all(props.apps.map(async (app) => {
-      return await getAppStat(app.app_id)
-    })))
-    t.data = t.map(i => i.data).flat()
-    t.count = t.data.length
-    return t
-  }
-  return supabase
-    .from('app_usage')
-    .select()
-    .eq('mode', 'day')
-}
+  if (props.appId)
+    return main.filterDashboard(props.appId, main.cycleInfo?.subscription_anchor_start, main.cycleInfo?.subscription_anchor_end)
 
-async function getAllStats() {
-  if (!main.user?.id)
-    return
-
-  const date_id = new Date().toISOString().slice(0, 7)
-  stats.value = await getTotalStats(main.user?.id, date_id)
+  return main.dashboard
 }
 
 async function getUsages() {
-  const currentStorage = 0
-  const { data, error } = await getAppStats()
-  if (data && !error) {
+  const currentStorage = bytesToGb(await getTotalStorage(main.auth?.id, props.appId))
+  const data = await getAppStats()
+  if (data && data.length > 0) {
     const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
     const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
     let graphDays = getDaysInCurrentMonth()
@@ -112,31 +61,30 @@ async function getUsages() {
     datas.value.mau = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
-    data.forEach((item: Database['public']['Tables']['app_usage']['Row']) => {
-      if (item.created_at) {
-        const createdAtDate = new Date(item.created_at)
+    data.forEach((item) => {
+      if (item.date) {
+        const createdAtDate = new Date(item.date)
         const dayNumber = createdAtDate.getDate()
         if (datas.value.mau[dayNumber])
           datas.value.mau[dayNumber] += item.mau
-
         else
           datas.value.mau[dayNumber] = item.mau
 
+        const storageVal = Number.parseFloat(bytesToGb(item.storage_added - item.storage_deleted).toFixed(2))
         if (datas.value.storage[dayNumber])
-          datas.value.storage[dayNumber] += item.storage ? octetsToGb(item.storage) : 0
-
+          datas.value.storage[dayNumber] += storageVal
         else
-          datas.value.storage[dayNumber] = item.storage ? octetsToGb(item.storage) : 0
+          datas.value.storage[dayNumber] = storageVal
 
         if (datas.value.bandwidth[dayNumber])
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? octetsToGb(item.bandwidth) : 0
-
+          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
         else
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? octetsToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
       }
     })
+
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    datas.value.storage[0] = currentStorage - storageVariance
+    datas.value.storage[0] = Number.parseFloat((currentStorage - storageVariance).toFixed(2))
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
@@ -152,10 +100,6 @@ async function loadData() {
     plans.value.push(...pls)
   })
   await getUsages()
-  await getAllStats()
-  await findBestPlan(stats.value).then(res => planSuggest.value = res)
-  if (main.user?.id)
-    await getCurrentPlanName(main.user?.id).then(res => planCurrrent.value = res)
   isLoading.value = false
 }
 loadData()
@@ -175,7 +119,7 @@ loadData()
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" unit="GB"
+      :title="t('Storage')" unit="GB" :accumulated="false"
     />
     <div
       v-else

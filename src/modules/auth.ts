@@ -1,4 +1,4 @@
-import { isSpoofed, spoofUser } from './../services/supabase'
+import { isAdmin, isSpoofed, spoofUser } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
@@ -32,33 +32,39 @@ async function guard(next: any, to: string, from: string) {
         else
           return next('/onboarding/verify_email')
         const { data: dataCycle, error: errorCycle } = await supabase
-          .rpc('get_cycle_info')
+          .rpc('get_cycle_info', { userid: main.auth?.id })
           .select()
           .single()
-        if (!errorCycle && dataCycle)
+        if (!errorCycle && dataCycle) {
           main.cycleInfo = dataCycle
+          await main.updateDashboard(dataCycle.subscription_anchor_start, dataCycle.subscription_anchor_end)
+        }
       }
       catch (error) {
         console.error('auth', error)
         return next('/onboarding/verify_email')
       }
     }
+
     initStunning(main.user?.customer_id)
-    isTrial(main.user?.id).then((res) => {
+    isTrial(main.auth?.id).then((res) => {
       // console.log('isTrial', res)
       main.trialDaysLeft = res
     })
-    isPaying(main.user.id).then((res) => {
+    isPaying(main.auth?.id).then((res) => {
       main.paying = res
     })
-    isAllowedAction(main.user?.id).then((res) => {
+    isAllowedAction(main.auth?.id).then((res) => {
       main.canUseMore = res
     })
-    isGoodPlan(main.user?.id).then((res) => {
+    isGoodPlan(main.auth?.id).then((res) => {
       main.goodPlan = res
     })
-    isCanceled(main.user?.id).then((res) => {
+    isCanceled(main.auth?.id).then((res) => {
       main.canceled = res
+    })
+    isAdmin().then((res) => {
+      main.isAdmin = res
     })
 
     snag.track({
