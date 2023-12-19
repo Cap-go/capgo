@@ -222,7 +222,15 @@ onMounted(checkLogin)
                       to="/register"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
-                      {{ t('create-a-free-accoun') }}
+                      {{ t('create-a-free-account') }}
+                    </router-link>
+                  </p>
+                  <p class="text-base text-gray-600">
+                    {{ t('did-not-recive-confirm-email') }} <br> <router-link
+                      to="/resend_email"
+                      class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
+                    >
+                      {{ t('resend') }}
                     </router-link>
                   </p>
                   <p class="pt-2 text-gray-300">
