@@ -82,7 +82,7 @@ DECLARE
 BEGIN
   EXECUTE format('SELECT ($1."%s")::text', TG_ARGV[1]) using OLD into filter_value;
   EXECUTE format('SELECT ($1."%s")::text', TG_ARGV[2]) using OLD into filter_value_two;
-  SELECT format ('DELETE FROM %s WHERE %s="%s" AND %s="%s"', TG_ARGV[0], TG_ARGV[1], filter_value, AG_ARGV[2], filter_value_two) INTO sql_query;
+  SELECT format ('DELETE FROM %s WHERE %s="%s" AND %s="%s"', TG_ARGV[0], TG_ARGV[1], filter_value, TG_ARGV[2], filter_value_two) INTO sql_query;
 
   PERFORM post_replication_sql(sql_query);
   RETURN OLD;
