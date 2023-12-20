@@ -1,3 +1,4 @@
+// use_trans_macros
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
@@ -10,13 +11,20 @@ import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 // Drizze orm
-import { drizzle } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js';
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js';
+import { drizzle as drizzle_sqlite } from 'https://esm.sh/drizzle-orm@^0.29.1/d1'
 import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
-//\import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
+import * as schema_postgres from './postgress_schema.ts'
+import * as schema_sqlite from './sqlite_schema.ts'
+import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'; // do_not_change
+import { alias as alias_sqlite } from 'https://esm.sh/drizzle-orm@^0.29.1/sqlite-core';
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
-import * as schema from './postgress_schema.ts'
-// import * as schema from './sqlite_schema.ts'
-import { alias } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core';
+// import drizzle_sqlite
+// Do not change the comment above, used in codegen
+
+// This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
+const useD1Database = true
+const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
@@ -39,12 +47,16 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
+// Do not change // COPY FUNCTION STOP/START
+// This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
+// COPY FUNCTION START
+const requestInfosPostgres = async (platform: string, app_id: string, device_id: string, version_name: string) => {
   const supaUrl = getEnv('SUPABASE_DB_URL')!
 
   // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)
-  const drizzleCient = drizzle(pgClient as any) //Wish me luck ;-)
+  const { alias, schema, drizzleCient } = { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
+  
   // DO NOT CHANGE END
 
   const appVersions = drizzleCient
@@ -197,6 +209,14 @@ async function requestInfos(platform: string, app_id: string, device_id: string,
   await pgClient.end()
   return { versionData, channelData, channelOverride, devicesOverride }
 }
+// COPY FUNCTION STOP
+
+// This will be transformed in the "convert_deno_to_node.mjs" script
+// This will become the clone of requestInfosPostgres
+
+const requestInfosSqlite = (platform: string, app_id: string, device_id: string, version_name: string): ReturnType<typeof requestInfosPostgres> => { throw new Error('TODO') }
+
+const requestInfos = useD1Database && !isSupabase ? requestInfosSqlite : requestInfosPostgres
 
 export async function update(body: AppInfos) {
   // await test()

@@ -47,7 +47,7 @@
     "d1:clear": "rm -rf .wrangler",
     "d1:seed": "npx wrangler d1 execute --local --command \"$(cat ./supabase/d1.sql)\" capgo",
     "d1:local-srv": "npx wrangler dev ./cloudflare_workers/d1.js --ip 0.0.0.0 --port 6655",
-    "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:8787' deno run --allow-all supabase/functions/_script/duplicate_in_d1.ts",
+    "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:6655' deno run --allow-all supabase/functions/_script/duplicate_in_d1.ts",
     "d1:reset": "pnpm d1:clear && pnpm d1:seed",
     "d1:generate-migration": "deno run --allow-all supabase/functions/_script/generate_d1_replication_sql_migration.ts",
     "cf-edge:run": "npx wrangler dev --port 7777"
@@ -137,6 +137,7 @@
     "nprogress": "1.0.0-1",
     "pinia": "2.1.7",
     "plausible-tracker": "^0.3.8",
+    "postgres": "^3.4.3",
     "prism-theme-vars": "^0.2.4",
     "semver": "^7.5.4",
     "vue": "3.3.8",

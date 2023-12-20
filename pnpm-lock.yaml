@@ -211,7 +211,7 @@ dependencies:
     version: 3.0.6
   drizzle-orm:
     specifier: ^0.29.1
-    version: 0.29.1(@cloudflare/workers-types@4.20231121.0)
+    version: 0.29.1(@cloudflare/workers-types@4.20231121.0)(postgres@3.4.3)
   firebase:
     specifier: 10.6.0
     version: 10.6.0
@@ -257,6 +257,9 @@ dependencies:
   plausible-tracker:
     specifier: ^0.3.8
     version: 0.3.8
+  postgres:
+    specifier: ^3.4.3
+    version: 3.4.3
   prism-theme-vars:
     specifier: ^0.2.4
     version: 0.2.4
@@ -8862,7 +8865,7 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /drizzle-orm@0.29.1(@cloudflare/workers-types@4.20231121.0):
+  /drizzle-orm@0.29.1(@cloudflare/workers-types@4.20231121.0)(postgres@3.4.3):
     resolution: {integrity: sha512-yItc4unfHnk8XkDD3/bdC63vdboTY7e7I03lCF1OJYABXSIfQYU9BFTQJXMMovVeb3T1/OJWwfW/70T1XPnuUA==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
@@ -8925,6 +8928,7 @@ packages:
         optional: true
     dependencies:
       '@cloudflare/workers-types': 4.20231121.0
+      postgres: 3.4.3
     dev: false
 
   /duplexer@0.1.2:
@@ -13396,6 +13400,11 @@ packages:
       nanoid: 3.3.6
       picocolors: 1.0.0
       source-map-js: 1.0.2
+
+  /postgres@3.4.3:
+    resolution: {integrity: sha512-iHJn4+M9vbTdHSdDzNkC0crHq+1CUdFhx+YqCE+SqWxPjm+Zu63jq7yZborOBF64c8pc58O5uMudyL1FQcHacA==}
+    engines: {node: '>=12'}
+    dev: false
 
   /prebuild-install@7.1.1:
     resolution: {integrity: sha512-jAXscXWMcCK8GgCoHOfIr0ODh5ai8mj63L2nWrjuAgXE6tDyYGnx4/8o/rCgU+B4JSyZBKbeZqzhtwtC3ovxjw==}

@@ -196,14 +196,39 @@ const mutationCloudflare = [
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
   { from: '{ match: \'ver\*\', count: 5000 }', to: '{ pattern: \'ver\*\', count: 5000 })' },
   { from: 'https://esm.sh/drizzle-orm@^0.29.1', to: 'drizzle-orm' },
-  { from: 'import postgres from \'https://deno.land/x/postgresjs/mod.js\'', to: '' },
-  { from: 'drizzle-orm/pg-core', to: 'drizzle-orm/sqlite-core' },
+  { from: 'import postgres from \'https://deno.land/x/postgresjs/mod.js\'', to: 'import postgres from \'postgres\';' },
+  { transform: (current) => {
+    // from: 'drizzle-orm/pg-core', to: 'drizzle-orm/sqlite-core'
+    // (.*(?:abc).*(?<! \/\/ do_not_change)$)
+    if (!current.includes('do_not_change_drizzle_to_sqlite')) {
+      current = current.replace(/(.*(?:drizzle-orm\/pg-core).*(?<! \/\/ do_not_change)$)/mg, 'drizzle-orm/sqlite-core')
+    }
+    return current
+  } },
   { from: './postgress_schema.ts', to: './sqlite_schema.ts' },
   { from: 'drizzle-orm/postgres-js', to: 'drizzle-orm/d1' },
-  { from: 'const pgClient = postgres(supaUrl)', to: '' },
-  { from: 'drizzle(pgClient as any)', to: 'drizzle(getEnv(\'DB\') as any)' },
+  // { from: 'drizzle(pgClient as any)', to: 'drizzle(getEnv(\'DB\') as any)' },
   { from: 'await pgClient.end()', to: '' },
-  { from: '//import presign s3', to: 'import { getSignedUrl as s3GetSignedUrl } from "@aws-sdk/s3-request-presigner";' }
+  { from: '//import presign s3', to: 'import { getSignedUrl as s3GetSignedUrl } from "@aws-sdk/s3-request-presigner";' },
+  { from: '// import drizzle_sqlite', to: 'import { drizzle as drizzle_sqlite } from \'drizzle-orm/d1\'\nimport * as schema_sqlite from \'./sqlite_schema.ts\'\nimport { alias as alias_sqlite } from \'drizzle-orm/sqlite-core\';' },
+  { from: 'isSupabase = true', to: 'isSupabase = false' },
+  { transform: (current) => {
+      if (current.includes('use_trans_macros')) {
+
+        let functionToCopy = current.split('COPY FUNCTION START')[1].split('\n// COPY FUNCTION STOP')[0]
+        functionToCopy = functionToCopy.replace('requestInfosPostgres', 'requestInfosSqlite')
+        functionToCopy = functionToCopy.replace(
+          '{ alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }',
+          '{ alias: alias_sqlite, schema: schema_sqlite, drizzleCient: drizzle_sqlite(getEnv(\'DB\') as any) }'
+        )
+        functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// Removed line')
+
+        current = current.replace(/(.*(?:requestInfosSqlite).*)/, functionToCopy)
+
+      }
+      return current
+    } 
+  }
   // { from: 'const bucket = \'capgo\'', to: 'const bucket = \'capgo\'\nimport { Buffer } from \'node:buffer\'' }
   // { from: supaTempl.redis, to: netlifyTempl.redis },
   // { from: '.ts\'', to: '\'' },
@@ -283,8 +308,12 @@ for (let i = 0; i < files.length; i++) {
 
   let newContentCloudflare = `// This code is generated don't modify it\n${content}`
   mutationCloudflare.forEach((m) => {
-    const { from, to } = m
-    newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+    const { from, to, transform } = m
+    if (transform) {
+      newContentCloudflare = transform(newContentCloudflare)
+    } else {
+      newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+    }
   })
 
   // write in new path
@@ -329,8 +358,12 @@ catch (e) {
 
       let newContentCloudfare = `// This code is generated don't modify it\n${content}`
       mutationCloudflare.forEach((m) => {
-        const { from, to } = m
-        newContentCloudfare = newContentCloudfare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+        const { from, to, transform } = m
+        if (transform) {
+          newContentCloudfare = transform(newContentCloudfare)
+        } else {
+          newContentCloudfare = newContentCloudfare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+        }
       })
 
       console.log('Generate :', `${baseNetlifyUtils}/${f}`)
@@ -368,8 +401,12 @@ catch (e) {
 
     let newContentCloudflare = `// This code is generated don't modify it\n${content}`
     mutationCloudflare.forEach((m) => {
-      const { from, to } = m
-      newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+      const { from, to, transform } = m
+      if (transform) {
+        newContentCloudflare = transform(newContentCloudflare)
+      } else {
+        newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
+      }
     })
     console.log('Generate :', `${baseNetlifyTests}/${f}`)
     writeFileSync(`${baseNetlifyTests}/${f}`, newContent)
