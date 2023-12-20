@@ -302,8 +302,8 @@ devDependencies:
     specifier: ^2.2.145
     version: 2.2.145
   '@playwright/test':
-    specifier: next
-    version: 1.41.0-alpha-nov-23-2023
+    specifier: ^1.40.1
+    version: 1.40.1
   '@tailwindcss/aspect-ratio':
     specifier: ^0.4.2
     version: 0.4.2(tailwindcss@3.3.5)
@@ -3575,12 +3575,12 @@ packages:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.15.0
 
-  /@playwright/test@1.41.0-alpha-nov-23-2023:
-    resolution: {integrity: sha512-UnQGiVO1SylmNSRdKkYx+ijxw5YG+D+xSWPKTPXButkNrUVUmkz+DutjE58g71ZGloTuflAJvvOQLYQzIDK4Mw==}
+  /@playwright/test@1.40.1:
+    resolution: {integrity: sha512-EaaawMTOeEItCRvfmkI9v6rBkF1svM8wjl/YPRrg2N2Wmp+4qJYkWtJsbew1szfKKDm6fPLy4YAanBhIlf9dWw==}
     engines: {node: '>=16'}
     hasBin: true
     dependencies:
-      playwright: 1.41.0-alpha-nov-23-2023
+      playwright: 1.40.1
     dev: true
 
   /@polka/url@1.0.0-next.21:
@@ -11415,18 +11415,18 @@ packages:
     engines: {node: '>=10'}
     dev: false
 
-  /playwright-core@1.41.0-alpha-nov-23-2023:
-    resolution: {integrity: sha512-sqB3THKyX+u9R1vDfRJXQZsFTPslKlJ0C6AO6HDXbUFykbOBdZTi9bG+n0VxX+l5rv6UXU4m+jkuEfSYKuCH4w==}
+  /playwright-core@1.40.1:
+    resolution: {integrity: sha512-+hkOycxPiV534c4HhpfX6yrlawqVUzITRKwHAmYfmsVreltEl6fAZJ3DPfLMOODw0H3s1Itd6MDCWmP1fl/QvQ==}
     engines: {node: '>=16'}
     hasBin: true
     dev: true
 
-  /playwright@1.41.0-alpha-nov-23-2023:
-    resolution: {integrity: sha512-cuw9V1zRixCC0lw7ROsU5YFoYcz0zn8FylN9pyY9BOFw0p+AfZCiCfWx2sDMAuyF5anBvVSy6S48csp9vTOQ3w==}
+  /playwright@1.40.1:
+    resolution: {integrity: sha512-2eHI7IioIpQ0bS1Ovg/HszsN/XKNwEG1kbzSDDmADpclKc7CyqkHw7Mg2JCz/bbCxg25QUPcjksoMW7JcIFQmw==}
     engines: {node: '>=16'}
     hasBin: true
     dependencies:
-      playwright-core: 1.41.0-alpha-nov-23-2023
+      playwright-core: 1.40.1
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
