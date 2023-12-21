@@ -11,13 +11,10 @@ import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 // Drizze orm
-import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js';
-import { drizzle as drizzle_sqlite } from 'https://esm.sh/drizzle-orm@^0.29.1/d1'
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js'; // do_not_change
 import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
-import * as schema_postgres from './postgress_schema.ts'
-import * as schema_sqlite from './sqlite_schema.ts'
+import * as schema_postgres from './postgress_schema.ts' // do_not_change
 import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'; // do_not_change
-import { alias as alias_sqlite } from 'https://esm.sh/drizzle-orm@^0.29.1/sqlite-core';
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
 // import drizzle_sqlite
 // Do not change the comment above, used in codegen

@@ -1,5 +1,4 @@
-// do_not_change_drizzle_to_sqlite
-import { pgEnum, pgTable, varchar, bigint, timestamp, uuid, boolean, text, jsonb, doublePrecision } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core';
+import { pgEnum, pgTable, varchar, bigint, timestamp, uuid, boolean, text, jsonb, doublePrecision } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'; // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ["major", "minor", "version_number", "none"])
 

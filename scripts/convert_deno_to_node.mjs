@@ -195,16 +195,17 @@ const mutationCloudflare = [
   { from: 'Promise<Response>', to: 'Promise<any>' },
   { from: 'btoa(STRIPE_TOKEN)', to: 'Buffer.from(STRIPE_TOKEN).toString(\'base64\')' },
   { from: '{ match: \'ver\*\', count: 5000 }', to: '{ pattern: \'ver\*\', count: 5000 })' },
-  { from: 'https://esm.sh/drizzle-orm@^0.29.1', to: 'drizzle-orm' },
+  { from: 'https://esm.sh/drizzle-orm@^0.29.1', to: 'drizzle-orm', force: true },
   { from: 'import postgres from \'https://deno.land/x/postgresjs/mod.js\'', to: 'import postgres from \'postgres\';' },
-  { transform: (current) => {
-    // from: 'drizzle-orm/pg-core', to: 'drizzle-orm/sqlite-core'
-    // (.*(?:abc).*(?<! \/\/ do_not_change)$)
-    if (!current.includes('do_not_change_drizzle_to_sqlite')) {
-      current = current.replace(/(.*(?:drizzle-orm\/pg-core).*(?<! \/\/ do_not_change)$)/mg, 'drizzle-orm/sqlite-core')
-    }
-    return current
-  } },
+  // { transform: (current) => {
+  //   // from: 'drizzle-orm/pg-core', to: 'drizzle-orm/sqlite-core'
+  //   // (.*(?:abc).*(?<! \/\/ do_not_change)$)
+  //   if (!current.includes('do_not_change_drizzle_to_sqlite')) {
+  //     current = current.replace(/(.*(?:drizzle-orm\/pg-core).*(?<! \/\/ do_not_change)$)/mg, 'drizzle-orm/sqlite-core')
+  //   }
+  //   return current
+  // } },
+  { from: 'drizzle-orm/pg-core', to: 'drizzle-orm/sqlite-core' },
   { from: './postgress_schema.ts', to: './sqlite_schema.ts' },
   { from: 'drizzle-orm/postgres-js', to: 'drizzle-orm/d1' },
   // { from: 'drizzle(pgClient as any)', to: 'drizzle(getEnv(\'DB\') as any)' },
@@ -221,7 +222,9 @@ const mutationCloudflare = [
           '{ alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }',
           '{ alias: alias_sqlite, schema: schema_sqlite, drizzleCient: drizzle_sqlite(getEnv(\'DB\') as any) }'
         )
-        functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// Removed line')
+        functionToCopy = functionToCopy.replace('const pgClient = postgres(supaUrl)', '// removed line')
+
+        // functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// Removed line')
 
         current = current.replace(/(.*(?:requestInfosSqlite).*)/, functionToCopy)
 
@@ -276,6 +279,21 @@ catch (e) {
   mkdirSync(baseNetlifyCloudflare, { recursive: true })
 }
 
+function applyMutations(mutations, content) {
+  mutations.forEach((m) => {
+    const { from, to, transform, force } = m
+    if (transform) {
+      content = transform(content)
+    } else {
+      const regexp = new RegExp(`${escapeRegExp(from)}${!force ? '(?=.*(?<!do_not_change)$)' : ''}`, 'gm')
+      console.log(regexp)
+      content = content.replace(regexp, to)
+    }
+  })
+
+  return content
+}
+
 for (let i = 0; i < files.length; i++) {
   const file = files[i]
   const netlifyFile = netlifyFiles[i]
@@ -289,32 +307,16 @@ for (let i = 0; i < files.length; i++) {
   const content = readFileSync(file, 'utf8')
 
   let newContent = `// This code is generated don't modify it\n${content}`
-  mutationsNode.forEach((m) => {
-    const { from, to } = m
-    newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
-  })
+  newContent = applyMutations(mutationsNode, newContent)
 
   let newContentEdge = `// This code is generated don't modify it\n${content}`
-  mutationsEgde.forEach((m) => {
-    const { from, to } = m
-    newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
-  })
+  newContentEdge = applyMutations(mutationsEgde, newContentEdge)
 
   let newContentBg = `${newContent}`
-  mutationsBg.forEach((m) => {
-    const { from, to } = m
-    newContentBg = newContentBg.replace(new RegExp(escapeRegExp(from), 'g'), to)
-  })
+  newContentBg = applyMutations(mutationsBg, newContentBg)
 
   let newContentCloudflare = `// This code is generated don't modify it\n${content}`
-  mutationCloudflare.forEach((m) => {
-    const { from, to, transform } = m
-    if (transform) {
-      newContentCloudflare = transform(newContentCloudflare)
-    } else {
-      newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
-    }
-  })
+  newContentCloudflare = applyMutations(mutationCloudflare, newContentCloudflare)
 
   // write in new path
   console.log('Generate :', netlifyFile)
@@ -345,26 +347,13 @@ catch (e) {
     if (allowedUtil.includes(fileName)) {
       const content = readFileSync(`${baseSupaUtils}/${f}`, 'utf8')
       let newContent = `// This code is generated don't modify it\n${content}`
-      mutationsNode.forEach((m) => {
-        const { from, to } = m
-        newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
-      })
+      newContent = applyMutations(mutationsNode, newContent)
 
       let newContentEdge = `// This code is generated don't modify it\n${content}`
-      mutationsEgde.forEach((m) => {
-        const { from, to } = m
-        newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
-      })
+      newContentEdge = applyMutations(mutationsEgde, newContentEdge)
 
       let newContentCloudfare = `// This code is generated don't modify it\n${content}`
-      mutationCloudflare.forEach((m) => {
-        const { from, to, transform } = m
-        if (transform) {
-          newContentCloudfare = transform(newContentCloudfare)
-        } else {
-          newContentCloudfare = newContentCloudfare.replace(new RegExp(escapeRegExp(from), 'g'), to)
-        }
-      })
+      newContentCloudfare = applyMutations(mutationCloudflare, newContentCloudfare)
 
       console.log('Generate :', `${baseNetlifyUtils}/${f}`)
       writeFileSync(`${baseNetlifyUtils}/${f}`, newContent)
@@ -389,25 +378,14 @@ catch (e) {
     // if allowedUtil file copy to netlify/_utils
     const content = readFileSync(`${baseSupaTests}/${f}`, 'utf8')
     let newContent = `// This code is generated don't modify it\n${content}`
-    mutationsNode.forEach((m) => {
-      const { from, to } = m
-      newContent = newContent.replace(new RegExp(escapeRegExp(from), 'g'), to)
-    })
+    newContent = applyMutations(mutationsNode, newContent)
+
     let newContentEdge = `// This code is generated don't modify it\n${content}`
-    mutationsEgde.forEach((m) => {
-      const { from, to } = m
-      newContentEdge = newContentEdge.replace(new RegExp(escapeRegExp(from), 'g'), to)
-    })
+    newContentEdge = applyMutations(mutationsEgde, newContentEdge)
 
     let newContentCloudflare = `// This code is generated don't modify it\n${content}`
-    mutationCloudflare.forEach((m) => {
-      const { from, to, transform } = m
-      if (transform) {
-        newContentCloudflare = transform(newContentCloudflare)
-      } else {
-        newContentCloudflare = newContentCloudflare.replace(new RegExp(escapeRegExp(from), 'g'), to)
-      }
-    })
+    newContentCloudflare = applyMutations(mutationCloudflare, newContentCloudflare)
+
     console.log('Generate :', `${baseNetlifyTests}/${f}`)
     writeFileSync(`${baseNetlifyTests}/${f}`, newContent)
     writeFileSync(`${baseNetlifyEdgeTests}/${f}`, newContentEdge)
