@@ -1,3 +1,4 @@
+/// <reference lib="deno.ns" />
 import { Client, Pool } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import * as p from 'npm:@clack/prompts@0.7.0';
 
@@ -68,6 +69,9 @@ async function migrationTable(client: Client, table: string) {
       // TODO: AUTH FOR ACCUAL API
       return fetch(d1HttpUrl, {
         method: 'POST',
+        headers: {
+          "Authorization": `Bearer ${Deno.env.get('D1_CF_APIKEY' ?? '')}`
+        },
         body: JSON.stringify({
           sql: sqlQuery,
           params: values
