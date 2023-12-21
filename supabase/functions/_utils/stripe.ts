@@ -26,7 +26,7 @@ export async function createPortal(customerId: string, callbackUrl: string) {
   return response.data
 }
 
-async function getPriceIds(planId: string, reccurence: string): Promise<{ priceId: string | null; meteredIds: string[] }> {
+async function getPriceIds(planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
   try {
@@ -49,7 +49,7 @@ export interface MeteredData {
   [key: string]: string
 }
 
-export function parsePriceIds(prices: any): { priceId: string | null; productId: string | null; meteredData: MeteredData } {
+export function parsePriceIds(prices: any): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
   let priceId: string | null = null
   let productId: string | null = null
   const meteredData: { [key: string]: string } = {}

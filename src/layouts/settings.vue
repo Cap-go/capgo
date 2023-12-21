@@ -53,7 +53,8 @@ if (!Capacitor.isNativePlatform()) {
 }
 watchEffect(() => {
   if (main.paying && !tabs.value.find(tab => tab.label === 'usage')) {
-    tabs.value.push({
+    // push it 2 before the last tab
+    tabs.value.splice(tabs.value.length - 2, 0, {
       label: 'usage',
       icon: shallowRef(IconPlans) as any,
       key: '/dashboard/settings/usage',

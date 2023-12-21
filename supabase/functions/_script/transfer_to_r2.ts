@@ -1,4 +1,6 @@
-import 'https://deno.land/x/dotenv/load.ts' // set it to ../_utils/r2.ts too to make it work
+import 'https://deno.land/x/dotenv/load.ts'
+
+// set it to ../_utils/r2.ts too to make it work
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import type { Database } from '../_utils/supabase.types.ts'
 import { r2 } from '../_utils/r2.ts'

@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.325.0-alpha.5",
+  "version": "10.334.0",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "preview-https": "serve dist",
     "mobile": "vite build --mode mobile && cap copy",
-    "capacitor-assets": "npx @capacitor/assets generate --assetPath assets --iconBackgroundColor '#111827' --iconBackgroundColorDark '#111827' --splashBackgroundColor '#111827' --splashBackgroundColorDark '#111827' --logoSplashScale 0.3",
+    "capacitor-assets": "bunx @capacitor/assets generate --assetPath assets --iconBackgroundColor '#111827' --iconBackgroundColorDark '#111827' --splashBackgroundColor '#111827' --splashBackgroundColorDark '#111827' --logoSplashScale 0.3",
     "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
     "sync": "cap sync",
     "sync:ios": "cap sync ios",
@@ -19,7 +19,7 @@
     "serve-dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
     "reset": "supabase db reset",
-    "dev": "npx netlify dev --port 8881",
+    "dev": "bunx netlify dev --port 8881",
     "test:e2e": "cypress open",
     "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts backend",
     "test:cli": "deno run --allow-all tests_backend/run_backend_tests.ts cli",
@@ -33,18 +33,18 @@
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
-    "types": "node ./scripts/getTypes.mjs",
-    "generate:node_serverless": "rm -rf netlify && node ./scripts/convert_deno_to_node.mjs",
     "generate:cf_serverless": "npm run generate:node_serverless && node scripts/generate_denoflare.mjs",
     "deploy:cf_serverless": "cd cloudflare_workers_deno && denoflare push capgoloadbal && cd .. ",
-    "dev-types": "BRANCH=development node ./scripts/getTypes.mjs",
+    "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && sudo bash -c 'rm -rf ./tests_backend/gh_actions/ch_data/ && rm -rf ./tests_backend/gh_actions/ch_logs/'",
+    "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
+    "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\"",
+    "types": "bun ./scripts/getTypes.mjs",
+    "generate:node_serverless": "rm -rf netlify && bun ./scripts/convert_deno_to_node.mjs",
+    "dev-types": "BRANCH=development bun ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit",
     "ionic:build": "vite build",
     "ionic:serve": "vite",
-    "size": "npx vite-bundle-visualizer",
-    "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && sudo bash -c 'rm -rf ./tests_backend/gh_actions/ch_data/ && rm -rf ./tests_backend/gh_actions/ch_logs/'",
-    "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
-    "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\""
+    "size": "bunx vite-bundle-visualizer"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "^4.0.0",
@@ -101,6 +101,7 @@
     "atropos": "^1.0.2",
     "axios": "^1.6.2",
     "base64-arraybuffer": "1.0.2",
+    "bun-types": "^1.0.17",
     "capacitor-rate-app": "4.0.3",
     "capacitor-secure-storage-plugin": "^0.9.0",
     "chart.js": "^4.4.0",
@@ -142,10 +143,10 @@
     "@antfu/eslint-config": "2.1.0",
     "@capacitor/cli": "^5.5.1",
     "@capacitor/core": "^5.5.1",
-    "@iconify-json/carbon": "1.1.22",
+    "@iconify-json/carbon": "1.1.25",
     "@iconify-json/heroicons": "^1.1.13",
-    "@iconify-json/ion": "1.1.13",
-    "@iconify-json/ls": "1.1.5",
+    "@iconify-json/ion": "1.1.14",
+    "@iconify-json/ls": "1.1.7",
     "@iconify/json": "^2.2.145",
     "@playwright/test": "^1.40.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
@@ -159,10 +160,9 @@
     "@types/lodash.debounce": "^4.0.9",
     "@types/mime": "^3.0.4",
     "@types/minio": "^7.1.1",
-    "@types/node": "20.9.4",
     "@types/nprogress": "^0.2.3",
     "@types/uuid": "9.0.7",
-    "@vitejs/plugin-vue": "4.5.0",
+    "@vitejs/plugin-vue": "4.5.2",
     "@vitejs/plugin-vue-jsx": "^3.1.0",
     "@vue/cli-service": "5.0.8",
     "@vue/compiler-sfc": "3.3.8",
@@ -170,7 +170,7 @@
     "autoprefixer": "^10.4.16",
     "critters": "0.0.20",
     "cross-env": "^7.0.3",
-    "cypress": "13.6.0",
+    "cypress": "13.6.1",
     "eslint": "8.54.0",
     "eslint-plugin-cypress": "^2.15.1",
     "http-server": "^14.1.1",
@@ -179,7 +179,7 @@
     "postcss": "^8.4.31",
     "sass": "1.69.5",
     "tailwindcss": "^3.3.5",
-    "typescript": "5.3.2",
+    "typescript": "5.3.3",
     "unplugin-icons": "0.17.4",
     "unplugin-vue-components": "^0.25.2",
     "vite": "5.0.2",
@@ -195,7 +195,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "pnpm run lint"
+      "pre-commit": "bun run lint"
     }
   }
 }

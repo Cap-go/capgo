@@ -52,12 +52,10 @@ app-not-found: Anwendung nicht gefunden
 are-u-sure: Bist du dir sicher ?
 available-in-the-san: Verfügbar in der Sandbox-App
 back-to-login-page: Zurück zur Anmeldeseite
+base: Base
 best-plan: Bester Plan
 bigger-app-size: Größere App-Größe
 billing: Abrechnung
-current-billing-cycle: Aktueller Abrechnungszyklus
-from: von
-to: Bis
 build-your-app-and-s: Erstellen Sie Ihre App und synchronisieren Sie sie
 build-your-code-and-: Laden Sie Ihren Code auf Capgo hoch
 bulk-upload: Bulk-Upload
@@ -109,6 +107,9 @@ check-on-web: Überprüfen Sie auf der Website
 checksum: Prüfsumme
 commands: Befehle
 confirm-email: Bestätige deine E-Mail
+confirm-email-sent: >-
+  Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
+  E-Mail zu bestätigen.
 confirm-password: Bestätige das Passwort
 confirm-public-desc: >-
   Wenn Sie diesen Kanal als Standard festlegen, werden Updates an alle Ihre
@@ -122,6 +123,7 @@ copy-your: Kopieren Sie Ihre
 country: Land
 create-a-free-accoun: Erstelle einen kostenlosen Account
 created-at: Hergestellt in
+current-billing-cycle: Aktueller Abrechnungszyklus
 custom-domain: Benutzerdefinierten Domain
 custom-id: Benutzerdefinierte ID
 custom-id-saved: Benutzerdefinierte ID gespeichert
@@ -137,6 +139,7 @@ device: Gerät
 device-id: Geräte ID
 devices: Geräte
 devices-using-this-b: Geräte, die dieses Paket verwenden
+did-not-recive-confirm-email: Haben Sie die Bestätigungs-E-Mail nicht erhalten?
 disable-auto-downgra: Deaktivieren Sie das automatische Downgrade unter native
 disable-auto-upgrade: Deaktivieren Sie das automatische Upgrade über Major
 discord: Zwietracht
@@ -163,11 +166,13 @@ forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
   erhalten
 forgot-success: Passwort erfolgreich aktualisiert
+from: von
 from-device: vom Gerät
 good: Gut
 id: AUSWEIS
 in-your-main-file: In Ihrer Hauptdatei
 in-your-project-fold: In Ihrem Projektordner
+included-in-plan: Im Plan enthalten
 info: Information
 informations: Informationen
 init-capgo-in-your-a: Initieren Sie Capgo in Ihrer App
@@ -263,6 +268,7 @@ please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 plugin-version: Plugin-Version
 prediction: Vorhersage
+price-per-unit-above: Preis pro Einheit über Plan
 pro-tip-you-can-copy: 'Pro-Tipp: Sie können die'
 projection: Projektionen
 recommended: Empfohlen
@@ -272,6 +278,8 @@ register-desc: Füllen Sie die folgenden Felder aus, um Ihre Registrierung abzus
 register-heading: Anmeldung
 register-next: Registrieren
 reload: Neu laden
+resend: Erneut senden
+resend-email: Bestätigungs-E-Mail erneut senden
 reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
 save: Speichert
@@ -312,6 +320,7 @@ thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
 the: Der
 this-page-will-self-: Diese Seite wird sich selbst aktualisieren
 title: Titel
+to: Bis
 to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
@@ -333,6 +342,7 @@ usage: Verwendung
 usage-success: Ihr Plan wurde eingerichtet. Diese Seite wird in wenigen Minuten aktualisiert
 usage-title: Gesamt
 use-the-command: 'Verwenden Sie den Befehl:'
+used-in-period: In der Zeit verwendet
 user: Benutzer
 validate: Bestätigen
 version: Ausführung
@@ -350,9 +360,3 @@ your-api-key: 'Ihr API-Schlüssel:'
 your-are-a: Dein Gebiet
 your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist
-resend-email: Bestätigungs-E-Mail erneut senden
-confirm-email-sent: >-
-  Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
-  E-Mail zu bestätigen.
-did-not-recive-confirm-email: Haben Sie die Bestätigungs-E-Mail nicht erhalten?
-resend: Erneut senden

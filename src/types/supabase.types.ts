@@ -38,6 +38,7 @@ export interface Database {
           {
             foreignKeyName: 'apikeys_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -66,6 +67,7 @@ export interface Database {
           {
             foreignKeyName: 'app_live_id_fkey'
             columns: ['id']
+            isOneToOne: true
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -124,12 +126,14 @@ export interface Database {
           {
             foreignKeyName: 'app_stats_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'app_stats_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -139,7 +143,7 @@ export interface Database {
         Row: {
           app_id: string
           bandwidth: number
-          created_at: string | null
+          date: string | null
           fails: number
           get: number
           id: string
@@ -152,7 +156,7 @@ export interface Database {
         Insert: {
           app_id: string
           bandwidth?: number
-          created_at?: string | null
+          date?: string | null
           fails?: number
           get?: number
           id?: string
@@ -165,7 +169,7 @@ export interface Database {
         Update: {
           app_id?: string
           bandwidth?: number
-          created_at?: string | null
+          date?: string | null
           fails?: number
           get?: number
           id?: string
@@ -230,12 +234,14 @@ export interface Database {
           {
             foreignKeyName: 'app_versions_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'app_versions_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -285,18 +291,21 @@ export interface Database {
           {
             foreignKeyName: 'app_versions_meta_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'app_versions_meta_id_fkey'
             columns: ['id']
+            isOneToOne: true
             referencedRelation: 'app_versions'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'app_versions_meta_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -340,6 +349,7 @@ export interface Database {
           {
             foreignKeyName: 'apps_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -374,18 +384,21 @@ export interface Database {
           {
             foreignKeyName: 'channel_devices_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'channel_devices_channel_id_fkey'
             columns: ['channel_id']
+            isOneToOne: false
             referencedRelation: 'channels'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'channel_devices_created_by_fkey'
             columns: ['created_by']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -423,24 +436,28 @@ export interface Database {
           {
             foreignKeyName: 'channel_users_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'channel_users_channel_id_fkey'
             columns: ['channel_id']
+            isOneToOne: false
             referencedRelation: 'channels'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'channel_users_created_by_fkey'
             columns: ['created_by']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'channel_users_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -520,24 +537,28 @@ export interface Database {
           {
             foreignKeyName: 'channels_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'channels_created_by_fkey'
             columns: ['created_by']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'channels_secondVersion_fkey'
             columns: ['secondVersion']
+            isOneToOne: false
             referencedRelation: 'app_versions'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'channels_version_fkey'
             columns: ['version']
+            isOneToOne: false
             referencedRelation: 'app_versions'
             referencedColumns: ['id']
           },
@@ -635,18 +656,21 @@ export interface Database {
           {
             foreignKeyName: 'devices_override_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'devices_override_created_by_fkey'
             columns: ['created_by']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'devices_override_version_fkey'
             columns: ['version']
+            isOneToOne: false
             referencedRelation: 'app_versions'
             referencedColumns: ['id']
           },
@@ -723,6 +747,7 @@ export interface Database {
           {
             foreignKeyName: 'notifications_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -763,24 +788,28 @@ export interface Database {
           {
             foreignKeyName: 'org_users_app_id_fkey'
             columns: ['app_id']
+            isOneToOne: false
             referencedRelation: 'apps'
             referencedColumns: ['app_id']
           },
           {
             foreignKeyName: 'org_users_channel_id_fkey'
             columns: ['channel_id']
+            isOneToOne: false
             referencedRelation: 'channels'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'org_users_org_id_fkey'
             columns: ['org_id']
+            isOneToOne: false
             referencedRelation: 'orgs'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'org_users_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -1082,6 +1111,7 @@ export interface Database {
           {
             foreignKeyName: 'stripe_info_product_id_fkey'
             columns: ['product_id']
+            isOneToOne: false
             referencedRelation: 'plans'
             referencedColumns: ['stripe_id']
           },
@@ -1137,12 +1167,14 @@ export interface Database {
           {
             foreignKeyName: 'users_customer_id_fkey'
             columns: ['customer_id']
+            isOneToOne: true
             referencedRelation: 'stripe_info'
             referencedColumns: ['customer_id']
           },
           {
             foreignKeyName: 'users_id_fkey'
             columns: ['id']
+            isOneToOne: true
             referencedRelation: 'users'
             referencedColumns: ['id']
           },
@@ -1339,16 +1371,16 @@ export interface Database {
         }
       get_cycle_info:
         | {
-          Args: {
-            userid: string
-          }
+          Args: Record<PropertyKey, never>
           Returns: {
             subscription_anchor_start: string
             subscription_anchor_end: string
           }[]
         }
         | {
-          Args: Record<PropertyKey, never>
+          Args: {
+            userid: string
+          }
           Returns: {
             subscription_anchor_start: string
             subscription_anchor_end: string
@@ -1413,15 +1445,12 @@ export interface Database {
         }
       get_plan_usage_percent:
         | {
-          Args: {
-            dateid: string
-          }
+          Args: Record<PropertyKey, never>
           Returns: number
         }
         | {
           Args: {
             userid: string
-            dateid: string
           }
           Returns: number
         }
@@ -1473,14 +1502,20 @@ export interface Database {
         }
         | {
           Args: {
-            userid: string
-            app_id: string
+            appid: string
           }
           Returns: number
         }
         | {
           Args: {
             userid: string
+          }
+          Returns: number
+        }
+        | {
+          Args: {
+            userid: string
+            appid: string
           }
           Returns: number
         }
@@ -1543,12 +1578,20 @@ export interface Database {
           }
           Returns: boolean
         }
-      is_allowed_action: {
-        Args: {
-          apikey: string
+      is_allowed_action:
+        | {
+          Args: {
+            apikey: string
+          }
+          Returns: boolean
         }
-        Returns: boolean
-      }
+        | {
+          Args: {
+            apikey: string
+            appid: string
+          }
+          Returns: boolean
+        }
       is_allowed_action_user:
         | {
           Args: Record<PropertyKey, never>
@@ -1577,6 +1620,13 @@ export interface Database {
           Returns: boolean
         }
       is_app_owner:
+        | {
+          Args: {
+            apikey: string
+            appid: string
+          }
+          Returns: boolean
+        }
         | {
           Args: {
             appid: string
@@ -1640,7 +1690,7 @@ export interface Database {
       is_good_plan_v4:
         | {
           Args: Record<PropertyKey, never>
-          Returns: number
+          Returns: boolean
         }
         | {
           Args: {
@@ -1732,13 +1782,13 @@ export interface Database {
       is_version_shared:
         | {
           Args: {
+            userid: string
             versionid: number
           }
           Returns: boolean
         }
         | {
           Args: {
-            userid: string
             versionid: number
           }
           Returns: boolean
@@ -1788,3 +1838,83 @@ export interface Database {
     }
   }
 }
+
+export type Tables<
+  PublicTableNameOrOptions extends
+  | keyof (Database['public']['Tables'] & Database['public']['Views'])
+  | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions['schema']]['Tables'] &
+    Database[PublicTableNameOrOptions['schema']]['Views'])
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions['schema']]['Tables'] &
+  Database[PublicTableNameOrOptions['schema']]['Views'])[TableName] extends {
+      Row: infer R
+    }
+      ? R
+      : never
+  : PublicTableNameOrOptions extends keyof (Database['public']['Tables'] &
+  Database['public']['Views'])
+    ? (Database['public']['Tables'] &
+    Database['public']['Views'])[PublicTableNameOrOptions] extends {
+        Row: infer R
+      }
+        ? R
+        : never
+    : never
+
+export type TablesInsert<
+  PublicTableNameOrOptions extends
+  | keyof Database['public']['Tables']
+  | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
+    Insert: infer I
+  }
+    ? I
+    : never
+  : PublicTableNameOrOptions extends keyof Database['public']['Tables']
+    ? Database['public']['Tables'][PublicTableNameOrOptions] extends {
+      Insert: infer I
+    }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  PublicTableNameOrOptions extends
+  | keyof Database['public']['Tables']
+  | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
+    Update: infer U
+  }
+    ? U
+    : never
+  : PublicTableNameOrOptions extends keyof Database['public']['Tables']
+    ? Database['public']['Tables'][PublicTableNameOrOptions] extends {
+      Update: infer U
+    }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  PublicEnumNameOrOptions extends
+  | keyof Database['public']['Enums']
+  | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions['schema']]['Enums']
+    : never = never,
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : PublicEnumNameOrOptions extends keyof Database['public']['Enums']
+    ? Database['public']['Enums'][PublicEnumNameOrOptions]
+    : never

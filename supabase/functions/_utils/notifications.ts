@@ -8,8 +8,7 @@ interface EventData {
   [key: string]: any
 }
 
-async function sendNow(eventName: string, eventData: EventData,
-  email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
+async function sendNow(eventName: string, eventData: EventData, email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
   console.log('send notif', eventName, email, color)
   await trackEvent(email, eventData, eventName)
   if (past != null) {

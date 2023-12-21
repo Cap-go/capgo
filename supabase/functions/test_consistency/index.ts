@@ -1,9 +1,20 @@
 import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 import {
-  baseNetlify, baseNetlifyEdge, baseSupabase, deleteBundle,
-  deleteDevice, getBundle, getChannels, getDevice,
-  getOk, postDevice, postStats, postUpdate, putChannel,
-  setChannel, setChannelSelf,
+  baseNetlify,
+  baseNetlifyEdge,
+  baseSupabase,
+  deleteBundle,
+  deleteDevice,
+  getBundle,
+  getChannels,
+  getDevice,
+  getOk,
+  postDevice,
+  postStats,
+  postUpdate,
+  putChannel,
+  setChannel,
+  setChannelSelf,
 } from '../_tests/api.ts'
 import { sendRes } from '../_utils/utils.ts'
 

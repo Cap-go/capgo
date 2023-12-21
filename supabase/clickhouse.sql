@@ -173,27 +173,36 @@ GROUP BY date, app_id;
 -- MAU aggregation
 -- 
 
--- CREATE TABLE IF NOT EXISTS mau
--- (
---     date Date,
---     app_id String,
---     total UInt64,
---     version UInt64 -- This column is used to determine the latest record
--- ) ENGINE = ReplacingMergeTree(version) -- Specify the version column for deduplication
--- PARTITION BY toYYYYMM(date)
--- ORDER BY (date, app_id);
+CREATE TABLE IF NOT EXISTS mau
+(
+    date Date,
+    app_id String,
+    mau UInt64
+) ENGINE = SummingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_id);
 
--- -- Recreate the mau_mv materialized view
--- CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
--- TO mau
--- AS
--- SELECT
---     toDate(created_at) AS date,
---     app_id,
---     countDistinct(device_id) AS total,
---     maxState(created_at) AS version -- Use the maximum created_at as the version
--- FROM logs
--- GROUP BY date, app_id;
+CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
+TO mau
+AS
+SELECT
+    minDate AS date,
+    app_id,
+    countDistinct(device_id) AS mau
+FROM
+    (
+    SELECT
+        min(toDate(created_at)) AS minDate,
+        app_id,
+        device_id
+    FROM logs
+    WHERE 
+        created_at >= toStartOfMonth(toDate(now())) 
+        AND created_at < toStartOfMonth(toDate(now()) + INTERVAL 1 MONTH)
+    GROUP BY device_id, app_id
+    )
+GROUP BY date, app_id;
+
 
 -- 
 -- Stats aggregation
@@ -283,6 +292,19 @@ GROUP BY ld.date, ld.app_id, a.storage_added, a.storage_deleted, ld.bandwidth, m
 -- GROUP BY device_id, app_id;
 
 
+-- Aggregate table partitioned by version only
+CREATE TABLE IF NOT EXISTS version_aggregate_logs
+(
+    version Int64,
+    total_installs Int64,
+    total_failures Int64,
+    unique_devices Int64,
+    install_percent Float64,
+    failure_percent Float64
+) ENGINE = AggregatingMergeTree()
+PARTITION BY version
+ORDER BY version;
+
 -- 
 -- Install and fail stats
 -- 
@@ -300,18 +322,7 @@ CREATE TABLE IF NOT EXISTS daily_aggregate_logs
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, version);
 
-CREATE TABLE IF NOT EXISTS version_aggregate_logs
-(
-    version Int64,
-    total_installs Int64,
-    total_failures Int64,
-    unique_devices Int64,
-    install_percent Float64,
-    failure_percent Float64
-) ENGINE = AggregatingMergeTree()
-PARTITION BY version
-ORDER BY version;
-
+-- Create a Materialized View that aggregates data daily
 CREATE MATERIALIZED VIEW daily_aggregate_logs_mv TO daily_aggregate_logs AS
 SELECT 
     toDate(created_at) AS date,

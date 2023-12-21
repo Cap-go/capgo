@@ -1,13 +1,17 @@
 {
-  "name": "locales",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "translate.js",
+  "base": "Base",
   "dependencies": {
     "js-yaml": "^4.1.0",
     "openai": "^4.12.3"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.7"
-  }
+  },
+  "included-in-plan": "Included in plan",
+  "main": "translate.js",
+  "name": "locales",
+  "price-per-unit-above": "Price per unit above plan",
+  "type": "module",
+  "used-in-period": "Used in period",
+  "version": "1.0.0"
 }
