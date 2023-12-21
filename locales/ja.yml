@@ -46,12 +46,10 @@ app-not-found: アプリが見つかりません
 are-u-sure: 本気ですか ？
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
+base: ベース
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
 billing: 請求する
-current-billing-cycle: 現在の請求サイクル
-from: 請求元
-to: 請求先
 build-your-app-and-s: アプリをビルドして同期する
 build-your-code-and-: コードを Capgo にアップロードする
 bulk-upload: 一括アップロード
@@ -103,6 +101,7 @@ check-on-web: ウェブサイトでチェック
 checksum: チェックサム
 commands: コマンド
 confirm-email: メールを確認する
+confirm-email-sent: 確認メールが送信されました。リンクをクリックしてメールアドレスを確認してください。
 confirm-password: パスワードを認証する
 confirm-public-desc: |-
   このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
@@ -114,6 +113,7 @@ copy-your: あなたのコピー
 country: 国
 create-a-free-accoun: 無料アカウントを作成
 created-at: で作成
+current-billing-cycle: 現在の請求サイクル
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 custom-id-saved: カスタム ID を保存しました
@@ -129,6 +129,7 @@ device: デバイス
 device-id: デバイスID
 devices: デバイス
 devices-using-this-b: このバンドルを使用するデバイス
+did-not-recive-confirm-email: 確認メールが届きませんでしたか？
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
 disable-auto-upgrade: メジャーを超える自動アップグレードを無効にする
 discord: 不和
@@ -151,11 +152,13 @@ force-version: 強制バージョン
 forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました
+from: 請求元
 from-device: デバイスから
 good: 良い
 id: ID
 in-your-main-file: メインファイルで
 in-your-project-fold: プロジェクト フォルダー内
+included-in-plan: プランに含まれるもの
 info: 情報
 informations: インフォメーション
 init-capgo-in-your-a: アプリで Capgo を初期化する
@@ -245,6 +248,7 @@ please-choose-your-p: お好みを選択してください
 please-upgrade: プランをアップグレードしてユーザーを追加してください
 plugin-version: プラグインのバージョン
 prediction: 予測
+price-per-unit-above: 上記プランの1台あたりの価格
 pro-tip-you-can-copy: 'プロのヒント: をコピーできます'
 projection: 予測
 recommended: おすすめされた
@@ -254,6 +258,8 @@ register-desc: 次のフィールドに入力して、登録を完了します
 register-heading: 登録
 register-next: 登録
 reload: リロード
+resend: 再送信してください
+resend-email: 確認メールを再送してください
 reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
 save: セーブ
@@ -294,6 +300,7 @@ thank-you-for-choosi: Capgo をお選びいただきありがとうございま�
 the: の
 this-page-will-self-: このページは自動的に更新されます
 title: タイトル
+to: 請求先
 to-live-reload: リロードを生きます。
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps: 私のアプリ
@@ -315,6 +322,7 @@ usage: 使用法
 usage-success: プランが設定されました。このページは数分後に更新されます
 usage-title: 合計
 use-the-command: 次のコマンドを使用します。
+used-in-period: 期間内に使用
 user: ユーザー
 validate: 検証
 version: バージョン
@@ -332,7 +340,3 @@ your-api-key: 'API キー:'
 your-are-a: あなたは
 your-current-plan-is: 現在のプランは
 your-current-suggested-plan-is: 現在お勧めのプランは
-resend-email: 確認メールを再送してください
-confirm-email-sent: 確認メールが送信されました。リンクをクリックしてメールアドレスを確認してください。
-did-not-recive-confirm-email: 確認メールが届きませんでしたか？
-resend: 再送信してください

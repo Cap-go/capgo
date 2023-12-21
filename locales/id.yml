@@ -46,12 +46,10 @@ app-not-found: Aplikasi tidak ditemukan
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
+base: Basis
 best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
 billing: Penagihan
-current-billing-cycle: Siklus Penagihan Saat Ini
-from: Dari
-to: Ke
 build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
 build-your-code-and-: Unggah ke Capgo kode Anda
 bulk-upload: Unggahan massal
@@ -103,6 +101,9 @@ check-on-web: Periksa di situs web
 checksum: Checksum
 commands: perintah
 confirm-email: Konfirmasi email Anda
+confirm-email-sent: >-
+  Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
+  Anda
 confirm-password: Konfirmasi sandi
 confirm-public-desc: >-
   Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
@@ -116,6 +117,7 @@ copy-your: Salin Anda
 country: Negara
 create-a-free-accoun: Buat Akun gratis
 created-at: Dibuat di
+current-billing-cycle: Siklus Penagihan Saat Ini
 custom-domain: Domain khusus
 custom-id: ID khusus
 custom-id-saved: ID khusus disimpan
@@ -131,6 +133,7 @@ device: Perangkat
 device-id: ID perangkat
 devices: Perangkat
 devices-using-this-b: Perangkat yang menggunakan bundel ini
+did-not-recive-confirm-email: Tidak menerima email konfirmasi?
 disable-auto-downgra: Nonaktifkan downgrade otomatis di bawah native
 disable-auto-upgrade: Nonaktifkan pemutakhiran otomatis di atas mayor
 discord: Perselisihan
@@ -157,11 +160,13 @@ forgot-check-email: >-
   Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
   Anda
 forgot-success: Kata sandi berhasil diperbarui
+from: Dari
 from-device: dari perangkat
 good: Bagus
 id: PENGENAL
 in-your-main-file: Di file utama Anda
 in-your-project-fold: Di folder proyek Anda
+included-in-plan: Termasuk dalam rencana
 info: Informasi
 informations: Informasi
 init-capgo-in-your-a: Init Capgo di aplikasi Anda
@@ -253,6 +258,7 @@ please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
 prediction: Ramalan
+price-per-unit-above: Harga per unit di atas rencana
 pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
 projection: Proyeksi
 recommended: Direkomendasikan
@@ -262,6 +268,8 @@ register-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
 register-heading: Registrasi
 register-next: Daftar
 reload: Muat ulang
+resend: Kirim ulang
+resend-email: Kirim Ulang Email Konfirmasi
 reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 save: Menghemat
@@ -302,6 +310,7 @@ thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri
 title: judul
+to: Ke
 to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
@@ -325,6 +334,7 @@ usage-success: >-
   menit
 usage-title: Total
 use-the-command: 'Gunakan perintah:'
+used-in-period: Digunakan dalam periode
 user: Pengguna
 validate: Mengesahkan
 version: 'Versi: kapan'
@@ -342,9 +352,3 @@ your-api-key: 'Kunci API Anda:'
 your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
-resend-email: Kirim Ulang Email Konfirmasi
-confirm-email-sent: >-
-  Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
-  Anda
-did-not-recive-confirm-email: Tidak menerima email konfirmasi?
-resend: Kirim ulang

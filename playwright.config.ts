@@ -14,7 +14,7 @@ const webServer: PlaywrightTestConfig['webServer'] = []
 
 if (!process.env.SKIP_BACKEND_START) {
   webServer.push({
-    command: 'ENV=local pnpm run backend',
+    command: 'ENV=local bun run backend',
     port: 54321,
     timeout: 60_000,
     reuseExistingServer: true,
@@ -25,7 +25,7 @@ else {
 }
 
 webServer.push({
-  command: 'pnpm run prebuild-serve-dev',
+  command: 'bun run prebuild-serve-dev',
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,

@@ -191,8 +191,7 @@ export async function setChannel(baseUrl: string) {
   const url = `${baseUrl}/channel`
   const response = await axios.post<typeof defaultRes>(url, {
 
-  },
-  {
+  }, {
     headers,
   })
   return response.data

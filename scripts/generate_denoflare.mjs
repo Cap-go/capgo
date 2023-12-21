@@ -68,4 +68,12 @@ async function generateConfig() {
   writeFileSync('cloudflare_workers_deno/generated_functions_map.ts', finalMapFile)
 }
 
+console.log('Generating DenoFlare config...')
 generateConfig()
+  .then(() => {
+    console.log('Done!')
+  })
+  .catch((err) => {
+    console.error(err)
+  })
+

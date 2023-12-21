@@ -98,33 +98,6 @@ FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 GROUP BY date, l.app_id;
 
-CREATE TABLE IF NOT EXISTS mau
-(
-    date Date,
-    app_id String,
-    mau UInt64
-) ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
-
-CREATE MATERIALIZED VIEW mau_mv
-TO mau
-AS
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
-FROM logs
-GROUP BY date, app_id;
-
-INSERT INTO mau
-SELECT
-    toDate(created_at) AS date,
-    app_id,
-    countDistinctIf(device_id, created_at >= toStartOfMonth(date) AND created_at < toStartOfMonth(date + INTERVAL 1 MONTH)) AS mau
-FROM logs
-GROUP BY date, app_id;
-
 CREATE TABLE IF NOT EXISTS app_versions_meta
 (
     created_at DateTime64(6),
@@ -157,4 +130,181 @@ SELECT
     sumIf(size, action = 'delete') AS storage_deleted
 FROM app_versions_meta
 GROUP BY date, app_id;
+
+-- 
+-- MAU aggregation
+-- 
+
+CREATE TABLE IF NOT EXISTS mau
+(
+    date Date,
+    app_id String,
+    mau UInt64
+) ENGINE = SummingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_id);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
+TO mau
+AS
+SELECT
+    minDate AS date,
+    app_id,
+    countDistinct(device_id) AS mau
+FROM
+    (
+    SELECT
+        min(toDate(created_at)) AS minDate,
+        app_id,
+        device_id
+    FROM logs
+    WHERE 
+        created_at >= toStartOfMonth(toDate(now())) 
+        AND created_at < toStartOfMonth(toDate(now()) + INTERVAL 1 MONTH)
+    GROUP BY device_id, app_id
+    )
+GROUP BY date, app_id;
+
+
+-- 
+-- Stats aggregation
+-- 
+
+CREATE TABLE IF NOT EXISTS aggregate_daily
+(
+    date Date,
+    app_id String,
+    storage_added Int64,
+    storage_deleted Int64,
+    bandwidth Int64,
+    mau UInt64,
+    get UInt64,
+    fail UInt64,
+    install UInt64,
+    uninstall UInt64,
+) ENGINE = SummingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_id);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS aggregate_daily_mv
+TO aggregate_daily
+AS
+SELECT
+    ld.date as date,
+    ld.app_id as app_id,
+    a.storage_added as storage_added,
+    a.storage_deleted as storage_deleted,
+    ld.bandwidth as bandwidth,
+    -- Get the MAU value for each app_id and date
+    m.total AS mau,
+    ld.get as get,
+    ld.fail as fail,
+    ld.install as install,
+    ld.uninstall as uninstall
+FROM logs_daily AS ld
+FULL JOIN app_storage_daily AS a ON ld.date = a.date AND ld.app_id = a.app_id
+LEFT JOIN mau AS m ON ld.date = m.date AND ld.app_id = m.app_id
+GROUP BY ld.date, ld.app_id, a.storage_added, a.storage_deleted, ld.bandwidth, m.total, ld.get, ld.fail, ld.install, ld.uninstall;
+
+
+-- OPTIONAL TABLES
+
+-- 
+-- Sessions stats
+-- 
+
+-- CREATE TABLE IF NOT EXISTS sessions
+-- (
+--     device_id String,
+--     app_id String,
+--     session_start DateTime64(6),
+--     session_end DateTime64(6)
+-- ) ENGINE = ReplacingMergeTree()
+-- ORDER BY (app_id, device_id, session_start)
+-- PRIMARY KEY (app_id, device_id, session_start);
+
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sessions
+-- TO sessions AS
+-- SELECT
+--     device_id,
+--     app_id,
+--     anyIf(created_at, action = 'app_moved_to_foreground') as session_start,
+--     anyIf(created_at, action = 'app_moved_to_background') as session_end
+-- FROM logs
+-- WHERE (action = 'app_moved_to_foreground' OR action = 'app_moved_to_background')
+-- GROUP BY device_id, app_id
+-- HAVING session_start < session_end;
+
+-- CREATE TABLE IF NOT EXISTS avg_session_length
+-- (
+--     device_id String,
+--     app_id String,
+--     avg_length Float64
+-- ) ENGINE = AggregatingMergeTree()
+-- ORDER BY (app_id, device_id)
+-- PRIMARY KEY (app_id, device_id);
+
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mv_avg_session_length
+-- TO avg_session_length AS
+-- SELECT
+--     device_id,
+--     app_id,
+--     avg(toUnixTimestamp(session_end) - toUnixTimestamp(session_start)) as avg_length
+-- FROM sessions
+-- GROUP BY device_id, app_id;
+
+
+-- Aggregate table partitioned by version only
+CREATE TABLE IF NOT EXISTS version_aggregate_logs
+(
+    version Int64,
+    total_installs Int64,
+    total_failures Int64,
+    unique_devices Int64,
+    install_percent Float64,
+    failure_percent Float64
+) ENGINE = AggregatingMergeTree()
+PARTITION BY version
+ORDER BY version;
+
+-- 
+-- Install and fail stats
+-- 
+
+CREATE TABLE IF NOT EXISTS daily_aggregate_logs
+(
+    date Date,
+    version Int64,
+    total_installs Int64,
+    total_failures Int64,
+    unique_devices Int64,
+    install_percent Float64,
+    failure_percent Float64
+) ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, version);
+
+-- Create a Materialized View that aggregates data daily
+CREATE MATERIALIZED VIEW daily_aggregate_logs_mv TO daily_aggregate_logs AS
+SELECT 
+    toDate(created_at) AS date,
+    version,
+    countIf(action = 'set') AS total_installs,
+    countIf(action IN ('set_fail', 'update_fail', 'download_fail')) AS total_failures,
+    uniq(device_id) AS unique_devices,
+    total_installs / unique_devices * 100 AS install_percent,
+    total_failures / unique_devices * 100 AS failure_percent
+FROM logs
+GROUP BY date, version;
+
+CREATE MATERIALIZED VIEW version_aggregate_logs_mv TO version_aggregate_logs AS
+SELECT 
+    version,
+    countIf(action = 'set') AS total_installs,
+    countIf(action IN ('set_fail', 'update_fail', 'download_fail')) AS total_failures,
+    uniq(device_id) AS unique_devices,
+    total_installs / unique_devices * 100 AS install_percent,
+    total_failures / unique_devices * 100 AS failure_percent
+FROM logs
+GROUP BY version;
 

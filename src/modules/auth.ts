@@ -32,18 +32,20 @@ async function guard(next: any, to: string, from: string) {
         else
           return next('/onboarding/verify_email')
         const { data: dataCycle, error: errorCycle } = await supabase
-          .rpc('get_cycle_info')
+          .rpc('get_cycle_info', { userid: main.auth?.id })
           .select()
           .single()
-        if (!errorCycle && dataCycle)
+        if (!errorCycle && dataCycle) {
           main.cycleInfo = dataCycle
+          await main.updateDashboard(dataCycle.subscription_anchor_start, dataCycle.subscription_anchor_end)
+        }
       }
       catch (error) {
         console.error('auth', error)
         return next('/onboarding/verify_email')
       }
     }
-    await main.updateDashboard()
+
     initStunning(main.user?.customer_id)
     isTrial(main.auth?.id).then((res) => {
       // console.log('isTrial', res)

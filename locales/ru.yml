@@ -50,6 +50,7 @@ app-not-found: Приложение не найдено
 are-u-sure: Вы уверены ?
 available-in-the-san: Доступно в приложении песочницы
 back-to-login-page: Назад на страницу входа
+base: База
 best-plan: Лучший план
 bigger-app-size: Большой размер приложения
 billing: Выставление счетов
@@ -57,9 +58,6 @@ build-your-app-and-s: создайте свое приложение и синх
 build-your-code-and-: Загрузите в Capgo свой код
 bulk-upload: Массовая загрузка
 bundle: Пучок
-current-billing-cycle: Текущий цикл выставления счетов
-from: С сайта
-to: По
 bundle-deleted: Группа удалена
 bundle-is-linked-channel: Пакет привязан к каналу, сначала отсоедините его.
 bundle-is-linked-device: Пакет привязан к устройству, сначала отсоедините его.
@@ -107,6 +105,9 @@ check-on-web: Проверить на сайте
 checksum: Контрольная сумма
 commands: команды
 confirm-email: Подтвердите ваш адрес электронной почты
+confirm-email-sent: >-
+  Подтверждающее письмо было отправлено, нажмите на ссылку, чтобы подтвердить
+  свой электронный адрес.
 confirm-password: Подтвердите пароль
 confirm-public-desc: >-
   Установка этого канала по умолчанию заставит его отправлять обновления всем
@@ -118,6 +119,7 @@ copy-your: Скопируйте свой
 country: Страна
 create-a-free-accoun: Создать бесплатный аккаунт
 created-at: Создан в
+current-billing-cycle: Текущий цикл выставления счетов
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
 custom-id-saved: Пользовательский идентификатор сохранен
@@ -133,6 +135,7 @@ device: Устройство
 device-id: Идентификатор устройства
 devices: Устройства
 devices-using-this-b: Устройства, использующие этот пакет
+did-not-recive-confirm-email: Не получили подтверждающее письмо?
 disable-auto-downgra: Отключить автоматическое понижение версии под нативным
 disable-auto-upgrade: Отключить автоматическое обновление выше основного
 discord: Раздор
@@ -155,11 +158,13 @@ force-version: Принудительная версия
 forgot: Забыл
 forgot-check-email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
 forgot-success: Пароль успешно обновлен
+from: С сайта
 from-device: с устройства
 good: Хороший
 id: ИДЕНТИФИКАТОР
 in-your-main-file: В вашем основном файле
 in-your-project-fold: В папке вашего проекта
+included-in-plan: Включено в план
 info: Информация
 informations: Информация
 init-capgo-in-your-a: Инициируйте Capgo в своем приложении
@@ -251,6 +256,7 @@ please-choose-your-p: Пожалуйста, выберите ваши предп
 please-upgrade: Обновите свой план, чтобы добавить больше пользователей
 plugin-version: Версия плагина
 prediction: Прогноз
+price-per-unit-above: Цена за единицу сверх плана
 pro-tip-you-can-copy: 'Совет: вы можете скопировать'
 projection: Прогнозы
 recommended: рекомендуемые
@@ -260,6 +266,8 @@ register-desc: Заполните следующие поля, чтобы зав
 register-heading: Постановка на учет
 register-next: регистр
 reload: Перезагрузить
+resend: Повторно отправить
+resend-email: Отправить письмо подтверждения еще раз
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
 save: Сохраняет
@@ -300,6 +308,7 @@ thank-you-for-choosi: Спасибо, что выбрали Капго!
 the: ''
 this-page-will-self-: Эта страница будет автоматически обновляться
 title: заголовок
+to: По
 to-live-reload: жить перезагрузить.
 to-open-encrypted-bu: 'Чтобы открыть зашифрованный пакет, используйте команду:'
 top-apps: Мои приложения
@@ -323,6 +332,7 @@ usage-success: >-
   минут.
 usage-title: Общий
 use-the-command: 'Используйте команду:'
+used-in-period: Используется в период
 user: Пользователь
 validate: Подтвердить
 version: Версия
@@ -340,9 +350,3 @@ your-api-key: 'Ваш ключ API:'
 your-are-a: Вы
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'
-resend-email: Отправить письмо подтверждения еще раз
-confirm-email-sent: >-
-  Подтверждающее письмо было отправлено, нажмите на ссылку, чтобы подтвердить
-  свой электронный адрес.
-did-not-recive-confirm-email: Не получили подтверждающее письмо?
-resend: Повторно отправить

@@ -1,8 +1,14 @@
 import { logsnag } from './logsnag.ts'
 import { sendNotif } from './notifications.ts'
 import {
-  getCurrentPlanName, getPlanUsagePercent,
-  isFreeUsage, isGoodPlan, isOnboarded, isOnboardingNeeded, isTrial, supabaseAdmin,
+  getCurrentPlanName,
+  getPlanUsagePercent,
+  isFreeUsage,
+  isGoodPlan,
+  isOnboarded,
+  isOnboardingNeeded,
+  isTrial,
+  supabaseAdmin,
 } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { recordUsage, setTreshold } from './stripe.ts'

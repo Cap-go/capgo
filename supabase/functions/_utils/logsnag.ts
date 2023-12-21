@@ -16,7 +16,7 @@ const logsnag = getEnv('LOGSNAG_TOKEN')
       insights: () => Promise.resolve(true),
     }
 
-async function insights(data: { title: string; value: string | boolean | number; icon: string }[]) {
+async function insights(data: { title: string, value: string | boolean | number, icon: string }[]) {
   const all = []
   console.log('logsnag', data)
   for (const d of data)

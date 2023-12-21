@@ -46,12 +46,10 @@ app-not-found: 앱을 찾을 수 없음
 are-u-sure: 확실합니까 ?
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
+base: 베이스
 best-plan: 최고의 계획
 bigger-app-size: 더 큰 앱 크기
 billing: 청구
-current-billing-cycle: 현재 청구 주기
-from: From
-to: To
 build-your-app-and-s: 앱 빌드 및 동기화
 build-your-code-and-: Capgo에 코드 업로드
 bulk-upload: 대량 업로드
@@ -103,6 +101,7 @@ check-on-web: 웹사이트에서 확인
 checksum: 체크섬
 commands: 명령
 confirm-email: 이메일 확인
+confirm-email-sent: 확인 이메일이 전송되었습니다. 이메일을 확인하려면 링크를 클릭하세요.
 confirm-password: 비밀번호 확인
 confirm-public-desc: |-
   이 채널을 기본으로 설정하면 모든 사용자에게 업데이트가 전송됩니다.
@@ -114,6 +113,7 @@ copy-your: 복사
 country: 국가
 create-a-free-accoun: 무료 계정 만들기
 created-at: 만든 시간
+current-billing-cycle: 현재 청구 주기
 custom-domain: 맞춤 도메인
 custom-id: 맞춤 ID
 custom-id-saved: 맞춤 ID가 저장됨
@@ -129,6 +129,7 @@ device: 장치
 device-id: 장치 아이디
 devices: 장치
 devices-using-this-b: 이 번들을 사용하는 기기
+did-not-recive-confirm-email: 확인 이메일을 받지 못하셨나요?
 disable-auto-downgra: 네이티브에서 자동 다운그레이드 비활성화
 disable-auto-upgrade: 메이저 이상의 자동 업그레이드 비활성화
 discord: 불화
@@ -151,11 +152,13 @@ force-version: 포스 버전
 forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
+from: From
 from-device: 장치에서
 good: 좋은
 id: ID
 in-your-main-file: 기본 파일에서
 in-your-project-fold: 프로젝트 폴더에서
+included-in-plan: 계획에 포함됨
 info: 정보
 informations: 정보
 init-capgo-in-your-a: 앱에서 Capgo 초기화
@@ -245,6 +248,7 @@ please-choose-your-p: 기본 설정을 선택하십시오
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
 prediction: 예측
+price-per-unit-above: 계획보다 높은 단위당 가격
 pro-tip-you-can-copy: '전문가 팁:'
 projection: 예측
 recommended: 추천
@@ -254,6 +258,8 @@ register-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 register-heading: 등록
 register-next: 등록하다
 reload: 새로고침
+resend: 재전송
+resend-email: 확인 이메일 재전송
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 save: 저장
@@ -294,6 +300,7 @@ thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
 title: 제목
+to: To
 to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps: 나의 앱들
@@ -315,6 +322,7 @@ usage: 용법
 usage-success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
 usage-title: 총
 use-the-command: 다음 명령을 사용하십시오.
+used-in-period: 기간에 사용
 user: 사용자
 validate: 확인
 version: 버전
@@ -332,7 +340,3 @@ your-api-key: '귀하의 API 키:'
 your-are-a: 당신은
 your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은 다음과 같습니다.
-resend-email: 확인 이메일 재전송
-confirm-email-sent: 확인 이메일이 전송되었습니다. 이메일을 확인하려면 링크를 클릭하세요.
-did-not-recive-confirm-email: 확인 이메일을 받지 못하셨나요?
-resend: 재전송

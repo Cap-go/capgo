@@ -10,7 +10,7 @@ interface RedisInterface {
   hdel(key: string, ...fields: string[]): Promise<number>
   pipeline(): RedisPipelineInterface
   tx(): RedisPipelineInterface
-  hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]>
+  hscan(key: string, cursor: number, opts?: { pattern: string, count: number }): Promise<[string, string[]]>
   hset(key: string, field: string, value: RedisValue): Promise<void>
   hmget(key: string, ...fields: string[]): Promise<(string | null | undefined)[]>
 }
@@ -89,7 +89,7 @@ export class RedisRedis implements RedisInterface {
     return new RedisRedisPipeline(this.redis.tx())
   }
 
-  async hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]> {
+  async hscan(key: string, cursor: number, opts?: { pattern: string, count: number }): Promise<[string, string[]]> {
     return await this.redis.hscan(key, cursor, opts)
   }
 
@@ -113,7 +113,7 @@ export class RedisUpstashImpl implements RedisInterface {
     return await this.redis.hdel(key, ...fields)
   }
 
-  async hscan(key: string, cursor: number, opts?: { pattern: string; count: number }): Promise<[string, string[]]> {
+  async hscan(key: string, cursor: number, opts?: { pattern: string, count: number }): Promise<[string, string[]]> {
     const [resultCursor, result] = await this.redis.hscan(
       key,
       cursor,

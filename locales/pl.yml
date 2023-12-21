@@ -5,10 +5,6 @@ Filters: Filtry
 Override: Nadpisanie
 Storage: Składowanie
 account: Konto
-channel-ab-testing: Włącz testowanie AB
-channel-ab-testing-percentage: Procent użytkowników którzy otrzymają drugą wersję
-disable-ab-testing: Wyłączono testy AB
-enabled-ab-testing: Włączono testy AB
 account-error: Błąd podczas aktualizowania konta
 account-password-error: Wystąpił błąd, spróbuj ponownie
 account-password-heading: Zmień moje hasło
@@ -57,12 +53,10 @@ app-not-found: Nie znaleziono aplikacji
 are-u-sure: Jesteś pewny ?
 available-in-the-san: Dostępne w aplikacji piaskownicy
 back-to-login-page: Powrót do strony logowania
+base: Baza
 best-plan: Najlepszy plan
 bigger-app-size: Większy rozmiar aplikacji
 billing: Dane do faktury
-current-billing-cycle: Obecny cykl płatniczy
-from: od
-to: do
 build-your-app-and-s: zbuduj swoją aplikację i zsynchronizuj
 build-your-code-and-: Prześlij do Capgo swój kod
 bulk-upload: Przesyłanie zbiorcze
@@ -99,6 +93,8 @@ cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
 change: Zmiana
 changed-password-suc: Hasło zostało zmienione pomyślnie
 channel: Kanał
+channel-ab-testing: Włącz testowanie AB
+channel-ab-testing-percentage: Procent użytkowników którzy otrzymają drugą wersję
 channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
 channel-forced-devices: Wymuszone urządzenia
@@ -115,6 +111,9 @@ check-on-web: Sprawdź na stronie internetowej
 checksum: Suma kontrolna
 commands: polecenia
 confirm-email: Potwierdź swój email
+confirm-email-sent: >-
+  Wysłano email z potwierdzeniem, kliknij link, aby potwierdzić swój adres
+  email.
 confirm-password: Potwierdź hasło
 confirm-public-desc: >-
   Ustawienie tego kanału jako domyślnego spowoduje wysyłanie aktualizacji do
@@ -128,6 +127,7 @@ copy-your: Skopiuj swój
 country: Kraj
 create-a-free-accoun: Utwórz bezpłatne konto
 created-at: Utworzono o godz
+current-billing-cycle: Obecny cykl płatniczy
 custom-domain: Domena niestandardowa
 custom-id: Identyfikator niestandardowy
 custom-id-saved: Niestandardowy identyfikator został zapisany
@@ -143,6 +143,8 @@ device: Urządzenie
 device-id: Identyfikator urzadzenia
 devices: Urządzenia
 devices-using-this-b: Urządzenia korzystające z tego pakietu
+did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
+disable-ab-testing: Wyłączono testy AB
 disable-auto-downgra: Wyłącz automatyczne obniżanie wersji natywnej
 disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej wersji głównej
 discord: Niezgoda
@@ -153,6 +155,7 @@ dont-have-an-account: Nie masz konta?
 download: Pobierać
 email: E-mail
 email-address: Adres e-mail
+enabled-ab-testing: Włączono testy AB
 encrypted: Zaszyfrowane pakiety
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
@@ -165,12 +168,14 @@ force-version: Wersja na siłę
 forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione
+from: od
 from-device: z urządzenia
 generated-new-apikey: Nowy klucz API został wygenerowany!
 good: Dobry
 id: ID
 in-your-main-file: W twoim głównym pliku
 in-your-project-fold: W twoim folderze projektu
+included-in-plan: Zawarte w planie
 info: Informacja
 informations: Informacje
 init-capgo-in-your-a: Zainicjuj Capgo w swojej aplikacji
@@ -265,6 +270,7 @@ please-choose-your-p: Wybierz swoje preferencje
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 plugin-version: Wersja wtyczki
 prediction: Prognoza
+price-per-unit-above: Cena za jednostkę powyżej planu
 pro-tip-you-can-copy: 'Pro wskazówka: możesz skopiować plik'
 projection: projekcje
 recommended: Zalecana
@@ -275,6 +281,8 @@ register-heading: Rejestracja
 register-next: Rejestr
 reload: Przeładować
 removed-apikey: Klucz API został pomyślnie usunięty
+resend: Ponownie wyślij
+resend-email: Wyślij ponownie email z potwierdzeniem
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
 save: Zapisuje
@@ -315,6 +323,7 @@ thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 the: The
 this-page-will-self-: Ta strona odświeży się samoczynnie
 title: tytuł
+to: do
 to-live-reload: przeładować na żywo.
 to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
 top-apps: Moje aplikacje
@@ -338,6 +347,7 @@ usage-success: >-
   minut
 usage-title: Całkowity
 use-the-command: 'Użyj polecenia:'
+used-in-period: Używany w okresie
 user: Użytkownik
 validate: Uprawomocnić
 version: Wersja
@@ -355,9 +365,3 @@ your-api-key: 'Twój klucz API:'
 your-are-a: Twoja okolica
 your-current-plan-is: Twój obecny plan to
 your-current-suggested-plan-is: Twój aktualny sugerowany plan to
-resend-email: Wyślij ponownie email z potwierdzeniem
-confirm-email-sent: >-
-  Wysłano email z potwierdzeniem, kliknij link, aby potwierdzić swój adres
-  email.
-did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
-resend: Ponownie wyślij

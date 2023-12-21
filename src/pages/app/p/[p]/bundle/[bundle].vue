@@ -407,7 +407,7 @@ async function openDownload() {
           if (!version.value)
             return
           if (version.value.session_key) {
-            const command = `npx @capgo/cli bundle decrypt ./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'} ${version.value.session_key} --key ./.capgo_key`
+            const command = `bunx @capgo/cli bundle decrypt ./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'} ${version.value.session_key} --key ./.capgo_key`
             displayStore.dialogOption = {
               header: '',
               message: `${t('to-open-encrypted-bu')}<br/><code>${command}</code>`,
