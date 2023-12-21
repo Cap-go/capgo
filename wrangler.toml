@@ -1,6 +1,8 @@
 name = "capgoloadbal"
 compatibility_date = "2022-04-05"
 workers_dev = false
+main = "./cloudflare_workers_deno/main_router.ts"
+node_compat = true
 
 [[d1_databases]]
 binding = "DB" # i.e. available in your Worker on env.DB

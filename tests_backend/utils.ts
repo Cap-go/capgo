@@ -103,6 +103,9 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
       SKIP_BACKEND: 'true',
       SUPABASE_ANON: supabaseAnonToken!,
       SUPABASE_URL: supabaseUrl!,
+      START_FRONTEND: 'true',
+      BACKEND_URL: backendUrl.toString(),
+      // BACKEND_URL: 'http://localhost:7777', 
       ...env,
     },
   })

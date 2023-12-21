@@ -1,5 +1,6 @@
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import { getEnv } from './utils.ts'
+//import presign s3
 
 const accountid = getEnv('R2_ACCOUNT_ID')
 const access_key_id = getEnv('R2_ACCESS_KEY_ID')
