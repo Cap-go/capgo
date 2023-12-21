@@ -7,10 +7,12 @@ DECLARE
   request_id text;
 BEGIN 
   SELECT INTO request_id net.http_post(
-    url := 'http://host.docker.internal:6655',
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'd1_http_url'),
     headers := jsonb_build_object(
       'Content-Type',
-      'application/json'
+      'application/json',
+      'Authorization',
+      (select format('Bearer %s', (select decrypted_secret from vault.decrypted_secrets where name = 'd1_cf_apikey')))
     ),
     body := jsonb_build_object(
       'sql',
