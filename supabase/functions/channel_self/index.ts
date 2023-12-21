@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import z from 'https://deno.land/x/zod@v3.22.2/index.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -10,6 +9,8 @@ import { redisDeviceInvalidate } from '../_utils/redis.ts'
 interface DeviceLink extends AppInfos {
   channel?: string
 }
+
+const devicePlatformScheme = z.union([z.literal('ios'), z.literal('android')])
 
 export const jsonRequestSchema = z.object({
   app_id: z.string({
@@ -30,6 +31,7 @@ export const jsonRequestSchema = z.object({
   }),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
+  platform: devicePlatformScheme,
 }).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
   message: INVALID_STRING_APP_ID,
 }).refine(data => deviceIdRegex.test(data.device_id), {
@@ -123,7 +125,7 @@ async function post(body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
-  if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
+  if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
     console.error('Cannot change device override current channel don\t allow it', { channel, dataChannelOverride })
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',
@@ -141,6 +143,7 @@ async function post(body: DeviceLink): Promise<Response> {
       .eq('allow_device_self_set', true)
       .single()
     if (dbError || !dataChannel) {
+      console.log(channel, app_id)
       console.error('Cannot find channel', { dbError, dataChannel })
       return sendRes({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
@@ -151,14 +154,20 @@ async function post(body: DeviceLink): Promise<Response> {
     // Get the main channel
     const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin()
       .from('channels')
-      .select('name')
+      .select('name, ios, android')
       .eq('app_id', app_id)
       .eq('public', true)
-      .single()
 
     // We DO NOT return if there is no main channel as it's not a critical error
     // We will just set the channel_devices as the user requested
-    const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
+    let mainChannelName = null as string | null
+    if (!dbMainChannelError) {
+      const devicePlatform = parseResult.data.platform
+      const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
+      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null 
+    }
+
+    // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
     if (dbMainChannelError || !mainChannel)
       console.error('Cannot find main channel', dbMainChannelError)
 
@@ -272,7 +281,7 @@ async function put(body: DeviceLink): Promise<Response> {
     .select()
     .eq('app_id', app_id)
     .eq('public', true)
-    .single()
+
   const { data: dataChannelOverride } = await supabaseAdmin()
     .from('channel_devices')
     .select(`
@@ -288,7 +297,7 @@ async function put(body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (dataChannelOverride && dataChannelOverride.channel_id) {
-    const channelId = dataChannelOverride.channel_id as Database['public']['Tables']['channels']['Row']
+    const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
 
     await redisDeviceInvalidate(app_id, device_id)
     return sendRes({
@@ -308,8 +317,27 @@ async function put(body: DeviceLink): Promise<Response> {
       version_build,
       version: version.id,
     }])
+
+    const devicePlatform = devicePlatformScheme.safeParse(platform)
+    if (!devicePlatform.success) {
+      return sendRes({
+        message: 'Invalid device platform',
+        error: 'invalid_platform',
+      }, 400)
+    }
+
+    const finalChannel = dataChannel.find(channel => channel[devicePlatform.data] === true)
+
+    if (!finalChannel) {
+      console.error('Cannot find channel', { dataChannel, errorChannel })
+      return sendRes({
+        message: 'Cannot find channel',
+        error: 'channel_not_found',
+      }, 400)
+    }
+
     return sendRes({
-      channel: dataChannel.name,
+      channel: finalChannel.name,
       status: 'default',
     })
   }
@@ -362,7 +390,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
     .single()
-  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
+  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
     console.error('Cannot change device override current channel don\t allow it', { dataChannelOverride })
     return sendRes({
       message: 'Cannot change device override current channel don\t allow it',
@@ -401,7 +429,7 @@ function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

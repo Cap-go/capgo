@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
 import { r2 } from '../_utils/r2.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
@@ -10,7 +9,7 @@ import { sendMetaToClickHouse } from '../_utils/clickhouse.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 // function.
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)

@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
 import { categories } from '../_utils/gplay_categ.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
@@ -103,7 +102,7 @@ async function main(url: URL, headers: BaseHeaders, _method: string, _body: any)
   }
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

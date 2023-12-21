@@ -190,6 +190,8 @@ login-to-your-accoun: Войдите в свой аккаунт
 logout: Выйти
 logs: Журналы
 lowerCaseError: Должен содержать строчные буквы
+make-default-android: Сделать по умолчанию для Android
+make-default-ios: Сделать по умолчанию для iOS
 make-normal: Сделать нормальным
 making-this-channel-: >-
   Чтобы сделать этот канал «обычным», вам потребуется настроить другой канал по

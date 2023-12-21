@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
 import { methodJson, sendRes } from '../_utils/utils.ts'
 import {
@@ -116,7 +115,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   return sendRes({ error: 'service not found', service }, 500)
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

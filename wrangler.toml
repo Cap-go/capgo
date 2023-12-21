@@ -5,7 +5,7 @@ workers_dev = false
 [[d1_databases]]
 binding = "DB" # i.e. available in your Worker on env.DB
 database_name = "capgo"
-database_id = "8361491c-b4e0-41e6-a24a-d69892e248dd"
+database_id = "9fba96e2-8243-43bd-adbe-d7a555b69fba"
 
 # [placement]
 # mode = "smart"

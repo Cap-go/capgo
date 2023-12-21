@@ -47,7 +47,7 @@ watch(props, (p) => {
           <div>
             <ul class="flex mr-3 flex-nowrap md:mr-0 md:block">
               <li v-for="(m, i) in tabs" :key="i" class="mr-0.5 md:mb-0.5 md:mr-0" @click="openLink(m.key)">
-                <button class="flex items-center whitespace-nowrap rounded px-2.5 py-2">
+                <button :id="`tab-${m.label}`" class="flex items-center whitespace-nowrap rounded px-2.5 py-2">
                   <component :is="m.icon" class="w-4 h-4 mr-2 fill-current shrink-0" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }" />
                   <span class="hidden text-sm font-medium md:block" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }">{{ t(m.label) }}</span>
                 </button>

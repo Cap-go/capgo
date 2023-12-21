@@ -129,21 +129,23 @@ async function deleteOne(one: typeof element) {
     .from('channel_users')
     .delete()
     .eq('app_id', props.appId)
-    .eq('user_id', one.id)
+    .eq('user_id', one.user_id)
   if (error)
     console.error(error)
   else
     await refreshData()
 }
 
+// what does that do?
 async function deleteUser(usr: Database['public']['Tables']['users']['Row']) {
   if (await didCancel(t('user')))
     return
+  console.log(usr)
   const { error } = await supabase
     .from('channel_users')
     .delete()
     .eq('app_id', props.appId)
-    .eq('user_id', usr.id)
+    .eq('user_id', usr.user_id.id)
   if (error)
     console.error(error)
   else

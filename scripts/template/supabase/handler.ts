@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.167.0/http/server.ts'
 import type { BaseHeaders } from '../../../supabase/functions/_utils/types.ts'
 import { methodJson, sendRes } from '../../../supabase/functions/_utils/utils.ts'
 
@@ -9,7 +8,7 @@ function main(url: URL, headers: BaseHeaders, method: string, body: any) {
 
 // upper is ignored during netlify generation phase
 // import from here
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
