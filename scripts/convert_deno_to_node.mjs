@@ -286,7 +286,6 @@ function applyMutations(mutations, content) {
       content = transform(content)
     } else {
       const regexp = new RegExp(`${escapeRegExp(from)}${!force ? '(?=.*(?<!do_not_change)$)' : ''}`, 'gm')
-      console.log(regexp)
       content = content.replace(regexp, to)
     }
   })
