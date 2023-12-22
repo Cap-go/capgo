@@ -18,6 +18,12 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+      
+      - name: Generate cloudflare functions
+        run: bun run generate:node_serverless
+
+      - name: Generate function map
+        run: bun run ./scripts/generate_cloudflare_function_map.mjs
 
       # - name: Install Node.js
       #   uses: actions/setup-node@v3
