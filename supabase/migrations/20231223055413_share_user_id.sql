@@ -1,4 +1,4 @@
-select vault.create_secret('CXhkUxGCUS7UqmMy3vPgvNwzkojya8meHrng9RSoCQqcGBTAD3zyiqJKvMEsLx8tj2PiGc8TyTZ5GA29gbgTrqVyFrJbJRpvKKxcFjpCBcxCtEDZUX789xFADgw4C3ig', 'user_id_password', 'user id password');
+select vault.create_secret('test_password', 'user_id_password', 'user id password');
 
 CREATE OR REPLACE FUNCTION public.share_user_id()
 RETURNS character varying
