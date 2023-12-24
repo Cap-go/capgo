@@ -26,12 +26,10 @@ async function main() {
                 `sql_query character varying;\n` +
                 `request_id text;\n` +
                 `BEGIN\n` +
-                `with i as (\n` + 
-                `   (select * from json_each_text((row_to_json(NEW))))\n` + 
-                `)\n` +
-                `(select 'INSERT INTO ${table.name} (${table.columns.map(c => `\"${c}\"`).join(', ')}) VALUES(${table.columns.map(c => '?').join(', ')})') INTO sql_query;\n` +
                 `\n` + 
-                `PERFORM post_replication_sql(sql_query);\n` + 
+                `select 'INSERT INTO ${table.name} (${table.columns.map(c => `\"${c}\"`).join(', ')}) VALUES(${table.columns.map(c => '?').join(', ')})' INTO sql_query;\n` +
+                `PERFORM post_replication_sql(sql_query, ARRAY [${table.columns.map(c => `(select (CASE WHEN NEW.${c} != NULL THEN NEW.${c} ELSE 'NULL' END))`)}]);\n` + 
+                `\n` + 
                 `RETURN NEW;\n` + 
                 `END;$$;\n`
     })
