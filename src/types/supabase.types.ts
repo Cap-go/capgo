@@ -1185,6 +1185,16 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      share_user_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      decrypt_user_id: {
+        Args: {
+          user_id: string
+        }
+        Returns: string
+      }
       calculate_cycle_usage: {
         Args: Record<PropertyKey, never>
         Returns: undefined
