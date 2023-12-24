@@ -28,7 +28,7 @@ async function main() {
                 `BEGIN\n` +
                 `\n` + 
                 `select 'INSERT INTO ${table.name} (${table.columns.map(c => `\"${c}\"`).join(', ')}) VALUES(${table.columns.map(c => '?').join(', ')})' INTO sql_query;\n` +
-                `PERFORM post_replication_sql(sql_query, ARRAY [${table.columns.map(c => `(select (CASE WHEN NEW.${c} != NULL THEN NEW.${c} ELSE 'NULL' END))`)}]);\n` + 
+                `PERFORM post_replication_sql(sql_query, ARRAY [${table.columns.map(c => `(select (CASE WHEN (NEW.${c}) is distinct from NULL THEN (NEW.${c})::TEXT ELSE NULL END))`)}]);\n` + 
                 `\n` + 
                 `RETURN NEW;\n` + 
                 `END;$$;\n`
