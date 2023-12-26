@@ -23,6 +23,33 @@ BEGIN
 END;
 $BODY$;
 
+CREATE OR REPLACE FUNCTION public.post_replication_sql(sql_query text, params text[]) 
+RETURNS void 
+LANGUAGE plpgsql 
+SECURITY DEFINER
+AS $BODY$
+DECLARE 
+  request_id text;
+BEGIN 
+  SELECT INTO request_id net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'd1_http_url'),
+    headers := jsonb_build_object(
+      'Content-Type',
+      'application/json',
+      'Authorization',
+      (select format('Bearer %s', (select decrypted_secret from vault.decrypted_secrets where name = 'd1_cf_apikey')))
+    ),
+    body := jsonb_build_object(
+      'sql',
+      sql_query,
+      'params',
+      params
+    ),
+    timeout_milliseconds := 15000
+   );
+END;
+$BODY$;
+
 -- with i as (
 --   (select * from json_each_text((row_to_json((select ROW(apps.*) from apps limit 1)))))
 -- )
