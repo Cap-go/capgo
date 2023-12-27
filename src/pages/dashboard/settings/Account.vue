@@ -199,19 +199,8 @@ async function deleteAccount() {
 }
 
 async function copyAccountId() {
-  console.log('yeS!')
-
-  const supabaseClient = useSupabase()
-  const { data, error } = await supabaseClient.rpc('share_user_id')
-
-  if (error || !data) {
-    toast.error(t('cannot-share'))
-    console.error(error)
-    return
-  }
-
+  copy(main!.user!.id)
   toast.success(t('copied-to-clipboard'))
-  copy(data)
 }
 
 const acronym = computed(() => {

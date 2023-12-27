@@ -2,16 +2,11 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { FormKitMessages } from '@formkit/vue'
-import { isSpoofed, saveSpoof, spoofUser, unspoofUser, useSupabase } from '~/services/supabase'
-import { toast } from 'vue-sonner';
-import { useI18n } from 'vue-i18n';
-import copy from 'copy-text-to-clipboard'
+import { isSpoofed, saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
 
 const route = useRoute()
 const isLoading = ref(false)
 const oldId = ref(isSpoofed())
-const userId = ref('')
-const { t } = useI18n()
 
 function setLogAs(id: string) {
   console.log('setLogAs', id)
@@ -31,20 +26,6 @@ async function submit(form: { uuid: string }) {
     return
   isLoading.value = true
   setLogAs(form.uuid)
-}
-
-async function decryptAccountId() {
-  const supabase = await useSupabase()
-  const { data, error } = await supabase.rpc('decrypt_user_id', { user_id: userId.value })
-
-  if (error || !data) {
-    toast.error('something went wrong')
-    console.error(error, data)
-    return
-  }
-
-  toast.success(t('copied-to-clipboard'))
-  copy(data)
 }
 
 if (route.path.includes('/admin')) {
@@ -102,10 +83,6 @@ function reset() {
               />
             </div>
           </div>
-          <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">Decrypt user ID</label>
-              <input autocomplete="off" v-model="userId" id="user_id" class=" w-[590px] h-[56px] bg-[#1f2937] border rounded border-gray-200 ">
-            </div>
         </section>
         <FormKitMessages />
       </div>
@@ -121,18 +98,6 @@ function reset() {
             >
               <span v-if="!isLoading" class="rounded-4xl">
                 Spoof
-              </span>
-              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-            </button>
-            <button
-              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
-              type="submit"
-              color="secondary"
-              shape="round"
-              @click.prevent="decryptAccountId()"
-            >
-              <span v-if="!isLoading" class="rounded-4xl">
-                Decrypt user id
               </span>
               <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>
