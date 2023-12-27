@@ -49,6 +49,7 @@ app: App
 app-deleted: App deleted
 app-id-example: App ID example
 app-not-found: App not found
+app-preview: App preview
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
@@ -85,6 +86,7 @@ cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
+cannot-download: Cannot download bundle
 cannot-get-the-test-: Cannot get the test version
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
@@ -276,6 +278,8 @@ please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
+preview: Preview bundle
+preview-short: preview
 price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 progressive-bundle-number: Progressive bundle number

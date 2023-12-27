@@ -448,6 +448,17 @@ function hideString(str: string) {
   return `${first}...${last}`
 }
 
+async function previewBundle() {
+  if (!version.value)
+    throw new Error('No version id?')
+
+  displayStore.appPreview = {
+    appId: packageId.value,
+    version: version.value
+  }
+  displayStore.showAppPreview = true
+}
+
 async function saveCustomId(input: string) {
   if (!id.value)
     return
@@ -526,6 +537,7 @@ async function saveCustomId(input: string) {
             <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
             <!-- size -->
             <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
+            <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" />
           </dl>
         </div>
       </div>
