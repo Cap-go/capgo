@@ -45,7 +45,14 @@ async function prepareBundle(bundle: AppPreviewOptions) {
     downloadUrl = bundleVersion.external_url ?? ''
   }
 
-  const downloadedResponse = await fetch(downloadUrl)
+  let downloadedResponse = null as Response | null
+  try {
+    downloadedResponse = await fetch(downloadUrl)
+  } catch (e) {
+    console.error('network error', e)
+    return undefined
+  }
+  
 
   if (!downloadedResponse.ok || !downloadedResponse.body) {
     console.error('download fail', downloadedResponse)

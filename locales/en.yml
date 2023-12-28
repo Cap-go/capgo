@@ -279,6 +279,7 @@ please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
 preview: Preview bundle
+preview-encrypted: Cannot preview encypted bundle
 preview-short: preview
 price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'

@@ -452,10 +452,15 @@ async function previewBundle() {
   if (!version.value)
     throw new Error('No version id?')
 
+  if (version.value.session_key) {
+    toast.error(t('preview-encrypted'))
+    return
+  }
+
   displayStore.appPreview = {
     appId: packageId.value,
     version: version.value
-  }
+  } as any
   displayStore.showAppPreview = true
 }
 
