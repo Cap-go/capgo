@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { Ref, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
@@ -7,11 +7,12 @@ import { FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
-import { iconEmail, iconPassword } from '~/services/icons'
+import { iconEmail, iconPassword, mfaIcon } from '~/services/icons'
 
 const route = useRoute()
 const supabase = useSupabase()
 const isLoading = ref(false)
+const stauts: Ref<'login' | '2fa'> = ref('2fa')
 const router = useRouter()
 const { t } = useI18n()
 
@@ -25,7 +26,8 @@ async function nextLogin() {
 }
 
 async function submit(form: { email: string, password: string }) {
-  isLoading.value = true
+  if (stauts.value === 'login') {
+    isLoading.value = true
   const { error } = await supabase.auth.signInWithPassword({
     email: form.email,
     password: form.password,
@@ -38,6 +40,9 @@ async function submit(form: { email: string, password: string }) {
   }
   else {
     await nextLogin()
+  }
+  } else {
+    console.log('check!')
   }
 }
 
@@ -118,7 +123,7 @@ onMounted(checkLogin)
         </p>
       </div>
 
-      <div class="relative max-w-md mx-auto mt-8 md:mt-4">
+      <div v-if="stauts === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
@@ -183,6 +188,50 @@ onMounted(checkLogin)
                       {{ t('resend') }}
                     </router-link>
                   </p>
+                  <p class="pt-2 text-gray-300">
+                    {{ version }}
+                  </p>
+                </div>
+              </div>
+            </FormKit>
+          </div>
+        </div>
+      </div>
+      <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">
+        <div class="overflow-hidden bg-white rounded-md shadow-md">
+          <div class="px-4 py-6 sm:px-8 sm:py-7">
+            <FormKit id="login-account" type="form" :actions="false" @submit="submit" autocapitalize="off">
+              <div class="space-y-5">
+                <FormKit
+                  type="text" name="code" :disabled="isLoading" input-class="!text-black"
+                  :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
+                  autocomplete="off"
+                  number
+                  validation="required:trim"
+                />
+                <FormKitMessages />
+                <div>
+                  <div class="inline-flex items-center justify-center w-full">
+                    <svg
+                      v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin"
+                      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    >
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path
+                        class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <button
+                      v-if="!isLoading" type="submit"
+                      class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
+                    >
+                      {{ t('verify') }}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="text-center">
                   <p class="pt-2 text-gray-300">
                     {{ version }}
                   </p>
