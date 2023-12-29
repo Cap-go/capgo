@@ -22,7 +22,7 @@ function getLocalConfig() {
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0] as string,
+    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0].split(':')[0] as string,
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
   } as CapgoConfig
@@ -87,6 +87,7 @@ export function saveSpoof(id: string) {
 }
 
 export function spoofUser() {
+  console.log(config.supbaseId)
   const textData = localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
   if (!textData)
     return false
