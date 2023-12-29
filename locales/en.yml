@@ -7,6 +7,7 @@ Storage: Storage
 ab-testing-progressive-deploy-conflict: AB testing and progressive deploy cannot be enabled at the same time
 account: Account
 account-error: Error while updating your account
+account-id: Account id
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
 account-settings: Account Settings
@@ -103,6 +104,7 @@ cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
+cannot-share: Cannot share user id, check browser console
 cannot-test-app-some: Cannot test app something wrong happened
 change: Change
 changed-password-suc: Password changed successfully
@@ -132,6 +134,7 @@ confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
   Others default channels will not be default anymore.
 copied-to-clipboard: Copied to clipboard
+copy-account-id: copy account id
 copy-command: Copy command
 copy-your: Copy your
 country: Country

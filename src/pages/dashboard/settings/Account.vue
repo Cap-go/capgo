@@ -14,6 +14,7 @@ import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
 import { availableLocales, i18n, languages, loadLanguageAsync } from '~/modules/i18n'
 import { iconEmail, iconName } from '~/services/icons'
+import copy from 'copy-text-to-clipboard'
 import { pickPhoto, takePhoto } from '~/services/photos'
 
 const version = import.meta.env.VITE_APP_VERSION
@@ -99,6 +100,11 @@ async function deleteAccount() {
       },
     ],
   }
+}
+
+async function copyAccountId() {
+  copy(main!.user!.id)
+  toast.success(t('copied-to-clipboard'))
 }
 
 const acronym = computed(() => {
@@ -317,6 +323,14 @@ onMounted(() => {
           </div>
           <FormKitMessages />
         </section>
+        <div class="flex flex-col md:flex-row md:items-center items-left">
+          <p class="text-slate-800 dark:text-white">
+            {{ t('account-id') }}:
+          </p>
+          <button class=" ml-4 text-white bg-blue-700 hover:bg-blue-800 focus:outline-none  font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700" @click.prevent="copyAccountId()">
+              {{ t('copy-account-id') }}
+            </button>
+        </div>
         <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
           <IconVersion /> <span class="pl-2"> {{ version }}</span>
         </div>
