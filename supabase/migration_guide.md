@@ -50,7 +50,7 @@ If the command completes successfully, your console output should provide detail
 
 Once you're confident that the migration works correctly, commit the migration file and push it to your GitHub repository's `main` branch.
 
-**Important:** Once a migration has been pushed to the main branch, it should be treated as immutable. Do not modify existing migrations to make corrections or updates. Instead, create new migrations to address any issues or changes to the database schema.
+**Important:** Once a migration has been pushed to the main branch, it should be treated as immutable. Do not modify existing migrations from the main branch to make corrections or updates. Instead, create new migrations to address any issues or changes to the database schema.
 
 6. **Automated Deployment:**
 
