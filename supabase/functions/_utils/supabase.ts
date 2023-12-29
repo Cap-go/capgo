@@ -141,7 +141,7 @@ export async function getPlanUsagePercent(userId: string): Promise<number> {
   return data || 0
 }
 
-export async function getOrgs(userId: string): Promise<number> {
+export async function getOrgs(userId: string) {
   const { data, error } = await supabaseAdmin()
     .rpc('get_orgs', { userid: userId })
     .single()
@@ -150,7 +150,7 @@ export async function getOrgs(userId: string): Promise<number> {
     throw new Error(error.message)
   }
 
-  return data || 0
+  return data
 }
 
 export async function isGoodPlan(userId: string): Promise<boolean> {

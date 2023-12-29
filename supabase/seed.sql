@@ -7,6 +7,8 @@ select vault.create_secret('["c591b04e-cf29-4945-b9a0-776d0672061a"]', 'admin_us
 select vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
 select vault.create_secret('http://localhost:8881/.netlify/functions/', 'external_function_url', 'external function url'); -- Netlify backend for long runny functions
 select vault.create_secret('testsecret', 'apikey', 'admin user id');
+select vault.create_secret('http://host.docker.internal:6655', 'd1_http_url', 'd1 replication HTTP url');
+select vault.create_secret('***', 'd1_cf_apikey', 'D1 cloudflare API key');
 
 CREATE TRIGGER on_channel_create 
 AFTER INSERT ON public.channels 

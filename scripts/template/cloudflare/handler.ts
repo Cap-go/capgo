@@ -8,9 +8,11 @@ function main(url: URL, headers: BaseHeaders, method: string, body: any) {
 
 // import from here
 
+export interface Env {}
+
 // importSetEnvHere
 export default {
-  async fetch(request: Request, env: any) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     setEnv(env)
 
     const url: URL = new URL(request.url)

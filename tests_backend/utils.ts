@@ -112,6 +112,7 @@ export async function testPlaywright(spec: string, backendUrl: URL, env: { [key:
       SUPABASE_URL: supabaseUrl!,
       START_FRONTEND: 'true',
       BACKEND_URL: backendUrl.toString(),
+      // BACKEND_URL: 'http://localhost:7777', 
       ...env,
     },
   })

@@ -1,6 +1,7 @@
+// use_trans_macros
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { appendHeaders, sendRes } from '../_utils/utils.ts'
+import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -8,6 +9,19 @@ import { sendNotif } from '../_utils/notifications.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
 import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
+
+// Drizze orm
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js'; // do_not_change
+import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
+import * as schema_postgres from './postgress_schema.ts' // do_not_change
+import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'; // do_not_change
+import postgres from 'https://deno.land/x/postgresjs/mod.js'
+// import drizzle_sqlite
+// Do not change the comment above, used in codegen
+
+// This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
+const useD1Database = true
+const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
@@ -30,137 +44,179 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-async function requestInfos(platform: string, app_id: string, device_id: string, version_name: string) {
-  const recV = supabaseAdmin()
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', app_id)
-    .or(`name.eq.${version_name}`)
-    .single()
-    .then(res => res.data)
-  const recD = supabaseAdmin()
-    .from('devices_override')
-    .select(`
-      device_id,
-      app_id,
-      created_at,
-      updated_at,
-      version (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url
-      )
-    `)
-    .eq('device_id', device_id)
-    .eq('app_id', app_id)
-    .single()
-    .then(res => res.data)
-  const recCO = supabaseAdmin()
-    .from('channel_devices')
-    .select(`
-      device_id,
-      app_id,
-      channel_id (
-        id,
-        created_at,
-        created_by,
-        name,
-        app_id,
-        allow_dev,
-        allow_emulator,
-        disableAutoUpdateUnderNative,
-        disableAutoUpdate,
-        ios,
-        android,
-        secondVersion (
-          id,
-          name,
-          checksum,
-          session_key,
-          user_id,
-          bucket_id,
-          storage_provider,
-          external_url,
-          minUpdateVersion
-        ),
-        secondaryVersionPercentage,
-        enable_progressive_deploy,
-        enableAbTesting,
-        version (
-          id,
-          name,
-          checksum,
-          session_key,
-          user_id,
-          bucket_id,
-          storage_provider,
-          external_url,
-          minUpdateVersion
-        )
-      ),
-      created_at,
-      updated_at
-    `)
-    .eq('device_id', device_id)
-    .eq('app_id', app_id)
-    .single()
-    .then(res => res.data)
-  const recC = supabaseAdmin()
-    .from('channels')
-    .select(`
-      id,
-      created_at,
-      created_by,
-      name,
-      app_id,
-      allow_dev,
-      allow_emulator,
-      disableAutoUpdateUnderNative,
-      disableAutoUpdate,
-      ios,
-      android,
-      secondVersion (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url,
-        minUpdateVersion
-      ),
-      secondaryVersionPercentage,
-      enable_progressive_deploy,
-      enableAbTesting,
-      version (
-        id,
-        name,
-        checksum,
-        session_key,
-        user_id,
-        bucket_id,
-        storage_provider,
-        external_url,
-        minUpdateVersion
-      )
-    `)
-    .eq('app_id', app_id)
-    .eq('public', true)
-    .eq(platform, true)
-    .single()
-    .then(res => res.data)
+// Do not change // COPY FUNCTION STOP/START
+// This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
+// COPY FUNCTION START
+const requestInfosPostgres = async (platform: string, app_id: string, device_id: string, version_name: string) => {
+  const supaUrl = getEnv('SUPABASE_DB_URL')!
+
+  // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
+  const pgClient = postgres(supaUrl)
+  const { alias, schema, drizzleCient } = { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
+  
+  // DO NOT CHANGE END
+
+  const appVersions = drizzleCient
+    .select({
+      id: schema.app_versions.id
+    })
+    .from(schema.app_versions)
+    .where(or(eq(schema.app_versions.name, version_name), eq(schema.app_versions.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  const versionAlias = alias(schema.app_versions, 'version')
+  const secondVersionAlias = alias(schema.app_versions, 'secondVersion')
+
+  const deviceOverwrite = drizzleCient
+    .select({
+      device_id: schema.devices_override.device_id,
+      app_id: schema.devices_override.app_id,
+      created_at: schema.devices_override.created_at,
+      updated_at: schema.devices_override.updated_at,
+      version: {
+        id: versionAlias.id,
+        name: versionAlias.name,
+        checksum: versionAlias.checksum,
+        session_key: versionAlias.session_key,
+        user_id: versionAlias.user_id,
+        bucket_id: versionAlias.bucket_id,
+        storage_provider: versionAlias.storage_provider,
+        external_url: versionAlias.external_url,
+        minUpdateVersion: versionAlias.minUpdateVersion
+      }
+    })
+    .from(schema.devices_override)
+    .innerJoin(versionAlias, eq(schema.devices_override.version, versionAlias.id))
+    .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  const channelDevice = drizzleCient
+    .select({
+        channel_devices: {
+          device_id: schema.channel_devices.device_id,
+          app_id: sql<string>`${schema.channel_devices.app_id}`.as('cd_app_id'),
+        },
+        version: {
+          id: sql<number>`${versionAlias.id}`.as('vid'),
+          name: sql<string>`${versionAlias.name}`.as('vname'),
+          checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+          session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+          user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+          bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
+          storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+          external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+          minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion')
+        },
+        secondVersion: {
+          id: sql<number>`${secondVersionAlias.id}`.as('svid'),
+          name: sql<string>`${secondVersionAlias.name}`.as('svname'),
+          checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
+          session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
+          user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+          bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
+          storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
+          external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
+          minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion')
+        },
+        channels: {
+          id: schema.channels.id,
+          created_at: schema.channels.created_at,
+          created_by: schema.channels.created_by,
+          name: schema.channels.name,
+          app_id: schema.channels.app_id,
+          allow_dev: schema.channels.allow_dev,
+          allow_emulator: schema.channels.allow_emulator,
+          disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
+          disableAutoUpdate: schema.channels.disableAutoUpdate,
+          ios: schema.channels.ios,
+          android: schema.channels.android,
+          secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+          enable_progressive_deploy: schema.channels.enable_progressive_deploy,
+          enableAbTesting: schema.channels.enableAbTesting,
+        }
+      }
+    )
+    .from(schema.channel_devices)
+    .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
+    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
+    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0));
+
+
+  // v => version
+  // sv => secondversion
+  const channel = drizzleCient
+    .select({
+      version: {
+        id: sql<number>`${versionAlias.id}`.as('vid'),
+        name: sql<string>`${versionAlias.name}`.as('vname'),
+        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+        user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+        bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
+        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion')
+      },
+      secondVersion: {
+        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
+        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
+        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
+        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
+        user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
+        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
+        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
+        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion')
+      },
+      channels: {
+        id: schema.channels.id,
+        created_at: schema.channels.created_at,
+        created_by: schema.channels.created_by,
+        name: schema.channels.name,
+        app_id: schema.channels.app_id,
+        allow_dev: schema.channels.allow_dev,
+        allow_emulator: schema.channels.allow_emulator,
+        disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
+        disableAutoUpdate: schema.channels.disableAutoUpdate,
+        ios: schema.channels.ios,
+        android: schema.channels.android,
+        secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+        enable_progressive_deploy: schema.channels.enable_progressive_deploy,
+        enableAbTesting: schema.channels.enableAbTesting,
+      }
+    })
+    .from(schema.channels)
+    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
+    .where(and(
+      eq(schema.channels.public, true), 
+      eq(schema.channels.app_id, app_id),
+      eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true)
+    ))
+    .limit(1)
+    .then(data => data.at(0))
+
   // promise all
-  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([recD, recCO, recC, recV])
+  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
+  await pgClient.end()
   return { versionData, channelData, channelOverride, devicesOverride }
 }
+// COPY FUNCTION STOP
+
+// This will be transformed in the "convert_deno_to_node.mjs" script
+// This will become the clone of requestInfosPostgres
+
+const requestInfosSqlite = (platform: string, app_id: string, device_id: string, version_name: string): ReturnType<typeof requestInfosPostgres> => { throw new Error('TODO') }
+
+const requestInfos = useD1Database && !isSupabase ? requestInfosSqlite : requestInfosPostgres
 
 export async function update(body: AppInfos) {
+  // await test()
   // create random id
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -271,6 +327,14 @@ export async function update(body: AppInfos) {
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
+    if (!versionData) {
+      console.log('No version data found')
+      return sendResWithStatus('fail', {
+        message: 'Couldn\'t find version data',
+        error: 'no-version_data',
+      }, 200)
+    }
+
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel', new Date().toISOString())
       if (versionData) {
@@ -292,30 +356,36 @@ export async function update(body: AppInfos) {
 
     // Trigger only if the channel is overwriten but the version is not
     if (channelOverride && !devicesOverride)
-      // deno-lint-ignore no-explicit-any
-      channelData = channelOverride.channel_id as any
+      channelData = channelOverride
 
-    let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+    if (!channelData) {
+      return sendResWithStatus('fail', {
+        message: 'channel data still null',
+        error: 'null_channel_data',
+      }, 200)
+    }
 
-    const enableProgressiveDeploy: boolean = (channelOverride?.channel_id as any)?.enableProgressiveDeploy || channelData?.enable_progressive_deploy
+    let enableAbTesting: boolean = channelData.channels.enableAbTesting
+    const enableProgressiveDeploy: boolean = channelData.channels.enable_progressive_deploy
+    // let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
+
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
 
     const updateOverwritten = devicesOverride !== null || channelOverride !== null
     // console.log(`OVER: ${updateOverwritten}, --- ${devicesOverride} --- ${channelOverride}`)
 
-    let version: Database['public']['Tables']['app_versions']['Row'] = devicesOverride?.version || (channelOverride?.channel_id as any)?.version || channelData?.version
-    const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData?.secondVersion : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
+    let version = devicesOverride?.version || channelOverride?.version || channelData.version
+    const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
+    // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(appOwner.user_id)
     stat.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
-
-        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) {
-          version = secondVersion
-        }
+        const secondVersionPercentage: number = channelData.channels.secondaryVersionPercentage // ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        // eslint-disable-next-line max-statements-per-line
+        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
         else if (version.name !== version_name) {
           const randomChange = Math.random()
@@ -404,7 +474,7 @@ export async function update(body: AppInfos) {
 
     if (!devicesOverride && channelData) {
     // console.log('check disableAutoUpdateToMajor', device_id)
-      if (!channelData.ios && platform === 'ios') {
+      if (!channelData.channels.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -417,7 +487,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (!channelData.android && platform === 'android') {
+      if (!channelData.channels.android && platform === 'android') {
         console.log(id, 'Cannot update, android is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -431,7 +501,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (channelData.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
+      if (channelData.channels.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -446,7 +516,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (channelData.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
+      if (channelData.channels.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -461,18 +531,18 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (channelData.disableAutoUpdate === 'version_number') {
+      if (channelData.channels.disableAutoUpdate === 'version_number') {
         const minUpdateVersion = version.minUpdateVersion
 
         // The channel is misconfigured
         if (minUpdateVersion === null) {
-          console.log(id, 'Channel is misconfigured', channelData.name, new Date().toISOString())
+          console.log(id, 'Channel is misconfigured', channelData.channels.name, new Date().toISOString())
           await sendStats([{
             ...stat,
             action: 'channelMisconfigured',
           }])
           return sendResWithStatus('fail', {
-            message: `Channel ${channelData.name} is misconfigured`,
+            message: `Channel ${channelData.channels.name} is misconfigured`,
             error: 'misconfigured_channel',
             version: version.name,
             old: version_name,
@@ -497,7 +567,7 @@ export async function update(body: AppInfos) {
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
-      if (channelData.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+      if (channelData.channels.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
         console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -511,7 +581,7 @@ export async function update(body: AppInfos) {
         }, 200, updateOverwritten)
       }
 
-      if (!channelData.allow_dev && !is_prod) {
+      if (!channelData.channels.allow_dev && !is_prod) {
         console.log(id, 'Cannot update dev build is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -524,7 +594,7 @@ export async function update(body: AppInfos) {
           old: version_name,
         }, 200, updateOverwritten)
       }
-      if (!channelData.allow_emulator && is_emulator) {
+      if (!channelData.channels.allow_emulator && is_emulator) {
         console.log(id, 'Cannot update emulator is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
@@ -556,7 +626,8 @@ export async function update(body: AppInfos) {
       action: 'get',
     }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
-    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version), 200, updateOverwritten)
+    // TODO: i have no idea why "as any"
+    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version as any), 200, updateOverwritten)
   }
   catch (e) {
     console.error('e', e)
