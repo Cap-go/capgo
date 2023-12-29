@@ -8,6 +8,7 @@ import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import type { Database } from '~/types/supabase.types'
+import { useOrganizationStore } from '~/stores/organization'
 
 const route = useRoute()
 const main = useMainStore()
@@ -16,6 +17,7 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
+const organizationStore = useOrganizationStore()
 
 async function getMyApps() {
   const { data, error } = await supabase
@@ -44,6 +46,7 @@ async function getSharedWithMe() {
     .from('apps')
     .select()
     .neq('user_id', main.user?.id).order('name', { ascending: true })
+    .in('user_id', [organizationStore.organizations.filter(org => org.role !== 'owner').map(org => org.created_by)])
 
   if (error) {
     console.log('Error get sharred: ', error)
