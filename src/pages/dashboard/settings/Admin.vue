@@ -12,6 +12,9 @@ const oldId = ref(isSpoofed())
 async function setLogAs(id: string) {
   console.log('setLogAs', id)
 
+  if (isSpoofed())
+  unspoofUser()
+
   const supabase = await useSupabase()
   const { data, error } = await supabase.functions.invoke('login_admin', {
     body: {
