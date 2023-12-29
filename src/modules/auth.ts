@@ -1,4 +1,4 @@
-import { isAdmin, isSpoofed, spoofUser } from './../services/supabase'
+import { isAdmin } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
@@ -16,8 +16,6 @@ async function guard(next: any, to: string, from: string) {
   const main = useMainStore()
 
   if (auth.user && !main.auth) {
-    if (isSpoofed())
-      auth.user.id = spoofUser()
     main.auth = auth.user
     // console.log('set auth', auth)
     if (!main.user) {

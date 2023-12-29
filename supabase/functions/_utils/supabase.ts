@@ -43,6 +43,17 @@ export function supabaseClient(auth: string) {
   return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
 }
 
+export function emptySupabase() {
+  const options = {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
+  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
+}
+
 // WARNING: The service role key has admin priviliges and should only be used in secure server environments!
 export function supabaseAdmin() {
   const options = {
