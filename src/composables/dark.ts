@@ -1,6 +1,7 @@
-import { useDark, useToggle } from '@vueuse/core'
+import { useToggle } from '@vueuse/core'
+import { ref } from 'vue'
 
-const isDark = true
+const isDark = ref(true)
 const toggleDark = useToggle(isDark)
 
 export {

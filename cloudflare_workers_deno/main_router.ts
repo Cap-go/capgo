@@ -1,16 +1,10 @@
 import { map } from './generated_functions_map.ts'
-import { ExecutionContext, Database } from "@cloudflare/workers-types";
-
-// import { fallback } from './fallback_loadbalancer.ts'
-// import * as d1 from './d1_facade.js'
-
-export interface Env {
-  DB: Database
-}
+import OnPgChange from './on_postgres_change.ts'
+import { fallback } from './fallback_loadbalancer.ts'
+import { WorkerEnv } from './worker_env.d.ts'
 
 export default {
-  // deno-lint-ignore no-explicit-any
-  async fetch(request: Request, env: Env) {
+  async fetch(request: Request, env: WorkerEnv) {
     try {
       const requestUrl = new URL(request.url)
       const functionName = requestUrl.pathname.split('/').pop()
@@ -22,13 +16,15 @@ export default {
         const response = edgeFunction(request, env)
         return response
       }
-      // Perhaps enable this, idk
-      
-      // else {
-      //   console.log('falling back to old router')
-      //   const response = await fallback(request)
-      //   return response
-      // }
+      else if (functionName === 'on_postgres_change') {
+        const response = await OnPgChange.fetch(request, env)
+        return response
+      }
+      else {
+        console.log('falling back to old router')
+        const response = await fallback(request)
+        return response
+      }
     }
     catch (e) {
       console.error(e)

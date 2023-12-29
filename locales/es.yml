@@ -50,12 +50,10 @@ app-not-found: Aplicación no encontrada
 are-u-sure: Está seguro ?
 available-in-the-san: Disponible en la aplicación sandbox
 back-to-login-page: Volver a la página de inicio de sesión
+base: Base
 best-plan: mejor plan
 bigger-app-size: Tamaño de aplicación más grande
 billing: Facturación
-current-billing-cycle: Ciclo de facturación actual
-from: Desde
-to: Hasta
 build-your-app-and-s: crea tu aplicación y sincroniza
 build-your-code-and-: Sube a Capgo tu código
 bulk-upload: Carga masiva
@@ -107,6 +105,9 @@ check-on-web: Comprobar en el sitio web
 checksum: Suma de verificación
 commands: comandos
 confirm-email: confirme su email
+confirm-email-sent: >-
+  Se envió un correo electrónico de confirmación, haz clic en el enlace para
+  confirmar tu correo electrónico.
 confirm-password: Confirmar Contraseña
 confirm-public-desc: >-
   Hacer que este canal sea el predeterminado hará que envíe actualizaciones a
@@ -120,6 +121,7 @@ copy-your: copia tu
 country: País
 create-a-free-accoun: Crea una cuenta nueva
 created-at: Creado en
+current-billing-cycle: Ciclo de facturación actual
 custom-domain: Dominio personalizado
 custom-id: Identificación personalizada
 custom-id-saved: ID personalizado guardado
@@ -135,6 +137,7 @@ device: Dispositivo
 device-id: ID del dispositivo
 devices: Dispositivos
 devices-using-this-b: Dispositivos que usan este paquete
+did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable-auto-downgra: Deshabilitar la degradación automática en nativo
 disable-auto-upgrade: Deshabilitar la actualización automática por encima de la principal
 discord: Discordia
@@ -161,11 +164,13 @@ forgot-check-email: >-
   Revise su correo electrónico para obtener el enlace para restablecer su
   contraseña
 forgot-success: Contraseña actualizada exitosamente
+from: Desde
 from-device: desde el dispositivo
 good: Bien
 id: IDENTIFICACIÓN
 in-your-main-file: En su archivo principal
 in-your-project-fold: En la carpeta de tu proyecto
+included-in-plan: Incluido en el plan
 info: Información
 informations: Informaciones
 init-capgo-in-your-a: Inicie Capgo en su aplicación
@@ -191,8 +196,6 @@ login-to-your-accoun: Ingrese a su cuenta
 logout: Cerrar sesión
 logs: Registros
 lowerCaseError: Debe contener letras minúsculas
-make-default-android: Establecer como predeterminado para Android
-make-default-ios: Establecer como predeterminado para iOS
 make-normal: normalizar
 making-this-channel-: >-
   Para hacer que este canal sea "normal", deberá configurar otro canal
@@ -261,6 +264,7 @@ please-choose-your-p: Por favor elige tus preferencias
 please-upgrade: Actualice su plan para agregar más usuarios
 plugin-version: Versión del complemento
 prediction: Predicción
+price-per-unit-above: Precio por unidad por encima del plan
 pro-tip-you-can-copy: 'Consejo profesional: puedes copiar el'
 projection: Proyecciones
 recommended: Recomendado
@@ -270,6 +274,8 @@ register-desc: Rellene los siguientes campos para completar su registro
 register-heading: Registro
 register-next: Registro
 reload: Recargar
+resend: Reenviar
+resend-email: Reenviar Correo Electrónico de Confirmación
 reset-password: Restablecer la contraseña
 reset-your-password: Restablecer su contraseña
 save: Ahorra
@@ -310,6 +316,7 @@ thank-you-for-choosi: ¡Gracias por elegir Capgo!
 the: El
 this-page-will-self-: Esta página se actualizará automáticamente
 title: título
+to: Hasta
 to-live-reload: vivir recargar.
 to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps: Mis aplicaciones
@@ -331,6 +338,7 @@ usage: Uso
 usage-success: Su plan ha sido configurado, esta página se actualizará en unos minutos.
 usage-title: Total
 use-the-command: 'Usa el comando:'
+used-in-period: Usado en periodo
 user: Usuario
 validate: Validar
 version: Versión
@@ -348,9 +356,3 @@ your-api-key: 'Su clave API:'
 your-are-a: Tu area
 your-current-plan-is: Su plan actual es
 your-current-suggested-plan-is: Su plan sugerido actual es
-resend-email: Reenviar Correo Electrónico de Confirmación
-confirm-email-sent: >-
-  Se envió un correo electrónico de confirmación, haz clic en el enlace para
-  confirmar tu correo electrónico.
-did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
-resend: Reenviar

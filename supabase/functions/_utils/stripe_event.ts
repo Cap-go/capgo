@@ -20,7 +20,8 @@ function parseHeader(header: string, scheme: string): Details {
     {
       timestamp: -1,
       signatures: [] as string[],
-    } as Details)
+    } as Details,
+  )
 }
 function scmpCompare(a: string, b: string) {
   const len = a.length

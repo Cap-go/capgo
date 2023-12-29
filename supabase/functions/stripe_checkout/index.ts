@@ -42,11 +42,7 @@ Deno.serve(async (event: Request) => {
 
     // console.log('user', user)
     // key: string, priceId: string, successUrl: string, cancelUrl: string
-    const checkout = await createCheckout(user.customer_id,
-      body.reccurence || 'month',
-      body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B',
-      body.successUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv('WEBAPP_URL')}/app/usage`,
-      body.clientReferenceId)
+    const checkout = await createCheckout(user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return sendRes({ url: checkout.url })
   }
   catch (e) {

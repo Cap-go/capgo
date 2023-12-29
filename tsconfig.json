@@ -5,12 +5,16 @@
   "lib": ["DOM", "ESNext"],
   "baseUrl": ".",
   "module": "ESNext",
-  "moduleResolution": "node",
+  "moduleResolution": "bundler",
+  "allowImportingTsExtensions": true,
+  "noEmit": true,
+  "moduleDetection": "force",
   "paths": {
     "~/*": ["src/*"]
   },
   "resolveJsonModule": true,
   "types": [
+    "bun-types",
     "vitest",
     "vite/client",
     "vue/ref-macros",

@@ -355,10 +355,17 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
     req = req.in('app_id', appIds)
   }
 
-  if (startDate !== undefined && endDate !== undefined) {
-    console.log('range', startDate, endDate)
-    // req range for start and end date for created_at
-    req = req.in('created_at', [startDate, endDate])
+  if (startDate) {
+    console.log('startDate', startDate)
+    // convert date string startDate to YYYY-MM-DD
+    const startDateStr = new Date(startDate).toISOString().split('T')[0]
+    req = req.gt('date', startDateStr)
+  }
+  if (endDate) {
+    console.log('endDate', endDate)
+    // convert date string endDate to YYYY-MM-DD
+    const endDateStr = new Date(endDate).toISOString().split('T')[0]
+    req = req.lt('date', endDateStr)
   }
 
   const res = await req
@@ -616,7 +623,8 @@ export async function createApiKey(userId: string) {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'read',
-        }])
+        },
+      ])
   }
   return Promise.resolve()
 }
@@ -638,7 +646,8 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
           created_by: userId,
           logo: 'https://res.cloudinary.com/dz3vsv9pg/image/upload/v1623349123/capgo/logo.png',
           name: `${name} organization`,
-        })
+        },
+      )
       .select()
       .single()
       // create org_users admin from data.id
@@ -676,8 +685,7 @@ export async function saveStoreInfo(apps: (Database['public']['Tables']['store_a
     console.error('saveStoreInfo error', error)
 }
 
-export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'],
-  plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
   const segments: Segments = {
     capgo: true,
     onboarded: await isOnboarded(userId),

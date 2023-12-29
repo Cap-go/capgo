@@ -311,15 +311,7 @@ export async function update(body: AppInfos) {
       }, 400)
     }
 
-    console.log(id, 'vals', platform,
-      app_id,
-      device_id,
-      custom_id,
-      version_build,
-      is_emulator,
-      is_prod,
-      plugin_version,
-      version_name, new Date().toISOString())
+    console.log(id, 'vals', platform, app_id, device_id, custom_id, version_build, is_emulator, is_prod, plugin_version, version_name, new Date().toISOString())
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
       created_at: new Date().toISOString(),

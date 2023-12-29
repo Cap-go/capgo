@@ -5,7 +5,7 @@
   "prettier.enable": false,
   "typescript.tsdk": "node_modules/typescript/lib",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit"
   },
   "files.associations": {
     "*.css": "css"
@@ -17,6 +17,7 @@
   "deno.cacheOnSave": true,
   "deno.enablePaths": [
     "./supabase/functions",
+    "./cloudflare_workers_deno",
     "./netlify/edge-functions",
     "./netlify/edge-functions_utils",
     "./netlify/edge-functions_tests",

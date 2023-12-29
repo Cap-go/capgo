@@ -7,6 +7,7 @@ Storage: Storage
 ab-testing-progressive-deploy-conflict: AB testing and progressive deploy cannot be enabled at the same time
 account: Account
 account-error: Error while updating your account
+account-id: Account id
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
 account-settings: Account Settings
@@ -59,6 +60,7 @@ app-not-found: App not found
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
+base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billing: Billing
@@ -102,6 +104,7 @@ cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
+cannot-share: Cannot share user id, check browser console
 cannot-test-app-some: Cannot test app something wrong happened
 change: Change
 changed-password-suc: Password changed successfully
@@ -131,6 +134,7 @@ confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
   Others default channels will not be default anymore.
 copied-to-clipboard: Copied to clipboard
+copy-account-id: copy account id
 copy-command: Copy command
 copy-your: Copy your
 country: Country
@@ -190,6 +194,7 @@ good: Good
 id: ID
 in-your-main-file: In your main file
 in-your-project-fold: In your project folder
+included-in-plan: Included in plan
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
@@ -307,6 +312,7 @@ please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
+price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 progressive-bundle-number: Progressive bundle number
 progressive-deploy-option: Select progressive deploy option
@@ -367,7 +373,7 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
-to: To
+to: to
 to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
@@ -392,6 +398,7 @@ usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
 use-the-command: 'Use the command:'
+used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate
 user: User
 user-already-invited: This user is already invited to this organization

@@ -66,7 +66,7 @@ supabase
       <h1 class="text-2xl font-bold text-slate-800 md:text-3xl dark:text-white">
         {{ t('live-reload') }}
       </h1>
-      <p>{{ t('use-the-command') }} <span class="font-bold"> npx @capgo/cli app watch [PORT]</span> {{ t('to-live-reload') }}</p>
+      <p>{{ t('use-the-command') }} <span class="font-bold"> bunx @capgo/cli app watch [PORT]</span> {{ t('to-live-reload') }}</p>
       <p v-if="!isMobile">
         <a class="text-blue-600 underline" href="https://capgo.app/app_mobile/">Test</a> in the mobile app, no need to Xcode or Android studio
       </p>

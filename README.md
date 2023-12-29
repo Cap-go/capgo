@@ -85,6 +85,7 @@ All official plugin are install and preconfigured
 
 - [TypeScript](https://www.typescriptlang.org/)
 - [Cypress](https://cypress.io/) - E2E Testing
+- [bun](https://bun.sh/) - fast javascipt runtime, package manager, bundler, test runner an all-in-one toolkit
 - [pnpm](https://pnpm.js.org/) - fast, disk space efficient package manager
   - [critters](https://github.com/GoogleChromeLabs/critters) - Critical CSS
 - [Netlify](https://www.netlify.com/) - zero-config deployment
@@ -103,8 +104,8 @@ All official plugin are install and preconfigured
 To build the App in mobile, run
 
 ```bash
-pnpm install
-pnpm mobile
+bun install
+bun mobile
 ```
 
 And you will see the generated file in `dist` that ready to be served.
@@ -120,12 +121,12 @@ You will need to start each local server in separate terminals.
 
 Before you continue, you need to have these installed:
 - [Docker](https://www.docker.com/)
-- [pnpm](https://pnpm.js.org/)
+- [bun](https://bun.sh/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
-You can install the `supabase` CLI globally with `pnpm install supabase -g` and you can invoke `supabase` from anywhere.
+You can install the `supabase` CLI globally with `bun install supabase -g` and you can invoke `supabase` from anywhere.
 
-Alternatively, you can install the CLI inside this repo with `pnpm install supabase --save-dev` but to invoke it use: `./node_modules/supabase/bin/supabase`.
+Alternatively, you can install the CLI inside this repo with `bun install supabase --save-dev` but to invoke it use: `./node_modules/supabase/bin/supabase`.
 
 The rest of this guide assumes that you installed the `supabase` CLI globally.
 
@@ -157,8 +158,8 @@ service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxX
 
 You need make sure Docker is running.
 ```bash
-pnpm install
-pnpm backend
+bun install
+bun backend
 ```
 
 #### Start Frontend Locally
@@ -171,12 +172,12 @@ In another terminal, run this to generate the necessary Netlify functions:
 ```bash
 export BRANCH=local
 
-pnpm generate:node_serverless
+bun generate:node_serverless
 ```
 
 Then start the server
 ```bash
-pnpm serve
+bun serve
 ```
 
 #### Login
@@ -203,5 +204,5 @@ Make sure you have Docker running.
 
 This will seed the DB with demo data again.
 ```bash
-pnpm reset
+bun reset
 ```
