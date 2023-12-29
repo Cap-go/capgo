@@ -413,6 +413,9 @@ Begin
 End;
 $$;
 
+DELETE FROM "public"."orgs"
+WHERE "created_by" NOT IN (SELECT "id" FROM "public"."users");
+
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "orgs_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
