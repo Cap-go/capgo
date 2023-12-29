@@ -184,6 +184,8 @@ login-to-your-accoun: 계정에 로그인
 logout: 로그 아웃
 logs: 로그
 lowerCaseError: 소문자를 포함해야 합니다.
+make-default-android: Android용 기본값으로 설정
+make-default-ios: iOS용 기본값으로 설정
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 mau: 월간 활성 사용자

@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import gplay from 'https://esm.sh/google-play-scraper?target=deno'
 import { saveStoreInfo, supabaseAdmin } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -113,7 +112,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   await saveStoreInfo(flattenToSave)
   return sendRes()
 }
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

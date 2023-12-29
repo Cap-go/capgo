@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
@@ -221,7 +220,7 @@ async function main(url: URL, headers: BaseHeaders, _method: string, _body: any)
   }
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

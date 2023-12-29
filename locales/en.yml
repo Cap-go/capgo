@@ -26,19 +26,26 @@ activation-validate: Validate
 add: Add
 add-another-app: Add your app
 add-api-key: Added new API key successfully
+add-member: Add Member
 add-shared-user: Add shared user
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
 admin: Admin
 afternoon: afternoon
+alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete
+alert-confirm-invite: Confirm invitation
 alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
+alert-denied-invite: Invitation denied
 alert-generate-new-key: Please select the type of API key that you want to generate.
+alert-no-invite: This invitation does no longer exist
+alert-not-invited: Invalid invitation, cannot accept
 alert-not-reverse-message: This action is not reversible
 alert-regenerate-key: Are you sure you want to regenerate this key
+alert-unknown-error: Unknown error, see dev console
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
@@ -72,8 +79,11 @@ button-browse: Browse
 button-camera: Camera
 button-cancel: Cancel
 button-delete: Delete
+button-deny-invite: Deny
 button-go: GO
 button-home: Home
+button-invite: Invite
+button-join: Accept
 button-options: Options
 button-regenerate: Regenerate
 button-remove: Remove
@@ -81,12 +91,17 @@ button-tabs: Tabs
 button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
+cancel: Cancel
+cannot-change-permission: Cannot change permissions, check browser console
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
+cannot-delete-member: Cannot delete member, check browser console
+cannot-delete-owner: Cannot delete owner from the organization
 cannot-get-the-test-: Cannot get the test version
+cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
 cannot-share: Cannot share user id, check browser console
@@ -155,6 +170,7 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
+email-does-not-exist: This user does not exist
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
@@ -172,6 +188,7 @@ forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from: From
 from-device: from device
+general-information: General Informations
 generated-new-apikey: Generated new API key!
 good: Good
 id: ID
@@ -181,17 +198,22 @@ included-in-plan: Included in plan
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
+insert-invite-email: Insert email of the user you want to invite
 install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
+invalid-email: Passed email is not valid
 invalid-version: Invalid semver version
+invite-accepted: Successfully accepted oranization inviation
 is-emulator: Is Emulator
 is-production-app: Is Production app
+key-admin: Admin
 key-all: All
 key-copied: Key copied in your clipboard
 key-read: Read
 key-upload: Upload
+key-write: Write
 language: Language
 last-name: Last name
 last-update: Last update
@@ -209,11 +231,15 @@ logs: Logs
 lowerCaseError: Should contain lowercase letters
 main-bundle-number: Main bundle number
 major: Major
+make-default-android: Make default for Android
+make-default-ios: Make default for iOS
 make-normal: Make normal
 making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+member-deleted: Successfully deleted member
+members: Members
 metadata: Metadata
 metadata-min-ver-not-set: Minimal update version for current bundle is undefined
 min-update-version: Minimal update version
@@ -233,9 +259,12 @@ name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
 'no': 'no'
 no-channel-linked: No channel, click to add
+no-channel-linked-no-perm: No channel
 no-devices: No devices
 no-logs: No logs
+no-permission: Insufficient permissions
 no-version-linked: No version, click to add
+no-version-linked-no-perm: No version
 none: None
 not-found: Not found
 notifications: Notifications
@@ -246,6 +275,9 @@ open-channel: Open channel
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
+org-changes-saved: Organization updated successfully
+org-invited-user: Successfully invited user to org
+organization-name: Organization Name
 os-version: OS version
 pages: Pages
 password: Password
@@ -254,6 +286,7 @@ password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
 percent-fail: Fail percentage
+permission-changed: Successfully changed user permission
 personal-information: Personal Informations
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
@@ -299,6 +332,7 @@ resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves
+save-changes: Save Changes
 search: Search
 search-bundle: Search Bundle
 search-bundle-id: Search by bundle ID
@@ -310,6 +344,8 @@ search-by-name: Search by name
 search-device: Search device
 search-user: Search User
 see-usage: See usage
+select-user-perms: Select user's permissions
+select-user-perms-expanded: Select which permission should the invited user have
 session_key: IvSessionKey
 set-bundle: Set bundle to channel
 settings: Settings
@@ -365,6 +401,7 @@ use-the-command: 'Use the command:'
 used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate
 user: User
+user-already-invited: This user is already invited to this organization
 validate: Validate
 version: Version
 version-build: Version build

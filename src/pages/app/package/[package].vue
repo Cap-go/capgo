@@ -119,7 +119,7 @@ watchEffect(async () => {
   <div v-else class="w-full h-full px-4 pt-4 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6">
     <Usage :app-id="id" />
 
-    <BlurBg class="mb-10">
+    <BlurBg id="app-stats" class="mb-10">
       <template #default>
         <StatsBar :stats="stats" />
       </template>

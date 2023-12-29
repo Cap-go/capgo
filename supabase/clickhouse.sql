@@ -1,7 +1,3 @@
--- 
--- Devices table
--- 
-
 CREATE TABLE IF NOT EXISTS devices
 (
     updated_at DateTime64(6),
@@ -15,25 +11,6 @@ CREATE TABLE IF NOT EXISTS devices
     version Int64,
     is_prod UInt8,
     is_emulator UInt8,
-) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(updated_at)
-ORDER BY (app_id, device_id, updated_at)
-PRIMARY KEY (app_id, device_id);
-
-CREATE TABLE IF NOT EXISTS devices_aggregate
-(
-    created_at DateTime64(6),
-    updated_at DateTime64(6),
-    device_id String,
-    custom_id String,
-    app_id String,
-    platform String,
-    plugin_version String,
-    os_version String,
-    version_build String,
-    version Int64,
-    is_prod UInt8,
-    is_emulator UInt8
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(updated_at)
 ORDER BY (app_id, device_id, updated_at)
@@ -74,29 +51,6 @@ SELECT
     argMax(is_emulator, updated_at) AS is_emulator
 FROM devices
 GROUP BY device_id;
-
-CREATE MATERIALIZED VIEW devices_aggregate_mv
-TO devices_aggregate
-AS
-SELECT
-    min(updated_at) AS created_at,
-    max(updated_at) AS updated_at,
-    device_id,
-    argMax(custom_id, updated_at) AS custom_id,
-    argMax(app_id, updated_at) AS app_id,
-    argMax(platform, updated_at) AS platform,
-    argMax(plugin_version, updated_at) AS plugin_version,
-    argMax(os_version, updated_at) AS os_version,
-    argMax(version_build, updated_at) AS version_build,
-    argMax(version, updated_at) AS version,
-    argMax(is_prod, updated_at) AS is_prod,
-    argMax(is_emulator, updated_at) AS is_emulator
-FROM devices
-GROUP BY device_id;
-
--- 
--- Logs table
---
 
 CREATE TABLE IF NOT EXISTS logs
 (
@@ -144,10 +98,6 @@ FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 GROUP BY date, l.app_id;
 
--- 
--- App versions table
--- 
-
 CREATE TABLE IF NOT EXISTS app_versions_meta
 (
     created_at DateTime64(6),
@@ -159,8 +109,6 @@ CREATE TABLE IF NOT EXISTS app_versions_meta
 PARTITION BY toYYYYMM(created_at)
 ORDER BY (id, app_id, action)
 PRIMARY KEY (id, app_id, action);
-
---  Create stats for app_versions_meta
 
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
@@ -265,45 +213,45 @@ GROUP BY ld.date, ld.app_id, a.storage_added, a.storage_deleted, ld.bandwidth, m
 -- Sessions stats
 -- 
 
-CREATE TABLE IF NOT EXISTS sessions
-(
-    device_id String,
-    app_id String,
-    session_start DateTime64(6),
-    session_end DateTime64(6)
-) ENGINE = ReplacingMergeTree()
-ORDER BY (app_id, device_id, session_start)
-PRIMARY KEY (app_id, device_id, session_start);
+-- CREATE TABLE IF NOT EXISTS sessions
+-- (
+--     device_id String,
+--     app_id String,
+--     session_start DateTime64(6),
+--     session_end DateTime64(6)
+-- ) ENGINE = ReplacingMergeTree()
+-- ORDER BY (app_id, device_id, session_start)
+-- PRIMARY KEY (app_id, device_id, session_start);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sessions
-TO sessions AS
-SELECT
-    device_id,
-    app_id,
-    anyIf(created_at, action = 'app_moved_to_foreground') as session_start,
-    anyIf(created_at, action = 'app_moved_to_background') as session_end
-FROM logs
-WHERE (action = 'app_moved_to_foreground' OR action = 'app_moved_to_background')
-GROUP BY device_id, app_id
-HAVING session_start < session_end;
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sessions
+-- TO sessions AS
+-- SELECT
+--     device_id,
+--     app_id,
+--     anyIf(created_at, action = 'app_moved_to_foreground') as session_start,
+--     anyIf(created_at, action = 'app_moved_to_background') as session_end
+-- FROM logs
+-- WHERE (action = 'app_moved_to_foreground' OR action = 'app_moved_to_background')
+-- GROUP BY device_id, app_id
+-- HAVING session_start < session_end;
 
-CREATE TABLE IF NOT EXISTS avg_session_length
-(
-    device_id String,
-    app_id String,
-    avg_length Float64
-) ENGINE = AggregatingMergeTree()
-ORDER BY (app_id, device_id)
-PRIMARY KEY (app_id, device_id);
+-- CREATE TABLE IF NOT EXISTS avg_session_length
+-- (
+--     device_id String,
+--     app_id String,
+--     avg_length Float64
+-- ) ENGINE = AggregatingMergeTree()
+-- ORDER BY (app_id, device_id)
+-- PRIMARY KEY (app_id, device_id);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS mv_avg_session_length
-TO avg_session_length AS
-SELECT
-    device_id,
-    app_id,
-    avg(toUnixTimestamp(session_end) - toUnixTimestamp(session_start)) as avg_length
-FROM sessions
-GROUP BY device_id, app_id;
+-- CREATE MATERIALIZED VIEW IF NOT EXISTS mv_avg_session_length
+-- TO avg_session_length AS
+-- SELECT
+--     device_id,
+--     app_id,
+--     avg(toUnixTimestamp(session_end) - toUnixTimestamp(session_start)) as avg_length
+-- FROM sessions
+-- GROUP BY device_id, app_id;
 
 
 -- Aggregate table partitioned by version only
@@ -349,7 +297,6 @@ SELECT
 FROM logs
 GROUP BY date, version;
 
--- Create a Materialized View that aggregates data by version
 CREATE MATERIALIZED VIEW version_aggregate_logs_mv TO version_aggregate_logs AS
 SELECT 
     version,

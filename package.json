@@ -26,6 +26,7 @@
     "test:selectable_disallow": "deno run --allow-all tests_backend/run_backend_tests.ts selectable_disallow",
     "test:all": "deno run --allow-all tests_backend/run_backend_tests.ts all",
     "test:zod": "deno test --allow-all tests_backend/zod.test.ts",
+    "test:organization": "deno run --allow-all tests_backend/run_backend_tests.ts organization",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
@@ -33,6 +34,11 @@
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
+    "generate:cf_serverless": "npm run generate:node_serverless && node scripts/generate_denoflare.mjs",
+    "deploy:cf_serverless": "cd cloudflare_workers_deno && denoflare push capgoloadbal && cd .. ",
+    "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && sudo bash -c 'rm -rf ./tests_backend/gh_actions/ch_data/ && rm -rf ./tests_backend/gh_actions/ch_logs/'",
+    "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
+    "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\"",
     "types": "bun ./scripts/getTypes.mjs",
     "generate:node_serverless": "rm -rf netlify && bun ./scripts/convert_deno_to_node.mjs",
     "dev-types": "BRANCH=development bun ./scripts/getTypes.mjs",
@@ -143,7 +149,7 @@
     "@iconify-json/ion": "1.1.14",
     "@iconify-json/ls": "1.1.7",
     "@iconify/json": "^2.2.145",
-    "@playwright/test": "^1.40.0",
+    "@playwright/test": "^1.40.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/line-clamp": "^0.4.4",
@@ -186,7 +192,9 @@
     "vite-plugin-vue-layouts": "0.8.0",
     "vite-plugin-windicss": "1.9.2",
     "vitest": "0.34.6",
-    "vue-tsc": "1.8.22"
+    "vue-tsc": "1.8.22",
+    "deep-diff": "1.0.2",
+    "@types/deep-diff": "1.0.5"
   },
   "husky": {
     "hooks": {

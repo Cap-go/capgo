@@ -200,7 +200,7 @@ onMounted(() => {
       </div>
     </div>
     <div class="hidden md:block">
-      <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+      <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
             <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable }" @click="sortClick(i)">

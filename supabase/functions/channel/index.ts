@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
@@ -174,7 +173,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
   return sendRes({ status: 'Method now allowed' }, 400)
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

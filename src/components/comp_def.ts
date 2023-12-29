@@ -28,4 +28,5 @@ export interface Tab {
   icon?: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
   key: string
   onClick?: (elem: any | undefined) => void
+  redirect?: boolean
 }

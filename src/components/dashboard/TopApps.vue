@@ -6,6 +6,8 @@ import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
+  header: string
+  deleteButton: boolean
 }>()
 const emit = defineEmits(['reload'])
 const { t } = useI18n()
@@ -15,13 +17,13 @@ const { t } = useI18n()
   <div id="my_apps" class="col-span-full border border-slate-200 rounded-lg bg-white shadow-lg xl:col-span-16 dark:border-slate-900 dark:bg-gray-800">
     <header class="border-b border-slate-100 px-5 py-4">
       <h2 class="font-semibold text-slate-800 dark:text-white">
-        {{ t('top-apps') }}
+        {{ header }}
       </h2>
     </header>
     <div class="">
       <!-- Table -->
       <div class="hidden overflow-x-auto p-3 md:block">
-        <table class="w-full table-auto" aria-label="Table with your apps">
+        <table id="top_apps" class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="rounded-sm bg-slate-50 text-xs uppercase text-slate-400 dark:bg-gray-800 dark:text-white">
             <tr>
@@ -51,12 +53,12 @@ const { t } = useI18n()
           <!-- Table body -->
           <tbody class="text-sm font-medium divide-y divide-slate-100">
             <!-- Row -->
-            <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :app="app" channel="" @reload="emit('reload')" />
+            <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :delete-button="deleteButton" :app="app" channel="" @reload="emit('reload')" />
           </tbody>
         </table>
       </div>
       <k-list class="my-0 w-full md:hidden">
-        <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :app="app" channel="" @reload="emit('reload')" />
+        <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :delete-button="deleteButton" :app="app" channel="" @reload="emit('reload')" />
       </k-list>
     </div>
   </div>

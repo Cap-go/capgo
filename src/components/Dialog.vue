@@ -72,7 +72,7 @@ onMounted(() => {
     aria-hidden="true"
     class="fixed left-0 right-0 top-0 z-50 hidden h-[calc(100%-1rem)] w-full overflow-x-hidden overflow-y-auto p-4 md:inset-0 md:h-full"
   >
-    <div class="relative w-full h-full max-w-2xl md:h-auto">
+    <div id="popout" class="relative w-full h-full max-w-2xl md:h-auto">
       <!-- Modal content -->
       <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
         <!-- Modal header -->
@@ -87,7 +87,12 @@ onMounted(() => {
         </div>
         <!-- Modal body -->
         <div class="p-6 space-y-6">
-          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)" />
+          <p v-if="!displayStore.dialogOption?.input" class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)" />
+          <template v-else>
+            <div class="flex flex-row max-w-2xl">
+              <input id="dialog-input-field" class="border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 w-full ml-4" type="text">
+            </div>
+          </template>
         </div>
         <!-- Modal footer -->
         <div class="flex items-center p-6 space-x-2 border-t border-gray-200 rounded-b dark:border-gray-600">

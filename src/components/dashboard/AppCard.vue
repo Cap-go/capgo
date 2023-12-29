@@ -17,6 +17,7 @@ import { useMainStore } from '~/stores/main'
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']
   channel: string
+  deleteButton: boolean
 }>()
 const emit = defineEmits(['reload'])
 const displayStore = useDisplayStore()
@@ -167,7 +168,7 @@ watchEffect(async () => {
     </td>
     <td class="w-1/4 p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
-        <IconTrash v-if="!channel" class="mr-4 text-lg text-red-600" />
+        <IconTrash v-if="!channel && deleteButton" class="mr-4 text-lg text-red-600" />
       </div>
     </td>
   </tr>

@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.199.0/http/server.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 import { redisDeviceInvalidate } from '../_utils/redis.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -7,7 +6,7 @@ import type { DeletePayload, InsertPayload, UpdatePayload } from '../_utils/supa
 // This endpoint is called when a device is updated, created or deleted, and channel_devices or devices_override is updated
 // It invalidates the device cache
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
