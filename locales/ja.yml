@@ -184,6 +184,8 @@ login-to-your-accoun: あなたのアカウントにログイン
 logout: ログアウト
 logs: ログ
 lowerCaseError: 小文字を含める必要があります
+make-default-android: Android のデフォルトにする
+make-default-ios: iOSのデフォルトにする
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 mau: 月間アクティブ ユーザー数

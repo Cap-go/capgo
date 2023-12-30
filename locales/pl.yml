@@ -204,6 +204,8 @@ login-to-your-accoun: Zaloguj się na swoje konto
 logout: Wyloguj
 logs: Logi
 lowerCaseError: Powinien zawierać małe litery
+make-default-android: Ustaw jako domyślny dla Androida
+make-default-ios: Ustaw jako domyślny dla iOS
 make-normal: Zrób normalne
 making-this-channel-: >-
   Ustawienie tego kanału jako „normalnego” będzie wymagało skonfigurowania

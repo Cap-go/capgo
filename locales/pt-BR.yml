@@ -188,6 +188,8 @@ login-to-your-accoun: Faça login na sua conta
 logout: Sair
 logs: Histórico
 lowerCaseError: Deve conter letras minúsculas
+make-default-android: Tornar padrão para Android
+make-default-ios: Tornar padrão para iOS
 make-normal: tornar normal
 making-this-channel-: >-
   Tornar este canal "normal" exigirá que você configure um outro padrão de canal

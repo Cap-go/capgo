@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { extractDataEvent, parseStripeEvent } from '../_utils/stripe_event.ts'
 import { customerToSegment, supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
@@ -7,7 +6,7 @@ import { logsnag } from '../_utils/logsnag.ts'
 import type { Person } from '../_utils/plunk.ts'
 import { addDataContact, trackEvent } from '../_utils/plunk.ts'
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   if (!event.headers.get('stripe-signature') || !getEnv('STRIPE_WEBHOOK_SECRET') || !getEnv('STRIPE_SECRET_KEY'))
     return sendRes({ status: 'Webhook Error: no signature or no secret found' }, 400)
 

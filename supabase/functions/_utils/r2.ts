@@ -1,16 +1,17 @@
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import { getEnv } from './utils.ts'
+//import presign s3
 
-const accountid = getEnv('R2_ACCOUNT_ID')
-const access_key_id = getEnv('R2_ACCESS_KEY_ID')
-const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
-const storageEndpoint = getEnv('S3_ENDPOINT')
-const storageRegion = getEnv('S3_REGION')
-const storagePort = Number.parseInt(getEnv('S3_PORT'))
-const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
 const bucket = 'capgo'
 
 function initR2() {
+  const accountid = getEnv('R2_ACCOUNT_ID')
+  const access_key_id = getEnv('R2_ACCESS_KEY_ID')
+  const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
+  const storageEndpoint = getEnv('S3_ENDPOINT')
+  const storageRegion = getEnv('S3_REGION')
+  const storagePort = Number.parseInt(getEnv('S3_PORT'))
+  const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
   const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',

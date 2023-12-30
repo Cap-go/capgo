@@ -184,6 +184,8 @@ login-to-your-accoun: 登录到您的帐户
 logout: 登出
 logs: 日志
 lowerCaseError: 应包含小写字母
+make-default-android: 为 Android 设置默认值
+make-default-ios: 为 iOS 设置默认值
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 mau: 月活跃用户

@@ -8,6 +8,7 @@ import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import type { Database } from '~/types/supabase.types'
+import { useOrganizationStore } from '~/stores/organization'
 
 const route = useRoute()
 const main = useMainStore()
@@ -15,20 +16,17 @@ const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
-const sharedApps = ref<(Database['public']['Tables']['channel_users']['Row'] & ChannelUserApp)[]>([])
-
-interface ChannelUserApp {
-  app_id: Database['public']['Tables']['apps']['Row']
-  channel_id: Database['public']['Tables']['channels']['Row'] & {
-    version: Database['public']['Tables']['app_versions']['Row']
-  }
-}
+const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
+const organizationStore = useOrganizationStore()
 
 async function getMyApps() {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('apps')
     .select()
     .eq('user_id', main.user?.id).order('name', { ascending: true })
+
+  console.log('my apps', data, error)
+
   if (data && data.length)
     apps.value = data
   else
@@ -40,34 +38,23 @@ async function onboardingDone() {
 }
 
 async function getSharedWithMe() {
-  const { data } = await supabase
-    .from('channel_users')
-    .select(`
-      id,
-      app_id (
-        app_id,
-        name,
-        updated_at,
-        icon_url,
-        last_version,
-        user_id,
-        created_at
-      ),
-      channel_id (
-        version (
-          bucket_id,
-          app_id,
-          name
-        ),
-        name,
-        updated_at,
-        created_at
-      ),
-      user_id
-      `)
-    .eq('user_id', main.user?.id)
-  if (data && data.length)
-    sharedApps.value = data as (Database['public']['Tables']['channel_users']['Row'] & ChannelUserApp)[]
+  const userId = main.user?.id
+  if (!userId)
+    return
+
+  const { data, error } = await supabase
+    .from('apps')
+    .select()
+    .neq('user_id', main.user?.id).order('name', { ascending: true })
+    .in('user_id', [organizationStore.organizations.filter(org => org.role !== 'owner').map(org => org.created_by)])
+
+  if (error) {
+    console.log('Error get sharred: ', error)
+    return
+  }
+
+  console.log('shared', data)
+  sharedApps.value = data
 }
 watchEffect(async () => {
   if (route.path === '/app/home') {

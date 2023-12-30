@@ -1,9 +1,8 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import type { InsertPayload } from '../_utils/supabase.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { getEnv, sendRes } from '../_utils/utils.ts'
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)

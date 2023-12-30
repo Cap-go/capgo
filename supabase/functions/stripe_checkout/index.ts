@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { createCheckout } from '../_utils/stripe.ts'
@@ -11,7 +10,7 @@ interface PortalData {
   successUrl: string
   cancelUrl: string
 }
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
   const authorization = event.headers.get('authorization')
