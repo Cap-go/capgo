@@ -270,7 +270,7 @@ async function handleMfa() {
             preventClose: true,
             handler: async () => {
               // User has clicked the "verify button - let's check"
-              const verifyCode = displayStore.dialogInputText
+              const verifyCode = displayStore.dialogInputText.replace(' ', '')
               
               const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
 

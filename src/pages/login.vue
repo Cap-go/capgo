@@ -28,7 +28,7 @@ async function nextLogin() {
   }, 500)
 }
 
-async function submit(form: { email: string, password: string, code: number }) {
+async function submit(form: { email: string, password: string, code: string }) {
   if (stauts.value === 'login') {
     isLoading.value = true
   const { error } = await supabase.auth.signInWithPassword({
@@ -80,7 +80,7 @@ async function submit(form: { email: string, password: string, code: number }) {
     const verify = await supabase.auth.mfa.verify({
       factorId: mfaLoginFactor.value!.id!,
       challengeId: mfaChallangeId.value!,
-      code: form.code.toString()
+      code: form.code.replace(' ', '')
     })
 
     if (verify.error) {
