@@ -91,6 +91,7 @@ cannot-get-the-test-: Cannot get the test version
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
 cannot-test-app-some: Cannot test app something wrong happened
+cannots-sign-off: Cannot log of
 change: Change
 changed-password-suc: Password changed successfully
 channel: Channel
@@ -175,6 +176,7 @@ forgot-success: Password updated successfully
 from: From
 from-device: from device
 generated-new-apikey: Generated new API key!
+go-back: Go back
 good: Good
 id: ID
 in-your-main-file: In your main file
@@ -187,6 +189,7 @@ install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
+invalid-mfa-code: Invalid 2FA code
 invalid-version: Invalid semver version
 is-emulator: Is Emulator
 is-production-app: Is Production app
