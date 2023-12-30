@@ -1,5 +1,6 @@
 2fa: Manage 2FA
 2fa-code: 2FA authentication code
+2fa-disabled: Disabled 2FA
 6-characters-minimum: 6 characters minimum, 1 uppercase, 1 lowercase, 1 special character
 Bandwidth: Bandwidth
 Current: Current
@@ -35,6 +36,7 @@ add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
 admin: Admin
 afternoon: afternoon
+alert-2fa-disable: Confirm that you want to disable 2FA
 alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete
@@ -42,6 +44,7 @@ alert-confirm-invite: Confirm invitation
 alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
 alert-denied-invite: Invitation denied
+alert-disable-2fa-message: Are you sure you want to disable 2FA?
 alert-generate-new-key: Please select the type of API key that you want to generate.
 alert-no-invite: This invitation does no longer exist
 alert-not-invited: Invalid invitation, cannot accept
@@ -174,9 +177,9 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
+email-does-not-exist: This user does not exist
 enable: Enable
 enable-2FA: Enable 2FA
-email-does-not-exist: This user does not exist
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
@@ -210,8 +213,8 @@ install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
-invalid-mfa-code: Invalid 2FA code
 invalid-email: Passed email is not valid
+invalid-mfa-code: Invalid 2FA code
 invalid-version: Invalid semver version
 invite-accepted: Successfully accepted oranization inviation
 is-emulator: Is Emulator

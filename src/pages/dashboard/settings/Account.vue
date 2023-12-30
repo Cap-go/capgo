@@ -16,6 +16,7 @@ import { availableLocales, i18n, languages, loadLanguageAsync } from '~/modules/
 import { iconEmail, iconName } from '~/services/icons'
 import copy from 'copy-text-to-clipboard'
 import { pickPhoto, takePhoto } from '~/services/photos'
+import { M } from '@upstash/redis/zmscore-415f6c9f'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -26,6 +27,7 @@ const main = useMainStore()
 const isLoading = ref(false)
 // mfa = 2fa
 const mfaEnabled = ref(false)
+const mfaFactorId = ref('')
 // const errorMessage = ref('')
 
 async function hashEmail(email: string) {
@@ -287,6 +289,7 @@ async function handleMfa() {
 
               toast.success(t('mfa-enabled'))
               mfaEnabled.value = true
+              mfaFactorId.value = data.id
               displayStore.showDialog = false
             }
           },
@@ -305,6 +308,47 @@ async function handleMfa() {
         }
       }
     }
+  } else {
+    // disable mfa
+    displayStore.dialogOption = {
+      header: t('alert-2fa-disable'),
+      message: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('disable'),
+          id: 'confirm-button',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    const canceled = await displayStore.onDialogDismiss()
+
+    // User has changed his mind - keepin 2fa
+    if (canceled)
+      return
+
+    // Remove 2fa
+    const factorId = mfaFactorId.value
+    if (!factorId) {
+      toast.error(t('mfa-fail'))
+      console.error('Factor id = null')
+      return
+    }
+
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: factorId })
+    if (unregisterError) {
+      toast.error(t('mfa-fail'))
+      console.error('Cannot unregister MFA', unregisterError)
+      return
+    }
+
+    mfaFactorId.value = ''
+    mfaEnabled.value = false
+    toast.success(t('2fa-disabled'))
   }
 }
 
@@ -329,6 +373,10 @@ onMounted(async () => {
 
   const hasMfa = mfaFactors?.all.find(factor => factor.status === 'verified')
   mfaEnabled.value = !!hasMfa
+
+  if (hasMfa) {
+    mfaFactorId.value = hasMfa.id
+  }
 })
 </script>
 
