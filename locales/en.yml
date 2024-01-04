@@ -242,6 +242,7 @@ member-deleted: Successfully deleted member
 members: Members
 metadata: Metadata
 metadata-min-ver-not-set: Minimal update version for current bundle is undefined
+metadata-not-found: metadata not found
 min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured

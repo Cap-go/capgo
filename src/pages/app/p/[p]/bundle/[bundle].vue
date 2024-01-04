@@ -99,7 +99,7 @@ const showSize = computed(() => {
   else if (version.value?.external_url)
     return t('stored-externally')
   else
-    return t('app-not-found')
+    return t('metadata-not-found')
 })
 
 async function getUnknowBundleId() {
