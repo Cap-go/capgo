@@ -52,3 +52,4 @@ cloudflare_workers_deno/generated_functions_map.ts
 cloudflare_workers_deno/.denoflare
 
 .dev.vars
+supabase/functions/_script/import_d1.sh
