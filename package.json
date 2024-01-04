@@ -204,7 +204,7 @@
     "vite-plugin-vue-layouts": "0.8.0",
     "vite-plugin-windicss": "1.9.2",
     "vitest": "0.34.6",
-    "vue-tsc": "1.8.22",
+    "vue-tsc": "1.8.27",
     "wrangler": "3.18.0"
   },
   "husky": {
