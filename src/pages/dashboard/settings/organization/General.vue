@@ -5,7 +5,6 @@ import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
-import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
 import { pickPhoto, takePhoto } from '~/services/photos'
 

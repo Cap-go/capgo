@@ -57,7 +57,7 @@ async function updloadPhotoUser(data: string, fileName: string, contentType: str
   await uploadPhotoShared(data, fileName, contentType, isLoading, userCallback)
 }
 
-async function updloadPhotoOrg(data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+async function updloadPhotoOrg(data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, _wentWrong: string) {
   async function orgCallback(success: boolean, url: string) {
     if (!success)
       return

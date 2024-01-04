@@ -13,26 +13,26 @@ keyof T
 type RequiredMergeKeys<T, U> = RequiredKeys<T> & RequiredKeys<U>
 
 type OptionalMergeKeys<T, U> =
-    | OptionalKeys<T>
-    | OptionalKeys<U>
-    | Exclude<RequiredKeys<T>, RequiredKeys<U>>
-    | Exclude<RequiredKeys<U>, RequiredKeys<T>>
+  | OptionalKeys<T>
+  | OptionalKeys<U>
+  | Exclude<RequiredKeys<T>, RequiredKeys<U>>
+  | Exclude<RequiredKeys<U>, RequiredKeys<T>>
 
 type MergeNonUnionObjects<T, U> = Expand<
-    {
-      [K in RequiredMergeKeys<T, U>]: Expand<Merge<T[K], U[K]>>;
-    } & {
-      [K in OptionalMergeKeys<T, U>]?: K extends keyof T
-        ? K extends keyof U
-          ? Expand<Merge<
+  {
+    [K in RequiredMergeKeys<T, U>]: Expand<Merge<T[K], U[K]>>;
+  } & {
+    [K in OptionalMergeKeys<T, U>]?: K extends keyof T
+      ? K extends keyof U
+        ? Expand<Merge<
                     Exclude<T[K], undefined>,
                     Exclude<U[K], undefined>
                 >>
-          : T[K]
-        : K extends keyof U
-          ? U[K]
-          : never;
-    }
+        : T[K]
+      : K extends keyof U
+        ? U[K]
+        : never;
+  }
 >
 
 type MergeNonUnionArrays<T extends readonly any[], U extends readonly any[]> = Array<Expand<Merge<T[number], U[number]>>>
@@ -66,9 +66,9 @@ type MergeObjects<T, U> = [T] extends [never]
         : never
 
 export type Merge<T, U> =
-    | Extract<T | U, Primitive>
-    | MergeArrays<Extract<T, readonly any[]>, Extract<U, readonly any[]>>
-    | MergeObjects<Exclude<T, Primitive | readonly any[]>, Exclude<U, Primitive | readonly any[]>>
+  | Extract<T | U, Primitive>
+  | MergeArrays<Extract<T, readonly any[]>, Extract<U, readonly any[]>>
+  | MergeObjects<Exclude<T, Primitive | readonly any[]>, Exclude<U, Primitive | readonly any[]>>
 
 export type ArrayElement<ArrayType extends readonly unknown[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never

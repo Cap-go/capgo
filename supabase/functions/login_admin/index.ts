@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
-import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient, emptySupabase } from '../_utils/supabase.ts'
+import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../_utils/supabase.ts'
 
 const bodySchema = z.object({
   user_id: z.string(),
@@ -13,9 +13,8 @@ async function main(_url: URL, headers: BaseHeaders, method: string, body: any) 
     return sendOptionsRes()
   const authToken = headers.authorization
 
-  if (!authToken) {
+  if (!authToken)
     return sendRes({ error: 'no_authorization_header' }, 400)
-  }
 
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
@@ -33,13 +32,12 @@ async function main(_url: URL, headers: BaseHeaders, method: string, body: any) 
     return sendRes({ error: 'is_admin_error' }, 500)
   }
 
-  if (!isAdmin) {
+  if (!isAdmin)
     return sendRes({ error: 'not_admin' }, 401)
-  }
 
   const user_id = parsedBodyResult.data.user_id
 
-  const { data: userData, count: userCount, error: userError } = await supabaseAdmin.from('users')
+  const { data: userData, count: _userCount, error: userError } = await supabaseAdmin.from('users')
     .select('email', { count: 'exact' })
     .eq('id', user_id)
     .single()
@@ -58,7 +56,7 @@ async function main(_url: URL, headers: BaseHeaders, method: string, body: any) 
 
   if (magicError) {
     console.error(JSON.stringify(magicError))
-    return sendRes({ error: 'generate_magic_link_error'}, 500)
+    return sendRes({ error: 'generate_magic_link_error' }, 500)
   }
 
   const tmpSupabaseClient = emptySupabase()

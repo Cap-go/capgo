@@ -1,9 +1,10 @@
+// eslint-disable
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
-import { load } from "https://deno.land/std@0.207.0/dotenv/mod.ts";
+import { load } from 'https://deno.land/std@0.207.0/dotenv/mod.ts'
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
-const env = await load();
+const env = await load()
 
 function getEnv(envName: string) {
   return Deno.env.get(envName) ?? env[envName] ?? ''
@@ -19,7 +20,6 @@ function useSupabase() {
   }
   return createClient<Database>(getEnv('SUPABASE_URL') || '***', getEnv('SUPABASE_SERVICE_ROLE_KEY') || '***', options)
 }
-
 
 function initR2() {
   const accountid = getEnv('R2_ACCOUNT_ID')
@@ -52,11 +52,9 @@ async function gen2array<T>(gen: AsyncIterable<T>): Promise<T[]> {
   return out
 }
 
-async function main2() {
- 
-  
+async function _main2() {
   const supabase = useSupabase()
-  const { data: apps, error: appError } = await supabase.from('apps').select('app_id, user_id')
+  const { data: _apps, error: appError } = await supabase.from('apps').select('app_id, user_id')
 
   if (appError) {
     console.error('app error')
@@ -80,9 +78,7 @@ async function main2() {
   console.log('done')
   // r2.
 }
-async function main() {
-
-
+async function _main() {
   // console.log(Deno.env.toObject())
 
   const supabase = useSupabase()

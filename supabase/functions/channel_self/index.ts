@@ -164,7 +164,7 @@ async function post(body: DeviceLink): Promise<Response> {
     if (!dbMainChannelError) {
       const devicePlatform = parseResult.data.platform
       const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
-      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null 
+      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
     }
 
     // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
