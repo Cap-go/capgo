@@ -1,5 +1,11 @@
 export default { 
     async fetch(request, env) { 
+        let headersObject = Object.fromEntries(request.headers);
+
+        if (!headersObject.authorization || !headersObject.authorization.includes('43a519ce-0993-4796-b813-1222d992f7ca')) {
+            return new Response(JSON.stringify({err: 'lol, no'}), { status: 400 });
+        }
+
         const text = await request.text()
 
         var json
@@ -61,16 +67,28 @@ export default {
             return new Response(`No database configured`, { status: 500 }) 
         }
 
-        let stmt = db.prepare(sql);
-        if (parms && typeof parms === 'object') {
-            stmt = stmt.bind(...parms)
-        }
-        
+        const stmts = sql.split(';').map(val => {
+            // console.log(val)
+            return db.prepare(val)
+        })
+        parms.forEach((val, i) => {
+            // console.log(i, stmts[i], val.length)
+            // console.log(stmts[i].bind)
+            stmts[i] = stmts[i].bind(...val)
+        })
+
+        // console.log(stmts)
+
+
+        // let stmt = db.prepare(sql);
+        // if (parms && typeof parms === 'object') {
+        //     stmt = stmt.bind(...parms)
+        // }
 
         let result;
 
         try {
-            result = await stmt.all()
+            result = await db.batch(stmts) // stmt.all()
         } catch (error) {
             console.log('err')
             console.log(error.cause)
