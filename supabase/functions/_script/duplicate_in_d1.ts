@@ -21,8 +21,8 @@ async function main() {
 
   const pool = new Pool(supabaseUrl, 5);
   const client = await pool.connect()
-  await migrationTable(client, 'app_versions')
-  await migrationTable(client, 'apps')
+  // await migrationTable(client, 'app_versions')
+  //await migrationTable(client, 'apps')
   await migrationTable(client, 'channel_devices')
   await migrationTable(client, 'channels')
   await migrationTable(client, 'devices_override')
@@ -49,6 +49,11 @@ function queryD1(sqlQuery: string, values: any) {
     })
   })
   .then((res) => res.json())
+  .then(json => {
+    // console.log(json)
+    return json
+  })
+  .catch(err => console.error('some error happend', JSON.stringify(err)))
 }
 
 async function migrationTable(client: Client, table: string) {
@@ -65,7 +70,7 @@ async function migrationTable(client: Client, table: string) {
 
   console.log(`migrate ${table} (size: ${count.toString()})`)
 
-  const promises = []
+  const promises = [] as { query: string, parms: string[] }[]
   while (true) {
     const query = `SELECT array_to_json(array_agg(row_to_json(${table}) ORDER BY id ASC)) FROM (select * from ${table} WHERE id > ${lastId.toString()} ORDER BY id ASC limit ${migrationsPerStep}) as ${table}`
     const resultArr = await client.queryObject<object>(query)
@@ -97,10 +102,11 @@ async function migrationTable(client: Client, table: string) {
         return (value !== undefined && value !== null) ? value.toString() : null
       })
   
-      const sqlQuery = `INSERT INTO ${table} ("${keys.join('", "')}") VALUES (${values.map((_) => `?`)})`
+      const sqlQuery = `INSERT INTO ${table} ("${keys.join('", "')}") VALUES (${values.map((a, b) => `?${b+1}`)})`
   
+      // console.log(values)
       // TODO: AUTH FOR ACCUAL API
-      return queryD1(sqlQuery, values)
+      return { query: sqlQuery, parms: values }
     }))
   
     totalMigrated += rows.length
@@ -112,10 +118,24 @@ async function migrationTable(client: Client, table: string) {
     }
     lastId = rows[rows.length - 1].id
     console.log(`not yet done for ${table}. Total: ${totalMigrated}, last id: ${lastId}`)
-    await Promise.all(promises)
+
+    const finalSql = promises.map(p => p.query).join(';\n')
+    // const finalValues = promises.flatMap(p => p.parms)
+
+    // console.log(finalSql)
+    
+
+    await queryD1(finalSql, promises.map(p => p.parms))
     promises.length = 0 // clear promises array
   }
-  await Promise.all(promises)
+  const finalSql = `${promises.map(p => p.query).join(';\n')}`
+  const finalValues = promises.map(p => p.parms)
+  // console.log(finalValues.length)
+
+  // console.log(finalSql)
+  
+
+  await queryD1(finalSql, finalValues)
   console.log(`migrate ${table} done. Total: ${totalMigrated}`)
 }
 
