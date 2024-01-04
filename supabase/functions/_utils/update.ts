@@ -1,6 +1,13 @@
 // use_trans_macros
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js'
+
+// do_not_change
+import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
+import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
+import postgres from 'https://deno.land/x/postgresjs/mod.js'
 import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
@@ -11,11 +18,13 @@ import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
 
 // Drizze orm
-import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js'; // do_not_change
-import { and, or, sql, eq } from 'https://esm.sh/drizzle-orm@^0.29.1'
-import * as schema_postgres from './postgress_schema.ts' // do_not_change
-import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'; // do_not_change
-import postgres from 'https://deno.land/x/postgresjs/mod.js'
+
+import * as schema_postgres from './postgress_schema.ts'
+
+// do_not_change
+
+// do_not_change
+
 // import drizzle_sqlite
 // Do not change the comment above, used in codegen
 
@@ -47,18 +56,18 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
 // Do not change // COPY FUNCTION STOP/START
 // This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
 // COPY FUNCTION START
-const requestInfosPostgres = async (platform: string, app_id: string, device_id: string, version_name: string) => {
+async function requestInfosPostgres(platform: string, app_id: string, device_id: string, version_name: string) {
   const supaUrl = getEnv('SUPABASE_DB_URL')!
 
   // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)
   const { alias, schema, drizzleCient } = { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
-  
+
   // DO NOT CHANGE END
 
   const appVersions = drizzleCient
     .select({
-      id: schema.app_versions.id
+      id: schema.app_versions.id,
     })
     .from(schema.app_versions)
     .where(or(eq(schema.app_versions.name, version_name), eq(schema.app_versions.app_id, app_id)))
@@ -83,8 +92,8 @@ const requestInfosPostgres = async (platform: string, app_id: string, device_id:
         bucket_id: versionAlias.bucket_id,
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
-        minUpdateVersion: versionAlias.minUpdateVersion
-      }
+        minUpdateVersion: versionAlias.minUpdateVersion,
+      },
     })
     .from(schema.devices_override)
     .innerJoin(versionAlias, eq(schema.devices_override.version, versionAlias.id))
@@ -94,63 +103,10 @@ const requestInfosPostgres = async (platform: string, app_id: string, device_id:
 
   const channelDevice = drizzleCient
     .select({
-        channel_devices: {
-          device_id: schema.channel_devices.device_id,
-          app_id: sql<string>`${schema.channel_devices.app_id}`.as('cd_app_id'),
-        },
-        version: {
-          id: sql<number>`${versionAlias.id}`.as('vid'),
-          name: sql<string>`${versionAlias.name}`.as('vname'),
-          checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-          session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-          user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
-          bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
-          storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-          external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-          minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion')
-        },
-        secondVersion: {
-          id: sql<number>`${secondVersionAlias.id}`.as('svid'),
-          name: sql<string>`${secondVersionAlias.name}`.as('svname'),
-          checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
-          session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-          user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
-          bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
-          storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
-          external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-          minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion')
-        },
-        channels: {
-          id: schema.channels.id,
-          created_at: schema.channels.created_at,
-          created_by: schema.channels.created_by,
-          name: schema.channels.name,
-          app_id: schema.channels.app_id,
-          allow_dev: schema.channels.allow_dev,
-          allow_emulator: schema.channels.allow_emulator,
-          disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
-          disableAutoUpdate: schema.channels.disableAutoUpdate,
-          ios: schema.channels.ios,
-          android: schema.channels.android,
-          secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
-          enable_progressive_deploy: schema.channels.enable_progressive_deploy,
-          enableAbTesting: schema.channels.enableAbTesting,
-        }
-      }
-    )
-    .from(schema.channel_devices)
-    .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
-    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
-    .limit(1)
-    .then(data => data.at(0));
-
-
-  // v => version
-  // sv => secondversion
-  const channel = drizzleCient
-    .select({
+      channel_devices: {
+        device_id: schema.channel_devices.device_id,
+        app_id: sql<string>`${schema.channel_devices.app_id}`.as('cd_app_id'),
+      },
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
         name: sql<string>`${versionAlias.name}`.as('vname'),
@@ -160,7 +116,7 @@ const requestInfosPostgres = async (platform: string, app_id: string, device_id:
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion')
+        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -171,7 +127,7 @@ const requestInfosPostgres = async (platform: string, app_id: string, device_id:
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion')
+        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
       },
       channels: {
         id: schema.channels.id,
@@ -188,15 +144,67 @@ const requestInfosPostgres = async (platform: string, app_id: string, device_id:
         secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
         enableAbTesting: schema.channels.enableAbTesting,
-      }
+      },
+    },
+    )
+    .from(schema.channel_devices)
+    .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
+    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
+    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  // v => version
+  // sv => secondversion
+  const channel = drizzleCient
+    .select({
+      version: {
+        id: sql<number>`${versionAlias.id}`.as('vid'),
+        name: sql<string>`${versionAlias.name}`.as('vname'),
+        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+        user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+        bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
+        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+      },
+      secondVersion: {
+        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
+        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
+        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
+        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
+        user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
+        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
+        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
+        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+      },
+      channels: {
+        id: schema.channels.id,
+        created_at: schema.channels.created_at,
+        created_by: schema.channels.created_by,
+        name: schema.channels.name,
+        app_id: schema.channels.app_id,
+        allow_dev: schema.channels.allow_dev,
+        allow_emulator: schema.channels.allow_emulator,
+        disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
+        disableAutoUpdate: schema.channels.disableAutoUpdate,
+        ios: schema.channels.ios,
+        android: schema.channels.android,
+        secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+        enable_progressive_deploy: schema.channels.enable_progressive_deploy,
+        enableAbTesting: schema.channels.enableAbTesting,
+      },
     })
     .from(schema.channels)
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
     .where(and(
-      eq(schema.channels.public, true), 
+      eq(schema.channels.public, true),
       eq(schema.channels.app_id, app_id),
-      eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true)
+      eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
     ))
     .limit(1)
     .then(data => data.at(0))
@@ -210,8 +218,8 @@ const requestInfosPostgres = async (platform: string, app_id: string, device_id:
 
 // This will be transformed in the "convert_deno_to_node.mjs" script
 // This will become the clone of requestInfosPostgres
-
-const requestInfosSqlite = (platform: string, app_id: string, device_id: string, version_name: string): ReturnType<typeof requestInfosPostgres> => { throw new Error('TODO') }
+// eslint-disable-next-line unused-imports/no-unused-vars, style/max-statements-per-line
+function requestInfosSqlite(platform: string, app_id: string, device_id: string, version_name: string): ReturnType<typeof requestInfosPostgres> { throw new Error('TODO') }
 
 const requestInfos = useD1Database && !isSupabase ? requestInfosSqlite : requestInfosPostgres
 
@@ -384,8 +392,10 @@ export async function update(body: AppInfos) {
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
         const secondVersionPercentage: number = channelData.channels.secondaryVersionPercentage // ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
-        // eslint-disable-next-line max-statements-per-line
-        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) { version = secondVersion }
+
+        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) {
+          version = secondVersion
+        }
         else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
         else if (version.name !== version_name) {
           const randomChange = Math.random()

@@ -7,6 +7,7 @@ import { FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
+import copy from 'copy-text-to-clipboard'
 import { useMainStore } from '~/stores/main'
 import { deleteUser, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -14,7 +15,6 @@ import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
 import { availableLocales, i18n, languages, loadLanguageAsync } from '~/modules/i18n'
 import { iconEmail, iconName } from '~/services/icons'
-import copy from 'copy-text-to-clipboard'
 import { pickPhoto, takePhoto } from '~/services/photos'
 
 const version = import.meta.env.VITE_APP_VERSION
@@ -328,8 +328,8 @@ onMounted(() => {
             {{ t('account-id') }}:
           </p>
           <button class=" ml-4 text-white bg-blue-700 hover:bg-blue-800 focus:outline-none  font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700" @click.prevent="copyAccountId()">
-              {{ t('copy-account-id') }}
-            </button>
+            {{ t('copy-account-id') }}
+          </button>
         </div>
         <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
           <IconVersion /> <span class="pl-2"> {{ version }}</span>

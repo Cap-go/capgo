@@ -3,12 +3,12 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
+import dayjs from 'dayjs'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanName, getPlans, getTotalStorage } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
-import dayjs from 'dayjs'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -54,7 +54,7 @@ async function getUsage() {
     storage: currentPlan?.storage_unit,
     bandwidth: currentPlan?.bandwidth_unit,
   }
-  
+
   let totalMau = 0
   const totalStorage = bytesToGb(await getTotalStorage(main.auth?.id))
   let totalBandwidth = 0
@@ -71,9 +71,9 @@ async function getUsage() {
 
   const isPayAsYouGo = currentPlan?.name === 'Pay as you go'
   const totalUsagePrice = computed(() => {
-    if (currentPlan?.name !== 'Pay as you go') {
+    if (currentPlan?.name !== 'Pay as you go')
       return 0
-    }
+
     const mauPrice = calculatePrice(totalMau, payg_base.mau, payg_units!.mau!)
     const storagePrice = calculatePrice(totalStorage, payg_base.storage, payg_units!.storage!)
     const bandwidthPrice = calculatePrice(totalBandwidth, payg_base.bandwidth, payg_units!.bandwidth!)
@@ -109,7 +109,6 @@ async function loadData() {
   await getPlans().then((pls) => {
     plans.value.length = 0
     plans.value.push(...pls)
-
   })
   getUsage().then((res) => {
     planUsage.value = res
@@ -129,11 +128,10 @@ loadData()
 
         <div class="my-2">
           <div class="flex justify-between mt-2 row">
-
             <div class="text-lg font-bold">
               {{ t('monthly-active-users') }}
             </div>
-            <div >
+            <div>
               <span class="font-semibold">{{ dayjs(main.cycleInfo?.subscription_anchor_start).format('YYYY/MM/D') }}</span> {{ t('to') }} <span class="font-semibold">{{ dayjs(main.cycleInfo?.subscription_anchor_end).format('YYYY/MM/D') }}</span>
             </div>
           </div>
@@ -157,16 +155,15 @@ loadData()
             </div>
           </div>
           <div v-if="planUsage?.isPayAsYouGo">
-
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('price-per-unit-above') }}
+            <hr class="my-1 border-t border-gray-300 opacity-50">
+            <div class="flex justify-between row">
+              <div>
+                {{ t('price-per-unit-above') }}
+              </div>
+              <div class="font-semibold">
+                $ {{ planUsage?.payg_units?.mau?.toLocaleString() }}
+              </div>
             </div>
-            <div class="font-semibold">
-              $ {{ planUsage?.payg_units?.mau?.toLocaleString() }}
-            </div>
-          </div>
           </div>
         </div>
 
@@ -194,17 +191,16 @@ loadData()
             </div>
           </div>
           <div v-if="planUsage?.isPayAsYouGo">
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('price-per-unit-above') }}
-            </div>
-            <div class="font-semibold">
-              $ {{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
+            <hr class="my-1 border-t border-gray-300 opacity-50">
+            <div class="flex justify-between row">
+              <div>
+                {{ t('price-per-unit-above') }}
+              </div>
+              <div class="font-semibold">
+                $ {{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
+              </div>
             </div>
           </div>
-        </div>
-
         </div>
 
         <div class="my-2">
@@ -231,17 +227,16 @@ loadData()
             </div>
           </div>
           <div v-if="planUsage?.isPayAsYouGo">
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('price-per-unit-above') }}
-            </div>
-            <div class="font-semibold">
-              $ {{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
+            <hr class="my-1 border-t border-gray-300 opacity-50">
+            <div class="flex justify-between row">
+              <div>
+                {{ t('price-per-unit-above') }}
+              </div>
+              <div class="font-semibold">
+                $ {{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
+              </div>
             </div>
           </div>
-        </div>
-
         </div>
         <div class="my-2">
           <div class="text-lg font-bold">
@@ -258,27 +253,25 @@ loadData()
           </div>
 
           <div v-if="planUsage?.isPayAsYouGo">
-
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('used-in-period') }}
+            <hr class="my-1 border-t border-gray-300 opacity-50">
+            <div class="flex justify-between row">
+              <div>
+                {{ t('used-in-period') }}
+              </div>
+              <div class="font-semibold">
+                $ {{ planUsage?.totalUsagePrice.toLocaleString() }}
+              </div>
             </div>
-            <div class="font-semibold">
-              $ {{ planUsage?.totalUsagePrice.toLocaleString() }}
+            <hr class="my-1 border-t border-gray-300 opacity-50">
+            <div class="flex justify-between row">
+              <div>
+                {{ t('usage-title') }}
+              </div>
+              <div class="font-semibold">
+                $ {{ planUsage?.totalPrice.toLocaleString() }}
+              </div>
             </div>
           </div>
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('usage-title') }}
-            </div>
-            <div class="font-semibold">
-              $ {{ planUsage?.totalPrice.toLocaleString() }}
-            </div>
-          </div>
-        </div>
-
         </div>
       </div>
     </div>

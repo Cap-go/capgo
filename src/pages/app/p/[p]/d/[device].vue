@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getCurrentInstance, ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { gt } from 'semver'

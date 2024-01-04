@@ -2,8 +2,8 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { FormKitMessages } from '@formkit/vue'
-import { useSupabase, isSpoofed, saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
-import { toast } from 'vue-sonner';
+import { toast } from 'vue-sonner'
+import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
 
 const route = useRoute()
 const isLoading = ref(false)
@@ -13,13 +13,13 @@ async function setLogAs(id: string) {
   console.log('setLogAs', id)
 
   if (isSpoofed())
-  unspoofUser()
+    unspoofUser()
 
   const supabase = await useSupabase()
   const { data, error } = await supabase.functions.invoke('login_admin', {
     body: {
-      user_id: id
-    }
+      user_id: id,
+    },
   })
 
   if (error) {
@@ -61,7 +61,7 @@ async function setLogAs(id: string) {
   saveSpoof(currentJwt, currentRefreshToken)
 
   console.log('ok')
-  
+
   isLoading.value = false
   setTimeout(() => {
     isLoading.value = false
@@ -90,7 +90,7 @@ function reset() {
   if (isLoading.value)
     return
   isLoading.value = true
-  
+
   if (!unspoofUser()) {
     isLoading.value = false
     return

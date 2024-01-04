@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
 // import { Http } from '@capacitor-community/http'

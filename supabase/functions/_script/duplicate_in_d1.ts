@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
-import { Client, Pool } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
-import * as p from 'npm:@clack/prompts@0.7.0';
+import type { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
+import { Pool } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
 
 let d1HttpUrl = ''
 const migrationsPerStep = 100
@@ -34,7 +34,7 @@ async function main() {
 //     select string_agg('INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "user_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider") VALUES ((pgsodium.randombytes_uniform(1000000) - pgsodium.randombytes_uniform(10000)), now(), ''com.demo.app'', format(''%s.%s.%s'', floor(random()  * 100000000), floor(random()  * 100000000), floor(random()  * 100000000)), ''8093d4ad-7d4b-427b-8d73-fc2a97b79ab9'', ''6aa76066-55ef-4238-ade6-0b32334a4097'', now(), ''f'', NULL, ''3885ee49'', NULL, ''r2'')',';')
 //     from generate_series(1,1000)
 // );
-// end; 
+// end;
 // $$;
 
 function queryD1(sqlQuery: string, values: any) {
@@ -79,7 +79,7 @@ async function migrationTable(client: Client, table: string) {
       console.log(`Problem with json result arr. Result arr to long. Length: ${resultArr.rows.length}, Data: ${resultArr.rows}`)
       Deno.exit(0)
     }
-  
+
     const rows = (resultArr.rows[0] as any).array_to_json as Record<string, any>[]
     // console.log(`rows length: ${rows.length}`)
     if (!rows) {

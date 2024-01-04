@@ -11,10 +11,23 @@ CREATE TABLE IF NOT EXISTS devices
     version Int64,
     is_prod UInt8,
     is_emulator UInt8,
+    last_mau DateTime64(6)
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(updated_at)
 ORDER BY (app_id, device_id, updated_at)
 PRIMARY KEY (app_id, device_id);
+
+CREATE TABLE IF NOT EXISTS app_versions_meta
+(
+    created_at DateTime64(6),
+    app_id String,
+    size Int64,
+    id Int64,
+    action String
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (id, app_id, action)
+PRIMARY KEY (id, app_id, action);
 
 CREATE TABLE IF NOT EXISTS devices_u
 (
@@ -98,18 +111,6 @@ FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 GROUP BY date, l.app_id;
 
-CREATE TABLE IF NOT EXISTS app_versions_meta
-(
-    created_at DateTime64(6),
-    app_id String,
-    size Int64,
-    id Int64,
-    action String
-) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(created_at)
-ORDER BY (id, app_id, action)
-PRIMARY KEY (id, app_id, action);
-
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
     date Date,
@@ -186,7 +187,7 @@ CREATE TABLE IF NOT EXISTS aggregate_daily
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS aggregate_daily_mv
+CREATE MATERIALIZED VIEW IF NOT EXISTS aggregate_daily_mv  
 TO aggregate_daily
 AS
 SELECT
