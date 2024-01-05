@@ -19,10 +19,10 @@ async function main() {
     Deno.exit(1)
   }
 
-  const pool = new Pool(supabaseUrl, 5);
+  const pool = new Pool(supabaseUrl, 5)
   const client = await pool.connect()
   // await migrationTable(client, 'app_versions')
-  //await migrationTable(client, 'apps')
+  // await migrationTable(client, 'apps')
   await migrationTable(client, 'channel_devices')
   await migrationTable(client, 'channels')
   await migrationTable(client, 'devices_override')
@@ -41,19 +41,19 @@ function queryD1(sqlQuery: string, values: any) {
   return fetch(d1HttpUrl, {
     method: 'POST',
     headers: {
-      "Authorization": `Bearer ${Deno.env.get('D1_CF_APIKEY' ?? '')}`
+      Authorization: `Bearer ${Deno.env.get('D1_CF_APIKEY' ?? '')}`,
     },
     body: JSON.stringify({
       sql: sqlQuery,
-      params: values
-    })
+      params: values,
+    }),
   })
-  .then((res) => res.json())
-  .then(json => {
+    .then(res => res.json())
+    .then((json) => {
     // console.log(json)
-    return json
-  })
-  .catch(err => console.error('some error happend', JSON.stringify(err)))
+      return json
+    })
+    .catch(err => console.error('some error happend', JSON.stringify(err)))
 }
 
 async function migrationTable(client: Client, table: string) {
@@ -63,9 +63,9 @@ async function migrationTable(client: Client, table: string) {
   // first clean up all data in the db, check if there is data
 
   const resCount = await client.queryObject<{ count: bigint }>(`SELECT count(*) FROM ${table}`)
-  if (resCount.rows.length !== 1) {
+  if (resCount.rows.length !== 1)
     console.error('invalid row count length', resCount)
-  }
+
   const count = resCount.rows[0].count
 
   console.log(`migrate ${table} (size: ${count.toString()})`)
@@ -86,7 +86,7 @@ async function migrationTable(client: Client, table: string) {
       console.log(`Nothing to migrate for ${table}`)
       return
     }
-  
+
     promises.push(...rows.map((row) => {
       let keys = Object.keys(row)
 
@@ -95,20 +95,20 @@ async function migrationTable(client: Client, table: string) {
           .filter(key => key !== 'id')
           .map(key => key === 'tmp_id' ? 'id' : key)
       }
-  
+
       const values = Object.entries(row)
-      .filter(([key, _]) => table === 'apps' ? (key !== 'id') : true) //Do not send column `id` into d1 for the table "apps"
-      .map(([_, value]) => {
-        return (value !== undefined && value !== null) ? value.toString() : null
-      })
-  
-      const sqlQuery = `INSERT INTO ${table} ("${keys.join('", "')}") VALUES (${values.map((a, b) => `?${b+1}`)})`
-  
+        .filter(([key, _]) => table === 'apps' ? (key !== 'id') : true) // Do not send column `id` into d1 for the table "apps"
+        .map(([_, value]) => {
+          return (value !== undefined && value !== null) ? value.toString() : null
+        })
+
+      const sqlQuery = `INSERT INTO ${table} ("${keys.join('", "')}") VALUES (${values.map((a, b) => `?${b + 1}`)})`
+
       // console.log(values)
       // TODO: AUTH FOR ACCUAL API
       return { query: sqlQuery, parms: values }
     }))
-  
+
     totalMigrated += rows.length
 
     if (rows.length < migrationsPerStep) {
@@ -123,7 +123,6 @@ async function migrationTable(client: Client, table: string) {
     // const finalValues = promises.flatMap(p => p.parms)
 
     // console.log(finalSql)
-    
 
     await queryD1(finalSql, promises.map(p => p.parms))
     promises.length = 0 // clear promises array
@@ -133,7 +132,6 @@ async function migrationTable(client: Client, table: string) {
   // console.log(finalValues.length)
 
   // console.log(finalSql)
-  
 
   await queryD1(finalSql, finalValues)
   console.log(`migrate ${table} done. Total: ${totalMigrated}`)
