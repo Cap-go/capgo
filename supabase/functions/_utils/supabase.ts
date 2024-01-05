@@ -336,10 +336,10 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_app_usage'
     if (appId) {
-      const hasReadRights = await client.rpc('has_read_rights')
-        .then(res => res.data || false)
+      // const hasReadRights = await client.rpc('has_read_rights')
+      //   .then(res => res.data || false)
 
-      console.log('read rights', hasReadRights)
+      // console.log('read rights', hasReadRights)
 
       const reqOwner = await client
         .rpc('is_app_owner', { appid: appId })
