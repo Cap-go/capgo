@@ -365,7 +365,7 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
     const appIds = await supabaseClient(auth)
       .from('apps')
       .select('app_id')
-      // .eq('user_id', userId)
+      .eq('user_id', userId)
       .then(res => res.data?.map(app => app.app_id) || [])
     console.log('appIds', appIds)
     req = req.in('app_id', appIds)
