@@ -238,6 +238,44 @@ async function makeDefault(val = true) {
             .from('channels')
             .update({ public: val })
             .eq('id', id.value)
+
+          // This code is here because the backend has a 20 second delay between setting a channel to public
+          // and the backend changing other channels to be not public
+          // In these 20 seconds the updates are broken
+          if (val && channel.value.ios) {
+            const { error: iosError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('ios', true)
+              .neq('id', channel.value.id)
+            const { error: hiddenError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', false)
+              .eq('ios', false)
+            if (iosError || hiddenError)
+              console.log('error', iosError || hiddenError)
+          }
+
+          if (val && channel.value.android) {
+            const { error: androidError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', true)
+              .neq('id', channel.value.id)
+            const { error: hiddenError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', false)
+              .eq('ios', false)
+            if (androidError || hiddenError)
+              console.log('error', androidError || hiddenError)
+          }
+
           if (error) {
             console.error(error)
           }
