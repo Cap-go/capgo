@@ -18,7 +18,8 @@ async function main() {
               columns,
             }
           })
-  console.log(tables)
+  // console.log(tables)
+  // tables = tables.filter(t => t.name === 'channels')
 
   const finalMigration = tables.map((table) => {
     return `CREATE OR REPLACE FUNCTION "public"."replicate_insert_d1_${table.name}"() RETURNS trigger\n`
@@ -29,13 +30,62 @@ async function main() {
       + `BEGIN\n`
       + `\n`
       + `select 'INSERT INTO ${table.name} (${table.columns.map(c => `\"${c}\"`).join(', ')}) VALUES(${table.columns.map(_c => '?').join(', ')})' INTO sql_query;\n`
-      + `PERFORM post_replication_sql(sql_query, ARRAY [${table.columns.map(c => `(select (CASE WHEN (NEW.${c}) is distinct from NULL THEN (NEW.${c})::TEXT ELSE NULL END))`)}]);\n`
+      + `PERFORM post_replication_sql(sql_query, ARRAY [${table.columns.map(c => `(select (CASE WHEN (NEW."${c}") is distinct from NULL THEN (NEW."${c}")::TEXT ELSE NULL END))`)}]);\n`
       + `\n`
       + `RETURN NEW;\n`
+      + `END;$$;\n`
+      + `\n`
+      + `CREATE OR REPLACE FUNCTION "public"."replicate_update_d1_${table.name}"() RETURNS trigger\n`
+      + `LANGUAGE plpgsql AS $$\n`
+      + `DECLARE\n`
+      + `sql_query character varying;\n`
+      + `BEGIN\n`
+      + `\n`
+      + `select 'UPDATE ${table.name} SET ${table.columns.map(c => `"${c}"=?`).join(', ')} where "id"=?' INTO sql_query;\n`
+      + `PERFORM post_replication_sql(sql_query, ARRAY [${table.columns.map(c => `(select (CASE WHEN (NEW."${c}") is distinct from NULL THEN (NEW."${c}")::TEXT ELSE NULL END))`)}, NEW.id::text]);\n`
+      + `\n`
+      + `RETURN NEW;\n`
+      + `END;$$;\n`
+      + `\n`
+      + `CREATE OR REPLACE FUNCTION "public"."replicate_drop_d1_${table.name}"() RETURNS trigger\n`
+      + `LANGUAGE plpgsql AS $$\n`
+      + `DECLARE\n`
+      + `sql_query character varying;\n`
+      + `BEGIN\n`
+      + `\n`
+      + `select 'DELETE FROM ${table.name} where id=?' INTO sql_query;\n`
+      + `PERFORM post_replication_sql(sql_query, ARRAY [OLD.id::text]);\n`
+      + `\n`
+      + `RETURN OLD;\n`
       + `END;$$;\n`
   })
 
   finalMigration.forEach(a => console.log(a))
+
+  const triggers = tables
+    .map((table) => {
+      if (table.name === 'channels')
+        return { triggerName: 'channel', realName: 'channels' }
+      else if (table.name === 'app_versions')
+        return { triggerName: 'version', realName: 'app_versions' }
+      else
+        return { triggerName: table.name, realName: table.name }
+    })
+    .map((table) => {
+      return `CREATE OR REPLACE TRIGGER replicate_${table.triggerName}_insert\n`
+        + `BEFORE INSERT ON "public"."${table.realName}" FOR EACH ROW\n`
+        + `EXECUTE PROCEDURE "public"."replicate_insert_d1_${table.realName}"();\n`
+        + `\n`
+        + `CREATE OR REPLACE TRIGGER replicate_${table.triggerName}_update\n`
+        + `BEFORE UPDATE ON "public"."${table.realName}" FOR EACH ROW\n`
+        + `EXECUTE PROCEDURE "public"."replicate_update_d1_${table.realName}"();\n`
+        + `\n`
+        + `CREATE OR REPLACE TRIGGER replicate_${table.triggerName}_drop\n`
+        + `BEFORE DELETE ON "public"."${table.realName}" FOR EACH ROW\n`
+        + `EXECUTE PROCEDURE "public"."replicate_drop_d1_${table.realName}"();\n`
+    })
+
+  triggers.forEach(t => console.log(t))
 }
 
 main()
