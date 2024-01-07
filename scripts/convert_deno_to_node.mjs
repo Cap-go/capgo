@@ -210,28 +210,26 @@ const mutationCloudflare = [
   { from: 'drizzle-orm/postgres-js', to: 'drizzle-orm/d1' },
   // { from: 'drizzle(pgClient as any)', to: 'drizzle(getEnv(\'DB\') as any)' },
   { from: 'await pgClient.end()', to: '' },
-  { from: '//import presign s3', to: 'import { getSignedUrl as s3GetSignedUrl } from "@aws-sdk/s3-request-presigner";' },
+  { from: '// import presign s3', to: 'import { getSignedUrl as s3GetSignedUrl } from "@aws-sdk/s3-request-presigner";' },
   { from: '// import drizzle_sqlite', to: 'import { drizzle as drizzle_sqlite } from \'drizzle-orm/d1\'\nimport * as schema_sqlite from \'./sqlite_schema.ts\'\nimport { alias as alias_sqlite } from \'drizzle-orm/sqlite-core\';' },
   { from: 'isSupabase = true', to: 'isSupabase = false' },
   { transform: (current) => {
-      if (current.includes('use_trans_macros')) {
+    if (current.includes('use_trans_macros')) {
+      let functionToCopy = current.split('COPY FUNCTION START')[1].split('\n// COPY FUNCTION STOP')[0]
+      functionToCopy = functionToCopy.replace('requestInfosPostgres', 'requestInfosSqlite')
+      functionToCopy = functionToCopy.replace(
+        '{ alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }',
+        '{ alias: alias_sqlite, schema: schema_sqlite, drizzleCient: drizzle_sqlite(getEnv(\'DB\') as any) }',
+      )
+      functionToCopy = functionToCopy.replace('const pgClient = postgres(supaUrl)', '// removed line')
 
-        let functionToCopy = current.split('COPY FUNCTION START')[1].split('\n// COPY FUNCTION STOP')[0]
-        functionToCopy = functionToCopy.replace('requestInfosPostgres', 'requestInfosSqlite')
-        functionToCopy = functionToCopy.replace(
-          '{ alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }',
-          '{ alias: alias_sqlite, schema: schema_sqlite, drizzleCient: drizzle_sqlite(getEnv(\'DB\') as any) }'
-        )
-        functionToCopy = functionToCopy.replace('const pgClient = postgres(supaUrl)', '// removed line')
+      // functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// Removed line')
 
-        // functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// Removed line')
-
-        current = current.replace(/(.*(?:requestInfosSqlite).*)/, functionToCopy)
-
-      }
-      return current
-    } 
-  }
+      current = current.replace(/(.*(?:requestInfosSqlite).*)/, functionToCopy)
+    }
+    return current
+  },
+  },
   // { from: 'const bucket = \'capgo\'', to: 'const bucket = \'capgo\'\nimport { Buffer } from \'node:buffer\'' }
   // { from: supaTempl.redis, to: netlifyTempl.redis },
   // { from: '.ts\'', to: '\'' },
@@ -284,7 +282,8 @@ function applyMutations(mutations, content) {
     const { from, to, transform, force } = m
     if (transform) {
       content = transform(content)
-    } else {
+    }
+    else {
       const regexp = new RegExp(`${escapeRegExp(from)}${!force ? '(?=.*(?<!do_not_change)$)' : ''}`, 'gm')
       content = content.replace(regexp, to)
     }
