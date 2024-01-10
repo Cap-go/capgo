@@ -2,9 +2,9 @@
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 
-import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js'
+// eslint-disable-next-line import/newline-after-import
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js' // do_not_change
 
-// do_not_change
 import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
 import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
@@ -19,9 +19,8 @@ import { appIdToUrl } from './../_utils/conversion.ts'
 
 // Drizze orm
 
-import * as schema_postgres from './postgress_schema.ts'
-
-// do_not_change
+// eslint-disable-next-line import/newline-after-import
+import * as schema_postgres from './postgress_schema.ts' // do_not_change
 
 // do_not_change
 
@@ -31,6 +30,8 @@ import * as schema_postgres from './postgress_schema.ts'
 // This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
 const useD1Database = true
 const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
+
+let globalPgClient = null as ReturnType<typeof postgres> | null
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
@@ -53,18 +54,57 @@ function sendResWithStatus(status: string, data?: any, statusCode?: number, upda
   return response
 }
 
-// Do not change // COPY FUNCTION STOP/START
-// This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
 // COPY FUNCTION START
-async function requestInfosPostgres(platform: string, app_id: string, device_id: string, version_name: string) {
+function getDrizzlePostgres() {
   const supaUrl = getEnv('SUPABASE_DB_URL')!
 
   // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)
-  const { alias, schema, drizzleCient } = { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
+  globalPgClient = pgClient
+  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
 
   // DO NOT CHANGE END
+}
+// COPY FUNCTION STOP
 
+// eslint-disable-next-line style/max-statements-per-line
+function getDrizzleSqlite(): ReturnType<typeof getDrizzlePostgres> { throw new Error('not yet implemented') }
+
+const getDrizzle = useD1Database && !isSupabase ? getDrizzleSqlite : getDrizzlePostgres
+
+async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeof drizzle_postgress>, schema: typeof schema_postgres): Promise<{ user_id: string } | null> {
+  try {
+    const appOwner = await drizzleCient
+      .select({ user_id: schema.apps.user_id })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+
+    return appOwner
+  }
+  catch (e: any) {
+    return null
+  }
+}
+
+// eslint-disable-next-line style/max-statements-per-line
+function getAppOwnerSqlite(): ReturnType<typeof getAppOwnerPostgres> { throw new Error('not yet implemented') }
+
+const getAppOwner = useD1Database && !isSupabase ? getAppOwnerSqlite : getAppOwnerPostgres
+
+// Do not change // COPY FUNCTION STOP/START
+// This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
+// COPY FUNCTION START
+async function requestInfosPostgres(
+  platform: string,
+  app_id: string,
+  device_id: string,
+  version_name: string,
+  alias: typeof alias_postgres,
+  drizzleCient: ReturnType<typeof drizzle_postgress>,
+  schema: typeof schema_postgres,
+) {
   const appVersions = drizzleCient
     .select({
       id: schema.app_versions.id,
@@ -211,7 +251,6 @@ async function requestInfosPostgres(platform: string, app_id: string, device_id:
 
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
-  await pgClient.end()
   return { versionData, channelData, channelOverride, devicesOverride }
 }
 // COPY FUNCTION STOP
@@ -219,13 +258,16 @@ async function requestInfosPostgres(platform: string, app_id: string, device_id:
 // This will be transformed in the "convert_deno_to_node.mjs" script
 // This will become the clone of requestInfosPostgres
 // eslint-disable-next-line unused-imports/no-unused-vars, style/max-statements-per-line
-function requestInfosSqlite(platform: string, app_id: string, device_id: string, version_name: string): ReturnType<typeof requestInfosPostgres> { throw new Error('TODO') }
+function requestInfosSqlite(platform: string, app_id: string, device_id: string, version_name: string, alias: any, drizzleCient: any, schema: any): ReturnType<typeof requestInfosPostgres> { throw new Error('TODO') }
 
 const requestInfos = useD1Database && !isSupabase ? requestInfosSqlite : requestInfosPostgres
 
 export async function update(body: AppInfos) {
   // await test()
   // create random id
+
+  const { alias, schema, drizzleCient } = getDrizzle()
+
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body, new Date().toISOString())
@@ -245,11 +287,7 @@ export async function update(body: AppInfos) {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
-    const { data: appOwner } = await supabaseAdmin()
-      .from('apps')
-      .select('user_id')
-      .eq('app_id', app_id)
-      .single()
+    const appOwner = await getAppOwner(app_id, drizzleCient, schema)
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
@@ -331,7 +369,7 @@ export async function update(body: AppInfos) {
       version: 0,
     }
 
-    const requestedInto = await requestInfos(platform, app_id, device_id, version_name)
+    const requestedInto = await requestInfos(platform, app_id, device_id, version_name, alias, drizzleCient, schema)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
@@ -645,5 +683,9 @@ export async function update(body: AppInfos) {
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
     }, 500)
+  }
+  finally {
+    if (globalPgClient)
+      await globalPgClient.end()
   }
 }
