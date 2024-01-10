@@ -6,7 +6,9 @@ import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js' // do_not_change
 
 import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
-import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
+
+// eslint-disable-next-line import/newline-after-import
+import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
 import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
@@ -71,27 +73,6 @@ function getDrizzlePostgres() {
 function getDrizzleSqlite(): ReturnType<typeof getDrizzlePostgres> { throw new Error('not yet implemented') }
 
 const getDrizzle = useD1Database && !isSupabase ? getDrizzleSqlite : getDrizzlePostgres
-
-async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeof drizzle_postgress>, schema: typeof schema_postgres): Promise<{ user_id: string } | null> {
-  try {
-    const appOwner = await drizzleCient
-      .select({ user_id: schema.apps.user_id })
-      .from(schema.apps)
-      .where(eq(schema.apps.app_id, appId))
-      .limit(1)
-      .then(data => data[0])
-
-    return appOwner
-  }
-  catch (e: any) {
-    return null
-  }
-}
-
-// eslint-disable-next-line style/max-statements-per-line
-function getAppOwnerSqlite(): ReturnType<typeof getAppOwnerPostgres> { throw new Error('not yet implemented') }
-
-const getAppOwner = useD1Database && !isSupabase ? getAppOwnerSqlite : getAppOwnerPostgres
 
 // Do not change // COPY FUNCTION STOP/START
 // This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
@@ -254,6 +235,29 @@ async function requestInfosPostgres(
   return { versionData, channelData, channelOverride, devicesOverride }
 }
 // COPY FUNCTION STOP
+
+// COPY FUNCTION START
+async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeof drizzle_postgress>, schema: typeof schema_postgres): Promise<{ user_id: string } | null> {
+  try {
+    const appOwner = await drizzleCient
+      .select({ user_id: schema.apps.user_id })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+
+    return appOwner
+  }
+  catch (e: any) {
+    return null
+  }
+}
+// COPY FUNCTION STOP
+
+// eslint-disable-next-line style/max-statements-per-line
+function getAppOwnerSqlite(): ReturnType<typeof getAppOwnerPostgres> { throw new Error('not yet implemented') }
+
+const getAppOwner = useD1Database && !isSupabase ? getAppOwnerSqlite : getAppOwnerPostgres
 
 // This will be transformed in the "convert_deno_to_node.mjs" script
 // This will become the clone of requestInfosPostgres

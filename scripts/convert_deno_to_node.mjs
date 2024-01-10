@@ -213,6 +213,7 @@ const mutationCloudflare = [
   { from: '// import presign s3', to: 'import { getSignedUrl as s3GetSignedUrl } from "@aws-sdk/s3-request-presigner";' },
   { from: '// import drizzle_sqlite', to: 'import { drizzle as drizzle_sqlite } from \'drizzle-orm/d1\'\nimport * as schema_sqlite from \'./sqlite_schema.ts\'\nimport { alias as alias_sqlite } from \'drizzle-orm/sqlite-core\';' },
   { from: 'isSupabase = true', to: 'isSupabase = false' },
+  { from: 'alias, drizzleCient, schema', to: 'alias as any, drizzleCient as any, schema as any' },
   { from: 'drizzleCient, schema', to: 'drizzleCient as any, schema as any' },
   { transform: (current) => {
     if (current.includes('use_trans_macros')) {
@@ -234,6 +235,18 @@ const mutationCloudflare = [
     return current
   },
   },
+  { transform: (current) => {
+    if (current.includes('use_trans_macros')) {
+      let functionToCopy = current.split('COPY FUNCTION START')[3].split('\n// COPY FUNCTION STOP')[0]
+      functionToCopy = functionToCopy.replace('getAppOwnerPostgres', 'getAppOwnerSqlite')
+      functionToCopy = functionToCopy.replace('ReturnType<typeof drizzle_postgress>, schema: typeof schema_postgres', 'ReturnType<typeof drizzle_sqlite>, schema: typeof schema_sqlite')
+
+      // functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// Removed line')
+
+      current = current.replace(/(.*(?:getAppOwnerSqlite).*)/, functionToCopy)
+    }
+    return current
+  } },
   { transform: (current) => {
     if (current.includes('use_trans_macros')) {
       let functionToCopy = current.split('COPY FUNCTION START')[1].split('\n// COPY FUNCTION STOP')[0]
