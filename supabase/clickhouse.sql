@@ -167,47 +167,6 @@ FROM
 GROUP BY date, app_id;
 
 
--- 
--- Stats aggregation
--- 
-
-CREATE TABLE IF NOT EXISTS aggregate_daily
-(
-    date Date,
-    app_id String,
-    storage_added Int64,
-    storage_deleted Int64,
-    bandwidth Int64,
-    mau UInt64,
-    get UInt64,
-    fail UInt64,
-    install UInt64,
-    uninstall UInt64,
-) ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS aggregate_daily_mv  
-TO aggregate_daily
-AS
-SELECT
-    ld.date as date,
-    ld.app_id as app_id,
-    a.storage_added as storage_added,
-    a.storage_deleted as storage_deleted,
-    ld.bandwidth as bandwidth,
-    -- Get the MAU value for each app_id and date
-    m.total AS mau,
-    ld.get as get,
-    ld.fail as fail,
-    ld.install as install,
-    ld.uninstall as uninstall
-FROM logs_daily AS ld
-FULL JOIN app_storage_daily AS a ON ld.date = a.date AND ld.app_id = a.app_id
-LEFT JOIN mau AS m ON ld.date = m.date AND ld.app_id = m.app_id
-GROUP BY ld.date, ld.app_id, a.storage_added, a.storage_deleted, ld.bandwidth, m.total, ld.get, ld.fail, ld.install, ld.uninstall;
-
-
 -- OPTIONAL TABLES
 
 -- 
