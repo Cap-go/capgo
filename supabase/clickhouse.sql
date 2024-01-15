@@ -140,10 +140,13 @@ CREATE TABLE IF NOT EXISTS mau
 (
     date Date,
     app_id String,
-    mau UInt64
-) ENGINE = SummingMergeTree()
+    mau AggregateFunction(uniq, String)
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
+-- select date, app_id, sum(mau) as mau from mau_mv group by date, app_id
+-- drop table mau_mv
+-- select * from mau_mv
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
 TO mau
@@ -151,7 +154,7 @@ AS
 SELECT
     minDate AS date,
     app_id,
-    countDistinct(device_id) AS mau
+    uniqState(device_id) AS mau
 FROM
     (
     SELECT
@@ -166,6 +169,33 @@ FROM
     )
 GROUP BY date, app_id;
 
+-- Used to populate data in mau table
+-- how to use:
+-- 1) create the mau table
+-- 2) make sure mau is empty
+-- 3) execute this populate query
+-- 4) execute the "CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv" from above 
+
+-- INSERT INTO mau SELECT
+--     minDate AS date,
+--     app_id,
+--     uniqState(device_id) AS mau
+-- FROM
+--     (
+--     SELECT
+--         min(toDate(created_at)) AS minDate,
+--         app_id,
+--         device_id
+--     FROM logs
+--     WHERE 
+--         created_at >= toStartOfMonth(toDate(now())) 
+--         AND created_at < toStartOfMonth(toDate(now()) + INTERVAL 1 MONTH)
+--     GROUP BY device_id, app_id
+--     )
+-- GROUP BY date, app_id;
+
+-- CREATE MATERIALIZED VIEW mau
+-- ENGINE = MergeTree()
 
 -- OPTIONAL TABLES
 
