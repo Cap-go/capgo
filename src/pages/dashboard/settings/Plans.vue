@@ -79,6 +79,10 @@ function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | '
   return plan[t === 'm' ? 'price_m' : 'price_y']
 }
 
+function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row']): boolean {
+  return plan.price_y !== plan.price_m
+}
+
 function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 }
@@ -228,9 +232,9 @@ const hightLights = computed<Stat[]>(() => ([
             </p>
             <p class="mt-8">
               <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
-              <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ isYearly ? 'yr' : 'mo' }}</span>
+              <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ isYearlyPlan(p) ? 'yr' : 'mo' }}</span>
             </p>
-            <span v-if="isYearly" class="text-md ml-3 rounded-full bg-emerald-500 px-1.5 font-semibold text-white"> {{ getSale(p) }} </span>
+            <span v-if="isYearlyPlan(p)" class="text-md ml-3 rounded-full bg-emerald-500 px-1.5 font-semibold text-white"> {{ getSale(p) }} </span>
             <button
               v-if="p.stripe_id !== 'free'"
               :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-gray-400 dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
