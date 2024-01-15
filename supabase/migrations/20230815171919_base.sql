@@ -1509,7 +1509,7 @@ CREATE TABLE "public"."deleted_account" (
 --     table '(SELECT DISTINCT ON (m.date,m.app_id) 
     -- m.date AS date,
     -- m.app_id AS app_id,
-    -- m.mau AS mau,
+    -- m.total AS mau,
     -- COALESCE(l.get, 0) AS get,
     -- COALESCE(l.fail, 0) AS fail,
     -- COALESCE(l.install, 0) AS install,

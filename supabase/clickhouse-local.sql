@@ -71,7 +71,7 @@ options (
   table '(SELECT DISTINCT ON (m.date,m.app_id) 
   m.date AS date,
   m.app_id AS app_id,
-  uniqMerge(m.mau) AS mau,
+  uniqMerge(m.total) AS mau,
   COALESCE(l.get, 0) AS get,
   COALESCE(l.fail, 0) AS fail,
   COALESCE(l.install, 0) AS install,
@@ -121,4 +121,4 @@ END;
 $$;
 
 --clickhouse_app_usage
--- (SELECT DISTINCT ON (m.date,m.app_id) m.date AS date, m.app_id AS app_id, m.mau AS mau, COALESCE(l.get, 0) AS get, COALESCE(l.fail, 0) AS fail, COALESCE(l.install, 0) AS install, COALESCE(l.uninstall, 0) AS uninstall, COALESCE(l.bandwidth, 0) AS bandwidth, COALESCE(s.storage_added, 0) AS storage_added, COALESCE(s.storage_deleted, 0) AS storage_deleted FROM mau m LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id)
+-- (SELECT DISTINCT ON (m.date,m.app_id) m.date AS date, m.app_id AS app_id, m.total AS mau, COALESCE(l.get, 0) AS get, COALESCE(l.fail, 0) AS fail, COALESCE(l.install, 0) AS install, COALESCE(l.uninstall, 0) AS uninstall, COALESCE(l.bandwidth, 0) AS bandwidth, COALESCE(s.storage_added, 0) AS storage_added, COALESCE(s.storage_deleted, 0) AS storage_deleted FROM mau m LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id)
