@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS mau
 (
     date Date,
     app_id String,
-    mau AggregateFunction(uniq, String)
+    total AggregateFunction(uniq, String)
 ) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
@@ -154,7 +154,7 @@ AS
 SELECT
     minDate AS date,
     app_id,
-    uniqState(device_id) AS mau
+    uniqState(device_id) AS total
 FROM
     (
     SELECT
