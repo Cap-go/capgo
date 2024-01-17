@@ -31,6 +31,7 @@ const planCurrrent = ref('')
 const planPercent = ref(0)
 const snag = useLogSnag()
 const isLoading = ref(false)
+const isSubscribeLoading = ref<Array<boolean>>([])
 const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
@@ -69,10 +70,13 @@ function convertKey(key: string) {
 const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
 const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
 
-function openChangePlan(planId: string) {
+
+async function openChangePlan(planId: string, index: number) {
   // get the current url
+  isSubscribeLoading.value[index] = true
   if (planId)
-    openCheckout(planId, window.location.href, window.location.href, isYearly.value)
+    await openCheckout(planId, window.location.href, window.location.href, isYearly.value)
+  isSubscribeLoading.value[index] = false
 }
 
 function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
@@ -209,7 +213,7 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </div>
       <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="p in displayPlans" :key="p.id" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+        <div v-for="(p, index) in displayPlans" :key="p.id" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600" viewBox="0 0 83 64" fill="currentColor"
@@ -237,10 +241,21 @@ const hightLights = computed<Stat[]>(() => ([
             <span v-if="isYearlyPlan(p)" class="text-md ml-3 rounded-full bg-emerald-500 px-1.5 font-semibold text-white"> {{ getSale(p) }} </span>
             <button
               v-if="p.stripe_id !== 'free'"
-              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-gray-400 dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
+              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
-              :disabled="isDisabled(p)" @click="openChangePlan(p.stripe_id)"
+              :disabled="isDisabled(p)" @click="openChangePlan(p.stripe_id, index)"
             >
+            <svg v-if="isSubscribeLoading[index]" class="inline-block w-5 h-5 mr-3 -ml-1 text-white dark:text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle
+                          class="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          stroke-width="4"
+                        />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
               {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
           </div>
