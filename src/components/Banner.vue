@@ -3,18 +3,23 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 defineProps({
   text: { type: String, default: '' },
   color: { type: String, default: '' },
 })
 const main = useMainStore()
+const org = useOrganizationStore()
 const { t } = useI18n()
 
 const isMobile = Capacitor.isNativePlatform()
 
 const bannerText = computed(() => {
-  if (main.canceled)
+  if (org.currentPlanName !== 'Free')
+    return null
+
+  else if (main.canceled)
     return t('plan-inactive')
 
   else if (!main.paying && main.trialDaysLeft > 1)

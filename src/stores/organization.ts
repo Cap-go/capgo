@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
-import { useSupabase } from '~/services/supabase'
+import { useSupabase, getCurrentPlanName } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
@@ -42,6 +42,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const currentOrganization = ref<Organization>()
   const currentRole = ref<OrganizationRole | null>(null)
+  const currentPlanName = ref<string>('Free')
 
   watch(currentOrganization, async (currentOrganization) => {
     if (!currentOrganization) {
@@ -50,6 +51,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     currentRole.value = await getCurrentRole(currentOrganization.created_by, undefined, undefined)
+    currentPlanName.value = await getCurrentPlanName(currentOrganization.created_by)
     console.log('current role', currentRole.value)
   })
 
@@ -141,6 +143,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     organizations,
     currentOrganization,
     currentRole,
+    currentPlanName,
     setCurrentOrganization,
     setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
