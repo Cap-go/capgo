@@ -137,7 +137,7 @@ async function setChannelProgressive(channel: Database['public']['Tables']['chan
     .from('channels')
     .update({
       secondVersion: id,
-      version: channel.secondVersion,
+      version: channel.secondVersion ?? undefined,
       secondaryVersionPercentage: 0.1,
     })
     .eq('id', channel.id)
@@ -580,28 +580,28 @@ function preventInputChangePerm(event: Event) {
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
               <template #start>
-                <span v-for="channel in bundleChannels" :key="channel.id">
+                <span v-for="chn in bundleChannels" :key="chn.id">
                   <span
-                    v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (channel!.secondVersion === version.id) : false"
-                    class="cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3"
-                    @click="openChannel(channel, true)"
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.secondVersion === version.id) : false"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, true)"
                   >
-                    {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? ((channel!.secondVersion
-                      === version.id) ? `${channel!.name}-B` : ``) : channel!.name }}
+                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion
+                      === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
                   </span>
                   <span
-                    v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (channel!.version === version.id) : false"
-                    class="cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3"
-                    @click="openChannel(channel, false)"
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.version === version.id) : false"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, false)"
                   >
-                    {{ `${channel!.name}-A` }}
+                    {{ `${chn!.name}-A` }}
                   </span>
                   <span
-                    v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? false : true"
-                    class="cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3"
-                    @click="openChannel(channel, false)"
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? false : true"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, false)"
                   >
-                    {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? ((channel!.secondVersion === version.id) ? `${channel!.name}-B` : ``) : channel!.name }}
+                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
                   </span>
                 </span>
               </template>

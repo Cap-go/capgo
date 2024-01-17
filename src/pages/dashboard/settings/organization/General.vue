@@ -99,14 +99,13 @@ function onInputClick(event: MouseEvent) {
 
 const acronym = computed(() => {
   let res = 'N/A'
-  //use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
+  // use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
   if (currentOrganization.value?.name) {
     const words = currentOrganization.value.name.split(' ')
-    if (words.length > 1) {
+    if (words.length > 1)
       res = words[0][0] + words[1][0]
-    } else {
+    else
       res = words[0].slice(0, 2)
-    }
   }
   return res.toUpperCase()
 })
