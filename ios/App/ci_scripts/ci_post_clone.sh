@@ -33,6 +33,7 @@ echo "🚀 Build code"
 bun run mobile
 
 # install native dependencies
-echo "📦 Install native dependencies "
+echo "📦 Install native dependencies"
+cd ios/App
 bun run sync:ios
 pod install
