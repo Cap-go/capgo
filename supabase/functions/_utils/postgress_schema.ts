@@ -1,6 +1,5 @@
-import { bigint, boolean, doublePrecision, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core'
-
-// do_not_change
+// eslint-disable-next-line import/newline-after-import
+import { bigint, boolean, doublePrecision, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'version_number', 'none'])
 
