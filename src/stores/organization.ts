@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
-import { useSupabase, getCurrentPlanName } from '~/services/supabase'
+import { getCurrentPlanName, useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
