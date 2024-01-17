@@ -11,7 +11,7 @@ import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
 import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
 import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
-import { isAllowedAction, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
+import { isAllowedAction, sendDevice, sendStats } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
