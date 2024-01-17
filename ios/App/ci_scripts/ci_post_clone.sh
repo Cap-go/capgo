@@ -13,6 +13,7 @@ npm -v
 
 # Install bun
 echo "📦 Install bun"
+brew tap oven-sh/bun
 brew install bun 
 
 # Install dependencies
