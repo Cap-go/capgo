@@ -11,6 +11,10 @@ brew link node@20
 node -v
 npm -v
 
+# Go up in folder structure
+cd ../..
+echo $PWD
+
 # Install bun
 echo "📦 Install bun"
 brew tap oven-sh/bun
