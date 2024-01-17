@@ -97,6 +97,20 @@ function onInputClick(event: MouseEvent) {
   }
 }
 
+const acronym = computed(() => {
+  let res = 'N/A'
+  //use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
+  if (currentOrganization.value?.name) {
+    const words = currentOrganization.value.name.split(' ')
+    if (words.length > 1) {
+      res = words[0][0] + words[1][0]
+    } else {
+      res = words[0].slice(0, 2)
+    }
+  }
+  return res.toUpperCase()
+})
+
 function onInputKeyDown(event: Event) {
   if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])))
     event.preventDefault()
@@ -104,7 +118,7 @@ function onInputKeyDown(event: Event) {
 </script>
 
 <template>
-  <div class="h-full p-8 max-h-fit grow md:pb-0 overflow-hidden" style="min-height: 100%;">
+  <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0" style="min-height: 100%;">
     <!-- TODO Classes are not working -->
     <FormKit id="update-account" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;">
       <div>
@@ -117,7 +131,7 @@ function onInputKeyDown(event: Event) {
                 width="80" height="80" alt="User upload"
               >
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
-                <p>{{ 'N/A' }}</p>
+                <p>{{ acronym }}</p>
               </div>
             </div>
             <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="presentActionSheet">
