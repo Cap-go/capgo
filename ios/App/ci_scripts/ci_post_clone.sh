@@ -12,7 +12,7 @@ node -v
 npm -v
 
 # Go up in folder structure
-cd ../..
+cd ../../..
 echo $PWD
 
 # Install bun
