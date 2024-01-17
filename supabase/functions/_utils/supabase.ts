@@ -660,7 +660,7 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
       .insert(
         {
           created_by: userId,
-          logo: 'https://res.cloudinary.com/dz3vsv9pg/image/upload/v1623349123/capgo/logo.png',
+          logo: '',
           name: `${name} organization`,
         },
       )
