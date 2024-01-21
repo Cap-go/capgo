@@ -110,6 +110,7 @@ loadData()
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau"
+      :accumulated="false"
       :title="t('montly-active')" unit="Users"
     />
     <div

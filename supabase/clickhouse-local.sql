@@ -28,7 +28,7 @@ values (
 create server clickhouse_server
   foreign data wrapper clickhouse_wrapper
   options (
-    conn_string_id '29a9ca87-7777-4d2b-b7b6-28fd943f9619' -- The Key ID from above.
+    conn_string_id '1b8b4987-9ef5-4bba-a2a3-602194ec39c3' -- The Key ID from above.
   );
 
 create foreign table clickhouse_devices (
@@ -68,22 +68,13 @@ create foreign table clickhouse_app_usage (
 )
 server clickhouse_server
 options (
-  table '(SELECT DISTINCT ON (m.date,m.app_id) 
-  m.date AS date,
-  m.app_id AS app_id,
-  uniqMerge(m.total) AS mau,
-  COALESCE(l.get, 0) AS get,
-  COALESCE(l.fail, 0) AS fail,
-  COALESCE(l.install, 0) AS install,
-  COALESCE(l.uninstall, 0) AS uninstall,
-  COALESCE(l.bandwidth, 0) AS bandwidth,
-  COALESCE(s.storage_added, 0) AS storage_added,
-  COALESCE(s.storage_deleted, 0) AS storage_deleted
-  FROM mau m
-  LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
-  LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id
-  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted)'
+  table 'mau_final'
 );
+
+create materialized view clickhouse_app_usage_view as 
+select * from clickhouse_app_usage;
+
+SELECT cron.schedule('Refresh stats materialized view', '*/5 * * * *', $$CALL REFRESH MATERIALIZED VIEW clickhouse_app_usage_view;$$);
 
 -- select uniqMerge(mau), app_id, date from mau group by app_id, date;
 
