@@ -16,7 +16,7 @@ BEGIN
             COALESCE(round(convert_bytes_to_gb(SUM(clickhouse_app_usage.bandwidth))::numeric,2), 0)::float AS bandwidth,
             COALESCE(round(convert_bytes_to_gb(SUM(clickhouse_app_usage.storage_added - clickhouse_app_usage.storage_deleted))::numeric,2), 0)::float AS storage
         FROM clickhouse_app_usage
-        WHERE app_id IN (SELECT app_id from apps where user_id=get_total_stats_v4.userid)
+        WHERE app_id IN (SELECT app_id from apps where user_id=userid)
         AND date >= anchor_start
         AND date <= anchor_end
         LIMIT 1;
