@@ -59,11 +59,6 @@ const tabs: Tab[] = [
     icon: IconInformations,
     key: 'info',
   },
-  // {
-  //   label: t('shared-users'),
-  //   icon: IconUsers,
-  //   key: 'users',
-  // },
   {
     label: t('channel-forced-devices'),
     icon: IconDevice,
@@ -666,11 +661,6 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item id="unlink-bundle" label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
           </k-list>
         </dl>
-      </div>
-    </div>
-    <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">

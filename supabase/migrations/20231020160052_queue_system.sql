@@ -198,7 +198,6 @@ EXECUTE PROCEDURE on_device_delete_sql();
 
 -- drop trigger on_channel_create on channels;
 -- drop trigger on_channel_update on channels;
--- drop trigger on_shared_create on channel_users;
 -- drop trigger on_user_create on users;
 -- drop trigger on_user_update on users;
 -- drop trigger on_version_create on app_versions;
@@ -217,11 +216,6 @@ EXECUTE PROCEDURE on_device_delete_sql();
 -- AFTER UPDATE ON public.channels 
 -- FOR EACH ROW 
 -- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_channel_update');
-
--- CREATE TRIGGER on_shared_create 
--- AFTER INSERT ON public.channel_users 
--- FOR EACH ROW 
--- EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_shared_create');
 
 -- CREATE TRIGGER on_user_create 
 -- AFTER INSERT ON public.users 
