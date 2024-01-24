@@ -20,11 +20,6 @@ AFTER UPDATE ON public.channels
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_channel_update');
 
-CREATE TRIGGER on_shared_create 
-AFTER INSERT ON public.channel_users 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_shared_create');
-
 CREATE TRIGGER on_user_create 
 AFTER INSERT ON public.users 
 FOR EACH ROW 
