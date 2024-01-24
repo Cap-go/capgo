@@ -2099,8 +2099,6 @@ CREATE POLICY "Allow select app owner" ON "public"."devices" FOR SELECT TO "auth
 
 CREATE POLICY "Allow self to modify self" ON "public"."users" TO "authenticated" USING (((("auth"."uid"() = "id") AND "public"."is_not_deleted"(("auth"."email"())::character varying)) OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (((("auth"."uid"() = "id") AND "public"."is_not_deleted"(("auth"."email"())::character varying)) OR "public"."is_admin"("auth"."uid"())));
 
-CREATE POLICY "Allow shared to see" ON "public"."app_versions" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
-
 CREATE POLICY "Allow user to get they meta" ON "public"."app_versions_meta" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Allow user to self get" ON "public"."stripe_info" FOR SELECT TO "authenticated" USING ((("auth"."uid"() IN ( SELECT "users"."id"
@@ -2115,8 +2113,6 @@ CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" FOR S
 
 CREATE POLICY "Enable select for authenticated users only" ON "public"."plans" FOR SELECT TO "authenticated" USING (true);
 
-CREATE POLICY "Select if app is shared with you or api" ON "public"."channels" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read}'::"public"."key_mode"[], "app_id")));
-
 CREATE POLICY "allow apikey to delete" ON "public"."app_versions" FOR DELETE TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id") AND "public"."is_allowed_action"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"))));
 
 CREATE POLICY "allow apikey to delete" ON "public"."apps" FOR DELETE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], "app_id"));
@@ -2124,8 +2120,6 @@ CREATE POLICY "allow apikey to delete" ON "public"."apps" FOR DELETE TO "anon" U
 CREATE POLICY "allow apikey to select" ON "public"."apps" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
 CREATE POLICY "allow for delete by the CLI" ON "public"."app_versions" FOR UPDATE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], "app_id"));
-
-CREATE POLICY "allowed shared to select" ON "public"."apps" FOR SELECT TO "authenticated" USING (("public"."is_app_shared"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
 CREATE POLICY "Allow user to get they app_usage" ON "public"."app_usage" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
 
@@ -2147,7 +2141,7 @@ CREATE POLICY "Allow apikey to manage they folder 1sbjm_1" ON storage.objects FO
 
 CREATE POLICY "Allow apikey to select 1sbjm_0" ON storage.objects FOR SELECT TO anon USING (((bucket_id = 'apps'::text) AND (((public.get_user_id(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text)))::text = (storage.foldername(name))[0]) AND public.is_allowed_capgkey(((current_setting('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all}'::public.key_mode[], ((storage.foldername(name))[1])::character varying))));
 
-CREATE POLICY "Allow user or shared to manage they folder 1sbjm_0" ON storage.objects FOR SELECT TO authenticated USING (((bucket_id = 'apps'::text) AND (((auth.uid())::text = (storage.foldername(name))[0]) OR public.is_app_shared(auth.uid(), ((storage.foldername(name))[1])::character varying))));
+CREATE POLICY "Allow user to manage they folder 1sbjm_0" ON storage.objects FOR SELECT TO authenticated USING (((bucket_id = 'apps'::text) AND (((auth.uid())::text = (storage.foldername(name))[0]))));
 
 CREATE POLICY "Allow user to delete they folder 1sbjm_0" ON storage.objects FOR DELETE TO authenticated USING (((bucket_id = 'apps'::text) AND ((auth.uid())::text = (storage.foldername(name))[0])));
 
@@ -2371,11 +2365,6 @@ GRANT ALL ON FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character
 GRANT ALL ON FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying) TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) TO "postgres";
-GRANT ALL ON FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) TO "anon";
-GRANT ALL ON FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_app_shared"("userid" "uuid", "appid" character varying) TO "service_role";
-
 GRANT ALL ON FUNCTION "public"."is_canceled"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_canceled"("userid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_canceled"("userid" "uuid") TO "authenticated";
@@ -2415,11 +2404,6 @@ GRANT ALL ON FUNCTION "public"."is_trial"("userid" "uuid") TO "postgres";
 GRANT ALL ON FUNCTION "public"."is_trial"("userid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_trial"("userid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_trial"("userid" "uuid") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "postgres";
-GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "anon";
-GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_version_shared"("userid" "uuid", "versionid" bigint) TO "service_role";
 
 GRANT ALL ON TABLE "public"."apikeys" TO "postgres";
 GRANT ALL ON TABLE "public"."apikeys" TO "anon";

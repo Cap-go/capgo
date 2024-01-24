@@ -9,7 +9,3 @@ COMMIT;
 BEGIN;
   ALTER POLICY "Allow api to update" ON "public"."channels" TO anon;
 COMMIT;
-
-BEGIN;
-  ALTER POLICY "Select if app is shared with you or api" ON "public"."channels" TO authenticated, anon;
-COMMIT;
