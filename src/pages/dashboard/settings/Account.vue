@@ -9,7 +9,7 @@ import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import copy from 'copy-text-to-clipboard'
 import { useMainStore } from '~/stores/main'
-import { deleteUser, useSupabase } from '~/services/supabase'
+import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
@@ -25,16 +25,6 @@ const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
 // const errorMessage = ref('')
-
-async function hashEmail(email: string) {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(email)
-
-  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
-  return hashHex
-}
 
 async function deleteAccount() {
   displayStore.showActionSheet = true
