@@ -60,7 +60,13 @@ jobs:
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
-      - name: Publish CF PROD
+      # - name: Deploy CF Worker
+      #   run: bunx wrangler deploy ./cloudflare_workers/loadbalancer.ts
+      #   if: ${{ !contains(github.ref, '-alpha.') }}
+      #   env:
+      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Publish CF webapp PROD
         uses: cloudflare/pages-action@1
         if: ${{ !contains(github.ref, '-alpha.') }}
         with:
@@ -69,7 +75,7 @@ jobs:
           projectName: capgo-webapp
           directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish CF PREPROD
+      - name: Publish CF webapp PREPROD
         uses: cloudflare/pages-action@1
         if: ${{ contains(github.ref, '-alpha.') }}
         with:
