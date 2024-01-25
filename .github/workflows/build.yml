@@ -74,6 +74,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: capgo-webapp
           directory: dist
+          branch: main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish CF webapp PREPROD
         uses: cloudflare/pages-action@1
@@ -83,6 +84,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: capgo-webapp-preprod
           directory: dist
+          branch: main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   build_android:
