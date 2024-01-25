@@ -6,4 +6,4 @@
 
 /api-edge/* https://webcapgo.netlify.app/api-edge/:splat
 
-/* / 200
+/* /index.html 200
