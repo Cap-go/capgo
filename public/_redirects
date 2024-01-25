@@ -1,8 +1,8 @@
 /.well-known/* /deepLink/:splat 200
 
-/api/auto_update https://webcapgo.netlify.app/api/updates
+/api/auto_update https://webcapgo.netlify.app/.netlify/functions/updates
 
-/api/* https://webcapgo.netlify.app/api/:splat
+/api/* https://webcapgo.netlify.app/.netlify/functions/:splat
 
 /api-edge/* https://webcapgo.netlify.app/api-edge/:splat
 
