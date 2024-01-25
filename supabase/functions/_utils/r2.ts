@@ -1,6 +1,8 @@
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import { getEnv } from './utils.ts'
 
+// import presign s3
+
 const bucket = 'capgo'
 
 function initR2() {

@@ -1,5 +1,5 @@
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import z from 'https://deno.land/x/zod@v3.22.2/index.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
@@ -164,7 +164,7 @@ async function post(body: DeviceLink): Promise<Response> {
     if (!dbMainChannelError) {
       const devicePlatform = parseResult.data.platform
       const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
-      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null 
+      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
     }
 
     // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null

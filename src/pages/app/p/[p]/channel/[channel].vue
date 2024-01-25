@@ -17,7 +17,6 @@ import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconSettings from '~icons/heroicons/cog-6-tooth'
 import IconInformations from '~icons/heroicons/information-circle'
-import IconUsers from '~icons/heroicons/users-solid'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import type { Tab } from '~/components/comp_def'
 import { urlToAppId } from '~/services/conversion'
@@ -60,11 +59,6 @@ const tabs: Tab[] = [
     icon: IconInformations,
     key: 'info',
   },
-  // {
-  //   label: t('shared-users'),
-  //   icon: IconUsers,
-  //   key: 'users',
-  // },
   {
     label: t('channel-forced-devices'),
     icon: IconDevice,
@@ -239,6 +233,44 @@ async function makeDefault(val = true) {
             .from('channels')
             .update({ public: val })
             .eq('id', id.value)
+
+          // This code is here because the backend has a 20 second delay between setting a channel to public
+          // and the backend changing other channels to be not public
+          // In these 20 seconds the updates are broken
+          if (val && channel.value.ios) {
+            const { error: iosError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('ios', true)
+              .neq('id', channel.value.id)
+            const { error: hiddenError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', false)
+              .eq('ios', false)
+            if (iosError || hiddenError)
+              console.log('error', iosError || hiddenError)
+          }
+
+          if (val && channel.value.android) {
+            const { error: androidError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', true)
+              .neq('id', channel.value.id)
+            const { error: hiddenError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', false)
+              .eq('ios', false)
+            if (androidError || hiddenError)
+              console.log('error', androidError || hiddenError)
+          }
+
           if (error) {
             console.error(error)
           }
@@ -629,11 +661,6 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item id="unlink-bundle" label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
           </k-list>
         </dl>
-      </div>
-    </div>
-    <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">

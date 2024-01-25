@@ -27,22 +27,22 @@ export function getTest(): RunnableTest {
       {
         name: 'Test invalid semver (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testInvalidSemver(backendBaseUrl, supabase, 'POST'),
+        test: async (backendBaseUrl, supabase) => await testInvalidSemver(backendBaseUrl, supabase, 'POST'),
       },
       {
         name: 'Test post without field (device_id) (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'POST'),
+        test: async (backendBaseUrl, supabase) => await testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'POST'),
       },
       {
         name: 'Test post without field (app_id) (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'POST'),
+        test: async (backendBaseUrl, supabase) => await testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'POST'),
       },
       {
         name: 'Test with a version that does not exist (post)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testWithNotExistingVersion(backendBaseUrl, supabase, 'POST'),
+        test: async (backendBaseUrl, supabase) => await testWithNotExistingVersion(backendBaseUrl, supabase, 'POST'),
       },
       {
         name: 'Test without channel (post)',
@@ -73,22 +73,22 @@ export function getTest(): RunnableTest {
       {
         name: 'Test invalid semver (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testInvalidSemver(backendBaseUrl, supabase, 'PUT'),
+        test: async (backendBaseUrl, supabase) => await testInvalidSemver(backendBaseUrl, supabase, 'PUT'),
       },
       {
         name: 'Test post without field (device_id) (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'PUT'),
+        test: async (backendBaseUrl, supabase) => await testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'PUT'),
       },
       {
         name: 'Test post without field (app_id) (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'PUT'),
+        test: async (backendBaseUrl, supabase) => await testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'PUT'),
       },
       {
         name: 'Test with a version that does not exist (put)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testWithNotExistingVersion(backendBaseUrl, supabase, 'PUT'),
+        test: async (backendBaseUrl, supabase) => await testWithNotExistingVersion(backendBaseUrl, supabase, 'PUT'),
       },
       {
         name: 'Test without overwrite (put)',
@@ -104,17 +104,17 @@ export function getTest(): RunnableTest {
       {
         name: 'Test invalid semver (delete)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testInvalidSemver(backendBaseUrl, supabase, 'DELETE'),
+        test: async (backendBaseUrl, supabase) => await testInvalidSemver(backendBaseUrl, supabase, 'DELETE'),
       },
       {
         name: 'Test post without field (device_id) (delete)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'DELETE'),
+        test: async (backendBaseUrl, supabase) => await testPostWithoutField(backendBaseUrl, supabase, 'device_id', 'DELETE'),
       },
       {
         name: 'Test post without field (app_id) (delete)',
         timesToExecute: 1,
-        test: (backendBaseUrl, supabase) => testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'DELETE'),
+        test: async (backendBaseUrl, supabase) => await testPostWithoutField(backendBaseUrl, supabase, 'app_id', 'DELETE'),
       },
       {
         name: 'Test delete with an overwrite that does not exist',
@@ -148,7 +148,7 @@ function fetchEndpoint(backendBaseUrl: URL, method: HttpMethod, body: object) {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: method !== 'DELETE' ? JSON.stringify(body) : undefined,
   })
 }
 
@@ -189,7 +189,7 @@ async function testPostWithoutField(backendBaseUrl: URL, _supabase: SupabaseType
   delete baseData[field]
 
   const response = await fetchEndpoint(backendBaseUrl, method, baseData)
-  responseStatusCode(response, 400, `Test post without field ${field}`)
+  await responseStatusCode(response, 400, `Test post without field ${field}`)
 
   // ZOD is used for post, but put has a custom validation. We test both here
   const error = await getResponseError(response)

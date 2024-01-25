@@ -6,14 +6,12 @@ import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
-type User = Database['public']['Tables']['users']['Row']
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 // TODO Create user rights in database
 // type Right = Database['public']['Tables']['user_rights']['Row']
-type Right = 'create' | 'read' | 'update' | 'delete'
 
 const supabase = useSupabase()
 
@@ -23,10 +21,24 @@ export const useOrganizationStore = defineStore('organization', () => {
   const organizations: ComputedRef<Organization[]> = computed(
     () => {
       return Array.from(
-        _organizations.value, ([key, value]) => value,
+        _organizations.value,
+        ([_key, value]) => value,
       )
     },
   )
+
+  const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
+    if (_organizations.value.size === 0) {
+      // eslint-disable-next-line ts/no-use-before-define
+      await fetchOrganizations()
+    }
+    for (const org of _organizations.value.values()) {
+      if (org.created_by === appOwner)
+        return org.role as OrganizationRole
+    }
+
+    throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
+  }
 
   const currentOrganization = ref<Organization>()
   const currentRole = ref<OrganizationRole | null>(null)
@@ -37,7 +49,6 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     currentRole.value = await getCurrentRole(currentOrganization.created_by, undefined, undefined)
     console.log('current role', currentRole.value)
   })
@@ -48,17 +59,6 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const setCurrentOrganizationFromValue = (value: Organization) => {
     currentOrganization.value = value
-  }
-
-  const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
-    if (_organizations.value.size === 0)
-      await fetchOrganizations()
-    for (const org of _organizations.value.values()) {
-      if (org.created_by === appOwner)
-        return org.role as OrganizationRole
-    }
-
-    throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
   const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
@@ -135,44 +135,6 @@ export const useOrganizationStore = defineStore('organization', () => {
   const dedupFetchOrganizations = async () => {
     if (_organizations.value.size === 0)
       await fetchOrganizations()
-  }
-
-  const createOrganization = (name: string, logo?: string) => {
-    throw new Error('Not implemented')
-  }
-
-  const updateOrganization = (name: string, logo?: string) => {
-    throw new Error('Not implemented')
-  }
-
-  const deleteOrganization = (name: string, logo?: string) => {
-    throw new Error('Not implemented')
-  }
-
-  const getUsers = (orgId: string): User[] => {
-    throw new Error('Not implemented')
-  }
-
-  const addUser = (newUserId: string) => {
-    throw new Error('Not implemented')
-  }
-
-  const deleteUser = (newUserId: string) => {
-    throw new Error('Not implemented')
-  }
-
-  const updateRightForUser = (userId: string, right: Right) => {
-    throw new Error('Not implemented')
-  }
-
-  /**
-   *
-   * @brief Create Stripe hosted solution
-   * @param orgId
-   * @returns
-   */
-  const getBillingInformation = (orgId: string) => {
-    return ''
   }
 
   return {

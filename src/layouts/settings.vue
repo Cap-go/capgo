@@ -15,6 +15,7 @@ import IconAdmin from '~icons/eos-icons/admin'
 import type { Tab } from '~/components/comp_def'
 import { useMainStore } from '~/stores/main'
 import { openPortal } from '~/services/stripe'
+import { isSpoofed } from '~/services/supabase'
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -92,7 +93,7 @@ watchEffect(() => {
   else if (!main.paying && tabs.value.find(tab => tab.label === 'usage')) {
     tabs.value = tabs.value.filter(tab => tab.label !== 'usage')
   }
-  if (main.isAdmin && !tabs.value.find(tab => tab.label === 'admin')) {
+  if ((main.isAdmin || isSpoofed()) && !tabs.value.find(tab => tab.label === 'admin')) {
     tabs.value.push({
       label: 'admin',
       icon: shallowRef(IconAdmin) as any,

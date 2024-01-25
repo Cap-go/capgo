@@ -1,4 +1,3 @@
-/* eslint-disable n/prefer-global/buffer */
 import AdmZip from 'https://esm.sh/adm-zip?target=deno'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
@@ -30,6 +29,7 @@ async function downloadApkPure(id: string, mode: 'APK' | 'XAPK' = 'APK') {
     credentials: 'include',
   })
   const arrayBuffer = await responseApk.arrayBuffer()
+  // eslint-disable-next-line node/prefer-global/buffer
   const buffer = Buffer.from(arrayBuffer)
   return buffer
 }
