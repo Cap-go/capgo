@@ -100,7 +100,7 @@ async function post(body: DeviceLink, c: Context): Promise<Response> {
   }
   // find device
 
-  await sendDevice({
+  await sendDevice(c, {
     app_id,
     device_id,
     plugin_version,
@@ -270,7 +270,7 @@ async function put(body: DeviceLink, c: Context): Promise<Response> {
       error: 'version_error',
     }, 400)
   }
-  await sendDevice({
+  await sendDevice(c, {
     app_id,
     device_id,
     plugin_version,

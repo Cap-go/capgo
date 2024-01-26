@@ -1,7 +1,7 @@
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import { Hono } from 'https://deno.land/x/hono/mod.ts'
 import type { Context } from 'https://deno.land/x/hono/mod.ts'
-import { middlewareKey } from '../_utils/hono.ts'
+import { middlewareKey } from '../../_utils/hono.ts'
 import { update } from 'backend/_utils/update.ts'
 import {
   INVALID_STRING_APP_ID,
@@ -17,8 +17,8 @@ import {
   deviceIdRegex,
   isLimited,
   reverseDomainRegex,
-} from '../_utils/utils.ts'
-import type { AppInfos } from '../_utils/types.ts'
+} from '../../_utils/utils.ts'
+import type { AppInfos } from '../../_utils/types.ts'
 
 export const jsonRequestSchema = z.object({
   app_id: z.string({
@@ -56,7 +56,7 @@ app.post('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<AppInfos>()
     console.log('body', body)
-    if (isLimited(body.app_id)) {
+    if (isLimited(body.app_id, c)) {
       return c.send({ 
         status: 'Too many requests', 
         error: 'too_many_requests' }, 200)

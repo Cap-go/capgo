@@ -184,7 +184,7 @@ async function post(body: AppStats, c: Context) {
       }
       else if (failActions.includes(action)) {
         console.log('FAIL!')
-        const sent = await sendNotif('user:update_fail', {
+        const sent = await sendNotif(c, 'user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
           current_version_id: appVersion.id,
@@ -209,7 +209,7 @@ async function post(body: AppStats, c: Context) {
       }, 200)
     }
     rows.push(stat)
-    await Promise.all([sendDevice(device).then(() => sendStats(rows, c))])
+    await Promise.all([sendDevice(c, device).then(() => sendStats(rows, c))])
     return c.send(BRES)
   }
   catch (e) {
