@@ -18,3 +18,5 @@ declare module 'hono' {
     apikey: Database['public']['Tables']['apikeys']['Row']
   }
 }
+
+export const BRES = { status: 'ok'}

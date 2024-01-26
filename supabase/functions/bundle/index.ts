@@ -55,9 +55,6 @@ export async function get(body: GetLatest, apikey: Database['public']['Tables'][
     if (!(await checkAppOwner(apikey.user_id, body.app_id)))
       return sendRes({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
-    if (!(await checkAppOwner(apikey.user_id, body.app_id)))
-      return sendRes({ status: 'You can\'t check this app' }, 400)
-
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
