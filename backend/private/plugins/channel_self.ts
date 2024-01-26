@@ -1,10 +1,13 @@
+// channel self old function
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import { Hono } from 'https://deno.land/x/hono/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import type { Database } from '../_utils/supabase.types.ts'
-import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
-import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
-import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, methodJson, reverseDomainRegex, sendRes } from '../_utils/utils.ts'
-import { redisDeviceInvalidate } from '../_utils/redis.ts'
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import { sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'
+import { BRES, middlewareKey } from '../../_utils/hono.ts'
+import type { AppInfos } from '../../_utils/types.ts'
+import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../../_utils/utils.ts'
+import { Database } from '~/types/supabase.types.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
@@ -43,12 +46,12 @@ export const jsonRequestSchema = z.object({
   return val
 })
 
-async function post(body: DeviceLink): Promise<Response> {
+async function post(body: DeviceLink, c: Context): Promise<Response> {
   console.log('body', body)
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
     console.error('Cannot parse json', { parseResult })
-    return sendRes({ error: `Cannot parse json: ${parseResult.error}` }, 400)
+    return c.send({ error: `Cannot parse json: ${parseResult.error}` }, 400)
   }
 
   let {
@@ -72,14 +75,14 @@ async function post(body: DeviceLink): Promise<Response> {
   }
   else {
     console.error('Cannot find version', { version_build })
-    return sendRes({
+    return c.send({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
-  const { data: version } = await supabaseAdmin()
+  const { data: version } = await supabaseAdmin(c)
     .from('app_versions')
     .select('id')
     .eq('app_id', app_id)
@@ -90,7 +93,7 @@ async function post(body: DeviceLink): Promise<Response> {
 
   if (!version) {
     console.error('Cannot find version', { version_name })
-    return sendRes({
+    return c.send({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
     }, 400)
@@ -111,7 +114,7 @@ async function post(body: DeviceLink): Promise<Response> {
     updated_at: new Date().toISOString(),
   })
 
-  const { data: dataChannelOverride } = await supabaseAdmin()
+  const { data: dataChannelOverride } = await supabaseAdmin(c)
     .from('channel_devices')
     .select(`
     app_id,
@@ -127,7 +130,7 @@ async function post(body: DeviceLink): Promise<Response> {
     .single()
   if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
     console.error('Cannot change device override current channel don\t allow it', { channel, dataChannelOverride })
-    return sendRes({
+    return c.send({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
     }, 400)
@@ -135,7 +138,7 @@ async function post(body: DeviceLink): Promise<Response> {
   // if channel set channel_override to it
   if (channel) {
     // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin()
+    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
       .from('channels')
       .select()
       .eq('app_id', app_id)
@@ -145,16 +148,20 @@ async function post(body: DeviceLink): Promise<Response> {
     if (dbError || !dataChannel) {
       console.log(channel, app_id)
       console.error('Cannot find channel', { dbError, dataChannel })
-      return sendRes({
+      return c.send({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
         error: 'channel_not_found',
       }, 400)
     }
 
     // Get the main channel
-    const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin()
+    const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin(c)
       .from('channels')
-      .select('name, ios, android')
+      .select(`
+        name, 
+        ios, 
+        android
+      `)
       .eq('app_id', app_id)
       .eq('public', true)
 
@@ -172,21 +179,21 @@ async function post(body: DeviceLink): Promise<Response> {
       console.error('Cannot find main channel', dbMainChannelError)
 
     if (mainChannelName && mainChannelName === channel) {
-      const { error: dbErrorDev } = await supabaseAdmin()
+      const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .delete()
         .eq('app_id', app_id)
         .eq('device_id', device_id)
       if (dbErrorDev) {
         console.error('Cannot do channel override', { dbErrorDev })
-        return sendRes({
+        return c.send({
           message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
           error: 'override_not_allowed',
         }, 400)
       }
     }
     else {
-      const { error: dbErrorDev } = await supabaseAdmin()
+      const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .upsert({
           device_id,
@@ -196,7 +203,7 @@ async function post(body: DeviceLink): Promise<Response> {
         })
       if (dbErrorDev) {
         console.error('Cannot do channel override', { dbErrorDev })
-        return sendRes({
+        return c.send({
           message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
           error: 'override_not_allowed',
         }, 400)
@@ -210,11 +217,11 @@ async function post(body: DeviceLink): Promise<Response> {
     app_id,
     version_build,
     version: version.id,
-  }])
-  return sendRes()
+  }], c)
+  return c.send(BRES)
 }
 
-async function put(body: DeviceLink): Promise<Response> {
+async function put(body: DeviceLink, c: Context): Promise<Response> {
   console.log('body', body)
   let {
     version_name,
@@ -236,7 +243,7 @@ async function put(body: DeviceLink): Promise<Response> {
   }
   else {
     console.error('Cannot find version', { version_build })
-    return sendRes({
+    return c.send({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
@@ -244,10 +251,10 @@ async function put(body: DeviceLink): Promise<Response> {
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!device_id || !app_id) {
     console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
-    return sendRes({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
+    return c.send({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
 
-  const { data: version } = await supabaseAdmin()
+  const { data: version } = await supabaseAdmin(c)
     .from('app_versions')
     .select('id')
     .eq('app_id', app_id)
@@ -258,7 +265,7 @@ async function put(body: DeviceLink): Promise<Response> {
 
   if (!version) {
     console.error('Cannot find version', { version_name })
-    return sendRes({
+    return c.send({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
     }, 400)
@@ -276,13 +283,13 @@ async function put(body: DeviceLink): Promise<Response> {
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
   })
-  const { data: dataChannel, error: errorChannel } = await supabaseAdmin()
+  const { data: dataChannel, error: errorChannel } = await supabaseAdmin(c)
     .from('channels')
     .select()
     .eq('app_id', app_id)
     .eq('public', true)
 
-  const { data: dataChannelOverride } = await supabaseAdmin()
+  const { data: dataChannelOverride } = await supabaseAdmin(c)
     .from('channel_devices')
     .select(`
       app_id,
@@ -299,8 +306,7 @@ async function put(body: DeviceLink): Promise<Response> {
   if (dataChannelOverride && dataChannelOverride.channel_id) {
     const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
 
-    await redisDeviceInvalidate(app_id, device_id)
-    return sendRes({
+    return c.send({
       channel: channelId.name,
       status: 'override',
       allowSet: channelId.allow_device_self_set,
@@ -316,11 +322,11 @@ async function put(body: DeviceLink): Promise<Response> {
       app_id,
       version_build,
       version: version.id,
-    }])
+    }], c)
 
     const devicePlatform = devicePlatformScheme.safeParse(platform)
     if (!devicePlatform.success) {
-      return sendRes({
+      return c.send({
         message: 'Invalid device platform',
         error: 'invalid_platform',
       }, 400)
@@ -330,25 +336,25 @@ async function put(body: DeviceLink): Promise<Response> {
 
     if (!finalChannel) {
       console.error('Cannot find channel', { dataChannel, errorChannel })
-      return sendRes({
+      return c.send({
         message: 'Cannot find channel',
         error: 'channel_not_found',
       }, 400)
     }
 
-    return sendRes({
+    return c.send({
       channel: finalChannel.name,
       status: 'default',
     })
   }
   console.error('Cannot find channel', { dataChannel, errorChannel })
-  return sendRes({
+  return c.send({
     message: 'Cannot find channel',
     error: 'channel_not_found',
   }, 400)
 }
 
-async function deleteOverride(body: DeviceLink): Promise<Response> {
+async function deleteOverride(body: DeviceLink, c: Context): Promise<Response> {
   console.log('body', body)
   let {
     version_build,
@@ -363,7 +369,7 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
   }
   else {
     console.error('Cannot find version', { version_build })
-    return sendRes({
+    return c.send({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
@@ -371,12 +377,9 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
 
   if (!device_id || !app_id) {
     console.error('Cannot find device_id or appi_id', { device_id, app_id, body })
-    return sendRes({
-      message: 'Cannot find device_id or appi_id',
-      error: 'missing_info',
-    }, 400)
+    return c.send({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
-  const { data: dataChannelOverride } = await supabaseAdmin()
+  const { data: dataChannelOverride } = await supabaseAdmin(c)
     .from('channel_devices')
     .select(`
     app_id,
@@ -392,53 +395,60 @@ async function deleteOverride(body: DeviceLink): Promise<Response> {
     .single()
   if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
     console.error('Cannot change device override current channel don\t allow it', { dataChannelOverride })
-    return sendRes({
+    return c.send({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
     }, 400)
   }
-  const { error } = await supabaseAdmin()
+  const { error } = await supabaseAdmin(c)
     .from('channel_devices')
     .delete()
     .eq('app_id', app_id)
     .eq('device_id', device_id)
   if (error) {
     console.error('Cannot delete channel override', { error })
-    return sendRes({
+    return c.send({
       message: `Cannot delete channel override ${JSON.stringify(error)}`,
       error: 'override_not_allowed',
     }, 400)
   }
-  await redisDeviceInvalidate(app_id, device_id)
-  return sendRes()
+  return c.send(BRES)
 }
 
-function main(url: URL, headers: BaseHeaders, method: string, body: any) {
-  try {
-    if (method === 'POST')
-      return post(body)
-    else if (method === 'PUT')
-      return put(body)
-    else if (method === 'DELETE')
-      return deleteOverride(body)
-  }
-  catch (error) {
-    console.error('Error', { error })
-    return sendRes({ message: `Error ${JSON.stringify(error)}`, error: 'general_error' }, 400)
-  }
-  console.error('Method now allowed', { method })
-  return sendRes({ message: 'Method now allowed', error: 'not_allowed' }, 400)
-}
+export const app = new Hono()
 
-Deno.serve(async (event: Request) => {
+app.post('/', middlewareKey, async (c: Context) => {
   try {
-    const url: URL = new URL(event.url)
-    const headers: BaseHeaders = Object.fromEntries(event.headers.entries())
-    const method: string = event.method
-    const body: any = methodJson.includes(method) ? await event.json() : Object.fromEntries(url.searchParams.entries())
-    return main(url, headers, method, body)
+    const body = await c.req.json<DeviceLink>()
+    const apikey = c.get('apikey')
+    console.log('body', body)
+    console.log('apikey', apikey)
+    return post(body, c)
+  } catch (e) {
+    return c.send({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
-  catch (e) {
-    return sendRes({ status: 'Error', error: JSON.stringify(e) }, 500)
+})
+
+app.put('/', middlewareKey, async (c: Context) => {
+  try {
+    const body = await c.req.json<DeviceLink>()
+    const apikey = c.get('apikey')
+    console.log('body', body)
+    console.log('apikey', apikey)
+    return put(body, c)
+  } catch (e) {
+    return c.send({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
+  }
+})
+
+app.delete('/', middlewareKey, async (c: Context) => {
+  try {
+    const body = await c.req.json<DeviceLink>()
+    const apikey = c.get('apikey')
+    console.log('body', body)
+    console.log('apikey', apikey)
+    return deleteOverride(body, c)
+  } catch (e) {
+    return c.send({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })

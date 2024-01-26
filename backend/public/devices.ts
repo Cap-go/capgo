@@ -173,7 +173,7 @@ app.post('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)
-    return c.json({ status: 'ok' })
+    return post(body, apikey, c)
   } catch (e) {
     return c.send({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
@@ -182,10 +182,10 @@ app.post('/', middlewareKey, async (c: Context) => {
 app.get('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    // const apikey = c.get('apikey')
+    const apikey = c.get('apikey')
     console.log('body', body)
-    // console.log('apikey', apikey)
-    return c.json({ status: 'ok' })
+    console.log('apikey', apikey)
+    return get(body, apikey, c)
   } catch (e) {
     return c.send({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
   }
