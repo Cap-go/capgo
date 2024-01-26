@@ -29,7 +29,7 @@ function sum(arr: number[]) {
 const total = computed(() => {
   // remove undefined values
   if (!props.accumulated)
-    return props.datas[props.datas.length - 1] as number
+    return props.datas[props.datas.length - 1] || 0 as number
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
   return sum(arrWithoutUndefined as number[])
