@@ -1,10 +1,17 @@
 import { LogSnag } from 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts'
 import { getEnv } from './utils.ts'
+import { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts';
 
-const logsnag = getEnv('LOGSNAG_TOKEN')
+
+interface LogSnagExt extends LogSnag {
+  insights(data: { title: string, value: string | boolean | number, icon: string }[]): Promise<void>
+}
+
+const logsnag = (c: Context) => {
+  const ls = getEnv(c, 'LOGSNAG_TOKEN')
   ? new LogSnag({
-    token: getEnv('LOGSNAG_TOKEN'),
-    project: getEnv('LOGSNAG_PROJECT'),
+    token: getEnv(c, 'LOGSNAG_TOKEN'),
+    project: getEnv(c, 'LOGSNAG_PROJECT'),
   })
   : {
       publish: () => Promise.resolve(true),
@@ -14,15 +21,16 @@ const logsnag = getEnv('LOGSNAG_TOKEN')
         increment: () => Promise.resolve(true),
       },
       insights: () => Promise.resolve(true),
-    }
-
-async function insights(data: { title: string, value: string | boolean | number, icon: string }[]) {
-  const all = []
-  console.log('logsnag', data)
-  for (const d of data)
-    all.push(logsnag.insight.track(d))
-  await Promise.all(all)
+    };
+  (ls as LogSnagExt).insights = async (data: { title: string, value: string | boolean | number, icon: string }[]) => {
+    const all = []
+    console.log('logsnag', data)
+    for (const d of data)
+      all.push(ls.insight.track(d))
+    await Promise.all(all)
+  }
+  return ls as LogSnagExt
 }
 
 // const logsnag = { publish: lsg.publish, insight, ...lsg }
-export { logsnag, insights }
+export { logsnag }

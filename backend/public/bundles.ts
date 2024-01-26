@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono/mod.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -11,14 +11,14 @@ interface GetLatest {
   page?: number
 }
 
-const deleteBundle = async (body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> => {
+const deleteBundle = async (c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
   if (!body.app_id)
-    return c.send({ status: 'Missing app_id' }, 400)
+    return c.json({ status: 'Missing app_id' }, 400)
   if (!body.version)
-    return c.send({ status: 'Missing version' }, 400)
+    return c.json({ status: 'Missing version' }, 400)
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
-    return c.send({ status: 'You can\'t access this app', app_id: body.app_id  }, 400)
+  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
+    return c.json({ status: 'You can\'t access this app', app_id: body.app_id  }, 400)
 
   try {
     if (body.version) {
@@ -30,7 +30,7 @@ const deleteBundle = async (body: GetLatest, apikey: Database['public']['Tables'
         .eq('app_id', body.app_id)
         .eq('name', body.version)
       if (dbError)
-        return c.send({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
+        return c.json({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
     }
     else {
       const { error: dbError } = await supabaseAdmin(c)
@@ -40,22 +40,22 @@ const deleteBundle = async (body: GetLatest, apikey: Database['public']['Tables'
         })
         .eq('app_id', body.app_id)
       if (dbError)
-        return c.send({ status: 'Cannot delete all version', error: JSON.stringify(dbError) }, 400)
+        return c.json({ status: 'Cannot delete all version', error: JSON.stringify(dbError) }, 400)
     }
   }
   catch (e) {
-    return c.send({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
-  return c.send(BRES)
+  return c.json(BRES)
 }
 
-async function get(body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
+async function get(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   try {
     if (!body.app_id)
-      return c.send({ status: 'Missing app_id' }, 400)
+      return c.json({ status: 'Missing app_id' }, 400)
 
     if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
-      return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+      return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
@@ -68,12 +68,12 @@ async function get(body: GetLatest, apikey: Database['public']['Tables']['apikey
       .range(from, to)
       .order('created_at', { ascending: false })
     if (dbError || !dataBundles || !dataBundles.length)
-      return c.send({ status: 'Cannot get bundle', error: dbError }, 400)
+      return c.json({ status: 'Cannot get bundle', error: dbError }, 400)
 
     return c.json(dataBundles)
   }
   catch (e) {
-    return c.send({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 }
 
@@ -85,7 +85,7 @@ app.get('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     return get(body, apikey, c)
   } catch (e) {
-    return c.send({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -95,6 +95,6 @@ app.delete('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     return deleteBundle(body, apikey, c)
   } catch (e) {
-    return c.send({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,4 +1,4 @@
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotif } from './notifications.ts'
 import {
@@ -124,7 +124,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
       .single()
     if (userError)
       throw userError
-    if (await isTrial(userId, c)) {
+    if (await isTrial(c, userId)) {
       const { error } = await supabaseAdmin(c)
         .from('stripe_info')
         .update({ is_good_plan: true })
@@ -134,24 +134,24 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         console.error('error.message', error.message)
       return Promise.resolve()
     }
-    const is_good_plan = await isGoodPlan(userId, c)
-    const is_onboarded = await isOnboarded(userId, c)
-    const is_onboarding_needed = await isOnboardingNeeded(userId, c)
-    const is_free_usage = await isFreeUsage(userId, c)
-    const percentUsage = await getPlanUsagePercent(userId, c)
+    const is_good_plan = await isGoodPlan(c, userId)
+    const is_onboarded = await isOnboarded(c, userId)
+    const is_onboarding_needed = await isOnboardingNeeded(c, userId)
+    const is_free_usage = await isFreeUsage(c, userId)
+    const percentUsage = await getPlanUsagePercent(c, userId)
     if (!is_good_plan && is_onboarded && !is_free_usage) {
       console.log('is_good_plan_v4', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
-      const get_total_stats = await getTotalStats(userId, c)
-      const current_plan = await getCurrentPlanName(userId, c)
+      const get_total_stats = await getTotalStats(c, userId)
+      const current_plan = await getCurrentPlanName(c, userId)
       if (get_total_stats) {
-        const best_plan = await findBestPlan(get_total_stats, c)
+        const best_plan = await findBestPlan(c, get_total_stats)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-        await setMetered(user.customer_id, userId, c)
+        await setMetered(c, user.customer_id!, userId)
         if (best_plan === 'Free' && current_plan === 'Free') {
-          await trackEvent(user.email, {}, 'user:need_more_time')
+          await trackEvent(c, user.email, {}, 'user:need_more_time')
           console.log('best_plan is free', userId)
-          await logsnag.track({
+          await logsnag(c).track({
             channel: 'usage',
             event: 'User need more time',
             icon: '⏰',
@@ -164,7 +164,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
             console.log(`user:upgrade_to_${bestPlanKey}`, userId)
-            await logsnag.track({
+            await logsnag(c).track({
               channel: 'usage',
               event: `User need upgrade to ${bestPlanKey}`,
               icon: '⚠️',
@@ -176,8 +176,8 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
       }
     }
     else if (!is_onboarded && is_onboarding_needed) {
-      await trackEvent(user.email, {}, 'user:need_onboarding')
-      await logsnag.track({
+      await trackEvent(c, user.email, {}, 'user:need_onboarding')
+      await logsnag(c).track({
         channel: 'usage',
         event: 'User need onboarding',
         icon: '🥲',
@@ -192,7 +192,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         const sent = await sendNotif(c, 'user:90_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'red')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
-          await logsnag.track({
+          await logsnag(c).track({
             channel: 'usage',
             event: 'User is at 90% of plan usage',
             icon: '⚠️',
@@ -206,7 +206,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         const sent = await sendNotif(c, 'user:70_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
-          await logsnag.track({
+          await logsnag(c).track({
             channel: 'usage',
             event: 'User is at 70% of plan usage',
             icon: '⚠️',
@@ -219,7 +219,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         const sent = await sendNotif(c, 'user:50_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
-          await logsnag.track({
+          await logsnag(c).track({
             channel: 'usage',
             event: 'User is at 50% of plan usage',
             icon: '⚠️',
@@ -237,7 +237,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         is_good_plan: is_good_plan || is_free_usage,
         plan_usage: Math.round(percentUsage),
       })
-      .eq('customer_id', user.customer_id)
+      .eq('customer_id', user.customer_id!)
       .then()
   }
   catch (e) {

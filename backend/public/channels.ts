@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono/mod.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -24,9 +24,9 @@ interface GetDevice {
   page?: number
 }
 
-export async function get(body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
+export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id, c)))
-    return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // get one channel or all channels
   if (body.channel) {
@@ -54,9 +54,9 @@ export async function get(body: GetDevice, apikey: Database['public']['Tables'][
       .eq('name', body.channel)
       .single()
     if (dbError || !dataChannel)
-      return c.send({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
+      return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
 
-    return c.send(dataChannel)
+    return c.json(dataChannel)
   }
   else {
     const fetchOffset = body.page == null ? 0 : body.page
@@ -86,14 +86,14 @@ export async function get(body: GetDevice, apikey: Database['public']['Tables'][
       .range(from, to)
       .order('created_at', { ascending: true })
     if (dbError || !dataChannels || !dataChannels.length)
-      return c.send([])
-    return c.send(dataChannels)
+      return c.json([])
+    return c.json(dataChannels)
   }
 }
 
-export async function deleteChannel(body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
+export async function deleteChannel(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
-    return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
     const { error: dbError } = await supabaseAdmin(c)
@@ -102,15 +102,15 @@ export async function deleteChannel(body: ChannelSet, apikey: Database['public']
       .eq('app_id', body.app_id)
       .eq('name', body.channel)
     if (dbError)
-      return c.send({ status: 'Cannot delete channels', error: JSON.stringify(dbError) }, 400)
+      return c.json({ status: 'Cannot delete channels', error: JSON.stringify(dbError) }, 400)
   }
   catch (e) {
-    return c.send({ status: 'Cannot delete channels', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot delete channels', error: JSON.stringify(e) }, 500)
   }
-  return c.send(BRES)
+  return c.json(BRES)
 }
 
-export async function post(body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
+export async function post(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
     app_id: body.app_id,
@@ -135,19 +135,19 @@ export async function post(body: ChannelSet, apikey: Database['public']['Tables'
       .eq('deleted', false)
       .single()
     if (vError || !data)
-      return c.send({ status: 'Cannot find version', error: JSON.stringify(vError) }, 400)
+      return c.json({ status: 'Cannot find version', error: JSON.stringify(vError) }, 400)
 
     channel.version = data.id
   }
   try {
-    const { error: dbError } = await updateOrCreateChannel(channel, c)
+    const { error: dbError } = await updateOrCreateChannel(c, channel)
     if (dbError)
-      return c.send({ status: 'Cannot create channel', error: JSON.stringify(dbError) }, 400)
+      return c.json({ status: 'Cannot create channel', error: JSON.stringify(dbError) }, 400)
   }
   catch (e) {
-    return c.send({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
-  return c.send(BRES)
+  return c.json(BRES)
 }
 export const app = new Hono()
 
@@ -157,7 +157,7 @@ app.post('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     return post(body, apikey, c)
   } catch (e) {
-    return c.send({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -167,7 +167,7 @@ app.get('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     return get(body, apikey, c)
   } catch (e) {
-    return c.send({ status: 'Cannot get channel', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get channel', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -177,6 +177,6 @@ app.delete('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     return deleteChannel(body, apikey, c)
   } catch (e) {
-    return c.send({ status: 'Cannot delete channel', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot delete channel', error: JSON.stringify(e) }, 500)
   }
 })

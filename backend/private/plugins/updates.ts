@@ -1,8 +1,8 @@
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { Hono } from 'https://deno.land/x/hono/mod.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { middlewareKey } from '../../_utils/hono.ts'
-import { update } from 'backend/_utils/update.ts'
+import { update } from '../../_utils/update.ts'
 import {
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,
@@ -56,21 +56,21 @@ app.post('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<AppInfos>()
     console.log('body', body)
-    if (isLimited(body.app_id, c)) {
-      return c.send({ 
+    if (isLimited(c, body.app_id)) {
+      return c.json({ 
         status: 'Too many requests', 
         error: 'too_many_requests' }, 200)
     }
     const parseResult = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
       console.log('parseResult', body, parseResult.error)
-      return c.send({
+      return c.json({
           error: `Cannot parse json: ${parseResult.error}` 
         }, 400)
     }
 
-    return update(body, c)
+    return update(c, body)
   } catch (e) {
-    return c.send({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })

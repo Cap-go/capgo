@@ -1,9 +1,9 @@
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { getEnv } from './utils.ts'
 
 function getAllMetrics(c: Context): Promise<string[]> {
-  const auth = btoa(`service_role:${getEnv('SUPABASE_SERVICE_ROLE_KEY', c)}`)
-  return fetch(`${getEnv('SUPABASE_URL', c)}/customer/v1/privileged/metrics`, {
+  const auth = btoa(`service_role:${getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')}`)
+  return fetch(`${getEnv(c, 'SUPABASE_URL')}/customer/v1/privileged/metrics`, {
     headers: {
       Authorization: `Basic ${auth}`,
     },

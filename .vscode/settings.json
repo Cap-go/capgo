@@ -15,7 +15,9 @@
   "deno.lint": true,
   "deno.unstable": true,
   "deno.cacheOnSave": true,
+  "editor.defaultFormatter": "denoland.vscode-deno",
   "deno.enablePaths": [
+    "./backend",
     "./supabase/functions",
     "./cloudflare_workers_deno",
     "./netlify/edge-functions",

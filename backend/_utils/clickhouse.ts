@@ -1,4 +1,4 @@
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 
@@ -7,13 +7,13 @@ export function isClickHouseEnabled(c: Context) {
   return !!clickHouseURL(c)
 }
 function clickHouseURL(c: Context) {
-  return getEnv('CLICKHOUSE_URL', c)
+  return getEnv(c, 'CLICKHOUSE_URL')
 }
 function clickHouseUser(c: Context) {
-  return getEnv('CLICKHOUSE_USER', c)
+  return getEnv(c, 'CLICKHOUSE_USER')
 }
 function clickHousePassword(c: Context) {
-  return getEnv('CLICKHOUSE_PASSWORD', c)
+  return getEnv(c, 'CLICKHOUSE_PASSWORD')
 }
 function clickHouseAuth(c: Context) {
   return `Basic ${btoa(`${clickHouseUser(c)}:${clickHousePassword(c)}`)}`
@@ -22,7 +22,7 @@ function clickhouseAuthEnabled(c: Context) {
   return !!clickHouseUser(c) && !!clickHousePassword(c)
 }
 
-export function sendDeviceToClickHouse(devices: Database['public']['Tables']['devices']['Update'][], c: Context) {
+export function sendDeviceToClickHouse(c: Context, devices: Database['public']['Tables']['devices']['Update'][]) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
 
@@ -63,7 +63,7 @@ interface ClickHouseMeta {
   size: number
   action: 'add' | 'delete'
 }
-export function sendMetaToClickHouse(meta: ClickHouseMeta, c: Context) {
+export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
 

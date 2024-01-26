@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono/mod.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import {
@@ -25,7 +25,7 @@ import type { Database } from '../../_utils/supabase.types.ts'
 import { sendNotif } from '../../_utils/notifications.ts'
 import { logsnag } from '../../_utils/logsnag.ts'
 import { appIdToUrl } from '../../_utils/conversion.ts'
-import { BRES } from 'backend/_utils/hono'
+import { BRES } from '../../_utils/hono.ts'
 
 const failActions = [
   'set_fail',
@@ -67,18 +67,18 @@ export const jsonRequestSchema = z.object({
   message: INVALID_STRING_DEVICE_ID,
 })
 
-async function post(body: AppStats, c: Context) {
+async function post(c: Context, body: AppStats) {
   try {
     console.log('body', body)
-    if (isLimited(body.app_id, c)) {
-      return c.send({
+    if (isLimited(c, body.app_id)) {
+      return c.json({
         message: 'Too many requests',
         error: 'too_many_requests',
       }, 200)
     }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success)
-      return c.send({
+      return c.json({
         error: `Cannot parse json: ${parseResult.error}`,
       }, 400) 
 
@@ -123,7 +123,7 @@ async function post(body: AppStats, c: Context) {
       //     updates: 1,
       //   })
       // }
-      return c.send({
+      return c.json({
         message: 'App not found',
         error: 'app_not_found',
       }, 200)
@@ -168,7 +168,7 @@ async function post(body: AppStats, c: Context) {
       stat.version = appVersion.id
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
-        const res = await getSDevice('', c, body.app_id, undefined, [body.device_id])
+        const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
         if (res && res.data && res.data.length) {
           const oldDevice = res.data[0]
           const oldVersion = oldDevice.version
@@ -191,7 +191,7 @@ async function post(body: AppStats, c: Context) {
           current_app_id_url: appIdToUrl(app_id),
         }, appVersion.user_id, '0 0 * * 1', 'orange')
         if (sent) {
-          await logsnag.track({
+          await logsnag(c).track({
             channel: 'updates',
             event: 'update fail',
             icon: '⚠️',
@@ -203,17 +203,17 @@ async function post(body: AppStats, c: Context) {
     }
     else {
       console.error('switch to onprem', app_id)
-      return c.send({
+      return c.json({
         message: 'App not found',
         error: 'app_not_found',
       }, 200)
     }
     rows.push(stat)
-    await Promise.all([sendDevice(c, device).then(() => sendStats(rows, c))])
-    return c.send(BRES)
+    await Promise.all([sendDevice(c, device).then(() => sendStats(c, rows))])
+    return c.json(BRES)
   }
   catch (e) {
-    return c.send({
+    return c.json({
       status: 'Error unknow',
       error: JSON.stringify(e),
     }, 500)
@@ -226,8 +226,8 @@ app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<AppStats>()
     console.log('body', body)
-    return post(body, c)
+    return post(c, body)
   } catch (e) {
-    return c.send({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })

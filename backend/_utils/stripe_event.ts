@@ -1,4 +1,4 @@
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'
 import type { Database } from './supabase.types.ts'

@@ -1,10 +1,10 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { getEnv } from './utils.ts'
 
 function getAuth(c: Context) {
   // get stripe token
-  const STRIPE_SECRET_KEY = getEnv('STRIPE_SECRET_KEY', c) || ''
+  const STRIPE_SECRET_KEY = getEnv(c, 'STRIPE_SECRET_KEY') || ''
   const STRIPE_TOKEN = `${STRIPE_SECRET_KEY}:`
   // encode b64
   const STRIPE_TOKEN_B64 = btoa(STRIPE_TOKEN)

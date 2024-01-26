@@ -1,5 +1,5 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
+import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { getEnv, shallowCleanObject } from './utils.ts'
 
 export interface Segments {
@@ -29,13 +29,13 @@ export interface Person {
 }
 
 function hasPlunk(c: Context) {
-  return getEnv('PLUNK_API_KEY', c).length > 0
+  return getEnv(c, 'PLUNK_API_KEY').length > 0
 }
 
 // https://api.useplunk.com/v1
 function getAuth(c: Context) {
   // get plunk token
-  const PLUNK_API_KEY = getEnv('PLUNK_API_KEY', c)
+  const PLUNK_API_KEY = getEnv(c, 'PLUNK_API_KEY')
   return `Bearer ${PLUNK_API_KEY}`
 }
 const baseUrl = () => 'https://api.useplunk.com'
