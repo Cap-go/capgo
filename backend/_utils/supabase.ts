@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import { createCustomer } from './stripe.ts'
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
@@ -31,7 +32,7 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   old_record: Database['public']['Tables'][T]['Row']
 }
 
-export function supabaseClient(auth: string) {
+export function supabaseClient(auth: string, c: Context) {
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -40,10 +41,10 @@ export function supabaseClient(auth: string) {
     },
     global: { headers: { Authorization: auth } },
   }
-  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
+  return createClient<Database>(getEnv('SUPABASE_URL', c), getEnv('SUPABASE_ANON_KEY', c), options)
 }
 
-export function emptySupabase() {
+export function emptySupabase(c: Context) {
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -51,11 +52,11 @@ export function emptySupabase() {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
+  return createClient<Database>(getEnv('SUPABASE_URL', c), getEnv('SUPABASE_ANON_KEY', c), options)
 }
 
 // WARNING: The service role key has admin priviliges and should only be used in secure server environments!
-export function supabaseAdmin() {
+export function supabaseAdmin(c: Context) {
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -63,32 +64,32 @@ export function supabaseAdmin() {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_SERVICE_ROLE_KEY'), options)
+  return createClient<Database>(getEnv('SUPABASE_URL', c), getEnv('SUPABASE_ANON_KEY', c), options)
 }
 
-export function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert']) {
+export function updateOrCreateVersion(update: Database['public']['Tables']['app_versions']['Insert'], c: Context) {
   console.log('updateOrCreateVersion', update)
-  return supabaseAdmin()
+  return supabaseAdmin(c)
     .from('app_versions')
     .upsert(update)
     .eq('app_id', update.app_id)
     .eq('name', update.name)
 }
 
-export async function updateOnpremStats(increment: Database['public']['Functions']['increment_store']['Args']) {
-  const { error } = await supabaseAdmin()
+export async function updateOnpremStats(increment: Database['public']['Functions']['increment_store']['Args'], c: Context) {
+  const { error } = await supabaseAdmin(c)
     .rpc('increment_store', increment)
   if (error)
     console.error('increment_store', error)
 }
 
-export function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert']) {
+export function updateOrCreateChannel(update: Database['public']['Tables']['channels']['Insert'], c: Context) {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
-  return supabaseAdmin()
+  return supabaseAdmin(c)
     .from('channels')
     .upsert(update)
     .eq('app_id', update.app_id)
@@ -96,11 +97,11 @@ export function updateOrCreateChannel(update: Database['public']['Tables']['chan
     .eq('created_by', update.created_by)
 }
 
-export async function checkAppOwner(userId: string | undefined, appId: string | undefined): Promise<boolean> {
+export async function checkAppOwner(userId: string | undefined, appId: string | undefined, c: Context): Promise<boolean> {
   if (!appId || !userId)
     return false
   try {
-    const { data, error } = await supabaseAdmin()
+    const { data, error } = await supabaseAdmin(c)
       .from('apps')
       .select()
       .eq('user_id', userId)
@@ -115,9 +116,9 @@ export async function checkAppOwner(userId: string | undefined, appId: string | 
   }
 }
 
-export async function getCurrentPlanName(userId: string): Promise<string> {
+export async function getCurrentPlanName(userId: string, c: Context): Promise<string> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('get_current_plan_name', { userid: userId })
       .single()
       .throwOnError()
@@ -129,8 +130,8 @@ export async function getCurrentPlanName(userId: string): Promise<string> {
   return ''
 }
 
-export async function getPlanUsagePercent(userId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin()
+export async function getPlanUsagePercent(userId: string, c: Context): Promise<number> {
+  const { data, error } = await supabaseAdmin(c)
     .rpc('get_plan_usage_percent', { userid: userId })
     .single()
   if (error) {
@@ -141,8 +142,8 @@ export async function getPlanUsagePercent(userId: string): Promise<number> {
   return data || 0
 }
 
-export async function getOrgs(userId: string) {
-  const { data, error } = await supabaseAdmin()
+export async function getOrgs(userId: string, c: Context) {
+  const { data, error } = await supabaseAdmin(c)
     .rpc('get_orgs', { userid: userId })
     .single()
   if (error) {
@@ -153,9 +154,9 @@ export async function getOrgs(userId: string) {
   return data
 }
 
-export async function isGoodPlan(userId: string): Promise<boolean> {
+export async function isGoodPlan(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_good_plan_v4', { userid: userId })
       .single()
       .throwOnError()
@@ -167,9 +168,9 @@ export async function isGoodPlan(userId: string): Promise<boolean> {
   return false
 }
 
-export async function isOnboarded(userId: string): Promise<boolean> {
+export async function isOnboarded(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_onboarded', { userid: userId })
       .single()
       .throwOnError()
@@ -181,9 +182,9 @@ export async function isOnboarded(userId: string): Promise<boolean> {
   return false
 }
 
-export async function isFreeUsage(userId: string): Promise<boolean> {
+export async function isFreeUsage(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_free_usage', { userid: userId })
       .single()
       .throwOnError()
@@ -195,9 +196,9 @@ export async function isFreeUsage(userId: string): Promise<boolean> {
   return false
 }
 
-export async function isOnboardingNeeded(userId: string): Promise<boolean> {
+export async function isOnboardingNeeded(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_onboarding_needed', { userid: userId })
       .single()
       .throwOnError()
@@ -209,9 +210,9 @@ export async function isOnboardingNeeded(userId: string): Promise<boolean> {
   return false
 }
 
-export async function isCanceled(userId: string): Promise<boolean> {
+export async function isCanceled(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_canceled', { userid: userId })
       .single()
       .throwOnError()
@@ -223,9 +224,9 @@ export async function isCanceled(userId: string): Promise<boolean> {
   return false
 }
 
-export async function isPaying(userId: string): Promise<boolean> {
+export async function isPaying(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_paying', { userid: userId })
       .single()
       .throwOnError()
@@ -237,9 +238,9 @@ export async function isPaying(userId: string): Promise<boolean> {
   return false
 }
 
-export async function isTrial(userId: string): Promise<number> {
+export async function isTrial(userId: string, c: Context): Promise<number> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_trial', { userid: userId })
       .single()
       .throwOnError()
@@ -251,8 +252,8 @@ export async function isTrial(userId: string): Promise<number> {
   return 0
 }
 
-export async function isAdmin(userId: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin()
+export async function isAdmin(userId: string, c: Context): Promise<boolean> {
+  const { data, error } = await supabaseAdmin(c)
     .rpc('is_admin', { userid: userId })
     .single()
   if (error)
@@ -261,9 +262,9 @@ export async function isAdmin(userId: string): Promise<boolean> {
   return data || false
 }
 
-export async function isAllowedAction(userId: string): Promise<boolean> {
+export async function isAllowedAction(userId: string, c: Context): Promise<boolean> {
   try {
-    const { data } = await supabaseAdmin()
+    const { data } = await supabaseAdmin(c)
       .rpc('is_allowed_action_user', { userid: userId })
       .single()
       .throwOnError()
@@ -275,11 +276,11 @@ export async function isAllowedAction(userId: string): Promise<boolean> {
   return false
 }
 
-export async function updateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string) {
+export async function updateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string, c: Context) {
   console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
 
-  const client = supabaseClient(auth)
-  await supabaseClient(auth)
+  const client = supabaseClient(auth, c)
+  await client
     .from('devices')
     .update({ custom_id: customId })
     .eq('app_id', appId)
@@ -301,7 +302,7 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   }
   console.log('UpdateDeviceCustomId clickhouse')
   // get the device from clickhouse
-  const device = await supabaseAdmin()
+  const device = await supabaseAdmin(c)
     .from('clickhouse_devices')
     .select()
     .eq('app_id', appId)
@@ -319,14 +320,14 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   }])
 }
 
-export async function getSDashboard(auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
+export async function getSDashboard(auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string, c: Context) {
   console.log(`getSDashboard userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let isAdmin = false
   let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
-  let client = supabaseClient(auth)
+  let client = supabaseClient(auth, c)
   if (!auth)
-    client = supabaseAdmin()
+    client = supabaseAdmin(c)
 
   const reqAdmin = await client
     .rpc('is_admin')
@@ -347,7 +348,7 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
       if (!reqOwner && !reqAdmin)
         return Promise.reject(new Error('not allowed'))
     }
-    client = supabaseAdmin()
+    client = supabaseAdmin(c)
   }
   console.log('tableName', tableName)
   let req = client
@@ -358,11 +359,11 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
     req = req.eq('app_id', appId)
   }
   else {
-    const userId = isAdmin ? userIdQuery : (await supabaseClient(auth).auth.getUser()).data.user?.id
+    const userId = isAdmin ? userIdQuery : (await supabaseClient(auth, c).auth.getUser()).data.user?.id
     if (!userId)
       return []
     // get all user apps id
-    const appIds = await supabaseClient(auth)
+    const appIds = await supabaseClient(auth, c)
       .from('apps')
       .select('app_id')
       .eq('user_id', userId)
@@ -389,14 +390,14 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   return res.data || []
 }
 
-export async function getSDevice(auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+export async function getSDevice(auth: string, c: Context, appId: string, versionId?: string, deviceIds?: string[] search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
   let tableName: 'devices' | 'clickhouse_devices' = 'devices'
-  let client = supabaseClient(auth)
+  let client = supabaseClient(auth, c)
   if (!auth)
-    client = supabaseAdmin()
+    client = supabaseAdmin(c)
 
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_devices'
@@ -410,7 +411,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
       if (!reqAdmin)
         return Promise.reject(new Error('not allowed'))
     }
-    client = supabaseAdmin()
+    client = supabaseAdmin(c)
   }
 
   const reqCount = count
@@ -471,7 +472,7 @@ export async function getSDevice(auth: string, appId: string, versionId?: string
   // }
 }
 
-export async function getSStats(auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
+export async function getSStats(auth: string, c: Context, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
   // getStats ee.forgr.captime undefined  [
@@ -479,9 +480,9 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
   let tableName: 'stats' | 'clickhouse_logs' = 'stats'
-  let client = supabaseClient(auth)
+  let client = supabaseClient(auth, c)
   if (!auth)
-    client = supabaseAdmin()
+    client = supabaseAdmin(c)
 
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_logs'
@@ -497,7 +498,7 @@ export async function getSStats(auth: string, appId: string, deviceIds?: string[
       if (!reqAdmin)
         return Promise.reject(new Error('not allowed'))
     }
-    client = supabaseAdmin()
+    client = supabaseAdmin(c)
   }
 
   const reqCount = count
@@ -580,7 +581,7 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
   if (isClickHouseEnabled())
     all.push(sendDeviceToClickHouse([deviceComplete]))
   else
-    all.push(supabaseAdmin().from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
+    all.push(supabaseAdmin(c).from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
 
   return Promise.all(all)
     .catch((e) => {
@@ -588,7 +589,7 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     })
 }
 
-export function sendStats(stats: Database['public']['Tables']['stats']['Update'][]) {
+export function sendStats(stats: Database['public']['Tables']['stats']['Update'][], c: Context) {
   const all = []
   for (const stat of stats) {
     const statComplete: Database['public']['Tables']['stats']['Insert'] = {
@@ -603,7 +604,7 @@ export function sendStats(stats: Database['public']['Tables']['stats']['Update']
     if (isClickHouseEnabled())
       all.push(sendLogToClickHouse([statComplete]))
     else
-      all.push(supabaseAdmin().from('stats').insert(statComplete))
+      all.push(supabaseAdmin(c).from('stats').insert(statComplete))
   }
 
   return Promise.all(all)
@@ -612,9 +613,9 @@ export function sendStats(stats: Database['public']['Tables']['stats']['Update']
     })
 }
 
-export async function createApiKey(userId: string) {
+export async function createApiKey(userId: string, c: Context) {
   // check if user has apikeys
-  const total = await supabaseAdmin()
+  const total = await supabaseAdmin(c)
     .from('apikeys')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
@@ -622,7 +623,7 @@ export async function createApiKey(userId: string) {
 
   if (total === 0) {
     // create apikeys
-    return supabaseAdmin()
+    return supabaseAdmin(c)
       .from('apikeys')
       .insert([
         {
@@ -645,9 +646,9 @@ export async function createApiKey(userId: string) {
   return Promise.resolve()
 }
 
-export async function createdefaultOrg(userId: string, name = 'Default') {
+export async function createdefaultOrg(userId: string, c: Context, name = 'Default') {
   // check if user has apikeys
-  const total = await supabaseAdmin()
+  const total = await supabaseAdmin(c)
     .from('orgs')
     .select('created_by', { count: 'exact', head: true })
     .eq('created_by', userId)
@@ -655,7 +656,7 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
 
   if (total === 0) {
     // create apikeys
-    const { data, error } = await supabaseAdmin()
+    const { data, error } = await supabaseAdmin(c)
       .from('orgs')
       .insert(
         {
@@ -688,23 +689,23 @@ export function userToPerson(user: Database['public']['Tables']['users']['Row'],
   return person
 }
 
-export async function saveStoreInfo(apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+export async function saveStoreInfo(apps: (Database['public']['Tables']['store_apps']['Insert'])[], c: Context) {
   // save in supabase
   if (!apps.length)
     return
   const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
   console.log('saveStoreInfo', noDup.length)
-  const { error } = await supabaseAdmin()
+  const { error } = await supabaseAdmin(c)
     .from('store_apps')
     .upsert(noDup)
   if (error)
     console.error('saveStoreInfo error', error)
 }
 
-export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], c: Context, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
   const segments: Segments = {
     capgo: true,
-    onboarded: await isOnboarded(userId),
+    onboarded: await isOnboarded(userId, c),
     trial: false,
     trial7: false,
     trial1: false,
@@ -713,12 +714,12 @@ export async function customerToSegment(userId: string, customer: Database['publ
     payingMonthly: plan?.price_m_id === customer.price_id,
     plan: plan?.name ?? '',
     overuse: false,
-    canceled: await isCanceled(userId),
+    canceled: await isCanceled(userId, c),
     issueSegment: false,
   }
-  const trialDaysLeft = await isTrial(userId)
-  const paying = await isPaying(userId)
-  const canUseMore = await isGoodPlan(userId)
+  const trialDaysLeft = await isTrial(userId, c)
+  const paying = await isPaying(userId, c)
+  const canUseMore = await isGoodPlan(userId, c)
 
   if (!segments.onboarded)
     return segments
@@ -752,8 +753,8 @@ export async function customerToSegment(userId: string, customer: Database['publ
   return segments
 }
 
-export async function getStripeCustomer(customerId: string) {
-  const { data: stripeInfo } = await supabaseAdmin()
+export async function getStripeCustomer(customerId: string, c: Context) {
+  const { data: stripeInfo } = await supabaseAdmin(c)
     .from('stripe_info')
     .select('*')
     .eq('customer_id', customerId)
@@ -761,12 +762,12 @@ export async function getStripeCustomer(customerId: string) {
   return stripeInfo
 }
 
-export async function createStripeCustomer(user: Database['public']['Tables']['users']['Row']) {
+export async function createStripeCustomer(user: Database['public']['Tables']['users']['Row'], c: Context) {
   const customer = await createCustomer(user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
-  const { error: createInfoError } = await supabaseAdmin()
+  const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({
       customer_id: customer.id,
@@ -775,7 +776,7 @@ export async function createStripeCustomer(user: Database['public']['Tables']['u
   if (createInfoError)
     console.log('createInfoError', createInfoError)
 
-  const { error: updateUserError } = await supabaseAdmin()
+  const { error: updateUserError } = await supabaseAdmin(c)
     .from('users')
     .update({
       customer_id: customer.id,
@@ -791,7 +792,7 @@ export async function createStripeCustomer(user: Database['public']['Tables']['u
     avatar: user.image_url ? user.image_url : undefined,
     country: user.country ? user.country : undefined,
   }
-  const { data: plan } = await supabaseAdmin()
+  const { data: plan } = await supabaseAdmin(c)
     .from('plans')
     .select()
     .eq('stripe_id', customer.product_id)

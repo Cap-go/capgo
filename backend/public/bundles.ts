@@ -17,12 +17,12 @@ const deleteBundle = async (body: GetLatest, apikey: Database['public']['Tables'
   if (!body.version)
     return c.send({ status: 'Missing version' }, 400)
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
+  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
     return c.send({ status: 'You can\'t access this app', app_id: body.app_id  }, 400)
 
   try {
     if (body.version) {
-      const { error: dbError } = await supabaseAdmin()
+      const { error: dbError } = await supabaseAdmin(c)
         .from('app_versions')
         .update({
           deleted: true,
@@ -33,7 +33,7 @@ const deleteBundle = async (body: GetLatest, apikey: Database['public']['Tables'
         return c.send({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
     }
     else {
-      const { error: dbError } = await supabaseAdmin()
+      const { error: dbError } = await supabaseAdmin(c)
         .from('app_versions')
         .update({
           deleted: true,
@@ -54,13 +54,13 @@ async function get(body: GetLatest, apikey: Database['public']['Tables']['apikey
     if (!body.app_id)
       return c.send({ status: 'Missing app_id' }, 400)
 
-    if (!(await checkAppOwner(apikey.user_id, body.app_id)))
+    if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
       return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const { data: dataBundles, error: dbError } = await supabaseAdmin()
+    const { data: dataBundles, error: dbError } = await supabaseAdmin(c)
       .from('app_versions')
       .select()
       .eq('app_id', body.app_id)

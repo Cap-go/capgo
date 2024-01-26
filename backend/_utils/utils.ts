@@ -1,7 +1,9 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
+import { env } from 'hono/adapter'
 
 export function jwtDecoder(jwt: string): JwtUser {
   return JSON.parse(atob(jwt.split('.')[1]))
@@ -125,8 +127,8 @@ interface LimitedApp {
   ignore: number
 }
 
-export function isLimited(id: string) {
-  const limits = getEnv('LIMITED_APPS')
+export function isLimited(id: string, c: Context) {
+  const limits = getEnv('LIMITED_APPS', c)
   if (!limits)
     return false
   const apps = JSON.parse(limits) as LimitedApp[]
@@ -139,15 +141,8 @@ export function isLimited(id: string) {
   return Math.random() < app.ignore
 }
 
-// eslint-disable-next-line unused-imports/no-unused-vars
-export function setEnv(env: any) {}
-
-export function getAllEnv() {
-  return Deno.env.toObject()
-}
-
-export function getEnv(key: string): string {
-  const val = Deno.env.get(key)
+export function getEnv(key: string, c: Context): string {
+  const val = env<any>(c)[key]
   return val || ''
 }
 
@@ -155,6 +150,6 @@ export function makeHMACContent(payload: string, details: Details) {
   return `${details.timestamp}.${payload}`
 }
 
-export function createHmac(data: string, details: Details) {
-  return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
+export function createHmac(data: string, details: Details, c: Context) {
+  return hmac('sha256', getEnv('STRIPE_WEBHOOK_SECRET', c) || '', makeHMACContent(data, details), 'utf8', 'hex')
 }

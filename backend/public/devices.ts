@@ -26,17 +26,17 @@ function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'
 }
 
 async function get(body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
-  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
+  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id, c)))
     return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // if device_id get one device
   if (body.device_id) {
-    const res = await getSDevice('', body.app_id, undefined, [body.device_id])
+    const res = await getSDevice('', c, body.app_id, undefined, [body.device_id])
     if (!res || !res.data || !res.data.length)
       return c.send({ status: 'Cannot find device' }, 400)
     const dataDevice = filterDeviceKeys(res.data)[0]
     // get version from device
-    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin()
+    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id, name')
       .eq('id', dataDevice.version)
@@ -51,13 +51,13 @@ async function get(body: GetDevice, apikey: Database['public']['Tables']['apikey
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const res = await getSDevice('', body.app_id, undefined, undefined, undefined, undefined, from, to)
+    const res = await getSDevice('', c, body.app_id, undefined, undefined, undefined, undefined, from, to)
     if (!res || !res.data)
       return c.send([])
     const dataDevices = filterDeviceKeys(res.data)
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
-    const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin()
+    const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin(c)
       .from('app_versions')
       .select(`
               id,
@@ -80,11 +80,11 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
   if (!body.device_id || !body.app_id)
     return c.send({ status: 'Cannot find device' }, 400)
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
+  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
     return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // find device
-  const res = await getSDevice('', body.app_id, undefined, [body.device_id])
+  const res = await getSDevice('', c, body.app_id, undefined, [body.device_id], c)
   if (!res || !res.data || !res.data.length)
     return c.send({ status: 'Cannot find device' }, 400)
 
@@ -93,7 +93,7 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
 
   // if version_id set device_override to it
   if (body.version_id) {
-    const { data: dataVersion, error: dbError } = await supabaseAdmin()
+    const { data: dataVersion, error: dbError } = await supabaseAdmin(c)
       .from('app_versions')
       .select()
       .eq('app_id', body.app_id)
@@ -102,7 +102,7 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
     if (dbError || !dataVersion)
       return c.send({ status: 'Cannot find version', error: dbError }, 400)
 
-    const { error: dbErrorDev } = await supabaseAdmin()
+    const { error: dbErrorDev } = await supabaseAdmin(c)
       .from('devices_override')
       .upsert({
         device_id: body.device_id,
@@ -116,7 +116,7 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
   // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin()
+    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
       .from('channels')
       .select()
       .eq('app_id', body.app_id)
@@ -125,7 +125,7 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
     if (dbError || !dataChannel)
       return c.send({ status: 'Cannot find channel', error: dbError }, 400)
 
-    const { error: dbErrorDev } = await supabaseAdmin()
+    const { error: dbErrorDev } = await supabaseAdmin(c)
       .from('channel_devices')
       .upsert({
         device_id: body.device_id,
@@ -140,11 +140,11 @@ async function post(body: DeviceLink, apikey: Database['public']['Tables']['apik
 }
 
 export async function deleteOverride(body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
-  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
+  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
     return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
-    const { error } = await supabaseAdmin()
+    const { error } = await supabaseAdmin(c)
       .from('devices_override')
       .delete()
       .eq('app_id', body.app_id)
@@ -152,7 +152,7 @@ export async function deleteOverride(body: DeviceLink, apikey: Database['public'
     if (error)
       return c.send({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
 
-    const { error: errorChannel } = await supabaseAdmin()
+    const { error: errorChannel } = await supabaseAdmin(c)
       .from('channel_devices')
       .delete()
       .eq('app_id', body.app_id)

@@ -25,12 +25,12 @@ interface GetDevice {
 }
 
 export async function get(body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
-  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id)))
+  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id, c)))
     return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // get one channel or all channels
   if (body.channel) {
-    const { data: dataChannel, error: dbError } = await supabaseAdmin()
+    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
       .from('channels')
       .select(`
         id,
@@ -62,7 +62,7 @@ export async function get(body: GetDevice, apikey: Database['public']['Tables'][
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const { data: dataChannels, error: dbError } = await supabaseAdmin()
+    const { data: dataChannels, error: dbError } = await supabaseAdmin(c)
       .from('channels')
       .select(`
         id,
@@ -92,11 +92,11 @@ export async function get(body: GetDevice, apikey: Database['public']['Tables'][
 }
 
 export async function deleteChannel(body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row'], c: Context): Promise<Response> {
-  if (!(await checkAppOwner(apikey.user_id, body.app_id)))
+  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
     return c.send({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
-    const { error: dbError } = await supabaseAdmin()
+    const { error: dbError } = await supabaseAdmin(c)
       .from('channels')
       .delete()
       .eq('app_id', body.app_id)
@@ -126,7 +126,7 @@ export async function post(body: ChannelSet, apikey: Database['public']['Tables'
     version: -1,
   }
   if (body.version) {
-    const { data, error: vError } = await supabaseAdmin()
+    const { data, error: vError } = await supabaseAdmin(c)
       .from('app_versions')
       .select()
       .eq('app_id', body.app_id)
@@ -140,7 +140,7 @@ export async function post(body: ChannelSet, apikey: Database['public']['Tables'
     channel.version = data.id
   }
   try {
-    const { error: dbError } = await updateOrCreateChannel(channel)
+    const { error: dbError } = await updateOrCreateChannel(channel, c)
     if (dbError)
       return c.send({ status: 'Cannot create channel', error: JSON.stringify(dbError) }, 400)
   }
