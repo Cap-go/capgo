@@ -1,6 +1,7 @@
 // use_trans_macros
 import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 
 // eslint-disable-next-line import/newline-after-import
 import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js' // do_not_change
@@ -10,7 +11,7 @@ import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
 // eslint-disable-next-line import/newline-after-import
 import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
-import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
+import { getEnv } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -35,7 +36,7 @@ const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
 
 let globalPgClient = null as ReturnType<typeof postgres> | null
 
-function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
+function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], c: Context) {
   const res: any = {
     version: version.name,
     url: signedURL,
@@ -47,18 +48,9 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   return res
 }
 
-function sendResWithStatus(status: string, data?: any, statusCode?: number, updateOverwritten?: boolean): Response {
-  const response = sendRes(data, 200)
-
-  appendHeaders(response, 'x-update-status', status)
-  appendHeaders(response, 'x-update-overwritten', (updateOverwritten ?? false).toString())
-  console.log('sendResWithStatus', new Date().toISOString())
-  return response
-}
-
 // COPY FUNCTION START
-function getDrizzlePostgres() {
-  const supaUrl = getEnv('SUPABASE_DB_URL')!
+function getDrizzlePostgres(c: Context) {
+  const supaUrl = getEnv('SUPABASE_DB_URL', c)!
 
   // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)
@@ -266,11 +258,11 @@ function requestInfosSqlite(platform: string, app_id: string, device_id: string,
 
 const requestInfos = useD1Database && !isSupabase ? requestInfosSqlite : requestInfosPostgres
 
-export async function update(body: AppInfos) {
+export async function update(body: AppInfos, c: Context) {
   // await test()
   // create random id
 
-  const { alias, schema, drizzleCient } = getDrizzle()
+  const { alias, schema, drizzleCient } = getDrizzle(c)
 
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -305,7 +297,7 @@ export async function update(body: AppInfos) {
       //     })
       // }
       console.log(id, 'App not found', app_id, new Date().toISOString())
-      return sendResWithStatus('app_not_found', {
+      return c.send({
         message: 'App not found',
         error: 'app_not_found',
       }, 200)
@@ -330,7 +322,7 @@ export async function update(body: AppInfos) {
           notify: false,
         }).catch()
       }
-      return sendResWithStatus('fail', {
+      return c.send({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
       }, 400)
@@ -355,7 +347,7 @@ export async function update(body: AppInfos) {
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      return sendResWithStatus('fail', {
+      return c.send({
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
       }, 400)
@@ -379,7 +371,7 @@ export async function update(body: AppInfos) {
 
     if (!versionData) {
       console.log('No version data found')
-      return sendResWithStatus('fail', {
+      return c.send({
         message: 'Couldn\'t find version data',
         error: 'no-version_data',
       }, 200)
@@ -396,9 +388,9 @@ export async function update(body: AppInfos) {
           ...stat,
           action: 'NoChannelOrOverride',
           version: versionData.id,
-        }])])
+        }], c)])
       }
-      return sendResWithStatus('fail', {
+      return c.send({
         message: 'no default channel or override',
         error: 'no_channel',
       }, 200)
@@ -409,7 +401,7 @@ export async function update(body: AppInfos) {
       channelData = channelOverride
 
     if (!channelData) {
-      return sendResWithStatus('fail', {
+      return c.send({
         message: 'channel data still null',
         error: 'null_channel_data',
       }, 200)
@@ -428,7 +420,7 @@ export async function update(body: AppInfos) {
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    const planValid = await isAllowedAction(appOwner.user_id)
+    const planValid = await isAllowedAction(appOwner.user_id, c)
     stat.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
@@ -461,7 +453,7 @@ export async function update(body: AppInfos) {
 
     // if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
     //   console.log('invalid ip', xForwardedFor, ip)
-    //   return sendRes({
+    //   return c.send({
     //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
     //     error: 'invalid_ip',
     //   }, 400)
@@ -487,8 +479,8 @@ export async function update(body: AppInfos) {
       await sendStats([{
         ...stat,
         action: 'needPlanUpgrade',
-      }])
-      return sendResWithStatus('fail', {
+      }], c)
+      return c.send({
         message: 'Cannot update, upgrade plan to continue to update',
         error: 'need_plan_upgrade',
       }, 200, updateOverwritten)
@@ -499,11 +491,11 @@ export async function update(body: AppInfos) {
       await sendStats([{
         ...stat,
         action: 'missingBundle',
-      }])
-      return sendResWithStatus('fail', {
+      }], c)
+      return c.send({
         message: 'Cannot get bundle',
         error: 'no_bundle',
-      }, 200, updateOverwritten)
+      }, 200)
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
@@ -518,10 +510,10 @@ export async function update(body: AppInfos) {
       await sendStats([{
         ...stat,
         action: 'noNew',
-      }])
-      return sendResWithStatus('no_new', {
+      }], c)
+      return c.send({
         message: 'No new version available',
-      }, 200, updateOverwritten)
+      }, 200)
     }
 
     if (!devicesOverride && channelData) {
@@ -531,8 +523,8 @@ export async function update(body: AppInfos) {
         await sendStats([{
           ...stat,
           action: 'disablePlatformIos',
-        }])
-        return sendResWithStatus('fail', {
+        }], c)
+        return c.send({
           message: 'Cannot update, ios it\'s disabled',
           error: 'disabled_platform_ios',
           version: version.name,
@@ -544,28 +536,28 @@ export async function update(body: AppInfos) {
         await sendStats([{
           ...stat,
           action: 'disablePlatformAndroid',
-        }])
+        }], c)
         console.log(id, 'sendStats', new Date().toISOString())
-        return sendResWithStatus('fail', {
+        return c.send({
           message: 'Cannot update, android is disabled',
           error: 'disabled_platform_android',
           version: version.name,
           old: version_name,
-        }, 200, updateOverwritten)
+        }, 200)
       }
       if (channelData.channels.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableAutoUpdateToMajor',
-        }])
-        return sendResWithStatus('fail', {
+        }], c)
+        return c.send({
           major: true,
           message: 'Cannot upgrade major version',
           error: 'disable_auto_update_to_major',
           version: version.name,
           old: version_name,
-        }, 200, updateOverwritten)
+        }, 200)
       }
 
       if (channelData.channels.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
@@ -573,14 +565,14 @@ export async function update(body: AppInfos) {
         await sendStats([{
           ...stat,
           action: 'disableAutoUpdateToMinor',
-        }])
-        return sendResWithStatus('fail', {
+        }], c)
+        return c.send({
           major: true,
           message: 'Cannot upgrade minor version',
           error: 'disable_auto_update_to_minor',
           version: version.name,
           old: version_name,
-        }, 200, updateOverwritten)
+        }, 200)
       }
 
       if (channelData.channels.disableAutoUpdate === 'version_number') {
@@ -592,13 +584,13 @@ export async function update(body: AppInfos) {
           await sendStats([{
             ...stat,
             action: 'channelMisconfigured',
-          }])
-          return sendResWithStatus('fail', {
+          }], c)
+          return c.send({
             message: `Channel ${channelData.channels.name} is misconfigured`,
             error: 'misconfigured_channel',
             version: version.name,
             old: version_name,
-          }, 200, updateOverwritten)
+          }, 200)
         }
 
         // Check if the minVersion is greater then the current version
@@ -607,14 +599,14 @@ export async function update(body: AppInfos) {
           await sendStats([{
             ...stat,
             action: 'disableAutoUpdateMetadata',
-          }])
-          return sendResWithStatus('fail', {
+          }], c)
+          return c.send({
             major: true,
             message: 'Cannot upgrade version, min update version > current version',
             error: 'disable_auto_update_to_metadata',
             version: version.name,
             old: version_name,
-          }, 200, updateOverwritten)
+          }, 200)
         }
       }
 
@@ -624,13 +616,13 @@ export async function update(body: AppInfos) {
         await sendStats([{
           ...stat,
           action: 'disableAutoUpdateUnderNative',
-        }])
-        return sendResWithStatus('fail', {
+        }], c)
+        return c.send({
           message: 'Cannot revert under native version',
           error: 'disable_auto_update_under_native',
           version: version.name,
           old: version_name,
-        }, 200, updateOverwritten)
+        }, 200)
       }
 
       if (!channelData.channels.allow_dev && !is_prod) {
@@ -638,26 +630,26 @@ export async function update(body: AppInfos) {
         await sendStats([{
           ...stat,
           action: 'disableDevBuild',
-        }])
-        return sendResWithStatus('fail', {
+        }], c)
+        return c.send({
           message: 'Cannot update, dev build is disabled',
           error: 'disable_dev_build',
           version: version.name,
           old: version_name,
-        }, 200, updateOverwritten)
+        }, 200)
       }
       if (!channelData.channels.allow_emulator && is_emulator) {
         console.log(id, 'Cannot update emulator is disabled', device_id, new Date().toISOString())
         await sendStats([{
           ...stat,
           action: 'disableEmulator',
-        }])
-        return sendResWithStatus('fail', {
+        }], c)
+        return c.send({
           message: 'Cannot update, emulator is disabled',
           error: 'disable_emulator',
           version: version.name,
           old: version_name,
-        }, 200, updateOverwritten)
+        }, 200)
       }
     }
     //  check signedURL and if it's url
@@ -666,24 +658,24 @@ export async function update(body: AppInfos) {
       await sendStats([{
         ...stat,
         action: 'cannotGetBundle',
-      }])
-      return sendResWithStatus('fail', {
+      }], c)
+      return c.send({
         message: 'Cannot get bundle',
         error: 'no_bundle',
-      }, 200, updateOverwritten)
+      }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    await sendStats([{
+    await c.send([{
       ...stat,
       action: 'get',
     }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
     // TODO: i have no idea why "as any"
-    return sendResWithStatus('new_version', resToVersion(plugin_version, signedURL, version as any), 200, updateOverwritten)
+    return c.send(resToVersion(plugin_version, signedURL, version as any, c), 200, updateOverwritten)
   }
   catch (e) {
     console.error('e', e)
-    return sendRes({
+    return c.send({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
     }, 500)

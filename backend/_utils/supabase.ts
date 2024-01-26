@@ -390,7 +390,7 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   return res.data || []
 }
 
-export async function getSDevice(auth: string, c: Context, appId: string, versionId?: string, deviceIds?: string[] search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+export async function getSDevice(auth: string, c: Context, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
