@@ -15,20 +15,20 @@ create foreign data wrapper clickhouse_wrapper
   handler click_house_fdw_handler
   validator click_house_fdw_validator;
 
-
+-- This will return `key_id`. Use this keyID in the SQL statement below
 insert into vault.secrets (id, name, secret)
 values (
   '29a9ca87-7777-4d2b-b7b6-28fd943f9619',
   'clickhouse',
-  'tcp://default@host.docker.internal:9000/default?connection_timeout=30s&ping_before_query=false'
-);
+  'tcp://default@host.docker.internal:9500/default?connection_timeout=30s&ping_before_query=false'
+) returning *;
 
 -- 29a9ca87-7777-4d2b-b7b6-28fd943f9619
 
 create server clickhouse_server
   foreign data wrapper clickhouse_wrapper
   options (
-    conn_string_id '1b8b4987-9ef5-4bba-a2a3-602194ec39c3' -- The Key ID from above.
+    conn_string_id 'aa23e5c3-cfe0-4908-b37a-f7dde36021ec' -- The Key ID from above.
   );
 
 create foreign table clickhouse_devices (
