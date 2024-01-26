@@ -85,7 +85,8 @@ export const app = new Hono()
 app.get('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<GetLatest>()
-    return get(body, c.apikey)
+    const apikey = c.get('apikey')
+    return get(body, apikey)
   } catch (e) {
     return sendRes({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
@@ -94,7 +95,8 @@ app.get('/', middlewareKey, async (c: Context) => {
 app.delete('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<GetLatest>()
-    return deleteBundle(body, c.apikey)
+    const apikey = c.get('apikey')
+    return deleteBundle(body, apikey)
   } catch (e) {
     return sendRes({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }

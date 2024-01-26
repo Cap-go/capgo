@@ -9,5 +9,12 @@ export const middlewareKey = async (c: Context, next: Next): Promise<void> => {
   if (!apikey)
     return c.res.status(400).send({ status: 'Invalid apikey' })
   c.apikey = apikey
+  c.set('apikey', apikey)
   await next()
+}
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    apikey: Database['public']['Tables']['apikeys']['Row']
+  }
 }
