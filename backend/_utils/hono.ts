@@ -5,7 +5,7 @@ import { supabaseAdmin } from './supabase.ts'
 
 export const middlewareKey = async (c: Context, next: Next): Promise<void> => {
   const apikey_string = c.req.authorization
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write'])
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(c), ['all', 'write'])
   if (!apikey)
     return c.res.status(400).send({ status: 'Invalid apikey' })
   c.apikey = apikey

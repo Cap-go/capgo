@@ -1,18 +1,19 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import { getEnv } from './utils.ts'
 
-function getAuth() {
+function getAuth(c: Context) {
   // get stripe token
-  const STRIPE_SECRET_KEY = getEnv('STRIPE_SECRET_KEY') || ''
+  const STRIPE_SECRET_KEY = getEnv('STRIPE_SECRET_KEY', c) || ''
   const STRIPE_TOKEN = `${STRIPE_SECRET_KEY}:`
   // encode b64
   const STRIPE_TOKEN_B64 = btoa(STRIPE_TOKEN)
   return `Basic ${STRIPE_TOKEN_B64}`
 }
-function getConfig(form = false) {
+function getConfig(c: Context, form = false) {
   return {
     headers: {
-      authorization: getAuth(),
+      authorization: getAuth(c),
       ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
     },
   }
@@ -26,11 +27,11 @@ export async function createPortal(customerId: string, callbackUrl: string) {
   return response.data
 }
 
-async function getPriceIds(planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
+async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
   try {
-    const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig())
+    const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig(c))
     const prices = response.data.data
     console.log('prices stripe', prices)
     prices.forEach((price: any) => {
@@ -72,8 +73,8 @@ export function parsePriceIds(prices: any): { priceId: string | null, productId:
   return { priceId, productId, meteredData }
 }
 
-export async function createCheckout(customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
-  const prices = await getPriceIds(planId, reccurence)
+export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
+  const prices = await getPriceIds(c, planId, reccurence)
   console.log('prices', prices)
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))

@@ -1,3 +1,4 @@
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
@@ -31,7 +32,7 @@ function scmpCompare(a: string, b: string) {
 
   return result === 0
 }
-export function parseStripeEvent(body: string, signature: string) {
+export function parseStripeEvent(c: Context, body: string, signature: string) {
   const details = parseHeader(signature, EXPECTED_SCHEME)
   if (!details || details.timestamp === -1)
     throw new Error('Unable to extract timestamp and signatures from header')
@@ -39,7 +40,7 @@ export function parseStripeEvent(body: string, signature: string) {
   if (!details.signatures.length)
     throw new Error('No signatures found with expected scheme')
 
-  const expectedSignature = createHmac(body, details)
+  const expectedSignature = createHmac(body, details, c)
   const signatureFound = !!details.signatures.filter(a => scmpCompare(a, expectedSignature as string)).length
 
   if (!signatureFound)

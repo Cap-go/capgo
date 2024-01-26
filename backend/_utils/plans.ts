@@ -1,3 +1,4 @@
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotif } from './notifications.ts'
 import {
@@ -31,8 +32,8 @@ function planToInt(plan: string) {
   }
 }
 
-export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
-  const { data, error } = await supabaseAdmin()
+export async function findBestPlan(c: Context, stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
+  const { data, error } = await supabaseAdmin(c)
     .rpc('find_best_plan_v3', {
       mau: stats.mau || 0,
       bandwidth: stats.bandwidth,
@@ -47,8 +48,8 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
   return data || 'Team'
 }
 
-export async function getTotalStats(userId: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
-  const { data, error } = await supabaseAdmin()
+export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
+  const { data, error } = await supabaseAdmin(c)
     .rpc('get_total_stats_v3', { userid: userId })
     .single()
 
@@ -64,8 +65,8 @@ export async function getTotalStats(userId: string): Promise<Database['public'][
   }
 }
 
-export async function getMeterdUsage(userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> {
-  const { data, error } = await supabaseAdmin()
+export async function getMeterdUsage(c: Context, userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> {
+  const { data, error } = await supabaseAdmin(c)
     .rpc('get_metered_usage', { userid: userId })
     .single()
 
@@ -86,12 +87,12 @@ interface Prices {
   bandwidth: string
 }
 
-async function setMetered(customer_id: string | null, userId: string) {
+async function setMetered(c: Context, customer_id: string | null, userId: string) {
   if (customer_id === null)
     return Promise.resolve()
   console.log('setMetered', customer_id, userId)
   // return await Promise.resolve({} as Prices)
-  const { data } = await supabaseAdmin()
+  const { data } = await supabaseAdmin(c)
     .from('stripe_info')
     .select()
     .eq('customer_id', customer_id)
@@ -104,7 +105,7 @@ async function setMetered(customer_id: string | null, userId: string) {
       console.log('error setTreshold', error)
     }
     const prices = data.subscription_metered as any as Prices
-    const get_metered_usage = await getMeterdUsage(userId)
+    const get_metered_usage = await getMeterdUsage(c, userId)
     if (get_metered_usage.mau > 0 && prices.mau)
       await recordUsage(prices.mau, get_metered_usage.mau)
     if (get_metered_usage.storage > 0)
@@ -114,17 +115,17 @@ async function setMetered(customer_id: string | null, userId: string) {
   }
 }
 
-export async function checkPlan(userId: string): Promise<void> {
+export async function checkPlan(c: Context, userId: string): Promise<void> {
   try {
-    const { data: user, error: userError } = await supabaseAdmin()
+    const { data: user, error: userError } = await supabaseAdmin(c)
       .from('users')
       .select()
       .eq('id', userId)
       .single()
     if (userError)
       throw userError
-    if (await isTrial(userId)) {
-      const { error } = await supabaseAdmin()
+    if (await isTrial(userId, c)) {
+      const { error } = await supabaseAdmin(c)
         .from('stripe_info')
         .update({ is_good_plan: true })
         .eq('customer_id', user.customer_id)
@@ -133,20 +134,20 @@ export async function checkPlan(userId: string): Promise<void> {
         console.error('error.message', error.message)
       return Promise.resolve()
     }
-    const is_good_plan = await isGoodPlan(userId)
-    const is_onboarded = await isOnboarded(userId)
-    const is_onboarding_needed = await isOnboardingNeeded(userId)
-    const is_free_usage = await isFreeUsage(userId)
-    const percentUsage = await getPlanUsagePercent(userId)
+    const is_good_plan = await isGoodPlan(userId, c)
+    const is_onboarded = await isOnboarded(userId, c)
+    const is_onboarding_needed = await isOnboardingNeeded(userId, c)
+    const is_free_usage = await isFreeUsage(userId, c)
+    const percentUsage = await getPlanUsagePercent(userId, c)
     if (!is_good_plan && is_onboarded && !is_free_usage) {
       console.log('is_good_plan_v4', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
-      const get_total_stats = await getTotalStats(userId)
-      const current_plan = await getCurrentPlanName(userId)
+      const get_total_stats = await getTotalStats(userId, c)
+      const current_plan = await getCurrentPlanName(userId, c)
       if (get_total_stats) {
-        const best_plan = await findBestPlan(get_total_stats)
+        const best_plan = await findBestPlan(get_total_stats, c)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
-        await setMetered(user.customer_id, userId)
+        await setMetered(user.customer_id, userId, c)
         if (best_plan === 'Free' && current_plan === 'Free') {
           await trackEvent(user.email, {}, 'user:need_more_time')
           console.log('best_plan is free', userId)
@@ -159,7 +160,7 @@ export async function checkPlan(userId: string): Promise<void> {
           }).catch()
         }
         else if (planToInt(best_plan) > planToInt(current_plan)) {
-          const sent = await sendNotif(`user:upgrade_to_${bestPlanKey}`, { current_best_plan: bestPlanKey }, userId, '0 0 * * 1', 'red')
+          const sent = await sendNotif(c, `user:upgrade_to_${bestPlanKey}`, { current_best_plan: bestPlanKey }, userId, '0 0 * * 1', 'red')
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
             console.log(`user:upgrade_to_${bestPlanKey}`, userId)
@@ -188,7 +189,7 @@ export async function checkPlan(userId: string): Promise<void> {
       // check if user is at more than 90%, 50% or 70% of plan usage
       if (percentUsage >= 90) {
         // cron every month * * * * 1
-        const sent = await sendNotif('user:90_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'red')
+        const sent = await sendNotif(c, 'user:90_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'red')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
           await logsnag.track({
@@ -202,7 +203,7 @@ export async function checkPlan(userId: string): Promise<void> {
       }
       else if (percentUsage >= 70) {
         // cron every month * * * * 1
-        const sent = await sendNotif('user:70_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
+        const sent = await sendNotif(c, 'user:70_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
           await logsnag.track({
@@ -215,7 +216,7 @@ export async function checkPlan(userId: string): Promise<void> {
         }
       }
       else if (percentUsage >= 50) {
-        const sent = await sendNotif('user:50_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
+        const sent = await sendNotif(c, 'user:50_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
           await logsnag.track({
@@ -230,7 +231,7 @@ export async function checkPlan(userId: string): Promise<void> {
 
       // and send email notification
     }
-    return supabaseAdmin()
+    return supabaseAdmin(c)
       .from('stripe_info')
       .update({
         is_good_plan: is_good_plan || is_free_usage,

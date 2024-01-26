@@ -307,7 +307,7 @@ export async function update(body: AppInfos, c: Context) {
     }
     else {
       // get app owner with app_id
-      const sent = await sendNotif('user:semver_issue', {
+      const sent = await sendNotif(c, 'user:semver_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
         current_version_id: version_build,
@@ -329,7 +329,7 @@ export async function update(body: AppInfos, c: Context) {
     }
     // if plugin_version is < 4 send notif to alert
     if (semver.lt(plugin_version, '5.0.0')) {
-      const sent = await sendNotif('user:plugin_issue', {
+      const sent = await sendNotif(c, 'user:plugin_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
         current_version_id: version_build,
@@ -380,15 +380,15 @@ export async function update(body: AppInfos, c: Context) {
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel', new Date().toISOString())
       if (versionData) {
-        await Promise.all([sendDevice({
+        await Promise.all([sendDevice(c, {
           app_id,
           device_id,
           version: versionData.id,
-        }), sendStats([{
+        }), sendStats(c, [{
           ...stat,
           action: 'NoChannelOrOverride',
           version: versionData.id,
-        }], c)])
+        }])])
       }
       return c.send({
         message: 'no default channel or override',
@@ -472,7 +472,7 @@ export async function update(body: AppInfos, c: Context) {
       version_build,
       updated_at: new Date().toISOString(),
     }
-    await sendDevice(device)
+    await sendDevice(c, device)
 
     if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
@@ -499,7 +499,7 @@ export async function update(body: AppInfos, c: Context) {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(version.storage_provider, `apps/${appOwner.user_id}/${app_id}/versions`, version.bucket_id)
+      const res = await getBundleUrl(c, version.storage_provider, `apps/${appOwner.user_id}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
     }

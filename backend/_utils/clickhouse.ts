@@ -1,28 +1,29 @@
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 
-export function isClickHouseEnabled() {
+export function isClickHouseEnabled(c: Context) {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
-  return !!clickHouseURL()
+  return !!clickHouseURL(c)
 }
-function clickHouseURL() {
-  return getEnv('CLICKHOUSE_URL')
+function clickHouseURL(c: Context) {
+  return getEnv('CLICKHOUSE_URL', c)
 }
-function clickHouseUser() {
-  return getEnv('CLICKHOUSE_USER')
+function clickHouseUser(c: Context) {
+  return getEnv('CLICKHOUSE_USER', c)
 }
-function clickHousePassword() {
-  return getEnv('CLICKHOUSE_PASSWORD')
+function clickHousePassword(c: Context) {
+  return getEnv('CLICKHOUSE_PASSWORD', c)
 }
-function clickHouseAuth() {
-  return `Basic ${btoa(`${clickHouseUser()}:${clickHousePassword()}`)}`
+function clickHouseAuth(c: Context) {
+  return `Basic ${btoa(`${clickHouseUser(c)}:${clickHousePassword(c)}`)}`
 }
-function clickhouseAuthEnabled() {
-  return !!clickHouseUser() && !!clickHousePassword()
+function clickhouseAuthEnabled(c: Context) {
+  return !!clickHouseUser(c) && !!clickHousePassword(c)
 }
 
-export function sendDeviceToClickHouse(devices: Database['public']['Tables']['devices']['Update'][]) {
-  if (!isClickHouseEnabled())
+export function sendDeviceToClickHouse(devices: Database['public']['Tables']['devices']['Update'][], c: Context) {
+  if (!isClickHouseEnabled(c))
     return Promise.resolve()
 
   // make log a string with a newline between each logdated_at: !device.updated_at ? new Date() : device.updated_at,
@@ -38,13 +39,13 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
   console.log('sending device to Clickhouse', devicesReady)
   // http://127.0.0.1:8123/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow
   return fetch(
-    `${clickHouseURL()}/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
+    `${clickHouseURL(c)}/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       body: devicesReady,
-      headers: clickhouseAuthEnabled()
+      headers: clickhouseAuthEnabled(c)
         ? {
-            'Authorization': clickHouseAuth(),
+            'Authorization': clickHouseAuth(c),
             'Content-Type': 'text/plain',
           }
         : { 'Content-Type': 'text/plain' },
@@ -62,20 +63,20 @@ interface ClickHouseMeta {
   size: number
   action: 'add' | 'delete'
 }
-export function sendMetaToClickHouse(meta: ClickHouseMeta) {
-  if (!isClickHouseEnabled())
+export function sendMetaToClickHouse(meta: ClickHouseMeta, c: Context) {
+  if (!isClickHouseEnabled(c))
     return Promise.resolve()
 
   console.log('sending meta to Clickhouse', meta)
   const metasReady = JSON.stringify(meta)
   return fetch(
-      `${clickHouseURL()}/?query=INSERT INTO app_versions_meta SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
+      `${clickHouseURL(c)}/?query=INSERT INTO app_versions_meta SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
       {
         method: 'POST',
         body: metasReady,
-        headers: clickhouseAuthEnabled()
+        headers: clickhouseAuthEnabled(c)
           ? {
-              'Authorization': clickHouseAuth(),
+              'Authorization': clickHouseAuth(c),
               'Content-Type': 'text/plain',
             }
           : { 'Content-Type': 'text/plain' },
@@ -86,8 +87,8 @@ export function sendMetaToClickHouse(meta: ClickHouseMeta) {
     .catch(e => console.log('sendMetaToClickHouse error', e))
 }
 
-export function sendLogToClickHouse(logs: Database['public']['Tables']['stats']['Insert'][]) {
-  if (!isClickHouseEnabled())
+export function sendLogToClickHouse(c: Context, logs: Database['public']['Tables']['stats']['Insert'][]) {
+  if (!isClickHouseEnabled(c))
     return Promise.resolve()
 
   // make log a string with a newline between each log
@@ -98,7 +99,7 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending log to Clickhouse', logReady)
   return fetch(
-    `${clickHouseURL()}/?query=INSERT INTO logs SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
+    `${clickHouseURL(c)}/?query=INSERT INTO logs SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       // add created_at: new Date().toISOString() to each log

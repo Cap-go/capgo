@@ -1,6 +1,6 @@
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import { createCustomer } from './stripe.ts'
-import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
@@ -276,7 +276,7 @@ export async function isAllowedAction(userId: string, c: Context): Promise<boole
   return false
 }
 
-export async function updateDeviceCustomId(auth: string, appId: string, deviceId: string, customId: string, c: Context) {
+export async function updateDeviceCustomId(c: Context, auth: string, appId: string, deviceId: string, customId: string) {
   console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
 
   const client = supabaseClient(auth, c)
@@ -286,7 +286,7 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
     .eq('app_id', appId)
     .eq('device_id', deviceId)
     // TODO: to remove if we go 100% clickhouse
-  if (!isClickHouseEnabled()) {
+  if (!isClickHouseEnabled(c)) {
     // update the device custom_id
     return
   }
@@ -317,10 +317,10 @@ export async function updateDeviceCustomId(auth: string, appId: string, deviceId
   return sendDeviceToClickHouse([{
     ...device,
     custom_id: customId,
-  }])
+  }], c)
 }
 
-export async function getSDashboard(auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string, c: Context) {
+export async function getSDashboard(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
   console.log(`getSDashboard userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let isAdmin = false
@@ -334,7 +334,7 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
     .then(res => res.data || false)
   isAdmin = reqAdmin
 
-  if (isClickHouseEnabled()) {
+  if (isClickHouseEnabled(c)) {
     tableName = 'clickhouse_app_usage'
     if (appId) {
       // const hasReadRights = await client.rpc('has_read_rights')
@@ -390,7 +390,7 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   return res.data || []
 }
 
-export async function getSDevice(auth: string, c: Context, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+export async function getSDevice(c: Context, auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
@@ -399,7 +399,7 @@ export async function getSDevice(auth: string, c: Context, appId: string, versio
   if (!auth)
     client = supabaseAdmin(c)
 
-  if (isClickHouseEnabled()) {
+  if (isClickHouseEnabled(c)) {
     tableName = 'clickhouse_devices'
     const reqOwner = await client
       .rpc('is_app_owner', { appid: appId })
@@ -472,7 +472,7 @@ export async function getSDevice(auth: string, c: Context, appId: string, versio
   // }
 }
 
-export async function getSStats(auth: string, c: Context, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
+export async function getSStats(c: Context, auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
   console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
   // getStats ee.forgr.captime undefined  [
@@ -484,7 +484,7 @@ export async function getSStats(auth: string, c: Context, appId: string, deviceI
   if (!auth)
     client = supabaseAdmin(c)
 
-  if (isClickHouseEnabled()) {
+  if (isClickHouseEnabled(c)) {
     tableName = 'clickhouse_logs'
     const reqOwner = auth
       ? (await client
@@ -562,7 +562,7 @@ export async function getSStats(auth: string, c: Context, appId: string, deviceI
   // }
 }
 
-export function sendDevice(device: Database['public']['Tables']['devices']['Update']) {
+export function sendDevice(c: Context, device: Database['public']['Tables']['devices']['Update']) {
   const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
     updated_at: device.updated_at || new Date().toISOString(),
     platform: device.platform as Database['public']['Enums']['platform_os'],
@@ -578,8 +578,8 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     created_at: device.created_at || new Date().toISOString(),
   }
   const all = []
-  if (isClickHouseEnabled())
-    all.push(sendDeviceToClickHouse([deviceComplete]))
+  if (isClickHouseEnabled(c))
+    all.push(sendDeviceToClickHouse(c, [deviceComplete]))
   else
     all.push(supabaseAdmin(c).from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
 
@@ -589,7 +589,7 @@ export function sendDevice(device: Database['public']['Tables']['devices']['Upda
     })
 }
 
-export function sendStats(stats: Database['public']['Tables']['stats']['Update'][], c: Context) {
+export function sendStats(c: Context, stats: Database['public']['Tables']['stats']['Update'][]) {
   const all = []
   for (const stat of stats) {
     const statComplete: Database['public']['Tables']['stats']['Insert'] = {
@@ -601,8 +601,8 @@ export function sendStats(stats: Database['public']['Tables']['stats']['Update']
       version: stat.version as number,
       platform: stat.platform as Database['public']['Enums']['platform_os'],
     }
-    if (isClickHouseEnabled())
-      all.push(sendLogToClickHouse([statComplete]))
+    if (isClickHouseEnabled(c))
+      all.push(sendLogToClickHouse(c, [statComplete]))
     else
       all.push(supabaseAdmin(c).from('stats').insert(statComplete))
   }
@@ -613,7 +613,7 @@ export function sendStats(stats: Database['public']['Tables']['stats']['Update']
     })
 }
 
-export async function createApiKey(userId: string, c: Context) {
+export async function createApiKey(c: Context, userId: string) {
   // check if user has apikeys
   const total = await supabaseAdmin(c)
     .from('apikeys')
@@ -646,7 +646,7 @@ export async function createApiKey(userId: string, c: Context) {
   return Promise.resolve()
 }
 
-export async function createdefaultOrg(userId: string, c: Context, name = 'Default') {
+export async function createdefaultOrg(c: Context, userId: string, name = 'Default') {
   // check if user has apikeys
   const total = await supabaseAdmin(c)
     .from('orgs')

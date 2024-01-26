@@ -1,8 +1,9 @@
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import { getEnv } from './utils.ts'
 
-function getAllMetrics(): Promise<string[]> {
-  const auth = btoa(`service_role:${getEnv('SUPABASE_SERVICE_ROLE_KEY')}`)
-  return fetch(`${getEnv('SUPABASE_URL')}/customer/v1/privileged/metrics`, {
+function getAllMetrics(c: Context): Promise<string[]> {
+  const auth = btoa(`service_role:${getEnv('SUPABASE_SERVICE_ROLE_KEY', c)}`)
+  return fetch(`${getEnv('SUPABASE_URL', c)}/customer/v1/privileged/metrics`, {
     headers: {
       Authorization: `Basic ${auth}`,
     },
@@ -91,8 +92,8 @@ function getCpuInfo(lines: string[]) {
   }
 }
 
-export function getCpu() {
-  return getAllMetrics()
+export function getCpu(c: Context) {
+  return getAllMetrics(c)
     .then((lines) => {
       const cpuInfo = getCpuInfo(getOneMetrics('node_cpu_seconds_total', lines))
       const cpuUsage = Math.round(cpuInfo.cpuUsage * 100) / 100
@@ -133,8 +134,8 @@ export function getMemFree(lines: string[]) {
   return total
 }
 
-export function getMem() {
-  return getAllMetrics()
+export function getMem(c: Context) {
+  return getAllMetrics(c)
     .then((lines) => {
       const available = getMemAvailable(getOneMetrics('node_memory_MemAvailable_bytes', lines))
       const total = getMemTotal(getOneMetrics('node_memory_MemTotal_bytes', lines))

@@ -1,4 +1,5 @@
 import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import { getEnv, shallowCleanObject } from './utils.ts'
 
 export interface Segments {
@@ -27,43 +28,43 @@ export interface Person {
   price_id?: string
 }
 
-function hasPlunk() {
-  return getEnv('PLUNK_API_KEY').length > 0
+function hasPlunk(c: Context) {
+  return getEnv('PLUNK_API_KEY', c).length > 0
 }
 
 // https://api.useplunk.com/v1
-function getAuth() {
+function getAuth(c: Context) {
   // get plunk token
-  const PLUNK_API_KEY = getEnv('PLUNK_API_KEY')
+  const PLUNK_API_KEY = getEnv('PLUNK_API_KEY', c)
   return `Bearer ${PLUNK_API_KEY}`
 }
 const baseUrl = () => 'https://api.useplunk.com'
-function getConfig() {
+function getConfig(c: Context) {
   return {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': getAuth(),
+      'Authorization': getAuth(c),
     },
   }
 }
 
-export async function trackEvent(email: string, data: any, event: string) {
-  if (!hasPlunk())
+export async function trackEvent(c: Context, email: string, data: any, event: string) {
+  if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/track`
   const response = await axios.post(url, {
     email,
     event,
     data: shallowCleanObject(data),
-  }, getConfig()).catch((e) => {
+  }, getConfig(c)).catch((e) => {
     console.log('trackEvent error', e)
     return { data: { error: e } }
   })
   return response.data
 }
 
-export async function addContact(email: string, data: any) {
-  if (!hasPlunk())
+export async function addContact(c: Context, email: string, data: any) {
+  if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/contacts`
   const payload = {
@@ -72,7 +73,7 @@ export async function addContact(email: string, data: any) {
     data: shallowCleanObject(data),
   }
   console.log('addContact', email)
-  const response = await axios.post(url, payload, getConfig()).catch((e) => {
+  const response = await axios.post(url, payload, getConfig(c)).catch((e) => {
     console.log('addContact error', e)
     return { data: { error: e } }
   })
@@ -84,15 +85,15 @@ export function addDataContact(email: string, data: Person, segments?: Segments)
   return trackEvent(email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
 }
 
-export async function sendEmail(to: string, subject: string, body: string) {
-  if (!hasPlunk())
+export async function sendEmail(c: Context, to: string, subject: string, body: string) {
+  if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/send`
   const response = await axios.post(url, {
     to,
     subject,
     body,
-  }, getConfig()).catch((e) => {
+  }, getConfig(c)).catch((e) => {
     console.log('trackEvent error', e)
     return { data: { error: e } }
   })
