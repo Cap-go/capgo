@@ -4,7 +4,7 @@ import { Hono } from 'https://deno.land/x/hono/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import type { Context } from 'https://deno.land/x/hono/mod.ts'
 import { sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'
-import { BRES, middlewareKey } from '../../_utils/hono.ts'
+import { BRES } from '../../_utils/hono.ts'
 import type { AppInfos } from '../../_utils/types.ts'
 import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../../_utils/utils.ts'
 import { Database } from '~/types/supabase.types.ts'
@@ -417,36 +417,30 @@ async function deleteOverride(body: DeviceLink, c: Context): Promise<Response> {
 
 export const app = new Hono()
 
-app.post('/', middlewareKey, async (c: Context) => {
+app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    const apikey = c.get('apikey')
     console.log('body', body)
-    console.log('apikey', apikey)
     return post(body, c)
   } catch (e) {
     return c.send({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.put('/', middlewareKey, async (c: Context) => {
+app.put('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    const apikey = c.get('apikey')
     console.log('body', body)
-    console.log('apikey', apikey)
     return put(body, c)
   } catch (e) {
     return c.send({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
   }
 })
 
-app.delete('/', middlewareKey, async (c: Context) => {
+app.delete('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    const apikey = c.get('apikey')
     console.log('body', body)
-    console.log('apikey', apikey)
     return deleteOverride(body, c)
   } catch (e) {
     return c.send({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
