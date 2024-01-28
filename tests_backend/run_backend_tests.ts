@@ -24,7 +24,7 @@ let backendType: 'none' | 'local' | 'upstash' | null = null
 const noRedisEnvFilePath = await getEnvFile('none')
 const localRedisEnvFilePath = await getEnvFile('local')
 
-async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string; anonToken: string, postgressRawUrl: string }> {
+async function getAdminSupabaseTokens(): Promise<{ url: string, serviceKey: string, anonToken: string, postgressRawUrl: string }> {
   const command = new Deno.Command('supabase', {
     args: [
       'status',
@@ -57,7 +57,7 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
     serviceKey: adminToken,
     url,
     anonToken,
-    postgressRawUrl
+    postgressRawUrl,
   }
 }
 
@@ -154,7 +154,6 @@ async function startSupabaseBackend(
       }
       break
     }
-      
 
     const string = new TextDecoder('utf-8').decode(chunk.value)
     console.log('out', string)
@@ -165,6 +164,8 @@ async function startSupabaseBackend(
       functionsUrl = new URL(split[split.length - 1].trim().replace('<function-name>', ''))
       break
     }
+
+    // await delay(10_000)
   }
 }
 
@@ -221,7 +222,7 @@ async function testLoop(functionsUrl: URL, supabase: SupabaseType, tests: Test[]
   return ok
 }
 
-async function runTestsForFolder(folder: string, shortName: string, firstArg: string) {
+async function runTestsForFolder(folder: string, shortName: string, _firstArg: string) {
   const useLocalRedis = Deno.env.get('USE_LOCAL_REDIS') === 'true'
   const upstashToken = Deno.env.get('UPSTASH_TOKEN')
   const upstashUrl = Deno.env.get('UPSTASH_URL')
@@ -270,7 +271,7 @@ async function runTestsForFolder(folder: string, shortName: string, firstArg: st
     }
 
     p.log.info(`Running tests \"${importedTest.fullName}\" (${dirEntry.name})`)
-    //let ok = await testLoop(new URL('http://localhost:7777'), supabase, importedTest.tests)
+    // let ok = await testLoop(new URL('http://localhost:7777'), supabase, importedTest.tests)
     let ok = await testLoop(functionsUrl, supabase, importedTest.tests)
 
     // This is likely unreacheble

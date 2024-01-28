@@ -482,7 +482,7 @@ test.describe('Test organization system permissions', () => {
           if (permission.changeChannelToggle) {
             await Promise.all([
               page.waitForResponse(`${SUPABASE_URL}\/**`),
-              await toggle.click(),
+              toggle.click(),
             ])
           }
           else {
@@ -653,7 +653,7 @@ test.describe('Test organization system permissions', () => {
         await page.click('#inforow-input')
 
         if (permission.setDeviceCustomId) {
-          await page.fill('#inforow-input', 'test')
+          await page.fill('#inforow-input', `test-${crypto.randomUUID()}`)
           await expectPopout(page, 'Custom ID saved')
         }
         else {

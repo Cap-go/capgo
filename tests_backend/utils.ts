@@ -2,8 +2,9 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.
 import { isEqual } from 'https://esm.sh/lodash-es@^4.17.21'
 import { mergeReadableStreams } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import * as p from 'npm:@clack/prompts@0.7.0'
+import type { PoolClient } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
+import { Pool } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
 import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
-import { Pool, PoolClient } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 let supabaseSecret: string | null = null
@@ -28,9 +29,14 @@ export interface RunnableTest {
 }
 
 export function setSupabaseSecrets(secret: string, anonToken: string, url: string, postgressRawUrl: string) {
+  const supaUrl = new URL(url)
+  supaUrl.hostname = 'localhost'
+
+  console.log(supaUrl.toString())
+
   supabaseSecret = secret
   supabaseAnonToken = anonToken
-  supabaseUrl = url
+  supabaseUrl = supaUrl.toString()
   postgressRawDbUrl = postgressRawUrl
 }
 
@@ -112,7 +118,7 @@ export async function testPlaywright(spec: string, backendUrl: URL, env: { [key:
       SUPABASE_URL: supabaseUrl!,
       START_FRONTEND: 'true',
       BACKEND_URL: backendUrl.toString(),
-      // BACKEND_URL: 'http://localhost:7777', 
+      // BACKEND_URL: 'http://localhost:7777',
       ...env,
     },
   })
@@ -149,12 +155,11 @@ export async function runSubprocess(command: Deno.Command, commandName: string) 
 }
 
 export async function getRawSqlConnection() {
-  if (rawConnection) {
+  if (rawConnection)
     return rawConnection
-  }
 
   assert(!!postgressRawDbUrl, 'Supabase raw postgress url is null')
-  const pool = new Pool(postgressRawDbUrl!, 3, true);
+  const pool = new Pool(postgressRawDbUrl!, 3, true)
   rawPool = pool
 
   rawConnection = await pool.connect()
