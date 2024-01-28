@@ -37,20 +37,6 @@ const bundleChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>(
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const secondaryChannel = ref<boolean>(false)
 
-const showChannel = computed((channel) => {
-  // channel.value && ((!channel.value.enableAbTesting && !channel.value.enable_progressive_deploy && channel.value.version === version.value.id) || ((channel.value.enableAbTesting || channel.value.enable_progressive_deploy) && channel.value.secondVersion === version.value.id))
-  if (!channel.value || !version.value)
-    return false
-
-  if (!channel.value.enableAbTesting && !channel.value.enable_progressive_deploy && channel.value.version === version.value.id)
-    return true
-
-  if ((channel.value.enableAbTesting || channel.value.enable_progressive_deploy) && channel.value.secondVersion === version.value.id)
-    return true
-
-  return false
-})
-
 const role = ref<OrganizationRole | null>(null)
 watch(version, async (version) => {
   if (!version) {
@@ -113,7 +99,7 @@ const showSize = computed(() => {
   else if (version.value?.external_url)
     return t('stored-externally')
   else
-    return t('app-not-found')
+    return t('metadata-not-found')
 })
 
 async function getUnknowBundleId() {
@@ -151,7 +137,7 @@ async function setChannelProgressive(channel: Database['public']['Tables']['chan
     .from('channels')
     .update({
       secondVersion: id,
-      version: channel.secondVersion,
+      version: channel.secondVersion ?? undefined,
       secondaryVersionPercentage: 0.1,
     })
     .eq('id', channel.id)
@@ -171,7 +157,7 @@ async function setChannelSkipProgressive(channel: Database['public']['Tables']['
 async function ASChannelChooser() {
   if (!version.value)
     return
-    if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
     toast.error(t('no-permission'))
     return
   }
@@ -563,7 +549,9 @@ function preventInputChangePerm(event: Event) {
     <div v-if="version" class="h-full md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+        <div
+          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
+        >
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
@@ -572,54 +560,76 @@ function preventInputChangePerm(event: Event) {
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- Min update version -->
-            <InfoRow v-if="channel?.disableAutoUpdate === 'version_number'" id="metadata-bundle" :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])" @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm" />
+            <InfoRow
+              v-if="channel?.disableAutoUpdate === 'version_number'" id="metadata-bundle"
+              :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''"
+              :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])"
+              @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
+            />
             <!-- meta devices -->
             <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
-            <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toLocaleString()" />
-            <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
+            <InfoRow
+              v-if="version_meta?.installs" :label="t('install')"
+              :value="version_meta.installs.toLocaleString()"
+            />
+            <InfoRow
+              v-if="version_meta?.uninstalls" :label="t('uninstall')"
+              :value="version_meta.uninstalls.toLocaleString()"
+            />
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
               <template #start>
-                <span v-for="channel in bundleChannels">
+                <span v-for="chn in bundleChannels" :key="chn.id">
                   <span
-                  v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (channel!.secondVersion == version.id) : false"
-                  class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
-                  @click="openChannel(channel, true)">
-                    {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? ((channel!.secondVersion == version.id) ? `${channel!.name}-B` : ``) : channel!.name }}
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.secondVersion === version.id) : false"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, true)"
+                  >
+                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion
+                      === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
                   </span>
                   <span
-                  v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (channel!.version == version.id) : false"
-                  class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
-                  @click="openChannel(channel, false)">
-                    {{ `${channel!.name}-A` }}
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.version === version.id) : false"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, false)"
+                  >
+                    {{ `${chn!.name}-A` }}
                   </span>
                   <span
-                  v-if="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? false : true"
-                  class='cursor-pointer underline underline-offset-4 text-blue-600 active dark:text-blue-500 font-bold text-dust pr-3'
-                  @click="openChannel(channel, false)">
-                    {{ (channel!.enableAbTesting || channel!.enable_progressive_deploy) ? ((channel!.secondVersion == version.id) ? `${channel!.name}-B` : ``) : channel!.name }}
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? false : true"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, false)"
+                  >
+                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
                   </span>
                 </span>
               </template>
             </InfoRow>
-            <InfoRow v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel(channel!, false)" />
+            <InfoRow
+              v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true"
+              @click="openChannel(channel!, false)"
+            />
             <!-- session_key -->
-            <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
+            <InfoRow
+              v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)"
+              :is-link="true" @click="copyToast(version?.session_key || '')"
+            />
             <!-- version.external_url -->
-            <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
+            <InfoRow
+              v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true"
+              @click="copyToast(version?.external_url || '')"
+            />
             <!-- size -->
             <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
           </dl>
         </div>
       </div>
       <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-          <DeviceTable
-            class="p-3"
-            :app-id="packageId"
-            :version-id="version.id"
-          />
+        <div
+          class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+        >
+          <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
         </div>
       </div>
     </div>

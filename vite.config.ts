@@ -33,7 +33,7 @@ readdirSync('./locales/')
       locales.push(file.split('.')[0])
   })
 // const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
-const guestPath = ['/login', '/register', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
+const guestPath = ['/login', '/register', '/delete_account', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
 export default defineConfig({
   resolve: {

@@ -28,6 +28,7 @@ CREATE TABLE apps (
 );
 
 CREATE TABLE channel_devices (
+    id bigint NOT NULL,
     created_at timestamp with time zone,
     channel_id bigint NOT NULL,
     app_id character varying NOT NULL,
@@ -60,6 +61,7 @@ CREATE TABLE channels (
 );
 
 CREATE TABLE devices_override (
+    id bigint NOT NULL,
     created_at timestamp with time zone,
     updated_at timestamp with time zone,
     device_id text NOT NULL,

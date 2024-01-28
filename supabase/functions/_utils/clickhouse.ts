@@ -2,7 +2,8 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 
 export function isClickHouseEnabled() {
-  return !!clickHouseURL() && !!clickHouseUser() && !!clickHousePassword()
+  // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
+  return !!clickHouseURL()
 }
 function clickHouseURL() {
   return getEnv('CLICKHOUSE_URL')
@@ -15,6 +16,9 @@ function clickHousePassword() {
 }
 function clickHouseAuth() {
   return `Basic ${btoa(`${clickHouseUser()}:${clickHousePassword()}`)}`
+}
+function clickhouseAuthEnabled() {
+  return !!clickHouseUser() && !!clickHousePassword()
 }
 
 export function sendDeviceToClickHouse(devices: Database['public']['Tables']['devices']['Update'][]) {
@@ -29,18 +33,21 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
     date_id: undefined,
     created_at: undefined,
     last_mau: undefined,
-    updated_at: !device.updated_at ? new Date().toISOString() : device.updated_at,
+    updated_at: formatDate(new Date()),
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending device to Clickhouse', devicesReady)
+  // http://127.0.0.1:8123/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow
   return fetch(
     `${clickHouseURL()}/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
     {
       method: 'POST',
       body: devicesReady,
-      headers: {
-        'Authorization': clickHouseAuth(),
-        'Content-Type': 'text/plain',
-      },
+      headers: clickhouseAuthEnabled()
+        ? {
+            'Authorization': clickHouseAuth(),
+            'Content-Type': 'text/plain',
+          }
+        : { 'Content-Type': 'text/plain' },
     },
   )
     .then(res => res.text())
@@ -66,10 +73,12 @@ export function sendMetaToClickHouse(meta: ClickHouseMeta) {
       {
         method: 'POST',
         body: metasReady,
-        headers: {
-          'Authorization': clickHouseAuth(),
-          'Content-Type': 'text/plain',
-        },
+        headers: clickhouseAuthEnabled()
+          ? {
+              'Authorization': clickHouseAuth(),
+              'Content-Type': 'text/plain',
+            }
+          : { 'Content-Type': 'text/plain' },
       },
   )
     .then(res => res.text())
@@ -85,7 +94,7 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
   const logReady = logs.map(l => ({
     ...l,
     // remove created_at and updated_at presicion ms use only seconds
-    created_at: !l.created_at ? new Date().toISOString() : l.created_at,
+    created_at: formatDate(new Date()),
   })).map(l => JSON.stringify(l)).join('\n')
   console.log('sending log to Clickhouse', logReady)
   return fetch(
@@ -95,7 +104,7 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
       // add created_at: new Date().toISOString() to each log
       body: logReady,
       headers: {
-        'Authorization': clickHouseAuth(),
+        // 'Authorization': clickHouseAuth(),
         'Content-Type': 'text/plain',
       },
     },
@@ -103,4 +112,12 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
     .then(res => res.text())
     .then(data => console.log('sendLogToClickHouse', data))
     .catch(e => console.log('sendLogToClickHouse error', e))
+}
+
+function padStartString(str: string | number) {
+  return (str.toString().split('').length === 2) ? str : `0${str}`
+}
+
+function formatDate(date: Date) {
+  return `${date.getUTCFullYear()}-${padStartString(date.getUTCMonth() + 1)}-${padStartString(date.getUTCDate())} ${padStartString(date.getUTCHours())}:${padStartString(date.getUTCMinutes())}:${padStartString(date.getUTCSeconds())}.000`
 }

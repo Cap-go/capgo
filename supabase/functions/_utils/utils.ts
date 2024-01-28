@@ -139,6 +139,7 @@ export function isLimited(id: string) {
   return Math.random() < app.ignore
 }
 
+// eslint-disable-next-line unused-imports/no-unused-vars
 export function setEnv(env: any) {}
 
 export function getAllEnv() {

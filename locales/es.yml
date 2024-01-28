@@ -131,6 +131,8 @@ defined-as: Definido como
 defined-as-private: definido como normal
 defined-as-public: definido como predeterminado
 delete-account: Borrar cuenta
+delete-account-0: Borrar cuenta
+delete-your-account: Elimina tu cuenta
 deleted: eliminado
 details-and-logs: Detalles y registros
 device: Dispositivo
@@ -187,6 +189,7 @@ last-update: Última actualización
 last-upload: última carga
 last-version: Última versión
 launch-bundle: Paquete de lanzamiento
+leaving: Partida
 limit-reached: Límite alcanzado
 live-reload: recarga en vivo
 loading-more-data: Cargando más datos...

@@ -15,7 +15,7 @@ function initR2() {
   const storagePort = Number.parseInt(getEnv('S3_PORT'))
   const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
   const params = {
-    endpoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : `http://${storageEndpoint}${storagePort ? `:${storagePort}`: ''}`,
+    endpoint: accountid ? `https://${accountid}.r2.cloudflarestorage.com` : `http://${storageEndpoint}${storagePort ? `:${storagePort}` : ''}`,
     region: storageRegion ?? 'us-east-1',
     credentials: {
       accessKeyId: access_key_id,
@@ -23,7 +23,7 @@ function initR2() {
     },
     useSSL: accountid ? true : storageUseSsl,
     port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
-    s3ForcePathStyle: true
+    forcePathStyle: true,
   }
   return new S3Client(params)
 }
@@ -37,7 +37,7 @@ function getUploadUrl(fileId: string, expirySeconds = 60) {
   const client = initR2()
   const command = new PutObjectCommand({
     Bucket: bucket,
-    Key: fileId
+    Key: fileId,
   })
   return s3GetSignedUrl(client, command, { expiresIn: expirySeconds })
 }
@@ -50,9 +50,9 @@ function deleteObject(fileId: string) {
 
 function checkIfExist(fileId: string) {
   const client = initR2()
-  
+
   return new Promise((resolve) => {
-    const command = new HeadObjectCommand({ Bucket: bucket, Key: fileId });
+    const command = new HeadObjectCommand({ Bucket: bucket, Key: fileId })
     client.send(command)
       .then(() => resolve(true))
       .catch(() => resolve(false))
@@ -61,9 +61,9 @@ function checkIfExist(fileId: string) {
 
 function getSignedUrl(fileId: string, expirySeconds: number) {
   const client = initR2()
-  const command = new GetObjectCommand({ 
+  const command = new GetObjectCommand({
     Bucket: bucket,
-    Key: fileId
+    Key: fileId,
   })
   return s3GetSignedUrl(client, command, { expiresIn: expirySeconds })
 }

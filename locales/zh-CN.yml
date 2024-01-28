@@ -123,6 +123,8 @@ defined-as: 定义为
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete-account: 删除帐户
+delete-account-0: 删除帐户
+delete-your-account: 删除您的帐户
 deleted: 删除
 details-and-logs: 详细信息和日志
 device: 设备
@@ -175,6 +177,7 @@ last-update: 最后更新
 last-upload: 最后上传
 last-version: 最新版本
 launch-bundle: 启动包
+leaving: 离开
 limit-reached: 达到限制
 live-reload: 实时重新加载
 loading-more-data: 加载更多数据...

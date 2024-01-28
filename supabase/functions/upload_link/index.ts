@@ -15,7 +15,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: dataUp
     return sendRes({ status: 'Missing apikey' }, 400)
 
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(), ['all', 'write', 'upload'])
-  const { data: userId, error: errorUserId } = await supabaseAdmin()
+  const { data: userId, error: _errorUserId } = await supabaseAdmin()
     .rpc('get_user_id', { apikey: apikey_string, app_id: body.app_id })
   if (!apikey)
     return sendRes({ status: 'Missing apikey' }, 400)

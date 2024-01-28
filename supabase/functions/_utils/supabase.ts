@@ -336,6 +336,11 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_app_usage'
     if (appId) {
+      // const hasReadRights = await client.rpc('has_read_rights')
+      //   .then(res => res.data || false)
+
+      // console.log('read rights', hasReadRights)
+
       const reqOwner = await client
         .rpc('is_app_owner', { appid: appId })
         .then(res => res.data || false)
@@ -360,7 +365,7 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
     const appIds = await supabaseClient(auth)
       .from('apps')
       .select('app_id')
-      // .eq('user_id', userId)
+      .eq('user_id', userId)
       .then(res => res.data?.map(app => app.app_id) || [])
     console.log('appIds', appIds)
     req = req.in('app_id', appIds)
@@ -655,7 +660,7 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
       .insert(
         {
           created_by: userId,
-          logo: 'https://res.cloudinary.com/dz3vsv9pg/image/upload/v1623349123/capgo/logo.png',
+          logo: '',
           name: `${name} organization`,
         },
       )

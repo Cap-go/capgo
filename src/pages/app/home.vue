@@ -59,6 +59,7 @@ async function getSharedWithMe() {
 watchEffect(async () => {
   if (route.path === '/app/home') {
     isLoading.value = true
+    await organizationStore.dedupFetchOrganizations()
     await getMyApps()
     await getSharedWithMe()
     isLoading.value = false

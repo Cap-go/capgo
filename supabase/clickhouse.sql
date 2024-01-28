@@ -11,10 +11,23 @@ CREATE TABLE IF NOT EXISTS devices
     version Int64,
     is_prod UInt8,
     is_emulator UInt8,
+    last_mau DateTime64(6)
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(updated_at)
 ORDER BY (app_id, device_id, updated_at)
 PRIMARY KEY (app_id, device_id);
+
+CREATE TABLE IF NOT EXISTS app_versions_meta
+(
+    created_at DateTime64(6),
+    app_id String,
+    size Int64,
+    id Int64,
+    action String
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (id, app_id, action)
+PRIMARY KEY (id, app_id, action);
 
 CREATE TABLE IF NOT EXISTS devices_u
 (
@@ -98,18 +111,6 @@ FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 GROUP BY date, l.app_id;
 
-CREATE TABLE IF NOT EXISTS app_versions_meta
-(
-    created_at DateTime64(6),
-    app_id String,
-    size Int64,
-    id Int64,
-    action String
-) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(created_at)
-ORDER BY (id, app_id, action)
-PRIMARY KEY (id, app_id, action);
-
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
     date Date,
@@ -139,10 +140,13 @@ CREATE TABLE IF NOT EXISTS mau
 (
     date Date,
     app_id String,
-    mau UInt64
-) ENGINE = SummingMergeTree()
+    total AggregateFunction(uniq, String)
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id);
+-- select date, app_id, sum(mau) as mau from mau_mv group by date, app_id
+-- drop table mau_mv
+-- select * from mau_mv
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
 TO mau
@@ -150,7 +154,7 @@ AS
 SELECT
     minDate AS date,
     app_id,
-    countDistinct(device_id) AS mau
+    uniqState(device_id) AS total
 FROM
     (
     SELECT
@@ -165,47 +169,33 @@ FROM
     )
 GROUP BY date, app_id;
 
+-- Used to populate data in mau table
+-- how to use:
+-- 1) create the mau table
+-- 2) make sure mau is empty
+-- 3) execute this populate query
+-- 4) execute the "CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv" from above 
 
--- 
--- Stats aggregation
--- 
+-- INSERT INTO mau SELECT
+--     minDate AS date,
+--     app_id,
+--     uniqState(device_id) AS mau
+-- FROM
+--     (
+--     SELECT
+--         min(toDate(created_at)) AS minDate,
+--         app_id,
+--         device_id
+--     FROM logs
+--     WHERE 
+--         created_at >= toStartOfMonth(toDate(now())) 
+--         AND created_at < toStartOfMonth(toDate(now()) + INTERVAL 1 MONTH)
+--     GROUP BY device_id, app_id
+--     )
+-- GROUP BY date, app_id;
 
-CREATE TABLE IF NOT EXISTS aggregate_daily
-(
-    date Date,
-    app_id String,
-    storage_added Int64,
-    storage_deleted Int64,
-    bandwidth Int64,
-    mau UInt64,
-    get UInt64,
-    fail UInt64,
-    install UInt64,
-    uninstall UInt64,
-) ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS aggregate_daily_mv
-TO aggregate_daily
-AS
-SELECT
-    ld.date as date,
-    ld.app_id as app_id,
-    a.storage_added as storage_added,
-    a.storage_deleted as storage_deleted,
-    ld.bandwidth as bandwidth,
-    -- Get the MAU value for each app_id and date
-    m.total AS mau,
-    ld.get as get,
-    ld.fail as fail,
-    ld.install as install,
-    ld.uninstall as uninstall
-FROM logs_daily AS ld
-FULL JOIN app_storage_daily AS a ON ld.date = a.date AND ld.app_id = a.app_id
-LEFT JOIN mau AS m ON ld.date = m.date AND ld.app_id = m.app_id
-GROUP BY ld.date, ld.app_id, a.storage_added, a.storage_deleted, ld.bandwidth, m.total, ld.get, ld.fail, ld.install, ld.uninstall;
-
+-- CREATE MATERIALIZED VIEW mau
+-- ENGINE = MergeTree()
 
 -- OPTIONAL TABLES
 
@@ -308,3 +298,38 @@ SELECT
 FROM logs
 GROUP BY version;
 
+CREATE VIEW mau_tmp_view AS
+SELECT result.1 date, uniqMerge(arrayJoin(result.2)) total, app_id
+FROM (
+    SELECT 
+        groupArray((date, value)) data,
+        arrayMap(
+            (x, index) -> (x.1, arrayMap(y -> y.2, arraySlice(data, index))), 
+            data, 
+            arrayEnumerate(data)) result_as_array,
+        arrayJoin(result_as_array) result, app_id
+    FROM (        
+        SELECT app_id, date, total value
+        FROM (
+            /* emulate the original data */
+            SELECT app_id, total, date from mau
+        ORDER BY date desc, app_id)
+    ) group by app_id
+) group by app_id, date order by date desc;
+
+CREATE VIEW mau_final as
+SELECT DISTINCT ON (m.date,m.app_id) 
+  m.date AS date,
+  m.app_id AS app_id,
+  COALESCE(m.total, 0) AS mau,
+  COALESCE(l.get, 0) AS get,
+  COALESCE(l.fail, 0) AS fail,
+  COALESCE(l.install, 0) AS install,
+  COALESCE(l.uninstall, 0) AS uninstall,
+  COALESCE(l.bandwidth, 0) AS bandwidth,
+  COALESCE(s.storage_added, 0) AS storage_added,
+  COALESCE(s.storage_deleted, 0) AS storage_deleted
+  FROM mau_tmp_view m
+  LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
+  LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id
+  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total;
