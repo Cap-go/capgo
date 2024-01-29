@@ -6,12 +6,18 @@ export interface ActionSheetOptionButton {
   id?: string
   selected?: boolean
   handler?: () => void
-  role?: string
+  role?: string,
+  preventClose?: boolean
 }
 export interface ActionSheetOption {
   header?: string
-  message?: string
-  input?: boolean
+  message?: string,
+  image?: string,
+  headerStyle?: string,
+  textStyle?: string,
+  input?: boolean,
+  size?: string,
+  buttonCenter?: boolean
   buttons?: ActionSheetOptionButton[]
 }
 
@@ -30,6 +36,7 @@ export const useDisplayStore = defineStore('display', () => {
   const durationToast = ref<number>(2000)
   const showLoader = ref<boolean>(false)
   const lastButtonRole = ref<string>('')
+  const dialogInputText = ref('')
   const onDialogDismiss = (): Promise<boolean> => {
     // watch showDialog for changes and if false then resolve
     return new Promise((resolve) => {
@@ -72,6 +79,7 @@ export const useDisplayStore = defineStore('display', () => {
     lastButtonRole,
     NavTitle,
     defaultBack,
+    dialogInputText
   }
 })
 

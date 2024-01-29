@@ -24,3 +24,5 @@ export const iconEmail = `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg
 export const iconName = `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
 </svg>`
+
+export const mfaIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="#888888" d="m11.05 12.2l2.85-2.85q.275-.275.7-.275t.7.275q.275.275.275.7t-.275.7l-3.55 3.55q-.3.3-.7.3t-.7-.3l-1.4-1.4q-.275-.275-.275-.7t.275-.7q.275-.275.7-.275t.7.275zM7 23q-.825 0-1.412-.587T5 21V3q0-.825.588-1.412T7 1h10q.825 0 1.413.588T19 3v18q0 .825-.587 1.413T17 23zm0-3v1h10v-1zm0-2h10V6H7zM7 4h10V3H7zm0 0V3zm0 16v1z"/></svg>'
