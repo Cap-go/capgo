@@ -702,7 +702,7 @@ export async function saveStoreInfo(apps: (Database['public']['Tables']['store_a
     console.error('saveStoreInfo error', error)
 }
 
-export async function customerToSegment(userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], c: Context, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+export async function customerToSegment(c: Context, userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
   const segments: Segments = {
     capgo: true,
     onboarded: await isOnboarded(c, userId),

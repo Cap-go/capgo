@@ -1,10 +1,10 @@
 import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { BRES, middlewareKey } from '../_utils/hono.ts'
+import { BRES, middlewareAPISecret } from '../_utils/hono.ts'
 
 export const app = new Hono()
 
-app.post('/', middlewareKey, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<any>()
     const apikey = c.get('apikey')
