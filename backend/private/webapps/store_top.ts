@@ -1,13 +1,14 @@
 import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { middlewareKey } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { middlewareKey } from '../../_utils/hono.ts';
+import { supabaseAdmin } from '../../_utils/supabase.ts';
 
 export const app = new Hono()
 
-app.get('/', middlewareKey, async (c: Context) => {
+app.post('/', middlewareKey, async (c: Context) => {
   try {
-    const mode = c.req.query('mode')
+    // count allapps
+    const mode = c.req.query('mode') || 'capacitor'
     const { count } = await supabaseAdmin(c)
       .from('store_apps')
       .select('*', { count: 'exact', head: true })
@@ -66,6 +67,6 @@ app.get('/', middlewareKey, async (c: Context) => {
       status: 'Error unknow',
     }, 500)
   } catch (e) {
-    return c.json({ status: 'Cannot get config', error: JSON.stringify(e) }, 500) 
+    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500) 
   }
 })
