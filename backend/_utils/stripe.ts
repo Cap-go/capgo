@@ -19,11 +19,11 @@ function getConfig(c: Context, form = false) {
   }
 }
 
-export async function createPortal(customerId: string, callbackUrl: string) {
+export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
   const response = await axios.post('https://api.stripe.com/v1/billing_portal/sessions', new URLSearchParams({
     customer: customerId,
     return_url: callbackUrl,
-  }), getConfig(true))
+  }), getConfig(c, true))
   return response.data
 }
 
