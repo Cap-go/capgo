@@ -25,7 +25,7 @@ interface GetDevice {
 }
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id, c)))
+  if (!body.app_id || !(await checkAppOwner(c, apikey.user_id, body.app_id)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // get one channel or all channels
@@ -92,7 +92,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
 }
 
 export async function deleteChannel(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
+  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
@@ -155,7 +155,7 @@ app.post('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
-    return post(body, apikey, c)
+    return post(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
@@ -165,7 +165,7 @@ app.get('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
-    return get(body, apikey, c)
+    return get(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot get channel', error: JSON.stringify(e) }, 500)
   }
@@ -175,7 +175,7 @@ app.delete('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
-    return deleteChannel(body, apikey, c)
+    return deleteChannel(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot delete channel', error: JSON.stringify(e) }, 500)
   }

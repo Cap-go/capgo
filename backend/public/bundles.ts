@@ -54,7 +54,7 @@ async function get(c: Context, body: GetLatest, apikey: Database['public']['Tabl
     if (!body.app_id)
       return c.json({ status: 'Missing app_id' }, 400)
 
-    if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
+    if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
     const fetchOffset = body.page == null ? 0 : body.page
@@ -70,7 +70,7 @@ async function get(c: Context, body: GetLatest, apikey: Database['public']['Tabl
     if (dbError || !dataBundles || !dataBundles.length)
       return c.json({ status: 'Cannot get bundle', error: dbError }, 400)
 
-    return c.json(dataBundles)
+    return c.json(dataBundles as any)
   }
   catch (e) {
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
@@ -83,7 +83,7 @@ app.get('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<GetLatest>()
     const apikey = c.get('apikey')
-    return get(body, apikey, c)
+    return get(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
@@ -93,7 +93,7 @@ app.delete('/', middlewareKey, async (c: Context) => {
   try {
     const body = await c.req.json<GetLatest>()
     const apikey = c.get('apikey')
-    return deleteBundle(body, apikey, c)
+    return deleteBundle(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }

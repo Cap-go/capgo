@@ -26,7 +26,7 @@ function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'
 }
 
 async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id || !(await checkAppOwner(apikey.user_id, body.app_id, c)))
+  if (!body.app_id || !(await checkAppOwner(c, apikey.user_id, body.app_id)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // if device_id get one device
@@ -80,11 +80,11 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
   if (!body.device_id || !body.app_id)
     return c.json({ status: 'Cannot find device' }, 400)
 
-  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
+  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // find device
-  const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id], c)
+  const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
   if (!res || !res.data || !res.data.length)
     return c.json({ status: 'Cannot find device' }, 400)
 
@@ -140,7 +140,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
 }
 
 export async function deleteOverride(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await checkAppOwner(apikey.user_id, body.app_id, c)))
+  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
@@ -173,7 +173,7 @@ app.post('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)
-    return post(body, apikey, c)
+    return post(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
@@ -185,7 +185,7 @@ app.get('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)
-    return get(body, apikey, c)
+    return get(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
   }
@@ -197,7 +197,7 @@ app.delete('/', middlewareKey, async (c: Context) => {
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)
-    return deleteOverride(body, apikey, c)
+    return deleteOverride(c, body, apikey)
   } catch (e) {
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }

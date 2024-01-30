@@ -126,6 +126,7 @@
     "flowbite": "^2.2.1",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
+    "hono": "^3.12.8",
     "ioredis": "^5.3.2",
     "json2csv": "^5.0.7",
     "konsta": "^3.1.2",
