@@ -3,6 +3,7 @@ import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
 import { middlewareAuth } from '../../_utils/hono.ts';
 import { supabaseAdmin } from '../../_utils/supabase.ts';
 import { createCheckout } from '../../_utils/stripe.ts';
+import { getEnv } from '../../_utils/utils.ts';
 
 interface PortalData {
   priceId: string
@@ -38,7 +39,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'no customer' }, 400)
 
     console.log('user', user)
-    const checkout = await createCheckout(c, user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv('WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+    const checkout = await createCheckout(c, user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return c.json({ url: checkout.url })
   } catch (e) {
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500) 
