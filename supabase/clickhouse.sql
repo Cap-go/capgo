@@ -315,7 +315,7 @@ FROM (
             SELECT app_id, total, date from mau
         ORDER BY date desc, app_id)
     ) group by app_id
-) group by app_id, date order by date desc
+) group by app_id, date order by date desc;
 
 CREATE VIEW mau_final as
 SELECT DISTINCT ON (m.date,m.app_id) 
@@ -332,4 +332,4 @@ SELECT DISTINCT ON (m.date,m.app_id)
   FROM mau_tmp_view m
   LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
   LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id
-  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total
+  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total;

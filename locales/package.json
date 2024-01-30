@@ -1,5 +1,7 @@
 {
   "base": "Base",
+  "delete-account-0": "Delete account",
+  "delete-your-account": "Delete your account",
   "dependencies": {
     "js-yaml": "^4.1.0",
     "openai": "^4.12.3"
@@ -8,6 +10,7 @@
     "@types/js-yaml": "^4.0.7"
   },
   "included-in-plan": "Included in plan",
+  "leaving": "Leaving",
   "main": "translate.js",
   "name": "locales",
   "price-per-unit-above": "Price per unit above plan",

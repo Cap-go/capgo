@@ -11,10 +11,10 @@ jobs:
     name: "Build code and release"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v1.1.1
         with:
           bun-version: latest
 
@@ -60,15 +60,41 @@ jobs:
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+      # - name: Deploy CF Worker
+      #   run: bunx wrangler deploy ./cloudflare_workers/loadbalancer.ts
+      #   if: ${{ !contains(github.ref, '-alpha.') }}
+      #   env:
+      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Publish CF webapp PROD
+        uses: cloudflare/pages-action@1
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: capgo-webapp
+          directory: dist
+          branch: main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish CF webapp PREPROD
+        uses: cloudflare/pages-action@1
+        if: ${{ contains(github.ref, '-alpha.') }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: capgo-webapp-preprod
+          directory: dist
+          branch: main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   build_android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v1.1.1
         with:
           bun-version: latest
       - name: Install dependencies
@@ -124,7 +150,7 @@ jobs:
   # build_ios:
       # runs-on: macOS-latest
       # steps:
-      #   - uses: actions/checkout@v3
+      #   - uses: actions/checkout@v4
       #   - uses: pnpm/action-setup@v2
       #     with:
       #       version: 8

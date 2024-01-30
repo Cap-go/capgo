@@ -86,6 +86,16 @@ export function saveSpoof(jwt: string, refreshToken: string) {
   return localStorage.setItem(`supabase-${config.supbaseId}.spoof_admin_jwt`, JSON.stringify({ jwt, refreshToken }))
 }
 
+export async function hashEmail(email: string) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(email)
+
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return hashHex
+}
+
 export async function deleteUser() {
   const { error } = await useSupabase()
     .rpc('delete_user')

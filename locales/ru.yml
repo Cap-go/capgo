@@ -129,6 +129,8 @@ defined-as: Определяется как
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
+delete-account-0: Удалить аккаунт
+delete-your-account: Удалить свой аккаунт
 deleted: удален
 details-and-logs: Детали и журналы
 device: Устройство
@@ -181,6 +183,7 @@ last-update: Последнее обновление
 last-upload: Последняя загрузка
 last-version: Последняя версия
 launch-bundle: Пакет запуска
+leaving: Уход
 limit-reached: Достигнут предел
 live-reload: Живая перезагрузка
 loading-more-data: Загрузка дополнительных данных...

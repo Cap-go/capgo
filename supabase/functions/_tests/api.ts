@@ -3,8 +3,8 @@ import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv } from '../_utils/utils.ts'
 
 export const baseSupabase = 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/'
-export const baseNetlify = 'https://web.capgo.app/api/'
-export const baseNetlifyEdge = 'https://web.capgo.app/api-edge/'
+export const baseNetlify = 'https://webcapgo.netlify.app/api/'
+export const baseNetlifyEdge = 'https://webcapgo.netlify.app/api-edge/'
 
 const defaultAppId = 'unknow.unknow'
 const defaultVersion = '1.2.3'
