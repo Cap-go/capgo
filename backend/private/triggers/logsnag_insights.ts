@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
 import { supabaseAdmin } from '../../_utils/supabase.ts';
 import { Database } from '../../_utils/supabase.types.ts';
@@ -20,7 +20,7 @@ interface GlobalStats {
 
 async function getGithubStars(): Promise<number> {
   const res = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater')
-  const json = await res.json()
+  const json = await res.json() as any
   return json.stargazers_count
 }
 

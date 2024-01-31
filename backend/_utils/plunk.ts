@@ -1,5 +1,5 @@
-import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import axios from 'axios'
+import type { Context } from 'hono'
 import { getEnv, shallowCleanObject } from './utils.ts'
 
 export interface Segments {
@@ -80,9 +80,9 @@ export async function addContact(c: Context, email: string, data: any) {
   return response.data
 }
 
-export function addDataContact(email: string, data: Person, segments?: Segments) {
+export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
   console.log('addDataContact', email, data, segments)
-  return trackEvent(email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
+  return trackEvent(c, email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
 }
 
 export async function sendEmail(c: Context, to: string, subject: string, body: string) {

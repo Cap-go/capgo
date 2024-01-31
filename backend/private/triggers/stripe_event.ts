@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { BRES } from '../../_utils/hono.ts';
 import { customerToSegment, supabaseAdmin } from '../../_utils/supabase.ts';
 import { Person, addDataContact, trackEvent } from '../../_utils/plunk.ts';
@@ -56,7 +56,7 @@ app.post('/', async (c: Context) => {
       price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
     }
-    await addDataContact(user.email, userData)
+    await addDataContact(c, user.email, userData)
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
       stripeData.status = 'succeeded'
@@ -71,7 +71,7 @@ app.post('/', async (c: Context) => {
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
         if (customer && customer.product_id !== 'free' && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
-          await removeOldSubscription(customer.subscription_id)
+          await removeOldSubscription(c, customer.subscription_id)
 
         if (dbError2)
           return c.json({ error: JSON.stringify(dbError) }, 500)
@@ -79,7 +79,7 @@ app.post('/', async (c: Context) => {
         const isMonthly = plan.price_m_id === stripeData.price_id
         const segment = await customerToSegment(c, user.id, customer, plan)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
-        await addDataContact(user.email, userData, segment)
+        await addDataContact(c, user.email, userData, segment)
         await trackEvent(c, user.email, { plan: plan.name }, eventName)
         await trackEvent(c, user.email, {}, 'user:upgrade')
         await LogSnag.track({
@@ -92,14 +92,14 @@ app.post('/', async (c: Context) => {
       }
       else {
         const segment = await customerToSegment(c, user.id, customer)
-        await addDataContact(user.email, userData, segment)
+        await addDataContact(c, user.email, userData, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
         const segment = await customerToSegment(c, user.id, customer)
-        await addDataContact(user.email, userData, segment)
+        await addDataContact(c, user.email, userData, segment)
         await trackEvent(c, user.email, {}, 'user:cancel')
         await LogSnag.track({
           channel: 'usage',
@@ -121,7 +121,7 @@ app.post('/', async (c: Context) => {
     }
     else {
       const segment = await customerToSegment(c, user.id, customer)
-      await addDataContact(user.email, userData, segment)
+      await addDataContact(c, user.email, userData, segment)
     }
 
     return c.json({ received: true })

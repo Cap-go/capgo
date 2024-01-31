@@ -1,4 +1,4 @@
-import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
+import axios from 'axios'
 
 async function ipapi(ip: string, lang = 'en') {
   ip = ip || ''

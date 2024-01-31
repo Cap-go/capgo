@@ -1,5 +1,5 @@
-import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { Client } from 'minio'
+import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
 
 // import presign s3
@@ -12,50 +12,60 @@ function initR2(c: Context) {
   const access_key_secret = getEnv(c, 'R2_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const storageRegion = getEnv(c, 'S3_REGION')
-  const storagePort = Number.parseInt(c, getEnv('S3_PORT'))
+  const storagePort = Number.parseInt(getEnv(c, 'S3_PORT'))
   const storageUseSsl = getEnv(c, 'S3_SSL').toLocaleLowerCase() === 'true'
   const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
     useSSL: accountid ? true : storageUseSsl,
     port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
-    bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
 
-  return new S3Client(params)
+  return new Client(params)
 }
 
 function upload(c: Context, fileId: string, file: Uint8Array) {
   const client = initR2(c)
-  return client.putObject(fileId, file)
+  // Upload a file:
+  return new Promise((resolve, reject) => {
+    client.putObject(bucket, fileId, Buffer.from(file), (err, res) => {
+      if (err)
+        return reject(err)
+      resolve(res)
+    })
+  })
 }
 
 function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
-  return client.getPresignedUrl('PUT', fileId, { expirySeconds })
+  return client.presignedPutObject(bucket, fileId, expirySeconds)
 }
 
 function deleteObject(c: Context, fileId: string) {
   const client = initR2(c)
-  return client.deleteObject(fileId)
+  return client.removeObject(bucket, fileId)
 }
 
 function checkIfExist(c: Context, fileId: string) {
   const client = initR2(c)
-  return client.exists(fileId)
+  return new Promise((resolve) => {
+    client.getPartialObject(bucket, fileId, 0, 1, (err) => {
+      resolve(!err)
+    })
+  })
 }
 
 function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   const client = initR2(c)
-  return client.getPresignedUrl('GET', fileId, { expirySeconds })
+  return client.presignedGetObject(bucket, fileId, expirySeconds)
 }
-// get the size from r2
-async function getSizeChecksum(c: Context, fileId: string) {
+
+async function getSizeChecksum(c: Context,fileId: string) {
   const client = initR2(c)
-  const { size, metadata } = await client.statObject(fileId)
-  const checksum = metadata['x-amz-meta-crc32']
+  const { size, metaData } = await client.statObject(bucket, fileId)
+  const checksum = metaData['x-amz-meta-crc32']
   return { size, checksum }
 }
 

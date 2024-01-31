@@ -1,5 +1,5 @@
-import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import axios from 'axios'
+import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
 
 function getAuth(c: Context) {
@@ -100,7 +100,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   })
   console.log('data', data.toString())
   try {
-    const response = await axios.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(true))
+    const response = await axios.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(c, true))
     return response.data
   }
   catch (err2) {
@@ -109,8 +109,8 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   }
 }
 
-export async function createCustomer(email: string, userId: string, name: string) {
-  const config = getConfig(true)
+export async function createCustomer(c: Context, email: string, userId: string, name: string) {
+  const config = getConfig(c, true)
   const customerData = {
     email,
     name,
@@ -121,9 +121,9 @@ export async function createCustomer(email: string, userId: string, name: string
   return response.data
 }
 
-export async function setTreshold(subscriptionId: string) {
+export async function setTreshold(c: Context, subscriptionId: string) {
   // set treshold to 5000 USD
-  const config = getConfig(true)
+  const config = getConfig(c, true)
   const checkoutData = {
     billing_thresholds: {
       amount_gte: 5000,
@@ -135,8 +135,8 @@ export async function setTreshold(subscriptionId: string) {
   return response.data
 }
 
-export async function setBillingPeriod(subscriptionId: string) {
-  const config = getConfig(true)
+export async function setBillingPeriod(c: Context, subscriptionId: string) {
+  const config = getConfig(c, true)
   const checkoutData = {
     billing_cycle_anchor: 'now',
     proration_behavior: 'create_prorations',
@@ -146,8 +146,8 @@ export async function setBillingPeriod(subscriptionId: string) {
   return response.data
 }
 
-export async function updateCustomer(customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
-  const config = getConfig(true)
+export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
+  const config = getConfig(c, true)
   const customerData = {
     email: billing_email || email,
     name,
@@ -159,8 +159,8 @@ export async function updateCustomer(customerId: string, email: string, billing_
   return response.data
 }
 
-export async function recordUsage(subscriptionId: string, quantity: number) {
-  const config = getConfig(true)
+export async function recordUsage(c: Context, subscriptionId: string, quantity: number) {
+  const config = getConfig(c, true)
   const checkoutData = {
     quantity,
     action: 'set',
@@ -170,9 +170,9 @@ export async function recordUsage(subscriptionId: string, quantity: number) {
   return response.data
 }
 
-export async function removeOldSubscription(subscriptionId: string) {
-  const config = getConfig(true)
+export async function removeOldSubscription(c: Context, subscriptionId: string) {
+  const config = getConfig(c, true)
   console.log('removeOldSubscription', subscriptionId)
-  const response = await axios.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, undefined, config)
+  const response = await axios.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, config)
   return response.data
 }

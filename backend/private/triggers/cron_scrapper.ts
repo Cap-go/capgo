@@ -1,6 +1,6 @@
-import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import axios from 'axios'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
 import { supabaseAdmin } from '../../_utils/supabase.ts';
 import { categories } from '../../_utils/gplay_categ.ts';

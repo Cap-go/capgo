@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'

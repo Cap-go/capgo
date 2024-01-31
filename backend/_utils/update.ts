@@ -1,16 +1,15 @@
-// use_trans_macros
-import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1.0/mod.ts'
-import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import cryptoRandomString from 'crypto-random-string'
+import * as semver from 'semver'
+import type { Context } from 'hono'
 
 // eslint-disable-next-line import/newline-after-import
-import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js' // do_not_change
+import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js' // do_not_change
 
-import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
+import { and, eq, or, sql } from 'drizzle-orm'
 
 // eslint-disable-next-line import/newline-after-import
-import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
-import postgres from 'https://deno.land/x/postgresjs/mod.js'
+import { alias as alias_postgres } from 'drizzle-orm/pg-core' // do_not_change
+import postgres from 'postgres'
 import { getEnv } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
@@ -264,6 +263,7 @@ export async function update(c: Context, body: AppInfos) {
 
   const { alias, schema, drizzleCient } = getDrizzle(c)
 
+  const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body, new Date().toISOString())
@@ -314,7 +314,7 @@ export async function update(c: Context, body: AppInfos) {
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
       if (sent) {
-        await logsnag(c).track({
+        await LogSnag.track({
           channel: 'updates',
           event: 'semver issue',
           icon: '⚠️',
@@ -336,7 +336,7 @@ export async function update(c: Context, body: AppInfos) {
         current_app_id_url: appIdToUrl(app_id),
       }, appOwner.user_id, '0 0 * * 1', 'red')
       if (sent) {
-        await logsnag(c).track({
+        await LogSnag.track({
           channel: 'updates',
           event: 'plugin issue',
           icon: '⚠️',

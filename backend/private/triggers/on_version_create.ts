@@ -1,6 +1,6 @@
-import { crc32 } from 'https://deno.land/x/crc32/mod.ts'
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { buf as crc32 } from "crc-32/crc32c";
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
 import { InsertPayload, supabaseAdmin } from '../../_utils/supabase.ts';
 import { Database } from '../../_utils/supabase.types.ts';
@@ -83,7 +83,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       size = u.byteLength
       const unit8 = new Uint8Array(u)
       // cr32 hash the file
-      checksum = crc32(unit8)
+      checksum = crc32(unit8).toString(16)
       await r2.upload(c, record.bucket_id, unit8)
     }
 

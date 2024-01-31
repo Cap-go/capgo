@@ -17,7 +17,6 @@
   "deno.cacheOnSave": true,
   "editor.defaultFormatter": "denoland.vscode-deno",
   "deno.enablePaths": [
-    "./backend",
     "./supabase/functions",
     "./v2_netlify",
     "./v2_supabase",

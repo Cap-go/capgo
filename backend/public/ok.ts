@@ -1,6 +1,6 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { BRES, middlewareAPISecret } from '../_utils/hono.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
+import { BRES, middlewareAPISecret, middlewareKey } from '../_utils/hono.ts'
 
 export const app = new Hono()
 

@@ -1,7 +1,7 @@
-import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { env } from 'https://deno.land/x/hono@v3.12.7/helper.ts'
+import crypto from 'node:crypto'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Context } from 'hono'
+import { env } from 'hono/adapter'
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
 
@@ -151,5 +151,8 @@ export function makeHMACContent(payload: string, details: Details) {
 }
 
 export function createHmac(c: Context, data: string, details: Details) {
-  return hmac('sha256', getEnv(c, 'STRIPE_WEBHOOK_SECRET') || '', makeHMACContent(data, details), 'utf8', 'hex')
+  const hmac = crypto.createHmac('sha256', getEnv(c, 'STRIPE_WEBHOOK_SECRET'))
+  hmac.write(makeHMACContent(data, details))
+  hmac.end()
+  return hmac.read().toString('hex')
 }

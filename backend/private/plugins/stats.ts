@@ -1,7 +1,7 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
+import { z } from 'zod'
+import * as semver from 'semver'
 import {
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,

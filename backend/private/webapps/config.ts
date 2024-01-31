@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { getEnv } from '../../_utils/utils.ts'
 
 export const app = new Hono()

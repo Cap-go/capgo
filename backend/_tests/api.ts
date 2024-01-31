@@ -1,5 +1,5 @@
-import axios from 'https://deno.land/x/axiod@0.26.2/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import axios from 'axios'
+import type { Context } from 'hono'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { getEnv } from '../_utils/utils.ts'
 

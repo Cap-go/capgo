@@ -1,8 +1,8 @@
 // channel self old function
-import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import * as semver from 'semver'
+import { Hono } from 'hono'
+import { z } from 'zod'
+import type { Context } from 'hono'
 import { sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'
 import { BRES } from '../../_utils/hono.ts'
 import type { AppInfos } from '../../_utils/types.ts'

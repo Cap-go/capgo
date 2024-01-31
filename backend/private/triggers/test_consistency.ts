@@ -1,6 +1,6 @@
-import { equal } from 'https://deno.land/x/equal@v1.5.0/mod.ts'
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { equal } from 'lauqe'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { BRES } from '../../_utils/hono.ts';
 import {
   baseNetlify,

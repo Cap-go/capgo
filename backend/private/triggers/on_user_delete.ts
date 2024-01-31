@@ -1,5 +1,5 @@
-import { Hono } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
 import { DeletePayload } from '../../_utils/supabase.ts';
 import { Database } from '../../_utils/supabase.types.ts';

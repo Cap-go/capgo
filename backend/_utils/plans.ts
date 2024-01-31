@@ -1,4 +1,4 @@
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import type { Context } from 'hono'
 import { logsnag } from './logsnag.ts'
 import { sendNotif } from './notifications.ts'
 import {

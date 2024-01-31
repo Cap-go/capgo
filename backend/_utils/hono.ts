@@ -1,4 +1,5 @@
-import { type Context, type Next, type MiddlewareHandler, HTTPException } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
+import { type Context, type Next, type MiddlewareHandler } from 'hono'
+import { HTTPException} from 'hono/http-exception'
 import { checkKey, getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import { supabaseAdmin } from './supabase.ts'

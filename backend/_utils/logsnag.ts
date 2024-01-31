@@ -1,7 +1,6 @@
-import { LogSnag } from 'https://cdn.logsnag.com/deno/1.0.0-beta.6/index.ts'
+import { LogSnag } from 'logsnag'
+import { Context } from 'hono';
 import { getEnv } from './utils.ts'
-import { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts';
-
 
 interface LogSnagExt extends LogSnag {
   insights(data: { title: string, value: string | boolean | number, icon: string }[]): Promise<void>

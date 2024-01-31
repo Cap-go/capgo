@@ -1,5 +1,5 @@
-import type { Context } from 'https://deno.land/x/hono@v3.12.7/mod.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
+import type { Context } from 'hono'
+import { createClient } from '@supabase/supabase-js'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
@@ -763,7 +763,7 @@ export async function getStripeCustomer(c: Context, customerId: string) {
 }
 
 export async function createStripeCustomer(c: Context, user: Database['public']['Tables']['users']['Row']) {
-  const customer = await createCustomer(user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
+  const customer = await createCustomer(c, user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
@@ -797,8 +797,8 @@ export async function createStripeCustomer(c: Context, user: Database['public'][
     .select()
     .eq('stripe_id', customer.product_id)
     .single()
-  const segment = await customerToSegment(user.id, customer, plan)
-  await addDataContact(user.email, { ...person, ...segment }).catch((e) => {
+  const segment = await customerToSegment(c, user.id, customer, plan)
+  await addDataContact(c, user.email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })
   console.log('stripe_info done')
