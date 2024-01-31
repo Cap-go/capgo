@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { Ref, onMounted, ref } from 'vue'
+import type { Ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
+import type { Factor } from '@supabase/supabase-js'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
 import { iconEmail, iconPassword, mfaIcon } from '~/services/icons'
-import { Factor } from '@supabase/supabase-js'
 
 const route = useRoute()
 const supabase = useSupabase()
@@ -31,62 +32,65 @@ async function nextLogin() {
 async function submit(form: { email: string, password: string, code: string }) {
   if (stauts.value === 'login') {
     isLoading.value = true
-  const { error } = await supabase.auth.signInWithPassword({
-    email: form.email,
-    password: form.password,
-  })
-  isLoading.value = false
-  if (error) {
-    console.error('error', error)
-    setErrors('login-account', [error.message], {})
-    toast.error(t('invalid-auth'))
-  }
-  else {
-    const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    })
+    isLoading.value = false
     if (error) {
-      setErrors('login-account', ['See browser console'], {})
-      console.error('Cannot getm MFA factors', error)
-      return
+      console.error('error', error)
+      setErrors('login-account', [error.message], {})
+      toast.error(t('invalid-auth'))
     }
-
-    const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
-    if (unverified && unverified.length > 0) {
-      console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
-      const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
-      
-      responses.filter(res => !!res.error).forEach(res => console.error('Failed to unregister', error))
-    }
-
-    const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
-    const hasMfa = !!mfaFactor
-    
-    if (hasMfa) {
-      mfaLoginFactor.value = mfaFactor
-      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
-      if (errorChallenge) {
+    else {
+      const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+      if (error) {
         setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot challange mfa', errorChallenge)
+        console.error('Cannot getm MFA factors', error)
         return
       }
 
-      mfaChallangeId.value = challenge.id
-      stauts.value = '2fa'
-    } else {
-      await nextLogin()
+      const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
+      if (unverified && unverified.length > 0) {
+        console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
+        const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
+
+        responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
+      }
+
+      const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+      const hasMfa = !!mfaFactor
+
+      if (hasMfa) {
+        mfaLoginFactor.value = mfaFactor
+        const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
+        if (errorChallenge) {
+          setErrors('login-account', ['See browser console'], {})
+          console.error('Cannot challange mfa', errorChallenge)
+          return
+        }
+
+        mfaChallangeId.value = challenge.id
+        stauts.value = '2fa'
+      }
+      else {
+        await nextLogin()
+      }
     }
   }
-  } else {
+  else {
     // http://localhost:5173/app/home
     const verify = await supabase.auth.mfa.verify({
       factorId: mfaLoginFactor.value!.id!,
       challengeId: mfaChallangeId.value!,
-      code: form.code.replace(' ', '')
+      code: form.code.replace(' ', ''),
     })
 
     if (verify.error) {
       toast.error(t('invalid-mfa-code'))
       console.error('verify error', verify.error)
-    } else {
+    }
+    else {
       await nextLogin()
     }
   }
@@ -127,7 +131,8 @@ async function checkLogin() {
 
       stauts.value = '2fa'
       isLoading.value = false
-    } else {
+    }
+    else {
       await nextLogin()
     }
   }
@@ -181,7 +186,7 @@ async function checkLogin() {
 }
 
 const mfaRegex = /(([0-9]){6})|(([0-9]){3} ([0-9]){3})$/
-const mfa_code_validation = function(node: { value: any}) {
+const mfa_code_validation = function (node: { value: any }) {
   return Promise.resolve(mfaRegex.test(node.value))
 }
 
@@ -294,14 +299,14 @@ onMounted(checkLogin)
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <FormKit id="login-account" type="form" :actions="false" @submit="submit" autocapitalize="off">
+            <FormKit id="login-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
               <div class="space-y-5">
                 <FormKit
                   type="text" name="code" :disabled="isLoading" input-class="!text-black"
                   :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
                   :validation-rules="{ mfa_code_validation }"
                   :validation-messages="{
-                    mfa_code_validation: '2FA authentication code is not formated properly'
+                    mfa_code_validation: '2FA authentication code is not formated properly',
                   }"
                   placeholder="xxx xxx"
                   autocomplete="off"
@@ -331,8 +336,8 @@ onMounted(checkLogin)
                 </div>
 
                 <div class="text-center">
-                  <p class="text-base text-gray-600">
-                    <p @click="goback()"  class="text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline font-medium">{{ t('go-back') }}</p>
+                  <p class="text-base text-gray-600" /><p class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline" @click="goback()">
+                    {{ t('go-back') }}
                   </p>
                   <p class="pt-2 text-gray-300">
                     {{ version }}

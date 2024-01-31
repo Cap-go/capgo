@@ -6,17 +6,17 @@ export interface ActionSheetOptionButton {
   id?: string
   selected?: boolean
   handler?: () => void
-  role?: string,
+  role?: string
   preventClose?: boolean
 }
 export interface ActionSheetOption {
   header?: string
-  message?: string,
-  image?: string,
-  headerStyle?: string,
-  textStyle?: string,
-  input?: boolean,
-  size?: string,
+  message?: string
+  image?: string
+  headerStyle?: string
+  textStyle?: string
+  input?: boolean
+  size?: string
   buttonCenter?: boolean
   buttons?: ActionSheetOptionButton[]
 }
@@ -79,7 +79,7 @@ export const useDisplayStore = defineStore('display', () => {
     lastButtonRole,
     NavTitle,
     defaultBack,
-    dialogInputText
+    dialogInputText,
   }
 })
 

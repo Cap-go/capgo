@@ -89,9 +89,9 @@ onMounted(() => {
         <!-- Modal body -->
         <div class="p-6 space-y-6">
           <p :class="`text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400 ${displayStore.dialogOption?.textStyle}`" v-html="displayText(displayStore.dialogOption?.message)" />
-          <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto"/>
-          <div class="flex flex-row max-w-2xl" v-if="displayStore.dialogOption?.input">
-            <input v-model="displayStore.dialogInputText" id="dialog-input-field" class="border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 w-full ml-4" type="text">
+          <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
+          <div v-if="displayStore.dialogOption?.input" class="flex flex-row max-w-2xl">
+            <input id="dialog-input-field" v-model="displayStore.dialogInputText" class="border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 w-full ml-4" type="text">
           </div>
         </div>
         <!-- Modal footer -->

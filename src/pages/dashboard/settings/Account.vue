@@ -16,7 +16,6 @@ import IconVersion from '~icons/radix-icons/update'
 import { availableLocales, i18n, languages, loadLanguageAsync } from '~/modules/i18n'
 import { iconEmail, iconName } from '~/services/icons'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { M } from '@upstash/redis/zmscore-415f6c9f'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -215,7 +214,6 @@ async function handleMfa() {
       return
     }
 
-    
     displayStore.dialogOption = {
       header: t('enable-2FA'),
       message: `${t('mfa-enable-instruction')}`,
@@ -237,11 +235,10 @@ async function handleMfa() {
     if (didCancel) {
       // User closed the window, go ahead and unregister mfa
       const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-      if (error) {
+      if (error)
         console.error('Cannot unregister MFA', unregisterError)
-        return
-      }
-    } else {
+    }
+    else {
       // User has scanned the code - verify his claim
 
       // Open the dialog
@@ -261,7 +258,7 @@ async function handleMfa() {
             handler: async () => {
               // User has clicked the "verify button - let's check"
               const verifyCode = displayStore.dialogInputText.replace(' ', '')
-              
+
               const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
 
               if (challengeError) {
@@ -270,7 +267,7 @@ async function handleMfa() {
                 displayStore.showDialog = false
                 return
               }
-              
+
               const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
               if (verifyError) {
                 toast.error(t('mfa-invalid-code'))
@@ -281,7 +278,7 @@ async function handleMfa() {
               mfaEnabled.value = true
               mfaFactorId.value = data.id
               displayStore.showDialog = false
-            }
+            },
           },
         ],
       }
@@ -292,13 +289,12 @@ async function handleMfa() {
       if (didCancel) {
         // User closed the window, go ahead and unregister mfa
         const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-        if (error) {
+        if (error)
           console.error('Cannot unregister MFA', unregisterError)
-          return
-        }
       }
     }
-  } else {
+  }
+  else {
     // disable mfa
     displayStore.dialogOption = {
       header: t('alert-2fa-disable'),
@@ -329,7 +325,7 @@ async function handleMfa() {
       return
     }
 
-    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: factorId })
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
     if (unregisterError) {
       toast.error(t('mfa-fail'))
       console.error('Cannot unregister MFA', unregisterError)
@@ -341,8 +337,6 @@ async function handleMfa() {
     toast.success(t('2fa-disabled'))
   }
 }
-
-
 
 onMounted(async () => {
   initDropdowns()
@@ -357,16 +351,15 @@ onMounted(async () => {
   if (unverified && unverified.length > 0) {
     console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
     const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
-    
-    responses.filter(res => !!res.error).forEach(res => console.error('Failed to unregister', error))
+
+    responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
   }
 
   const hasMfa = mfaFactors?.all.find(factor => factor.status === 'verified')
   mfaEnabled.value = !!hasMfa
 
-  if (hasMfa) {
+  if (hasMfa)
     mfaFactorId.value = hasMfa.id
-  }
 })
 </script>
 
@@ -415,14 +408,14 @@ onMounted(async () => {
           </div>
         </section>
 
-       <section class="flex flex-col md:flex-row md:items-center items-left">
+        <section class="flex flex-col md:flex-row md:items-center items-left">
           <p class="text-slate-800 dark:text-white">
             {{ t('2fa') }}
           </p>
           <button :class="`md:ml-6 text-white ${!mfaEnabled ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-800' : 'bg-red-500 hover:bg-red-600 focus:ring-rose-600'} focus:ring-4 focus:outline-none font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center`" @click="handleMfa">
             {{ !mfaEnabled ? t('enable') : t('disable') }}
           </button>
-       </section>
+        </section>
 
         <!-- Personal Info -->
         <section>

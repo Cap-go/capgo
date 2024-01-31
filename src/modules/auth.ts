@@ -21,9 +21,8 @@ async function guard(next: any, to: string, from: string) {
     return
   }
 
-  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2') {
+  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2')
     return next('/login')
-  }
 
   if (auth.user && !main.auth) {
     main.auth = auth.user
