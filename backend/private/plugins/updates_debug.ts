@@ -1,6 +1,8 @@
-import { z } from 'zod'
+// @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+// @transform node import 'zod' to deno 'npm:zod'
+import { z } from 'zod'
 import { middlewareKey } from '../../_utils/hono.ts'
 import { update } from '../../_utils/update.ts'
 import {

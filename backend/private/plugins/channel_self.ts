@@ -1,6 +1,9 @@
 // channel self old function
+// @transform node import 'semver' to deno 'npm:semver'
 import * as semver from 'semver'
+// @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
+// @transform node import 'zod' to deno 'npm:zod'
 import { z } from 'zod'
 import type { Context } from 'hono'
 import { sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'

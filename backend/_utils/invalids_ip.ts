@@ -1,3 +1,4 @@
+// @transform node import 'axios' to deno 'npm:axios'
 import axios from 'axios'
 
 async function ipapi(ip: string, lang = 'en') {

@@ -1,3 +1,4 @@
+// @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getEnv } from '../../_utils/utils.ts'

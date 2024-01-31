@@ -1,4 +1,6 @@
+// @transform node import 'minio' to deno 'npm:minio'
 import { Client } from 'minio'
+// @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
 

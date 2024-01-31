@@ -1,6 +1,6 @@
+// @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES } from '../../_utils/hono.ts';
 import { customerToSegment, supabaseAdmin } from '../../_utils/supabase.ts';
 import { Person, addDataContact, trackEvent } from '../../_utils/plunk.ts';
 import { logsnag } from '../../_utils/logsnag.ts';

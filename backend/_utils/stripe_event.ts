@@ -1,3 +1,4 @@
+// @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
 import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'
@@ -40,7 +41,7 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   if (!details.signatures.length)
     throw new Error('No signatures found with expected scheme')
 
-  const expectedSignature = createHmac(body, details, c)
+  const expectedSignature = createHmac(c, body, details)
   const signatureFound = !!details.signatures.filter(a => scmpCompare(a, expectedSignature as string)).length
 
   if (!signatureFound)

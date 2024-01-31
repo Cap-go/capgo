@@ -1,5 +1,6 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
+// @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
 
 // eslint-disable-next-line import/newline-after-import
@@ -8,6 +9,7 @@ import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js' // do_not
 import { and, eq, or, sql } from 'drizzle-orm'
 
 // eslint-disable-next-line import/newline-after-import
+// @transform node import 'drizzle-orm' to deno 'npm:drizzle-orm'
 import { alias as alias_postgres } from 'drizzle-orm/pg-core' // do_not_change
 import postgres from 'postgres'
 import { getEnv } from '../_utils/utils.ts'

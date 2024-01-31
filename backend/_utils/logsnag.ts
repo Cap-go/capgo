@@ -1,4 +1,6 @@
+// @transform node import 'logsnag' to deno 'npm:logsnag'
 import { LogSnag } from 'logsnag'
+// @transform node import 'hono' to deno 'npm:hono'
 import { Context } from 'hono';
 import { getEnv } from './utils.ts'
 

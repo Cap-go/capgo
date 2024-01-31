@@ -1,3 +1,4 @@
+// @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
 import { logsnag } from './logsnag.ts'
 import { sendNotif } from './notifications.ts'
@@ -99,7 +100,7 @@ async function setMetered(c: Context, customer_id: string | null, userId: string
     .single()
   if (data && data.subscription_metered) {
     try {
-      await setTreshold(customer_id)
+      await setTreshold(c, customer_id)
     }
     catch (error) {
       console.log('error setTreshold', error)
@@ -107,11 +108,11 @@ async function setMetered(c: Context, customer_id: string | null, userId: string
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(c, userId)
     if (get_metered_usage.mau > 0 && prices.mau)
-      await recordUsage(prices.mau, get_metered_usage.mau)
+      await recordUsage(c, prices.mau, get_metered_usage.mau)
     if (get_metered_usage.storage > 0)
-      await recordUsage(prices.storage, get_metered_usage.storage)
+      await recordUsage(c, prices.storage, get_metered_usage.storage)
     if (get_metered_usage.bandwidth > 0)
-      await recordUsage(prices.bandwidth, get_metered_usage.bandwidth)
+      await recordUsage(c, prices.bandwidth, get_metered_usage.bandwidth)
   }
 }
 
@@ -128,7 +129,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
       const { error } = await supabaseAdmin(c)
         .from('stripe_info')
         .update({ is_good_plan: true })
-        .eq('customer_id', user.customer_id)
+        .eq('customer_id', user.customer_id!)
         .then()
       if (error)
         console.error('error.message', error.message)

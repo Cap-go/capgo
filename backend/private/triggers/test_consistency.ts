@@ -1,4 +1,6 @@
+// @transform node import 'lauqe' to deno 'npm:lauqe'
 import { equal } from 'lauqe'
+// @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { BRES } from '../../_utils/hono.ts';
