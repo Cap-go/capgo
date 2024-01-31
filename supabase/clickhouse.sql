@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS devices_u
     version_build String,
     version Int64,
     is_prod UInt8,
-    is_emulator UInt8,
+    is_emulator UInt8
 ) ENGINE = ReplacingMergeTree(updated_at)
 PARTITION BY toYYYYMM(updated_at)
 ORDER BY (device_id);
