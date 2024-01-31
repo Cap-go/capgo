@@ -4,7 +4,7 @@
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
-  X-XSS-Protection: '1; mode=block'
+  X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin
 /api/*
   cache-control: public, s-max-age=60
