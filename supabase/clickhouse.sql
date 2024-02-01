@@ -10,8 +10,7 @@ CREATE TABLE IF NOT EXISTS devices
     version_build String,
     version Int64,
     is_prod UInt8,
-    is_emulator UInt8,
-    last_mau DateTime64(6)
+    is_emulator UInt8
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(updated_at)
 ORDER BY (app_id, device_id, updated_at)
