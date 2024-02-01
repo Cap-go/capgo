@@ -131,6 +131,22 @@ SELECT
 FROM app_versions_meta
 GROUP BY date, app_id;
 
+-- 
+-- MAU aggregation
+-- 
+
+CREATE TABLE IF NOT EXISTS mau
+(
+    date Date,
+    app_id String,
+    total AggregateFunction(uniq, String)
+) ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_id);
+-- select date, app_id, sum(mau) as mau from mau_mv group by date, app_id
+-- drop table mau_mv
+-- select * from mau_mv
+
 -- Aggregate table partitioned by version only
 CREATE TABLE IF NOT EXISTS version_aggregate_logs
 (
@@ -204,7 +220,7 @@ FROM (
     ) group by app_id
 ) group by app_id, date order by date desc;
 
-CREATE VIEW IF NOT EXISTS mau as
+CREATE VIEW mau_final IF NOT EXISTS as
 SELECT DISTINCT ON (m.date,m.app_id) 
   m.date AS date,
   m.app_id AS app_id,

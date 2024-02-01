@@ -1506,7 +1506,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
---     table 'mau'
+--     table 'mau_final'
 --   );
 
 CREATE TABLE "public"."devices" (
