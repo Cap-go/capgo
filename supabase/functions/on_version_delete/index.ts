@@ -60,13 +60,13 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     console.log('Cannot find version meta', record.id)
     return sendRes()
   }
-  await sendMetaToClickHouse({
+  await sendMetaToClickHouse([{
     id: record.id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
     size: data.size,
     action: 'delete',
-  })
+  }])
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin()
     .from('app_versions_meta')
