@@ -205,7 +205,7 @@ FROM (
     ) group by app_id
 ) group by app_id, date order by date desc;
 
-CREATE VIEW mau IF NOT EXISTS as
+CREATE VIEW IF NOT EXISTS mau as
 SELECT DISTINCT ON (m.date,m.app_id) 
   m.date AS date,
   m.app_id AS app_id,
