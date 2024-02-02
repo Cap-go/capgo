@@ -1,6 +1,5 @@
 import type { Database } from './supabase.types.ts'
-import { getEnv } from './utils.ts'
-import { convertAllDatesToCH } from '../../../src/services/date.ts';
+import { convertAllDatesToCH, getEnv } from './utils.ts'
 
 export function isClickHouseEnabled() {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
