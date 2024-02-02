@@ -1,5 +1,5 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
-import dayjs from 'npm:dayjs@1.11.7'
+import dayjs from 'https://cdn.skypack.dev/dayjs'; 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
