@@ -54,44 +54,12 @@
 # auto egde generate
 
 [[edge_functions]]
-  path = "/api-edge/bundle"
-  function = "bundle"
-
-[[edge_functions]]
-  path = "/bundle"
-  function = "bundle"
-
-[[edge_functions]]
-  path = "/api-edge/channel"
-  function = "channel"
-
-[[edge_functions]]
-  path = "/channel"
-  function = "channel"
-
-[[edge_functions]]
   path = "/api-edge/channel_self"
   function = "channel_self"
 
 [[edge_functions]]
   path = "/channel_self"
   function = "channel_self"
-
-[[edge_functions]]
-  path = "/api-edge/device"
-  function = "device"
-
-[[edge_functions]]
-  path = "/device"
-  function = "device"
-
-[[edge_functions]]
-  path = "/api-edge/ok"
-  function = "ok"
-
-[[edge_functions]]
-  path = "/ok"
-  function = "ok"
 
 [[edge_functions]]
   path = "/api-edge/plans"
@@ -102,20 +70,20 @@
   function = "plans"
 
 [[edge_functions]]
-  path = "/api-edge/stats"
-  function = "stats"
+  path = "/api-edge/ok"
+  function = "ok"
 
 [[edge_functions]]
-  path = "/stats"
-  function = "stats"
+  path = "/ok"
+  function = "ok"
 
 [[edge_functions]]
-  path = "/api-edge/store_top"
-  function = "store_top"
+  path = "/api-edge/bundle"
+  function = "bundle"
 
 [[edge_functions]]
-  path = "/store_top"
-  function = "store_top"
+  path = "/bundle"
+  function = "bundle"
 
 [[edge_functions]]
   path = "/api-edge/updates"
@@ -126,10 +94,42 @@
   function = "updates"
 
 [[edge_functions]]
+  path = "/api-edge/channel"
+  function = "channel"
+
+[[edge_functions]]
+  path = "/channel"
+  function = "channel"
+
+[[edge_functions]]
+  path = "/api-edge/store_top"
+  function = "store_top"
+
+[[edge_functions]]
+  path = "/store_top"
+  function = "store_top"
+
+[[edge_functions]]
+  path = "/api-edge/device"
+  function = "device"
+
+[[edge_functions]]
+  path = "/device"
+  function = "device"
+
+[[edge_functions]]
   path = "/api-edge/website_stats"
   function = "website_stats"
 
 [[edge_functions]]
   path = "/website_stats"
   function = "website_stats"
+
+[[edge_functions]]
+  path = "/api-edge/stats"
+  function = "stats"
+
+[[edge_functions]]
+  path = "/stats"
+  function = "stats"
 
