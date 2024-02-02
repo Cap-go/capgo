@@ -40,6 +40,7 @@ function upload(c: Context, fileId: string, file: Uint8Array) {
   })
 }
 
+
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
 

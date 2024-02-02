@@ -65,29 +65,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       }, 500)
     }
 
-    let checksum = ''
-    let size = 0
-    if (record.storage_provider === 'r2-direct') {
-      // skip checksum and size for r2-direct
-      console.log('r2-direct skip checksum and size')
-    }
-    else {
-      const { data, error } = await supabaseAdmin(c)
-        .storage
-        .from(`apps/${record.user_id}/${record.app_id}/versions`)
-        .download(record.bucket_id)
-      if (error || !data) {
-        console.log('Error', record.bucket_id, error)
-        return c.json(BRES)
-      }
-      const u = await data.arrayBuffer()
-      // get the size of the Uint8Array
-      size = u.byteLength
-      const unit8 = new Uint8Array(u)
-      // cr32 hash the file
-      checksum = crc32(unit8).toString(16)
-      await r2.upload(c, record.bucket_id, unit8)
-    }
+    const checksum = ''
+    const size = 0
 
     // create app version meta
     const { error: dbError } = await supabaseAdmin(c)
@@ -109,27 +88,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }])
     if (dbError)
       console.error('Cannot create app version meta', dbError)
-    if (record.storage_provider === 'r2-direct')
-      return c.json(BRES) // skip delete s3 and increment size in new upload
+    return c.json(BRES) // skip delete s3 and increment size in new upload
 
-    // `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-    // modify app_versions to set storage to r2
-    const { error: errorUpdateStorage } = await supabaseAdmin(c)
-      .from('app_versions')
-      .update({
-        storage_provider: 'r2',
-      })
-      .eq('id', record.id)
-    if (errorUpdateStorage)
-      console.log('errorUpdateStorage', errorUpdateStorage)
-    // remove from supabase storage after r2 upload
-    const { error: errorDelete } = await supabaseAdmin(c)
-      .storage
-      .from(`apps/${record.user_id}/${record.app_id}/versions`)
-      .remove([record.bucket_id])
-    if (errorDelete)
-      console.log('errorDelete', errorDelete)
-    return c.json(BRES)
   } catch (e) {
     return c.json({ status: 'Cannot process version', error: JSON.stringify(e) }, 500)
   }

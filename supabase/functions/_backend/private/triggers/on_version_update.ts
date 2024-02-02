@@ -27,64 +27,31 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
     console.log('no id')
     return c.json(BRES)
   }
-  const exist = await r2.checkIfExist(c, record.bucket_id)
-  console.log('exist ?', record.app_id, record.bucket_id, exist)
-  if (!exist && !record.bucket_id.endsWith('.zip')) {
-    console.log('upload to r2', record.bucket_id)
-    // upload to r2
-    const { data, error } = await supabaseAdmin(c)
-      .storage
-      .from(`apps/${record.user_id}/${record.app_id}/versions`)
-      .download(record.bucket_id)
-    if (error || !data) {
-      console.log('Cannot download', record.bucket_id)
-      return c.json(BRES)
-    }
-    try {
-      const u = await data.arrayBuffer()
-      const unit8 = new Uint8Array(u)
-      await r2.upload(c, record.bucket_id, unit8)
-      const { error: errorUpdateStorage } = await supabaseAdmin(c)
-        .from('app_versions')
+  const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+  const existV2 = await r2.checkIfExist(c, v2Path)
+
+  if (existV2 && record.storage_provider === 'r2') {
+    // pdate size and checksum
+    console.log('V2', record.bucket_id)
+    const { size, checksum } = await r2.getSizeChecksum(c, v2Path)
+    if (size) {
+      // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
+      const { error: errorUpdate } = await supabaseAdmin(c)
+        .from('app_versions_meta')
         .update({
-          storage_provider: 'r2',
+          size,
+          checksum,
         })
         .eq('id', record.id)
-      if (errorUpdateStorage)
-        console.log('errorUpdateStorage', errorUpdateStorage)
-    }
-    catch (error) {
-      console.log('Cannot upload', record.bucket_id, error)
-      return c.json(BRES)
-    }
-  }
-  else {
-    const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-    const existV2 = await r2.checkIfExist(c, v2Path)
-
-    if (existV2 && record.storage_provider === 'r2') {
-      // pdate size and checksum
-      console.log('V2', record.bucket_id)
-      const { size, checksum } = await r2.getSizeChecksum(c, v2Path)
-      if (size) {
-        // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
-        const { error: errorUpdate } = await supabaseAdmin(c)
-          .from('app_versions_meta')
-          .update({
-            size,
-            checksum,
-          })
-          .eq('id', record.id)
-        if (errorUpdate)
-          console.log('errorUpdate', errorUpdate)
-        await sendMetaToClickHouse(c, [{
-          id: record.id,
-          created_at: new Date().toISOString(),
-          app_id: record.app_id,
-          size,
-          action: 'add',
-        }])
-      }
+      if (errorUpdate)
+        console.log('errorUpdate', errorUpdate)
+      await sendMetaToClickHouse(c, [{
+        id: record.id,
+        created_at: new Date().toISOString(),
+        app_id: record.app_id,
+        size,
+        action: 'add',
+      }])
     }
   }
   return c.json(BRES)
@@ -102,32 +69,16 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   }
   console.log('Delete', record.bucket_id)
 
-  // check if in r2 storage and delete
-  const exist = await r2.checkIfExist(c, record.bucket_id)
+  const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+  const existV2 = await r2.checkIfExist(c, v2Path)
 
-  if (exist) {
-    // delete in r2
+  if (existV2) {
     try {
-      await r2.deleteObject(c, record.bucket_id)
+      await r2.deleteObject(c, v2Path)
     }
     catch (error) {
-      console.log('Cannot delete r2', record.bucket_id, error)
+      console.log('Cannot delete r2 (v2)', record.bucket_id, error)
       return c.json(BRES)
-    }
-  }
-  else {
-    // delete in r2 (V2)
-    const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-    const existV2 = await r2.checkIfExist(c, v2Path)
-
-    if (existV2) {
-      try {
-        await r2.deleteObject(c, v2Path)
-      }
-      catch (error) {
-        console.log('Cannot delete r2 (v2)', record.bucket_id, error)
-        return c.json(BRES)
-      }
     }
   }
 

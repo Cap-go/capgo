@@ -17,8 +17,5 @@ export async function getBundleUrl(c: Context, platform: string, path: string, b
   else if (platform === 'r2' && bucket_id.endsWith('.zip')) {
     return await r2.getSignedUrl(c, `${path}/${bucket_id}`, EXPIRATION_SECONDS)
   }
-  else if (platform === 'r2' && !bucket_id.endsWith('.zip')) {
-    return await r2.getSignedUrl(c, bucket_id, EXPIRATION_SECONDS)
-  }
   return null
 }
