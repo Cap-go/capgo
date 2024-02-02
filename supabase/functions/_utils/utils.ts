@@ -1,5 +1,5 @@
 import { hmac } from 'https://deno.land/x/hmac@v2.0.1/mod.ts'
-import dayjs from "npm:dayjs@1.11.7"
+import dayjs from 'npm:dayjs@1.11.7'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
@@ -168,10 +168,9 @@ export function convertAllDatesToCH(obj: any) {
   // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
   const datesFields = ['created_at', 'updated_at']
   const newObj = { ...obj }
-  datesFields.forEach(field => {
-    if (newObj[field]) {
+  datesFields.forEach((field) => {
+    if (newObj[field])
       newObj[field] = formatDateCH(newObj[field])
-    }
   })
   return newObj
 }

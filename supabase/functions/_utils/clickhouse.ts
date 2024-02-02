@@ -35,8 +35,8 @@ export function sendDeviceToClickHouse(devices: Database['public']['Tables']['de
     last_mau: undefined,
     updated_at: new Date(),
   }))
-  .map(convertAllDatesToCH)
-  .map(l => JSON.stringify(l)).join('\n')
+    .map(convertAllDatesToCH)
+    .map(l => JSON.stringify(l)).join('\n')
   console.log('sending device to Clickhouse', devicesReady)
   // http://127.0.0.1:8123/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow
   return fetch(
@@ -70,8 +70,8 @@ export function sendMetaToClickHouse(meta: ClickHouseMeta[]) {
 
   console.log('sending meta to Clickhouse', meta)
   const metasReady = meta
-  .map(convertAllDatesToCH)
-  .map(l => JSON.stringify(l)).join('\n')
+    .map(convertAllDatesToCH)
+    .map(l => JSON.stringify(l)).join('\n')
   return fetch(
       `${clickHouseURL()}/?query=INSERT INTO app_versions_meta SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
       {
@@ -96,8 +96,8 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
 
   // make log a string with a newline between each log
   const logReady = logs
-  .map(convertAllDatesToCH)
-  .map(l => JSON.stringify(l)).join('\n')
+    .map(convertAllDatesToCH)
+    .map(l => JSON.stringify(l)).join('\n')
   console.log('sending log to Clickhouse', logReady)
   return fetch(
     `${clickHouseURL()}/?query=INSERT INTO logs SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,

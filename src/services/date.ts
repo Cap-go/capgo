@@ -12,10 +12,9 @@ export function convertAllDatesToCH(obj: any) {
   // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
   const datesFields = ['created_at', 'updated_at']
   const newObj = { ...obj }
-  datesFields.forEach(field => {
-    if (newObj[field]) {
+  datesFields.forEach((field) => {
+    if (newObj[field])
       newObj[field] = formatDateCH(newObj[field])
-    }
   })
   return newObj
 }
