@@ -28,18 +28,6 @@ function initR2(c: Context) {
   return new Client(params)
 }
 
-function upload(c: Context, fileId: string, file: Uint8Array) {
-  const client = initR2(c)
-  // Upload a file:
-  return new Promise((resolve, reject) => {
-    client.putObject(bucket, fileId, Buffer.from(file), (err, res) => {
-      if (err)
-        return reject(err)
-      resolve(res)
-    })
-  })
-}
-
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
@@ -83,7 +71,6 @@ async function getSizeChecksum(c: Context,fileId: string) {
 }
 
 export const r2 = {
-  upload,
   getSizeChecksum,
   deleteObject,
   checkIfExist,
