@@ -161,7 +161,7 @@ export function createHmac(data: string, details: Details) {
 }
 
 export function formatDateCH(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
+  return dayjs(date).format('YYYY-MM-DD HH:mm:ss.000')
 }
 
 export function convertAllDatesToCH(obj: any) {

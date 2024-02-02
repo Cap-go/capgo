@@ -17,6 +17,7 @@ function clickHousePassword() {
 function clickHouseAuth() {
   return `Basic ${btoa(`${clickHouseUser()}:${clickHousePassword()}`)}`
 }
+
 function clickhouseAuthEnabled() {
   return !!clickHouseUser() && !!clickHousePassword()
 }
@@ -105,10 +106,12 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
       method: 'POST',
       // add created_at: new Date().toISOString() to each log
       body: logReady,
-      headers: {
-        // 'Authorization': clickHouseAuth(),
-        'Content-Type': 'text/plain',
-      },
+      headers: clickhouseAuthEnabled()
+      ? {
+          'Authorization': clickHouseAuth(),
+          'Content-Type': 'text/plain',
+        }
+      : { 'Content-Type': 'text/plain' },
     },
   )
     .then(res => res.text())
