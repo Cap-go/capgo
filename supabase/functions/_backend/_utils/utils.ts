@@ -3,7 +3,9 @@ import crypto from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 // @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
+import dayjs from 'dayjs'; 
 import { env } from 'hono/adapter'
+
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
 
@@ -157,4 +159,19 @@ export function createHmac(c: Context, data: string, details: Details) {
   hmac.write(makeHMACContent(data, details))
   hmac.end()
   return hmac.read().toString('hex')
+}
+
+export function formatDateCH(date: string | undefined) {
+  return dayjs(date).format('YYYY-MM-DD HH:mm:ss.000')
+}
+
+export function convertAllDatesToCH(obj: any) {
+  // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
+  const datesFields = ['created_at', 'updated_at']
+  const newObj = { ...obj }
+  datesFields.forEach((field) => {
+    if (newObj[field])
+      newObj[field] = formatDateCH(newObj[field])
+  })
+  return newObj
 }

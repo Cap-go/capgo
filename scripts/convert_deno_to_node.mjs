@@ -3,7 +3,7 @@
 // netlify/functions/bundle.ts
 // this script is run on netlify to create netlify function, background function and egde function from supabase functions
 
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs'
 
 const baseSupa = 'supabase'
 const baseNetlify = 'netlify'
@@ -37,7 +37,7 @@ const baseCloudflareUtils = `${baseCloudflareFolder}/${baseCloudflare + baseUtil
 const allowed = ['bundle', 'channel_self', 'ok', 'stats', 'website_stats', 'channel', 'device', 'plans', 'updates', 'store_top', 'updates_redis']
 const background = ['web_stats', 'cron_good_plan', 'get_framework', 'get_top_apk', 'get_similar_app', 'get_store_info', 'cron_email']
 // const onlyNode = ['get_framework-background', 'get_top_apk-background', 'get_similar_app-background', 'get_store_info-background']
-const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis', 'clickhouse', 'postgress_schema', 'sqlite_schema']
+const allowedUtil = ['utils', 'conversion', 'types', 'supabase', 'supabase.types', 'invalids_ip', 'plans', 'logsnag', 'crisp', 'plunk', 'notifications', 'stripe', 'r2', 'downloadUrl', 'gplay_categ', 'update', 'redis', 'clickhouse']
 
 const supaTempl = {}
 const netlifyTempl = {}
@@ -289,28 +289,17 @@ const netlifyBgFiles = filesBg.map(f => f.replace(`${baseSupaFunctions}/`, `${ba
 const netlifyEdgeFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyEdgeFunctions}/`).replace('/index.ts', '.ts'))
 const cloudflareFiles = files.map(f => f.replace(`${baseSupaFunctions}/`, `${baseNetlifyCloudflare}/`).replace('/index.ts', '.ts'))
 // create netlify/functions folder if not exists
-try {
-  readdirSync(baseNetlifyFunctions)
-}
-catch (e) {
-  console.log(`Creating folder: ${baseNetlifyFunctions}`)
-  mkdirSync(baseNetlifyFunctions, { recursive: true })
-}
-try {
-  readdirSync(baseNetlifyEdgeFunctions)
-}
-catch (e) {
-  console.log(`Creating folder: ${baseNetlifyEdgeFunctions}`)
-  mkdirSync(baseNetlifyEdgeFunctions, { recursive: true })
-}
+console.log(`Creating folder: ${baseNetlifyFunctions}`)
+rmSync(baseNetlifyFunctions, { recursive: true })
+mkdirSync(baseNetlifyFunctions, { recursive: true })
 
-try {
-  readdirSync(baseNetlifyCloudflare)
-}
-catch (e) {
-  console.log(`Creating folder: ${baseNetlifyCloudflare}`)
-  mkdirSync(baseNetlifyCloudflare, { recursive: true })
-}
+console.log(`Creating folder: ${baseNetlifyEdgeFunctions}`)
+rmSync(baseNetlifyEdgeFunctions, { recursive: true })
+mkdirSync(baseNetlifyEdgeFunctions, { recursive: true })
+
+console.log(`Creating folder: ${baseNetlifyCloudflare}`)
+rmSync(baseNetlifyCloudflare, { recursive: true })
+mkdirSync(baseNetlifyCloudflare, { recursive: true })
 
 function applyMutations(mutations, content) {
   mutations.forEach((m) => {
@@ -371,6 +360,9 @@ try {
 catch (e) {
   // copy baseSupaUtils folder content to baseNetlifyUtils
   console.log(`Creating folder: ${baseNetlifyUtils}`)
+  rmSync(baseNetlifyUtils, { recursive: true })
+  rmSync(baseNetlifyEgdeUtils, { recursive: true })
+  rmSync(baseCloudflareUtils, { recursive: true })
   mkdirSync(baseNetlifyUtils, { recursive: true })
   mkdirSync(baseNetlifyEgdeUtils, { recursive: true })
   mkdirSync(baseCloudflareUtils, { recursive: true })
@@ -403,6 +395,10 @@ try {
 }
 catch (e) {
   console.log(`Creating folder: ${baseNetlifyTests}`)
+  rmSync(baseNetlifyTests, { recursive: true })
+  rmSync(baseNetlifyEdgeTests, { recursive: true })
+  rmSync(baseCloudflareTests, { recursive: true })
+
   mkdirSync(baseNetlifyTests, { recursive: true })
   mkdirSync(baseNetlifyEdgeTests, { recursive: true })
   mkdirSync(baseCloudflareTests, { recursive: true })

@@ -40,9 +40,14 @@ function upload(c: Context, fileId: string, file: Uint8Array) {
   })
 }
 
-function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
+async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
-  return client.presignedPutObject(bucket, fileId, expirySeconds)
+
+  const url = new URL(await client.presignedPutObject(bucket, fileId, expirySeconds))
+  if (url.hostname === 'host.docker.internal')
+    url.hostname = '0.0.0.0'
+
+  return url.toString()
 }
 
 function deleteObject(c: Context, fileId: string) {
@@ -59,9 +64,14 @@ function checkIfExist(c: Context, fileId: string) {
   })
 }
 
-function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
+async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   const client = initR2(c)
-  return client.presignedGetObject(bucket, fileId, expirySeconds)
+
+  const url = new URL(await client.presignedGetObject(bucket, fileId, expirySeconds))
+  if (url.hostname === 'host.docker.internal')
+    url.hostname = '0.0.0.0'
+
+  return url.toString()
 }
 
 async function getSizeChecksum(c: Context,fileId: string) {

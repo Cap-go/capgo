@@ -77,13 +77,13 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
           .eq('id', record.id)
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
-        await sendMetaToClickHouse(c, {
+        await sendMetaToClickHouse(c, [{
           id: record.id,
           created_at: new Date().toISOString(),
           app_id: record.app_id,
           size,
           action: 'add',
-        })
+        }])
       }
     }
   }
@@ -140,13 +140,13 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     console.log('Cannot find version meta', record.id)
     return c.json(BRES)
   }
-  await sendMetaToClickHouse(c, {
+  await sendMetaToClickHouse(c, [{
     id: record.id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
     size: data.size,
     action: 'delete',
-  })
+  }])
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('app_versions_meta')

@@ -99,13 +99,14 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         checksum,
         size,
       })
-    await sendMetaToClickHouse(c, {
+    await sendMetaToClickHouse(c, [{
+
       id: record.id,
       created_at: new Date().toISOString(),
       app_id: record.app_id,
       size,
       action: 'add',
-    })
+    }])
     if (dbError)
       console.error('Cannot create app version meta', dbError)
     if (record.storage_provider === 'r2-direct')
