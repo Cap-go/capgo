@@ -1,5 +1,12 @@
+// use_(2)_trans_macros
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
+import postgres from 'https://deno.land/x/postgresjs/mod.js'
+
+// eslint-disable-next-line import/newline-after-import
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js' // do_not_change
+
+import { eq, or } from 'https://esm.sh/drizzle-orm@^0.29.1'
 import {
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,
@@ -14,10 +21,13 @@ import {
   NON_STRING_VERSION_NAME,
   NON_STRING_VERSION_OS,
   deviceIdRegex,
+  getEnv,
   isLimited,
+  isSupabase,
   methodJson,
   reverseDomainRegex,
   sendRes,
+  useD1Database,
 } from '../_utils/utils.ts'
 import { getSDevice, sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppStats, BaseHeaders } from '../_utils/types.ts'
@@ -25,6 +35,9 @@ import type { Database } from '../_utils/supabase.types.ts'
 import { sendNotif } from '../_utils/notifications.ts'
 import { logsnag } from '../_utils/logsnag.ts'
 import { appIdToUrl } from './../_utils/conversion.ts'
+import * as schema_postgres from './../_utils/postgress_schema.ts'
+
+// import drizzle_sqlite
 
 const failActions = [
   'set_fail',
@@ -99,11 +112,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
 
     const coerce = semver.coerce(version_build)
 
-    const { data: appOwner } = await supabaseAdmin()
-      .from('apps')
-      .select('app_id')
-      .eq('app_id', app_id)
-      .single()
+    const { appOwner, appVersion } = await requestData(app_id, version_name)
+
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
@@ -156,12 +166,6 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       created_at: new Date().toISOString(),
     }
     const rows: Database['public']['Tables']['stats']['Insert'][] = []
-    const { data: appVersion } = await supabaseAdmin()
-      .from('app_versions')
-      .select('id, user_id')
-      .eq('app_id', app_id)
-      .or(`name.eq.${version_name}`)
-      .single()
     console.log(`appVersion ${JSON.stringify(appVersion)}`)
     if (appVersion) {
       stat.version = appVersion.id
@@ -218,6 +222,61 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
     }, 500)
   }
 }
+
+// COPY FUNCTION START
+async function requestDataPostgres(app_id: string, version_name: string) {
+  const supaUrl = getEnv('SUPABASE_DB_URL')!
+  const pgClient = postgres(supaUrl)
+  const drizzleCient = drizzle_postgress(pgClient as any)
+
+  const schema = schema_postgres
+
+  const appVersions = drizzleCient
+    .select({
+      id: schema.app_versions.id,
+      user_id: schema.app_versions.user_id,
+    })
+    .from(schema.app_versions)
+    .where(or(eq(schema.app_versions.name, version_name), eq(schema.app_versions.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  const appId = drizzleCient
+    .select({ app_id: schema.apps.app_id })
+    .from(schema.apps)
+    .where(eq(schema.apps.app_id, app_id))
+    .limit(1)
+    .then(data => data.at(0))
+
+  // const getApp = supabaseAdmin()
+  //   .from('apps')
+  //   .select('app_id')
+  //   .eq('app_id', app_id)
+  //   .single()
+  //   .then(data => data.data)
+
+  // const getAppVersion = supabaseAdmin()
+  //   .from('app_versions')
+  //   .select('id, user_id')
+  //   .eq('app_id', app_id)
+  //   .or(`name.eq.${version_name}`)
+  //   .single()
+  //   .then(data => data.data)
+
+  // const [appOwner, appVersion] = await Promise.all([getApp, getAppVersion])
+  const [appOwner, appVersion] = await Promise.all([appId, appVersions])
+
+  await pgClient.end()
+  return { appOwner, appVersion }
+}
+// COPY FUNCTION STOP
+
+// eslint-disable-next-line style/max-statements-per-line
+async function requestDataSqlite(): ReturnType<typeof requestDataPostgres> { throw new Error('not yet implemented') }
+
+const requestData = useD1Database && !isSupabase
+  ? requestDataSqlite
+  : requestDataPostgres
 
 Deno.serve(async (event: Request) => {
   try {

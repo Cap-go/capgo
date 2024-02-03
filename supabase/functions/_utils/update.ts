@@ -10,7 +10,7 @@ import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
 // eslint-disable-next-line import/newline-after-import
 import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
-import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
+import { appendHeaders, getEnv, isSupabase, sendRes, useD1Database } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats } from '../_utils/supabase.ts'
 import type { AppInfos } from '../_utils/types.ts'
 import type { Database } from '../_utils/supabase.types.ts'
@@ -28,10 +28,6 @@ import * as schema_postgres from './postgress_schema.ts' // do_not_change
 
 // import drizzle_sqlite
 // Do not change the comment above, used in codegen
-
-// This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
-const useD1Database = true
-const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
 
 let globalPgClient = null as ReturnType<typeof postgres> | null
 

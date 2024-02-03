@@ -51,6 +51,11 @@ export const NON_STRING_VERSION_OS = 'Version OS must be a string'
 export const MISSING_STRING_PLATFORM = 'Platform is required'
 export const NON_STRING_PLATFORM = 'Platform must be a string'
 
+export const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
+
+// This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
+export const useD1Database = false
+
 export function shallowCleanObject(obj: Record<string, unknown>) {
   return Object.entries(obj).reduce((acc, [key, value]) => {
     if (value ?? false)

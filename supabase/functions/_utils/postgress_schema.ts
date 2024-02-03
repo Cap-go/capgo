@@ -20,7 +20,7 @@ export const app_versions = pgTable('app_versions', {
   app_id: varchar('app_id').notNull().references(() => apps.name),
   name: varchar('name').notNull(),
   bucket_id: varchar('bucket_id'),
-  user_id: uuid('user_id'),
+  user_id: uuid('user_id').notNull(),
   updated_at: timestamp('updated_at').defaultNow(),
   deleted: boolean('deleted').default(false),
   external_url: varchar('external_url'),

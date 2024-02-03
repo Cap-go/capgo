@@ -26,7 +26,7 @@ export const app_versions = sqliteTable('app_versions', {
   app_id: text('app_id').notNull().references(() => apps.name),
   name: text('name').notNull(),
   bucket_id: text('bucket_id'),
-  user_id: text('user_id'),
+  user_id: text('user_id').notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
   deleted: boolean('deleted').default(false),
   external_url: text('external_url'),

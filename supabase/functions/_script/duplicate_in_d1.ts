@@ -21,10 +21,10 @@ async function main() {
 
   const pool = new Pool(supabaseUrl, 5)
   const client = await pool.connect()
-  // await migrationTable(client, 'app_versions')
-  // await migrationTable(client, 'apps')
+  await migrationTable(client, 'app_versions')
+  await migrationTable(client, 'apps')
   await migrationTable(client, 'channel_devices')
-  await migrationTable(client, 'channels')
+  // await migrationTable(client, 'channels')
   await migrationTable(client, 'devices_override')
 }
 

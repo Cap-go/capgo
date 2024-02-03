@@ -265,6 +265,22 @@ const mutationCloudflare = [
     }
     return current
   } },
+  { transform: (current) => {
+    if (current.includes('use_(2)_trans_macros')) {
+      let functionToCopy = current.split('COPY FUNCTION START')[1].split('\n// COPY FUNCTION STOP')[0]
+      functionToCopy = functionToCopy.replace('const pgClient = postgres(supaUrl)', '// removed line')
+      functionToCopy = functionToCopy.replace('const supaUrl = getEnv(\'SUPABASE_DB_URL\')!', '// removed line')
+      functionToCopy = functionToCopy.replace('requestDataPostgres', 'requestDataSqlite')
+      functionToCopy = functionToCopy.replace('const schema = schema_postgres', 'const schema = schema_sqlite')
+      functionToCopy = functionToCopy.replace('drizzle_postgress(pgClient as any)', 'drizzle_sqlite(getEnv(\'DB\') as any)')
+
+      current = current.replace(/(.*(?:requestDataSqlite).*)/, functionToCopy)
+      current = current.replace('./sqlite_schema.ts', './../cloudflare_utils/sqlite_schema.ts')
+      current = current.replace('import { alias as alias_sqlite } from \'drizzle-orm/sqlite-core\';', '// removed line')
+    }
+
+    return current
+  } },
   // { from: 'const bucket = \'capgo\'', to: 'const bucket = \'capgo\'\nimport { Buffer } from \'node:buffer\'' }
   // { from: supaTempl.redis, to: netlifyTempl.redis },
   // { from: '.ts\'', to: '\'' },

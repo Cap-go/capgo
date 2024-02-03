@@ -17,7 +17,7 @@ CREATE TABLE app_versions (
 
 CREATE TABLE apps (
     created_at timestamp with time zone,
-    app_id character varying NOT NULL,
+    app_id character varying NOT NULL PRIMARY KEY,
     icon_url character varying NOT NULL,
     user_id uuid NOT NULL,
     name character varying,
@@ -69,3 +69,9 @@ CREATE TABLE devices_override (
     app_id character varying NOT NULL,
     created_by uuid
 )
+
+CREATE INDEX "idx_app_id_device_id_channel_devices" ON "channel_devices" ("app_id", "device_id");
+CREATE INDEX "idx_app_id_name_app_versions" ON "app_versions" ("app_id", "name");
+CREATE INDEX "idx_app_id_device_id_devices_override" ON "devices_override" ("app_id", "device_id");
+CREATE INDEX "idx_app_id_public_channel_android" ON "channels" ("app_id", "public", "android");
+CREATE INDEX "idx_app_id_public_channel_ios" ON "channels" ("app_id", "public", "ios");
