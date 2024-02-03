@@ -12,7 +12,8 @@ import { useDisplayStore } from '~/stores/display'
 */
 const displayStore = useDisplayStore()
 function close(item?: ActionSheetOptionButton) {
-  displayStore.showDialog = false
+  if (!item?.preventClose)
+    displayStore.showDialog = false
   if (item) {
     displayStore.lastButtonRole = item.id ?? ''
     if (item.role === 'cancel')
@@ -72,12 +73,12 @@ onMounted(() => {
     aria-hidden="true"
     class="fixed left-0 right-0 top-0 z-50 hidden h-[calc(100%-1rem)] w-full overflow-x-hidden overflow-y-auto p-4 md:inset-0 md:h-full"
   >
-    <div id="popout" class="relative w-full h-full max-w-2xl md:h-auto">
+    <div id="popout" :class="`relative w-full h-full ${displayStore.dialogOption?.size ?? 'max-w-2xl'} md:h-auto`">
       <!-- Modal content -->
       <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
         <!-- Modal header -->
         <div class="flex items-start justify-between p-4 border-b rounded-t dark:border-gray-600">
-          <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+          <h3 :class="`text-xl font-semibold text-gray-900 dark:text-white ${displayStore.dialogOption?.headerStyle}`">
             {{ displayStore.dialogOption?.header }}
           </h3>
           <button type="button" class="ml-auto inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-gray-400 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-gray-600 dark:hover:text-white" @click="close({ role: 'cancel' } as any)">
@@ -87,19 +88,18 @@ onMounted(() => {
         </div>
         <!-- Modal body -->
         <div class="p-6 space-y-6">
-          <p v-if="!displayStore.dialogOption?.input" class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" v-html="displayText(displayStore.dialogOption?.message)" />
-          <template v-else>
-            <div class="flex flex-row max-w-2xl">
-              <input id="dialog-input-field" class="border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 w-full ml-4" type="text">
-            </div>
-          </template>
+          <p :class="`text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400 ${displayStore.dialogOption?.textStyle}`" v-html="displayText(displayStore.dialogOption?.message)" />
+          <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
+          <div v-if="displayStore.dialogOption?.input" class="flex flex-row max-w-2xl">
+            <input id="dialog-input-field" v-model="displayStore.dialogInputText" class="border rounded border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 w-full ml-4" type="text">
+          </div>
         </div>
         <!-- Modal footer -->
         <div class="flex items-center p-6 space-x-2 border-t border-gray-200 rounded-b dark:border-gray-600">
           <button
             v-for="(item, i) in displayStore.dialogOption?.buttons"
             :key="i"
-            :class="{ 'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800': item.role !== 'cancel', 'text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600': item.role === 'cancel' }"
+            :class="{ 'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800': item.role !== 'cancel', 'text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600': item.role === 'cancel', 'ml-auto mr-auto': displayStore.dialogOption?.buttonCenter }"
             class="rounded-lg bg-blue-700 px-5 py-2.5 text-center text-sm font-medium text-white dark:bg-blue-600 hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
             @click="close(item)"
           >
