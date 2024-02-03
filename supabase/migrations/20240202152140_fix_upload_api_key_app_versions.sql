@@ -1,3 +1,6 @@
 DROP POLICY "allow for delete by the CLI" ON "public"."app_versions";
 
 CREATE POLICY "Allow update by the CLI (apikey)" ON "public"."app_versions" FOR UPDATE TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all,upload}'::"public"."key_mode"[], "app_id")) WITH CHECK ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all,upload}'::"public"."key_mode"[], "app_id"));
+
+DROP POLICY "Allow apikey to select" ON "public"."app_versions";
+CREATE POLICY "Allow apikey to select" ON "public"."app_versions" FOR SELECT TO "anon" USING (("public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all,upload,all}'::"public"."key_mode"[], "app_id") OR "public"."is_allowed_capgkey"((("current_setting"('request.headers'::text, true))::json ->> 'capgkey'::text), '{read,all,upload,all}'::"public"."key_mode"[], "app_id", 'read'::"public"."user_min_right", "user_id")));
