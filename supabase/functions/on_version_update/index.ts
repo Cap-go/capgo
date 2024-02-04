@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import type { UpdatePayload } from '../_utils/supabase.ts'
 import { supabaseAdmin } from '../_utils/supabase.ts'
 import { r2 } from '../_utils/r2.ts'
@@ -76,13 +75,13 @@ async function isUpdate(body: UpdatePayload<'app_versions'>) {
           .eq('id', record.id)
         if (errorUpdate)
           console.log('errorUpdate', errorUpdate)
-        await sendMetaToClickHouse({
+        await sendMetaToClickHouse([{
           id: record.id,
           created_at: new Date().toISOString(),
           app_id: record.app_id,
           size,
           action: 'add',
-        })
+        }])
       }
     }
   }
@@ -140,13 +139,13 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
     console.log('Cannot find version meta', record.id)
     return sendRes()
   }
-  await sendMetaToClickHouse({
+  await sendMetaToClickHouse([{
     id: record.id,
     created_at: new Date().toISOString(),
     app_id: record.app_id,
     size: data.size,
     action: 'delete',
-  })
+  }])
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin()
     .from('app_versions_meta')
@@ -163,7 +162,7 @@ async function isDelete(body: UpdatePayload<'app_versions'>) {
   return sendRes()
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   const API_SECRET = getEnv('API_SECRET')
   const authorizationSecret = event.headers.get('apisecret')
   if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)

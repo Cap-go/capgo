@@ -1,6 +1,5 @@
 import type { BaseHeaders } from 'supabase/functions/_utils/types'
 import { methodJson } from 'supabase/functions/_utils/utils'
-import type { Handler } from '@netlify/functions'
 import { sendRes } from './res'
 
 async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
@@ -9,6 +8,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: any) {
 }
 // upper is ignored during netlify generation phase
 // import from here
+import type { Handler } from '@netlify/functions'
+
 export const handler: Handler = async (event) => {
   try {
     const url: URL = new URL(event.rawUrl)

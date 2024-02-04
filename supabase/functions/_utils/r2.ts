@@ -1,16 +1,18 @@
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
 import { getEnv } from './utils.ts'
 
-const accountid = getEnv('R2_ACCOUNT_ID')
-const access_key_id = getEnv('R2_ACCESS_KEY_ID')
-const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
-const storageEndpoint = getEnv('S3_ENDPOINT')
-const storageRegion = getEnv('S3_REGION')
-const storagePort = Number.parseInt(getEnv('S3_PORT'))
-const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
+// import presign s3
+
 const bucket = 'capgo'
 
 function initR2() {
+  const accountid = getEnv('R2_ACCOUNT_ID')
+  const access_key_id = getEnv('R2_ACCESS_KEY_ID')
+  const access_key_secret = getEnv('R2_SECRET_ACCESS_KEY')
+  const storageEndpoint = getEnv('S3_ENDPOINT')
+  const storageRegion = getEnv('S3_REGION')
+  const storagePort = Number.parseInt(getEnv('S3_PORT'))
+  const storageUseSsl = getEnv('S3_SSL').toLocaleLowerCase() === 'true'
   const params = {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
@@ -29,9 +31,14 @@ function upload(fileId: string, file: Uint8Array) {
   return client.putObject(fileId, file)
 }
 
-function getUploadUrl(fileId: string, expirySeconds = 60) {
+async function getUploadUrl(fileId: string, expirySeconds = 60) {
   const client = initR2()
-  return client.getPresignedUrl('PUT', fileId, { expirySeconds })
+
+  const url = new URL(await client.getPresignedUrl('PUT', fileId, { expirySeconds }))
+  if (url.hostname === 'host.docker.internal')
+    url.hostname = '0.0.0.0'
+
+  return url.toString()
 }
 
 function deleteObject(fileId: string) {
@@ -44,9 +51,13 @@ function checkIfExist(fileId: string) {
   return client.exists(fileId)
 }
 
-function getSignedUrl(fileId: string, expirySeconds: number) {
+async function getSignedUrl(fileId: string, expirySeconds: number) {
   const client = initR2()
-  return client.getPresignedUrl('GET', fileId, { expirySeconds })
+  const url = new URL(await client.getPresignedUrl('GET', fileId, { expirySeconds }))
+  if (url.hostname === 'host.docker.internal')
+    url.hostname = '0.0.0.0'
+
+  return url.toString()
 }
 // get the size from r2
 async function getSizeChecksum(fileId: string) {

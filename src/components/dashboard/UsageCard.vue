@@ -62,7 +62,7 @@ const lastDayEvolution = computed(() => {
         {{ t('usage-title') }}
       </div>
       <div class="flex items-start">
-        <div class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
+        <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
           {{ total?.toLocaleString() }} {{ unit }}
         </div>
         <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">

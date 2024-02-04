@@ -1,5 +1,4 @@
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import {
   INVALID_STRING_APP_ID,
@@ -143,6 +142,8 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       is_emulator: is_emulator == null ? false : is_emulator,
       is_prod: is_prod == null ? true : is_prod,
       custom_id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     const stat: Database['public']['Tables']['stats']['Insert'] = {
@@ -152,6 +153,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
       app_id,
       version_build,
       version: 0,
+      created_at: new Date().toISOString(),
     }
     const rows: Database['public']['Tables']['stats']['Insert'][] = []
     const { data: appVersion } = await supabaseAdmin()
@@ -217,7 +219,7 @@ async function main(url: URL, headers: BaseHeaders, method: string, body: AppSta
   }
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

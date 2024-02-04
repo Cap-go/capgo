@@ -127,6 +127,8 @@ defined-as: Definido como
 defined-as-private: definido como normal
 defined-as-public: definido como padrão
 delete-account: Deletar conta
+delete-account-0: Deletar conta
+delete-your-account: Deletar sua conta
 deleted: excluído
 details-and-logs: Detalhes e registros
 device: Dispositivo
@@ -179,6 +181,7 @@ last-update: Última atualização
 last-upload: último upload
 last-version: Última versão
 launch-bundle: Lançar pacote
+leaving: Saindo
 limit-reached: Limite alcançado
 live-reload: Recarregamento ao vivo
 loading-more-data: Carregando mais dados...
@@ -188,6 +191,8 @@ login-to-your-accoun: Faça login na sua conta
 logout: Sair
 logs: Histórico
 lowerCaseError: Deve conter letras minúsculas
+make-default-android: Tornar padrão para Android
+make-default-ios: Tornar padrão para iOS
 make-normal: tornar normal
 making-this-channel-: >-
   Tornar este canal "normal" exigirá que você configure um outro padrão de canal

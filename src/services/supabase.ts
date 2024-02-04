@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
 // import { Http } from '@capacitor-community/http'
@@ -22,7 +22,7 @@ function getLocalConfig() {
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0] as string,
+    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0].split(':')[0] as string,
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
   } as CapgoConfig
@@ -45,7 +45,7 @@ export async function getRemoteConfig() {
 }
 
 export function useSupabase() {
-  const options: SupabaseClientOptions<'public'> = {
+  const options = {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
@@ -80,22 +80,22 @@ export function useSupabase() {
 }
 
 export function isSpoofed() {
-  return !!localStorage.getItem('supabase.spoof_id')
+  return !!localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
 }
-export function saveSpoof(id: string) {
-  return localStorage.setItem('supabase.spoof_id', id)
+export function saveSpoof(jwt: string, refreshToken: string) {
+  return localStorage.setItem(`supabase-${config.supbaseId}.spoof_admin_jwt`, JSON.stringify({ jwt, refreshToken }))
 }
 
-export function spoofUser() {
-  const textData = localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
-  if (!textData)
-    return false
+export async function hashEmail(email: string) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(email)
 
-  const data = JSON.parse(textData)
-  data.user.id = localStorage.getItem('supabase.spoof_id')
-  localStorage.setItem(`sb-${config.supbaseId}-auth-token`, JSON.stringify(data))
-  return data.user.id
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return hashHex
 }
+
 export async function deleteUser() {
   const { error } = await useSupabase()
     .rpc('delete_user')
@@ -110,18 +110,17 @@ export function getSupabaseToken() {
   return localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
 }
 export function unspoofUser() {
-  const textData = localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
+  const textData: string = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
   if (!textData || !isSpoofed())
     return false
 
-  const data = JSON.parse(textData)
-  const oldId = localStorage.getItem('supabase.spoof_id')
-  if (!oldId)
+  const { jwt, refreshToken } = JSON.parse(textData)
+  if (!jwt || !refreshToken)
     return false
 
-  data.user.id = oldId
-  localStorage.setItem(`sb-${config.supbaseId}-auth-token`, JSON.stringify(data))
-  localStorage.removeItem('supabase.spoof_id')
+  const supabase = useSupabase()
+  supabase.auth.setSession({ access_token: jwt, refresh_token: refreshToken })
+  localStorage.removeItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
   return true
 }
 
@@ -205,6 +204,20 @@ export async function isGoodPlan(userid?: string): Promise<boolean> {
 
   return data || false
 }
+
+export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['Row'][]> {
+  const { data, error } = await useSupabase()
+    .from('orgs')
+    .select('*')
+
+  if (error) {
+    console.error('getOrgs error', error.message)
+    throw error
+  }
+
+  return data || []
+}
+
 export async function isTrial(userid?: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial', { userid })

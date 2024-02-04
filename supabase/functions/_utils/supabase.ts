@@ -43,6 +43,17 @@ export function supabaseClient(auth: string) {
   return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
 }
 
+export function emptySupabase() {
+  const options = {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
+  return createClient<Database>(getEnv('SUPABASE_URL'), getEnv('SUPABASE_ANON_KEY'), options)
+}
+
 // WARNING: The service role key has admin priviliges and should only be used in secure server environments!
 export function supabaseAdmin() {
   const options = {
@@ -128,6 +139,18 @@ export async function getPlanUsagePercent(userId: string): Promise<number> {
   }
 
   return data || 0
+}
+
+export async function getOrgs(userId: string) {
+  const { data, error } = await supabaseAdmin()
+    .rpc('get_orgs', { userid: userId })
+    .single()
+  if (error) {
+    console.error('getOrgs error', error.message)
+    throw new Error(error.message)
+  }
+
+  return data
 }
 
 export async function isGoodPlan(userId: string): Promise<boolean> {
@@ -313,6 +336,11 @@ export async function getSDashboard(auth: string, userIdQuery: string, startDate
   if (isClickHouseEnabled()) {
     tableName = 'clickhouse_app_usage'
     if (appId) {
+      // const hasReadRights = await client.rpc('has_read_rights')
+      //   .then(res => res.data || false)
+
+      // console.log('read rights', hasReadRights)
+
       const reqOwner = await client
         .rpc('is_app_owner', { appid: appId })
         .then(res => res.data || false)
@@ -632,7 +660,7 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
       .insert(
         {
           created_by: userId,
-          logo: 'https://res.cloudinary.com/dz3vsv9pg/image/upload/v1623349123/capgo/logo.png',
+          logo: '',
           name: `${name} organization`,
         },
       )
@@ -642,17 +670,8 @@ export async function createdefaultOrg(userId: string, name = 'Default') {
     if (error)
       console.error('createdefaultOrg error', error)
 
-    if (data) {
-      return supabaseAdmin()
-        .from('org_users')
-        .insert([
-          {
-            org_id: data.id,
-            user_id: userId,
-            role: 'admin',
-          },
-        ])
-    }
+    if (data)
+      return Promise.resolve()
   }
   return Promise.resolve()
 }

@@ -1,6 +1,6 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, watch } from 'vue'
-import { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/supabase.types'
 
 export interface ActionSheetOptionButton {
   text: string
@@ -8,15 +8,22 @@ export interface ActionSheetOptionButton {
   selected?: boolean
   handler?: () => void
   role?: string
+  preventClose?: boolean
 }
 export interface ActionSheetOption {
   header?: string
   message?: string
+  image?: string
+  headerStyle?: string
+  textStyle?: string
+  input?: boolean
+  size?: string
+  buttonCenter?: boolean
   buttons?: ActionSheetOptionButton[]
 }
 
 export interface AppPreviewOptions {
-  appId: string,
+  appId: string
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
@@ -37,6 +44,7 @@ export const useDisplayStore = defineStore('display', () => {
   const durationToast = ref<number>(2000)
   const showLoader = ref<boolean>(false)
   const lastButtonRole = ref<string>('')
+  const dialogInputText = ref('')
   const onDialogDismiss = (): Promise<boolean> => {
     // watch showDialog for changes and if false then resolve
     return new Promise((resolve) => {
@@ -80,7 +88,8 @@ export const useDisplayStore = defineStore('display', () => {
     NavTitle,
     defaultBack,
     showAppPreview,
-    appPreview
+    appPreview,
+    dialogInputText,
   }
 })
 

@@ -123,6 +123,8 @@ defined-as: 로써 정의 된
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete-account: 계정 삭제
+delete-account-0: 계정 삭제
+delete-your-account: 계정 삭제
 deleted: 삭제
 details-and-logs: 세부 정보 및 로그
 device: 장치
@@ -175,6 +177,7 @@ last-update: 마지막 업데이트
 last-upload: 마지막 업로드
 last-version: 마지막 버전
 launch-bundle: 번들 실행
+leaving: 퇴거
 limit-reached: 한도 도달
 live-reload: 라이브 리로드
 loading-more-data: 더 많은 데이터 로드 중...
@@ -184,6 +187,8 @@ login-to-your-accoun: 계정에 로그인
 logout: 로그 아웃
 logs: 로그
 lowerCaseError: 소문자를 포함해야 합니다.
+make-default-android: Android용 기본값으로 설정
+make-default-ios: iOS용 기본값으로 설정
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 mau: 월간 활성 사용자

@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { getEnv, methodJson, sendRes } from '../_utils/utils.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { trackEvent } from '../_utils/plunk.ts'
@@ -140,7 +139,7 @@ async function main(_url: URL, headers: BaseHeaders, _method: string, _body: any
   return sendRes()
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   try {
     const url: URL = new URL(event.url)
     const headers: BaseHeaders = Object.fromEntries(event.headers.entries())

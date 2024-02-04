@@ -127,6 +127,8 @@ defined-as: Định nghĩa là
 defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete-account: Xóa tài khoản
+delete-account-0: Xóa tài khoản
+delete-your-account: Xóa tài khoản của bạn
 deleted: đã xóa
 details-and-logs: Chi tiết và nhật ký
 device: Thiết bị
@@ -181,6 +183,7 @@ last-update: Cập nhật cuối cùng
 last-upload: Tải lên lần cuối
 last-version: Phiên bản cuối cùng
 launch-bundle: Khởi chạy gói
+leaving: Rời đi
 limit-reached: Đạt tới giới hạn
 live-reload: tải lại trực tiếp
 loading-more-data: Đang tải thêm dữ liệu...
@@ -190,6 +193,8 @@ login-to-your-accoun: đăng nhập vào tài khoản của bạn
 logout: Đăng xuất
 logs: Nhật ký
 lowerCaseError: Nên chứa chữ thường
+make-default-android: Đặt làm mặc định cho Android
+make-default-ios: Đặt làm mặc định cho iOS
 make-normal: làm cho bình thường
 making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho

@@ -2,20 +2,67 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { FormKitMessages } from '@formkit/vue'
-import { isSpoofed, saveSpoof, spoofUser, unspoofUser } from '~/services/supabase'
+import { toast } from 'vue-sonner'
+import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
 
 const route = useRoute()
 const isLoading = ref(false)
 const oldId = ref(isSpoofed())
 
-function setLogAs(id: string) {
+async function setLogAs(id: string) {
   console.log('setLogAs', id)
-  saveSpoof(id)
-  if (!spoofUser()) {
+
+  if (isSpoofed())
+    unspoofUser()
+
+  const supabase = await useSupabase()
+  const { data, error } = await supabase.functions.invoke('login_admin', {
+    body: {
+      user_id: id,
+    },
+  })
+
+  if (error) {
+    toast.error('cannot log in, see console')
     isLoading.value = false
+    console.error(error)
     return
   }
-  // reload page
+
+  const newJwt = data.jwt
+  const newRereshToken = data.refreshToken
+
+  if (!data || !newJwt || !newRereshToken) {
+    toast.error('cannot log in, see console')
+    isLoading.value = false
+    console.error('no data or token?', data)
+    return
+  }
+
+  const { data: currentSession, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || !currentSession || !currentSession.session) {
+    console.error('no current session', sessionError)
+    isLoading.value = false
+    toast.error('cannot log in, see console')
+    return
+  }
+
+  const currentJwt = currentSession.session.access_token
+  const currentRefreshToken = currentSession.session.refresh_token
+
+  const { error: authError } = await supabase.auth.setSession({ access_token: newJwt, refresh_token: newRereshToken })
+  if (authError) {
+    isLoading.value = false
+    console.error('Auth error', authError)
+    toast.error('cannot log in, see console')
+    return
+  }
+
+  saveSpoof(currentJwt, currentRefreshToken)
+
+  console.log('ok')
+
+  isLoading.value = false
   setTimeout(() => {
     isLoading.value = false
     window.location.reload()
@@ -43,6 +90,7 @@ function reset() {
   if (isLoading.value)
     return
   isLoading.value = true
+
   if (!unspoofUser()) {
     isLoading.value = false
     return

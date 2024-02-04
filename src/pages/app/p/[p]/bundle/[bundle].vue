@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { valid } from 'semver'
 import { useRoute, useRouter } from 'vue-router'
@@ -16,11 +16,14 @@ import { useDisplayStore } from '~/stores/display'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/material-symbols/info-rounded'
 import type { Tab } from '~/components/comp_def'
+import type { OrganizationRole } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const supabase = useSupabase()
 const ActiveTab = ref('info')
@@ -30,8 +33,20 @@ const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
+const bundleChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const secondaryChannel = ref<boolean>(false)
+
+const role = ref<OrganizationRole | null>(null)
+watch(version, async (version) => {
+  if (!version) {
+    role.value = null
+    return
+  }
+
+  role.value = await organizationStore.getCurrentRole(version.user_id, version.app_id, undefined)
+  console.log(role.value)
+})
 
 async function copyToast(text: string) {
   copy(text)
@@ -55,6 +70,7 @@ async function getChannels() {
   if (!version.value)
     return
   channel.value = undefined
+  bundleChannels.value = []
   const { data: dataChannel } = await supabase
     .from('channels')
     .select()
@@ -65,7 +81,7 @@ async function getChannels() {
   channels.value.forEach((chan) => {
     const v: number = chan.version as any
     if (version.value && (v === version.value.id || version.value.id === chan.secondVersion)) {
-      channel.value = chan
+      bundleChannels.value.push(chan)
       secondaryChannel.value = (version.value.id === chan.secondVersion)
     }
   })
@@ -83,7 +99,7 @@ const showSize = computed(() => {
   else if (version.value?.external_url)
     return t('stored-externally')
   else
-    return t('app-not-found')
+    return t('metadata-not-found')
 })
 
 async function getUnknowBundleId() {
@@ -121,7 +137,7 @@ async function setChannelProgressive(channel: Database['public']['Tables']['chan
     .from('channels')
     .update({
       secondVersion: id,
-      version: channel.secondVersion,
+      version: channel.secondVersion ?? undefined,
       secondaryVersionPercentage: 0.1,
     })
     .eq('id', channel.id)
@@ -141,6 +157,10 @@ async function setChannelSkipProgressive(channel: Database['public']['Tables']['
 async function ASChannelChooser() {
   if (!version.value)
     return
+  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+    toast.error(t('no-permission'))
+    return
+  }
   const buttons = []
 
   // This makes sure that A and B cannot be selected on the same time
@@ -291,20 +311,16 @@ async function ASChannelChooser() {
   }
   displayStore.showActionSheet = true
 }
-async function openChannel() {
+
+async function openChannel(selChannel: Database['public']['Tables']['channels']['Row'], canHaveSecondVersion: boolean) {
+  channel.value = selChannel
   if (!version.value || !main.auth)
     return
   if (!channel.value)
     return ASChannelChooser()
+
   displayStore.actionSheetOption = {
     buttons: [
-      {
-        text: t('set-bundle'),
-        handler: () => {
-          displayStore.showActionSheet = false
-          ASChannelChooser()
-        },
-      },
       {
         text: t('button-cancel'),
         role: 'cancel',
@@ -314,38 +330,54 @@ async function openChannel() {
       },
     ],
   }
+
+  // Push set-bundle if role > read
+  if (displayStore.actionSheetOption.buttons && role.value && (role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+    displayStore.actionSheetOption.buttons.splice(0, 0, {
+      text: t('set-bundle'),
+      handler: () => {
+        displayStore.showActionSheet = false
+        ASChannelChooser()
+      },
+    })
+  }
+
+  const baseIndex = (displayStore.actionSheetOption?.buttons?.length ?? 0) - 1
+
   // push in button at index 1 if channel is set
   if (channel.value && displayStore.actionSheetOption.buttons) {
-    displayStore.actionSheetOption.buttons.splice(1, 0, {
+    displayStore.actionSheetOption.buttons.splice(baseIndex, 0, {
       text: t('open-channel'),
       handler: () => {
         displayStore.showActionSheet = false
         openChannelLink()
       },
     })
-    displayStore.actionSheetOption.buttons.splice(2, 0, {
-      text: t('unlink-channel'),
-      handler: async () => {
-        displayStore.showActionSheet = false
-        try {
-          if (!channel.value)
-            return
-          const id = await getUnknowBundleId()
-          if (!id)
-            return
-          if (!secondaryChannel.value)
-            await setChannel(channel.value, id)
-          else
-            await setSecondChannel(channel.value, id)
+    if (role.value && (role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+      displayStore.actionSheetOption.buttons.splice(baseIndex + 1, 0, {
+        text: t('unlink-channel'),
+        handler: async () => {
+          displayStore.showActionSheet = false
+          try {
+            if (!channel.value)
+              return
+            const id = await getUnknowBundleId()
+            if (!id)
+              return
+            if (!canHaveSecondVersion)
+              await setChannel(channel.value, id)
+            else
+              await setSecondChannel(channel.value, id)
 
-          await getChannels()
-        }
-        catch (error) {
-          console.error(error)
-          toast.error(t('cannot-test-app-some'))
-        }
-      },
-    })
+            await getChannels()
+          }
+          catch (error) {
+            console.error(error)
+            toast.error(t('cannot-test-app-some'))
+          }
+        },
+      })
+    }
   }
   displayStore.showActionSheet = true
 }
@@ -511,6 +543,21 @@ async function saveCustomId(input: string) {
 //   const fail = version_meta.value?.fails || 1
 //   return `${Math.round((fail / total) * 100).toLocaleString()}%`
 // })
+
+function guardMinAutoUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
+
+function preventInputChangePerm(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    event.preventDefault()
+    return false
+  }
+}
 </script>
 
 <template>
@@ -518,7 +565,9 @@ async function saveCustomId(input: string) {
     <div v-if="version" class="h-full md:py-4">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-        <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+        <div
+          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
+        >
           <dl class="divide-y divide-gray-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
@@ -527,19 +576,66 @@ async function saveCustomId(input: string) {
             <!-- Checksum -->
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- Min update version -->
-            <InfoRow v-if="channel?.disableAutoUpdate === 'version_number'" :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''" @update:value="saveCustomId" />
+            <InfoRow
+              v-if="channel?.disableAutoUpdate === 'version_number'" id="metadata-bundle"
+              :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''"
+              :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])"
+              @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
+            />
             <!-- meta devices -->
             <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
-            <InfoRow v-if="version_meta?.installs" :label="t('install')" :value="version_meta.installs.toLocaleString()" />
-            <InfoRow v-if="version_meta?.uninstalls" :label="t('uninstall')" :value="version_meta.uninstalls.toLocaleString()" />
+            <InfoRow
+              v-if="version_meta?.installs" :label="t('install')"
+              :value="version_meta.installs.toLocaleString()"
+            />
+            <InfoRow
+              v-if="version_meta?.uninstalls" :label="t('uninstall')"
+              :value="version_meta.uninstalls.toLocaleString()"
+            />
             <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="channel" :label="t('channel')" :value="(channel!.enableAbTesting || channel!.enable_progressive_deploy) ? (secondaryChannel ? `${channel!.name}-B` : `${channel!.name}-A`) : channel!.name" :is-link="true" @click="openChannel()" />
-            <InfoRow v-else :label="t('channel')" :value="t('set-bundle')" :is-link="true" @click="openChannel()" />
+            <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
+              <template #start>
+                <span v-for="chn in bundleChannels" :key="chn.id">
+                  <span
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.secondVersion === version.id) : false"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, true)"
+                  >
+                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion
+                      === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
+                  </span>
+                  <span
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.version === version.id) : false"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, false)"
+                  >
+                    {{ `${chn!.name}-A` }}
+                  </span>
+                  <span
+                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? false : true"
+                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    @click="openChannel(chn, false)"
+                  >
+                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
+                  </span>
+                </span>
+              </template>
+            </InfoRow>
+            <InfoRow
+              v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true"
+              @click="openChannel(channel!, false)"
+            />
             <!-- session_key -->
-            <InfoRow v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)" :is-link="true" @click="copyToast(version?.session_key || '')" />
+            <InfoRow
+              v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)"
+              :is-link="true" @click="copyToast(version?.session_key || '')"
+            />
             <!-- version.external_url -->
-            <InfoRow v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true" @click="copyToast(version?.external_url || '')" />
+            <InfoRow
+              v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true"
+              @click="copyToast(version?.external_url || '')"
+            />
             <!-- size -->
             <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
             <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" />
@@ -547,12 +643,10 @@ async function saveCustomId(input: string) {
         </div>
       </div>
       <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-          <DeviceTable
-            class="p-3"
-            :app-id="packageId"
-            :version-id="version.id"
-          />
+        <div
+          class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+        >
+          <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
         </div>
       </div>
     </div>

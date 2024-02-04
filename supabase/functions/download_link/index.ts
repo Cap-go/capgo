@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
 import { isAdmin, supabaseAdmin } from '../_utils/supabase.ts'
 import { sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { getBundleUrl } from '../_utils/downloadUrl.ts'
@@ -10,7 +9,7 @@ interface DataDownload {
   bucket_id: string
 }
 
-serve(async (event: Request) => {
+Deno.serve(async (event: Request) => {
   if (event.method === 'OPTIONS')
     return sendOptionsRes()
   const authorization = event.headers.get('authorization')

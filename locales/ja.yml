@@ -123,6 +123,8 @@ defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
+delete-account-0: アカウントを削除する
+delete-your-account: アカウントを削除する
 deleted: 削除された
 details-and-logs: 詳細とログ
 device: デバイス
@@ -175,6 +177,7 @@ last-update: 最後の更新
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
 launch-bundle: バンドルを起動
+leaving: 出発
 limit-reached: 制限に達しました
 live-reload: ライブリロード
 loading-more-data: さらにデータを読み込んでいます...
@@ -184,6 +187,8 @@ login-to-your-accoun: あなたのアカウントにログイン
 logout: ログアウト
 logs: ログ
 lowerCaseError: 小文字を含める必要があります
+make-default-android: Android のデフォルトにする
+make-default-ios: iOSのデフォルトにする
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 mau: 月間アクティブ ユーザー数
