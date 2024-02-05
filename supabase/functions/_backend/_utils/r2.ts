@@ -20,12 +20,15 @@ function initR2(c: Context) {
     endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
     region: storageRegion ?? 'us-east-1',
     useSSL: accountid ? true : storageUseSsl,
-    port: storagePort ? (!Number.isNaN(storagePort) ? storagePort : undefined) : undefined,
+    port: storagePort && !Number.isNaN(storagePort) ? storagePort : undefined,
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
 
-  return new Client(params)
+  console.log('R2 params', params)
+  const client = new Client(params)
+  console.log('R2 client', client)
+  return client
 }
 
 
