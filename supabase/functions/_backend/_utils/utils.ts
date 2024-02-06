@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
-// @transform node import 'hono' to deno 'npm:@supabase/supabase-js'
+
 import type { SupabaseClient } from '@supabase/supabase-js'
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import dayjs from 'dayjs'; 
 import { env } from 'hono/adapter'

@@ -1,6 +1,6 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
-// @transform node import 'hon@supabase/supabase-jso' to deno 'npm:@supabase/supabase-js'
+
 import { createClient } from '@supabase/supabase-js'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'

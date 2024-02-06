@@ -1,9 +1,9 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-// @transform node import 'zod' to deno 'npm:zod'
+
 import { z } from 'zod'
-// @transform node import 'semver' to deno 'npm:semver'
+
 import * as semver from 'semver'
 import {
   INVALID_STRING_APP_ID,

@@ -1,4 +1,4 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { r2 } from '../../_utils/r2.ts'

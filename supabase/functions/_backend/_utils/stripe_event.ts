@@ -1,4 +1,4 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'

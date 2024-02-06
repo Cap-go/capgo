@@ -1,4 +1,3 @@
-// @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret, middlewareKey } from '../_utils/hono.ts'

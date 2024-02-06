@@ -1,4 +1,4 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import { type Context, type Next, type MiddlewareHandler } from 'hono'
 import { HTTPException} from 'hono/http-exception'
 import { checkKey, getEnv } from './utils.ts'

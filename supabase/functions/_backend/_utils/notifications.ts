@@ -1,6 +1,6 @@
-// @transform node import 'cron-schedule' to deno 'npm:cron-schedule'
+
 import { parseCronExpression } from 'cron-schedule'
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import dayjs from 'dayjs'
 import { supabaseAdmin } from './supabase.ts'

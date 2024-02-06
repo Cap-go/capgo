@@ -1,4 +1,4 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import { r2 } from './r2.ts'
 import { supabaseAdmin } from './supabase.ts'

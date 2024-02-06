@@ -1,6 +1,6 @@
-// @transform node import 'minio' to deno 'npm:minio'
+
 import { Client as S3Client } from "./s3/index.ts";
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
 

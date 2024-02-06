@@ -1,6 +1,6 @@
-// @transform node import 'crc-32' to deno 'npm:crc-32/crc32c'
+
 import { buf as crc32 } from "crc-32/crc32c";
-// @transform node import 'hono' to deno 'npm:hono'
+
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';

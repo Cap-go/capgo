@@ -1,4 +1,4 @@
-// @transform node import 'drizzle-orm' to deno 'npm:drizzle-orm'
+
 import { customType, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 const boolean = customType<{ data: boolean }>({

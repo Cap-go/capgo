@@ -1,4 +1,4 @@
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { convertAllDatesToCH, getEnv } from './utils.ts'

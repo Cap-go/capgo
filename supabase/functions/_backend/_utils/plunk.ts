@@ -1,6 +1,6 @@
-// @transform node import 'axios' to deno 'npm:axios'
+
 import axios from 'axios'
-// @transform node import 'hono' to deno 'npm:hono'
+
 import type { Context } from 'hono'
 import { getEnv, shallowCleanObject } from './utils.ts'
 

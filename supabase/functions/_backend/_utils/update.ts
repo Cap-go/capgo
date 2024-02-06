@@ -1,15 +1,8 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
-// @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
-
-// eslint-disable-next-line import/newline-after-import
 import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js' // do_not_change
-
 import { and, eq, or, sql } from 'drizzle-orm'
-
-// eslint-disable-next-line import/newline-after-import
-// @transform node import 'drizzle-orm' to deno 'npm:drizzle-orm'
 import { alias as alias_postgres } from 'drizzle-orm/pg-core' // do_not_change
 import postgres from 'postgres'
 import { getEnv } from './utils.ts'
@@ -20,24 +13,11 @@ import { sendNotif } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
-
-// Drizze orm
-
-// eslint-disable-next-line import/newline-after-import
 import * as schema_postgres from './postgress_schema.ts' // do_not_change
-
-// do_not_change
-
-// import drizzle_sqlite
-// Do not change the comment above, used in codegen
-
-// This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
-const useD1Database = false
-const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
 
 let globalPgClient = null as ReturnType<typeof postgres> | null
 
-function resToVersion(c: Context, plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
+function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: any = {
     version: version.name,
     url: signedURL,
@@ -49,28 +29,15 @@ function resToVersion(c: Context, plugin_version: string, signedURL: string, ver
   return res
 }
 
-// COPY FUNCTION START
 function getDrizzlePostgres(c: Context) {
   const supaUrl = getEnv(c, 'SUPABASE_DB_URL')!
   console.log('getDrizzlePostgres', supaUrl)
 
-  // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)
   globalPgClient = pgClient
   return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
-
-  // DO NOT CHANGE END
 }
-// COPY FUNCTION STOP
 
-// eslint-disable-next-line style/max-statements-per-line
-function getDrizzleSqlite(): ReturnType<typeof getDrizzlePostgres> { throw new Error('not yet implemented') }
-
-const getDrizzle = useD1Database && !isSupabase ? getDrizzleSqlite : getDrizzlePostgres
-
-// Do not change // COPY FUNCTION STOP/START
-// This works as a macro later in "convert_deno_to_node.mjs" that will mark the start and end of the function to copy
-// COPY FUNCTION START
 async function requestInfosPostgres(
   platform: string,
   app_id: string,
@@ -228,9 +195,7 @@ async function requestInfosPostgres(
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
   return { versionData, channelData, channelOverride, devicesOverride }
 }
-// COPY FUNCTION STOP
 
-// COPY FUNCTION START
 async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeof drizzle_postgress>, schema: typeof schema_postgres): Promise<{ user_id: string } | null> {
   try {
     const appOwner = await drizzleCient
@@ -246,25 +211,9 @@ async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeo
     return null
   }
 }
-// COPY FUNCTION STOP
-
-// eslint-disable-next-line style/max-statements-per-line
-function getAppOwnerSqlite(): ReturnType<typeof getAppOwnerPostgres> { throw new Error('not yet implemented') }
-
-const getAppOwner = useD1Database && !isSupabase ? getAppOwnerSqlite : getAppOwnerPostgres
-
-// This will be transformed in the "convert_deno_to_node.mjs" script
-// This will become the clone of requestInfosPostgres
-// eslint-disable-next-line unused-imports/no-unused-vars, style/max-statements-per-line
-function requestInfosSqlite(platform: string, app_id: string, device_id: string, version_name: string, alias: any, drizzleCient: any, schema: any): ReturnType<typeof requestInfosPostgres> { throw new Error('TODO') }
-
-const requestInfos = useD1Database && !isSupabase ? requestInfosSqlite : requestInfosPostgres
 
 export async function update(c: Context, body: AppInfos) {
-  // await test()
-  // create random id
-
-  const { alias, schema, drizzleCient } = getDrizzle(c)
+  const { alias, schema, drizzleCient } = getDrizzlePostgres(c)
 
   const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
@@ -286,7 +235,7 @@ export async function update(c: Context, body: AppInfos) {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
-    const appOwner = await getAppOwner(app_id, drizzleCient, schema)
+    const appOwner = await getAppOwnerPostgres(app_id, drizzleCient, schema)
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
@@ -368,7 +317,7 @@ export async function update(c: Context, body: AppInfos) {
       version: 0,
     }
 
-    const requestedInto = await requestInfos(platform, app_id, device_id, version_name, alias, drizzleCient, schema)
+    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, alias, drizzleCient, schema)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
@@ -415,9 +364,6 @@ export async function update(c: Context, body: AppInfos) {
     // let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
     const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
-
-    const updateOverwritten = devicesOverride !== null || channelOverride !== null
-    // console.log(`OVER: ${updateOverwritten}, --- ${devicesOverride} --- ${channelOverride}`)
 
     let version = devicesOverride?.version || channelOverride?.version || channelData.version
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
@@ -673,8 +619,7 @@ export async function update(c: Context, body: AppInfos) {
       action: 'get',
     }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
-    // TODO: i have no idea why "as any"
-    return c.json(resToVersion(c, plugin_version, signedURL, version as any), 200)
+    return c.json(resToVersion(plugin_version, signedURL, version as any), 200)
   }
   catch (e) {
     console.error('e', e)
