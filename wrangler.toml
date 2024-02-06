@@ -3,6 +3,8 @@ compatibility_date = "2022-04-05"
 workers_dev = false
 main = "./cloudflare_workers/index.ts"
 node_compat = true
+route = "v2_api.capgo.app"
+
 
 [[d1_databases]]
 binding = "DB" # i.e. available in your Worker on env.DB

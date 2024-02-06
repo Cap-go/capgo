@@ -56,6 +56,7 @@ app.route('/device', devices)
 // Plugin API
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
+app.route('/updates_debug', updates)
 app.route('/stats', stats)
 
 // Webapps API

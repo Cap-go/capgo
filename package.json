@@ -49,6 +49,8 @@
     "d1:reset": "pnpm d1:clear && pnpm d1:seed",
     "d1:generate-migration": "deno run --allow-all supabase/functions/_script/generate_d1_replication_sql_migration.ts",
     "cf-edge:run": "bunx wrangler dev --port 7777",
+    "cf-backend_deploy": "bunx wrangler deploy",
+    "cf-backend_deploy_env": "node scripts/deploy_cf_backend_env.mjs",
     "size": "bunx vite-bundle-visualizer"
   },
   "dependencies": {
@@ -208,7 +210,7 @@
     "vite-plugin-windicss": "1.9.2",
     "vitest": "0.34.6",
     "vue-tsc": "1.8.22",
-    "wrangler": "3.18.0"
+    "wrangler": "latest"
   },
   "husky": {
     "hooks": {
