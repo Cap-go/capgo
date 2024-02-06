@@ -18,14 +18,7 @@
   "editor.defaultFormatter": "denoland.vscode-deno",
   "deno.enablePaths": [
     "./supabase/functions",
-    "./v2_netlify",
-    "./v2_supabase",
     "./netlify/edge-functions",
-    "./netlify/edge-functions_utils",
-    "./netlify/edge-functions_tests",
-    "./scripts/template/supabase",
-    "./scripts/template/netlify-edge",
-    "netlify/edge-functions",
     "./tests_backend"
   ],
   "deno.importMap": ".netlify/edge-functions-import-map.json",
