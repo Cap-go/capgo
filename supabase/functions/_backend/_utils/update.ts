@@ -32,7 +32,7 @@ import * as schema_postgres from './postgress_schema.ts' // do_not_change
 // Do not change the comment above, used in codegen
 
 // This is not used here in supabase, however this WILL be used after "convert_deno_to_node.mjs"
-const useD1Database = true
+const useD1Database = false
 const isSupabase = true // NEVER, EVER CHANGE THIS VALUE
 
 let globalPgClient = null as ReturnType<typeof postgres> | null
@@ -52,6 +52,7 @@ function resToVersion(c: Context, plugin_version: string, signedURL: string, ver
 // COPY FUNCTION START
 function getDrizzlePostgres(c: Context) {
   const supaUrl = getEnv(c, 'SUPABASE_DB_URL')!
+  console.log('getDrizzlePostgres', supaUrl)
 
   // IMPORTANT: DO NOT CHANGE THIS!!!!! THIS IS TRANSFORMED LATER TO ALLOW FOR D1
   const pgClient = postgres(supaUrl)

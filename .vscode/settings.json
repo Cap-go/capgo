@@ -20,7 +20,6 @@
     "./supabase/functions",
     "./v2_netlify",
     "./v2_supabase",
-    "./cloudflare_workers_deno",
     "./netlify/edge-functions",
     "./netlify/edge-functions_utils",
     "./netlify/edge-functions_tests",

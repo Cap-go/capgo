@@ -2,11 +2,11 @@
 // @transform node import 'hono' to deno 'npm:hono'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES } from '../../_utils/hono.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
 
 export const app = new Hono()
 
-app.get('/', (c: Context) => {
+app.get('/', middlewareAPISecret, (c: Context) => {
   try {
     return c.json(BRES)
   } catch (e) {
