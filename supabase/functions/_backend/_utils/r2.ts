@@ -1,5 +1,5 @@
 // @transform node import 'minio' to deno 'npm:minio'
-import { Client } from 'minio'
+import { Client as S3Client } from "./s3/index.ts";
 // @transform node import 'hono' to deno 'npm:hono'
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
@@ -21,21 +21,19 @@ function initR2(c: Context) {
     region: storageRegion ?? 'us-east-1',
     useSSL: accountid ? true : storageUseSsl,
     port: storagePort && !Number.isNaN(storagePort) ? storagePort : undefined,
+    bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
-
-  console.log('R2 params', params)
-  const client = new Client(params)
-  console.log('R2 client', client)
-  return client
+  console.log('initR2', params)
+  return new S3Client(params)
 }
 
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
 
-  const url = new URL(await client.presignedPutObject(bucket, fileId, expirySeconds))
+  const url = new URL(await client.getPresignedUrl('PUT', fileId, { expirySeconds }))
   if (url.hostname === 'host.docker.internal')
     url.hostname = '0.0.0.0'
 
@@ -44,22 +42,18 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
 
 function deleteObject(c: Context, fileId: string) {
   const client = initR2(c)
-  return client.removeObject(bucket, fileId)
+  return client.deleteObject(fileId)
 }
 
 function checkIfExist(c: Context, fileId: string) {
   const client = initR2(c)
-  return new Promise((resolve) => {
-    client.getPartialObject(bucket, fileId, 0, 1, (err) => {
-      resolve(!err)
-    })
-  })
+  return client.exists(fileId)
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   const client = initR2(c)
 
-  const url = new URL(await client.presignedGetObject(bucket, fileId, expirySeconds))
+  const url = new URL(await client.getPresignedUrl('GET', fileId, { expirySeconds }))
   if (url.hostname === 'host.docker.internal')
     url.hostname = '0.0.0.0'
 
@@ -68,8 +62,8 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
 
 async function getSizeChecksum(c: Context,fileId: string) {
   const client = initR2(c)
-  const { size, metaData } = await client.statObject(bucket, fileId)
-  const checksum = metaData['x-amz-meta-crc32']
+  const { size, metadata } = await client.statObject(fileId)
+  const checksum = metadata['x-amz-meta-crc32']
   return { size, checksum }
 }
 

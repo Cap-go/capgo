@@ -13,11 +13,14 @@
     "drizzle-orm/sqlite-core": "npm:drizzle-orm/sqlite-core",
     "drizzle-orm/postgres-js": "npm:drizzle-orm/postgres-js",
     "minio": "npm:minio",
+    "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner": "npm:@aws-sdk/s3-request-presigner",
     "@supabase/supabase-js": "npm:@supabase/supabase-js",
     "crypto-random-string": "npm:crypto-random-string",
     "semver": "npm:semver",
     "postgres": "npm:postgres",
     "crc-32": "npm:crc-32",
-    "lauqe": "npm:lauqe"
+    "lauqe": "npm:lauqe",
+    "node:crypto": "https://deno.land/std@0.177.0/node/crypto.ts"
   }
 }
