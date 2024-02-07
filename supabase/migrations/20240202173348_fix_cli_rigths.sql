@@ -1,4 +1,4 @@
-DROP FUNCTION public.is_allowed_action(apikey text, appid character varying);
+-- DROP FUNCTION public.is_allowed_action(apikey text, appid character varying);
 
 -- CREATE OR REPLACE FUNCTION public.is_allowed_action(apikey text, appid character varying)
 --  RETURNS boolean
