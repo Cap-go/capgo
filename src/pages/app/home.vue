@@ -25,8 +25,6 @@ async function getMyApps() {
     .select()
     .eq('user_id', main.user?.id).order('name', { ascending: true })
 
-  console.log('my apps', data, error)
-
   if (data && data.length)
     apps.value = data
   else
@@ -53,7 +51,6 @@ async function getSharedWithMe() {
     return
   }
 
-  console.log('shared', data)
   sharedApps.value = data
 }
 watchEffect(async () => {
