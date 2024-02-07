@@ -20,7 +20,7 @@ const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const organizationStore = useOrganizationStore()
 
 async function getMyApps() {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('apps')
     .select()
     .eq('user_id', main.user?.id).order('name', { ascending: true })

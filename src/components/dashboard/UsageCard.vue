@@ -47,7 +47,7 @@ const lastDayEvolution = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800" :class="{'h-[460px]': props.datas?.length }">
+  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800" :class="{ 'h-[460px]': props.datas?.length }">
     <div class="px-5 pt-3">
       <div class="flex flex-row">
         <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
@@ -74,7 +74,7 @@ const lastDayEvolution = computed(() => {
 
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <LineChartStats :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" v-if="props.datas?.length" />
+      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
       <div v-else class="flex flex-col items-center justify-center h-full">
         {{ t('no-data') }}
       </div>

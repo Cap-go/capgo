@@ -109,7 +109,7 @@ loadData()
 </script>
 
 <template>
-      <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''" v-if="!noData || isLoading">
+  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau"
