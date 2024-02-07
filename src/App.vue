@@ -5,7 +5,6 @@ import { defineAsyncComponent } from 'vue'
 const ActionSheet = defineAsyncComponent(() => import('~/components/ActionSheet.vue'))
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
-const AppPreview = defineAsyncComponent(() => import('~/components/AppPreview.vue'))
 </script>
 
 <template>
