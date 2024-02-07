@@ -480,6 +480,22 @@ function hideString(str: string) {
   return `${first}...${last}`
 }
 
+async function previewBundle() {
+  if (!version.value)
+    throw new Error('No version id?')
+
+  if (version.value.session_key) {
+    toast.error(t('preview-encrypted'))
+    return
+  }
+
+  displayStore.appPreview = {
+    appId: packageId.value,
+    version: version.value
+  } as any
+  displayStore.showAppPreview = true
+}
+
 async function saveCustomId(input: string) {
   if (!id.value)
     return
@@ -622,6 +638,7 @@ function preventInputChangePerm(event: Event) {
             />
             <!-- size -->
             <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
+            <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" />
           </dl>
         </div>
       </div>

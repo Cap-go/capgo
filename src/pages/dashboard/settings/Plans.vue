@@ -244,7 +244,7 @@ const hightLights = computed<Stat[]>(() => ([
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="isDisabled(p)" @click="openChangePlan(p.stripe_id, index)"
             >
-              <svg v-if="isSubscribeLoading[index]" class="inline-block w-5 h-5 mr-3 -ml-1 text-white dark:text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg v-if="isSubscribeLoading[index]" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle dark:text-gray-900 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle
                   class="opacity-25"
                   cx="12"
@@ -263,7 +263,7 @@ const hightLights = computed<Stat[]>(() => ([
               {{ t('plan-whats-included') }}
             </h3>
             <ul role="list" class="mt-6 space-y-4">
-              <li v-for="(f, index) in planFeatures(p)" :key="index" class="flex space-x-3">
+              <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex space-x-3">
                 <svg class="flex-shrink-0 w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
