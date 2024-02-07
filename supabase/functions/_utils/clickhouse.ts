@@ -107,11 +107,11 @@ export function sendLogToClickHouse(logs: Database['public']['Tables']['stats'][
       // add created_at: new Date().toISOString() to each log
       body: logReady,
       headers: clickhouseAuthEnabled()
-      ? {
-          'Authorization': clickHouseAuth(),
-          'Content-Type': 'text/plain',
-        }
-      : { 'Content-Type': 'text/plain' },
+        ? {
+            'Authorization': clickHouseAuth(),
+            'Content-Type': 'text/plain',
+          }
+        : { 'Content-Type': 'text/plain' },
     },
   )
     .then(res => res.text())
