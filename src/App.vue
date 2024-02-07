@@ -15,7 +15,6 @@ const AppPreview = defineAsyncComponent(() => import('~/components/AppPreview.vu
       <ActionSheet />
       <Toast />
       <Dialog />
-      <AppPreview />
     </div>
   </kProvider>
 </template>
