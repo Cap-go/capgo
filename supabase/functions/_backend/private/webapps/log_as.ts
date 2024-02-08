@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 
 import { z } from 'zod'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../utils/hono.ts'
+import { middlewareAuth, middlewareCors } from '../../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -11,7 +11,7 @@ const bodySchema = z.object({
 
 export const app = new Hono()
 
-app.post('/', middlewareKey, async (c: Context) => {
+app.post('/', middlewareCors, middlewareAuth, async (c: Context) => {
   try {
     const authToken = c.req.header('authorization')
 

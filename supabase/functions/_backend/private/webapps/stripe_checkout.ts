@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareAuth } from '../../utils/hono.ts'
+import { middlewareAuth, middlewareCors } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { createCheckout } from '../../utils/stripe.ts'
 import { getEnv } from '../../utils/utils.ts'
@@ -15,7 +15,7 @@ interface PortalData {
 
 export const app = new Hono()
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareCors, middlewareAuth, async (c: Context) => {
   try {
     const body = await c.req.json<PortalData>()
     console.log('body', body)

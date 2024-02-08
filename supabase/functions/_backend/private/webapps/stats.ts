@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../utils/hono.ts'
+import { middlewareAuth, middlewareCors } from '../../utils/hono.ts'
 import { checkAppOwner, getSStats, supabaseAdmin } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
 import type { Order } from '../../utils/types.ts'
@@ -20,7 +20,7 @@ interface dataStats {
 
 export const app = new Hono()
 
-app.post('/', middlewareKey, async (c: Context) => {
+app.post('/', middlewareCors, middlewareAuth, async (c: Context) => {
   try {
     const body = await c.req.json<dataStats>()
     console.log('body', body)

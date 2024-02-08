@@ -31,10 +31,10 @@ function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 
 export async function getRemoteConfig() {
-  // call host + /api/get_config and parse the result as json using axios
+  // call host + /api/private/config and parse the result as json using axios
   const localConfig = await getLocalConfig()
   const data = await axios
-    .get(`${defaultApiHost}/get_config`)
+    .get(`${defaultApiHost}/private/config`)
     .then(res => res.data as CapgoConfig)
     .then(data => ({ ...data, ...localConfig } as CapgoConfig))
     .catch(() => {
@@ -131,7 +131,7 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     storage_provider: provider,
     bucket_id: bucketId,
   }
-  const res = await useSupabase().functions.invoke('download_link', { body: JSON.stringify(data) })
+  const res = await useSupabase().functions.invoke('private/download_link', { body: JSON.stringify(data) })
   return res.data.url
 }
 

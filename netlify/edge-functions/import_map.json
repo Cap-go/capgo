@@ -1,6 +1,7 @@
 {
   "imports": {
     "hono": "npm:hono",
+    "hono/cors": "npm:hono/cors",
     "hono/http-exception": "npm:hono/http-exception",
     "hono/adapter": "npm:hono/adapter",
     "zod": "npm:zod",

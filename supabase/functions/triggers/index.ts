@@ -1,4 +1,4 @@
-import { Hono } from 'https://deno.land/x/hono/mod.ts'
+import { Hono } from 'hono'
 
 // Triggers API
 import { app as clear_app_cache } from '../_backend/private/triggers/clear_app_cache.ts'

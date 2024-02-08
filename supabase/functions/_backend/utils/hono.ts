@@ -3,6 +3,13 @@ import { HTTPException } from 'hono/http-exception'
 import { checkKey, getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { cors } from 'hono/cors'
+
+export const middlewareCors = cors({
+  origin: '*',
+  allowHeaders: ['*'],
+  allowMethods: ['POST', 'GET', 'OPTIONS'],
+})
 
 export const middlewareKey: MiddlewareHandler<{
   Variables: {

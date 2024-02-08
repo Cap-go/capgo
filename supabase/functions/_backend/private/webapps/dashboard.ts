@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getSDashboard } from '../../utils/supabase.ts'
+import { middlewareCors } from '../../utils/hono.ts';
 
 interface dataDevice {
   userId: string
@@ -11,7 +12,7 @@ interface dataDevice {
 
 export const app = new Hono()
 
-app.post('/', async (c: Context) => {
+app.post('/', middlewareCors, async (c: Context) => {
   try {
     const body = await c.req.json<dataDevice>()
     console.log('body', body)
