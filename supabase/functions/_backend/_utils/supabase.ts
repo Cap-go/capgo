@@ -694,7 +694,7 @@ export function userToPerson(user: Database['public']['Tables']['users']['Row'],
   return person
 }
 
-export async function saveStoreInfo(apps: (Database['public']['Tables']['store_apps']['Insert'])[], c: Context) {
+export async function saveStoreInfo(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
   // save in supabase
   if (!apps.length)
     return

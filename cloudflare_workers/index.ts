@@ -10,6 +10,7 @@ import { app as channels } from '../supabase/functions/_backend/public/channels.
 import { app as channel_self } from '../supabase/functions/_backend/private/plugins/channel_self.ts'
 import { app as updates } from '../supabase/functions/_backend/private/plugins/updates.ts'
 import { app as stats } from '../supabase/functions/_backend/private/plugins/stats.ts'
+import { app as setCustomId } from '../supabase/functions/_backend/private/plugins/custom_ids.ts'
 
 // Webapps API
 import { app as plans } from '../supabase/functions/_backend/private/webapps/plans.ts'
@@ -58,8 +59,9 @@ app.route('/channel_self', channel_self)
 app.route('/updates', updates)
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
+app.route('/set_custom_id', setCustomId)
 
-// Webapps API
+// PRIVATE API
 appFront.route('/plans', plans)
 appFront.route('/store_top', storeTop)
 appFront.route('/website_stats', publicStats)

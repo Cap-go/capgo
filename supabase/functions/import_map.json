@@ -21,6 +21,8 @@
     "postgres": "npm:postgres",
     "crc-32": "npm:crc-32",
     "lauqe": "npm:lauqe",
-    "node:crypto": "https://deno.land/std@0.177.0/node/crypto.ts"
+    "node:crypto": "https://deno.land/std@0.177.0/node/crypto.ts",
+    "adm-zip": "https://esm.sh/adm-zip?target=deno",
+    "google-play-scraper": "https://esm.sh/google-play-scraper?target=deno"
   }
 }
