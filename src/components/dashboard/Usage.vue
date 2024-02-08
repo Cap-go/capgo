@@ -4,7 +4,7 @@ import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { getPlans, getTotalStorage } from '~/services/supabase'
+import { getPlans, getTotaAppStorage } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
@@ -52,7 +52,7 @@ async function getAppStats() {
 }
 
 async function getUsages() {
-  const currentStorage = bytesToGb(await getTotalStorage(main.auth?.id, props.appId))
+  const currentStorage = bytesToGb(await getTotaAppStorage(main.auth?.id, props.appId))
   const data = await getAppStats()
   if (data && data.length > 0) {
     const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null

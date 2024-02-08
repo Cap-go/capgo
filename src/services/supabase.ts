@@ -185,6 +185,17 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
   })
   return (req.data || []) as appUsage[]
 }
+
+export async function getTotaAppStorage(userid?: string, app_id?: string): Promise<number> {
+  const { data, error } = await useSupabase()
+    .rpc('get_total_app_storage_size', { userid, appid: app_id })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || 0
+}
+
 export async function getTotalStorage(userid?: string, app_id?: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('get_total_storage_size', { userid, appid: app_id })
