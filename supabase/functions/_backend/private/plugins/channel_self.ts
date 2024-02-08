@@ -53,7 +53,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   console.log('body', body)
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
-    console.error('Cannot parse json', { parseResult })
+    console.error('Cannot parse json', { error: parseResult.error })
     return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
   }
 
@@ -95,7 +95,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .single()
 
   if (!version) {
-    console.error('Cannot find version', { version_name })
+    console.error('Cannot find version', { version_name, body })
     return c.json({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
