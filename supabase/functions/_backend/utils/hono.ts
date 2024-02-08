@@ -31,7 +31,7 @@ export async function getBody<T>(c: Context) {
   try {
     body = await c.req.json<T>()
   }
-  catch (e) {
+  catch (_e) {
     body = await c.req.query() as any as T
   }
   if (!body)
