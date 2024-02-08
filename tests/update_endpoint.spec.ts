@@ -263,7 +263,7 @@ backendTest.describe('Test update logic', () => {
       const json = await response.json()
       expect(json).toEqual({ message: 'No new version available' })
 
-      const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
       await delay(3000)
 
       // Check if device was added
