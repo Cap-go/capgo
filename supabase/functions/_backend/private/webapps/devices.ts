@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { getSDevice } from '../../_utils/supabase.ts'
-import type { Order } from '../../_utils/types.ts'
+import { getSDevice } from '../../utils/supabase.ts'
+import type { Order } from '../../utils/types.ts'
 
 interface dataDevice {
   appId: string

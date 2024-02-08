@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../_utils/hono.ts'
-import { isAdmin, supabaseAdmin } from '../../_utils/supabase.ts'
-import { getBundleUrl } from '../../_utils/downloadUrl.ts'
+import { middlewareKey } from '../../utils/hono.ts'
+import { isAdmin, supabaseAdmin } from '../../utils/supabase.ts'
+import { getBundleUrl } from '../../utils/downloadUrl.ts'
 
 interface DataDownload {
   app_id: string

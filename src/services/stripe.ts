@@ -34,7 +34,7 @@ export async function openPortal() {
   displayStore.messageLoader = 'Please wait...'
   displayStore.showLoader = true
   try {
-    const resp = await supabase.functions.invoke('stripe_portal', {
+    const resp = await supabase.functions.invoke('private/stripe_portal', {
       body: JSON.stringify({ callbackUrl: window.location.href }),
     })
     console.error('stripe_portal', resp)
@@ -64,7 +64,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   displayStore.messageLoader = 'Please wait...'
   try {
     displayStore.showLoader = true
-    const resp = await supabase.functions.invoke('stripe_checkout', {
+    const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
         priceId,
         successUrl,

@@ -6,11 +6,11 @@ import { Hono } from 'hono'
 
 import { z } from 'zod'
 import type { Context } from 'hono'
-import { BRES, getBody } from '../../_utils/hono.ts'
-import { sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'
-import type { AppInfos } from '../../_utils/types.ts'
-import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../../_utils/utils.ts'
-import type { Database } from '../../_utils/supabase.types.ts'
+import { BRES, getBody } from '../../utils/hono.ts'
+import { sendDevice, sendStats, supabaseAdmin } from '../../utils/supabase.ts'
+import type { AppInfos } from '../../utils/types.ts'
+import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../../utils/utils.ts'
+import type { Database } from '../../utils/supabase.types.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string

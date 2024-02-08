@@ -20,14 +20,14 @@ import {
   deviceIdRegex,
   isLimited,
   reverseDomainRegex,
-} from '../../_utils/utils.ts'
-import { getSDevice, sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'
-import type { AppStats } from '../../_utils/types.ts'
-import type { Database } from '../../_utils/supabase.types.ts'
-import { sendNotif } from '../../_utils/notifications.ts'
-import { logsnag } from '../../_utils/logsnag.ts'
-import { appIdToUrl } from '../../_utils/conversion.ts'
-import { BRES } from '../../_utils/hono.ts'
+} from '../../utils/utils.ts'
+import { getSDevice, sendDevice, sendStats, supabaseAdmin } from '../../utils/supabase.ts'
+import type { AppStats } from '../../utils/types.ts'
+import type { Database } from '../../utils/supabase.types.ts'
+import { sendNotif } from '../../utils/notifications.ts'
+import { logsnag } from '../../utils/logsnag.ts'
+import { appIdToUrl } from '../../utils/conversion.ts'
+import { BRES } from '../../utils/hono.ts'
 
 const failActions = [
   'set_fail',

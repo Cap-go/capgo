@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { Context } from 'hono'
-import { supabaseAdmin } from '../_utils/supabase.ts'
-import { getEnv } from '../_utils/utils.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 export const baseSupabase = 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/'
 export const baseNetlify = 'https://webcapgo.netlify.app/api/'

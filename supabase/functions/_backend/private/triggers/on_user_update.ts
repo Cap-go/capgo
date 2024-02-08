@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
-import type { UpdatePayload } from '../../_utils/supabase.ts'
-import { createApiKey, createStripeCustomer } from '../../_utils/supabase.ts'
-import type { Database } from '../../_utils/supabase.types.ts'
-import { checkPlan } from '../../_utils/plans.ts'
-import { updateCustomer } from '../../_utils/stripe.ts'
+import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
+import type { UpdatePayload } from '../../utils/supabase.ts'
+import { createApiKey, createStripeCustomer } from '../../utils/supabase.ts'
+import type { Database } from '../../utils/supabase.types.ts'
+import { checkPlan } from '../../utils/plans.ts'
+import { updateCustomer } from '../../utils/stripe.ts'
 
 export const app = new Hono()
 

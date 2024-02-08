@@ -2,9 +2,9 @@ import axios from 'axios'
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
-import { categories } from '../../_utils/gplay_categ.ts'
+import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import { categories } from '../../utils/gplay_categ.ts'
 
 const toGetFramwork = 500
 const toGetInfo = 500

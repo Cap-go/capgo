@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { getEnv } from '../../_utils/utils.ts'
+import { getEnv } from '../../utils/utils.ts'
 
 export const app = new Hono()
 

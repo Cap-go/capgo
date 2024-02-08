@@ -4,7 +4,7 @@ import { mergeReadableStreams } from 'https://deno.land/std@0.201.0/streams/merg
 import * as p from 'npm:@clack/prompts@0.7.0'
 import type { PoolClient } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
 import { Pool } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
-import type { Database } from '../supabase/functions/_backend/_utils/supabase.types.ts'
+import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 let supabaseSecret: string | null = null

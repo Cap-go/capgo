@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 
 import { z } from 'zod'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../_utils/hono.ts'
-import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../../_utils/supabase.ts'
+import { middlewareKey } from '../../utils/hono.ts'
+import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   user_id: z.string(),

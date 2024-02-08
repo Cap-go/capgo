@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = new Hono()
 

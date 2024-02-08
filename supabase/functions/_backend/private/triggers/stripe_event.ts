@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { customerToSegment, supabaseAdmin } from '../../_utils/supabase.ts'
-import type { Person } from '../../_utils/plunk.ts'
-import { addDataContact, trackEvent } from '../../_utils/plunk.ts'
-import { logsnag } from '../../_utils/logsnag.ts'
-import { removeOldSubscription } from '../../_utils/stripe.ts'
-import { extractDataEvent, parseStripeEvent } from '../../_utils/stripe_event.ts'
-import { getEnv } from '../../_utils/utils.ts'
+import { customerToSegment, supabaseAdmin } from '../../utils/supabase.ts'
+import type { Person } from '../../utils/plunk.ts'
+import { addDataContact, trackEvent } from '../../utils/plunk.ts'
+import { logsnag } from '../../utils/logsnag.ts'
+import { removeOldSubscription } from '../../utils/stripe.ts'
+import { extractDataEvent, parseStripeEvent } from '../../utils/stripe_event.ts'
+import { getEnv } from '../../utils/utils.ts'
 
 export const app = new Hono()
 

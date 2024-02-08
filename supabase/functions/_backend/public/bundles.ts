@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
-import { fetchLimit } from '../_utils/utils.ts'
-import type { Database } from '../_utils/supabase.types.ts'
-import { BRES, getBody, middlewareKey } from '../_utils/hono.ts'
+import { checkAppOwner, supabaseAdmin } from '../utils/supabase.ts'
+import { fetchLimit } from '../utils/utils.ts'
+import type { Database } from '../utils/supabase.types.ts'
+import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
 
 interface GetLatest {
   app_id?: string

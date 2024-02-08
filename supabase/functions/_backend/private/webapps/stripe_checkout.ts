@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareAuth } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
-import { createCheckout } from '../../_utils/stripe.ts'
-import { getEnv } from '../../_utils/utils.ts'
+import { middlewareAuth } from '../../utils/hono.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import { createCheckout } from '../../utils/stripe.ts'
+import { getEnv } from '../../utils/utils.ts'
 
 interface PortalData {
   priceId: string

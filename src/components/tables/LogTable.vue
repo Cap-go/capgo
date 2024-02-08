@@ -73,7 +73,7 @@ async function versionData() {
 async function getData() {
   isLoading.value = true
   try {
-    const req = await supabase.functions.invoke('get_stats', {
+    const req = await supabase.functions.invoke('private/stats', {
       body: {
         appId: props.appId,
         devicesId: props.deviceId ? [props.deviceId] : undefined,

@@ -14,8 +14,8 @@
     "sync": "cap sync",
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
-    "serve": "vite",
-    "prebuild-serve-dev": "ENV=local vite build --sourcemap true --minify false --assetsDir . && http-server ./dist -p 5173",
+    "serve": "vite --port 5174",
+    "prebuild-serve-dev": "ENV=local vite build --sourcemap true --minify false --assetsDir . && http-server ./dist -p 5174",
     "serve-dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
     "reset": "supabase db reset",
@@ -45,9 +45,9 @@
     "d1:clear": "rm -rf .wrangler",
     "d1:seed": "bunx wrangler d1 execute --local --command \"$(cat ./supabase/d1.sql)\" capgo",
     "d1:local-srv": "bunx wrangler dev ./cloudflare_workers/d1.js --ip 0.0.0.0 --port 6655",
-    "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:6655' deno run --allow-all supabase/functions/_script/duplicate_in_d1.ts",
+    "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:6655' deno run --allow-all supabase/functions/script/duplicate_in_d1.ts",
     "d1:reset": "pnpm d1:clear && pnpm d1:seed",
-    "d1:generate-migration": "deno run --allow-all supabase/functions/_script/generate_d1_replication_sql_migration.ts",
+    "d1:generate-migration": "deno run --allow-all supabase/functions/script/generate_d1_replication_sql_migration.ts",
     "cf-edge:run": "bunx wrangler dev --port 7777",
     "cf-backend_deploy": "bunx wrangler deploy",
     "cf-backend_deploy_env": "node scripts/deploy_cf_backend_env.mjs",
@@ -55,7 +55,7 @@
     "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && sudo bash -c 'rm -rf ./tests_backend/gh_actions/ch_data/ && rm -rf ./tests_backend/gh_actions/ch_logs/'",
     "clickhouse:start": "cd ./tests_backend/gh_actions && mkdir ch_data && mkdir ch_logs && sh ./clickhouse.sh && cd ../..",
     "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\"",
-    "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts"
+    "clickhouse:add-local": "deno run --allow-all supabase/functions/script/add_clickhouse_to_supabase.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.485.0",

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareAPISecret } from '../supabase/functions/_backend/_utils/hono.ts';
+import { middlewareAPISecret } from '../supabase/functions/_backend/utils/hono.ts';
 import type { D1Database } from "@cloudflare/workers-types"
 
 export interface DBPayload {

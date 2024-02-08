@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 
 import { z } from 'zod'
-import { update } from '../../_utils/update.ts'
+import { update } from '../../utils/update.ts'
 import {
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,
@@ -17,8 +17,8 @@ import {
   deviceIdRegex,
   isLimited,
   reverseDomainRegex,
-} from '../../_utils/utils.ts'
-import type { AppInfos } from '../../_utils/types.ts'
+} from '../../utils/utils.ts'
+import type { AppInfos } from '../../utils/types.ts'
 
 export const jsonRequestSchema = z.object({
   app_id: z.string({

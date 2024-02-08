@@ -16,7 +16,7 @@ async function setLogAs(id: string) {
     unspoofUser()
 
   const supabase = await useSupabase()
-  const { data, error } = await supabase.functions.invoke('login_admin', {
+  const { data, error } = await supabase.functions.invoke('private/log_as', {
     body: {
       user_id: id,
     },

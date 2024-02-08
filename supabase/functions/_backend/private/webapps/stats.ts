@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../_utils/hono.ts'
-import { checkAppOwner, getSStats, supabaseAdmin } from '../../_utils/supabase.ts'
-import { checkKey } from '../../_utils/utils.ts'
-import type { Order } from '../../_utils/types.ts'
-import type { Database } from '../../_utils/supabase.types.ts'
+import { middlewareKey } from '../../utils/hono.ts'
+import { checkAppOwner, getSStats, supabaseAdmin } from '../../utils/supabase.ts'
+import { checkKey } from '../../utils/utils.ts'
+import type { Order } from '../../utils/types.ts'
+import type { Database } from '../../utils/supabase.types.ts'
 
 // get_stats
 

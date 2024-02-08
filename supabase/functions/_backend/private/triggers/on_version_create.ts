@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
-import type { InsertPayload } from '../../_utils/supabase.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
-import type { Database } from '../../_utils/supabase.types.ts'
-import { sendMetaToClickHouse } from '../../_utils/clickhouse.ts'
+import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
+import type { InsertPayload } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import type { Database } from '../../utils/supabase.types.ts'
+import { sendMetaToClickHouse } from '../../utils/clickhouse.ts'
 
 export const app = new Hono()
 

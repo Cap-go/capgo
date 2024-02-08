@@ -5,7 +5,7 @@ import {
   MISSING_STRING_VERSION_OS,
   NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS,
   deviceIdRegex, reverseDomainRegex,
-} from '../supabase/functions/_utils/utils.ts'
+} from '../supabase/functions/utils/utils.ts'
 
 const NO_ERROR = { error: '' }
 // import { jsonRequestSchema as updateRequestSchema } from '../supabase/functions/updates/index.ts'

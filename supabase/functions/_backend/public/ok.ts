@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, getBody, middlewareAPISecret, middlewareKey } from '../_utils/hono.ts'
+import { BRES, getBody, middlewareAPISecret, middlewareKey } from '../utils/hono.ts'
 
 export const app = new Hono()
 

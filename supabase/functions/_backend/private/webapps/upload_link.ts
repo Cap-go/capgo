@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { r2 } from '../../_utils/r2.ts'
-import { middlewareKey } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { r2 } from '../../utils/r2.ts'
+import { middlewareKey } from '../../utils/hono.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 interface dataUpload {
   bucket_id: string

@@ -176,7 +176,7 @@ export interface appUsage {
 export async function getAllDashboard(userId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
   const supabase = useSupabase()
 
-  const req = await supabase.functions.invoke('get_dashboard', {
+  const req = await supabase.functions.invoke('private/dashboard', {
     body: {
       userId,
       startDate,

@@ -2,7 +2,7 @@ import { equal } from 'lauqe'
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES } from '../../_utils/hono.ts'
+import { BRES } from '../../utils/hono.ts'
 import {
   baseNetlify,
   baseNetlifyEdge,
@@ -19,7 +19,7 @@ import {
   putChannel,
   setChannel,
   setChannelSelf,
-} from '../../_tests/api.ts'
+} from '../../tests/api.ts'
 
 export const app = new Hono()
 

@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareAuth } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
-import { createPortal } from '../../_utils/stripe.ts'
+import { middlewareAuth } from '../../utils/hono.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
+import { createPortal } from '../../utils/stripe.ts'
 
 interface PortalData {
   callbackUrl: string

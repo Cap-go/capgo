@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { getSDashboard } from '../../_utils/supabase.ts'
+import { getSDashboard } from '../../utils/supabase.ts'
 
 interface dataDevice {
   userId: string

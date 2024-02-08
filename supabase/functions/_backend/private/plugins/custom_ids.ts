@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES } from '../../_utils/hono.ts'
-import { updateDeviceCustomId } from '../../_utils/supabase.ts'
+import { BRES } from '../../utils/hono.ts'
+import { updateDeviceCustomId } from '../../utils/supabase.ts'
 
 interface dataDevice {
   appId: string

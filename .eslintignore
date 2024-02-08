@@ -3,4 +3,5 @@ public
 src/types/supabase.ts
 backend
 supabase
-supabase/functions/_backend/_utils/s3/*
+supabase/functions/_backend/utils/s3/*
+supabase/functions/_backend/scripts/*

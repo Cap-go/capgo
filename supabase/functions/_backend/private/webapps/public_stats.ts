@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../_utils/hono.ts'
-import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { middlewareKey } from '../../utils/hono.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 // website_stats
 
