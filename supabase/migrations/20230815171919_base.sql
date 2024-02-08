@@ -909,7 +909,7 @@ BEGIN
 END;  
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_total_app_storage_size(userid uuid, app_id character varying)
+CREATE OR REPLACE FUNCTION public.get_total_app_storage_size(userid uuid, appid character varying)
 RETURNS double precision
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
@@ -920,19 +920,19 @@ BEGIN
     FROM app_versions
     INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
     WHERE app_versions.user_id = userid
-    AND app_versions.app_id = app_id
+    AND app_versions.app_id = appid
     AND app_versions.deleted = false;
 
     RETURN total_size;
 END;  
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_total_app_storage_size(app_id character varying)
+CREATE OR REPLACE FUNCTION public.get_total_app_storage_size(appid character varying)
 RETURNS double precision
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    RETURN get_total_app_storage_size(auth.uid(), app_id);
+    RETURN get_total_app_storage_size(auth.uid(), appid);
 END;  
 $$;
 

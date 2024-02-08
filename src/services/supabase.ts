@@ -187,6 +187,8 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
 }
 
 export async function getTotaAppStorage(userid?: string, app_id?: string): Promise<number> {
+  if(!app_id)
+    return getTotalStorage(userid)
   const { data, error } = await useSupabase()
     .rpc('get_total_app_storage_size', { userid, appid: app_id })
     .single()
@@ -196,9 +198,9 @@ export async function getTotaAppStorage(userid?: string, app_id?: string): Promi
   return data || 0
 }
 
-export async function getTotalStorage(userid?: string, app_id?: string): Promise<number> {
+export async function getTotalStorage(userid?: string): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('get_total_storage_size', { userid, appid: app_id })
+    .rpc('get_total_storage_size', { userid })
     .single()
   if (error)
     throw new Error(error.message)
