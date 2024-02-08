@@ -110,7 +110,7 @@ export function getSupabaseToken() {
   return localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
 }
 export function unspoofUser() {
-  const textData: string = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
+  const textData: string | null = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
   if (!textData || !isSpoofed())
     return false
 
@@ -186,11 +186,13 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
   return (req.data || []) as appUsage[]
 }
 
-export async function getTotaAppStorage(userid?: string, app_id?: string): Promise<number> {
+export async function getTotaAppStorage(userid?: string, appid?: string): Promise<number> {
+  if (!userid)
+    return 0
   if(!app_id)
     return getTotalStorage(userid)
   const { data, error } = await useSupabase()
-    .rpc('get_total_app_storage_size', { userid, appid: app_id })
+    .rpc('get_total_app_storage_size', { userid, appid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -199,6 +201,8 @@ export async function getTotaAppStorage(userid?: string, app_id?: string): Promi
 }
 
 export async function getTotalStorage(userid?: string): Promise<number> {
+  if (!userid)
+    return 0
   const { data, error } = await useSupabase()
     .rpc('get_total_storage_size', { userid })
     .single()
@@ -209,6 +213,8 @@ export async function getTotalStorage(userid?: string): Promise<number> {
 }
 
 export async function isGoodPlan(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_good_plan_v4', { userid })
     .single()
@@ -232,6 +238,8 @@ export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['R
 }
 
 export async function isTrial(userid?: string): Promise<number> {
+  if (!userid)
+    return 0
   const { data, error } = await useSupabase()
     .rpc('is_trial', { userid })
     .single()
@@ -241,6 +249,8 @@ export async function isTrial(userid?: string): Promise<number> {
   return data || 0
 }
 export async function isAdmin(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_admin', { userid })
     .single()
@@ -251,6 +261,8 @@ export async function isAdmin(userid?: string): Promise<boolean> {
 }
 
 export async function isCanceled(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_canceled', { userid })
     .single()
@@ -261,6 +273,8 @@ export async function isCanceled(userid?: string): Promise<boolean> {
 }
 
 export async function isPaying(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_paying', { userid })
     .single()
@@ -280,6 +294,8 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
 }
 
 export async function isAllowedAction(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_allowed_action_user', { userid })
     .single()
@@ -290,6 +306,8 @@ export async function isAllowedAction(userid?: string): Promise<boolean> {
 }
 
 export async function getPlanUsagePercent(userid?: string): Promise<number> {
+  if (!userid)
+    return 0
   const { data, error } = await useSupabase()
     .rpc('get_plan_usage_percent', { userid })
     .single()
@@ -299,6 +317,12 @@ export async function getPlanUsagePercent(userid?: string): Promise<number> {
 }
 
 export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
+  if (!userid)
+    return {
+      mau: 0,
+      bandwidth: 0,
+      storage: 0,
+    }
   const { data, error } = await useSupabase()
     .rpc('get_total_stats_v3', { userid })
     .single()
@@ -314,6 +338,8 @@ export async function getTotalStats(userid?: string): Promise<Database['public']
 }
 
 export async function getCurrentPlanName(userid?: string): Promise<string> {
+  if (!userid)
+    return 'Free'
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name', { userid })
     .single()
