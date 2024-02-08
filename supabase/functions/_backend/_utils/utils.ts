@@ -1,13 +1,10 @@
 import crypto from 'node:crypto'
-
-import type { SupabaseClient } from '@supabase/supabase-js'
-
-import type { Context } from 'hono'
 import dayjs from 'dayjs'; 
 import { env } from 'hono/adapter'
-
 import type { Database } from './supabase.types.ts'
 import type { Details, JwtUser } from './types.ts'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Context } from 'hono'
 
 export function jwtDecoder(jwt: string): JwtUser {
   return JSON.parse(atob(jwt.split('.')[1]))

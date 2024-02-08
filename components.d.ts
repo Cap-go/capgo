@@ -10,6 +10,7 @@ declare module 'vue' {
     ActionSheet: typeof import('./src/components/ActionSheet.vue')['default']
     ApiKeys: typeof import('./src/components/ApiKeys.vue')['default']
     AppCard: typeof import('./src/components/dashboard/AppCard.vue')['default']
+    AppPreview: typeof import('./src/components/AppPreview.vue')['default']
     AppStat: typeof import('./src/components/package/AppStat.vue')['default']
     AppTable: typeof import('./src/components/tables/AppTable.vue')['default']
     Banner: typeof import('./src/components/Banner.vue')['default']

@@ -104,9 +104,9 @@ cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
-cannot-download: Cannot download bundle
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
+cannot-download: Cannot download bundle
 cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
@@ -258,12 +258,12 @@ member-deleted: Successfully deleted member
 members: Members
 metadata: Metadata
 metadata-min-ver-not-set: Minimal update version for current bundle is undefined
+metadata-not-found: metadata not found
 mfa-enable-instruction: Please scan the QR code in the authenticator app and verify
 mfa-enable-instruction-2: Please type the current 2FA code
 mfa-enabled: Enabled 2FA
 mfa-fail: Cannot change 2FA, please check browser console
 mfa-invalid-code: Invalid 2FA code, try again!
-metadata-not-found: metadata not found
 min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured
@@ -282,6 +282,7 @@ need-more-contact-us: Need more ? Contact us for tailored plan
 'no': 'no'
 no-channel-linked: No channel, click to add
 no-channel-linked-no-perm: No channel
+no-data: No Data
 no-devices: No devices
 no-logs: No logs
 no-permission: Insufficient permissions

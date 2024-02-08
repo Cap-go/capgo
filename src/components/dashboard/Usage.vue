@@ -17,6 +17,9 @@ const props = defineProps<{
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
 
+const noData = computed(() => false)
+// const noData = computed(() => datas.value.mau.length == 0)
+
 const datas = ref({
   mau: [] as number[],
   storage: [] as number[],
@@ -106,7 +109,7 @@ loadData()
 </script>
 
 <template>
-  <div class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
+  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau"

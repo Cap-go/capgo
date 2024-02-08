@@ -491,7 +491,7 @@ async function previewBundle() {
 
   displayStore.appPreview = {
     appId: packageId.value,
-    version: version.value
+    version: version.value,
   } as any
   displayStore.showAppPreview = true
 }

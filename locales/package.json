@@ -13,6 +13,7 @@
   "leaving": "Leaving",
   "main": "translate.js",
   "name": "locales",
+  "no-data": "No Data",
   "price-per-unit-above": "Price per unit above plan",
   "type": "module",
   "used-in-period": "Used in period",
