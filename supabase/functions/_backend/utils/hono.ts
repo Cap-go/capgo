@@ -16,10 +16,12 @@ export const middlewareKey: MiddlewareHandler<{
     apikey: Database['public']['Tables']['apikeys']['Row'] | null
   }
 }> = async (c: Context, next: Next) => {
+  const capgkey_string = c.req.header('capgkey')
   const apikey_string = c.req.header('authorization')
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(c), ['all', 'write'])
+  const key = capgkey_string || apikey_string
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(key, supabaseAdmin(c), ['all', 'write'])
   if (!apikey)
-    throw new HTTPException(400, { message: 'Invalid apikey' })
+    throw new HTTPException(400, { message: 'Invalid apikey', key })
   c.set('apikey', apikey)
   await next()
 }
