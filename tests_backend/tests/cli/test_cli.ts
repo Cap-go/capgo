@@ -196,7 +196,8 @@ async function runCli(params: string[], logOutput = false, overwriteApiKey?: str
 async function uploadToCloud(_backendBaseUrl: URL, _supabase: SupabaseType) {
   // We do not care about the output, if it fails the runCli will throw an error
   // Also we log output
-  await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
+  const cliOutput = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
+  assert(cliOutput.includes('Time to share your update to the world'), `CLI output does not include 'Time to share your update to the world'. CLI output:\n${cliOutput}`)
 }
 
 async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
