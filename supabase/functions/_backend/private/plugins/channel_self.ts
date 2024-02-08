@@ -9,7 +9,7 @@ import type { Context } from 'hono'
 import { sendDevice, sendStats, supabaseAdmin } from '../../_utils/supabase.ts'
 import { BRES } from '../../_utils/hono.ts'
 import type { AppInfos } from '../../_utils/types.ts'
-import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../../_utils/utils.ts'
+import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, recordToObject, reverseDomainRegex } from '../../_utils/utils.ts'
 import { Database } from '../../_utils/supabase.types.ts';
 
 interface DeviceLink extends AppInfos {
@@ -423,7 +423,7 @@ export const app = new Hono()
 app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log('body', body)
+    console.log('post body', body)
     return post(c, body)
   } catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
@@ -433,7 +433,7 @@ app.post('/', async (c: Context) => {
 app.put('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log('body', body)
+    console.log('put body', body)
     return put(c, body)
   } catch (e) {
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
@@ -441,9 +441,15 @@ app.put('/', async (c: Context) => {
 })
 
 app.delete('/', async (c: Context) => {
+  let body: DeviceLink
   try {
-    const body = await c.req.json<DeviceLink>()
-    console.log('body', body)
+    body = await c.req.json<DeviceLink>()
+  } catch (e) {
+    body = await c.req.query() as any as DeviceLink
+  }
+  try {
+    // const body = await c.req.json<DeviceLink>()
+    console.log('delete body', body)
     return deleteOverride(c, body)
   } catch (e) {
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
