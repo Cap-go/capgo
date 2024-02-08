@@ -8,7 +8,7 @@ import type { Database } from '~/types/supabase.types'
 
 let supaClient: SupabaseClient<Database> = null as any
 
-export const defaultApiHost = 'https://api.capgo.app'
+export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
 interface CapgoConfig {
   supaHost: string
