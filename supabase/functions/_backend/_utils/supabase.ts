@@ -66,7 +66,7 @@ export function supabaseAdmin(c: Context) {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
+  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
 export function updateOrCreateVersion(c: Context, update: Database['public']['Tables']['app_versions']['Insert']) {

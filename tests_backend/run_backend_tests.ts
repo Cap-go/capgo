@@ -11,7 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 
 import * as p from 'npm:@clack/prompts@0.7.0'
 
-import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
+import type { Database } from '../supabase/functions/_backend/_utils/supabase.types.ts'
 import { setSupabaseSecrets } from './utils.ts'
 import type { RunnableTest, SupabaseType, Test } from './utils.ts'
 

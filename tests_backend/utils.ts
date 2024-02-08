@@ -2,7 +2,7 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.
 import { isEqual } from 'https://esm.sh/lodash-es@^4.17.21'
 import { mergeReadableStreams } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import * as p from 'npm:@clack/prompts@0.7.0'
-import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
+import type { Database } from '../supabase/functions/_backend/_utils/supabase.types.ts'
 import { Pool, PoolClient } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'

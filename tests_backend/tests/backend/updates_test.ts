@@ -1,5 +1,5 @@
-import type { RunnableTest, SupabaseType, updateAndroidBaseData } from '../../utils.ts'
-import { assert, assertEquals, updateAndroidBaseData as baseData, defaultUserId, delay, getUpdateBaseData as getBaseData, getResponseError, responseOk, sendUpdate, getRawSqlConnection, testPlaywright } from '../../utils.ts'
+import type { RunnableTest, SupabaseType } from '../../utils.ts'
+import { assert, assertEquals, updateAndroidBaseData as baseData, delay, responseOk, sendUpdate, getRawSqlConnection, testPlaywright } from '../../utils.ts'
 
 export function getTest(): RunnableTest {
   return {
@@ -45,7 +45,7 @@ const baseDataIos = {
 }
 
 function getBaseDataIos(): typeof baseData {
-  return structuredClone(baseDataIos)
+  return structuredClone(baseDataIos) as any as typeof baseData
 }
 
 const noNew = { message: 'No new version available' }
