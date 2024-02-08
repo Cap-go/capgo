@@ -1,9 +1,8 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { DeletePayload } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import type { DeletePayload } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
 
 export const app = new Hono()
 
@@ -25,7 +24,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     // delete all apps from org
     // delete stripe customer
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process user', error: JSON.stringify(e) }, 500)
   }
 })

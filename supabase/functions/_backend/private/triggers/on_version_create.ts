@@ -1,13 +1,10 @@
-
-import { buf as crc32 } from "crc-32/crc32c";
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { InsertPayload, supabaseAdmin } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
-import { r2 } from '../../_utils/r2.ts';
-import { sendMetaToClickHouse } from '../../_utils/clickhouse.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import type { InsertPayload } from '../../_utils/supabase.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
+import { sendMetaToClickHouse } from '../../_utils/clickhouse.ts'
 
 export const app = new Hono()
 
@@ -89,8 +86,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (dbError)
       console.error('Cannot create app version meta', dbError)
     return c.json(BRES) // skip delete s3 and increment size in new upload
-
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process version', error: JSON.stringify(e) }, 500)
   }
 })

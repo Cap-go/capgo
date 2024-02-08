@@ -31,9 +31,11 @@ const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 const defaultCreatedAt = '2022-12-13T23:22:50.057507+00:00'
 const defaultUpdatedAt = '2022-12-21T13:35:17.523397+00:00'
 
-const headers = (c: Context) => ({
-  Authorization: getEnv(c, 'TEST_APIKEY'),
-})
+function headers(c: Context) {
+  return {
+    Authorization: getEnv(c, 'TEST_APIKEY'),
+  }
+}
 
 export const defaultUpdatePayload = {
   platform: defaultOs,

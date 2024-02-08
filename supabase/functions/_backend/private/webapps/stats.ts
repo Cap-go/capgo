@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { middlewareKey } from '../../_utils/hono.ts'
@@ -6,6 +5,7 @@ import { checkAppOwner, getSStats, supabaseAdmin } from '../../_utils/supabase.t
 import { checkKey } from '../../_utils/utils.ts'
 import type { Order } from '../../_utils/types.ts'
 import type { Database } from '../../_utils/supabase.types.ts'
+
 // get_stats
 
 interface dataStats {
@@ -34,7 +34,8 @@ app.post('/', middlewareKey, async (c: Context) => {
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }
     return c.json(await getSStats(c, apikey_string === authorization ? '' : authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
-  } catch (e) {
-    return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,11 +1,10 @@
-
 import axios from 'axios'
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
-import { categories } from '../../_utils/gplay_categ.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { categories } from '../../_utils/gplay_categ.ts'
 
 const toGetFramwork = 500
 const toGetInfo = 500
@@ -88,7 +87,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     await Promise.all(all)
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process scrapper', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,8 +1,7 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareKey } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
+import { middlewareKey } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
 
 export const app = new Hono()
 
@@ -67,7 +66,8 @@ app.post('/', middlewareKey, async (c: Context) => {
     return c.json({
       status: 'Error unknow',
     }, 500)
-  } catch (e) {
-    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,9 +1,7 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 
 import { z } from 'zod'
-import { middlewareKey } from '../../_utils/hono.ts'
 import { update } from '../../_utils/update.ts'
 import {
   INVALID_STRING_APP_ID,
@@ -59,20 +57,22 @@ app.post('/', async (c: Context) => {
     const body = await c.req.json<AppInfos>()
     console.log('body', body)
     if (isLimited(c, body.app_id)) {
-      return c.json({ 
-        status: 'Too many requests', 
-        error: 'too_many_requests' }, 200)
+      return c.json({
+        status: 'Too many requests',
+        error: 'too_many_requests',
+      }, 200)
     }
     const parseResult = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
       console.log('parseResult', body, parseResult.error)
       return c.json({
-          error: `Cannot parse json: ${parseResult.error}` 
-        }, 400)
+        error: `Cannot parse json: ${parseResult.error}`,
+      }, 400)
     }
 
     return update(c, body)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })

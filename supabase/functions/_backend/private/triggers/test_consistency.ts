@@ -1,9 +1,8 @@
-
 import { equal } from 'lauqe'
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES } from '../../_utils/hono.ts';
+import { BRES } from '../../_utils/hono.ts'
 import {
   baseNetlify,
   baseNetlifyEdge,
@@ -166,7 +165,8 @@ app.get('/', async (c: Context) => {
     if (!found)
       return c.json({ error: 'service not found', service }, 500)
     return c.json({ status: 'ok', service })
-  } catch (e) {
-    return c.json({ status: 'Cannot get config', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get config', error: JSON.stringify(e) }, 500)
   }
 })

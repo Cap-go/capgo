@@ -1,4 +1,3 @@
-
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { convertAllDatesToCH, getEnv } from './utils.ts'
@@ -108,11 +107,11 @@ export function sendLogToClickHouse(c: Context, logs: Database['public']['Tables
       // add created_at: new Date().toISOString() to each log
       body: logReady,
       headers: clickhouseAuthEnabled(c)
-      ? {
-          'Authorization': clickHouseAuth(c),
-          'Content-Type': 'text/plain',
-        }
-      : { 'Content-Type': 'text/plain' },
+        ? {
+            'Authorization': clickHouseAuth(c),
+            'Content-Type': 'text/plain',
+          }
+        : { 'Content-Type': 'text/plain' },
     },
   )
     .then(res => res.text())

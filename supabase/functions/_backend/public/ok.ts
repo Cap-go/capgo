@@ -11,7 +11,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     console.log('body', body)
     console.log('apikey', apikey)
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })
@@ -23,8 +24,9 @@ app.get('/', async (c: Context) => {
     console.log('body', body)
     // console.log('apikey', apikey)
     return c.json(BRES)
-  } catch (e) {
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -35,7 +37,8 @@ app.delete('/', middlewareKey, async (c: Context) => {
     console.log('body', body)
     console.log('apikey', apikey)
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { middlewareKey } from '../../_utils/hono.ts'
@@ -13,7 +12,8 @@ app.get('/', middlewareKey, async (c: Context) => {
       .select()
       .order('price_m')
     return c.json(plans || [])
-  } catch (e) {
-    return c.json({ status: 'Cannot get plans', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get plans', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,2 +1,1 @@
-export const isD1Enabled = true;
-
+export const isD1Enabled = true

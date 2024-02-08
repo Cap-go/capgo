@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
@@ -157,7 +156,8 @@ app.post('/', middlewareKey, async (c: Context) => {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
     return post(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
 })
@@ -167,7 +167,8 @@ app.get('/', middlewareKey, async (c: Context) => {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
     return get(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot get channel', error: JSON.stringify(e) }, 500)
   }
 })
@@ -177,7 +178,8 @@ app.delete('/', middlewareKey, async (c: Context) => {
     const body = await getBody<ChannelSet>(c)
     const apikey = c.get('apikey')
     return deleteChannel(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot delete channel', error: JSON.stringify(e) }, 500)
   }
 })

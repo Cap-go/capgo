@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
@@ -12,14 +11,14 @@ interface GetLatest {
   page?: number
 }
 
-const deleteBundle = async (c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> => {
+async function deleteBundle(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id)
     return c.json({ status: 'Missing app_id' }, 400)
   if (!body.version)
     return c.json({ status: 'Missing version' }, 400)
 
   if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
-    return c.json({ status: 'You can\'t access this app', app_id: body.app_id  }, 400)
+    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
     if (body.version) {
@@ -85,7 +84,8 @@ app.get('/', middlewareKey, async (c: Context) => {
     const body = await c.req.json<GetLatest>()
     const apikey = c.get('apikey')
     return get(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 })
@@ -95,7 +95,8 @@ app.delete('/', middlewareKey, async (c: Context) => {
     const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey')
     return deleteBundle(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })

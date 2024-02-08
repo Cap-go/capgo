@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getSDashboard } from '../../_utils/supabase.ts'
@@ -17,7 +16,8 @@ app.post('/', async (c: Context) => {
     const body = await c.req.json<dataDevice>()
     console.log('body', body)
     return c.json(await getSDashboard(c, c.req.header('authorization') || 'MISSING', body.userId, body.startDate, body.endDate, body.appId))
-  } catch (e) {
-    return c.json({ status: 'Cannot get dashboard', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get dashboard', error: JSON.stringify(e) }, 500)
   }
 })

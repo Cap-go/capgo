@@ -1,9 +1,8 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareAuth } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
-import { createPortal } from '../../_utils/stripe.ts';
+import { middlewareAuth } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { createPortal } from '../../_utils/stripe.ts'
 
 interface PortalData {
   callbackUrl: string
@@ -37,7 +36,8 @@ app.post('/', middlewareAuth, async (c: Context) => {
     console.log('user', user)
     const link = await createPortal(c, user.customer_id, body.callbackUrl)
     return c.json({ url: link.url })
-  } catch (e) {
-    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

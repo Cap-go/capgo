@@ -1,9 +1,7 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
-
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
 
 export const app = new Hono()
 
@@ -24,7 +22,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     await Promise.all(all)
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process googd plan', error: JSON.stringify(e) }, 500)
   }
 })

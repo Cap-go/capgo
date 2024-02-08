@@ -1,4 +1,3 @@
-
 import { parseCronExpression } from 'cron-schedule'
 
 import type { Context } from 'hono'

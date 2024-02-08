@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { middlewareKey } from '../../_utils/hono.ts'
@@ -26,15 +25,16 @@ app.post('/', middlewareKey, async (c: Context) => {
       authorization?.split('Bearer ')[1],
     )
     if (error || !auth || !auth.user)
-      return c.json({status: 'not authorize' }, 400)
+      return c.json({ status: 'not authorize' }, 400)
 
     const admin = await isAdmin(c, auth.user.id)
     const userId = (admin && body.user_id) ? body.user_id : auth.user.id
     const url = await getBundleUrl(c, body.storage_provider, `apps/${userId}/${body.app_id}/versions`, body.bucket_id)
     if (!url)
-      return c.json({ status: 'Error unknow' }, 500)  
+      return c.json({ status: 'Error unknow' }, 500)
     return c.json({ url })
-  } catch (e) {
-    return c.json({ status: 'Cannot get download link', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get download link', error: JSON.stringify(e) }, 500)
   }
 })

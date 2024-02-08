@@ -1,5 +1,5 @@
-import { app } from '../_backend/private/plugins/stats.ts'
 import { Hono } from 'hono'
+import { app } from '../_backend/private/plugins/stats.ts'
 
 const functionName = 'stats'
 const appGlobal = new Hono().basePath(`/${functionName}`)

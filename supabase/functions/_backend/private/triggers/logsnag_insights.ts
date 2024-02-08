@@ -1,10 +1,9 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
-import { logsnag } from '../../_utils/logsnag.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
+import { logsnag } from '../../_utils/logsnag.ts'
 
 interface PlanTotal { [key: string]: number }
 interface GlobalStats {
@@ -205,7 +204,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.error('insights error', e)
     })
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
   }
 })

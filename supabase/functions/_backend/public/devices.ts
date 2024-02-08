@@ -1,11 +1,9 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { checkAppOwner, getSDevice, supabaseAdmin } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../_utils/hono.ts'
-
 
 interface DeviceLink {
   app_id: string
@@ -175,7 +173,8 @@ app.post('/', middlewareKey, async (c: Context) => {
     console.log('body', body)
     console.log('apikey', apikey)
     return post(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })
@@ -187,8 +186,9 @@ app.get('/', middlewareKey, async (c: Context) => {
     console.log('body', body)
     console.log('apikey', apikey)
     return get(c, body, apikey)
-  } catch (e) {
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -199,7 +199,8 @@ app.delete('/', middlewareKey, async (c: Context) => {
     console.log('body', body)
     console.log('apikey', apikey)
     return deleteOverride(c, body, apikey)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })

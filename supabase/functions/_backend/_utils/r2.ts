@@ -1,7 +1,6 @@
-
-import { Client as S3Client } from "./s3/index.ts";
-
 import type { Context } from 'hono'
+import { Client as S3Client } from './s3/index.ts'
+
 import { getEnv } from './utils.ts'
 
 // import presign s3
@@ -28,7 +27,6 @@ function initR2(c: Context) {
   console.log('initR2', params)
   return new S3Client(params)
 }
-
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
@@ -60,7 +58,7 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   return url.toString()
 }
 
-async function getSizeChecksum(c: Context,fileId: string) {
+async function getSizeChecksum(c: Context, fileId: string) {
   const client = initR2(c)
   const { size, metadata } = await client.statObject(fileId)
   const checksum = metadata['x-amz-meta-crc32']

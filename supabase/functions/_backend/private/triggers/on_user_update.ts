@@ -1,11 +1,11 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { UpdatePayload, createApiKey, createStripeCustomer } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
-import { checkPlan } from '../../_utils/plans.ts';
-import { updateCustomer } from '../../_utils/stripe.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import type { UpdatePayload } from '../../_utils/supabase.ts'
+import { createApiKey, createStripeCustomer } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
+import { checkPlan } from '../../_utils/plans.ts'
+import { updateCustomer } from '../../_utils/stripe.ts'
 
 export const app = new Hono()
 
@@ -47,7 +47,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     await checkPlan(c, record.id)
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process user', error: JSON.stringify(e) }, 500)
   }
 })

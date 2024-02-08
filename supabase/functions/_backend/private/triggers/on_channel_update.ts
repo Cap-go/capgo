@@ -1,9 +1,9 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { UpdatePayload, supabaseAdmin } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import type { UpdatePayload } from '../../_utils/supabase.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
 
 export const app = new Hono()
 
@@ -27,7 +27,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         error: 'Np app id included the request',
       }, 500)
     }
-
 
     if (record.public && record.ios) {
       const { error: iosError } = await supabaseAdmin(c)
@@ -75,7 +74,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
 
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process channel', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,12 +1,12 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { customerToSegment, supabaseAdmin } from '../../_utils/supabase.ts';
-import { Person, addDataContact, trackEvent } from '../../_utils/plunk.ts';
-import { logsnag } from '../../_utils/logsnag.ts';
-import { removeOldSubscription } from '../../_utils/stripe.ts';
-import { extractDataEvent, parseStripeEvent } from '../../_utils/stripe_event.ts';
-import { getEnv } from '../../_utils/utils.ts';
+import { customerToSegment, supabaseAdmin } from '../../_utils/supabase.ts'
+import type { Person } from '../../_utils/plunk.ts'
+import { addDataContact, trackEvent } from '../../_utils/plunk.ts'
+import { logsnag } from '../../_utils/logsnag.ts'
+import { removeOldSubscription } from '../../_utils/stripe.ts'
+import { extractDataEvent, parseStripeEvent } from '../../_utils/stripe_event.ts'
+import { getEnv } from '../../_utils/utils.ts'
 
 export const app = new Hono()
 
@@ -14,9 +14,9 @@ app.post('/', async (c: Context) => {
   try {
     const LogSnag = logsnag(c)
     if (!c.req.header('stripe-signature') || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
-    return c.json({ status: 'Webhook Error: no signature or no secret found' }, 400)
+      return c.json({ status: 'Webhook Error: no signature or no secret found' }, 400)
 
-  // event.headers
+    // event.headers
     const signature = c.req.header('Stripe-Signature') || ''
     const stripeEvent = parseStripeEvent(c, await c.req.text(), signature)
     const stripeData = await extractDataEvent(stripeEvent)
@@ -125,7 +125,8 @@ app.post('/', async (c: Context) => {
     }
 
     return c.json({ received: true })
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot parse event', error: JSON.stringify(e) }, 500)
   }
 })

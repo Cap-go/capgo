@@ -1,6 +1,5 @@
-
-import { type Context, type Next, type MiddlewareHandler } from 'hono'
-import { HTTPException} from 'hono/http-exception'
+import type { Context, MiddlewareHandler, Next } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { checkKey, getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -18,11 +17,12 @@ export const middlewareKey: MiddlewareHandler<{
   await next()
 }
 
-export const getBody = async <T>(c: Context) => {
+export async function getBody<T>(c: Context) {
   let body: T
   try {
     body = await c.req.json<T>()
-  } catch (e) {
+  }
+  catch (e) {
     body = await c.req.query() as any as T
   }
   if (!body)
@@ -55,4 +55,4 @@ export const middlewareAPISecret: MiddlewareHandler<{
   await next()
 }
 
-export const BRES = { status: 'ok'}
+export const BRES = { status: 'ok' }

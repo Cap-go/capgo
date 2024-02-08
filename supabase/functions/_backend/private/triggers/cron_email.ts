@@ -1,9 +1,8 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
-import { trackEvent } from '../../_utils/plunk.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import { trackEvent } from '../../_utils/plunk.ts'
 
 // This is required propoably due to this https://github.com/supabase/postgrest-js/issues/408
 interface AppWithUser {
@@ -74,7 +73,7 @@ export const app = new Hono()
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const supabase = await supabaseAdmin(c)
-  
+
     const { data: apps, error: appsError } = await supabase
       .from('apps')
       .select(`
@@ -82,16 +81,16 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         name,
         user_id ( id, email )
       `)
-  
+
     if (appsError) {
       console.error('appsError', appsError)
       // We have no error handling here, as we call this edge fn from postgress and postgress does not care
       return c.json(BRES)
     }
-  
+
     // We propably do not need this, however for whatever reason supabase does not like our join
     const mappedApps = apps as unknown as AppWithUser[]
-  
+
     // Set stats = all updates
     // Sucess updates = set - failed
     // Fail = failed
@@ -99,23 +98,23 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
         app_id: mapApp.app_id,
       }).single()
-  
+
       if (!weeklyStats || generateStatsError) {
         console.error('Cannot send email for app', mapApp.app_id, generateStatsError, mapApp.user_id.email)
         continue
       }
-  
+
       if (weeklyStats.all_updates === 0)
         continue
-  
+
       const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
       if (sucessUpdates < 0) {
         console.error('Cannot send email for app, sucessUpdates < 0', weeklyStats, mapApp)
         continue
       }
-  
+
       const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
-  
+
       const metadata = {
         app_id: mapApp.app_id,
         weekly_updates: (weeklyStats.all_updates).toString(),
@@ -127,12 +126,13 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         weekly_open: (weeklyStats.open_app).toString(),
         fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
       }
-  
+
       await trackEvent(c, mapApp.user_id.email, metadata, 'cron-stats')
     }
-  
+
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process emails', error: JSON.stringify(e) }, 500)
   }
 })

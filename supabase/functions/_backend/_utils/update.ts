@@ -1,9 +1,15 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
 import type { Context } from 'hono'
-import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js' // do_not_change
+
+import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
+
+// do_not_change
 import { and, eq, or, sql } from 'drizzle-orm'
-import { alias as alias_postgres } from 'drizzle-orm/pg-core' // do_not_change
+
+import { alias as alias_postgres } from 'drizzle-orm/pg-core'
+
+// do_not_change
 import postgres from 'postgres'
 import { getEnv } from './utils.ts'
 import { isAllowedAction, sendDevice, sendStats } from './supabase.ts'
@@ -13,7 +19,10 @@ import { sendNotif } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
-import * as schema_postgres from './postgress_schema.ts' // do_not_change
+
+import * as schema_postgres from './postgress_schema.ts'
+
+// do_not_change
 
 let globalPgClient = null as ReturnType<typeof postgres> | null
 

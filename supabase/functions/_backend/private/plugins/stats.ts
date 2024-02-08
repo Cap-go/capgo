@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 
@@ -80,10 +79,11 @@ async function post(c: Context, body: AppStats) {
       }, 200)
     }
     const parseResult: any = jsonRequestSchema.safeParse(body)
-    if (!parseResult.success)
+    if (!parseResult.success) {
       return c.json({
         error: `Cannot parse json: ${parseResult.error}`,
-      }, 400) 
+      }, 400)
+    }
 
     let {
       version_name,
@@ -230,7 +230,8 @@ app.post('/', async (c: Context) => {
     const body = await c.req.json<AppStats>()
     console.log('body', body)
     return post(c, body)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,11 +1,11 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { InsertPayload, createApiKey, createStripeCustomer, createdefaultOrg } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
-import { addContact, trackEvent } from '../../_utils/plunk.ts';
-import { logsnag } from '../../_utils/logsnag.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import type { InsertPayload } from '../../_utils/supabase.ts'
+import { createApiKey, createStripeCustomer, createdefaultOrg } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
+import { addContact, trackEvent } from '../../_utils/plunk.ts'
+import { logsnag } from '../../_utils/logsnag.ts'
 
 export const app = new Hono()
 
@@ -53,7 +53,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       }),
     ])
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process user', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,9 +1,8 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { r2 } from '../../_utils/r2.ts'
-import { middlewareKey } from '../../_utils/hono.ts';
-import { supabaseAdmin } from '../../_utils/supabase.ts';
+import { middlewareKey } from '../../_utils/hono.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
 
 interface dataUpload {
   bucket_id: string
@@ -18,7 +17,7 @@ app.post('/', middlewareKey, async (c: Context) => {
     console.log('body', body)
     const apikey = c.get('apikey')
     const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
-    .rpc('get_user_id', { apikey: c.req.header('authorization')!, app_id: body.app_id })
+      .rpc('get_user_id', { apikey: c.req.header('authorization')!, app_id: body.app_id })
     if (_errorUserId)
       return c.json({ status: 'Error User not found' }, 500)
     const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
@@ -53,7 +52,8 @@ app.post('/', middlewareKey, async (c: Context) => {
       return c.json({ status: 'Error unknow' }, 500)
     console.log('url', filePath, url)
     return c.json({ url })
-  } catch (e) {
-    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

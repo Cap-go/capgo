@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getEnv } from '../../_utils/utils.ts'
@@ -13,7 +12,8 @@ app.get('/', (c: Context) => {
       supaKey: getEnv(c, 'SUPABASE_ANON_KEY'),
       signKey: getEnv(c, 'DEFAULT_SIGN_KEY'),
     })
-  } catch (e) {
-    return c.json({ status: 'Cannot get config', error: JSON.stringify(e) }, 500) 
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get config', error: JSON.stringify(e) }, 500)
   }
 })

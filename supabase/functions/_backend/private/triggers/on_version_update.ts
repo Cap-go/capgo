@@ -1,11 +1,11 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES, middlewareAPISecret } from '../../_utils/hono.ts';
-import { UpdatePayload, supabaseAdmin } from '../../_utils/supabase.ts';
-import { Database } from '../../_utils/supabase.types.ts';
-import { sendMetaToClickHouse } from '../../_utils/clickhouse.ts';
-import { r2 } from '../../_utils/r2.ts';
+import { BRES, middlewareAPISecret } from '../../_utils/hono.ts'
+import type { UpdatePayload } from '../../_utils/supabase.ts'
+import { supabaseAdmin } from '../../_utils/supabase.ts'
+import type { Database } from '../../_utils/supabase.types.ts'
+import { sendMetaToClickHouse } from '../../_utils/clickhouse.ts'
+import { r2 } from '../../_utils/r2.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
@@ -58,7 +58,6 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-
   if (!record.bucket_id) {
     console.log('no bucket_id')
     return c.json(BRES)
@@ -114,7 +113,6 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   return c.json(BRES)
 }
 
-
 export const app = new Hono()
 
 app.post('/', middlewareAPISecret, async (c: Context) => {
@@ -146,7 +144,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     console.log('Update but not deleted')
     return updateIt(c, body)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot process version', error: JSON.stringify(e) }, 500)
   }
 })

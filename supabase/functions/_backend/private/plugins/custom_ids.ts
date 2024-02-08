@@ -1,4 +1,3 @@
-
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { BRES } from '../../_utils/hono.ts'
@@ -18,7 +17,8 @@ app.post('/', async (c: Context) => {
     console.log('body', body)
     await updateDeviceCustomId(c, c.req.header('authorization') || '', body.appId, body.deviceId, body.customId)
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
   }
 })
