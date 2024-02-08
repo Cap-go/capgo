@@ -4,7 +4,7 @@ import type { Context } from 'hono'
 import { checkAppOwner, supabaseAdmin } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { BRES, middlewareKey } from '../_utils/hono.ts'
+import { BRES, getBody, middlewareKey } from '../_utils/hono.ts'
 
 interface GetLatest {
   app_id?: string
@@ -92,7 +92,7 @@ app.get('/', middlewareKey, async (c: Context) => {
 
 app.delete('/', middlewareKey, async (c: Context) => {
   try {
-    const body = await c.req.json<GetLatest>()
+    const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey')
     return deleteBundle(c, body, apikey)
   } catch (e) {

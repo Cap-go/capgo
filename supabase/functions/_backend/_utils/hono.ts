@@ -18,6 +18,18 @@ export const middlewareKey: MiddlewareHandler<{
   await next()
 }
 
+export const getBody = async <T>(c: Context) => {
+  let body: T
+  try {
+    body = await c.req.json<T>()
+  } catch (e) {
+    body = await c.req.query() as any as T
+  }
+  if (!body)
+    throw new HTTPException(400, { message: 'Cannot find body' })
+  return body
+}
+
 export const middlewareAuth: MiddlewareHandler<{
   Variables: {
     authorization: string

@@ -1,3 +1,4 @@
+import { getBody } from '../../_utils/hono.ts';
 // channel self old function
 
 import * as semver from 'semver'
@@ -441,13 +442,8 @@ app.put('/', async (c: Context) => {
 })
 
 app.delete('/', async (c: Context) => {
-  let body: DeviceLink
   try {
-    body = await c.req.json<DeviceLink>()
-  } catch (e) {
-    body = await c.req.query() as any as DeviceLink
-  }
-  try {
+    const body = await getBody<DeviceLink>(c)
     // const body = await c.req.json<DeviceLink>()
     console.log('delete body', body)
     return deleteOverride(c, body)

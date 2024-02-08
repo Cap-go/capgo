@@ -4,7 +4,7 @@ import type { Context } from 'hono'
 import { checkAppOwner, getSDevice, supabaseAdmin } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { BRES, middlewareKey } from '../_utils/hono.ts'
+import { BRES, getBody, middlewareKey } from '../_utils/hono.ts'
 
 
 interface DeviceLink {
@@ -194,7 +194,7 @@ app.get('/', middlewareKey, async (c: Context) => {
 
 app.delete('/', middlewareKey, async (c: Context) => {
   try {
-    const body = await c.req.json<DeviceLink>()
+    const body = await getBody<DeviceLink>(c)
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)

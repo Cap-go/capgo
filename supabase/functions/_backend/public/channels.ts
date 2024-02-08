@@ -4,7 +4,7 @@ import type { Context } from 'hono'
 import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../_utils/supabase.ts'
 import { fetchLimit } from '../_utils/utils.ts'
 import type { Database } from '../_utils/supabase.types.ts'
-import { BRES, middlewareKey } from '../_utils/hono.ts'
+import { BRES, getBody, middlewareKey } from '../_utils/hono.ts'
 
 interface ChannelSet {
   app_id: string
@@ -174,7 +174,7 @@ app.get('/', middlewareKey, async (c: Context) => {
 
 app.delete('/', middlewareKey, async (c: Context) => {
   try {
-    const body = await c.req.json<ChannelSet>()
+    const body = await getBody<ChannelSet>(c)
     const apikey = c.get('apikey')
     return deleteChannel(c, body, apikey)
   } catch (e) {
