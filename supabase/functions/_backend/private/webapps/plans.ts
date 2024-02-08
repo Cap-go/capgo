@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareCors } from '../../utils/hono.ts'
+import { useCors } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = new Hono()
 
-app.get('/', middlewareCors, async (c: Context) => {
+app.use('/', useCors)
+
+app.get('/', async (c: Context) => {
   try {
     const { data: plans } = await supabaseAdmin(c)
       .from('plans')

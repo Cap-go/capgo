@@ -5,7 +5,7 @@ import type { Database } from './supabase.types.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { cors } from 'hono/cors'
 
-export const middlewareCors = cors({
+export const useCors = cors({
   origin: '*',
   allowHeaders: ['*'],
   allowMethods: ['POST', 'GET', 'OPTIONS'],

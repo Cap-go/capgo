@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareCors, middlewareAuth } from '../../utils/hono.ts'
+import { useCors, middlewareAuth } from '../../utils/hono.ts'
 import { isAdmin, supabaseAdmin } from '../../utils/supabase.ts'
 import { getBundleUrl } from '../../utils/downloadUrl.ts'
 
@@ -13,7 +13,9 @@ interface DataDownload {
 
 export const app = new Hono()
 
-app.post('/', middlewareCors, middlewareAuth, async (c: Context) => {
+app.use('/', useCors)
+
+app.post('/', middlewareAuth, async (c: Context) => {
   try {
     const body = await c.req.json<DataDownload>()
     console.log('body', body)

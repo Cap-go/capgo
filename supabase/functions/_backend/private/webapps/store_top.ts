@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { middlewareCors } from '../../utils/hono.ts'
+import { useCors } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = new Hono()
 
-app.post('/', middlewareCors, async (c: Context) => {
+app.use('/', useCors)
+
+app.post('/', async (c: Context) => {
   try {
     // count allapps
     const mode = c.req.query('mode') || 'capacitor'

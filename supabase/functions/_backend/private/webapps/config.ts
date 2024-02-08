@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getEnv } from '../../utils/utils.ts'
-import { middlewareCors } from '../../utils/hono.ts';
+import { useCors } from '../../utils/hono.ts';
 
 export const app = new Hono()
 
-app.get('/', middlewareCors, (c: Context) => {
+app.use('/', useCors)
+
+app.get('/', (c: Context) => {
   try {
     return c.json({
       supaHost: getEnv(c, 'SUPABASE_URL'),
