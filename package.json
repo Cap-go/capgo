@@ -51,7 +51,11 @@
     "cf-edge:run": "bunx wrangler dev --port 7777",
     "cf-backend_deploy": "bunx wrangler deploy",
     "cf-backend_deploy_env": "node scripts/deploy_cf_backend_env.mjs",
-    "size": "bunx vite-bundle-visualizer"
+    "size": "bunx vite-bundle-visualizer",
+    "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && sudo bash -c 'rm -rf ./tests_backend/gh_actions/ch_data/ && rm -rf ./tests_backend/gh_actions/ch_logs/'",
+    "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
+    "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\"",
+    "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.485.0",
@@ -163,7 +167,7 @@
     "@iconify-json/ion": "1.1.14",
     "@iconify-json/ls": "1.1.7",
     "@iconify/json": "^2.2.164",
-    "@playwright/test": "^1.40.1",
+    "@playwright/test": "1.41.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/line-clamp": "^0.4.4",

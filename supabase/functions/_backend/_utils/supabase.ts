@@ -292,7 +292,7 @@ export async function updateDeviceCustomId(c: Context, auth: string, appId: stri
     return
   }
   const reqOwner = await client
-    .rpc('is_app_owner', { appid: appId })
+    .rpc('has_app_right', { appid: appId, right: 'write' })
     .then(res => res.data || false)
   if (!reqOwner) {
     const reqAdmin = await client
@@ -344,7 +344,7 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
       // console.log('read rights', hasReadRights)
 
       const reqOwner = await client
-        .rpc('is_app_owner', { appid: appId })
+        .rpc('has_app_right', { appid: appId, right: 'read' })
         .then(res => res.data || false)
       if (!reqOwner && !reqAdmin)
         return Promise.reject(new Error('not allowed'))
@@ -367,7 +367,7 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
     const appIds = await supabaseClient(c, auth)
       .from('apps')
       .select('app_id')
-      .eq('user_id', userId)
+      // .eq('user_id', userId)
       .then(res => res.data?.map(app => app.app_id) || [])
     console.log('appIds', appIds)
     req = req.in('app_id', appIds)
@@ -403,7 +403,11 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
   if (isClickHouseEnabled(c)) {
     tableName = 'clickhouse_devices'
     const reqOwner = await client
-      .rpc('is_app_owner', { appid: appId })
+      .rpc('has_app_right', { appid: appId, right: 'read' })
+      .then((r) => {
+        console.log(r)
+        return r
+      })
       .then(res => res.data || false)
     if (!reqOwner) {
       const reqAdmin = await client
@@ -489,7 +493,7 @@ export async function getSStats(c: Context, auth: string, appId: string, deviceI
     tableName = 'clickhouse_logs'
     const reqOwner = auth
       ? (await client
-          .rpc('is_app_owner', { appid: appId })
+          .rpc('has_app_right', { appid: appId, right: 'read' })
           .then(res => res.data || false))
       : true
     if (!reqOwner) {

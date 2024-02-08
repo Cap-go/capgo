@@ -1,9 +1,10 @@
-import { APIRequestContext, test } from '@playwright/test'
-import { useSupabaseAdmin } from './utils'
-import type { Database } from '~/types/supabase.types'
-import { z } from 'zod'
-import { expect } from './zodUtils'
 import * as crypto from 'node:crypto'
+import type { APIRequestContext } from '@playwright/test'
+import { test } from '@playwright/test'
+import { z } from 'zod'
+import { useSupabaseAdmin } from './utils'
+import { expect } from './zodUtils'
+import type { Database } from '~/types/supabase.types'
 
 const functionUrl = process.env.BACKEND_URL || 'http://localhost:54321/functions/v1/'
 const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
@@ -28,7 +29,7 @@ function getBaseData() {
 
 const updateNewScheme = z.object({
   url: z.string(),
-  version: z.string()
+  version: z.string(),
 })
 
 const backendTest = test.extend<object, {}>({
@@ -68,22 +69,21 @@ async function restoreChannel() {
 
 function postUpdate(request: APIRequestContext, data: object) {
   return request.post('', {
-    data
+    data,
   })
 }
- 
-backendTest.describe('Test update logic', () => {
 
+backendTest.describe('Test update logic', () => {
   backendTest.beforeAll(async () => await copyChannelById(22))
   backendTest.beforeAll(async () => {
     const supabase = await useSupabaseAdmin()
 
     const { error } = await supabase.from('channels')
-      .update({ 
+      .update({
         version: 9654,
-        public: true, 
+        public: true,
         android: true,
-        disableAutoUpdate: 'major'
+        disableAutoUpdate: 'major',
       })
       .eq('id', 22)
 
@@ -97,7 +97,7 @@ backendTest.describe('Test update logic', () => {
     const response = await postUpdate(request, baseData)
 
     expect(response.ok()).toBeTruthy()
-    expect(await response.json()).toEqual({ message: 'No new version available' });
+    expect(await response.json()).toEqual({ message: 'No new version available' })
   })
 
   backendTest('Test new version available', async ({ request }) => {
@@ -142,10 +142,10 @@ backendTest.describe('Test update logic', () => {
     backendTest('Test disable_auto_update_to_minor', async ({ request }) => {
       const baseData = getBaseData()
       baseData.version_name = '1.1.0'
-  
+
       const response = await postUpdate(request, baseData)
       expect(response.ok()).toBeTruthy()
-  
+
       expect(response).toHaveError('disable_auto_update_to_minor')
     })
   })
@@ -180,10 +180,10 @@ backendTest.describe('Test update logic', () => {
       const baseData = getBaseData()
       baseData.version_name = '1.1.0'
       baseData.is_emulator = true
-  
+
       const response = await postUpdate(request, baseData)
       expect(response.ok()).toBeTruthy()
-  
+
       expect(response).toHaveError('disable_emulator')
     })
   })
@@ -207,10 +207,10 @@ backendTest.describe('Test update logic', () => {
       const baseData = getBaseData()
       baseData.version_name = '1.1.0'
       baseData.is_prod = false
-  
+
       const response = await postUpdate(request, baseData)
       expect(response.ok()).toBeTruthy()
-  
+
       expect(response).toHaveError('disable_dev_build')
     })
   })
@@ -245,27 +245,30 @@ backendTest.describe('Test update logic', () => {
       // Get and check response
       const response = await postUpdate(request, baseData)
       expect(response.ok()).toBeTruthy()
-  
+
       // Parse response (check schema)
       const json = await response.json()
-      expect(json).toEqual({ message: 'No new version available' });
+      expect(json).toEqual({ message: 'No new version available' })
     })
 
     backendTest('Assert new device was created', async ({ request }) => {
       const baseData = getBaseData()
       baseData.device_id = uuid
-      
+
       // Get and check response
       const response = await postUpdate(request, baseData)
       expect(response.ok()).toBeTruthy()
-  
+
       // Parse response (check schema)
       const json = await response.json()
-      expect(json).toEqual({ message: 'No new version available' });
+      expect(json).toEqual({ message: 'No new version available' })
+
+      const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+      await delay(3000)
 
       // Check if device was added
       const supabase = await useSupabaseAdmin()
-      const { error, data } = await supabase.from('devices')
+      const { error, data } = await supabase.from('clickhouse_devices')
         .select()
         .eq('device_id', uuid)
         .single()
@@ -294,35 +297,35 @@ backendTest.describe('Test update logic', () => {
         const supabase = await useSupabaseAdmin()
 
         const { error } = await supabase
-        .from('channel_devices')
-        .insert({
-          device_id: uuid,
-          channel_id: 23,
-          app_id: updateAndroidBaseData.app_id,
-          created_by: defaultUserId,
-        })
+          .from('channel_devices')
+          .insert({
+            device_id: uuid,
+            channel_id: 23,
+            app_id: updateAndroidBaseData.app_id,
+            created_by: defaultUserId,
+          })
         expect(error).toBeFalsy()
 
         const { error: error2 } = await supabase
           .from('channels')
           .update({ disableAutoUpdate: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
           .eq('id', 23)
-        
+
         expect(error2).toBeFalsy()
       })
-  
+
       backendTest('Test device overwrite', async ({ request }) => {
         const baseData = await getBaseData()
         baseData.device_id = uuid
         baseData.version_name = '0.0.0'
-        
+
         const response = await postUpdate(request, baseData)
         expect(response.ok()).toBeTruthy()
-    
+
         const json = await response.json()
         await expect(json).toMatchSchema(updateNewScheme)
         const parsed = updateNewScheme.parse(json)
-    
+
         expect(parsed.version).toBe('1.361.0')
       })
     })
@@ -346,39 +349,37 @@ backendTest.describe('Test update logic', () => {
         const supabase = await useSupabaseAdmin()
 
         const { error } = await supabase
-        .from('devices_override')
-        .insert({
-          device_id: uuid,
-          version: 9601,
-          app_id: updateAndroidBaseData.app_id,
-          created_by: defaultUserId,
-        })
+          .from('devices_override')
+          .insert({
+            device_id: uuid,
+            version: 9601,
+            app_id: updateAndroidBaseData.app_id,
+            created_by: defaultUserId,
+          })
         expect(error).toBeFalsy()
 
         const { error: error2 } = await supabase
           .from('channels')
           .update({ disableAutoUpdate: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
           .eq('id', 23)
-        
+
         expect(error2).toBeFalsy()
       })
-  
+
       backendTest('Test device overwrite', async ({ request }) => {
         const baseData = await getBaseData()
         baseData.device_id = uuid
         baseData.version_name = '0.0.0'
-        
+
         const response = await postUpdate(request, baseData)
         expect(response.ok()).toBeTruthy()
-    
+
         const json = await response.json()
         await expect(json).toMatchSchema(updateNewScheme)
         const parsed = updateNewScheme.parse(json)
-    
+
         expect(parsed.version).toBe('1.359.0')
       })
     })
   })
 })
-
-

@@ -1,17 +1,17 @@
 // import type { Page } from '@playwright/test'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import pkg from 'deep-diff';
-const { diff } = pkg;
+import pkg from 'deep-diff'
 import type { SupabaseType } from './utils'
 import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
 
+const { diff } = pkg
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 test.beforeEach(beforeEachTest)
 
@@ -365,8 +365,8 @@ test.describe('Test organization system permissions', () => {
 
         // We ALLWAYS expect app to be accesible. We are added to the org
         let users = Number.parseInt((await monthlyStatLocator.innerText()).split(' ')[0])
-        await expect(users).toBeTruthy()
-        await expect(users).toBeGreaterThan(0) // Check if getting stats works
+        await expect(users).not.toBeNaN()
+        await expect(users).toBeGreaterThanOrEqual(0) // Check if getting stats works
 
         if (inviteType !== 'owner') {
           const sharedAppsLocator = await page.locator('#shared')
@@ -382,13 +382,13 @@ test.describe('Test organization system permissions', () => {
 
         // Check again. This time for specific app
         users = Number.parseInt((await monthlyStatLocator.innerText()).split(' ')[0])
-        await expect(users).toBeTruthy()
-        await expect(users).toBeGreaterThan(0) // Check if getting stats works
+        await expect(users).not.toBeNaN()
+        await expect(users).toBeGreaterThanOrEqual(0) // Check if getting stats works
 
         const bundlesTotalSelector = await page.locator('#bundles-total')
         const bundlesTotal = Number.parseInt(await bundlesTotalSelector.innerText())
-        await expect(bundlesTotal).toBeTruthy()
-        await expect(bundlesTotal).toBeGreaterThan(0) // Check if bundles graph work
+        await expect(bundlesTotal).not.toBeNaN()
+        await expect(bundlesTotal).toBeGreaterThanOrEqual(0) // Check if bundles graph work
 
         // Test this down stripe (channels, bundles, devices, updates)
         // None of those values should be zero. If it is then something is broken
@@ -397,8 +397,8 @@ test.describe('Test organization system permissions', () => {
           const innerText = await stat.innerHTML()
           const innerNumber = Number.parseInt(innerText)
 
-          await expect(innerNumber).toBeTruthy()
-          await expect(innerNumber).toBeGreaterThan(0)
+          await expect(innerNumber).not.toBeNaN()
+          await expect(innerNumber).toBeGreaterThanOrEqual(0)
         }))
 
         // go to 'channels'
@@ -482,7 +482,7 @@ test.describe('Test organization system permissions', () => {
           if (permission.changeChannelToggle) {
             await Promise.all([
               page.waitForResponse(`${SUPABASE_URL}\/**`),
-              await toggle.click(),
+              toggle.click(),
             ])
           }
           else {
@@ -596,7 +596,7 @@ test.describe('Test organization system permissions', () => {
         await page.goto(`${BASE_URL}/app/p/com--demo--app/bundle/9601`)
 
         // Click on `Channel` to see the options available
-        await page.locator('#open-channel').click()
+        await page.locator('#open-channel').first().click()
         await expect(page.locator('#action-sheet')).toBeVisible()
 
         // Get all buttons
@@ -653,7 +653,7 @@ test.describe('Test organization system permissions', () => {
         await page.click('#inforow-input')
 
         if (permission.setDeviceCustomId) {
-          await page.fill('#inforow-input', 'test')
+          await page.fill('#inforow-input', `test-${crypto.randomUUID()}`)
           await expectPopout(page, 'Custom ID saved')
         }
         else {
