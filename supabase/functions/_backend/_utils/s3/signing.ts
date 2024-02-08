@@ -1,118 +1,116 @@
-import * as errors from "./errors.ts";
-import { bin2hex, getScope, makeDateLong, makeDateShort, sha256digestHex } from "./helpers.ts";
+import * as errors from './errors.ts'
+import { bin2hex, getScope, makeDateLong, makeDateShort, sha256digestHex } from './helpers.ts'
 
-const signV4Algorithm = "AWS4-HMAC-SHA256";
+const signV4Algorithm = 'AWS4-HMAC-SHA256'
 
 /**
  * Generate the Authorization header required to authenticate an S3/AWS request.
  */
 export async function signV4(request: {
-  headers: Headers;
-  method: string;
-  path: string;
-  accessKey: string;
-  secretKey: string;
-  region: string;
-  date: Date;
+  headers: Headers
+  method: string
+  path: string
+  accessKey: string
+  secretKey: string
+  region: string
+  date: Date
 }): Promise<string> {
-  if (!request.accessKey) {
-    throw new errors.AccessKeyRequiredError("accessKey is required for signing");
-  }
-  if (!request.secretKey) {
-    throw new errors.SecretKeyRequiredError("secretKey is required for signing");
-  }
+  if (!request.accessKey)
+    throw new errors.AccessKeyRequiredError('accessKey is required for signing')
 
-  const sha256sum = request.headers.get("x-amz-content-sha256");
+  if (!request.secretKey)
+    throw new errors.SecretKeyRequiredError('secretKey is required for signing')
+
+  const sha256sum = request.headers.get('x-amz-content-sha256')
   if (sha256sum === null) {
     throw new Error(
-      "Internal S3 client error - expected x-amz-content-sha256 header, but it's missing.",
-    );
+      'Internal S3 client error - expected x-amz-content-sha256 header, but it\'s missing.',
+    )
   }
 
-  const signedHeaders = getHeadersToSign(request.headers);
+  const signedHeaders = getHeadersToSign(request.headers)
   const canonicalRequest = getCanonicalRequest(
     request.method,
     request.path,
     request.headers,
     signedHeaders,
     sha256sum,
-  );
+  )
   const stringToSign = await getStringToSign(
     canonicalRequest,
     request.date,
     request.region,
-  );
+  )
   const signingKey = await getSigningKey(
     request.date,
     request.region,
     request.secretKey,
-  );
+  )
   const credential = getCredential(
     request.accessKey,
     request.region,
     request.date,
-  );
+  )
   const signature = bin2hex(await sha256hmac(signingKey, stringToSign))
-    .toLowerCase();
+    .toLowerCase()
 
   return `${signV4Algorithm} Credential=${credential}, SignedHeaders=${
-    signedHeaders.join(";").toLowerCase()
-  }, Signature=${signature}`;
+    signedHeaders.join(';').toLowerCase()
+  }, Signature=${signature}`
 }
 
 /**
  * Generate a pre-signed URL
  */
 export async function presignV4(request: {
-  protocol: "http:" | "https:";
-  headers: Headers;
-  method: string;
-  path: string;
-  accessKey: string;
-  secretKey: string;
-  region: string;
-  date: Date;
-  expirySeconds: number;
+  protocol: 'http:' | 'https:'
+  headers: Headers
+  method: string
+  path: string
+  accessKey: string
+  secretKey: string
+  region: string
+  date: Date
+  expirySeconds: number
 }): Promise<string> {
-  if (!request.accessKey) {
-    throw new errors.AccessKeyRequiredError("accessKey is required for signing");
-  }
-  if (!request.secretKey) {
-    throw new errors.SecretKeyRequiredError("secretKey is required for signing");
-  }
-  if (request.expirySeconds < 1) {
-    throw new errors.InvalidExpiryError("expirySeconds cannot be less than 1 seconds");
-  }
-  if (request.expirySeconds > 604800) {
-    throw new errors.InvalidExpiryError("expirySeconds cannot be greater than 7 days");
-  }
-  if (!request.headers.has("Host")) {
-    throw new Error("Internal error: host header missing");
-  }
+  if (!request.accessKey)
+    throw new errors.AccessKeyRequiredError('accessKey is required for signing')
+
+  if (!request.secretKey)
+    throw new errors.SecretKeyRequiredError('secretKey is required for signing')
+
+  if (request.expirySeconds < 1)
+    throw new errors.InvalidExpiryError('expirySeconds cannot be less than 1 seconds')
+
+  if (request.expirySeconds > 604800)
+    throw new errors.InvalidExpiryError('expirySeconds cannot be greater than 7 days')
+
+  if (!request.headers.has('Host'))
+    throw new Error('Internal error: host header missing')
 
   // Information about the future request that we're going to sign:
-  const resource = request.path.split("?")[0];
-  const queryString = request.path.split("?")[1];
-  const iso8601Date = makeDateLong(request.date);
-  const signedHeaders = getHeadersToSign(request.headers);
-  const credential = getCredential(request.accessKey, request.region, request.date);
-  const hashedPayload = "UNSIGNED-PAYLOAD";
+  const resource = request.path.split('?')[0]
+  const queryString = request.path.split('?')[1]
+  const iso8601Date = makeDateLong(request.date)
+  const signedHeaders = getHeadersToSign(request.headers)
+  const credential = getCredential(request.accessKey, request.region, request.date)
+  const hashedPayload = 'UNSIGNED-PAYLOAD'
 
   // Build the query string for our new signed URL:
-  const newQuery = new URLSearchParams(queryString);
-  newQuery.set("X-Amz-Algorithm", signV4Algorithm);
-  newQuery.set("X-Amz-Credential", credential);
-  newQuery.set("X-Amz-Date", iso8601Date);
-  newQuery.set("X-Amz-Expires", request.expirySeconds.toString());
-  newQuery.set("X-Amz-SignedHeaders", signedHeaders.join(";").toLowerCase());
-  const newPath = resource + "?" + newQuery.toString().replace("+", "%20"); // Signing requires spaces become %20, never +
+  const newQuery = new URLSearchParams(queryString)
+  newQuery.set('X-Amz-Algorithm', signV4Algorithm)
+  newQuery.set('X-Amz-Credential', credential)
+  newQuery.set('X-Amz-Date', iso8601Date)
+  newQuery.set('X-Amz-Expires', request.expirySeconds.toString())
+  newQuery.set('X-Amz-SignedHeaders', signedHeaders.join(';').toLowerCase())
+  const newPath = `${resource}?${newQuery.toString().replace('+', '%20')}` // Signing requires spaces become %20, never +
 
-  const canonicalRequest = getCanonicalRequest(request.method, newPath, request.headers, signedHeaders, hashedPayload);
-  const stringToSign = await getStringToSign(canonicalRequest, request.date, request.region);
-  const signingKey = await getSigningKey(request.date, request.region, request.secretKey);
-  const signature = bin2hex(await sha256hmac(signingKey, stringToSign)).toLowerCase();
-  const presignedUrl = `${request.protocol}//${request.headers.get("Host")}${newPath}&X-Amz-Signature=${signature}`;
-  return presignedUrl;
+  const canonicalRequest = getCanonicalRequest(request.method, newPath, request.headers, signedHeaders, hashedPayload)
+  const stringToSign = await getStringToSign(canonicalRequest, request.date, request.region)
+  const signingKey = await getSigningKey(request.date, request.region, request.secretKey)
+  const signature = bin2hex(await sha256hmac(signingKey, stringToSign)).toLowerCase()
+  const presignedUrl = `${request.protocol}//${request.headers.get('Host')}${newPath}&X-Amz-Signature=${signature}`
+  return presignedUrl
 }
 
 /**
@@ -148,32 +146,32 @@ function getHeadersToSign(headers: Headers): string[] {
   //      Is skipped for obvious reasons
 
   const ignoredHeaders = [
-    "authorization",
-    "content-length",
-    "content-type",
-    "user-agent",
-  ];
-  const headersToSign = [];
+    'authorization',
+    'content-length',
+    'content-type',
+    'user-agent',
+  ]
+  const headersToSign = []
   for (const key of headers.keys()) {
-    if (ignoredHeaders.includes(key.toLowerCase())) {
-      continue; // Ignore this header
-    }
-    headersToSign.push(key);
+    if (ignoredHeaders.includes(key.toLowerCase()))
+      continue // Ignore this header
+
+    headersToSign.push(key)
   }
-  headersToSign.sort();
-  return headersToSign;
+  headersToSign.sort()
+  return headersToSign
 }
 
 const CODES = {
-  A: "A".charCodeAt(0),
-  Z: "Z".charCodeAt(0),
-  a: "a".charCodeAt(0),
-  z: "z".charCodeAt(0),
-  "0": "0".charCodeAt(0),
-  "9": "9".charCodeAt(0),
-  "/": "/".charCodeAt(0),
-};
-const ALLOWED_BYTES = "-._~".split("").map((s) => s.charCodeAt(0));
+  'A': 'A'.charCodeAt(0),
+  'Z': 'Z'.charCodeAt(0),
+  'a': 'a'.charCodeAt(0),
+  'z': 'z'.charCodeAt(0),
+  '0': '0'.charCodeAt(0),
+  '9': '9'.charCodeAt(0),
+  '/': '/'.charCodeAt(0),
+}
+const ALLOWED_BYTES = '-._~'.split('').map(s => s.charCodeAt(0))
 
 /**
  * Canonical URI encoding for signing, per AWS documentation:
@@ -192,22 +190,21 @@ const ALLOWED_BYTES = "-._~".split("").map((s) => s.charCodeAt(0));
  * @param string the string to encode.
  */
 function awsUriEncode(string: string, allowSlashes = false) {
-  const bytes: Uint8Array = new TextEncoder().encode(string);
-  let encoded = "";
+  const bytes: Uint8Array = new TextEncoder().encode(string)
+  let encoded = ''
   for (const byte of bytes) {
     if (
-      (byte >= CODES.A && byte <= CODES.Z) ||
-      (byte >= CODES.a && byte <= CODES.z) ||
-      (byte >= CODES["0"] && byte <= CODES["9"]) ||
-      (ALLOWED_BYTES.includes(byte)) ||
-      (byte == CODES["/"] && allowSlashes)
-    ) {
-      encoded += String.fromCharCode(byte);
-    } else {
-      encoded += "%" + byte.toString(16).padStart(2, "0").toUpperCase();
-    }
+      (byte >= CODES.A && byte <= CODES.Z)
+      || (byte >= CODES.a && byte <= CODES.z)
+      || (byte >= CODES['0'] && byte <= CODES['9'])
+      || (ALLOWED_BYTES.includes(byte))
+      || (byte === CODES['/'] && allowSlashes)
+    )
+      encoded += String.fromCharCode(byte)
+    else
+      encoded += `%${byte.toString(16).padStart(2, '0').toUpperCase()}`
   }
-  return encoded;
+  return encoded
 }
 
 /**
@@ -230,31 +227,32 @@ function getCanonicalRequest(
 ): string {
   const headersArray = headersToSign.reduce<string[]>((acc, headerKey) => {
     // Trim spaces from the value (required by V4 spec)
-    const val = `${headers.get(headerKey)}`.replace(/ +/g, " ");
-    acc.push(`${headerKey.toLowerCase()}:${val}`);
-    return acc;
-  }, []);
+    const val = `${headers.get(headerKey)}`.replace(/ +/g, ' ')
+    acc.push(`${headerKey.toLowerCase()}:${val}`)
+    return acc
+  }, [])
 
-  const requestResource = path.split("?")[0];
-  let requestQuery = path.split("?")[1];
+  const requestResource = path.split('?')[0]
+  let requestQuery = path.split('?')[1]
   if (requestQuery) {
     requestQuery = requestQuery
-      .split("&")
+      .split('&')
       .sort()
-      .map((element) => element.indexOf("=") === -1 ? element + "=" : element)
-      .join("&");
-  } else {
-    requestQuery = "";
+      .map(element => !element.includes('=') ? `${element}=` : element)
+      .join('&')
+  }
+  else {
+    requestQuery = ''
   }
 
-  const canonical = [];
-  canonical.push(method.toUpperCase());
-  canonical.push(awsUriEncode(requestResource, true));
-  canonical.push(requestQuery);
-  canonical.push(headersArray.join("\n") + "\n");
-  canonical.push(headersToSign.join(";").toLowerCase());
-  canonical.push(payloadHash);
-  return canonical.join("\n");
+  const canonical = []
+  canonical.push(method.toUpperCase())
+  canonical.push(awsUriEncode(requestResource, true))
+  canonical.push(requestQuery)
+  canonical.push(`${headersArray.join('\n')}\n`)
+  canonical.push(headersToSign.join(';').toLowerCase())
+  canonical.push(payloadHash)
+  return canonical.join('\n')
 }
 
 // returns the string that needs to be signed
@@ -263,14 +261,14 @@ async function getStringToSign(
   requestDate: Date,
   region: string,
 ): Promise<string> {
-  const hash = await sha256digestHex(canonicalRequest);
-  const scope = getScope(region, requestDate);
-  const stringToSign = [];
-  stringToSign.push(signV4Algorithm);
-  stringToSign.push(makeDateLong(requestDate));
-  stringToSign.push(scope);
-  stringToSign.push(hash);
-  return stringToSign.join("\n");
+  const hash = await sha256digestHex(canonicalRequest)
+  const scope = getScope(region, requestDate)
+  const stringToSign = []
+  stringToSign.push(signV4Algorithm)
+  stringToSign.push(makeDateLong(requestDate))
+  stringToSign.push(scope)
+  stringToSign.push(hash)
+  return stringToSign.join('\n')
 }
 
 /** returns the key used for calculating signature */
@@ -279,16 +277,16 @@ async function getSigningKey(
   region: string,
   secretKey: string,
 ): Promise<Uint8Array> {
-  const dateLine = makeDateShort(date);
-  const hmac1 = await sha256hmac("AWS4" + secretKey, dateLine);
-  const hmac2 = await sha256hmac(hmac1, region);
-  const hmac3 = await sha256hmac(hmac2, "s3");
-  return await sha256hmac(hmac3, "aws4_request");
+  const dateLine = makeDateShort(date)
+  const hmac1 = await sha256hmac(`AWS4${secretKey}`, dateLine)
+  const hmac2 = await sha256hmac(hmac1, region)
+  const hmac3 = await sha256hmac(hmac2, 's3')
+  return await sha256hmac(hmac3, 'aws4_request')
 }
 
 /** generate a credential string  */
 function getCredential(accessKey: string, region: string, requestDate: Date) {
-  return `${accessKey}/${getScope(region, requestDate)}`;
+  return `${accessKey}/${getScope(region, requestDate)}`
 }
 
 /**
@@ -301,20 +299,20 @@ async function sha256hmac(
   secretKey: Uint8Array | string,
   data: Uint8Array | string,
 ): Promise<Uint8Array> {
-  const enc = new TextEncoder();
+  const enc = new TextEncoder()
   const keyObject = await crypto.subtle.importKey(
-    "raw", // raw format of the key - should be Uint8Array
+    'raw', // raw format of the key - should be Uint8Array
     secretKey instanceof Uint8Array ? secretKey : enc.encode(secretKey),
-    { name: "HMAC", hash: { name: "SHA-256" } }, // algorithm
+    { name: 'HMAC', hash: { name: 'SHA-256' } }, // algorithm
     false, // export = false
-    ["sign", "verify"], // what this key can do
-  );
+    ['sign', 'verify'], // what this key can do
+  )
   const signature = await crypto.subtle.sign(
-    "HMAC",
+    'HMAC',
     keyObject,
     data instanceof Uint8Array ? data : enc.encode(data),
-  );
-  return new Uint8Array(signature);
+  )
+  return new Uint8Array(signature)
 }
 
 // Export for testing purposes only
@@ -326,4 +324,4 @@ export const _internalMethods = {
   getSigningKey,
   getCredential,
   sha256hmac,
-};
+}
