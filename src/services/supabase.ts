@@ -189,7 +189,7 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
 export async function getTotaAppStorage(userid?: string, appid?: string): Promise<number> {
   if (!userid)
     return 0
-  if(!app_id)
+  if(!appid)
     return getTotalStorage(userid)
   const { data, error } = await useSupabase()
     .rpc('get_total_app_storage_size', { userid, appid })
