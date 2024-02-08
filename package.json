@@ -53,7 +53,7 @@
     "cf-backend_deploy_env": "node scripts/deploy_cf_backend_env.mjs",
     "size": "bunx vite-bundle-visualizer",
     "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && sudo bash -c 'rm -rf ./tests_backend/gh_actions/ch_data/ && rm -rf ./tests_backend/gh_actions/ch_logs/'",
-    "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
+    "clickhouse:start": "cd ./tests_backend/gh_actions && mkdir ch_data && mkdir ch_logs && sh ./clickhouse.sh && cd ../..",
     "clickhouse:seed": "docker exec some-clickhouse-server clickhouse-client -q --multiquery \"$(cat ./supabase/clickhouse.sql)\"",
     "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts"
   },
