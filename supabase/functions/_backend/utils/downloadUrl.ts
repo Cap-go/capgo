@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { r2 } from './r2.ts'
+import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 const EXPIRATION_SECONDS = 604800
@@ -14,7 +14,7 @@ export async function getBundleUrl(c: Context, platform: string, path: string, b
     return data?.signedUrl
   }
   else if (platform === 'r2' && bucket_id.endsWith('.zip')) {
-    return await r2.getSignedUrl(c, `${path}/${bucket_id}`, EXPIRATION_SECONDS)
+    return await s3.getSignedUrl(c, `${path}/${bucket_id}`, EXPIRATION_SECONDS)
   }
   return null
 }

@@ -5,7 +5,7 @@ import type { UpdatePayload } from '../../utils/supabase.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { sendMetaToClickHouse } from '../../utils/clickhouse.ts'
-import { r2 } from '../../utils/r2.ts'
+import { s3 } from '../../utils/s3.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
@@ -28,12 +28,12 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
     return c.json(BRES)
   }
   const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-  const existV2 = await r2.checkIfExist(c, v2Path)
+  const existV2 = await s3.checkIfExist(c, v2Path)
 
   if (existV2 && record.storage_provider === 'r2') {
     // pdate size and checksum
     console.log('V2', record.bucket_id)
-    const { size, checksum } = await r2.getSizeChecksum(c, v2Path)
+    const { size, checksum } = await s3.getSizeChecksum(c, v2Path)
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
@@ -69,14 +69,14 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   console.log('Delete', record.bucket_id)
 
   const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-  const existV2 = await r2.checkIfExist(c, v2Path)
+  const existV2 = await s3.checkIfExist(c, v2Path)
 
   if (existV2) {
     try {
-      await r2.deleteObject(c, v2Path)
+      await s3.deleteObject(c, v2Path)
     }
     catch (error) {
-      console.log('Cannot delete r2 (v2)', record.bucket_id, error)
+      console.log('Cannot delete s3 (v2)', record.bucket_id, error)
       return c.json(BRES)
     }
   }
@@ -138,7 +138,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log('no bucket_id')
       return c.json(BRES)
     }
-    // // check if not deleted it's present in r2 storage
+    // // check if not deleted it's present in s3 storage
     if (record.deleted && record.deleted !== body.old_record.deleted)
       return deleteIt(c, body.record as any)
 

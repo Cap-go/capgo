@@ -3,7 +3,7 @@ import { Client as S3Client } from './s3/index.ts'
 
 import { getEnv } from './utils.ts'
 
-function initR2(c: Context) {
+function initS3(c: Context) {
   const bucket = getEnv(c, 'S3_BUCKET')
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
@@ -20,12 +20,12 @@ function initR2(c: Context) {
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
-  console.log('initR2', params)
+  console.log('initS3', params)
   return new S3Client(params)
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
-  const client = initR2(c)
+  const client = initS3(c)
 
   if (client.host.includes('host.docker.internal'))
     client.host = client.host.replace('host.docker.internal', '0.0.0.0')
@@ -36,17 +36,17 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
 }
 
 function deleteObject(c: Context, fileId: string) {
-  const client = initR2(c)
+  const client = initS3(c)
   return client.deleteObject(fileId)
 }
 
 function checkIfExist(c: Context, fileId: string) {
-  const client = initR2(c)
+  const client = initS3(c)
   return client.exists(fileId)
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initR2(c)
+  const client = initS3(c)
 
   if (client.host.includes('host.docker.internal'))
     client.host = client.host.replace('host.docker.internal', '0.0.0.0')
@@ -57,13 +57,13 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
 }
 
 async function getSizeChecksum(c: Context, fileId: string) {
-  const client = initR2(c)
+  const client = initS3(c)
   const { size, metadata } = await client.statObject(fileId)
   const checksum = metadata['x-amz-meta-crc32']
   return { size, checksum }
 }
 
-export const r2 = {
+export const s3 = {
   getSizeChecksum,
   deleteObject,
   checkIfExist,

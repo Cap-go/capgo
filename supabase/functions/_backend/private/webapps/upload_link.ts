@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { r2 } from '../../utils/r2.ts'
+import { s3 } from '../../utils/s3.ts'
 import { middlewareKey } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
@@ -49,16 +49,16 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       console.log('errorApp', errorApp)
       return c.json({ status: 'Error App not found' }, 500)
     }
-    console.log('r2.checkIfExist', filePath)
+    console.log('s3.checkIfExist', filePath)
 
     // check if object exist in r2
-    const exist = await r2.checkIfExist(c, filePath)
+    const exist = await s3.checkIfExist(c, filePath)
     if (exist) {
       console.log('exist', exist)
       return c.json({ status: 'Error already exist' }, 500)
     }
-    console.log('r2.getUploadUrl', filePath)
-    const url = await r2.getUploadUrl(c, filePath)
+    console.log('s3.getUploadUrl', filePath)
+    const url = await s3.getUploadUrl(c, filePath)
     console.log('url', url)
     if (!url) {
       console.log('no url found')
