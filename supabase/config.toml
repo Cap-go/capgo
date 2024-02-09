@@ -135,6 +135,9 @@ verify_jwt = false
 [functions.set_custom_id]
 verify_jwt = false
 
+[functions.upload_link]
+verify_jwt = false
+
 # PRIVATE ENDPOINTS
 
 [functions.private]

@@ -149,7 +149,7 @@ async function startSupabaseBackend(
     totalOut = `${totalOut}|${string}`
     if (string.includes('Serving functions on')) {
       p.log.success('Supabase backend started')
-      const split = string.split(' ')
+      const split = string.split('\n')[0].split(' ')
       functionsUrl = new URL(split[split.length - 1].trim().replace('<function-name>', ''))
       break
     }
@@ -236,12 +236,11 @@ async function runTestsForFolder(folder: string, shortName: string, _firstArg: s
 
     p.log.info(`Running tests \"${importedTest.fullName}\" (${dirEntry.name})`)
     // let ok = await testLoop(new URL('http://localhost:7777'), supabase, importedTest.tests)
-    let ok = await testLoop(functionsUrl, supabase, importedTest.tests)
+    const ok = await testLoop(functionsUrl, supabase, importedTest.tests)
 
     // This is likely unreacheble
     if (!ok)
       Deno.exit(1)
-
   }
 }
 
