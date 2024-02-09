@@ -4,7 +4,6 @@ import { Client as S3Client } from './s3/index.ts'
 import { getEnv } from './utils.ts'
 
 function initR2(c: Context) {
-  const accountid = getEnv(c, 'S3_ACCOUNT_ID')
   const bucket = getEnv(c, 'S3_BUCKET')
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
@@ -13,9 +12,9 @@ function initR2(c: Context) {
   const storagePort = Number.parseInt(getEnv(c, 'S3_PORT'))
   const storageUseSsl = getEnv(c, 'S3_SSL').toLocaleLowerCase() === 'true'
   const params = {
-    endPoint: accountid ? `${accountid}.r2.cloudflarestorage.com` : storageEndpoint,
+    endPoint: storageEndpoint,
     region: storageRegion ?? 'us-east-1',
-    useSSL: accountid ? true : storageUseSsl,
+    useSSL: storageUseSsl,
     port: storagePort && !Number.isNaN(storagePort) ? storagePort : undefined,
     bucket,
     accessKey: access_key_id,
