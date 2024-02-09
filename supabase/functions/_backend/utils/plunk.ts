@@ -1,4 +1,4 @@
-import axios from 'axios'
+import ky from 'ky'
 
 import type { Context } from 'hono'
 import { getEnv, shallowCleanObject } from './utils.ts'
@@ -40,12 +40,10 @@ function getAuth(c: Context) {
   return `Bearer ${PLUNK_API_KEY}`
 }
 const baseUrl = () => 'https://api.useplunk.com'
-function getConfig(c: Context) {
+function getConfigHeaders(c: Context) {
   return {
-    headers: {
       'Content-Type': 'application/json',
       'Authorization': getAuth(c),
-    },
   }
 }
 
@@ -53,15 +51,19 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
   if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/track`
-  const response = await axios.post(url, {
-    email,
-    event,
-    data: shallowCleanObject(data),
-  }, getConfig(c)).catch((e) => {
-    console.log('trackEvent error', e)
-    return { data: { error: e } }
+  return await ky.post(url, {
+    json: {
+      email,
+      event,
+      data: shallowCleanObject(data),
+    },
+    headers: getConfigHeaders(c),
   })
-  return response.data
+  .then((res) => res.json())
+  .catch((e) => {
+      console.log('trackEvent error', e)
+      return { data: { error: e } }
+    })
 }
 
 export async function addContact(c: Context, email: string, data: any) {
@@ -74,11 +76,16 @@ export async function addContact(c: Context, email: string, data: any) {
     data: shallowCleanObject(data),
   }
   console.log('addContact', email)
-  const response = await axios.post(url, payload, getConfig(c)).catch((e) => {
+  return await ky.post(url, {
+    json: payload,
+    headers: getConfigHeaders(c)
+  }
+    )
+    .then((res) => res.json())
+    .catch((e) => {
     console.log('addContact error', e)
     return { data: { error: e } }
   })
-  return response.data
 }
 
 export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
@@ -90,13 +97,17 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
   if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/send`
-  const response = await axios.post(url, {
-    to,
-    subject,
-    body,
-  }, getConfig(c)).catch((e) => {
+  return await ky.post(url, {
+    json: {
+      to,
+      subject,
+      body,
+    },
+    headers: getConfigHeaders(c)
+  })
+  .then((res) => res.json())
+  .catch((e) => {
     console.log('trackEvent error', e)
     return { data: { error: e } }
   })
-  return response.data
 }

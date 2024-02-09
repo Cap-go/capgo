@@ -1,4 +1,4 @@
-import axios from 'axios'
+import ky from 'ky'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -31,11 +31,11 @@ function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 
 export async function getRemoteConfig() {
-  // call host + /api/private/config and parse the result as json using axios
+  // call host + /api/private/config and parse the result as json using ky
   const localConfig = await getLocalConfig()
-  const data = await axios
+  const data = await ky
     .get(`${defaultApiHost}/private/config`)
-    .then(res => res.data as CapgoConfig)
+    .then(res => res.json<CapgoConfig>())
     .then(data => ({ ...data, ...localConfig } as CapgoConfig))
     .catch(() => {
       console.log('Local config', localConfig)

@@ -1,4 +1,4 @@
-import axios from 'axios'
+import ky from 'ky'
 
 async function ipapi(ip: string, lang = 'en') {
   ip = ip || ''
@@ -9,9 +9,9 @@ async function ipapi(ip: string, lang = 'en') {
   if (!langs.includes(lang))
     throw new Error(`unknown language, supported ones are: ${langs.join(', ')}`)
 
-  const res = await axios(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
+  const res = await ky(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
 
-  return res.data
+  return await res.json<{isp: string}>()
 }
 
 export async function invalidIps(ips: string[]) {

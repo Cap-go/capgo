@@ -1,5 +1,4 @@
-import axios from 'axios'
-
+import ky from 'ky'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
@@ -54,21 +53,21 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     // split countries by 10 to batch send to netlify
     for (let i = 0; i < categories.length; i++) {
       console.log('category', categories[i])
-      all.push(axios.post(`${baseApi}/get_top_apk-background`, {
+      all.push(ky.post(`${baseApi}/get_top_apk-background`, {
         category: categories[i],
       }, options))
     }
     if (appsToGetFramework?.length) {
       for (let i = 0; i < appsToGetFramework.length; i += pageSizeLittle) {
         const appsBatch = appsToGetFramework.slice(i, i + pageSizeLittle)
-        all.push(axios.post(`${baseApi}/get_framework-background`, {
+        all.push(ky.post(`${baseApi}/get_framework-background`, {
           appIds: appsBatch.map(app => app.app_id),
         }, options))
       }
     }
     if (appsToGetInfo?.length) {
       for (let i = 0; i < appsToGetInfo.length; i++) {
-        all.push(axios.post(`${baseApi}/get_store_info-background`, {
+        all.push(ky.post(`${baseApi}/get_store_info-background`, {
           appId: appsToGetInfo[i],
         }, options))
       }
@@ -76,11 +75,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (appsToGetSimilar?.length) {
       for (let i = 0; i < appsToGetSimilar.length; i += pageSize) {
         const appsSimilarBatch = appsToGetSimilar.slice(i, i + pageSize)
-        // all.push(axios.post('https://netlify.capgo.app/get_framework-background', {
+        // all.push(ky.post('https://netlify.capgo.app/get_framework-background', {
         //   appIds: appsSimilarBatch.map(app => app.app_id),
         // }))
         console.log('appsSimilarBatch', appsSimilarBatch.length)
-        all.push(axios.post(`${baseApi}/get_similar_app-background`, {
+        all.push(ky.post(`${baseApi}/get_similar_app-background`, {
           appIds: appsSimilarBatch.map(app => app.app_id),
         }, options))
       }

@@ -1,4 +1,4 @@
-import axios from 'axios'
+import ky from 'ky'
 import type { Context } from 'hono'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -58,21 +58,23 @@ export const defaultUpdateRes = {
 export async function postUpdate(baseUrl: string) {
   const url = `${baseUrl}/updates`
   const payload = { ...defaultUpdatePayload, version_build: defaultVersionDev }
-  const response = await axios.post<typeof defaultUpdateRes>(url, payload, {
+  const response = await ky.post(url, {
+    json: payload,
     headers: {
       'x-forwarded-for': '1.1.1.1',
     },
   })
-  response.data.url = response.data.url.split(defaultStorageSplit)[0]
-  return response.data
+  const data = await response.json<typeof defaultUpdateRes>()
+  data.url = data.url.split(defaultStorageSplit)[0]
+  return data
 }
 
 export const defaultResOk = { status: 'ok', service: 'ok' }
 export const defaultRes = { status: 'ok' }
 export async function getOk(baseUrl: string) {
   const url = `${baseUrl}/ok`
-  const response = await axios.get<typeof defaultResOk>(url)
-  return response.data
+  const response = await ky.get(url)
+  return response.json<typeof defaultResOk>()
 }
 
 export async function getDatabase(c: Context) {
@@ -87,22 +89,22 @@ export async function getDatabase(c: Context) {
 export async function postStats(baseUrl: string) {
   const url = `${baseUrl}/stats`
   const payload = { ...defaultUpdatePayload, action: defaultAction }
-  const response = await axios.post<typeof defaultRes>(url, payload)
-  return response.data
+  const response = await ky.post(url, {json: payload})
+  return response.json<typeof defaultRes>()
 }
 
 export async function setChannelSelf(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
   const payload = { ...defaultUpdatePayload, channel: defaultChannel }
-  const response = await axios.post<typeof defaultRes>(url, payload)
-  return response.data
+  const response = await ky.post(url, {json: payload})
+  return response.json<typeof defaultRes>()
 }
 
 export const defaultPutChannelRes = { channel: defaultChannel, status: defaultStatus }
 export async function putChannel(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
-  const response = await axios.put<typeof defaultPutChannelRes>(url, defaultUpdatePayload)
-  return response.data
+  const response = await ky.put(url, {json: defaultUpdatePayload})
+  return response.json<typeof defaultPutChannelRes>()
 }
 
 export const defaultGetDevicesRes = [{
@@ -121,13 +123,14 @@ export const defaultGetDevicesRes = [{
 }]
 export async function getDevice(c: Context, baseUrl: string) {
   const url = `${baseUrl}/device`
-  const response = await axios.get<typeof defaultGetDevicesRes>(url, {
-    params: {
-      app_id: defaultAppId,
-    },
+  const searchParams = new URLSearchParams();
+  searchParams.set('app_id', defaultAppId);
+  const response = await ky.get(url, {
+    body: searchParams,
     headers: headers(c),
   })
-  return response.data.map((res) => {
+  const data = await response.json<typeof defaultGetDevicesRes>()
+  return data.map((res) => {
     res.updated_at = defaultUpdatedAt
     res.created_at = defaultCreatedAt
     res.version_build = defaultVersion
@@ -143,21 +146,22 @@ const defaultSetDevice = {
 }
 export async function deleteDevice(c: Context, baseUrl: string) {
   const url = `${baseUrl}/device`
-  const response = await axios.delete<typeof defaultRes>(url, {
-    params: {
-      app_id: defaultAppId,
-    },
+  const searchParams = new URLSearchParams();
+  searchParams.set('app_id', defaultAppId);
+  const response = await ky.delete(url, {
+    body: searchParams,
     headers: headers(c),
   })
-  return response.data
+  return response.json<typeof defaultRes>()
 }
 
 export async function postDevice(c: Context, baseUrl: string) {
   const url = `${baseUrl}/device`
-  const response = await axios.post<typeof defaultRes>(url, defaultSetDevice, {
+  const response = await ky.post(url, {
+    json: defaultSetDevice,
     headers: headers(c),
   })
-  return response.data
+  return response.json<typeof defaultRes>()
 }
 
 export const defaultGetChannelRes = [{
@@ -178,13 +182,14 @@ export const defaultGetChannelRes = [{
 
 export async function getChannels(c: Context, baseUrl: string) {
   const url = `${baseUrl}/channel`
-  const response = await axios.get<typeof defaultGetChannelRes>(url, {
-    params: {
-      app_id: defaultAppId,
-    },
+  const searchParams = new URLSearchParams();
+  searchParams.set('app_id', defaultAppId);
+  const response = await ky.get(url, {
+    body: searchParams,
     headers: headers(c),
   })
-  return response.data.map((res) => {
+  const data = await response.json<typeof defaultGetChannelRes>()
+  return data.map((res) => {
     res.updated_at = defaultUpdatedAt
     res.created_at = defaultCreatedAt
     res.version = { name: defaultVersion, id: defaultVersionId }
@@ -193,12 +198,10 @@ export async function getChannels(c: Context, baseUrl: string) {
 }
 export async function setChannel(c: Context, baseUrl: string) {
   const url = `${baseUrl}/channel`
-  const response = await axios.post<typeof defaultRes>(url, {
-
-  }, {
+  const response = await ky.post(url, {
     headers: headers(c),
   })
-  return response.data
+  return response.json<typeof defaultRes>()
 }
 
 export const defaultSetBundleRes = {
@@ -222,7 +225,7 @@ export const defaultGetBundleRes = [
 
 // export const setBundle = async (baseUrl: string) => {
 //   const url = `${baseUrl}/bundle`
-//   const response = await axios.post<typeof defaultGetBundleRes>(url, defaultSetBundleRes, {
+//   const response = await ky.post<typeof defaultGetBundleRes>(url, defaultSetBundleRes, {
 //     params: {
 //       app_id: defaultAppId,
 //     },
@@ -233,13 +236,14 @@ export const defaultGetBundleRes = [
 
 export async function getBundle(c: Context, baseUrl: string) {
   const url = `${baseUrl}/bundle`
-  const response = await axios.get<typeof defaultGetBundleRes>(url, {
-    params: {
-      app_id: defaultAppId,
-    },
+  const searchParams = new URLSearchParams();
+  searchParams.set('app_id', defaultAppId);
+  const response = await ky.get(url, {
+    body: searchParams,
     headers: headers(c),
   })
-  return response.data.map((res) => {
+  const data = await response.json<typeof defaultGetBundleRes>()
+  return data.map((res) => {
     res.updated_at = defaultUpdatedAt
     res.created_at = defaultCreatedAt
     return res
@@ -248,11 +252,11 @@ export async function getBundle(c: Context, baseUrl: string) {
 
 export async function deleteBundle(c: Context, baseUrl: string) {
   const url = `${baseUrl}/bundle`
-  const response = await axios.delete<typeof defaultRes>(url, {
-    params: {
-      app_id: defaultAppId,
-    },
+  const searchParams = new URLSearchParams();
+  searchParams.set('app_id', defaultAppId);
+  const response = await ky.delete(url, {
+    body: searchParams,
     headers: headers(c),
   })
-  return response.data
+  return response.json<typeof defaultRes>()
 }

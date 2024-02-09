@@ -6,7 +6,7 @@
     "hono/adapter": "npm:hono@3.12.8/adapter",
     "zod": "npm:zod@3.22.4",
     "dayjs": "npm:dayjs@1.11.10",
-    "axios": "npm:axios@1.6.7",
+    "ky": "https://esm.sh/ky@1.2.0",
     "logsnag": "npm:logsnag@1.0.0",
     "cron-schedule": "npm:cron-schedule@4.0.0",
     "drizzle-orm": "npm:drizzle-orm@0.29.3",

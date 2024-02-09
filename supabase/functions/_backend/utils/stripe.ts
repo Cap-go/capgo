@@ -1,4 +1,4 @@
-import axios from 'axios'
+import ky from 'ky'
 
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
@@ -11,29 +11,31 @@ function getAuth(c: Context) {
   const STRIPE_TOKEN_B64 = btoa(STRIPE_TOKEN)
   return `Basic ${STRIPE_TOKEN_B64}`
 }
-function getConfig(c: Context, form = false) {
+function getConfigHeaders(c: Context, form = false) {
   return {
-    headers: {
       authorization: getAuth(c),
       ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
-    },
   }
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
-  const response = await axios.post('https://api.stripe.com/v1/billing_portal/sessions', new URLSearchParams({
+  const config = getConfigHeaders(c, true)
+  const data = new URLSearchParams({
     customer: customerId,
     return_url: callbackUrl,
-  }), getConfig(c, true))
-  return response.data
+  })
+  const response = await ky.post('https://api.stripe.com/v1/billing_portal/sessions', { body: data, headers: config })
+  return response.json()
 }
 
 async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
+  const config = getConfigHeaders(c, true)
   let priceId = null
   const meteredIds: string[] = []
   try {
-    const response = await axios.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), getConfig(c))
-    const prices = response.data.data
+    const response = await ky.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), { headers: config })
+    const data = await response.json<any>()
+    const prices = data.data
     console.log('prices stripe', prices)
     prices.forEach((price: any) => {
       if (price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
@@ -75,6 +77,7 @@ export function parsePriceIds(prices: any): { priceId: string | null, productId:
 }
 
 export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
+  const config = getConfigHeaders(c, true)
   const prices = await getPriceIds(c, planId, reccurence)
   console.log('prices', prices)
   if (!prices.priceId)
@@ -101,8 +104,8 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   })
   console.log('data', data.toString())
   try {
-    const response = await axios.post('https://api.stripe.com/v1/checkout/sessions', data, getConfig(c, true))
-    return response.data
+    const response = await ky.post('https://api.stripe.com/v1/checkout/sessions', { body: data, headers: config })
+    return response.json()
   }
   catch (err2) {
     console.log('create customer err', err2)
@@ -111,20 +114,20 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, name: string) {
-  const config = getConfig(c, true)
+  const config = getConfigHeaders(c, true)
   const customerData = {
     email,
     name,
   }
   const data = new URLSearchParams(customerData as any)
   data.append('metadata[user_id]', userId)
-  const response = await axios.post('https://api.stripe.com/v1/customers', data, config)
-  return response.data
+  const response = await ky.post('https://api.stripe.com/v1/customers', { body: data, headers: config })
+  return response.json()
 }
 
 export async function setTreshold(c: Context, subscriptionId: string) {
   // set treshold to 5000 USD
-  const config = getConfig(c, true)
+  const config = getConfigHeaders(c, true)
   const checkoutData = {
     billing_thresholds: {
       amount_gte: 5000,
@@ -132,23 +135,23 @@ export async function setTreshold(c: Context, subscriptionId: string) {
     },
   }
   const data = new URLSearchParams(checkoutData as any)
-  const response = await axios.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, data, config)
-  return response.data
+  const response = await ky.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { body: data, headers: config })
+  return response.json()
 }
 
 export async function setBillingPeriod(c: Context, subscriptionId: string) {
-  const config = getConfig(c, true)
+  const config = getConfigHeaders(c, true)
   const checkoutData = {
     billing_cycle_anchor: 'now',
     proration_behavior: 'create_prorations',
   }
   const data = new URLSearchParams(checkoutData as any)
-  const response = await axios.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, data, config)
-  return response.data
+  const response = await ky.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { body: data, headers: config })
+  return response.json()
 }
 
 export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
-  const config = getConfig(c, true)
+  const config = getConfigHeaders(c, true)
   const customerData = {
     email: billing_email || email,
     name,
@@ -156,24 +159,24 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
   const data = new URLSearchParams(customerData as any)
   data.append('metadata[user_id]', userId)
   data.append('metadata[email]', email)
-  const response = await axios.post(`https://api.stripe.com/v1/customers/${customerId}`, data, config)
-  return response.data
+  const response = await ky.post(`https://api.stripe.com/v1/customers/${customerId}`, { body: data, headers: config })
+  return response.json()
 }
 
 export async function recordUsage(c: Context, subscriptionId: string, quantity: number) {
-  const config = getConfig(c, true)
+  const config = getConfigHeaders(c, true)
   const checkoutData = {
     quantity,
     action: 'set',
   }
   const data = new URLSearchParams(checkoutData as any)
-  const response = await axios.post(`https://api.stripe.com/v1/subscription_items/${subscriptionId}/usage_records`, data, config)
-  return response.data
+  const response = await ky.post(`https://api.stripe.com/v1/subscription_items/${subscriptionId}/usage_records`, { body: data, headers: config })
+  return response.json()
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
-  const config = getConfig(c, true)
+  const config = getConfigHeaders(c, true)
   console.log('removeOldSubscription', subscriptionId)
-  const response = await axios.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, config)
-  return response.data
+  const response = await ky.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { headers: config })
+  return response.json()
 }
