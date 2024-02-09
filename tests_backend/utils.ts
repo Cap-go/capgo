@@ -25,7 +25,6 @@ export interface Test {
 export interface RunnableTest {
   fullName: string
   tests: Test[]
-  testWithRedis: boolean
 }
 
 export function setSupabaseSecrets(secret: string, anonToken: string, url: string, postgressRawUrl: string) {

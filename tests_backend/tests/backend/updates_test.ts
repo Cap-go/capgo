@@ -4,7 +4,6 @@ import { assert, assertEquals, updateAndroidBaseData as baseData, delay, respons
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test updates endpoint',
-    testWithRedis: true,
     tests: [
       {
         name: 'Prepare update test',

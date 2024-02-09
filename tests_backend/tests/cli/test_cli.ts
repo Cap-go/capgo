@@ -63,7 +63,6 @@ export default config;\n`
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test cli',
-    testWithRedis: false,
     tests: [
       {
         name: 'Prepare cli',

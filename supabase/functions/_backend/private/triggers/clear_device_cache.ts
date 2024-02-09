@@ -1,4 +1,4 @@
-// DO nothing it's only for redis cache
+// DO nothing it's only for cache
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
