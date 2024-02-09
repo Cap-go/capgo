@@ -30,7 +30,7 @@ app.get('/', async (c: Context) => {
   }
 })
 
-app.delete('/', middlewareKey, async (c: Context) => {
+app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await getBody<any>(c)
     const apikey = c.get('apikey')

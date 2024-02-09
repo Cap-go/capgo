@@ -166,7 +166,7 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
 }
 export const app = new Hono()
 
-app.post('/', middlewareKey, async (c: Context) => {
+app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
     const apikey = c.get('apikey')
@@ -179,7 +179,7 @@ app.post('/', middlewareKey, async (c: Context) => {
   }
 })
 
-app.get('/', middlewareKey, async (c: Context) => {
+app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
     const apikey = c.get('apikey')
@@ -192,7 +192,7 @@ app.get('/', middlewareKey, async (c: Context) => {
   }
 })
 
-app.delete('/', middlewareKey, async (c: Context) => {
+app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await getBody<DeviceLink>(c)
     const apikey = c.get('apikey')

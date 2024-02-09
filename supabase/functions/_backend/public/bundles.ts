@@ -79,7 +79,7 @@ async function get(c: Context, body: GetLatest, apikey: Database['public']['Tabl
 
 export const app = new Hono()
 
-app.get('/', middlewareKey, async (c: Context) => {
+app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await c.req.json<GetLatest>()
     const apikey = c.get('apikey')
@@ -90,7 +90,7 @@ app.get('/', middlewareKey, async (c: Context) => {
   }
 })
 
-app.delete('/', middlewareKey, async (c: Context) => {
+app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey')

@@ -11,20 +11,24 @@ export const useCors = cors({
   allowMethods: ['POST', 'GET', 'OPTIONS'],
 })
 
-export const middlewareKey: MiddlewareHandler<{
-  Variables: {
-    apikey: Database['public']['Tables']['apikeys']['Row'] | null
+
+export const middlewareKey = (rights: Database['public']['Enums']['key_mode'][]) => {
+  const subMiddlewareKey: MiddlewareHandler<{
+    Variables: {
+      apikey: Database['public']['Tables']['apikeys']['Row'] | null
+    }
+  }> = async (c: Context, next: Next) => {
+    const capgkey_string = c.req.header('capgkey')
+    const apikey_string = c.req.header('authorization')
+    const key = capgkey_string || apikey_string
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(key, supabaseAdmin(c), rights)
+    if (!apikey)
+      throw new HTTPException(400, { message: 'Invalid apikey' })
+    c.set('apikey', apikey)
+    c.set('capgkey', key)
+    await next()
   }
-}> = async (c: Context, next: Next) => {
-  const capgkey_string = c.req.header('capgkey')
-  const apikey_string = c.req.header('authorization')
-  const key = capgkey_string || apikey_string
-  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(key, supabaseAdmin(c), ['all', 'write'])
-  if (!apikey)
-    throw new HTTPException(400, { message: 'Invalid apikey' })
-  c.set('apikey', apikey)
-  c.set('capgkey', key)
-  await next()
+  return subMiddlewareKey
 }
 
 export async function getBody<T>(c: Context) {

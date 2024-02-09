@@ -151,7 +151,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
 }
 export const app = new Hono()
 
-app.post('/', middlewareKey, async (c: Context) => {
+app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
@@ -162,7 +162,7 @@ app.post('/', middlewareKey, async (c: Context) => {
   }
 })
 
-app.get('/', middlewareKey, async (c: Context) => {
+app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey')
@@ -173,7 +173,7 @@ app.get('/', middlewareKey, async (c: Context) => {
   }
 })
 
-app.delete('/', middlewareKey, async (c: Context) => {
+app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
     const body = await getBody<ChannelSet>(c)
     const apikey = c.get('apikey')
