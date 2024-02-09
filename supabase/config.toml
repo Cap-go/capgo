@@ -135,8 +135,15 @@ verify_jwt = false
 [functions.set_custom_id]
 verify_jwt = false
 
+# DEPRECATED TODO: to remove when all user got the latest CLI
+
 [functions.upload_link]
 verify_jwt = false
+
+[functions.get_stats]
+verify_jwt = false
+
+# END of deprecated
 
 # PRIVATE ENDPOINTS
 
