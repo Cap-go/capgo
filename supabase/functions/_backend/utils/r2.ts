@@ -3,14 +3,11 @@ import { Client as S3Client } from './s3/index.ts'
 
 import { getEnv } from './utils.ts'
 
-// import presign s3
-
-const bucket = 'capgo'
-
 function initR2(c: Context) {
-  const accountid = getEnv(c, 'R2_ACCOUNT_ID')
-  const access_key_id = getEnv(c, 'R2_ACCESS_KEY_ID')
-  const access_key_secret = getEnv(c, 'R2_SECRET_ACCESS_KEY')
+  const accountid = getEnv(c, 'S3_ACCOUNT_ID')
+  const bucket = getEnv(c, 'S3_BUCKET')
+  const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
+  const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const storageRegion = getEnv(c, 'S3_REGION')
   const storagePort = Number.parseInt(getEnv(c, 'S3_PORT'))
