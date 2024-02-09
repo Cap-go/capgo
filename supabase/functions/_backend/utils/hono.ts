@@ -21,8 +21,9 @@ export const middlewareKey: MiddlewareHandler<{
   const key = capgkey_string || apikey_string
   const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(key, supabaseAdmin(c), ['all', 'write'])
   if (!apikey)
-    throw new HTTPException(400, { message: 'Invalid apikey', key })
+    throw new HTTPException(400, { message: 'Invalid apikey' })
   c.set('apikey', apikey)
+  c.set('capgkey', key)
   await next()
 }
 

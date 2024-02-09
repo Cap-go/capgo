@@ -16,10 +16,15 @@ app.post('/', middlewareKey, async (c: Context) => {
     const body = await c.req.json<dataUpload>()
     console.log('body', body)
     const apikey = c.get('apikey')
+    const capgkey = c.get('capgkey')
+    // console.log('apikey', apikey)
+    // console.log('capgkey', capgkey)
     const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
-      .rpc('get_user_id', { apikey: c.req.header('authorization')!, app_id: body.app_id })
-    if (_errorUserId)
+      .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
+    if (_errorUserId) {
+      console.log('_errorUserId', _errorUserId)
       return c.json({ status: 'Error User not found' }, 500)
+    }
     const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
     // check if app version exist
     const { error: errorVersion } = await supabaseAdmin(c)
