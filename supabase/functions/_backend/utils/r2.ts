@@ -31,9 +31,10 @@ function initR2(c: Context) {
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initR2(c)
 
+  if (client.host.includes('host.docker.internal'))
+    client.host = client.host.replace('host.docker.internal', '0.0.0.0')
+
   const url = new URL(await client.getPresignedUrl('PUT', fileId, { expirySeconds }))
-  if (url.hostname === 'host.docker.internal')
-    url.hostname = '0.0.0.0'
 
   return url.toString()
 }
@@ -51,9 +52,10 @@ function checkIfExist(c: Context, fileId: string) {
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   const client = initR2(c)
 
+  if (client.host.includes('host.docker.internal'))
+    client.host = client.host.replace('host.docker.internal', '0.0.0.0')
+
   const url = new URL(await client.getPresignedUrl('GET', fileId, { expirySeconds }))
-  if (url.hostname === 'host.docker.internal')
-    url.hostname = '0.0.0.0'
 
   return url.toString()
 }

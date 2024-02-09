@@ -120,7 +120,7 @@ export interface ObjectStatus extends S3Object {
 const maxObjectSize = 5 * 1024 * 1024 * 1024 * 1024
 
 export class Client {
-  readonly host: string
+  host: string
   readonly port: number
   readonly protocol: 'https:' | 'http:'
   readonly accessKey?: string
@@ -446,6 +446,7 @@ export class Client {
     const requestDate = options.requestDate ?? new Date()
     const expirySeconds = options.expirySeconds ?? 24 * 60 * 60 * 7 // default expiration is 7 days in seconds.
 
+    console.log(path, headers)
     return presignV4({
       protocol: this.protocol,
       headers,
