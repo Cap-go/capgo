@@ -30,11 +30,6 @@ export interface BaseHeaders {
   [k: string]: string | undefined
 }
 
-export interface Details {
-  timestamp: number
-  signatures: string[]
-}
-
 export interface Order {
   key: string
   sortable?: 'asc' | 'desc'

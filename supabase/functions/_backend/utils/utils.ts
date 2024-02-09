@@ -1,10 +1,9 @@
-import crypto from 'node:crypto'
 import dayjs from 'dayjs'
 import { env } from 'hono/adapter'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import type { Details, JwtUser } from './types.ts'
+import type { JwtUser } from './types.ts'
 
 export function jwtDecoder(jwt: string): JwtUser {
   return JSON.parse(atob(jwt.split('.')[1]))
@@ -145,17 +144,6 @@ export function isLimited(c: Context, id: string) {
 export function getEnv(c: Context, key: string): string {
   const val = env<any>(c)[key]
   return val || ''
-}
-
-export function makeHMACContent(payload: string, details: Details) {
-  return `${details.timestamp}.${payload}`
-}
-
-export function createHmac(c: Context, data: string, details: Details) {
-  const hmac = crypto.createHmac('sha256', getEnv(c, 'STRIPE_WEBHOOK_SECRET'))
-  hmac.write(makeHMACContent(data, details))
-  hmac.end()
-  return hmac.read().toString('hex')
 }
 
 export function formatDateCH(date: string | undefined) {
