@@ -13,7 +13,7 @@
     "drizzle-orm/pg-core": "npm:drizzle-orm/pg-core",
     "drizzle-orm/sqlite-core": "npm:drizzle-orm/sqlite-core",
     "drizzle-orm/postgres-js": "npm:drizzle-orm/postgres-js",
-    "minio": "npm:minio",
+    "minio": "https://esm.sh/minio?target=deno",
     "@supabase/supabase-js": "npm:@supabase/supabase-js",
     "crypto-random-string": "npm:crypto-random-string",
     "semver": "npm:semver",

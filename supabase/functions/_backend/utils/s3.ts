@@ -1,10 +1,9 @@
 import type { Context } from 'hono'
-import { Client as S3Client } from './s3/index.ts'
+import { Client } from 'minio'
 
 import { getEnv } from './utils.ts'
 
 function initS3(c: Context) {
-  const bucket = getEnv(c, 'S3_BUCKET')
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
@@ -16,50 +15,48 @@ function initS3(c: Context) {
     region: storageRegion ?? 'us-east-1',
     useSSL: storageUseSsl,
     port: storagePort && !Number.isNaN(storagePort) ? storagePort : undefined,
-    bucket,
     accessKey: access_key_id,
     secretKey: access_key_secret,
   }
   console.log('initS3', params)
-  return new S3Client(params)
+  return new Client(params)
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
   const client = initS3(c)
 
-  if (client.host.includes('host.docker.internal'))
-    client.host = client.host.replace('host.docker.internal', '0.0.0.0')
-
-  const url = new URL(await client.getPresignedUrl('PUT', fileId, { expirySeconds }))
-
-  return url.toString()
+  const bucket = getEnv(c, 'S3_BUCKET')
+  return client.presignedPutObject(bucket, fileId, expirySeconds)
 }
 
 function deleteObject(c: Context, fileId: string) {
   const client = initS3(c)
-  return client.deleteObject(fileId)
+  const bucket = getEnv(c, 'S3_BUCKET')
+  return client.removeObject(bucket, fileId)
 }
 
 function checkIfExist(c: Context, fileId: string) {
   const client = initS3(c)
-  return client.exists(fileId)
+  const bucket = getEnv(c, 'S3_BUCKET')
+  return new Promise((resolve) => {
+    client.getPartialObject(bucket, fileId, 0, 1, (err) => {
+      resolve(!err)
+    })
+  })
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   const client = initS3(c)
 
-  if (client.host.includes('host.docker.internal'))
-    client.host = client.host.replace('host.docker.internal', '0.0.0.0')
-
-  const url = new URL(await client.getPresignedUrl('GET', fileId, { expirySeconds }))
-
-  return url.toString()
+  const bucket = getEnv(c, 'S3_BUCKET')
+  return client.presignedGetObject(bucket, fileId, expirySeconds)
 }
 
 async function getSizeChecksum(c: Context, fileId: string) {
   const client = initS3(c)
-  const { size, metadata } = await client.statObject(fileId)
-  const checksum = metadata['x-amz-meta-crc32']
+  const bucket = getEnv(c, 'S3_BUCKET')
+  const { size, metaData } = await client.statObject(bucket, fileId)
+  const checksum = metaData['x-amz-meta-crc32']
   return { size, checksum }
 }
 
