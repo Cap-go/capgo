@@ -34,7 +34,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.136.3
+          version: 1.142.2
       - name: 🍜 Prepare Supabase
         run: bun scripts/prepare_supabase.mjs
       # - name: Apply Supabase Migrations TODO: make this work 
