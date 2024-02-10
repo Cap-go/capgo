@@ -19,7 +19,7 @@
     "crypto-random-string": "npm:crypto-random-string@5.0.0",
     "semver": "npm:semver@7.6.0",
     "postgres": "npm:postgres@3.4.3",
-    "lauqe": "npm:lauqe@1.5.0",
+    "lauqe": "https://deno.land/x/equal@1.5.0/mod.ts",
     "adm-zip": "https://esm.sh/adm-zip@0.5.10?target=deno",
     "google-play-scraper": "https://esm.sh/google-play-scraper@10.0.0?target=deno"
   }
