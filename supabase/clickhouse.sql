@@ -147,6 +147,27 @@ ORDER BY (date, app_id);
 -- drop table mau_mv
 -- select * from mau_mv
 
+CREATE MATERIALIZED VIEW IF NOT EXISTS mau_mv
+TO mau
+AS
+SELECT
+    minDate AS date,
+    app_id,
+    uniqState(device_id) AS total
+FROM
+    (
+    SELECT
+        min(toDate(created_at)) AS minDate,
+        app_id,
+        device_id
+    FROM logs
+    WHERE 
+        created_at >= toStartOfMonth(toDate(now())) 
+        AND created_at < toStartOfMonth(toDate(now()) + INTERVAL 1 MONTH)
+    GROUP BY device_id, app_id
+    )
+GROUP BY date, app_id;
+
 -- Aggregate table partitioned by version only
 CREATE TABLE IF NOT EXISTS version_aggregate_logs
 (
