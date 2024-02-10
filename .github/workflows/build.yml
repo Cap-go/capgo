@@ -92,7 +92,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup bun
         uses: oven-sh/setup-bun@v1.1.1
         with:
