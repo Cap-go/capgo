@@ -3,10 +3,10 @@ import { Client } from 'minio'
 
 import { getEnv } from './utils.ts'
 
-function initS3(c: Context) {
+function initS3(c: Context, clientSideOnly?: boolean) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
-  const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
+  const storageEndpoint = !clientSideOnly ? getEnv(c, 'S3_ENDPOINT') : getEnv(c, 'S3_ENDPOINT').replace('host.docker.internal', '0.0.0.0')
   const storageRegion = getEnv(c, 'S3_REGION')
   const storagePort = Number.parseInt(getEnv(c, 'S3_PORT'))
   const storageUseSsl = getEnv(c, 'S3_SSL').toLocaleLowerCase() === 'true'
@@ -23,7 +23,7 @@ function initS3(c: Context) {
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
-  const client = initS3(c)
+  const client = initS3(c, true)
 
   const bucket = getEnv(c, 'S3_BUCKET')
   return client.presignedPutObject(bucket, fileId, expirySeconds)
@@ -46,7 +46,7 @@ function checkIfExist(c: Context, fileId: string) {
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initS3(c)
+  const client = initS3(c, true)
 
   const bucket = getEnv(c, 'S3_BUCKET')
   return client.presignedGetObject(bucket, fileId, expirySeconds)
