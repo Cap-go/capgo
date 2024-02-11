@@ -6,6 +6,11 @@ export function getTest(): RunnableTest {
     fullName: 'Test updates endpoint',
     tests: [
       {
+        name: 'Test two channels',
+        test: testTwoChannels,
+        timesToExecute: 1,
+      },
+      {
         name: 'Prepare update test',
         test: prepapreUpdateTest,
         timesToExecute: 1,
@@ -19,11 +24,6 @@ export function getTest(): RunnableTest {
         name: 'Test updates endpoint for IOS',
         test: testForIos,
         timesToExecute: 3,
-      },
-      {
-        name: 'Test two channels',
-        test: testTwoChannels,
-        timesToExecute: 1,
       },
     ],
   }
