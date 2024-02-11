@@ -243,7 +243,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
       </button>
     </div>
     <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-full md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-      <dl class="divide-y divide-gray-500">
+      <dl id="members-div" class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
           <div id="member-card" class="flex justify-between mt-2 mb-2 ml-2">
             <div class="flex">
