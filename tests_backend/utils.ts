@@ -35,7 +35,7 @@ export function setSupabaseSecrets(secret: string, anonToken: string, url: strin
 
   supabaseSecret = secret
   supabaseAnonToken = anonToken
-  supabaseUrl = supaUrl.toString()
+  supabaseUrl = supaUrl.origin
   postgressRawDbUrl = postgressRawUrl
 }
 
@@ -102,6 +102,7 @@ export function getUpdateBaseData(): typeof updateAndroidBaseData {
 }
 
 export async function testPlaywright(spec: string, backendUrl: URL, env: { [key: string]: string }) {
+  console.log(supabaseUrl)
   const playwrightCommand = new Deno.Command('npx', {
     args: [
       'playwright',
