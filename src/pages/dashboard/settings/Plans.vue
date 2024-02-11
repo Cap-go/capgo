@@ -11,6 +11,8 @@ import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
+import HeroiconsExclamationTriangleSolid from '~icons/heroicons/exclamation-triangle-solid'
+import { useOrganizationStore } from '~/stores/organization'
 
 function openSupport() {
   openMessenger()
@@ -36,6 +38,7 @@ const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
 const main = useMainStore()
+const organizationStore = useOrganizationStore()
 const isMobile = Capacitor.isNativePlatform()
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
@@ -177,6 +180,13 @@ const hightLights = computed<Stat[]>(() => ([
         <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
           {{ t('plan-desc') }}<br>
         </p>
+        <div v-if="organizationStore.organizations.length > 1" class="flex flex-row ml-auto mr-auto">
+          <HeroiconsExclamationTriangleSolid class="h-[35px] w-[35px] mt-1 mb-0 pr-2" style="color: #ea590b" />
+          <p class="mt-2 text-lg sm:text-center text-orange-600 w-fit">
+            {{ t('plan-page-warn') }}<br>
+          </p>
+          <HeroiconsExclamationTriangleSolid class="h-[35px] w-[35px] mt-1 mb-0 pl-2" style="color: #ea590b" />
+        </div>
       </div>
       <section class="px-8 pt-4 sm:px-0">
         <BlurBg :mini="true">
