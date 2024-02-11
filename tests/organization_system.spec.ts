@@ -931,9 +931,9 @@ test.describe('Test organization system permissions', () => {
 
 async function getAllMembers(page: Page) {
   await page.goto(`${BASE_URL}/dashboard/settings/organization/members`)
-  await page.waitForTimeout(500)
+  await expect(page.locator('#members-div')).toBeVisible()
 
-  const userTable = await page.locator('dl.divide-y')
+  const userTable = await page.locator('#members-div')
   const userTableDivs = await userTable.all()
 
   const members = await Promise.all(userTableDivs.map(async (el) => {
