@@ -46,7 +46,7 @@
     "d1:seed": "bunx wrangler d1 execute --local --command \"$(cat ./supabase/d1.sql)\" capgo",
     "d1:local-srv": "bunx wrangler dev ./cloudflare_workers/d1.js --ip 0.0.0.0 --port 6655",
     "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:6655' deno run --allow-all supabase/functions/script/duplicate_in_d1.ts",
-    "d1:reset": "pnpm d1:clear && pnpm d1:seed",
+    "d1:reset": "bun d1:clear && bun d1:seed",
     "d1:generate-migration": "deno run --allow-all supabase/functions/script/generate_d1_replication_sql_migration.ts",
     "cf-edge:run": "bunx wrangler dev --port 7777",
     "cf-backend_deploy": "bunx wrangler deploy",
