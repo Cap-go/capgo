@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { BRES } from '../../utils/hono.ts'
+import { BRES, useCors } from '../../utils/hono.ts'
 import { updateDeviceCustomId } from '../../utils/supabase.ts'
 
 interface dataDevice {
@@ -10,6 +10,7 @@ interface dataDevice {
 }
 
 export const app = new Hono()
+app.use('/', useCors)
 
 app.post('/', async (c: Context) => {
   try {
