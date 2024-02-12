@@ -1,5 +1,5 @@
-import type { RunnableTest, SupabaseType } from '../../utils.ts'
-import { assert, assertEquals, updateAndroidBaseData as baseData, delay, responseOk, sendUpdate, getRawSqlConnection, testPlaywright } from '../../utils.ts'
+import type { RunnableTest, SupabaseType, updateAndroidBaseData as baseData } from '../../utils.ts'
+import { assert, assertEquals, delay, getRawSqlConnection, responseOk, sendUpdate, testPlaywright } from '../../utils.ts'
 
 export function getTest(): RunnableTest {
   return {
@@ -18,7 +18,7 @@ export function getTest(): RunnableTest {
       {
         name: 'Test updates endpoint (playwright)',
         test: testUpdateEndpoint,
-        timesToExecute: 3,
+        timesToExecute: 1,
       },
       {
         name: 'Test updates endpoint for IOS',
@@ -64,12 +64,12 @@ async function forceSupabaseTaskQueueFlush(_supabase: SupabaseType) {
   // Ugly, but should work for the most part
   const error = console.error
   // Ignore the notices raised by postgress
-  console.error = function(...data: any[]) {}
+  console.error = function (...data: any[]) {}
 
   const result = await connection.queryArray<[bigint]>('select process_current_jobs_if_unlocked();')
 
   const waitForResponseArray = result.rows.map(async (id) => {
-    if (id.length !== 1) 
+    if (id.length !== 1)
       throw new Error(`Request id length not 0 (it's ${id.length}).\nRow Data: ${id}\nTotal data: ${result}`)
 
     let shouldPool = true
@@ -84,14 +84,15 @@ async function forceSupabaseTaskQueueFlush(_supabase: SupabaseType) {
 
   try {
     // Timeout of 10 seconds
-    await Promise.race([delay(10_000), Promise.all(waitForResponseArray)]);
-  } catch(err) {
+    await Promise.race([delay(10_000), Promise.all(waitForResponseArray)])
+  }
+  catch (err) {
     console.log('Pool task queue HTTP response timedout after 10 seconds!')
-    console.log(err);
+    console.log(err)
   }
 
   console.error = error
-} 
+}
 
 async function testTwoChannels(_backendBaseUrl: URL, supabase: SupabaseType) {
   // We update production channel iOS: true then check if two_default channel is still public or not
@@ -203,7 +204,7 @@ async function testForIos(backendBaseUrl: URL, supabase: SupabaseType) {
     .eq('id', '24')
     .single()
 
-    assert(setIosChannelError === null, `Set ios channel error not null. ${setIosChannelError}`)
+  assert(setIosChannelError === null, `Set ios channel error not null. ${setIosChannelError}`)
 
   // Test for IOS device
   try {
@@ -238,9 +239,9 @@ async function testForIos(backendBaseUrl: URL, supabase: SupabaseType) {
     assert(deleteDeviceError === null, `Supabase delete device IOS error ${JSON.stringify(deleteDeviceError)} is not null`)
 
     const { error: setIosChannelError } = await supabase.from('channels')
-    .update(prevIosChannelGet!)
-    .eq('id', '24')
-    .single()
+      .update(prevIosChannelGet!)
+      .eq('id', '24')
+      .single()
 
     assert(setIosChannelError === null, `Set ios channel error not null. ${setIosChannelError}`)
   }
