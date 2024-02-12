@@ -127,3 +127,8 @@ BEGIN
 
 END;
 $$ LANGUAGE plpgsql;
+
+REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.reset_and_seed_data() TO postgres;
