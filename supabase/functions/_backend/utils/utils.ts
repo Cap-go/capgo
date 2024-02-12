@@ -1,28 +1,9 @@
-import dayjs from 'dayjs'
 import { env } from 'hono/adapter'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import type { JwtUser } from './types.ts'
-
-export function jwtDecoder(jwt: string): JwtUser {
-  return JSON.parse(atob(jwt.split('.')[1]))
-}
 
 export const fetchLimit = 50
-
-export const methodJson = ['POST', 'PUT', 'PATCH']
-
-export const basicHeaders = {
-  'Access-Control-Expose-Headers': 'Content-Length, X-JSON',
-  'Content-Type': 'application/json',
-}
-
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
 
 // Regex for Zod validation of an app id
 export const reverseDomainRegex = /^[a-z0-9]+(\.[a-z0-9_-]+)+$/i
@@ -82,46 +63,6 @@ export async function checkKey(authorization: string | undefined, supabase: Supa
   }
 }
 
-export function sendResBg(data: any = { status: 'ok' }, statusCode = 200) {
-  if (statusCode >= 400)
-    console.error('sendResBg error', JSON.stringify(data, null, 2))
-}
-
-export function sendRes(data: any = { status: 'ok' }, statusCode = 200) {
-  if (statusCode >= 400)
-    console.error('sendRes error', JSON.stringify(data, null, 2))
-
-  return sendResText(JSON.stringify(data), statusCode)
-}
-
-export function appendHeaders(res: Response, key: string, value: string) {
-  res.headers.append(key, value)
-}
-
-export function sendResText(data: string, statusCode = 200) {
-  if (statusCode >= 400)
-    console.error('sendRes error', JSON.stringify(data, null, 2))
-
-  return new Response(
-    data,
-    {
-      status: statusCode,
-      headers: { ...basicHeaders, ...corsHeaders },
-    },
-  )
-}
-
-export function sendOptionsRes() {
-  return new Response(
-    'ok',
-    {
-      headers: {
-        ...corsHeaders,
-      },
-    },
-  )
-}
-
 interface LimitedApp {
   id: string
   ignore: number
@@ -146,17 +87,3 @@ export function getEnv(c: Context, key: string): string {
   return val || ''
 }
 
-export function formatDateCH(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss.000')
-}
-
-export function convertAllDatesToCH(obj: any) {
-  // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
-  const datesFields = ['created_at', 'updated_at']
-  const newObj = { ...obj }
-  datesFields.forEach((field) => {
-    if (newObj[field])
-      newObj[field] = formatDateCH(newObj[field])
-  })
-  return newObj
-}

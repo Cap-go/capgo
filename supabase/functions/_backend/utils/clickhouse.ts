@@ -1,6 +1,7 @@
+import dayjs from 'dayjs'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import { convertAllDatesToCH, getEnv } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 export function isClickHouseEnabled(c: Context) {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
@@ -20,6 +21,21 @@ function clickHouseAuth(c: Context) {
 }
 function clickhouseAuthEnabled(c: Context) {
   return !!clickHouseUser(c) && !!clickHousePassword(c)
+}
+
+export function formatDateCH(date: string | undefined) {
+  return dayjs(date).format('YYYY-MM-DD HH:mm:ss.000')
+}
+
+export function convertAllDatesToCH(obj: any) {
+  // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
+  const datesFields = ['created_at', 'updated_at']
+  const newObj = { ...obj }
+  datesFields.forEach((field) => {
+    if (newObj[field])
+      newObj[field] = formatDateCH(newObj[field])
+  })
+  return newObj
 }
 
 export function sendDeviceToClickHouse(c: Context, devices: Database['public']['Tables']['devices']['Update'][]) {

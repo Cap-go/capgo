@@ -3,12 +3,6 @@ export interface Customer {
   stripe_customer_id: string
 }
 
-export interface JwtUser {
-  sub: string
-  email?: string
-  role: 'anon' | 'authenticated'
-}
-
 export interface AppInfos {
   version_name: string
   version_build: string
