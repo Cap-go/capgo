@@ -6,7 +6,7 @@ import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import pkg from 'deep-diff'
 import type { SupabaseType } from './utils'
-import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
+import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, loginAsUser1, loginAsUser2, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
 
 const { diff } = pkg
@@ -21,6 +21,8 @@ test.describe.configure({ mode: 'serial' })
 
 test.describe('Test organization invite', () => {
   test.describe.configure({ mode: 'serial' })
+
+  test.beforeEach(loginAsUser1)
 
   test.beforeEach(async () => {
     const supabase = await useSupabaseAdmin()
@@ -95,8 +97,10 @@ test.describe('Test organization invitation accept', () => {
   test.describe.configure({ mode: 'serial' })
 
   const testWithInvitedUser = test.extend<object, { workerStorageState: string }>({
-    storageState: 'playwright/.auth/user2.json',
+    // storageState: 'playwright/.auth/user2.json',
   })
+
+  testWithInvitedUser.beforeEach(loginAsUser2)
 
   for (const inviteType of inviteTypes) {
     test.describe(`Test organization invitation accept (${inviteType})`, () => {
@@ -273,8 +277,10 @@ test.describe('Test organization system permissions', () => {
 
       const testWithInvitedUser = test.extend<object, { workerStorageState: string }>({
         // User = owner if invite type === owner, otherwise user = invited
-        storageState: inviteType !== 'owner' ? 'playwright/.auth/user2.json' : 'playwright/.auth/user1.json',
+        // storageState: inviteType !== 'owner' ? 'playwright/.auth/user2.json' : 'playwright/.auth/user1.json',
       })
+
+      testWithInvitedUser.beforeEach(inviteType !== 'owner' ? loginAsUser2 : loginAsUser1)
 
       // Generate invite
       testWithInvitedUser.beforeAll(async () => {

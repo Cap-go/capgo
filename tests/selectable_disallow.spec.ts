@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { BASE_URL, beforeEachTest, expectPopout, useSupabase } from './utils'
+import { BASE_URL, beforeEachTest, expectPopout, loginAsUser1, useSupabase } from './utils'
 
 test.beforeEach(beforeEachTest)
+test.beforeEach(loginAsUser1)
 test.describe.configure({ mode: 'serial' })
 
 test('test selectable disallow (no AB)', async ({ page }) => {

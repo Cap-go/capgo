@@ -22,6 +22,29 @@ export async function beforeEachTest({ page }: { page: Page }) {
   await page.goto(`${BASE_URL}/`)
   await page.waitForTimeout(START_TIMEOUT)
 }
+async function loginWithEmail({ page }: { page: Page }, email: string) {
+  await page.goto(`${BASE_URL}/`)
+
+  // Fill in the username and password fields
+  await page.fill('input[name="email"]', email)
+  await page.fill('input[name="password"]', 'testtest')
+
+  // Click the submit button
+  await page.getByRole('button', { name: 'Log in' }).click()
+
+  // Expect the URL to change to the logged in dashboard
+  await expect(page).toHaveURL(`${BASE_URL}/app/home`, { timeout: 60_000 })
+
+  await page.evaluate(email => localStorage.setItem('supabase-email', email), email)
+}
+
+export async function loginAsUser1({ page }: { page: Page }) {
+  await loginWithEmail({ page }, 'test@capgo.app')
+}
+
+export async function loginAsUser2({ page }: { page: Page }) {
+  await loginWithEmail({ page }, 'test2@capgo.app')
+}
 
 export async function expectPopout(page: Page, toHave: string) {
   // Check if the popout has the correct text
