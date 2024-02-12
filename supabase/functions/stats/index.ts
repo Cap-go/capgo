@@ -1,4 +1,4 @@
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 import {
   INVALID_STRING_APP_ID,

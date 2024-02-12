@@ -1,5 +1,5 @@
-import { serve } from 'https://deno.land/std@0.200.0/http/server.ts'
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
+import { serve } from 'https://deno.land/std@0.215.0/http/server.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import type { BaseHeaders } from '../_utils/types.ts'
 import { methodJson, sendOptionsRes, sendRes } from '../_utils/utils.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../_utils/supabase.ts'

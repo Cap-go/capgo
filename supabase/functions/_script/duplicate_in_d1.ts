@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
-import type { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
-import { Pool } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
+import type { Client } from 'https://deno.land/x/postgres@v.0.18.1/mod.ts'
+import { Pool } from 'https://deno.land/x/postgres@v.0.18.1/mod.ts'
 
 let d1HttpUrl = ''
 const migrationsPerStep = 100

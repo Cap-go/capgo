@@ -1,5 +1,5 @@
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
-import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 import { sendDevice, sendStats, supabaseAdmin } from '../_utils/supabase.ts'
 import type { AppInfos, BaseHeaders } from '../_utils/types.ts'
