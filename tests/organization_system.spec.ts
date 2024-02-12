@@ -659,6 +659,9 @@ test.describe('Test organization system permissions', () => {
         await page.click('#inforow-input')
 
         if (permission.setDeviceCustomId) {
+          // Usually I would use crypto.random BUT the github CI/CD is on node 18
+          // Thus crypto.randomUUID does not work :<
+          // I stole this code from stackoverflow - https://stackoverflow.com/a/873856
           function createUUID() {
             // http://www.ietf.org/rfc/rfc4122.txt
             const s = [] as string[]
