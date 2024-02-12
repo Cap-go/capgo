@@ -1,9 +1,9 @@
 {
   "imports": {
-    "hono": "https://deno.land/x/hono@v4.0.0",
-    "hono/cors": "https://deno.land/x/hono@v4.0.0/cors",
-    "hono/http-exception": "https://deno.land/x/hono@v4.0.0/http-exception",
-    "hono/adapter": "https://deno.land/x/hono@v4.0.0/adapter",
+    "hono": "https://deno.land/x/hono@v4.0.0/mod.ts",
+    "hono/cors": "ttps://deno.land/x/hono@v4.0.0/middleware/cors/index.ts",
+    "hono/http-exception": "https://deno.land/x/hono@v4.0.0/http-exception.ts",
+    "hono/adapter": "https://deno.land/x/hono/adapter@v4.0.0/netlify/mod.ts",
     "stripe": "https://esm.sh/stripe@14.16.0?target=deno",
     "zod": "npm:zod@3.22.4",
     "dayjs": "npm:dayjs@1.11.10",
