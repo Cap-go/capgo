@@ -59,7 +59,7 @@ export default defineConfig({
   },
   expect: {
     /* CI/CD is VERY slow, I am sorry */
-    timeout: 20_000,
+    timeout: 40_000,
   },
   webServer,
   projects: [
