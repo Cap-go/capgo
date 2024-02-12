@@ -1,4 +1,4 @@
-import { LogSnag } from 'logsnag'
+import { LogSnag } from '@logsnag/node'
 
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
@@ -6,6 +6,7 @@ import { getEnv } from './utils.ts'
 interface LogSnagExt extends LogSnag {
   insights(data: { title: string, value: string | boolean | number, icon: string }[]): Promise<void>
 }
+
 
 function logsnag(c: Context) {
   const ls = getEnv(c, 'LOGSNAG_TOKEN')
