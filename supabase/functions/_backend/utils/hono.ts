@@ -1,9 +1,11 @@
+// eslint-disable-next-line unicorn/prefer-node-protocol
+import { timingSafeEqual } from 'crypto'
 import type { Context, MiddlewareHandler, Next } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { cors } from 'hono/cors'
 import { checkKey, getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import { supabaseAdmin } from './supabase.ts'
-import { cors } from 'hono/cors'
 
 export const useCors = cors({
   origin: '*',
@@ -11,8 +13,7 @@ export const useCors = cors({
   allowMethods: ['POST', 'GET', 'OPTIONS'],
 })
 
-
-export const middlewareKey = (rights: Database['public']['Enums']['key_mode'][]) => {
+export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
   const subMiddlewareKey: MiddlewareHandler<{
     Variables: {
       apikey: Database['public']['Tables']['apikeys']['Row'] | null
@@ -63,7 +64,13 @@ export const middlewareAPISecret: MiddlewareHandler<{
 }> = async (c: Context, next: Next) => {
   const authorizationSecret = c.req.header('apisecret')
   const API_SECRET = getEnv(c, 'API_SECRET')
-  if (!authorizationSecret || !API_SECRET || authorizationSecret !== API_SECRET)
+
+  // Here to prevent a timing attack
+  const encoder = new TextEncoder()
+  const a = encoder.encode(authorizationSecret)
+  const b = encoder.encode(API_SECRET)
+
+  if (!authorizationSecret || !API_SECRET || !timingSafeEqual(a, b))
     throw new HTTPException(400, { message: 'Cannot find authorization' })
   c.set('APISecret', authorizationSecret)
   await next()
