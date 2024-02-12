@@ -21,6 +21,6 @@
     "./netlify/edge-functions",
     "./tests_backend"
   ],
-  "deno.importMap": ".netlify/edge-functions-import-map.json",
+  "deno.importMap": "./supabase/functions/import_map.json",
   "deno.documentPreloadLimit": 1000000
 }
