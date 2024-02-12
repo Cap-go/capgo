@@ -51,10 +51,10 @@
     "cf-backend_deploy_env": "node scripts/deploy_cf_backend_env.mjs",
     "size": "bunx vite-bundle-visualizer",
     "minio:start": "cd ./tests_backend/gh_actions && sh ./minio.sh && cd ../..",
-    "minio:seed": "cd ./tests_backend/gh_actions && sh ./minio.sh && cd ../..",
+    "minio:seed": "cd ./tests_backend/gh_actions && sh ./minio-seed.sh && cd ../..",
     "minio:delete": "docker stop minio1 && docker rm minio1 && rm -rf /tmp/minio-data",
     "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
-    "clickhouse:seed": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
+    "clickhouse:seed": "cd ./tests_backend/gh_actions && sh ./clickhouse-seed.sh && cd ../..",
     "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && rm -rf /tmp/ch_*",
     "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts"
   },
