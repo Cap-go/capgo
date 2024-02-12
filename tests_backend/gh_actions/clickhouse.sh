@@ -42,5 +42,3 @@ while ! check_clickhouse_ready; do
 done
 
 echo "ClickHouse is ready."
-
-docker exec some-clickhouse-server clickhouse-client -q --multiquery "$(cat ./../../supabase/clickhouse.sql)"
