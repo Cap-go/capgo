@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import { S3Client } from '@capgo/s3-lite-client'
 
-
 import { getEnv } from './utils.ts'
 
 function initS3(c: Context, clientSideOnly?: boolean) {
