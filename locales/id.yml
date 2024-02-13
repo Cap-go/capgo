@@ -127,6 +127,8 @@ defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
+delete-account-0: Hapus akun
+delete-your-account: Hapus akun anda
 deleted: dihapus
 details-and-logs: Detail dan log
 device: Perangkat
@@ -183,6 +185,7 @@ last-update: Pembaharuan Terakhir
 last-upload: Unggahan terakhir
 last-version: Versi terakhir
 launch-bundle: Luncurkan bundel
+leaving: Meninggalkan
 limit-reached: Batas tercapai
 live-reload: Muat ulang langsung
 loading-more-data: Memuat lebih banyak data...
@@ -213,6 +216,7 @@ need-more-contact-us: |-
   Butuh lebih banyak? 
   Hubungi kami untuk rencana yang disesuaikan
 no-channel-linked: Tidak ada saluran, klik untuk menambahkan
+no-data: Tidak ada data
 no-devices: Tidak ada perangkat
 no-logs: Tidak ada log
 no-version-linked: Tidak ada versi, klik untuk menambahkan

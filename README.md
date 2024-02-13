@@ -86,8 +86,7 @@ All official plugin are install and preconfigured
 - [TypeScript](https://www.typescriptlang.org/)
 - [Cypress](https://cypress.io/) - E2E Testing
 - [bun](https://bun.sh/) - fast javascipt runtime, package manager, bundler, test runner an all-in-one toolkit
-- [pnpm](https://pnpm.js.org/) - fast, disk space efficient package manager
-  - [critters](https://github.com/GoogleChromeLabs/critters) - Critical CSS
+- [critters](https://github.com/GoogleChromeLabs/critters) - Critical CSS
 - [Netlify](https://www.netlify.com/) - zero-config deployment
 - [VS Code Extensions](./.vscode/extensions.json)
   - [Vite](https://marketplace.visualstudio.com/items?itemName=antfu.vite) - Fire up Vite server automatically
@@ -167,15 +166,8 @@ bun backend
 Before starting the frontend, make sure you replace the value of `supa_anon.local` inside the file `configs.json` with the value of `anon key`. If `supabase` is already running, you can also obtain `anon key` from the output of `supabase status`.  
 
 
-In another terminal, run this to generate the necessary Netlify functions:
+In another terminal, run the server with the necessary Netlify functions:
 
-```bash
-export BRANCH=local
-
-bun generate:node_serverless
-```
-
-Then start the server
 ```bash
 bun serve
 ```

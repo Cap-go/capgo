@@ -11,10 +11,10 @@ jobs:
     name: "Build code and release"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v1.1.1
         with:
           bun-version: latest
 
@@ -34,19 +34,28 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.110.1
-      - name: 🍜 Prepare Supabase
+          version: 1.142.2
+      - name: 🍜 Prepare Supabase PROD
         run: bun scripts/prepare_supabase.mjs
-      # - name: Apply Supabase Migrations TODO: make this work 
-      #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
-      - name: Update functions Alpha
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        env:
+          BRANCH: main
+      - name: 🍜 Prepare Supabase Alpha
+        run: bun scripts/prepare_supabase.mjs
         if: ${{ contains(github.ref, '-alpha.') }}
-        id: update_functions_preprod
+        env:
+          BRANCH: development
+      - name: 🦤 Apply Supabase Migrations
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        run: supabase migration up -p ${{ secrets.SUPABASE_DB_PASS }}
+      - name: 🆙 Update functions Alpha
+        if: ${{ contains(github.ref, '-alpha.') }}
+        id: update_functions_alpha
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
           BRANCH: development
         run: supabase functions deploy
-      - name: Update functions
+      - name: 🆙 Update functions
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: update_functions_prod
         env:
@@ -54,23 +63,57 @@ jobs:
         run: supabase functions deploy
       - name: Create Release Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
-        id: create_release_prepro
+        id: create_release_alpha
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+      - name: Deploy CF Worker
+        run: bunx wrangler@latest deploy --name capgo_api
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy CF Worker Alpha
+        run: bunx wrangler@latest deploy --name capgo_api-alpha
+        if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Publish CF webapp
+        uses: cloudflare/pages-action@1
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: capgo-webapp
+          directory: dist
+          branch: main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish CF webapp Alpha
+        uses: cloudflare/pages-action@1
+        if: ${{ contains(github.ref, '-alpha.') }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: capgo-webapp-alpha
+          directory: dist
+          branch: main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   build_android:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v1.1.1
         with:
           bun-version: latest
       - name: Install dependencies
         id: install_code
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Build
         id: build_code
         run: bun mobile
@@ -78,7 +121,7 @@ jobs:
         id: sync_code
         run: bun x cap sync
       - name: Setup java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
             distribution: 'zulu'
             java-version: '17'
@@ -94,7 +137,7 @@ jobs:
         with:
           fileName: "serviceAccount.json"
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/android/.gradle/*
@@ -113,7 +156,7 @@ jobs:
         with:
           lane: android beta
       - name: Upload release bundle
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android-release
           path: ./android/app/build/outputs/bundle/release/app-release.aab
@@ -121,7 +164,7 @@ jobs:
   # build_ios:
       # runs-on: macOS-latest
       # steps:
-      #   - uses: actions/checkout@v3
+      #   - uses: actions/checkout@v4
       #   - uses: pnpm/action-setup@v2
       #     with:
       #       version: 8

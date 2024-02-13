@@ -29,7 +29,7 @@ function sum(arr: number[]) {
 const total = computed(() => {
   // remove undefined values
   if (!props.accumulated)
-    return props.datas[props.datas.length - 1] as number
+    return props.datas[props.datas.length - 1] || 0 as number
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
   return sum(arrWithoutUndefined as number[])
@@ -47,7 +47,7 @@ const lastDayEvolution = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-[460px] bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
       <div class="flex flex-row">
         <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
@@ -62,7 +62,7 @@ const lastDayEvolution = computed(() => {
         {{ t('usage-title') }}
       </div>
       <div class="flex items-start">
-        <div class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
+        <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
           {{ total?.toLocaleString() }} {{ unit }}
         </div>
         <div v-if="lastDayEvolution" class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
@@ -74,7 +74,10 @@ const lastDayEvolution = computed(() => {
 
     <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <LineChartStats :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
+      <LineChartStats v-if="props.datas?.length" :title="props.title" :colors="props.colors" :limits="props.limits" :data="props.datas" :accumulated="accumulated" />
+      <div v-else class="flex flex-col items-center justify-center h-full">
+        {{ t('no-data') }}
+      </div>
     </div>
   </div>
 </template>

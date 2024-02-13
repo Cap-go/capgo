@@ -12,7 +12,7 @@ import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
 import annotationPlugin from 'chartjs-plugin-annotation'
 import { useI18n } from 'vue-i18n'
-import { isDark } from '~/composables'
+import { isDark } from '../composables/dark'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
 
@@ -187,7 +187,8 @@ const chartData = ref<ChartData<'line'>>({
     pointBorderWidth: 0,
   }],
 })
-const chartOptions = {
+const chartOptions = ref({
+  maintainAspectRatio: false,
   scales: {
     y: {
       ticks: {
@@ -212,7 +213,7 @@ const chartOptions = {
       display: false,
     },
   },
-}
+})
 </script>
 
 <template>

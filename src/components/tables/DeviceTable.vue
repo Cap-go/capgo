@@ -104,7 +104,7 @@ async function getData() {
     if (filters.value.Override)
       ids = await getDevicesID()
 
-    const req = await supabase.functions.invoke('get_devices', {
+    const req = await supabase.functions.invoke('private/devices', {
       body: {
         // appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number
         appId: props.appId,

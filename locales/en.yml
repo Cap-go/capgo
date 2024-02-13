@@ -1,3 +1,6 @@
+2fa: Manage 2FA
+2fa-code: 2FA authentication code
+2fa-disabled: Disabled 2FA
 6-characters-minimum: 6 characters minimum, 1 uppercase, 1 lowercase, 1 special character
 Bandwidth: Bandwidth
 Current: Current
@@ -7,6 +10,7 @@ Storage: Storage
 ab-testing-progressive-deploy-conflict: AB testing and progressive deploy cannot be enabled at the same time
 account: Account
 account-error: Error while updating your account
+account-id: Account id
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
 account-settings: Account Settings
@@ -25,19 +29,28 @@ activation-validate: Validate
 add: Add
 add-another-app: Add your app
 add-api-key: Added new API key successfully
+add-member: Add Member
 add-shared-user: Add shared user
 add-this-code-to-you: Add this code to your project
 add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
 admin: Admin
 afternoon: afternoon
+alert-2fa-disable: Confirm that you want to disable 2FA
+alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete
+alert-confirm-invite: Confirm invitation
 alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
+alert-denied-invite: Invitation denied
+alert-disable-2fa-message: Are you sure you want to disable 2FA?
 alert-generate-new-key: Please select the type of API key that you want to generate.
+alert-no-invite: This invitation does no longer exist
+alert-not-invited: Invalid invitation, cannot accept
 alert-not-reverse-message: This action is not reversible
 alert-regenerate-key: Are you sure you want to regenerate this key
+alert-unknown-error: Unknown error, see dev console
 allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
@@ -49,6 +62,7 @@ app: App
 app-deleted: App deleted
 app-id-example: App ID example
 app-not-found: App not found
+app-preview: App preview
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
@@ -71,8 +85,11 @@ button-browse: Browse
 button-camera: Camera
 button-cancel: Cancel
 button-delete: Delete
+button-deny-invite: Deny
 button-go: GO
 button-home: Home
+button-invite: Invite
+button-join: Accept
 button-options: Options
 button-regenerate: Regenerate
 button-remove: Remove
@@ -80,15 +97,23 @@ button-tabs: Tabs
 button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
+cancel: Cancel
+cannot-change-permission: Cannot change permissions, check browser console
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
+cannot-delete-member: Cannot delete member, check browser console
+cannot-delete-owner: Cannot delete owner from the organization
+cannot-download: Cannot download bundle
 cannot-get-the-test-: Cannot get the test version
+cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
+cannot-share: Cannot share user id, check browser console
 cannot-test-app-some: Cannot test app something wrong happened
+cannots-sign-off: Cannot log of
 change: Change
 changed-password-suc: Password changed successfully
 channel: Channel
@@ -117,6 +142,7 @@ confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users. 
   Others default channels will not be default anymore.
 copied-to-clipboard: Copied to clipboard
+copy-account-id: copy account id
 copy-command: Copy command
 copy-your: Copy your
 country: Country
@@ -132,6 +158,8 @@ defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
+delete-account-0: Delete account
+delete-your-account: Delete your account
 deleted: deleted
 details-and-logs: Details and logs
 device: Device
@@ -139,6 +167,7 @@ device-id: Device ID
 devices: Devices
 devices-using-this-b: Devices using this bundle
 did-not-recive-confirm-email: Didn't receive confirmation email?
+disable: Disable
 disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
 disable-auto-upgrade: Disable auto upgrade above major
@@ -152,6 +181,9 @@ dont-have-an-account: Don’t have an account?
 download: Download
 email: Email
 email-address: Email address
+email-does-not-exist: This user does not exist
+enable: Enable
+enable-2FA: Enable 2FA
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
@@ -169,7 +201,9 @@ forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 from: From
 from-device: from device
+general-information: General Informations
 generated-new-apikey: Generated new API key!
+go-back: Go back
 good: Good
 id: ID
 in-your-main-file: In your main file
@@ -178,23 +212,30 @@ included-in-plan: Included in plan
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
+insert-invite-email: Insert email of the user you want to invite
 install: Installed
 install-the-capacito: Install the Capacitor plugin
 into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
+invalid-email: Passed email is not valid
+invalid-mfa-code: Invalid 2FA code
 invalid-version: Invalid semver version
+invite-accepted: Successfully accepted oranization inviation
 is-emulator: Is Emulator
 is-production-app: Is Production app
+key-admin: Admin
 key-all: All
 key-copied: Key copied in your clipboard
 key-read: Read
 key-upload: Upload
+key-write: Write
 language: Language
 last-name: Last name
 last-update: Last update
 last-upload: Last upload
 last-version: Last version
 launch-bundle: Launch bundle
+leaving: Leaving
 limit-reached: Limit reached
 live-reload: Live reload
 loading-more-data: Loading more data...
@@ -213,8 +254,16 @@ making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+member-deleted: Successfully deleted member
+members: Members
 metadata: Metadata
 metadata-min-ver-not-set: Minimal update version for current bundle is undefined
+metadata-not-found: metadata not found
+mfa-enable-instruction: Please scan the QR code in the authenticator app and verify
+mfa-enable-instruction-2: Please type the current 2FA code
+mfa-enabled: Enabled 2FA
+mfa-fail: Cannot change 2FA, please check browser console
+mfa-invalid-code: Invalid 2FA code, try again!
 min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured
@@ -232,9 +281,13 @@ name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
 'no': 'no'
 no-channel-linked: No channel, click to add
+no-channel-linked-no-perm: No channel
+no-data: No Data
 no-devices: No devices
 no-logs: No logs
+no-permission: Insufficient permissions
 no-version-linked: No version, click to add
+no-version-linked-no-perm: No version
 none: None
 not-found: Not found
 notifications: Notifications
@@ -245,6 +298,9 @@ open-channel: Open channel
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
+org-changes-saved: Organization updated successfully
+org-invited-user: Successfully invited user to org
+organization-name: Organization Name
 os-version: OS version
 pages: Pages
 password: Password
@@ -253,6 +309,7 @@ password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
 percent-fail: Fail percentage
+permission-changed: Successfully changed user permission
 personal-information: Personal Informations
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
@@ -278,6 +335,9 @@ please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
+preview: Preview bundle
+preview-encrypted: Cannot preview encypted bundle
+preview-short: preview
 price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 progressive-bundle-number: Progressive bundle number
@@ -298,6 +358,7 @@ resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves
+save-changes: Save Changes
 search: Search
 search-bundle: Search Bundle
 search-bundle-id: Search by bundle ID
@@ -309,6 +370,8 @@ search-by-name: Search by name
 search-device: Search device
 search-user: Search User
 see-usage: See usage
+select-user-perms: Select user's permissions
+select-user-perms-expanded: Select which permission should the invited user have
 session_key: IvSessionKey
 set-bundle: Set bundle to channel
 settings: Settings
@@ -364,7 +427,10 @@ use-the-command: 'Use the command:'
 used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate
 user: User
+user-already-invited: This user is already invited to this organization
 validate: Validate
+verify: Verify
+verify-2FA: Verify 2FA
 version: Version
 version-build: Version build
 version-builtin: Version builtin

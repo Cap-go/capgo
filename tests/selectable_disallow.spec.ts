@@ -1,12 +1,14 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { BASE_URL, beforeEachTest, useSupabase } from './utils'
+import { BASE_URL, beforeEachTest, expectPopout, loginAsUser1, useSupabase } from './utils'
 
 test.beforeEach(beforeEachTest)
+test.beforeEach(loginAsUser1)
+test.describe.configure({ mode: 'serial' })
 
 test('test selectable disallow (no AB)', async ({ page }) => {
   // Get supabase (auth + create client)
-  const supabase = await useSupabase()
+  const supabase = await useSupabase(page)
 
   // Prepare test
   const { error: bundleErrorPrepare } = await supabase
@@ -19,7 +21,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/22`)
 
   // Click on 'settings'
-  await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
+  await page.click('li.mr-2:nth-child(3) > button:nth-child(1)')
 
   // Click on 'metadata'
   await page.locator('#selectableDisallow').selectOption({ value: 'version_number' })
@@ -44,7 +46,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await page.waitForURL('**')
 
   // Check if the 'Minimal update version' is present
-  await expect(page.locator('div.px-4:nth-child(6) > dt:nth-child(1)')).toContainText('Minimal update version')
+  await expect(page.locator('#metadata-bundle')).toContainText('Minimal update version')
 
   // Check if the input is empty
   const inputValue = await page.$eval('input.block', el => (<HTMLInputElement>el).value)
@@ -69,7 +71,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
 
 test('test selectable disallow (with AB)', async ({ page }) => {
   // Get supabase (auth + create client)
-  const supabase = await useSupabase()
+  const supabase = await useSupabase(page)
 
   // Prepare test
   const { error: bundleErrorPrepare } = await supabase
@@ -82,7 +84,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await goto(page, `${BASE_URL}/app/p/com--demo--app/channel/23`)
 
   // Click on 'settings'
-  await page.click('li.mr-2:nth-child(4) > button:nth-child(1)')
+  await page.click('li.mr-2:nth-child(3) > button:nth-child(1)')
 
   // Enable AB testing
   await page.click('li.text-lg:nth-child(9) > label:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1)')
@@ -117,7 +119,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await page.click('.cursor-pointer > div:nth-child(1) > span:nth-child(1)')
 
   // Check if the 'Minimal update version' is present
-  await expect(page.locator('div.px-4:nth-child(6) > dt:nth-child(1)')).toContainText('Minimal update version')
+  await expect(page.locator('#metadata-bundle')).toContainText('Minimal update version')
 
   // Check if the input is empty
   const inputValue = await page.$eval('input.block', el => (<HTMLInputElement>el).value)
@@ -224,24 +226,6 @@ async function checkIfChannelIsValid(channel: string, valid: boolean, page: Page
 
   // If valid then misconfigured is 'no', else it is 'yes
   await expect(failingChannels.find(el => el.name === channel && el.failing === (valid ? 'no' : 'yes'))).toBeDefined()
-}
-
-async function expectPopout(page: Page, toHave: string) {
-  // Check if the popout has the correct text
-  const popOutLocator = '.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > div:nth-child(3) > div:nth-child(1)'
-  await expect(page.locator(popOutLocator)).toContainText(toHave)
-
-  // Close all popouts
-  let popOutVisible = true
-  while (popOutVisible) {
-    // Close the popout
-    await page.click('.k-ios > section:nth-child(4) > ol:nth-child(1) > li:nth-child(1) > button:nth-child(1)')
-
-    await page.waitForTimeout(250)
-
-    // Check if the popout is still visible
-    popOutVisible = await page.locator(popOutLocator).isVisible()
-  }
 }
 
 // We have to go around this wierd dev server

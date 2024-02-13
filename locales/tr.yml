@@ -125,6 +125,8 @@ defined-as: olarak tanımlandı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete-account: Hesabı sil
+delete-account-0: Hesabı sil
+delete-your-account: Hesabını sil
 deleted: silindi
 details-and-logs: Ayrıntılar ve günlükler
 device: Cihaz
@@ -179,6 +181,7 @@ last-update: Son Güncelleme
 last-upload: Son yükleme
 last-version: Son sürüm
 launch-bundle: Paketi başlat
+leaving: Ayrılıyorum
 limit-reached: Sınıra ulaşıldı
 live-reload: Canlı yeniden yükleme
 loading-more-data: Daha fazla veri yükleniyor...
@@ -209,6 +212,7 @@ need-more-contact-us: |-
   Daha fazlasına ihtiyaç var ? 
   Size özel plan için bize ulaşın
 no-channel-linked: Kanal yok, eklemek için tıklayın
+no-data: Veri yok
 no-devices: Cihaz yok
 no-logs: günlük yok
 no-version-linked: Sürüm yok, eklemek için tıklayın

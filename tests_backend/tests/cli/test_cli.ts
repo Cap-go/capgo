@@ -63,7 +63,6 @@ export default config;\n`
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test cli',
-    testWithRedis: false,
     tests: [
       {
         name: 'Prepare cli',
@@ -100,6 +99,11 @@ export function getTest(): RunnableTest {
         test: testAutoMinVersionFlag,
         timesToExecute: 1,
       },
+      {
+        name: 'Test upload with organization (upload)',
+        test: testUploadWithOrganization,
+        timesToExecute: 1
+      }
     ],
   }
 }
@@ -128,7 +132,7 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
 
   appPath = tempFileFolder
 
-  await pnpmInstall()
+  await bunInstall()
 
   // We set the channel update scheme to major
   // id 22 = production
@@ -137,13 +141,13 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
   assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
 }
 
-async function pnpmInstall() {
-  const pnpmInstallCommand = new Deno.Command('pnpm', {
+async function bunInstall() {
+  const bunInstallCommand = new Deno.Command('bun', {
     args: ['install', '--no-frozen-lockfile'],
     cwd: tempFileFolder,
   })
 
-  const result = await pnpmInstallCommand.output()
+  const result = await bunInstallCommand.output()
 
   if (result.code !== 0) {
     const textDecoder = new TextDecoder()
@@ -152,13 +156,13 @@ async function pnpmInstall() {
 
     console.log('stdout', stdout)
     console.log('stderr', stderr)
-    throw new Error('pnpm install failed')
+    throw new Error('bun install failed')
   }
 }
 
-async function runCli(params: string[], logOutput = false): Promise<string> {
+async function runCli(params: string[], logOutput = false, overwriteApiKey?: string): Promise<string> {
   const command = new Deno.Command('node', {
-    args: [cliPath!, ...params, '--apikey', defaultApiKey],
+    args: [cliPath!, ...params, '--apikey', overwriteApiKey ?? defaultApiKey],
     cwd: appPath!,
     stdout: 'piped',
     stderr: 'piped',
@@ -191,7 +195,8 @@ async function runCli(params: string[], logOutput = false): Promise<string> {
 async function uploadToCloud(_backendBaseUrl: URL, _supabase: SupabaseType) {
   // We do not care about the output, if it fails the runCli will throw an error
   // Also we log output
-  await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
+  const cliOutput = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
+  assert(cliOutput.includes('Time to share your update to the world'), `CLI output does not include 'Time to share your update to the world'. CLI output:\n${cliOutput}`)
 }
 
 async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
@@ -258,7 +263,7 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
   }
   await Deno.writeTextFile(`${tempFileFolder}/package.json`, defaultPackageJson.replace('%DEPENDENCIES%', JSON.stringify(dependencies)))
 
-  await pnpmInstall()
+  await bunInstall()
 
   async function assertCompatibilityTableColumns(column1: string, column2: string, column3: string, column4: string) {
     const cliTableOutput = await runCli(['bundle', 'compatibility', '-c', 'production'])
@@ -292,7 +297,7 @@ async function testCompatibilityTable(_backendBaseUrl: URL, _supabase: SupabaseT
 
   await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
 
-  await pnpmInstall()
+  await bunInstall()
 }
 
 async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseType) {
@@ -351,8 +356,60 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   )
 }
 
-async function testFrontend(_backendBaseUrl: URL, _supabase: SupabaseType) {
-  await testPlaywright('bundle.spec.ts', {
+async function testFrontend(backendBaseUrl: URL, _supabase: SupabaseType) {
+  await testPlaywright('bundle.spec.ts', backendBaseUrl, {
     BUNDLE: semver,
   })
+}
+
+async function testUploadWithOrganization(_backendBaseUrl: URL, supabase: SupabaseType) {
+  const testApiKey = crypto.randomUUID()
+  const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
+
+  const { error: apikeyError } = await supabase.from('apikeys')
+    .insert({ key: testApiKey, user_id: testUserId, mode: 'upload' })
+
+  assert(apikeyError === null, `Insert test api key error not null. Error: ${apikeyError}`)
+
+  try {
+    const { data: orgMembers, error: getOrgMembersError } = await supabase.from('org_users')
+      .delete()
+      .eq('user_id', testUserId)
+      .select('*')
+
+    assert(!!orgMembers, `Org members is null. Org members: ${orgMembers}`)
+    assert(getOrgMembersError === null, `Get orgs memers error is not null. Error: ${getOrgMembersError}`)
+
+    try {
+      const { error: insertTempUserError } = await supabase.from('org_users')
+        .insert({ user_id: testUserId, org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', user_right: 'upload' })
+
+      assert(insertTempUserError === null, `Insert temp organization user error is not null. Error: ${insertTempUserError}`)
+
+      try{
+        increaseSemver()
+
+        const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], false, testApiKey)
+        assert(output.includes('Bundle Uploaded'), `The upload propably failed. Output:\n${output}`)
+      } finally {
+        const { error: deleteTempUserError } = await supabase.from('org_users')
+          .delete()
+          .eq('user_id', testUserId)
+          .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+          .eq('user_right', 'upload')
+
+        assert(deleteTempUserError === null, `Delete temp user error is not null ${deleteTempUserError}`)
+      }
+    } finally {
+      const { error: insertOrgUsers } = await supabase.from('org_users').insert(orgMembers!)
+      assert(insertOrgUsers === null, `Insert org users error not null: ${insertOrgUsers}`)
+    }
+  } finally {
+    const { error: deleteApiKeyError } = await supabase.from('apikeys')
+      .delete()
+      .eq('key', testApiKey)
+      .eq('user_id', testUserId)
+
+    assert(deleteApiKeyError === null, `Delete API key error not null. Error: ${defaultApiKey}`)
+  }
 }

@@ -13,6 +13,8 @@ import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import type { Tab } from '~/components/comp_def'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import type { OrganizationRole } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -39,6 +41,7 @@ const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
 const ActiveTab = ref('info')
+const organizationStore = useOrganizationStore()
 
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
 const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
@@ -46,6 +49,8 @@ const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
+const role = ref<OrganizationRole | null>(null)
+const reloadCount = ref(0)
 
 const tabs: Tab[] = [
   {
@@ -161,7 +166,7 @@ async function getDevice() {
   if (!id.value)
     return
   try {
-    const data = await supabase.functions.invoke('get_devices', {
+    const data = await supabase.functions.invoke('private/devices', {
       body: {
         appId: packageId.value,
         deviceIds: [id.value],
@@ -187,6 +192,24 @@ async function getDevice() {
   }
 }
 
+async function getOrgRole() {
+  const supabaseAppFetch = supabase.from('apps')
+    .select('user_id')
+    .eq('app_id', packageId.value)
+    .single()
+
+  const orgFetch = organizationStore.dedupFetchOrganizations()
+  const allFetch = await Promise.all([supabaseAppFetch, orgFetch])
+  const { data, error } = allFetch[0]
+
+  if (error || !data) {
+    console.error(`Cannot get role, error:\n${error}`)
+    return
+  }
+
+  role.value = await organizationStore.getCurrentRole(data.user_id, packageId.value, undefined)
+}
+
 function minVersion(val: string, min = '4.6.99') {
   return gt(val, min)
 }
@@ -200,7 +223,9 @@ async function loadData() {
     getChannelOverride(),
     getChannels(),
     getVersion(),
+    getOrgRole(),
   ])
+  reloadCount.value += 1
   isLoading.value = false
 }
 
@@ -261,13 +286,20 @@ async function delDevVersion(device: string) {
     .eq('app_id', packageId.value)
 }
 async function updateOverride() {
+  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])
+
+  if (!hasPerm) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   const buttons = []
   if (deviceOverride.value) {
     buttons.push({
       text: t('button-remove'),
       handler: async () => {
         device.value?.device_id && await delDevVersion(device.value?.device_id)
-        toast.error(t('unlink-version'))
+        toast.success(t('unlink-version'))
         await loadData()
       },
     })
@@ -281,7 +313,7 @@ async function updateOverride() {
         isLoading.value = true
         try {
           await upsertDevVersion(device.value?.device_id, version)
-          toast.error(t('version-linked'))
+          toast.success(t('version-linked'))
           await loadData()
         }
         catch (error) {
@@ -329,15 +361,25 @@ async function delDevChannel(device: string) {
 
 async function updateChannel() {
   const buttons = []
+  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])
+
+  if (!hasPerm && !channelDevice.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   if (channelDevice.value) {
-    buttons.push({
-      text: t('button-remove'),
-      handler: async () => {
-        device.value?.device_id && await delDevChannel(device.value?.device_id)
-        toast.success(t('unlink-channel'))
-        await loadData()
-      },
-    })
+    if (hasPerm) {
+      buttons.push({
+        text: t('button-remove'),
+        handler: async () => {
+          device.value?.device_id && await delDevChannel(device.value?.device_id)
+          toast.success(t('unlink-channel'))
+          await loadData()
+        },
+      })
+    }
+
     buttons.push({
       text: t('open-channel'),
       handler: async () => {
@@ -346,26 +388,30 @@ async function updateChannel() {
       },
     })
   }
-  for (const channel of channels.value) {
-    buttons.push({
-      text: channel.name,
-      handler: async () => {
-        if (!device.value?.device_id)
-          return
-        isLoading.value = true
-        try {
-          await upsertDevChannel(device.value?.device_id, channel)
-          toast.success(t('channel-linked'))
-          await loadData()
-        }
-        catch (error) {
-          console.error(error)
-          toast.error(t('channel-link-fail'))
-        }
-        isLoading.value = false
-      },
-    })
+
+  if (hasPerm) {
+    for (const channel of channels.value) {
+      buttons.push({
+        text: channel.name,
+        handler: async () => {
+          if (!device.value?.device_id)
+            return
+          isLoading.value = true
+          try {
+            await upsertDevChannel(device.value?.device_id, channel)
+            toast.success(t('channel-linked'))
+            await loadData()
+          }
+          catch (error) {
+            console.error(error)
+            toast.error(t('channel-link-fail'))
+          }
+          isLoading.value = false
+        },
+      })
+    }
   }
+
   buttons.push({
     text: t('button-cancel'),
     role: 'cancel',
@@ -390,6 +436,14 @@ watchEffect(async () => {
     displayStore.defaultBack = `/app/package/${route.params.p}/devices`
   }
 })
+
+function guardCustomID(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
 </script>
 
 <template>
@@ -397,9 +451,9 @@ watchEffect(async () => {
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <dl class="divide-y divide-gray-500">
+        <dl :key="reloadCount" class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
-          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" @update:value="saveCustomId" />
+          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])" @update:value="saveCustomId" @click="guardCustomID" />
           <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
           <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
           <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
@@ -409,8 +463,8 @@ watchEffect(async () => {
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow :label="t('force-version')" :value="deviceOverride?.version?.name || t('no-version-linked')" :is-link="true" @click="updateOverride()" />
-          <InfoRow :label="t('channel-link')" :value="channelDevice?.channel_id.name || t('no-channel-linked') " :is-link="true" @click="updateChannel()" />
+          <InfoRow id="update-version" :label="t('force-version')" :value="deviceOverride?.version?.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write']) ? 'no-version-linked' : 'no-version-linked-no-perm')" :is-link="true" @click="updateOverride()" />
+          <InfoRow id="update-channel" :label="t('channel-link')" :value="channelDevice?.channel_id.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write']) ? 'no-channel-linked' : 'no-channel-linked-no-perm')" :is-link="true" @click="updateChannel()" />
         </dl>
       </div>
     </div>

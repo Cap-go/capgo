@@ -123,6 +123,8 @@ defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
+delete-account-0: アカウントを削除する
+delete-your-account: アカウントを削除する
 deleted: 削除された
 details-and-logs: 詳細とログ
 device: デバイス
@@ -175,6 +177,7 @@ last-update: 最後の更新
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
 launch-bundle: バンドルを起動
+leaving: 出発
 limit-reached: 制限に達しました
 live-reload: ライブリロード
 loading-more-data: さらにデータを読み込んでいます...
@@ -203,6 +206,7 @@ need-more-contact-us: |-
   もっといります ？
   オーダーメイドプランはお問い合わせください
 no-channel-linked: チャンネルがありません。クリックして追加してください
+no-data: データなし
 no-devices: デバイスがありません
 no-logs: ログなし
 no-version-linked: バージョンなし、クリックして追加

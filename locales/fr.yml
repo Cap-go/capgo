@@ -131,6 +131,8 @@ defined-as: Défini comme
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
 delete-account: Supprimer le compte
+delete-account-0: Supprimer le compte
+delete-your-account: Supprimer votre compte
 deleted: supprimé
 details-and-logs: Détails et journaux
 device: Appareil
@@ -187,6 +189,7 @@ last-update: Dernière mise à jour
 last-upload: Dernier téléchargement
 last-version: Dernière version
 launch-bundle: Lancer le bundle
+leaving: Sortie
 limit-reached: Limite atteinte
 live-reload: Rechargement en direct
 loading-more-data: Charger plus...
@@ -215,6 +218,7 @@ need-more-contact-us: |-
   Besoin de plus ? 
   Contactez-nous pour un plan sur mesure
 no-channel-linked: Pas de canal, cliquez pour ajouter
+no-data: Pas de données
 no-devices: Aucun appareil
 no-logs: Aucun journal
 no-version-linked: Pas de version, cliquez pour ajouter

@@ -2,12 +2,18 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.
 import { isEqual } from 'https://esm.sh/lodash-es@^4.17.21'
 import { mergeReadableStreams } from 'https://deno.land/std@0.201.0/streams/merge_readable_streams.ts'
 import * as p from 'npm:@clack/prompts@0.7.0'
-import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
+import type { PoolClient } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
+import { Pool } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
+import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 
 export const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 let supabaseSecret: string | null = null
 let supabaseAnonToken: string | null = null
 let supabaseUrl: string | null = null
+let postgressRawDbUrl: string | null = null
+
+let rawPool: null | Pool = null
+let rawConnection: null | PoolClient = null
 
 export interface Test {
   name: string
@@ -19,13 +25,18 @@ export interface Test {
 export interface RunnableTest {
   fullName: string
   tests: Test[]
-  testWithRedis: boolean
 }
 
-export function setSupabaseSecrets(secret: string, anonToken: string, url: string) {
+export function setSupabaseSecrets(secret: string, anonToken: string, url: string, postgressRawUrl: string) {
+  const supaUrl = new URL(url)
+  supaUrl.hostname = 'localhost'
+
+  console.log(supaUrl.toString())
+
   supabaseSecret = secret
   supabaseAnonToken = anonToken
-  supabaseUrl = url
+  supabaseUrl = supaUrl.origin
+  postgressRawDbUrl = postgressRawUrl
 }
 
 export function getSupabaseSecret() {
@@ -90,8 +101,9 @@ export function getUpdateBaseData(): typeof updateAndroidBaseData {
   return structuredClone(updateAndroidBaseData)
 }
 
-export async function testPlaywright(spec: string, env: { [key: string]: string }) {
-  const playwrightCommand = new Deno.Command('bunx', {
+export async function testPlaywright(spec: string, backendUrl: URL, env: { [key: string]: string }) {
+  console.log(supabaseUrl)
+  const playwrightCommand = new Deno.Command('npx', {
     args: [
       'playwright',
       'test',
@@ -102,7 +114,11 @@ export async function testPlaywright(spec: string, env: { [key: string]: string 
     env: {
       SKIP_BACKEND: 'true',
       SUPABASE_ANON: supabaseAnonToken!,
+      SUPABASE_SERVICE: supabaseSecret!,
       SUPABASE_URL: supabaseUrl!,
+      START_FRONTEND: 'true',
+      BACKEND_URL: backendUrl.toString(),
+      // BACKEND_URL: 'http://localhost:7777',
       ...env,
     },
   })
@@ -136,6 +152,18 @@ export async function runSubprocess(command: Deno.Command, commandName: string) 
     console.log(finalString)
     throw new Error(`${commandName} failed`)
   }
+}
+
+export async function getRawSqlConnection() {
+  if (rawConnection)
+    return rawConnection
+
+  assert(!!postgressRawDbUrl, 'Supabase raw postgress url is null')
+  const pool = new Pool(postgressRawDbUrl!, 3, true)
+  rawPool = pool
+
+  rawConnection = await pool.connect()
+  return rawConnection
 }
 
 export type SupabaseType = SupabaseClient<Database>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -17,10 +17,11 @@ import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconSettings from '~icons/heroicons/cog-6-tooth'
 import IconInformations from '~icons/heroicons/information-circle'
-import IconUsers from '~icons/heroicons/users-solid'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import type { Tab } from '~/components/comp_def'
 import { urlToAppId } from '~/services/conversion'
+import type { OrganizationRole } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -28,6 +29,7 @@ interface Channel {
 }
 const router = useRouter()
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const { t } = useI18n()
 const route = useRoute()
 const main = useMainStore()
@@ -40,16 +42,22 @@ const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
 const secondaryVersionPercentage = ref(50)
 
+const role = ref<OrganizationRole | null>(null)
+watch(channel, async (channel) => {
+  if (!channel) {
+    role.value = null
+    return
+  }
+
+  role.value = await organizationStore.getCurrentRole(channel.created_by, channel.app_id, channel.id)
+  console.log(role.value)
+})
+
 const tabs: Tab[] = [
   {
     label: t('info'),
     icon: IconInformations,
     key: 'info',
-  },
-  {
-    label: t('shared-users'),
-    icon: IconUsers,
-    key: 'users',
   },
   {
     label: t('channel-forced-devices'),
@@ -118,6 +126,8 @@ async function getChannel() {
             minUpdateVersion
           ),
           created_at,
+          created_by,
+          app_id,
           allow_emulator,
           allow_dev,
           allow_device_self_set,
@@ -159,6 +169,11 @@ async function reload() {
 }
 
 async function saveChannelChange(key: string, val: any) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   console.log('saveChannelChange', key, val)
   if (!id.value || !channel.value)
     return
@@ -194,6 +209,10 @@ watchEffect(async () => {
 })
 
 async function makeDefault(val = true) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
   const buttonMessage = channel.value?.ios && !channel.value.android
     ? t('make-default-ios')
     : channel.value?.android && !channel.value.ios
@@ -214,6 +233,44 @@ async function makeDefault(val = true) {
             .from('channels')
             .update({ public: val })
             .eq('id', id.value)
+
+          // This code is here because the backend has a 20 second delay between setting a channel to public
+          // and the backend changing other channels to be not public
+          // In these 20 seconds the updates are broken
+          if (val && channel.value.ios) {
+            const { error: iosError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('ios', true)
+              .neq('id', channel.value.id)
+            const { error: hiddenError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', false)
+              .eq('ios', false)
+            if (iosError || hiddenError)
+              console.log('error', iosError || hiddenError)
+          }
+
+          if (val && channel.value.android) {
+            const { error: androidError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', true)
+              .neq('id', channel.value.id)
+            const { error: hiddenError } = await supabase
+              .from('channels')
+              .update({ public: false })
+              .eq('app_id', channel.value.app_id)
+              .eq('android', false)
+              .eq('ios', false)
+            if (androidError || hiddenError)
+              console.log('error', androidError || hiddenError)
+          }
+
           if (error) {
             console.error(error)
           }
@@ -257,6 +314,10 @@ async function getUnknownVersion(): Promise<number> {
 async function openPannel() {
   if (!channel.value || !main.auth)
     return
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+    toast.error(t('no-permission'))
+    return
+  }
   displayStore.actionSheetOption = {
     buttons: [
       {
@@ -282,6 +343,10 @@ async function openPannel() {
 }
 
 async function enableAbTesting() {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
   if (!channel.value)
     return
 
@@ -309,6 +374,10 @@ async function enableAbTesting() {
 }
 
 async function enableProgressiveDeploy() {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
   if (!channel.value)
     return
 
@@ -336,6 +405,10 @@ async function enableProgressiveDeploy() {
 }
 
 const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
   const { error } = await supabase
     .from('channels')
     .update({ secondaryVersionPercentage: percentage / 100 })
@@ -346,6 +419,10 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
 const debouncedInformAboutProgressiveDeployPercentageSet = debounce(() => {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    return
+  }
   toast.error(t('progressive-deploy-set-percentage'))
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
@@ -358,13 +435,29 @@ async function setSecondaryVersionPercentage(percentage: number) {
 }
 
 function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
-  if (channel.value?.enable_progressive_deploy) {
+  if (channel.value?.enable_progressive_deploy || !(role.value && organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner']))) {
     debouncedInformAboutProgressiveDeployPercentageSet()
     event.preventDefault()
   }
 }
 
+function guardChangeAutoUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
+
 async function onChangeAutoUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    if (channel?.value?.disableAutoUpdate)
+      (event.target as HTMLSelectElement).value = channel.value.disableAutoUpdate
+
+    return false
+  }
   const value = (event.target as HTMLSelectElement).value as Database['public']['Enums']['disable_update']
 
   if (value === 'version_number') {
@@ -424,10 +517,11 @@ async function onChangeAutoUpdate(event: Event) {
     <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <k-list class="w-full mt-5 list-none border-t border-gray-200">
+          <k-list id="klist" class="w-full mt-5 list-none border-t border-gray-200">
             <k-list-item label :title="t('channel-is-public')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle-def"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.public"
@@ -438,6 +532,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label title="iOS" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.ios"
@@ -448,6 +543,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label title="Android" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.android"
@@ -458,6 +554,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('disable-auto-downgra')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.disableAutoUpdateUnderNative"
@@ -477,7 +574,7 @@ async function onChangeAutoUpdate(event: Event) {
             </k-list-item> -->
             <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
-                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @change="(event) => onChangeAutoUpdate(event)">
+                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
                   <option value="major">
                     {{ t('major') }}
                   </option>
@@ -496,6 +593,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('allow-develoment-bui')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_dev"
@@ -506,6 +604,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('allow-emulator')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_emulator"
@@ -516,6 +615,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('allow-device-to-self')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.allow_device_self_set"
@@ -526,6 +626,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('channel-ab-testing')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.enableAbTesting"
@@ -536,6 +637,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="t('channel-progressive-deploy')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-toggle
+                  id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
                   :checked="channel?.enable_progressive_deploy"
@@ -546,6 +648,7 @@ async function onChangeAutoUpdate(event: Event) {
             <k-list-item label :title="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <k-range
+                  id="second-percentage-slider"
                   :value="secondaryVersionPercentage"
                   class="-my-1 k-color-success"
                   component="div"
@@ -555,14 +658,9 @@ async function onChangeAutoUpdate(event: Event) {
                 />
               </template>
             </k-list-item>
-            <k-list-item label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
+            <k-list-item id="unlink-bundle" label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
           </k-list>
         </dl>
-      </div>
-    </div>
-    <div v-if="channel && ActiveTab === 'users'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <SharedUserTable allow-add class="p-3" :app-id="channel.version.app_id" :channel-id="id" />
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">

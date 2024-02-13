@@ -6,7 +6,6 @@ const TEST2UUID = 'f851c669-5fc3-4d44-b862-f1438aec7383'
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test selectable disallow',
-    testWithRedis: false,
     tests: [
       {
         name: 'Prepare selectable disallow test',
@@ -127,6 +126,6 @@ async function testDisableUpdateBasedOnMetadataPresent(backendBaseUrl: URL, _sup
   assert(responseSuccessJson.version === '1.359.0', `Response ${JSON.stringify(responseSuccessJson)} version is not equal to 1.0.0`)
 }
 
-async function testSelectableDisallowFront(_backendBaseUrl: URL, _supabase: SupabaseType) {
-  await testPlaywright('selectable_disallow.spec', {})
+async function testSelectableDisallowFront(backendBaseUrl: URL, _supabase: SupabaseType) {
+  await testPlaywright('selectable_disallow.spec', backendBaseUrl, {})
 }

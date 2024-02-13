@@ -166,10 +166,6 @@ watchEffect(async () => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/app/home') {
-    if (typeof main.user === 'undefined')
-      return location.reload()
-  }
   await getKey()
 })
 </script>

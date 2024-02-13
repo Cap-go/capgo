@@ -1,6 +1,5 @@
 // We make some assumtion when running these tests:
 // - We have a supabase instance running on localhost:5432
-// - We have redis running on localhost:6379
 
 import {
   mergeReadableStreams,
@@ -11,7 +10,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.38.5'
 
 import * as p from 'npm:@clack/prompts@0.7.0'
 
-import type { Database } from '../supabase/functions/_utils/supabase.types.ts'
+import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 import { setSupabaseSecrets } from './utils.ts'
 import type { RunnableTest, SupabaseType, Test } from './utils.ts'
 
@@ -19,12 +18,10 @@ let supabaseProcess: Deno.ChildProcess | null = null
 let joined: ReadableStream<Uint8Array> | null = null
 let supabase: SupabaseClient<Database> | null = null
 let functionsUrl: URL | null = null
-let tempUpstashEnvFilePath: string | null = null
-let backendType: 'none' | 'local' | 'upstash' | null = null
-const noRedisEnvFilePath = await getEnvFile('none')
-const localRedisEnvFilePath = await getEnvFile('local')
+let tempEnvFilePath: string | null = null
+const envFilePath = await getEnvFile()
 
-async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: string; anonToken: string }> {
+async function getAdminSupabaseTokens(): Promise<{ url: string, serviceKey: string, anonToken: string, postgressRawUrl: string }> {
   const command = new Deno.Command('supabase', {
     args: [
       'status',
@@ -40,8 +37,9 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
   let adminToken = separateLines.find(line => line.includes('service_role'))
   let url = separateLines.find(line => line.includes('API URL'))
   let anonToken = separateLines.find(line => line.includes('anon'))
+  let postgressRawUrl = separateLines.find(line => line.includes('DB URL'))
 
-  if (!adminToken || !url || !anonToken) {
+  if (!adminToken || !url || !anonToken || !postgressRawUrl) {
     p.log.error('Cannot get supabase tokens')
     console.log('output\n', output)
     Deno.exit(1)
@@ -50,18 +48,20 @@ async function getAdminSupabaseTokens(): Promise<{ url: string; serviceKey: stri
   adminToken = adminToken.replace('service_role key: ', '').trim()
   url = url.replace('API URL: ', '').trim()
   anonToken = anonToken.replace('anon key: ', '').trim()
+  postgressRawUrl = postgressRawUrl.replace('DB URL: ', '').trim()
 
   return {
     serviceKey: adminToken,
     url,
     anonToken,
+    postgressRawUrl,
   }
 }
 
-async function genTempUpstashEnvFile(upstashToken: string, upstashUrl: string): Promise<string> {
+async function genTempEnvFile(): Promise<string> {
   const tempFilePath = await Deno.makeTempFile()
   const exampleEnvFile = await Deno.readTextFile('supabase/.env.example')
-  let tempEnvFile = `${exampleEnvFile}\nREDIS_CONNECTION_TYPE=upstash\nREDIS_TOKEN=${upstashToken}\nREDIS_URL=${upstashUrl}`
+  let tempEnvFile = `${exampleEnvFile}\n`
 
   const minioUrl = Deno.env.get('MINIO_URL')
   if (minioUrl)
@@ -71,8 +71,8 @@ async function genTempUpstashEnvFile(upstashToken: string, upstashUrl: string): 
   return tempFilePath
 }
 
-async function getEnvFile(redis: 'none' | 'local') {
-  const envFilePath = `./supabase/.env.example${redis === 'local' ? '.redis' : ''}`
+async function getEnvFile() {
+  const envFilePath = `./supabase/.env.example`
 
   const minioUrl = Deno.env.get('MINIO_URL')
   if (minioUrl) {
@@ -89,8 +89,8 @@ async function getEnvFile(redis: 'none' | 'local') {
 
 export async function connectToSupabase() {
   try {
-    const { serviceKey, url, anonToken } = await getAdminSupabaseTokens()
-    setSupabaseSecrets(serviceKey, anonToken, url)
+    const { serviceKey, url, anonToken, postgressRawUrl } = await getAdminSupabaseTokens()
+    setSupabaseSecrets(serviceKey, anonToken, url, postgressRawUrl)
     const options = {
       auth: {
         autoRefreshToken: false,
@@ -108,22 +108,14 @@ export async function connectToSupabase() {
 }
 
 async function startSupabaseBackend(
-  redis: 'none' | 'local' | 'upstash' = 'none',
   envFile?: string,
 ) {
-  backendType = redis
-
-  if (redis === 'upstash' && !envFile) {
-    p.log.error('Cannot start upstash backend without env file')
-    Deno.exit(1)
-  }
-
   const command = new Deno.Command('supabase', {
     args: [
       'functions',
       'serve',
       '--env-file',
-      (redis !== 'upstash' || !envFile) ? (redis === 'none' ? noRedisEnvFilePath : localRedisEnvFilePath) : envFile,
+      envFilePath,
     ],
     stdout: 'piped',
     stderr: 'piped',
@@ -140,18 +132,29 @@ async function startSupabaseBackend(
   joined = first
 
   const reader = second.getReader()
+  let totalOut = ''
   while (true) {
     const chunk = await reader.read()
-    if (chunk.done)
+    if (chunk.done) {
+      if (!functionsUrl) {
+        p.log.error('Something went wrong, functions url are not defined!')
+        const string = new TextDecoder('utf-8').decode(chunk.value)
+        console.log(`Last output: ${string}`)
+      }
       break
+    }
 
     const string = new TextDecoder('utf-8').decode(chunk.value)
+    console.log('out', string)
+    totalOut = `${totalOut}|${string}`
     if (string.includes('Serving functions on')) {
       p.log.success('Supabase backend started')
-      const split = string.split(' ')
+      const split = string.split('\n')[0].split(' ')
       functionsUrl = new URL(split[split.length - 1].trim().replace('<function-name>', ''))
       break
     }
+
+    // await delay(10_000)
   }
 }
 
@@ -167,11 +170,6 @@ function killSupabase() {
 
 function killSupabaseAndOutput() {
   killSupabase()
-
-  if (tempUpstashEnvFilePath) {
-    p.log.info(`Removing temp upstash ENV file at ${tempUpstashEnvFilePath}`)
-    Deno.removeSync(tempUpstashEnvFilePath)
-  }
 
   p.log.info('Supabase output:')
   joined?.pipeTo(Deno.stdout.writable)
@@ -208,16 +206,10 @@ async function testLoop(functionsUrl: URL, supabase: SupabaseType, tests: Test[]
   return ok
 }
 
-async function runTestsForFolder(folder: string, shortName: string, firstArg: string) {
-  const useLocalRedis = Deno.env.get('USE_LOCAL_REDIS') === 'true'
-  const upstashToken = Deno.env.get('UPSTASH_TOKEN')
-  const upstashUrl = Deno.env.get('UPSTASH_URL')
-
-  if (upstashToken && upstashUrl) {
-    p.log.info('Generating temp ENV file for upstash...')
-    tempUpstashEnvFilePath = await genTempUpstashEnvFile(upstashToken, upstashUrl)
-    p.log.info(`Temp ENV file generated at ${tempUpstashEnvFilePath}`)
-  }
+async function runTestsForFolder(folder: string, shortName: string, _firstArg: string) {
+  p.log.info('Generating temp ENV file for test...')
+  tempEnvFilePath = await genTempEnvFile()
+  p.log.info(`Temp ENV file generated at ${tempEnvFilePath}`)
 
   for await (const dirEntry of Deno.readDir(folder)) {
     const firstArg = Deno.args[0]
@@ -226,21 +218,7 @@ async function runTestsForFolder(folder: string, shortName: string, firstArg: st
     // Like /test cli will run only tests from the cli folder
     if (dirEntry.isDirectory || !dirEntry.name.endsWith('.ts') || (firstArg !== 'all' && shortName !== firstArg))
       continue
-
-    // Make sure the first time we always have "normal" backend
-    if (backendType !== 'none') {
-      // Only if backend !== null
-      if (backendType) {
-        p.log.info('Killing supabase...')
-        killSupabase()
-      }
-
-      p.log.info('Starting normal backend...')
-      // None means no redis is not going to be configured
-      // This is here to check what happens if redis fails or is disabled for whatever reason
-      await startSupabaseBackend('none')
-    }
-
+    await startSupabaseBackend(tempEnvFilePath)
     const path = await Deno.realPath(`${folder}/${dirEntry.name}`)
     const imported = await import(path)
 
@@ -257,45 +235,12 @@ async function runTestsForFolder(folder: string, shortName: string, firstArg: st
     }
 
     p.log.info(`Running tests \"${importedTest.fullName}\" (${dirEntry.name})`)
-    let ok = await testLoop(functionsUrl, supabase, importedTest.tests)
+    // let ok = await testLoop(new URL('http://localhost:7777'), supabase, importedTest.tests)
+    const ok = await testLoop(functionsUrl, supabase, importedTest.tests)
 
     // This is likely unreacheble
     if (!ok)
       Deno.exit(1)
-
-    // Test with redis if needed
-    if (importedTest.testWithRedis) {
-      if (useLocalRedis) {
-        p.log.info('Running with redis')
-        killSupabase()
-        p.log.info('Starting supabase backend with local redis...')
-
-        // Local means redis is running on localhost
-        await startSupabaseBackend('local')
-        ok = await testLoop(functionsUrl, supabase, importedTest.tests)
-
-        if (!ok)
-          Deno.exit(1)
-      }
-
-      else { p.log.warn('Skipping running with redis') }
-
-      if (upstashToken && upstashUrl) {
-        p.log.info('Running with upstash')
-        killSupabase()
-
-        p.log.info('Starting supabase backend with upstash...')
-
-        // upstash means redis is running remotly and is being hostend by upstash
-        await startSupabaseBackend('upstash', tempUpstashEnvFilePath!)
-        ok = await testLoop(functionsUrl, supabase, importedTest.tests)
-
-        if (!ok)
-          Deno.exit(1)
-      }
-
-      else { p.log.warn('Skipping running with upstash') }
-    }
   }
 }
 
@@ -311,6 +256,7 @@ else {
   await runTestsForFolder('./tests_backend/tests/backend', 'backend', firstArg)
   await runTestsForFolder('./tests_backend/tests/cli', 'cli', firstArg)
   await runTestsForFolder('./tests_backend/tests/selectable_disallow', 'selectable_disallow', firstArg)
+  await runTestsForFolder('./tests_backend/tests/organization', 'organization', firstArg)
   Deno.exit(0)
 }
 

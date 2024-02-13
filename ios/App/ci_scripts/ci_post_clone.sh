@@ -11,8 +11,13 @@ brew link node@20
 node -v
 npm -v
 
+# Go up in folder structure
+cd ../../..
+echo $PWD
+
 # Install bun
 echo "📦 Install bun"
+brew tap oven-sh/bun
 brew install bun 
 
 # Install dependencies
@@ -28,6 +33,7 @@ echo "🚀 Build code"
 bun run mobile
 
 # install native dependencies
-echo "📦 Install native dependencies "
+echo "📦 Install native dependencies"
 bun run sync:ios
+cd ios/App
 pod install

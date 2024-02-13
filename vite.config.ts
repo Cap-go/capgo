@@ -19,11 +19,11 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
-function getUrl(): string {
+function getUrl(key = 'base_domain'): string {
   if (branch === 'local')
-    return `http://${getRightKey('base_domain')}`
+    return `http://${getRightKey(key)}`
   else
-    return `https://${getRightKey('base_domain')}`
+    return `https://${getRightKey(key)}`
 }
 
 const locales: string[] = []
@@ -33,7 +33,7 @@ readdirSync('./locales/')
       locales.push(file.split('.')[0])
   })
 // const markdownWrapperClasses = 'prose prose-xl m-auto text-left'
-const guestPath = ['/login', '/register', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
+const guestPath = ['/login', '/register', '/delete_account', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
 
 export default defineConfig({
   resolve: {
@@ -70,6 +70,7 @@ export default defineConfig({
       VITE_SUPABASE_ANON_KEY: getRightKey('supa_anon'),
       VITE_SUPABASE_URL: getRightKey('supa_url'),
       VITE_APP_URL: `${getUrl()}`,
+      VITE_API_HOST: `${getUrl('api_domain')}`,
       VITE_BRANCH: branch,
       package_dependencies: JSON.stringify(pack.dependencies),
       domain: getUrl(),

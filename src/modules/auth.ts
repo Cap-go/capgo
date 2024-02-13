@@ -1,4 +1,4 @@
-import { isAdmin, isSpoofed, spoofUser } from './../services/supabase'
+import { isAdmin } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
@@ -15,9 +15,16 @@ async function guard(next: any, to: string, from: string) {
 
   const main = useMainStore()
 
+  const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (mfaError) {
+    console.error('Cannot guard auth', mfaError)
+    return
+  }
+
+  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2')
+    return next('/login')
+
   if (auth.user && !main.auth) {
-    if (isSpoofed())
-      auth.user.id = spoofUser()
     main.auth = auth.user
     // console.log('set auth', auth)
     if (!main.user) {
