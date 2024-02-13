@@ -18,10 +18,6 @@ const envJson = envVars.reduce((acc, envVar) => {
 const secrets = JSON.stringify(envJson, null, 2);
 console.log('Secrets', secrets);
 
-// Define the worker name and environment if needed
-const workerName = 'your-worker-name'; // Replace with your worker name
-const environment = 'your-environment'; // Replace with your environment or remove if not needed
-
 // Construct the command to execute
 const command = `echo '${secrets}' | wrangler secret:bulk`;
 
