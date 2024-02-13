@@ -4,11 +4,3 @@ workers_dev = false
 main = "./cloudflare_workers/index.ts"
 compatibility_flags = [ "nodejs_compat" ]
 route = { pattern = "v2.api.capgo.app", custom_domain = true }
-
-[[d1_databases]]
-binding = "DB" # i.e. available in your Worker on env.DB
-database_name = "capgo"
-database_id = "8361491c-b4e0-41e6-a24a-d69892e248dd"
-
-# [placement]
-# mode = "smart"
