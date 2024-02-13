@@ -19,6 +19,7 @@
     "serve-dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
     "reset": "supabase db reset",
+    "dev-back": "wrangler dev cloudflare_workers/index.ts",
     "dev": "bunx netlify dev --port 8881",
     "test:e2e": "cypress open",
     "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts backend",
