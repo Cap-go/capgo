@@ -69,6 +69,23 @@ export const jsonRequestSchema = z.object({
   message: INVALID_STRING_DEVICE_ID,
 })
 
+function requestData(c: Context, app_id: string, version_name: string) {
+  const appOwnerRaw = supabaseAdmin(c)
+    .from('apps')
+    .select('app_id')
+    .eq('app_id', app_id)
+    .single()
+
+  const appVersionRaw = supabaseAdmin(c)
+    .from('app_versions')
+    .select('id, user_id')
+    .eq('app_id', app_id)
+    .or(`name.eq.${version_name}`)
+    .single()
+
+  return Promise.all([appOwnerRaw, appVersionRaw])
+}
+
 async function post(c: Context, body: AppStats) {
   try {
     console.log('body', body)
@@ -103,34 +120,15 @@ async function post(c: Context, body: AppStats) {
 
     const coerce = semver.coerce(version_build)
 
-    const { data: appOwner } = await supabaseAdmin(c)
-      .from('apps')
-      .select('app_id')
-      .eq('app_id', app_id)
-      .single()
-    if (!appOwner) {
-      // TODO: transfer to clickhouse
-      // if (app_id) {
-      //   await supabaseAdmin()
-      //     .from('store_apps')
-      //     .upsert({
-      //       app_id,
-      //       onprem: true,
-      //       capacitor: true,
-      //       capgo: true,
-      //     })
-      // }
-      // if (action === 'get') {
-      //   await updateOnpremStats({
-      //     app_id,
-      //     updates: 1,
-      //   })
-      // }
+    const [appOwnerRaw, appVersionRaw] = await requestData(c, app_id, version_name)
+    if (appOwnerRaw.error || !appOwnerRaw.data) {
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
       }, 200)
     }
+
+    const appVersion = appVersionRaw.data
 
     if (coerce)
       version_build = coerce.version
@@ -160,12 +158,6 @@ async function post(c: Context, body: AppStats) {
       created_at: new Date().toISOString(),
     }
     const rows: Database['public']['Tables']['stats']['Insert'][] = []
-    const { data: appVersion } = await supabaseAdmin(c)
-      .from('app_versions')
-      .select('id, user_id')
-      .eq('app_id', app_id)
-      .or(`name.eq.${version_name}`)
-      .single()
     console.log(`appVersion ${JSON.stringify(appVersion)}`)
     if (appVersion) {
       stat.version = appVersion.id
@@ -212,7 +204,7 @@ async function post(c: Context, body: AppStats) {
       }, 200)
     }
     rows.push(stat)
-    await Promise.all([sendDevice(c, device).then(() => sendStats(c, rows))])
+    await Promise.all([sendDevice(c, device), sendStats(c, rows)])
     return c.json(BRES)
   }
   catch (e) {
