@@ -1,4 +1,4 @@
-import { LogSnag } from '@logsnag/node'
+import { LogSnag } from 'logsnag'
 import { isSpoofed } from './supabase'
 
 export function useLogSnag(): LogSnag {
