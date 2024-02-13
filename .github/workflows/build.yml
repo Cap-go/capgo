@@ -70,13 +70,13 @@ jobs:
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
       - name: Deploy CF Worker
-        run: bunx wrangler@latest deploy --name capgoloadbal
+        run: bunx wrangler@latest deploy --name capgo_api
         if: ${{ !contains(github.ref, '-alpha.') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Deploy CF Worker Alpha
-        run: bunx wrangler@latest deploy --name capgoloadbal-alpha
+        run: bunx wrangler@latest deploy --name capgo_api-alpha
         if: ${{ contains(github.ref, '-alpha.') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

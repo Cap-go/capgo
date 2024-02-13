@@ -1,4 +1,4 @@
-name = "capgoloadbal-alpha"
+name = "capgo_api-alpha"
 compatibility_date = "2023-12-01"
 workers_dev = false
 main = "./cloudflare_workers/index.ts"
