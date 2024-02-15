@@ -9,7 +9,7 @@ import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import copy from 'copy-text-to-clipboard'
 import { useMainStore } from '~/stores/main'
-import { deleteUser, useSupabase } from '~/services/supabase'
+import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
@@ -24,17 +24,10 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
 const isLoading = ref(false)
+// mfa = 2fa
+const mfaEnabled = ref(false)
+const mfaFactorId = ref('')
 // const errorMessage = ref('')
-
-async function hashEmail(email: string) {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(email)
-
-  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
-  return hashHex
-}
 
 async function deleteAccount() {
   displayStore.showActionSheet = true
@@ -208,8 +201,165 @@ async function submit(form: { first_name: string, last_name: string, email: stri
   main.user = usr
   isLoading.value = false
 }
-onMounted(() => {
+
+async function handleMfa() {
+  if (!mfaEnabled.value) {
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: 'totp',
+    })
+
+    if (error) {
+      toast.error(t('mfa-fail'))
+      console.error(error)
+      return
+    }
+
+    displayStore.dialogOption = {
+      header: t('enable-2FA'),
+      message: `${t('mfa-enable-instruction')}`,
+      image: data.totp.qr_code,
+      headerStyle: 'w-full text-center',
+      textStyle: 'w-full text-center',
+      size: 'max-w-lg',
+      buttonCenter: true,
+      buttons: [
+        {
+          text: t('verify'),
+          id: 'verify',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    const didCancel = await displayStore.onDialogDismiss()
+
+    if (didCancel) {
+      // User closed the window, go ahead and unregister mfa
+      const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
+      if (error)
+        console.error('Cannot unregister MFA', unregisterError)
+    }
+    else {
+      // User has scanned the code - verify his claim
+
+      // Open the dialog
+      displayStore.dialogOption = {
+        header: t('verify-2FA'),
+        message: `${t('mfa-enable-instruction-2')}`,
+        input: true,
+        headerStyle: 'w-full text-center',
+        textStyle: 'w-full text-center',
+        size: 'max-w-lg',
+        buttonCenter: true,
+        buttons: [
+          {
+            text: t('verify'),
+            id: 'verify',
+            preventClose: true,
+            handler: async () => {
+              // User has clicked the "verify button - let's check"
+              const verifyCode = displayStore.dialogInputText.replace(' ', '')
+
+              const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
+
+              if (challengeError) {
+                toast.error(t('mfa-fail'))
+                console.error('Cannot create MFA challange', challengeError)
+                displayStore.showDialog = false
+                return
+              }
+
+              const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
+              if (verifyError) {
+                toast.error(t('mfa-invalid-code'))
+                return
+              }
+
+              toast.success(t('mfa-enabled'))
+              mfaEnabled.value = true
+              mfaFactorId.value = data.id
+              displayStore.showDialog = false
+            },
+          },
+        ],
+      }
+      displayStore.showDialog = true
+
+      // Check the cancel again
+      const didCancel = await displayStore.onDialogDismiss()
+      if (didCancel) {
+        // User closed the window, go ahead and unregister mfa
+        const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
+        if (error)
+          console.error('Cannot unregister MFA', unregisterError)
+      }
+    }
+  }
+  else {
+    // disable mfa
+    displayStore.dialogOption = {
+      header: t('alert-2fa-disable'),
+      message: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('disable'),
+          id: 'confirm-button',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    const canceled = await displayStore.onDialogDismiss()
+
+    // User has changed his mind - keepin 2fa
+    if (canceled)
+      return
+
+    // Remove 2fa
+    const factorId = mfaFactorId.value
+    if (!factorId) {
+      toast.error(t('mfa-fail'))
+      console.error('Factor id = null')
+      return
+    }
+
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
+    if (unregisterError) {
+      toast.error(t('mfa-fail'))
+      console.error('Cannot unregister MFA', unregisterError)
+      return
+    }
+
+    mfaFactorId.value = ''
+    mfaEnabled.value = false
+    toast.success(t('2fa-disabled'))
+  }
+}
+
+onMounted(async () => {
   initDropdowns()
+
+  const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+  if (error) {
+    console.error('Cannot getm MFA factors', error)
+    return
+  }
+
+  const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
+  if (unverified && unverified.length > 0) {
+    console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
+    const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
+
+    responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
+  }
+
+  const hasMfa = mfaFactors?.all.find(factor => factor.status === 'verified')
+  mfaEnabled.value = !!hasMfa
+
+  if (hasMfa)
+    mfaFactorId.value = hasMfa.id
 })
 </script>
 
@@ -256,6 +406,15 @@ onMounted(() => {
               </ul>
             </div>
           </div>
+        </section>
+
+        <section class="flex flex-col md:flex-row md:items-center items-left">
+          <p class="text-slate-800 dark:text-white">
+            {{ t('2fa') }}
+          </p>
+          <button :class="`md:ml-6 text-white ${!mfaEnabled ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-800' : 'bg-red-500 hover:bg-red-600 focus:ring-rose-600'} focus:ring-4 focus:outline-none font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center`" @click="handleMfa">
+            {{ !mfaEnabled ? t('enable') : t('disable') }}
+          </button>
         </section>
 
         <!-- Personal Info -->

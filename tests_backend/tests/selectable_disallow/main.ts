@@ -6,7 +6,6 @@ const TEST2UUID = 'f851c669-5fc3-4d44-b862-f1438aec7383'
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test selectable disallow',
-    testWithRedis: false,
     tests: [
       {
         name: 'Prepare selectable disallow test',

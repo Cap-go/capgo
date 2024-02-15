@@ -1310,6 +1310,7 @@ CREATE TABLE "public"."deleted_account" (
 -- values (
 --   'clickhouse',
 --   'tcp://default:****@****.eu-central-1.aws.clickhouse.cloud:9440/default?connection_timeout=30s&ping_before_query=false&secure=true'
+--   'tcp://default:****@clickhouse2.capgo.app/default?connection_timeout=30s&ping_before_query=false&secure=false&compression=lz4' -- New clickhouse self hosted
 -- )
 -- returning key_id;
 
@@ -1506,20 +1507,7 @@ CREATE TABLE "public"."deleted_account" (
 -- )
 --   server clickhouse_server
 --   options (
---     table '(SELECT DISTINCT ON (m.date,m.app_id) 
-    -- m.date AS date,
-    -- m.app_id AS app_id,
-    -- m.total AS mau,
-    -- COALESCE(l.get, 0) AS get,
-    -- COALESCE(l.fail, 0) AS fail,
-    -- COALESCE(l.install, 0) AS install,
-    -- COALESCE(l.uninstall, 0) AS uninstall,
-    -- COALESCE(l.bandwidth, 0) AS bandwidth,
-    -- COALESCE(s.storage_added, 0) AS storage_added,
-    -- COALESCE(s.storage_deleted, 0) AS storage_deleted
-    -- FROM mau m
-    -- LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
-    -- LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id)'
+--     table 'mau_final'
 --   );
 
 CREATE TABLE "public"."devices" (

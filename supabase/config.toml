@@ -104,91 +104,23 @@ vector_port = 54328
 # Configure one of the supported backends: `postgres`, `bigquery`
 backend = "postgres"
 
+# PUBLIC ENDPOINTS
+
+[functions.ok]
+verify_jwt = false
+
 [functions.bundle]
+verify_jwt = false
+
+[functions.devices]
 verify_jwt = false
 
 [functions.channel]
 verify_jwt = false
 
+# PLUGIN ENDPOINTS
+
 [functions.channel_self]
-verify_jwt = false
-
-[functions.cron_good_plan]
-verify_jwt = false
-
-[functions.cron_scrapper]
-verify_jwt = false
-
-[functions.cron_email]
-verify_jwt = false
-
-[functions.device]
-verify_jwt = false
-
-[functions.download_link]
-verify_jwt = false
-
-[functions.get_framework]
-verify_jwt = false
-
-[functions.get_similar_app]
-verify_jwt = false
-
-[functions.get_store_info]
-verify_jwt = false
-
-[functions.get_top_apk]
-verify_jwt = false
-
-[functions.get_config]
-verify_jwt = false
-
-[functions.ok]
-verify_jwt = false
-
-[functions.on_app_stats_create]
-verify_jwt = false
-
-[functions.on_app_stats_update]
-verify_jwt = false
-
-[functions.on_channel_update]
-verify_jwt = false
-
-[functions.on_device_update]
-verify_jwt = false
-
-[functions.on_user_create]
-verify_jwt = false
-
-[functions.on_user_delete]
-verify_jwt = false
-
-[functions.on_user_update]
-verify_jwt = false
-
-[functions.on_version_create]
-verify_jwt = false
-
-[functions.on_version_delete]
-verify_jwt = false
-
-[functions.on_version_update]
-verify_jwt = false
-
-[functions.plans]
-verify_jwt = false
-
-[functions.stats]
-verify_jwt = false
-
-[functions.store_top]
-verify_jwt = false
-
-[functions.stripe_event]
-verify_jwt = false
-
-[functions.test_consistency]
 verify_jwt = false
 
 [functions.updates]
@@ -197,14 +129,33 @@ verify_jwt = false
 [functions.updates_debug]
 verify_jwt = false
 
+[functions.stats]
+verify_jwt = false
+
+[functions.set_custom_id]
+verify_jwt = false
+
+# DEPRECATED TODO: to remove when all user got the latest CLI
+
 [functions.upload_link]
 verify_jwt = false
 
-[functions.web_stats]
-verify_jwt = false
-
-[functions.website_stats]
-verify_jwt = false
-
 [functions.get_stats]
+verify_jwt = false
+
+# END of deprecated
+
+# PRIVATE ENDPOINTS
+
+[functions.private]
+verify_jwt = false
+
+# TRIGGERS ENDPOINTS
+
+[functions.triggers]
+verify_jwt = false
+
+# SCRAPPING ENDPOINTS
+
+[functions.scrapping]
 verify_jwt = false

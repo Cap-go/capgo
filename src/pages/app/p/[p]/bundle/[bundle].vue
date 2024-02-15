@@ -36,6 +36,7 @@ const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const bundleChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const secondaryChannel = ref<boolean>(false)
+const showBundleMetadataInput = ref<boolean>(false)
 
 const role = ref<OrganizationRole | null>(null)
 watch(version, async (version) => {
@@ -85,6 +86,8 @@ async function getChannels() {
       secondaryChannel.value = (version.value.id === chan.secondVersion)
     }
   })
+
+  showBundleMetadataInput.value = !!bundleChannels.value.find(c => c.disableAutoUpdate === 'version_number')
 }
 
 async function openChannelLink() {
@@ -480,6 +483,22 @@ function hideString(str: string) {
   return `${first}...${last}`
 }
 
+async function previewBundle() {
+  if (!version.value)
+    throw new Error('No version id?')
+
+  if (version.value.session_key) {
+    toast.error(t('preview-encrypted'))
+    return
+  }
+
+  displayStore.appPreview = {
+    appId: packageId.value,
+    version: version.value,
+  } as any
+  displayStore.showAppPreview = true
+}
+
 async function saveCustomId(input: string) {
   if (!id.value)
     return
@@ -561,7 +580,7 @@ function preventInputChangePerm(event: Event) {
             <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
             <!-- Min update version -->
             <InfoRow
-              v-if="channel?.disableAutoUpdate === 'version_number'" id="metadata-bundle"
+              v-if="showBundleMetadataInput" id="metadata-bundle"
               :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''"
               :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])"
               @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
@@ -580,7 +599,7 @@ function preventInputChangePerm(event: Event) {
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
               <template #start>
-                <span v-for="chn in bundleChannels" :key="chn.id">
+                <span v-for="chn in bundleChannels" id="open-channel" :key="chn.id">
                   <span
                     v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.secondVersion === version.id) : false"
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
@@ -622,6 +641,7 @@ function preventInputChangePerm(event: Event) {
             />
             <!-- size -->
             <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
+            <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" />
           </dl>
         </div>
       </div>

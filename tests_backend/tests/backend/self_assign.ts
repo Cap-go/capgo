@@ -12,7 +12,6 @@ type HttpMethod = 'POST' | 'PUT' | 'DELETE'
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test self assign endpoint',
-    testWithRedis: true,
     tests: [
       {
         name: 'Test POST invalid json',

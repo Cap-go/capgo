@@ -188,6 +188,7 @@ const chartData = ref<ChartData<'line'>>({
   }],
 })
 const chartOptions = ref({
+  maintainAspectRatio: false,
   scales: {
     y: {
       ticks: {

@@ -50,7 +50,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     currentRole.value = await getCurrentRole(currentOrganization.created_by, undefined, undefined)
-    console.log('current role', currentRole.value)
   })
 
   const setCurrentOrganization = (id: string) => {

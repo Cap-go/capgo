@@ -123,6 +123,8 @@ defined-as: 로써 정의 된
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete-account: 계정 삭제
+delete-account-0: 계정 삭제
+delete-your-account: 계정 삭제
 deleted: 삭제
 details-and-logs: 세부 정보 및 로그
 device: 장치
@@ -175,6 +177,7 @@ last-update: 마지막 업데이트
 last-upload: 마지막 업로드
 last-version: 마지막 버전
 launch-bundle: 번들 실행
+leaving: 퇴거
 limit-reached: 한도 도달
 live-reload: 라이브 리로드
 loading-more-data: 더 많은 데이터 로드 중...
@@ -203,6 +206,7 @@ need-more-contact-us: |-
   더 필요하십니까? 
   맞춤형 계획을 위해 저희에게 연락하십시오
 no-channel-linked: 채널이 없습니다. 추가하려면 클릭하세요.
+no-data: 데이터 없음
 no-devices: 기기 없음
 no-logs: 로그 없음
 no-version-linked: 버전이 없습니다. 추가하려면 클릭하세요.

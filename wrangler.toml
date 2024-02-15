@@ -1,13 +1,6 @@
-name = "capgoloadbal"
-compatibility_date = "2022-04-05"
+name = "capgo_api-alpha"
+compatibility_date = "2023-12-01"
 workers_dev = false
-main = "./cloudflare_workers_deno/main_router.ts"
-node_compat = true
-
-[[d1_databases]]
-binding = "DB" # i.e. available in your Worker on env.DB
-database_name = "capgo"
-database_id = "8361491c-b4e0-41e6-a24a-d69892e248dd"
-
-# [placement]
-# mode = "smart"
+main = "./cloudflare_workers/index.ts"
+compatibility_flags = [ "nodejs_compat" ]
+# route = { pattern = "v2.api.capgo.app", custom_domain = true }

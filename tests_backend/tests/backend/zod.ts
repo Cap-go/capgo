@@ -3,7 +3,6 @@ import { type RunnableTest, type SupabaseType, runSubprocess } from '../../utils
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test updates endpoint',
-    testWithRedis: true,
     tests: [
       {
         name: 'Test ZOD',

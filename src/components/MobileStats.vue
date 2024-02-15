@@ -159,7 +159,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
+  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800" :class="{ 'h-[460px]': dataDevValues.length }">
     <Spinner size="w-40 h-40" />
   </div>
   <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
@@ -176,8 +176,11 @@ watchEffect(async () => {
         </div>
       </div>
     </div>
-    <div class="w-full p-6 px-16">
-      <Doughnut :data="chartData" :options="chartOptions" />
+    <div class="w-full h-full p-6 px-16">
+      <Doughnut v-if="dataDevValues.length" :data="chartData" :options="chartOptions" />
+      <div v-else class="flex flex-col items-center justify-center h-full">
+        {{ t('no-data') }}
+      </div>
     </div>
   </div>
 </template>

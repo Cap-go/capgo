@@ -166,7 +166,7 @@ async function getDevice() {
   if (!id.value)
     return
   try {
-    const data = await supabase.functions.invoke('get_devices', {
+    const data = await supabase.functions.invoke('private/devices', {
       body: {
         appId: packageId.value,
         deviceIds: [id.value],

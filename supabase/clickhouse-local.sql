@@ -15,20 +15,20 @@ create foreign data wrapper clickhouse_wrapper
   handler click_house_fdw_handler
   validator click_house_fdw_validator;
 
-
+-- This will return `key_id`. Use this keyID in the SQL statement below
 insert into vault.secrets (id, name, secret)
 values (
   '29a9ca87-7777-4d2b-b7b6-28fd943f9619',
   'clickhouse',
-  'tcp://default@host.docker.internal:9000/default?connection_timeout=30s&ping_before_query=false'
-);
+  'tcp://default@host.docker.internal:9500/default?connection_timeout=30s&ping_before_query=false'
+) returning *;
 
 -- 29a9ca87-7777-4d2b-b7b6-28fd943f9619
 
 create server clickhouse_server
   foreign data wrapper clickhouse_wrapper
   options (
-    conn_string_id '1b8b4987-9ef5-4bba-a2a3-602194ec39c3' -- The Key ID from above.
+    conn_string_id 'magic_key_id' -- The Key ID from above.
   );
 
 create foreign table clickhouse_devices (
@@ -92,24 +92,19 @@ options (
   table 'logs'
 );
 
-
+-- This code is ugly, very ugly but it has to be like that. Please do NOT touch this
 CREATE OR REPLACE FUNCTION public.get_total_storage_size(appid character varying, userid uuid)
 RETURNS double precision
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
-    total_size double precision := 0;
-BEGIN
+    total_size double precision := 0;BEGIN
     SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
     FROM app_versions
     INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
     WHERE app_versions.user_id = userid
     AND app_versions.app_id = appid
-    AND app_versions.deleted = false;
-
-    RETURN total_size;
-END;  
-$$;
+    AND app_versions.deleted = false; RETURN total_size;END;$$;
 
 --clickhouse_app_usage
 -- (SELECT DISTINCT ON (m.date,m.app_id) m.date AS date, m.app_id AS app_id, m.total AS mau, COALESCE(l.get, 0) AS get, COALESCE(l.fail, 0) AS fail, COALESCE(l.install, 0) AS install, COALESCE(l.uninstall, 0) AS uninstall, COALESCE(l.bandwidth, 0) AS bandwidth, COALESCE(s.storage_added, 0) AS storage_added, COALESCE(s.storage_deleted, 0) AS storage_deleted FROM mau m LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id)

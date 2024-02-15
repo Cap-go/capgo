@@ -56,22 +56,22 @@ export default defineConfig({
     trace: 'on',
     video: 'on',
     screenshot: 'on',
+    // storageState: 'playwright/.auth/user1.json',
   },
   expect: {
     /* CI/CD is VERY slow, I am sorry */
-    timeout: 20_000,
+    timeout: 40_000,
   },
   webServer,
+  // globalSetup: './tests/global-auth-setup',
+  timeout: 180 * 1000,
   projects: [
-    { name: 'setup', testMatch: /.*\.setup\.ts/ },
     {
       name: 'chromium',
       use: {
+        // storageState: 'playwright/.auth/user1.json',
         ...devices['Desktop Chrome'],
-        storageState: 'playwright/.auth/user1.json',
       },
-      dependencies: ['setup'],
     },
   ],
-  timeout: 180 * 1000,
 })
