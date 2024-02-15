@@ -53,3 +53,5 @@ cloudflare_workers_deno/.denoflare
 .dev.vars
 .vars
 supabase/functions/_script/import_d1.sh
+src/types/supabase.types.ts
+supabase/functions/_backend/utils/supabase.types.ts
