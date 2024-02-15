@@ -11,7 +11,7 @@ async function ipapi(ip: string, lang = 'en') {
 
   const res = await ky(`http://ip-api.com/json/${ip}?lang=${lang}&fields=66842623`)
 
-  return await res.json<{isp: string}>()
+  return await res.json<{ isp: string }>()
 }
 
 export async function invalidIps(ips: string[]) {

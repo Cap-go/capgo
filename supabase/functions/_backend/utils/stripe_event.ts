@@ -1,10 +1,11 @@
 import Stripe from 'stripe'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import { MeteredData, parsePriceIds } from './stripe.ts';
-import { getEnv } from './utils.ts';
+import type { MeteredData } from './stripe.ts'
+import { parsePriceIds } from './stripe.ts'
+import { getEnv } from './utils.ts'
 
-export const parseStripeEvent = async (c: Context, body: string, signature: string) => {
+export async function parseStripeEvent(c: Context, body: string, signature: string) {
   const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
   const webhookKey = getEnv(c, 'STRIPE_WEBHOOK_SECRET')
   const stripe = new Stripe(secretKey, {
@@ -28,7 +29,7 @@ export const parseStripeEvent = async (c: Context, body: string, signature: stri
   return receivedEvent
 }
 
-export const extractDataEvent = (event: any): Database['public']['Tables']['stripe_info']['Insert'] => {
+export function extractDataEvent(event: any): Database['public']['Tables']['stripe_info']['Insert'] {
   const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',

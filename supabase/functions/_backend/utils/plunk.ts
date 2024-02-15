@@ -42,8 +42,8 @@ function getAuth(c: Context) {
 const baseUrl = () => 'https://api.useplunk.com'
 function getConfigHeaders(c: Context) {
   return {
-      'Content-Type': 'application/json',
-      'Authorization': getAuth(c),
+    'Content-Type': 'application/json',
+    'Authorization': getAuth(c),
   }
 }
 
@@ -59,8 +59,8 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
     },
     headers: getConfigHeaders(c),
   })
-  .then((res) => res.json())
-  .catch((e) => {
+    .then(res => res.json())
+    .catch((e) => {
       console.log('trackEvent error', e)
       return { data: { error: e } }
     })
@@ -78,14 +78,13 @@ export async function addContact(c: Context, email: string, data: any) {
   console.log('addContact', email)
   return await ky.post(url, {
     json: payload,
-    headers: getConfigHeaders(c)
-  }
-    )
-    .then((res) => res.json())
-    .catch((e) => {
-    console.log('addContact error', e)
-    return { data: { error: e } }
+    headers: getConfigHeaders(c),
   })
+    .then(res => res.json())
+    .catch((e) => {
+      console.log('addContact error', e)
+      return { data: { error: e } }
+    })
 }
 
 export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
@@ -103,11 +102,11 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
       subject,
       body,
     },
-    headers: getConfigHeaders(c)
+    headers: getConfigHeaders(c),
   })
-  .then((res) => res.json())
-  .catch((e) => {
-    console.log('trackEvent error', e)
-    return { data: { error: e } }
-  })
+    .then(res => res.json())
+    .catch((e) => {
+      console.log('trackEvent error', e)
+      return { data: { error: e } }
+    })
 }

@@ -86,4 +86,3 @@ export function getEnv(c: Context, key: string): string {
   const val = env<any>(c)[key]
   return val || ''
 }
-

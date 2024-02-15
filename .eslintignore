@@ -3,6 +3,7 @@ public
 src/types/supabase.ts
 backend
 supabase
+supabase/functions/_backend/utils/supabase.types.ts
 supabase/functions/_backend/utils/s3/*
 supabase/functions/_backend/scripts/*
 CHANGELOG.md

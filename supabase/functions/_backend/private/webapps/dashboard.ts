@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getSDashboard } from '../../utils/supabase.ts'
-import { useCors } from '../../utils/hono.ts';
+import { useCors } from '../../utils/hono.ts'
 
 interface dataDevice {
   userId: string

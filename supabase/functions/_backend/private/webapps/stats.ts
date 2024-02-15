@@ -20,7 +20,6 @@ interface dataStats {
 
 export const app = new Hono()
 
-
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c: Context) => {

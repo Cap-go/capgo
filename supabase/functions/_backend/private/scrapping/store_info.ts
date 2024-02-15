@@ -2,9 +2,9 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
-import { Database } from '../../utils/supabase.types.ts';
-import { supabaseAdmin, saveStoreInfo } from '../../utils/supabase.ts';
-import { countries } from '../../utils/gplay_categ.ts';
+import type { Database } from '../../utils/supabase.types.ts'
+import { saveStoreInfo, supabaseAdmin } from '../../utils/supabase.ts'
+import { countries } from '../../utils/gplay_categ.ts'
 
 export const app = new Hono()
 

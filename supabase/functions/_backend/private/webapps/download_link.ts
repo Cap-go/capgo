@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { useCors, middlewareAuth } from '../../utils/hono.ts'
+import { middlewareAuth, useCors } from '../../utils/hono.ts'
 import { isAdmin, supabaseAdmin } from '../../utils/supabase.ts'
 import { getBundleUrl } from '../../utils/downloadUrl.ts'
 

@@ -89,21 +89,21 @@ export async function getDatabase(c: Context) {
 export async function postStats(baseUrl: string) {
   const url = `${baseUrl}/stats`
   const payload = { ...defaultUpdatePayload, action: defaultAction }
-  const response = await ky.post(url, {json: payload})
+  const response = await ky.post(url, { json: payload })
   return response.json<typeof defaultRes>()
 }
 
 export async function setChannelSelf(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
   const payload = { ...defaultUpdatePayload, channel: defaultChannel }
-  const response = await ky.post(url, {json: payload})
+  const response = await ky.post(url, { json: payload })
   return response.json<typeof defaultRes>()
 }
 
 export const defaultPutChannelRes = { channel: defaultChannel, status: defaultStatus }
 export async function putChannel(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
-  const response = await ky.put(url, {json: defaultUpdatePayload})
+  const response = await ky.put(url, { json: defaultUpdatePayload })
   return response.json<typeof defaultPutChannelRes>()
 }
 
@@ -123,8 +123,8 @@ export const defaultGetDevicesRes = [{
 }]
 export async function getDevice(c: Context, baseUrl: string) {
   const url = `${baseUrl}/device`
-  const searchParams = new URLSearchParams();
-  searchParams.set('app_id', defaultAppId);
+  const searchParams = new URLSearchParams()
+  searchParams.set('app_id', defaultAppId)
   const response = await ky.get(url, {
     body: searchParams,
     headers: headers(c),
@@ -146,8 +146,8 @@ const defaultSetDevice = {
 }
 export async function deleteDevice(c: Context, baseUrl: string) {
   const url = `${baseUrl}/device`
-  const searchParams = new URLSearchParams();
-  searchParams.set('app_id', defaultAppId);
+  const searchParams = new URLSearchParams()
+  searchParams.set('app_id', defaultAppId)
   const response = await ky.delete(url, {
     body: searchParams,
     headers: headers(c),
@@ -182,8 +182,8 @@ export const defaultGetChannelRes = [{
 
 export async function getChannels(c: Context, baseUrl: string) {
   const url = `${baseUrl}/channel`
-  const searchParams = new URLSearchParams();
-  searchParams.set('app_id', defaultAppId);
+  const searchParams = new URLSearchParams()
+  searchParams.set('app_id', defaultAppId)
   const response = await ky.get(url, {
     body: searchParams,
     headers: headers(c),
@@ -236,8 +236,8 @@ export const defaultGetBundleRes = [
 
 export async function getBundle(c: Context, baseUrl: string) {
   const url = `${baseUrl}/bundle`
-  const searchParams = new URLSearchParams();
-  searchParams.set('app_id', defaultAppId);
+  const searchParams = new URLSearchParams()
+  searchParams.set('app_id', defaultAppId)
   const response = await ky.get(url, {
     body: searchParams,
     headers: headers(c),
@@ -252,8 +252,8 @@ export async function getBundle(c: Context, baseUrl: string) {
 
 export async function deleteBundle(c: Context, baseUrl: string) {
   const url = `${baseUrl}/bundle`
-  const searchParams = new URLSearchParams();
-  searchParams.set('app_id', defaultAppId);
+  const searchParams = new URLSearchParams()
+  searchParams.set('app_id', defaultAppId)
   const response = await ky.delete(url, {
     body: searchParams,
     headers: headers(c),

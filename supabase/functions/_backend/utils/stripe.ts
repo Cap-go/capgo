@@ -13,8 +13,8 @@ function getAuth(c: Context) {
 }
 function getConfigHeaders(c: Context, form = false) {
   return {
-      authorization: getAuth(c),
-      ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
+    authorization: getAuth(c),
+    ...(form && { 'content-type': 'application/x-www-form-urlencoded' }),
   }
 }
 

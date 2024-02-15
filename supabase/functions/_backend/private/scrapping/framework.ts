@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import AdmZip from 'adm-zip'
 import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts';
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = new Hono()
 
@@ -142,7 +142,6 @@ async function getInfoCap(c: Context, appId: string) {
       console.log('error insert', error)
   }
 }
-
 
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {

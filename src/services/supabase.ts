@@ -189,7 +189,7 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
 export async function getTotaAppStorage(userid?: string, appid?: string): Promise<number> {
   if (!userid)
     return 0
-  if(!appid)
+  if (!appid)
     return getTotalStorage(userid)
   const { data, error } = await useSupabase()
     .rpc('get_total_app_storage_size', { userid, appid })
@@ -317,12 +317,13 @@ export async function getPlanUsagePercent(userid?: string): Promise<number> {
 }
 
 export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
-  if (!userid)
+  if (!userid) {
     return {
       mau: 0,
       bandwidth: 0,
       storage: 0,
     }
+  }
   const { data, error } = await useSupabase()
     .rpc('get_total_stats_v3', { userid })
     .single()

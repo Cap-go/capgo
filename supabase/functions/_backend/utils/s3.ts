@@ -32,7 +32,6 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
 
 function deleteObject(c: Context, fileId: string) {
   const client = initS3(c)
-  const bucket = getEnv(c, 'S3_BUCKET')
   return client.deleteObject(fileId)
 }
 

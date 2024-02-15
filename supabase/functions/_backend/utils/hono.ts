@@ -1,4 +1,3 @@
-// eslint-disable-next-line unicorn/prefer-node-protocol
 import { timingSafeEqual } from 'node:crypto'
 import type { Context, MiddlewareHandler, Next } from 'hono'
 import { HTTPException } from 'hono/http-exception'
