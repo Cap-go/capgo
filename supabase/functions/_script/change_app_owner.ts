@@ -4,19 +4,19 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js'
 import { ensureFile } from 'https://deno.land/std/fs/ensure_file.ts'
 import type { Database } from '../_backend/utils/supabase.types.ts'
 
-const supabaseUrl = 'http://127.0.0.1:54321'
-const supabaseServiceRole = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
-const appToTransfer = 'com.demo.app'
-const newOwnerEmail = 'admin@capgo.app'
+const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+const supabaseServiceRole = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2d3pwb2F6bXhrcW9zcmRld3l2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY5NzgwNTc4OCwiZXhwIjoyMDEzMzgxNzg4fQ.yI0f2IvaPl1ktMoaHeSzctMF491XT8Aa6D1W0OTilYY'
+const appToTransfer = 'com.starlingminds.dev.member'
+const newOwnerEmail = 'admin@starlingminds.com'
 
 async function main() {
   const s3client = new S3Client({
-    endPoint: '0.0.0.0',
+    endPoint: '9ee3d7479a3c359681e3fab2c8cb22c0.r2.cloudflarestorage.com',
     port: 9000,
-    useSSL: false,
-    region: 'auto',
-    accessKey: 'ROOTUSER',
-    secretKey: 'CHANGEME123',
+    useSSL: true,
+    region: 'us-west-1',
+    accessKey: '4b774468d838171f31fadb4e2d149450',
+    secretKey: 'b46010ff7cf283b2a2912505bfc738d5d322d073ce82a6afd6f662dee11eaf50',
     bucket: 'capgo',
   })
 
@@ -59,6 +59,7 @@ async function main() {
       throw err
   }
 
+  console.log(`Listing objects for ${oldUserId}`)
   for await (const obj of s3client.listObjects({ prefix: `apps/${oldUserId}/` })) {
     console.log(`Processing ${obj.key}`)
     const getObj = await s3client.getObject(obj.key)
@@ -70,6 +71,7 @@ async function main() {
     await s3client.deleteObject(obj.key)
   }
 
+  console.log('Updating user_id in apps')
   const { error: error3 } = await supabase.from('apps')
     .update({ user_id: newUserId })
     .eq('user_id', oldUserId)
@@ -77,6 +79,7 @@ async function main() {
   if (error3)
     throw error3
 
+  console.log('Updating user_id in app_versions')
   const { error: error4 } = await supabase.from('app_versions')
     .update({ user_id: newUserId })
     .eq('app_id', appToTransfer)
@@ -84,6 +87,7 @@ async function main() {
   if (error4)
     throw error4
 
+  console.log('Updating user_id in app_versions_meta')
   const { error: error5 } = await supabase.from('app_versions_meta')
     .update({ user_id: newUserId })
     .eq('app_id', appToTransfer)
@@ -91,6 +95,7 @@ async function main() {
   if (error5)
     throw error5
 
+  console.log('Updating user_id in channel_devices')
   const { error: error6 } = await supabase.from('channel_devices')
     .update({ created_by: newUserId })
     .eq('app_id', appToTransfer)
@@ -98,6 +103,7 @@ async function main() {
   if (error6)
     throw error6
 
+  console.log('Updating user_id in channels')
   const { error: error7 } = await supabase.from('channels')
     .update({ created_by: newUserId })
     .eq('app_id', appToTransfer)
@@ -105,6 +111,7 @@ async function main() {
   if (error7)
     console.log(JSON.stringify(error7))
 
+  console.log('Updating user_id in devices_override')
   const { error: error8 } = await supabase.from('devices_override')
     .update({ created_by: newUserId })
     .eq('app_id', appToTransfer)
