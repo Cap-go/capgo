@@ -85,6 +85,7 @@ export async function useSupabase(page: Page) {
 
 // eslint-disable-next-line n/prefer-global/process
 export const SUPABASE_URL = process.env.SUPABASE_URL ?? defaultSupabaseUrl
+export const ANON_KEY = process.env.SUPABASE_ANON ?? defaultSupabaseAnonKey
 
 export async function useSupabaseAdmin() {
   const options: SupabaseClientOptions<'public'> = {

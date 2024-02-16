@@ -6,7 +6,32 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikeys: {
@@ -44,78 +69,12 @@ export type Database = {
           }
         ]
       }
-      app_stats: {
-        Row: {
-          app_id: string
-          bandwidth: number
-          channels: number
-          created_at: string | null
-          date_id: string
-          devices: number
-          devices_real: number
-          mlu: number
-          mlu_real: number
-          shared: number
-          updated_at: string | null
-          user_id: string
-          version_size: number
-          versions: number
-        }
-        Insert: {
-          app_id: string
-          bandwidth?: number
-          channels?: number
-          created_at?: string | null
-          date_id?: string
-          devices?: number
-          devices_real?: number
-          mlu?: number
-          mlu_real?: number
-          shared?: number
-          updated_at?: string | null
-          user_id: string
-          version_size?: number
-          versions?: number
-        }
-        Update: {
-          app_id?: string
-          bandwidth?: number
-          channels?: number
-          created_at?: string | null
-          date_id?: string
-          devices?: number
-          devices_real?: number
-          mlu?: number
-          mlu_real?: number
-          shared?: number
-          updated_at?: string | null
-          user_id?: string
-          version_size?: number
-          versions?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_stats_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "app_stats_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       app_usage: {
         Row: {
           app_id: string
           bandwidth: number
           date: string | null
-          fails: number
+          fail: number
           get: number
           id: string
           install: number
@@ -128,7 +87,7 @@ export type Database = {
           app_id: string
           bandwidth?: number
           date?: string | null
-          fails?: number
+          fail?: number
           get?: number
           id?: string
           install?: number
@@ -141,7 +100,7 @@ export type Database = {
           app_id?: string
           bandwidth?: number
           date?: string | null
-          fails?: number
+          fail?: number
           get?: number
           id?: string
           install?: number
@@ -164,10 +123,10 @@ export type Database = {
           minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
+          owner_org: string | null
           session_key: string | null
           storage_provider: string
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           app_id: string
@@ -180,10 +139,10 @@ export type Database = {
           minUpdateVersion?: string | null
           name: string
           native_packages?: Json[] | null
+          owner_org?: string | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           app_id?: string
@@ -196,10 +155,10 @@ export type Database = {
           minUpdateVersion?: string | null
           name?: string
           native_packages?: Json[] | null
+          owner_org?: string | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
-          user_id?: string
         }
         Relationships: [
           {
@@ -210,10 +169,10 @@ export type Database = {
             referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: "app_versions_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           }
         ]
@@ -287,41 +246,44 @@ export type Database = {
           app_id: string
           created_at: string | null
           icon_url: string
-          id: string | null
+          id: number
           last_version: string | null
           name: string | null
+          owner_org: string | null
           retention: number
+          tmp_id: string | null
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           app_id: string
           created_at?: string | null
           icon_url: string
-          id?: string | null
+          id?: number
           last_version?: string | null
           name?: string | null
+          owner_org?: string | null
           retention?: number
+          tmp_id?: string | null
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           app_id?: string
           created_at?: string | null
           icon_url?: string
-          id?: string | null
+          id?: number
           last_version?: string | null
           name?: string | null
+          owner_org?: string | null
           retention?: number
+          tmp_id?: string | null
           updated_at?: string | null
-          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "apps_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           }
         ]
@@ -476,45 +438,6 @@ export type Database = {
           }
         ]
       }
-      clickhouse_app_usage_tmp: {
-        Row: {
-          app_id: string | null
-          bandwidth: number | null
-          date: string | null
-          fail: number | null
-          get: number | null
-          install: number | null
-          mau: number | null
-          storage_added: number | null
-          storage_deleted: number | null
-          uninstall: number | null
-        }
-        Insert: {
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Update: {
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Relationships: []
-      }
       deleted_account: {
         Row: {
           created_at: string | null
@@ -523,7 +446,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -1204,14 +1127,6 @@ export type Database = {
         }
         Returns: string
       }
-      calculate_cycle_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      calculate_daily_app_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_min_rights:
         | {
             Args: {
@@ -1294,23 +1209,9 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      create_partitions: {
-        Args: {
-          start_date: string
-          num_years: number
-        }
-        Returns: undefined
-      }
       delete_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      exist_app: {
-        Args: {
-          appid: string
-          apikey: string
-        }
-        Returns: boolean
       }
       exist_app_v2: {
         Args: {
@@ -1420,25 +1321,30 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_infos: {
+      get_identity:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: string
+          }
+        | {
+            Args: {
+              keymode: Database["public"]["Enums"]["key_mode"][]
+            }
+            Returns: string
+          }
+      get_identity_apikey_only: {
         Args: {
-          appid: string
-          deviceid: string
-          versionname: string
+          keymode: Database["public"]["Enums"]["key_mode"][]
         }
-        Returns: {
-          current_version_id: number
-          versiondata: Json
-          channel: Json
-        }[]
+        Returns: string
       }
       get_max_plan:
         | {
             Args: Record<PropertyKey, never>
             Returns: {
               mau: number
-              bandwidth: number
               storage: number
+              bandwidth: number
             }[]
           }
         | {
@@ -1502,6 +1408,22 @@ export type Database = {
           role: string
         }[]
       }
+      get_orgs_v3: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          gid: string
+          created_by: string
+          logo: string
+          name: string
+          role: string
+          paying: boolean
+          trial_left: number
+          can_use_more: boolean
+          is_canceled: boolean
+        }[]
+      }
       get_plan_usage_percent:
         | {
             Args: Record<PropertyKey, never>
@@ -1510,6 +1432,20 @@ export type Database = {
         | {
             Args: {
               userid: string
+            }
+            Returns: number
+          }
+      get_total_app_storage_size:
+        | {
+            Args: {
+              appid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
             }
             Returns: number
           }
@@ -1554,16 +1490,6 @@ export type Database = {
               storage: number
             }[]
           }
-      get_total_stats_v3_old: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
       get_total_stats_v4: {
         Args: {
           userid: string
@@ -1581,20 +1507,7 @@ export type Database = {
           }
         | {
             Args: {
-              appid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
               userid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-              appid: string
             }
             Returns: number
           }
@@ -1640,6 +1553,13 @@ export type Database = {
           failed_updates: number
           open_app: number
         }[]
+      }
+      has_app_right: {
+        Args: {
+          appid: string
+          right: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: boolean
       }
       has_min_right: {
         Args: {
@@ -1831,12 +1751,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_not_deleted_v2: {
-        Args: {
-          email_check: string
-        }
-        Returns: boolean
-      }
       is_onboarded:
         | {
             Args: Record<PropertyKey, never>
@@ -1925,6 +1839,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      remove_enum_value: {
+        Args: {
+          enum_type: unknown
+          enum_value: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       retry_failed_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1933,27 +1858,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      update_app_usage:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: undefined
-          }
-        | {
-            Args: {
-              minutes_interval: number
-            }
-            Returns: undefined
-          }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
     }
     Enums: {
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       queue_job_status: "inserted" | "requested" | "failed"
       stripe_status:
@@ -1963,7 +1875,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -1973,12 +1885,10 @@ export type Database = {
         | "upload"
         | "write"
         | "admin"
+        | "super_admin"
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
-      match_plan: {
-        name: string
-      }
       orgs_table: {
         id: string
         created_by: string
@@ -1999,6 +1909,185 @@ export type Database = {
         bandwidth: number
         storage: number
       }
+    }
+  }
+  storage: {
+    Tables: {
+      buckets: {
+        Row: {
+          allowed_mime_types: string[] | null
+          avif_autodetection: boolean | null
+          created_at: string | null
+          file_size_limit: number | null
+          id: string
+          name: string
+          owner: string | null
+          owner_id: string | null
+          public: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id: string
+          name: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id?: string
+          name?: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      migrations: {
+        Row: {
+          executed_at: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Insert: {
+          executed_at?: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Update: {
+          executed_at?: string | null
+          hash?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      objects: {
+        Row: {
+          bucket_id: string | null
+          created_at: string | null
+          id: string
+          last_accessed_at: string | null
+          metadata: Json | null
+          name: string | null
+          owner: string | null
+          owner_id: string | null
+          path_tokens: string[] | null
+          updated_at: string | null
+          version: string | null
+        }
+        Insert: {
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          version?: string | null
+        }
+        Update: {
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objects_bucketId_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      can_insert_object: {
+        Args: {
+          bucketid: string
+          name: string
+          owner: string
+          metadata: Json
+        }
+        Returns: undefined
+      }
+      extension: {
+        Args: {
+          name: string
+        }
+        Returns: string
+      }
+      filename: {
+        Args: {
+          name: string
+        }
+        Returns: string
+      }
+      foldername: {
+        Args: {
+          name: string
+        }
+        Returns: unknown
+      }
+      get_size_by_bucket: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          size: number
+          bucket_id: string
+        }[]
+      }
+      search: {
+        Args: {
+          prefix: string
+          bucketname: string
+          limits?: number
+          levels?: number
+          offsets?: number
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          name: string
+          id: string
+          updated_at: string
+          created_at: string
+          last_accessed_at: string
+          metadata: Json
+        }[]
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
@@ -2082,3 +2171,4 @@ export type Enums<
   : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
   ? Database["public"]["Enums"][PublicEnumNameOrOptions]
   : never
+
