@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { ref, watchEffect } from 'vue'
-import { storeToRefs } from 'pinia'
 import Steps from '../../components/dashboard/Steps.vue'
 import Dashboard from '../../components/dashboard/Dashboard.vue'
 import { useOrganizationStore } from '~/stores/organization'
@@ -13,7 +12,6 @@ import type { Database } from '~/types/supabase.types'
 
 const route = useRoute()
 const organizationStore = useOrganizationStore()
-const { currentOrganization } = storeToRefs(organizationStore)
 const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()

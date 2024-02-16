@@ -29,15 +29,16 @@ app.use(plugin, defaultConfig({
 CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
-const router = createRouter({ 
-  history: createWebHistory(import.meta.env.BASE_URL), 
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
   // routes,
   extendRoutes: (routes) => {
     const newRoutes = routes.map((route) => {
       if (guestPath.includes(route.path)) {
         route.meta ??= {}
         route.meta.layout = 'auth'
-      } else {
+      }
+      else {
         route.meta ??= {}
         route.meta.middleware = 'auth'
       }
