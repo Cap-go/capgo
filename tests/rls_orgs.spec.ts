@@ -22,7 +22,7 @@ async function createDefaultJWTSupabase() {
   return supabase
 }
 
-async function createDefaultApikeySupabase(keyType: 'read' | 'upload' | 'write' | 'all') {
+function apiKeyTypeToKey(keyType: string) {
   let apiKey = ''
 
   switch (keyType) {
@@ -38,8 +38,14 @@ async function createDefaultApikeySupabase(keyType: 'read' | 'upload' | 'write' 
     case 'all':
       apiKey = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
       break
+    default:
+      throw new Error(`Api key type ${keyType} is not known`)
   }
 
+  return apiKey
+}
+
+async function createDefaultApikeySupabase(keyType: string) {
   const supabase = createClient<Database>(SUPABASE_URL, ANON_KEY, {
     auth: {
       autoRefreshToken: false,
@@ -48,7 +54,7 @@ async function createDefaultApikeySupabase(keyType: 'read' | 'upload' | 'write' 
     },
     global: {
       headers: {
-        capgkey: apiKey,
+        capgkey: apiKeyTypeToKey(keyType),
       },
     },
   })
@@ -61,6 +67,23 @@ test.beforeEach(async () => {
   const supabaseAdmin = await useSupabaseAdmin()
   const { error } = await supabaseAdmin.rpc('reset_and_seed_data')
   expect(error).toBeFalsy()
+})
+
+test('Sanity check on apikey types', async () => {
+  const supabase = await useSupabaseAdmin()
+
+  for (const type of ['read', 'upload', 'write', 'all']) {
+    const apikey = apiKeyTypeToKey(type)
+
+    const { data, error } = await supabase.from('apikeys')
+      .select('*')
+      .eq('key', apikey)
+      .single()
+
+    expect(error).toBeFalsy()
+    expect(data?.mode).toBeTruthy()
+    expect(data?.mode).toBe(type)
+  }
 })
 
 test.describe('Test "apps" RLS policies', () => {
