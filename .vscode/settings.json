@@ -21,6 +21,7 @@
     "./netlify/edge-functions",
     "./tests_backend"
   ],
+  "typescript.preferences.autoImportFileExcludePatterns": ["vue-router"],
   "deno.importMap": "./supabase/functions/import_map.json",
   "deno.documentPreloadLimit": 1000000
 }
