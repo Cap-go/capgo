@@ -141,7 +141,7 @@
     "postgres": "^3.4.3",
     "prism-theme-vars": "^0.2.4",
     "semver": "^7.5.4",
-    "vue": "3.3.8",
+    "vue": "3.4.15",
     "vue-chartjs": "^5.3.0",
     "vue-demi": "0.14.6",
     "vue-i18n": "9.7.1",
