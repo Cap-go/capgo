@@ -52,8 +52,10 @@ jobs:
         if: ${{ contains(github.ref, '-alpha.') }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+      # - name: 🚨 Seed Supabase ALPHA
+      #   if: ${{ contains(github.ref, '-alpha.') }}
+      #   run: supabase db reset --linked
       - name: 🦤 Apply Supabase Migrations
-        if: ${{ !contains(github.ref, '-alpha.') }}
         run: supabase db push
       - name: 🆙 Update functions
         id: update_functions_prod
