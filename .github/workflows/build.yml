@@ -45,9 +45,13 @@ jobs:
       - name: 🍜 Prepare Supabase PROD
         run: supabase link --project-ref xvwzpoazmxkqosrdewyv -p ${{ secrets.SUPABASE_DB_PASS }}
         if: ${{ !contains(github.ref, '-alpha.') }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: 🍜 Prepare Supabase Alpha
         run: supabase link --project-ref aucsybvnhavogdmzwtcw -p ${{ secrets.SUPABASE_DB_PASS_ALPHA }}
         if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: 🦤 Apply Supabase Migrations
         if: ${{ !contains(github.ref, '-alpha.') }}
         run: supabase db push
