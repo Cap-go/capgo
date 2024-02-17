@@ -13,9 +13,11 @@ export const app = new Hono()
 app.post('/', async (c: Context) => {
   try {
     const LogSnag = logsnag(c)
-    if (!c.req.header('stripe-signature') || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
-      return c.json({ status: 'Webhook Error: no signature or no secret found' }, 400)
+    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+      return c.json({ status: 'Webhook Error: no secret found' }, 400)
 
+    if (!c.req.header('stripe-signature') || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+      return c.json({ status: 'Webhook Error: no signature' }, 400)
     // event.headers
     const signature = c.req.header('Stripe-Signature') || ''
     const stripeEvent = parseStripeEvent(c, await c.req.text(), signature)
