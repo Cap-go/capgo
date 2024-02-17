@@ -46,9 +46,10 @@ app.post('/', middlewareAuth, async (c: Context) => {
   }
   catch (error) {
     if (error.name === 'HTTPError') {
-      const errorJson = await error.response.json();
+      const errorJson = await error.response.json()
       return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(errorJson) }, 500)
-    } else {
+    }
+    else {
       return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(error) }, 500)
     }
   }
