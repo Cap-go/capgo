@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/private/plugins/channel_self.ts'
 
 const functionName = 'channel_self'

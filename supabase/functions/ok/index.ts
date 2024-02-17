@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/public/ok.ts'
 
 const functionName = 'ok'

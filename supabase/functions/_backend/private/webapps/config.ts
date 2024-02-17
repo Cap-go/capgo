@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { getEnv } from '../../utils/utils.ts'
 import { useCors } from '../../utils/hono.ts'

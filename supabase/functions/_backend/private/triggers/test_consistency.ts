@@ -1,6 +1,6 @@
 import { equal } from 'lauqe'
 
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { BRES } from '../../utils/hono.ts'
 import {

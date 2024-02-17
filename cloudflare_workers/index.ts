@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 
 // Public API
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'

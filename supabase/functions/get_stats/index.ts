@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/private/webapps/stats.ts'
 
 // DEPRECATED: This is a deprecated function. Please use the new function private/stats instead.
