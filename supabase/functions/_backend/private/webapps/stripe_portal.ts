@@ -39,7 +39,12 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const link = await createPortal(c, user.customer_id, body.callbackUrl)
     return c.json({ url: link.url })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot get portal url', error: JSON.stringify(e) }, 500)
+  catch (error) {
+    if (error.name === 'HTTPError') {
+      const errorJson = await error.response.json();
+      return c.json({ status: 'Cannot get portal url', error: JSON.stringify(errorJson) }, 500)
+    } else {
+      return c.json({ status: 'Cannot get portal url', error: JSON.stringify(error) }, 500)
+    }
   }
 })

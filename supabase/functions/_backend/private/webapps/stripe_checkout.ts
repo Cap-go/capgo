@@ -44,7 +44,12 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const checkout = await createCheckout(c, user.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return c.json({ url: checkout.url })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(e) }, 500)
+  catch (error) {
+    if (error.name === 'HTTPError') {
+      const errorJson = await error.response.json();
+      return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(errorJson) }, 500)
+    } else {
+      return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(error) }, 500)
+    }
   }
 })
