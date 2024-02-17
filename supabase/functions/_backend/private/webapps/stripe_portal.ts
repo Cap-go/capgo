@@ -40,6 +40,6 @@ app.post('/', middlewareAuth, async (c: Context) => {
     return c.json({ url: link.url })
   }
   catch (e) {
-    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get portal url', error: JSON.stringify(e) }, 500)
   }
 })

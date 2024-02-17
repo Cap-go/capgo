@@ -232,6 +232,6 @@ app.post('/', async (c: Context) => {
     return post(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot post stats', error: JSON.stringify(e) }, 500)
   }
 })

@@ -20,6 +20,6 @@ app.post('/', async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot set custom ids', error: JSON.stringify(e) }, 500)
   }
 })

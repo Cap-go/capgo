@@ -45,6 +45,6 @@ app.post('/', middlewareAuth, async (c: Context) => {
     return c.json({ url: checkout.url })
   }
   catch (e) {
-    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(e) }, 500)
   }
 })

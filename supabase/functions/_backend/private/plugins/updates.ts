@@ -73,6 +73,6 @@ app.post('/', async (c: Context) => {
     return update(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 500)
   }
 })

@@ -427,7 +427,7 @@ app.post('/', async (c: Context) => {
     return post(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -438,7 +438,7 @@ app.put('/', async (c: Context) => {
     return put(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -450,6 +450,6 @@ app.delete('/', async (c: Context) => {
     return deleteOverride(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
   }
 })

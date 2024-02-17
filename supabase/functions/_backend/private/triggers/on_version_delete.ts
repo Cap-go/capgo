@@ -33,6 +33,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return deleteIt(c, body.old_record as any)
   }
   catch (e) {
-    return c.json({ status: 'Cannot process version', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
 })

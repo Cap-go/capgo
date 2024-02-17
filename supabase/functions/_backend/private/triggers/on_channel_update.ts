@@ -76,6 +76,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
-    return c.json({ status: 'Cannot process channel', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot update channel', error: JSON.stringify(e) }, 500)
   }
 })

@@ -70,6 +70,6 @@ app.post('/', async (c: Context) => {
     }, 500)
   }
   catch (e) {
-    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get top store apps', error: JSON.stringify(e) }, 500)
   }
 })
