@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 
 import { z } from 'zod'

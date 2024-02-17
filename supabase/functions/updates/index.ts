@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/private/plugins/updates.ts'
 
 const functionName = 'updates'

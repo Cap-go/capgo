@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 
 // Webapps API
 import { app as plans } from '../_backend/private/webapps/plans.ts'

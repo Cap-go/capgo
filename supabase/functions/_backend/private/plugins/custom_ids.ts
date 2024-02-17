@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { BRES, useCors } from '../../utils/hono.ts'
 import { updateDeviceCustomId } from '../../utils/supabase.ts'

@@ -5,18 +5,17 @@ import { ensureFile } from 'https://deno.land/std/fs/ensure_file.ts'
 import type { Database } from '../_backend/utils/supabase.types.ts'
 
 const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
-const supabaseServiceRole = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2d3pwb2F6bXhrcW9zcmRld3l2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY5NzgwNTc4OCwiZXhwIjoyMDEzMzgxNzg4fQ.yI0f2IvaPl1ktMoaHeSzctMF491XT8Aa6D1W0OTilYY'
-const appToTransfer = 'com.starlingminds.dev.member'
-const newOwnerEmail = 'admin@starlingminds.com'
+const supabaseServiceRole = '***'
+const appToTransfer = 'com.demo.app'
+const newOwnerEmail = 'admin@capgo.app'
 
 async function main() {
   const s3client = new S3Client({
     endPoint: '9ee3d7479a3c359681e3fab2c8cb22c0.r2.cloudflarestorage.com',
-    port: 9000,
     useSSL: true,
-    region: 'us-west-1',
-    accessKey: '4b774468d838171f31fadb4e2d149450',
-    secretKey: 'b46010ff7cf283b2a2912505bfc738d5d322d073ce82a6afd6f662dee11eaf50',
+    region: 'auto',
+    accessKey: '***',
+    secretKey: '***',
     bucket: 'capgo',
   })
 

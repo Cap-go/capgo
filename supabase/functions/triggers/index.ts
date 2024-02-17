@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 
 // Triggers API
 import { app as clear_app_cache } from '../_backend/private/triggers/clear_app_cache.ts'

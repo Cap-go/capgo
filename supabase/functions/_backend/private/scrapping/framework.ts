@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import AdmZip from 'adm-zip'
 import { BRES, middlewareAPISecret } from '../../utils/hono.ts'

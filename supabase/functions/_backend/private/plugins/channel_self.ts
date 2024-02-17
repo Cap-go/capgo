@@ -2,7 +2,7 @@
 
 import * as semver from 'semver'
 
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 
 import { z } from 'zod'
 import type { Context } from 'hono'

@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/private/webapps/upload_link.ts'
 
 const functionName = 'upload_link'
