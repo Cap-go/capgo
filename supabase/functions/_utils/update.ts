@@ -3,12 +3,12 @@ import { cryptoRandomString } from 'https://deno.land/x/crypto_random_string@1.1
 import * as semver from 'https://deno.land/x/semver@v1.4.1/mod.ts'
 
 // eslint-disable-next-line import/newline-after-import
-import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@^0.29.1/postgres-js' // do_not_change
+import { drizzle as drizzle_postgress } from 'https://esm.sh/drizzle-orm@0.29.3/postgres-js#^' // do_not_change
 
-import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@^0.29.1'
+import { and, eq, or, sql } from 'https://esm.sh/drizzle-orm@0.29.3/#^'
 
 // eslint-disable-next-line import/newline-after-import
-import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@^0.29.1/pg-core' // do_not_change
+import { alias as alias_postgres } from 'https://esm.sh/drizzle-orm@0.29.3/#^/pg-core' // do_not_change
 import postgres from 'https://deno.land/x/postgresjs/mod.js'
 import { appendHeaders, getEnv, sendRes } from '../_utils/utils.ts'
 import { isAllowedAction, sendDevice, sendStats } from '../_utils/supabase.ts'

@@ -1,6 +1,6 @@
 // eslint-disable
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
-import { load } from 'https://deno.land/std@0.207.0/dotenv/mod.ts'
+import { load } from 'https://deno.land/std@0.216.0/dotenv/mod.ts'
 import { readCSVObjects } from 'https://deno.land/x/csv/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 

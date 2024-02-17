@@ -1,7 +1,7 @@
 // eslint-disable
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.2.3'
-import { load } from 'https://deno.land/std@0.207.0/dotenv/mod.ts'
-import { S3Client } from 'https://deno.land/x/s3_lite_client@0.6.1/mod.ts'
+import { load } from 'https://deno.land/std@0.216.0/dotenv/mod.ts'
+import { S3Client } from 'https://deno.land/x/s3_lite_client@0.7.0/mod.ts'
 import type { Database } from '../_utils/supabase.types.ts'
 
 const env = await load()
