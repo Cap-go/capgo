@@ -36,17 +36,14 @@ jobs:
         with:
           version: 1.142.2
       - name: 🍜 Prepare Supabase PROD
-        run: bun scripts/prepare_supabase.mjs
+        run: supabase link --project-ref xvwzpoazmxkqosrdewyv -p ${{ secrets.SUPABASE_DB_PASS }}
         if: ${{ !contains(github.ref, '-alpha.') }}
-        env:
-          BRANCH: main
       - name: 🍜 Prepare Supabase Alpha
-        run: bun scripts/prepare_supabase.mjs
+        run: supabase link --project-ref aucsybvnhavogdmzwtcw -p ${{ secrets.SUPABASE_DB_PASS_ALPHA }}
         if: ${{ contains(github.ref, '-alpha.') }}
-        env:
-          BRANCH: development
       - name: 🦤 Apply Supabase Migrations
-        run: supabase migration up -p ${{ secrets.SUPABASE_DB_PASS }}
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        run: supabase db push
       - name: 🆙 Update functions
         id: update_functions_prod
         env:
