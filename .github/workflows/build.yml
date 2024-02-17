@@ -20,17 +20,24 @@ jobs:
 
       - name: Install dependencies
         run: bun install
-
       - name: Lint
         id: lint_code
         run: bun lint && bun lint-backend
-      - name: Build
+      - name: Build PROD
         id: build_code
+        if: ${{ !contains(github.ref, '-alpha.') }}
         run: bun mobile
         env:
-          VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Build PROD
+        id: build_code_alpha
+        if: ${{ contains(github.ref, '-alpha.') }}
+        run: bun mobile
+        env:
+          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          BRANCH: development
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
