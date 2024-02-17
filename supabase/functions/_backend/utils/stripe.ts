@@ -108,7 +108,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     return response.json()
   }
   catch (err2) {
-    console.log('create customer err', err2)
+    console.log('create checkout err', err2)
     return null
   }
 }
