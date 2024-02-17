@@ -103,14 +103,8 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     data.append(`line_items[${index + 1}][price]`, priceId)
   })
   console.log('data', data.toString())
-  try {
-    const response = await ky.post('https://api.stripe.com/v1/checkout/sessions', { body: data, headers: config })
-    return response.json()
-  }
-  catch (err2) {
-    console.log('create checkout err', err2)
-    return null
-  }
+  const response = await ky.post('https://api.stripe.com/v1/checkout/sessions', { body: data, headers: config })
+  return response.json()
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, name: string) {
