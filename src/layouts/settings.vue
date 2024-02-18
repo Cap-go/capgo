@@ -69,39 +69,40 @@ watch(type, (val) => {
 
 watchEffect(() => {
   if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
-  && !tabs.value.find(tab => tab.label === 'plans')) {
-  organizationTabs.value.push(
-    {
-    label: 'plans',
-    icon: shallowRef(IconPlans),
-    key: '/dashboard/settings/plans',
+    && !tabs.value.find(tab => tab.label === 'plans')) {
+    organizationTabs.value.push(
+      {
+        label: 'plans',
+        icon: shallowRef(IconPlans),
+        key: '/dashboard/settings/plans',
+      },
+    )
   }
-  )
-}
   else {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
   }
-  if (!Capacitor.isNativePlatform() 
-  && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
-  && !organizationTabs.value.find(tab => tab.label === 'billing')) {
+  if (!Capacitor.isNativePlatform()
+    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+    && !organizationTabs.value.find(tab => tab.label === 'billing')) {
     organizationTabs.value.push({
       label: 'billing',
       icon: shallowRef(IconBilling) as any,
       key: '/billing',
       onClick: openPortal,
     })
-  } else {
+  }
+  else {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
   if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
-  && (main.paying && !organizationTabs.value.find(tab => tab.label === 'usage'))) {
-      // push it 2 before the last tab
-      organizationTabs.value.splice(tabs.value.length - 2, 0, {
-        label: 'usage',
-        icon: shallowRef(IconPlans) as any,
-        key: '/dashboard/settings/usage',
-      })
-    }
+    && (main.paying && !organizationTabs.value.find(tab => tab.label === 'usage'))) {
+    // push it 2 before the last tab
+    organizationTabs.value.splice(tabs.value.length - 2, 0, {
+      label: 'usage',
+      icon: shallowRef(IconPlans) as any,
+      key: '/dashboard/settings/usage',
+    })
+  }
   else if (!main.paying && organizationTabs.value.find(tab => tab.label === 'usage')) {
     organizationTabs.value = tabs.value.filter(tab => tab.label !== 'usage')
   }
