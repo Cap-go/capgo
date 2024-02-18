@@ -325,7 +325,6 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
   console.log(`getSDashboard userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let isAdmin = false
-  let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
   let client = supabaseClient(c, auth)
   if (!auth)
     client = supabaseAdmin(c)
@@ -335,29 +334,23 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
     .then(res => res.data || false)
   isAdmin = reqAdmin
 
-  if (isClickHouseEnabled(c)) {
-    tableName = 'clickhouse_app_usage'
-    if (appId) {
-      // const hasReadRights = await client.rpc('has_read_rights')
-      //   .then(res => res.data || false)
-
-      // console.log('read rights', hasReadRights)
-
-      const reqOwner = await client
-        .rpc('has_app_right', { appid: appId, right: 'read' })
-        .then(res => res.data || false)
-      if (!reqOwner && !reqAdmin)
-        return Promise.reject(new Error('not allowed'))
-    }
-    client = supabaseAdmin(c)
+  if (appId) {
+    const reqOwner = await client
+      .rpc('has_app_right', { appid: appId, right: 'read' })
+      .then(res => res.data || false)
+    if (!reqOwner && !reqAdmin)
+      return Promise.reject(new Error('not allowed'))
   }
+
+  client = supabaseAdmin(c)
+
   console.log('tableName', tableName)
   let req = client
-    .from(tableName)
+    .from('clickhouse_app_usage_parm')
     .select()
 
   if (appId) {
-    req = req.eq('app_id', appId)
+    req = req.eq('_app_list', JSON.stringify([appId]))
   }
   else {
     const userId = isAdmin ? userIdQuery : (await supabaseClient(c, auth).auth.getUser()).data.user?.id
@@ -370,20 +363,20 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
       // .eq('user_id', userId)
       .then(res => res.data?.map(app => app.app_id) || [])
     console.log('appIds', appIds)
-    req = req.in('app_id', appIds)
+    req = req.eq('_app_list', JSON.stringify(appIds))
   }
 
   if (startDate) {
     console.log('startDate', startDate)
     // convert date string startDate to YYYY-MM-DD
     const startDateStr = new Date(startDate).toISOString().split('T')[0]
-    req = req.gt('date', startDateStr)
+    req = req.eq('_start_date', startDateStr)
   }
   if (endDate) {
     console.log('endDate', endDate)
     // convert date string endDate to YYYY-MM-DD
     const endDateStr = new Date(endDate).toISOString().split('T')[0]
-    req = req.lt('date', endDateStr)
+    req = req.eq('_end_date', endDateStr)
   }
 
   const res = await req

@@ -71,6 +71,26 @@ options (
   table 'mau_final'
 );
 
+create foreign table clickhouse_app_usage_parm (
+  date date,
+  app_id text,
+  bandwidth bigint,
+  mau bigint,
+  get bigint,
+  fail bigint,
+  uninstall bigint,
+  install bigint,
+  storage_added bigint,
+  storage_deleted bigint,
+  _app_list text,
+  _start_date Date,
+  _end_date Date
+)
+server clickhouse_server
+options (
+  table '(select * from mau_final_param(app_list=${_app_list}, start_date=${_start_date}, end_date=${_end_date}))'
+);
+
 create materialized view clickhouse_app_usage_view as 
 select * from clickhouse_app_usage;
 

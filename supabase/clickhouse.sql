@@ -168,6 +168,40 @@ FROM
     )
 GROUP BY date, app_id;
 
+-- AND date >= {start_date:Date} AND date <= {end_date:Date}
+CREATE VIEW IF NOT EXISTS mau_final_param as
+SELECT DISTINCT ON (m.date,m.app_id) 
+  m.date AS date,
+  m.app_id AS app_id,
+  COALESCE(m.total, 0) AS mau,
+  COALESCE(l.get, 0) AS get,
+  COALESCE(l.fail, 0) AS fail,
+  COALESCE(l.install, 0) AS install,
+  COALESCE(l.uninstall, 0) AS uninstall,
+  COALESCE(l.bandwidth, 0) AS bandwidth,
+  COALESCE(s.storage_added, 0) AS storage_added,
+  COALESCE(s.storage_deleted, 0) AS storage_deleted
+  FROM (SELECT result.1 date, uniqMerge(arrayJoin(result.2)) total, app_id
+    FROM (
+        SELECT 
+            groupArray((date, value)) data,
+            arrayMap(
+                (x, index) -> (x.1, arrayMap(y -> y.2, arraySlice(data, index))), 
+                data, 
+                arrayEnumerate(data)) result_as_array,
+            arrayJoin(result_as_array) result, app_id
+        FROM (        
+            SELECT app_id, date, total value
+            FROM (
+                /* emulate the original data */
+                SELECT app_id, total, date from mau where hasAll(JSONExtract({app_list:String}, 'Array(String)'), [app_id]) AND date >= {start_date:Date} AND date < {end_date:Date} 
+            ORDER BY date desc, app_id)
+        ) group by app_id
+    ) group by app_id, date order by date desc) m
+  LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
+  LEFT JOIN (select * from app_storage_daily final) s ON l.date = s.date AND l.app_id = s.app_id
+  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total;
+
 -- Aggregate table partitioned by version only
 CREATE TABLE IF NOT EXISTS version_aggregate_logs
 (
@@ -221,39 +255,3 @@ SELECT
     total_failures / unique_devices * 100 AS failure_percent
 FROM logs
 GROUP BY version;
-
-CREATE VIEW IF NOT EXISTS mau_tmp_view AS
-SELECT result.1 date, uniqMerge(arrayJoin(result.2)) total, app_id
-FROM (
-    SELECT 
-        groupArray((date, value)) data,
-        arrayMap(
-            (x, index) -> (x.1, arrayMap(y -> y.2, arraySlice(data, index))), 
-            data, 
-            arrayEnumerate(data)) result_as_array,
-        arrayJoin(result_as_array) result, app_id
-    FROM (        
-        SELECT app_id, date, total value
-        FROM (
-            /* emulate the original data */
-            SELECT app_id, total, date from mau
-        ORDER BY date desc, app_id)
-    ) group by app_id
-) group by app_id, date order by date desc;
-
-CREATE VIEW IF NOT EXISTS mau_final as
-SELECT DISTINCT ON (m.date,m.app_id) 
-  m.date AS date,
-  m.app_id AS app_id,
-  COALESCE(m.total, 0) AS mau,
-  COALESCE(l.get, 0) AS get,
-  COALESCE(l.fail, 0) AS fail,
-  COALESCE(l.install, 0) AS install,
-  COALESCE(l.uninstall, 0) AS uninstall,
-  COALESCE(l.bandwidth, 0) AS bandwidth,
-  COALESCE(s.storage_added, 0) AS storage_added,
-  COALESCE(s.storage_deleted, 0) AS storage_deleted
-  FROM mau_tmp_view m
-  LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
-  LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id
-  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total;
