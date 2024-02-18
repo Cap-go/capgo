@@ -5,7 +5,7 @@ import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
-export async function parseStripeEvent(c: Context, body: string, signature: string) {
+export function parseStripeEvent(c: Context, body: string, signature: string) {
   const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
   const webhookKey = getEnv(c, 'STRIPE_WEBHOOK_SECRET')
   const stripe = new Stripe(secretKey, {

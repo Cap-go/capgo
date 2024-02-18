@@ -16,12 +16,11 @@ app.post('/', async (c: Context) => {
     if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no secret found' }, 400)
 
-    if (!c.req.header('stripe-signature') || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+    const signature = c.req.header('stripe-signature')
+    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no signature' }, 400)
     // event.headers
-    const signature = c.req.raw.headers.get("stripe-signature");
-    const body = await c.req.raw.text()
-    
+    const body = await c.req.raw.clone().text()
     const stripeEvent = await parseStripeEvent(c, body, signature!)
     const stripeData = await extractDataEvent(stripeEvent)
     if (stripeData.customer_id === '')
