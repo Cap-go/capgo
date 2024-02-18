@@ -59,8 +59,8 @@ app.route('/updates', updates)
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
 app.route('/set_custom_id', setCustomId)
-app.route('/get_config', config) // TODO: deprecatedremove when everyone use the new CLI
-app.route('/upload_link', upload_link) // TODO: deprecatedremove when everyone use the new CLI
+app.route('/get_config', config) // TODO: deprecated remove when everyone use the new CLI
+app.route('/upload_link', upload_link) // TODO: deprecated remove when everyone use the new CLI
 
 // PRIVATE API
 appFront.route('/plans', plans)
