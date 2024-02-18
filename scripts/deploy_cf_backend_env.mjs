@@ -12,7 +12,7 @@ if (!envFileName) {
 
 // Read the environment file
 const envFilePath = resolve(envFileName);
-const nameWorker = envFilePath === '.env' ? 'capgo_api' : 'capgo_api-alpha';
+const nameWorker = envFileName === '.env' ? 'capgo_api' : 'capgo_api-alpha';
 let env;
 try {
   env = readFileSync(envFilePath, 'utf8');
