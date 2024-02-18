@@ -98,21 +98,21 @@ BEGIN
     PERFORM cron.schedule(
         'process_current_jobs_if_unlocked_job_1',
         '* * * * *',
-        $$ PERFORM process_current_jobs_if_unlocked(); $$
+        $$SELECT process_current_jobs_if_unlocked(); $$
     );
     -- Schedule second job with a 20-second delay
     PERFORM pg_sleep(20);
     PERFORM cron.schedule(
         'process_current_jobs_if_unlocked_job_2',
         '* * * * *',
-        $$ PERFORM process_current_jobs_if_unlocked(); $$
+        $$SELECT process_current_jobs_if_unlocked(); $$
     );
     -- Schedule third job with another 20-second delay
     PERFORM pg_sleep(20);
     PERFORM cron.schedule(
         'process_current_jobs_if_unlocked_job_3',
         '* * * * *',
-        $$ PERFORM process_current_jobs_if_unlocked(); $$
+        $$SELECT process_current_jobs_if_unlocked(); $$
     );
 END;
 $body$ LANGUAGE plpgsql;

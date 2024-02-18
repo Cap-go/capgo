@@ -32,7 +32,6 @@ fastlane/metadata/review_information/phone_number.txt
 .capgo_key.pub
 .wrangler/*
 
-/netlify
 scripts/template/netlify/test.gplay.js
 
 /test-results/
@@ -54,3 +53,6 @@ cloudflare_workers_deno/.denoflare
 .dev.vars
 .vars
 supabase/functions/_script/import_d1.sh
+src/types/supabase.types.ts
+supabase/functions/_backend/utils/supabase.types.ts
+.env.alpha

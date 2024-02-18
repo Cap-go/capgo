@@ -166,6 +166,9 @@ device: Device
 device-id: Device ID
 devices: Devices
 devices-using-this-b: Devices using this bundle
+dialog-warning-msg: |-
+  This information comes from the organization owner.
+  You cannot upgrade the capgo tier for this app
 did-not-recive-confirm-email: Didn't receive confirmation email?
 disable: Disable
 disable-ab-testing: Disabled AB testing
@@ -320,6 +323,8 @@ plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.
 plan-maker: Best for small business owners
 plan-member: plan member.
+plan-page-warn: Buying a plan will not affect the organizations your are invited to.
+plan-page-warn-2: Learn more about it.
 plan-payasyougo: Best for scalling enterprises
 plan-pricing-plans: Pricing Plans
 plan-progressive-deploy: Progressive deploy
@@ -327,7 +332,7 @@ plan-solo: Best for indies
 plan-storage: GB Storage
 plan-team: Best for big business owners
 plan-updates: Updates
-plan-upgrade: Subcribes
+plan-upgrade: Subscribe
 plan-whats-included: What's included
 plans: Plans
 platform: Platform
@@ -437,6 +442,7 @@ version-builtin: Version builtin
 version-linked: Version link
 version-linking: Link to bundle
 versions: Versions
+warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 yearly: Yearly

@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { BASE_URL, beforeEachTest } from './utils'
+import { BASE_URL, beforeEachTest, loginAsUser1 } from './utils'
 
 test.beforeEach(beforeEachTest)
+test.beforeEach(loginAsUser1)
 
 test('test bundle', async ({ page }) => {
   // Go to the production channel

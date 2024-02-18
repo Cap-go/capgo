@@ -20,53 +20,75 @@ jobs:
 
       - name: Install dependencies
         run: bun install
-
       - name: Lint
         id: lint_code
         run: bun lint && bun lint-backend
-      - name: Build
+      - name: Build PROD
         id: build_code
+        if: ${{ !contains(github.ref, '-alpha.') }}
         run: bun mobile
         env:
-          VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+      - name: Build PROD
+        id: build_code_alpha
+        if: ${{ contains(github.ref, '-alpha.') }}
+        run: bun mobile
+        env:
+          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          BRANCH: development
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: 1.142.2
-      - name: 🍜 Prepare Supabase
-        run: bun scripts/prepare_supabase.mjs
-      # - name: Apply Supabase Migrations TODO: make this work 
-      #   run: supabase db push -p ${{ secrets.SUPABASE_DB_PASS }} 
-      - name: Update functions Alpha
+      - name: Set env PROD
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS }}" >> $GITHUB_ENV
+      - name: Set env PRAlphaOD
         if: ${{ contains(github.ref, '-alpha.') }}
-        id: update_functions_preprod
+        run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV      
+      - name: 🍜 Prepare Supabase PROD
+        run: supabase link --project-ref xvwzpoazmxkqosrdewyv
+        if: ${{ !contains(github.ref, '-alpha.') }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-          BRANCH: development
-        run: supabase functions deploy
-      - name: Update functions
-        if: ${{ !contains(github.ref, '-alpha.') }}
+      - name: 🍜 Prepare Supabase Alpha
+        run: supabase link --project-ref aucsybvnhavogdmzwtcw
+        if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+      # - name: 🚨 Seed Supabase ALPHA
+      #   if: ${{ contains(github.ref, '-alpha.') }}
+      #   run: supabase db reset --linked
+      - name: 🦤 Apply Supabase Migrations
+        run: supabase db push
+      - name: 🆙 Update functions
         id: update_functions_prod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: supabase functions deploy
       - name: Create Release Alpha
         if: ${{ contains(github.ref, '-alpha.') }}
-        id: create_release_preprod
+        id: create_release_alpha
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
       - name: Create Release Production
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
-      # - name: Deploy CF Worker
-      #   run: bunx wrangler deploy ./cloudflare_workers/loadbalancer.ts
-      #   if: ${{ !contains(github.ref, '-alpha.') }}
-      #   env:
-      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      #     CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Publish CF webapp PROD
+      - name: Deploy CF Worker
+        run: bunx wrangler@latest deploy --name capgo_api
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy CF Worker Alpha
+        run: bunx wrangler@latest deploy --name capgo_api-alpha
+        if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Publish CF webapp
         uses: cloudflare/pages-action@1
         if: ${{ !contains(github.ref, '-alpha.') }}
         with:
@@ -76,13 +98,13 @@ jobs:
           directory: dist
           branch: main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish CF webapp PREPROD
+      - name: Publish CF webapp Alpha
         uses: cloudflare/pages-action@1
         if: ${{ contains(github.ref, '-alpha.') }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: capgo-webapp-preprod
+          projectName: capgo-webapp-alpha
           directory: dist
           branch: main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
@@ -92,7 +114,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup bun
         uses: oven-sh/setup-bun@v1.1.1
         with:
@@ -107,7 +128,7 @@ jobs:
         id: sync_code
         run: bun x cap sync
       - name: Setup java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
             distribution: 'zulu'
             java-version: '17'
@@ -123,7 +144,7 @@ jobs:
         with:
           fileName: "serviceAccount.json"
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/android/.gradle/*
@@ -142,7 +163,7 @@ jobs:
         with:
           lane: android beta
       - name: Upload release bundle
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android-release
           path: ./android/app/build/outputs/bundle/release/app-release.aab

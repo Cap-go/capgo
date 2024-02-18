@@ -6,7 +6,7 @@ import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v2']['Returns']>
+export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v3']['Returns']>
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
@@ -17,6 +17,7 @@ const supabase = useSupabase()
 
 export const useOrganizationStore = defineStore('organization', () => {
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
+  const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
 
   const organizations: ComputedRef<Organization[]> = computed(
     () => {
@@ -51,6 +52,35 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     currentRole.value = await getCurrentRole(currentOrganization.created_by, undefined, undefined)
   })
+
+  watch(_organizations, async (organizationsMap) => {
+    const organizations = Array.from(organizationsMap.values())
+    const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, user_id')
+    if (error) {
+      console.error('Cannot get app apps for org store', error)
+      return
+    }
+
+    const organizationsByAppId = new Map<string, Organization>()
+
+    for (const app of allAppsByOwner) {
+      // For each app find the org_id that owns said app
+      // This is needed for the "banner"
+      const org = organizations.find(org => org.created_by === app.user_id)
+      if (!org) {
+        console.error(`Cannot find organization for app ${app}`)
+        return
+      }
+
+      organizationsByAppId.set(app.app_id, org)
+    }
+
+    _organizationsByAppId.value = organizationsByAppId
+  })
+
+  const getOrgByAppId = (appId: string) => {
+    return _organizationsByAppId.value.get(appId)
+  }
 
   const setCurrentOrganization = (id: string) => {
     currentOrganization.value = organizations.value.find(org => org.gid === id)
@@ -109,7 +139,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // We have RLS that ensure that we only selct rows where we are member or owner
     const { data, error } = await supabase
-      .rpc('get_orgs_v2', {
+      .rpc('get_orgs_v3', {
         userid: userId,
       })
 
@@ -148,5 +178,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     hasPermisisonsInRole,
     fetchOrganizations,
     dedupFetchOrganizations,
+    getOrgByAppId,
   }
 })

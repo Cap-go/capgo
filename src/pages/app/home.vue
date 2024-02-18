@@ -3,21 +3,21 @@ import { useRoute } from 'vue-router'
 import { ref, watchEffect } from 'vue'
 import Steps from '../../components/dashboard/Steps.vue'
 import Dashboard from '../../components/dashboard/Dashboard.vue'
+import { useOrganizationStore } from '~/stores/organization'
 import { useMainStore } from '~/stores/main'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import type { Database } from '~/types/supabase.types'
-import { useOrganizationStore } from '~/stores/organization'
 
 const route = useRoute()
+const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
-const organizationStore = useOrganizationStore()
 
 async function getMyApps() {
   const { data } = await supabase

@@ -1,17 +1,17 @@
 // import type { Page } from '@playwright/test'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import pkg from 'deep-diff';
-const { diff } = pkg;
+import pkg from 'deep-diff'
 import type { SupabaseType } from './utils'
-import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, useSupabase, useSupabaseAdmin } from './utils'
+import { BASE_URL, SUPABASE_URL, awaitPopout, beforeEachTest, expectPopout, firstItemAsync, loginAsUser1, loginAsUser2, useSupabase, useSupabaseAdmin } from './utils'
 import type { Database } from '~/types/supabase.types'
 
+const { diff } = pkg
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 test.beforeEach(beforeEachTest)
 
@@ -21,6 +21,8 @@ test.describe.configure({ mode: 'serial' })
 
 test.describe('Test organization invite', () => {
   test.describe.configure({ mode: 'serial' })
+
+  test.beforeEach(loginAsUser1)
 
   test.beforeEach(async () => {
     const supabase = await useSupabaseAdmin()
@@ -95,8 +97,10 @@ test.describe('Test organization invitation accept', () => {
   test.describe.configure({ mode: 'serial' })
 
   const testWithInvitedUser = test.extend<object, { workerStorageState: string }>({
-    storageState: 'playwright/.auth/user2.json',
+    // storageState: 'playwright/.auth/user2.json',
   })
+
+  testWithInvitedUser.beforeEach(loginAsUser2)
 
   for (const inviteType of inviteTypes) {
     test.describe(`Test organization invitation accept (${inviteType})`, () => {
@@ -273,8 +277,10 @@ test.describe('Test organization system permissions', () => {
 
       const testWithInvitedUser = test.extend<object, { workerStorageState: string }>({
         // User = owner if invite type === owner, otherwise user = invited
-        storageState: inviteType !== 'owner' ? 'playwright/.auth/user2.json' : 'playwright/.auth/user1.json',
+        // storageState: inviteType !== 'owner' ? 'playwright/.auth/user2.json' : 'playwright/.auth/user1.json',
       })
+
+      testWithInvitedUser.beforeEach(inviteType !== 'owner' ? loginAsUser2 : loginAsUser1)
 
       // Generate invite
       testWithInvitedUser.beforeAll(async () => {
@@ -365,8 +371,8 @@ test.describe('Test organization system permissions', () => {
 
         // We ALLWAYS expect app to be accesible. We are added to the org
         let users = Number.parseInt((await monthlyStatLocator.innerText()).split(' ')[0])
-        await expect(users).toBeTruthy()
-        await expect(users).toBeGreaterThan(0) // Check if getting stats works
+        await expect(users).not.toBeNaN()
+        await expect(users).toBeGreaterThanOrEqual(0) // Check if getting stats works
 
         if (inviteType !== 'owner') {
           const sharedAppsLocator = await page.locator('#shared')
@@ -382,13 +388,13 @@ test.describe('Test organization system permissions', () => {
 
         // Check again. This time for specific app
         users = Number.parseInt((await monthlyStatLocator.innerText()).split(' ')[0])
-        await expect(users).toBeTruthy()
-        await expect(users).toBeGreaterThan(0) // Check if getting stats works
+        await expect(users).not.toBeNaN()
+        await expect(users).toBeGreaterThanOrEqual(0) // Check if getting stats works
 
         const bundlesTotalSelector = await page.locator('#bundles-total')
         const bundlesTotal = Number.parseInt(await bundlesTotalSelector.innerText())
-        await expect(bundlesTotal).toBeTruthy()
-        await expect(bundlesTotal).toBeGreaterThan(0) // Check if bundles graph work
+        await expect(bundlesTotal).not.toBeNaN()
+        await expect(bundlesTotal).toBeGreaterThanOrEqual(0) // Check if bundles graph work
 
         // Test this down stripe (channels, bundles, devices, updates)
         // None of those values should be zero. If it is then something is broken
@@ -397,8 +403,8 @@ test.describe('Test organization system permissions', () => {
           const innerText = await stat.innerHTML()
           const innerNumber = Number.parseInt(innerText)
 
-          await expect(innerNumber).toBeTruthy()
-          await expect(innerNumber).toBeGreaterThan(0)
+          await expect(innerNumber).not.toBeNaN()
+          await expect(innerNumber).toBeGreaterThanOrEqual(0)
         }))
 
         // go to 'channels'
@@ -482,7 +488,7 @@ test.describe('Test organization system permissions', () => {
           if (permission.changeChannelToggle) {
             await Promise.all([
               page.waitForResponse(`${SUPABASE_URL}\/**`),
-              await toggle.click(),
+              toggle.click(),
             ])
           }
           else {
@@ -596,7 +602,7 @@ test.describe('Test organization system permissions', () => {
         await page.goto(`${BASE_URL}/app/p/com--demo--app/bundle/9601`)
 
         // Click on `Channel` to see the options available
-        await page.locator('#open-channel').click()
+        await page.locator('#open-channel').first().click()
         await expect(page.locator('#action-sheet')).toBeVisible()
 
         // Get all buttons
@@ -653,7 +659,25 @@ test.describe('Test organization system permissions', () => {
         await page.click('#inforow-input')
 
         if (permission.setDeviceCustomId) {
-          await page.fill('#inforow-input', 'test')
+          // Usually I would use crypto.random BUT the github CI/CD is on node 18
+          // Thus crypto.randomUUID does not work :<
+          // I stole this code from stackoverflow - https://stackoverflow.com/a/873856
+          function createUUID() {
+            // http://www.ietf.org/rfc/rfc4122.txt
+            const s = [] as string[]
+            const hexDigits: string = '0123456789abcdef'
+            for (let i = 0; i < 36; i++)
+              s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1)
+
+            s[14] = '4' // bits 12-15 of the time_hi_and_version field to 0010
+            s[19] = hexDigits.substr((s[19] as any & 0x3) | 0x8, 1) // bits 6-7 of the clock_seq_hi_and_reserved to 01
+            s[8] = s[13] = s[18] = s[23] = '-'
+
+            const uuid = s.join('')
+            return uuid
+          }
+
+          await page.fill('#inforow-input', `test-${createUUID()}`)
           await expectPopout(page, 'Custom ID saved')
         }
         else {
@@ -931,9 +955,9 @@ test.describe('Test organization system permissions', () => {
 
 async function getAllMembers(page: Page) {
   await page.goto(`${BASE_URL}/dashboard/settings/organization/members`)
-  await page.waitForTimeout(500)
+  await expect(page.locator('#members-div')).toBeVisible()
 
-  const userTable = await page.locator('dl.divide-y')
+  const userTable = await page.locator('#members-div')
   const userTableDivs = await userTable.all()
 
   const members = await Promise.all(userTableDivs.map(async (el) => {

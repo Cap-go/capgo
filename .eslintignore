@@ -1,6 +1,7 @@
 dist
 public
-src/types/supabase.ts
-supabase/functions/_utils/types_supabase.ts
-/supabase/functions/_script/*.ts
-/supabase/functions/_script/remove_not_used_r2.ts
+**/supabase.types*
+supabase
+supabase/functions/_backend/utils/supabase.types.ts
+supabase/functions/_backend/scripts/*
+CHANGELOG.md

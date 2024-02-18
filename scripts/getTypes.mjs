@@ -18,7 +18,7 @@ async function main() {
     console.error(e) // should contain code (exit code) and signal (that caused the termination).
   }
   try {
-    const { stderr: err } = await exec('cp src/types/supabase.types.ts supabase/functions/_utils/supabase.types.ts')
+    const { stderr: err } = await exec('cp src/types/supabase.types.ts supabase/functions/_backend/utils/supabase.types.ts')
     if (err)
       console.error(err)
     else

@@ -4,7 +4,6 @@ import { testPlaywright } from '../../utils.ts'
 export function getTest(): RunnableTest {
   return {
     fullName: 'Test organization system',
-    testWithRedis: false,
     tests: [{
       name: 'Test organization system frontend',
       test: runFrontendTests,

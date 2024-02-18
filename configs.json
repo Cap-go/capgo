@@ -1,7 +1,7 @@
 {
   "base_domain": {
     "prod": "web.capgo.app",
-    "development": "development.web.capgo.app",
+    "development": "development.capgo.app",
     "local": "localhost:3332"
   },
   "supa_anon": {
@@ -13,5 +13,10 @@
     "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
     "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
     "local": "http://localhost:54321"
+  },
+  "api_domain": {
+    "prod": "api.capgo.app",
+    "development": "api-dev.capgo.app",
+    "local": "localhost:54321/functions/v1"
   }
 }

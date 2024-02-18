@@ -1,4 +1,4 @@
-import axios from 'axios'
+import ky from 'ky'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -8,7 +8,7 @@ import type { Database } from '~/types/supabase.types'
 
 let supaClient: SupabaseClient<Database> = null as any
 
-export const defaultApiHost = 'https://api.capgo.app'
+export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
 interface CapgoConfig {
   supaHost: string
@@ -31,11 +31,11 @@ function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 
 export async function getRemoteConfig() {
-  // call host + /api/get_config and parse the result as json using axios
+  // call host + /api/private/config and parse the result as json using ky
   const localConfig = await getLocalConfig()
-  const data = await axios
-    .get(`${defaultApiHost}/get_config`)
-    .then(res => res.data as CapgoConfig)
+  const data = await ky
+    .get(`${defaultApiHost}/private/config`)
+    .then(res => res.json<CapgoConfig>())
     .then(data => ({ ...data, ...localConfig } as CapgoConfig))
     .catch(() => {
       console.log('Local config', localConfig)
@@ -110,7 +110,7 @@ export function getSupabaseToken() {
   return localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
 }
 export function unspoofUser() {
-  const textData: string = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
+  const textData: string | null = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
   if (!textData || !isSpoofed())
     return false
 
@@ -131,7 +131,7 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     storage_provider: provider,
     bucket_id: bucketId,
   }
-  const res = await useSupabase().functions.invoke('download_link', { body: JSON.stringify(data) })
+  const res = await useSupabase().functions.invoke('private/download_link', { body: JSON.stringify(data) })
   return res.data.url
 }
 
@@ -176,7 +176,7 @@ export interface appUsage {
 export async function getAllDashboard(userId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
   const supabase = useSupabase()
 
-  const req = await supabase.functions.invoke('get_dashboard', {
+  const req = await supabase.functions.invoke('private/dashboard', {
     body: {
       userId,
       startDate,
@@ -185,9 +185,26 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
   })
   return (req.data || []) as appUsage[]
 }
-export async function getTotalStorage(userid?: string, app_id?: string): Promise<number> {
+
+export async function getTotaAppStorage(userid?: string, appid?: string): Promise<number> {
+  if (!userid)
+    return 0
+  if (!appid)
+    return getTotalStorage(userid)
   const { data, error } = await useSupabase()
-    .rpc('get_total_storage_size', { userid, appid: app_id })
+    .rpc('get_total_app_storage_size', { userid, appid })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || 0
+}
+
+export async function getTotalStorage(userid?: string): Promise<number> {
+  if (!userid)
+    return 0
+  const { data, error } = await useSupabase()
+    .rpc('get_total_storage_size', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -196,6 +213,8 @@ export async function getTotalStorage(userid?: string, app_id?: string): Promise
 }
 
 export async function isGoodPlan(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_good_plan_v4', { userid })
     .single()
@@ -219,6 +238,8 @@ export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['R
 }
 
 export async function isTrial(userid?: string): Promise<number> {
+  if (!userid)
+    return 0
   const { data, error } = await useSupabase()
     .rpc('is_trial', { userid })
     .single()
@@ -228,6 +249,8 @@ export async function isTrial(userid?: string): Promise<number> {
   return data || 0
 }
 export async function isAdmin(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_admin', { userid })
     .single()
@@ -238,6 +261,8 @@ export async function isAdmin(userid?: string): Promise<boolean> {
 }
 
 export async function isCanceled(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_canceled', { userid })
     .single()
@@ -248,6 +273,8 @@ export async function isCanceled(userid?: string): Promise<boolean> {
 }
 
 export async function isPaying(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_paying', { userid })
     .single()
@@ -267,6 +294,8 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
 }
 
 export async function isAllowedAction(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
   const { data, error } = await useSupabase()
     .rpc('is_allowed_action_user', { userid })
     .single()
@@ -277,6 +306,8 @@ export async function isAllowedAction(userid?: string): Promise<boolean> {
 }
 
 export async function getPlanUsagePercent(userid?: string): Promise<number> {
+  if (!userid)
+    return 0
   const { data, error } = await useSupabase()
     .rpc('get_plan_usage_percent', { userid })
     .single()
@@ -286,6 +317,13 @@ export async function getPlanUsagePercent(userid?: string): Promise<number> {
 }
 
 export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
+  if (!userid) {
+    return {
+      mau: 0,
+      bandwidth: 0,
+      storage: 0,
+    }
+  }
   const { data, error } = await useSupabase()
     .rpc('get_total_stats_v3', { userid })
     .single()
@@ -301,6 +339,8 @@ export async function getTotalStats(userid?: string): Promise<Database['public']
 }
 
 export async function getCurrentPlanName(userid?: string): Promise<string> {
+  if (!userid)
+    return 'Free'
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name', { userid })
     .single()

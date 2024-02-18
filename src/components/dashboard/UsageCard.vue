@@ -29,7 +29,7 @@ function sum(arr: number[]) {
 const total = computed(() => {
   // remove undefined values
   if (!props.accumulated)
-    return props.datas[props.datas.length - 1] as number
+    return props.datas[props.datas.length - 1] || 0 as number
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
   return sum(arrWithoutUndefined as number[])
@@ -47,7 +47,7 @@ const lastDayEvolution = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800" :class="{ 'h-[460px]': props.datas?.length }">
+  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
       <div class="flex flex-row">
         <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">

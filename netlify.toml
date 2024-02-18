@@ -3,7 +3,7 @@
 
 [build]
   publish = "dist"
-  command = "bun run build && bun generate:node_serverless"
+  command = "bun run build"
 
 [dev]
   framework = "vite"
@@ -51,7 +51,8 @@
   [headers.values]
     Content-Type = "application/manifest+json"
 
-# auto egde generate
+[functions]
+  deno_import_map = "./supabase/functions/import_map.json"
 
 [[edge_functions]]
   path = "/api-edge/channel_self"

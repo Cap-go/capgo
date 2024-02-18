@@ -520,6 +520,6 @@ onMounted(async () => {
 </template>
 
 <route lang="yaml">
-meta:
-  layout: settings
-    </route>
+  meta:
+    layout: settings
+      </route>

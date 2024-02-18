@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { BASE_URL, beforeEachTest, expectPopout, useSupabase } from './utils'
+import { BASE_URL, beforeEachTest, expectPopout, loginAsUser1, useSupabase } from './utils'
 
 test.beforeEach(beforeEachTest)
+test.beforeEach(loginAsUser1)
 test.describe.configure({ mode: 'serial' })
 
 test('test selectable disallow (no AB)', async ({ page }) => {
@@ -45,7 +46,7 @@ test('test selectable disallow (no AB)', async ({ page }) => {
   await page.waitForURL('**')
 
   // Check if the 'Minimal update version' is present
-  await expect(page.locator('div.px-4:nth-child(6) > dt:nth-child(1)')).toContainText('Minimal update version')
+  await expect(page.locator('#metadata-bundle')).toContainText('Minimal update version')
 
   // Check if the input is empty
   const inputValue = await page.$eval('input.block', el => (<HTMLInputElement>el).value)
@@ -118,7 +119,7 @@ test('test selectable disallow (with AB)', async ({ page }) => {
   await page.click('.cursor-pointer > div:nth-child(1) > span:nth-child(1)')
 
   // Check if the 'Minimal update version' is present
-  await expect(page.locator('div.px-4:nth-child(6) > dt:nth-child(1)')).toContainText('Minimal update version')
+  await expect(page.locator('#metadata-bundle')).toContainText('Minimal update version')
 
   // Check if the input is empty
   const inputValue = await page.$eval('input.block', el => (<HTMLInputElement>el).value)

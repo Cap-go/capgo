@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
-import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   kFab,
@@ -18,7 +17,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits(['done'])
 
-const route = useRoute()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
@@ -166,10 +164,6 @@ watchEffect(async () => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/app/home') {
-    if (typeof main.user === 'undefined')
-      return location.reload()
-  }
   await getKey()
 })
 </script>

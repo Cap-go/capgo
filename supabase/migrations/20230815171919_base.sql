@@ -1310,6 +1310,7 @@ CREATE TABLE "public"."deleted_account" (
 -- values (
 --   'clickhouse',
 --   'tcp://default:****@****.eu-central-1.aws.clickhouse.cloud:9440/default?connection_timeout=30s&ping_before_query=false&secure=true'
+--   'tcp://default:****@clickhouse2.capgo.app/default?connection_timeout=30s&ping_before_query=false&secure=false&compression=lz4' -- New clickhouse self hosted
 -- )
 -- returning key_id;
 
