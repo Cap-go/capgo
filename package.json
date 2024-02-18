@@ -100,7 +100,7 @@
     "@capgo/inappbrowser": "^1.3.3",
     "@capgo/native-audio": "^6.1.36",
     "@capgo/native-market": "^5.0.5",
-    "@capgo/s3-lite-client": "0.1.4",
+    "@capgo/s3-lite-client": "0.1.8",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
     "@formkit/themes": "1.5.9",
     "@formkit/vue": "1.5.9",
