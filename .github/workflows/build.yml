@@ -68,14 +68,6 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: supabase functions deploy
-      - name: Create Release Alpha
-        if: ${{ contains(github.ref, '-alpha.') }}
-        id: create_release_alpha
-        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
-      - name: Create Release Production
-        if: ${{ !contains(github.ref, '-alpha.') }}
-        id: create_release_prod
-        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
       - name: Deploy CF Worker
         run: bunx wrangler@latest deploy --name capgo_api
         if: ${{ !contains(github.ref, '-alpha.') }}
@@ -108,7 +100,14 @@ jobs:
           directory: dist
           branch: main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Create Release Alpha
+        if: ${{ contains(github.ref, '-alpha.') }}
+        id: create_release_alpha
+        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+      - name: Create Release Production
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        id: create_release_prod
+        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
   build_android:
     runs-on: ubuntu-latest
     steps:
