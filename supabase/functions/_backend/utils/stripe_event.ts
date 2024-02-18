@@ -10,23 +10,16 @@ export async function parseStripeEvent(c: Context, body: string, signature: stri
   const webhookKey = getEnv(c, 'STRIPE_WEBHOOK_SECRET')
   const stripe = new Stripe(secretKey, {
     apiVersion: '2023-10-16',
-    httpClient: Stripe.createFetchHttpClient(),
+    // httpClient: Stripe.createFetchHttpClient(),
   })
-  let receivedEvent
-  try {
-    receivedEvent = await stripe.webhooks.constructEventAsync(
+  
+  return stripe.webhooks.constructEventAsync(
       body,
       signature,
       webhookKey,
       undefined,
       Stripe.createSubtleCryptoProvider(),
     )
-  }
-  catch (err) {
-    console.log('Error parsing event', err)
-    return new Response(err.message, { status: 400 })
-  }
-  return receivedEvent
 }
 
 export function extractDataEvent(event: any): Database['public']['Tables']['stripe_info']['Insert'] {
