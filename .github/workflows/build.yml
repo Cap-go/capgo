@@ -88,26 +88,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Publish CF webapp
-        uses: cloudflare/pages-action@1
+      - name: Publish CF webapp PROD
         if: ${{ !contains(github.ref, '-alpha.') }}
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: capgo-webapp
-          directory: dist
-          branch: main
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        run: bunx wrangler@latest deploy pages deploy dist --project-name capgo-webapp --branch main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Publish CF webapp Alpha
-        uses: cloudflare/pages-action@1
         if: ${{ contains(github.ref, '-alpha.') }}
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: capgo-webapp-alpha
-          directory: dist
-          branch: main
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        run: bunx wrangler@latest deploy pages deploy dist --project-name capgo-webapp-alpha --branch main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   build_android:
     runs-on: ubuntu-latest
