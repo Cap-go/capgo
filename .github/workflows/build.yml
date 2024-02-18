@@ -62,7 +62,7 @@ jobs:
       #   if: ${{ contains(github.ref, '-alpha.') }}
       #   run: supabase db reset --linked
       - name: 🦤 Apply Supabase Migrations
-        run: supabase db push
+        run: supabase db push --include-all
       - name: 🆙 Update functions
         id: update_functions_prod
         env:
