@@ -12,14 +12,14 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
   })
-  
+
   return stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      webhookKey,
-      undefined,
-      Stripe.createSubtleCryptoProvider(),
-    )
+    body,
+    signature,
+    webhookKey,
+    undefined,
+    Stripe.createSubtleCryptoProvider(),
+  )
 }
 
 export function extractDataEvent(event: any): Database['public']['Tables']['stripe_info']['Insert'] {

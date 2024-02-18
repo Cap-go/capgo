@@ -16,7 +16,7 @@ app.post('/', async (c: Context) => {
     if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no secret found' }, 400)
 
-    const signature = c.req.raw.headers.get("stripe-signature")
+    const signature = c.req.raw.headers.get('stripe-signature')
     if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no signature' }, 400)
     // event.headers
@@ -24,7 +24,7 @@ app.post('/', async (c: Context) => {
     const stripeEvent = await parseStripeEvent(c, body, signature!)
     const stripeData = await extractDataEvent(stripeEvent)
     if (stripeData.customer_id === '')
-      return c.json({"error": 'no customer found', stripeData, stripeEvent, body}, 500)
+      return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
 
     // find email from user with customer_id
     const { error: dbError, data: user } = await supabaseAdmin(c)
