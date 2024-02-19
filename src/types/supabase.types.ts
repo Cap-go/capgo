@@ -476,7 +476,7 @@ export type Database = {
           }
         ]
       }
-      clickhouse_app_usage_tmp: {
+      clickhouse_app_usage: {
         Row: {
           app_id: string | null
           bandwidth: number | null
@@ -1502,6 +1502,22 @@ export type Database = {
           role: string
         }[]
       }
+      get_orgs_v3: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          gid: string
+          created_by: string
+          logo: string
+          name: string
+          role: string
+          paying: boolean
+          trial_left: number
+          can_use_more: boolean
+          is_canceled: boolean
+        }[]
+      }
       get_plan_usage_percent:
         | {
             Args: Record<PropertyKey, never>
@@ -1640,6 +1656,13 @@ export type Database = {
           failed_updates: number
           open_app: number
         }[]
+      }
+      has_app_right: {
+        Args: {
+          appid: string
+          right: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: boolean
       }
       has_min_right: {
         Args: {
@@ -1922,6 +1945,10 @@ export type Database = {
         Returns: number[]
       }
       process_requested_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
