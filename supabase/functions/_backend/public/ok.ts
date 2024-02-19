@@ -19,10 +19,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
 app.get('/', async (c: Context) => {
   try {
-    const body = await c.req.json<any>()
-    // const apikey = c.get('apikey')
-    console.log('body', body)
-    // console.log('apikey', apikey)
     return c.json(BRES)
   }
   catch (e) {
