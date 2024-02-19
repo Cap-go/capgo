@@ -68,7 +68,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       // This is needed for the "banner"
       const org = organizations.find(org => org.created_by === app.user_id)
       if (!org) {
-        console.error(`Cannot find organization for app ${app}`)
+        console.error(`Cannot find organization for app`, app)
         return
       }
 
