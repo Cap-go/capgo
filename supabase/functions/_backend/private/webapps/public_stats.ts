@@ -9,7 +9,7 @@ export const app = new Hono()
 
 app.use('/', useCors)
 
-app.post('/', async (c: Context) => {
+app.get('/', async (c: Context) => {
   try {
     const date_id = new Date().toISOString().slice(0, 10)
     const { data, error } = await supabaseAdmin(c)
