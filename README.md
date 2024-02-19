@@ -26,6 +26,7 @@
 <p align='center'>
 <a href="https://capgo.app/">Capgo - Instant updates for capacitor</a>
 </p>
+<h2><a href="https://capgo.app/consulting/">Hire a Capacitor consultant</a></h2>
 
 <br>
 
