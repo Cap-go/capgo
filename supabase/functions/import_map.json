@@ -19,7 +19,7 @@
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3?target=deno",
     "crypto-random-string": "https://esm.sh/crypto-random-string@5.0.0?target=deno",
     "semver": "https://esm.sh/semver@7.6.0?target=deno",
-    "postgres": "https://deno.land/x/postgresjs/mod.js",
+    "postgres": "https://deno.land/x/postgresjs@v3.4.3/mod.js",
     "lauqe": "https://deno.land/x/equal@v1.5.0/mod.ts",
     "adm-zip": "https://esm.sh/adm-zip@0.5.10?target=deno",
     "google-play-scraper": "https://esm.sh/google-play-scraper@10.0.0?target=deno",
