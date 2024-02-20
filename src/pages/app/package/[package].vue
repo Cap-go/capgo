@@ -7,7 +7,7 @@ import Spinner from '~/components/Spinner.vue'
 import type { Stat } from '~/components/comp_def'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
-import Usage from '~/components/dashboard/Usage.vue'
+// import Usage from '~/components/dashboard/Usage.vue'
 import type { Database } from '~/types/supabase.types'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
