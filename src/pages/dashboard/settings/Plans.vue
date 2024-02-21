@@ -81,11 +81,16 @@ async function openChangePlan(planId: string, index: number) {
 }
 
 function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
-  return plan[t === 'm' ? 'price_m' : 'price_y']
+  if (t === 'm' || plan.price_y === plan.price_m)
+    return plan['price_m']
+  else {
+    const p = plan.price_y
+    return + (p / 12).toFixed(0)
+  }
 }
 
-function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row']): boolean {
-  return plan.price_y !== plan.price_m
+function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): boolean {
+  return plan.price_y !== plan.price_m && t === 'y'
 }
 
 function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
@@ -244,9 +249,8 @@ const hightLights = computed<Stat[]>(() => ([
             </p>
             <p class="mt-8">
               <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
-              <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ isYearlyPlan(p) ? 'yr' : 'mo' }}</span>
+              <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
-            <span v-if="isYearlyPlan(p)" class="text-md ml-3 rounded-full bg-emerald-500 px-1.5 font-semibold text-white"> {{ getSale(p) }} </span>
             <button
               v-if="p.stripe_id !== 'free'"
               :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
@@ -266,6 +270,9 @@ const hightLights = computed<Stat[]>(() => ([
               </svg>
               {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
+            <p class="mt-8"  v-if="isYearlyPlan(p, segmentVal)">
+              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} €{{ p['price_y']}}</span>
+            </p>
           </div>
           <div class="px-6 pt-6 pb-8">
             <h3 class="text-xs font-medium tracking-wide text-gray-900 uppercase dark:text-white">

@@ -49,6 +49,7 @@ back-to-login-page: Kembali ke halaman login
 base: Basis
 best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
+billed-annually-at: Ditagih setiap tahun pada
 billing: Penagihan
 build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
 build-your-code-and-: Unggah ke Capgo kode Anda
@@ -202,6 +203,7 @@ making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
 mau: Pengguna aktif bulanan
+mo: bulan
 module-heading: Modul
 monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan

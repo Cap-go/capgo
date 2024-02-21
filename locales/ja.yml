@@ -49,6 +49,7 @@ back-to-login-page: ログインページに戻る
 base: ベース
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
+billed-annually-at: 毎年請求されます
 billing: 請求する
 build-your-app-and-s: アプリをビルドして同期する
 build-your-code-and-: コードを Capgo にアップロードする
@@ -192,6 +193,7 @@ make-default-ios: iOSのデフォルトにする
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 mau: 月間アクティブ ユーザー数
+mo: 月
 module-heading: モジュール
 monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数

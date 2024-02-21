@@ -51,6 +51,7 @@ back-to-login-page: Voltar para a página de login
 base: Base
 best-plan: melhor plano
 bigger-app-size: Tamanho maior do aplicativo
+billed-annually-at: Faturado anualmente em
 billing: Cobrança
 build-your-app-and-s: crie seu aplicativo e sincronize
 build-your-code-and-: Envie para o Capgo seu código
@@ -198,6 +199,7 @@ making-this-channel-: >-
   Tornar este canal "normal" exigirá que você configure um outro padrão de canal
   ou deixe o dispositivo auto-atribuído.
 mau: Usuários ativos mensais
+mo: m
 module-heading: Módulos
 monthly: Por mês
 monthly-active-users: Usuários ativos mensais

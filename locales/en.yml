@@ -69,6 +69,7 @@ back-to-login-page: Back to login page
 base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
+billed-annually-at: Billed annually at
 billing: Billing
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
@@ -271,6 +272,7 @@ min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured
 misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
+mo: mo
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
