@@ -51,19 +51,21 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
   if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/track`
-  return await ky.post(url, {
-    json: {
-      email,
-      event,
-      data: shallowCleanObject(data),
-    },
-    headers: getConfigHeaders(c),
-  })
-    .then(res => res.json())
-    .catch((e) => {
-      console.log('trackEvent error', e)
-      return { data: { error: e } }
+  try {
+    const res = await ky.post(url, {
+      json: {
+        email,
+        event,
+        data: shallowCleanObject(data),
+      },
+      headers: getConfigHeaders(c),
     })
+      .then(res => res.json())
+    console.log('trackEvent', email, event, res)
+    return res
+  } catch (e) {
+    console.log('trackEvent error', e)
+  }
 }
 
 export async function addContact(c: Context, email: string, data: any) {
@@ -76,15 +78,17 @@ export async function addContact(c: Context, email: string, data: any) {
     data: shallowCleanObject(data),
   }
   console.log('addContact', email)
-  return await ky.post(url, {
-    json: payload,
-    headers: getConfigHeaders(c),
-  })
-    .then(res => res.json())
-    .catch((e) => {
-      console.log('addContact error', e)
-      return { data: { error: e } }
+  try {
+    const res = await ky.post(url, {
+      json: payload,
+      headers: getConfigHeaders(c),
     })
+      .then(res => res.json())
+    console.log('addContact', email, res)
+    return res
+  } catch (e) {
+    console.log('addContact error', e)
+  }
 }
 
 export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
@@ -96,17 +100,20 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
   if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/send`
-  return await ky.post(url, {
-    json: {
-      to,
-      subject,
-      body,
-    },
-    headers: getConfigHeaders(c),
-  })
-    .then(res => res.json())
-    .catch((e) => {
-      console.log('trackEvent error', e)
-      return { data: { error: e } }
+  try {
+    const res = await ky.post(url, {
+      json: {
+        to,
+        subject,
+        body,
+      },
+      headers: getConfigHeaders(c),
     })
+      .then(res => res.json())
+    console.log('sendEmail', to, subject, res)
+    return res
+  }
+  catch (e) {
+    console.log('sendEmail error', e)
+  }
 }
