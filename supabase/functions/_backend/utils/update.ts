@@ -623,7 +623,7 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    await c.json([{
+    await sendStats(c, [{
       ...stat,
       action: 'get',
     }])
