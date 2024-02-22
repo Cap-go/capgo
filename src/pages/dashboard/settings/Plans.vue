@@ -249,7 +249,7 @@ const hightLights = computed<Stat[]>(() => ([
               {{ t(convertKey(p.description)) }}
             </p>
             <p class="mt-8">
-              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">€{{ getPrice(p, segmentVal) }}</span>
+              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">${{ getPrice(p, segmentVal) }}</span>
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
             <button
@@ -272,7 +272,7 @@ const hightLights = computed<Stat[]>(() => ([
               {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-8">
-              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} €{{ p.price_y }}</span>
+              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} ${{ p.price_y }}</span>
             </p>
           </div>
           <div class="px-6 pt-6 pb-8">
