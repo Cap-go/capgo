@@ -232,7 +232,7 @@ export const defaultGetBundleRes = [
 // export const setBundle = async (baseUrl: string) => {
 //   const url = `${baseUrl}/bundle`
 //   const response = await ky.post<typeof defaultGetBundleRes>(url, defaultSetBundleRes, {
-  // credentials: undefined,
+// credentials: undefined,
 //     params: {
 //       app_id: defaultAppId,
 //     },

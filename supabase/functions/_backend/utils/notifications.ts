@@ -13,7 +13,7 @@ interface EventData {
 async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, userId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
   console.log('send notif', eventName, email, color)
   const res = await trackEvent(c, email, eventData, eventName)
-  if(!res) {
+  if (!res) {
     console.log('trackEvent failed', eventName, email, eventData)
     return
   }

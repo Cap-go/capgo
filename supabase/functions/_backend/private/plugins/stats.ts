@@ -28,9 +28,8 @@ import { sendNotif } from '../../utils/notifications.ts'
 import { logsnag } from '../../utils/logsnag.ts'
 import { appIdToUrl } from '../../utils/conversion.ts'
 import { BRES } from '../../utils/hono.ts'
-import type { DeviceWithoutCreatedAt } from '../../utils/clickhouse.ts'
+import type { DeviceWithoutCreatedAt, StatsActions } from '../../utils/clickhouse.ts'
 import { sendStatsAndDevice } from '../../utils/clickhouse.ts'
-import type { StatsActions } from './../../utils/clickhouse.ts'
 
 const failActions = [
   'set_fail',

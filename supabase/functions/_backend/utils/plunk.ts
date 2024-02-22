@@ -63,11 +63,12 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
       .then(res => res.json())
     console.log('trackEvent', email, event, res)
     return res
-  } catch (e) {
+  }
+  catch (e) {
     console.log('trackEvent error', e)
     if (e.name === 'HTTPError') {
-      const errorJson = await e.response.json();
-      console.log('errorJson', errorJson);
+      const errorJson = await e.response.json()
+      console.log('errorJson', errorJson)
     }
     return false
   }
@@ -92,11 +93,12 @@ export async function addContact(c: Context, email: string, data: any) {
       .then(res => res.json())
     console.log('addContact', email, res)
     return res
-  } catch (e) {
+  }
+  catch (e) {
     console.log('addContact error', e)
     if (e.name === 'HTTPError') {
-      const errorJson = await e.response.json();
-      console.log('errorJson', errorJson);
+      const errorJson = await e.response.json()
+      console.log('errorJson', errorJson)
     }
     return false
   }
@@ -128,8 +130,8 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
   catch (e) {
     console.log('sendEmail error', e)
     if (e.name === 'HTTPError') {
-      const errorJson = await e.response.json();
-      console.log('errorJson', errorJson);
+      const errorJson = await e.response.json()
+      console.log('errorJson', errorJson)
     }
     return false
   }

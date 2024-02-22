@@ -57,7 +57,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         credentials: undefined,
         json: {
           category: categories[i],
-        }
+        },
       }, options))
     }
     if (appsToGetFramework?.length) {
@@ -67,7 +67,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           credentials: undefined,
           json: {
             appIds: appsBatch.map(app => app.app_id),
-          }
+          },
         }, options))
       }
     }
@@ -77,7 +77,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           credentials: undefined,
           json: {
             appId: appsToGetInfo[i],
-          }
+          },
         }, options))
       }
     }
@@ -92,7 +92,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           credentials: undefined,
           json: {
             appIds: appsSimilarBatch.map(app => app.app_id),
-          }
+          },
         }, options))
       }
     }
