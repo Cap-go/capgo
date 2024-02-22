@@ -81,11 +81,12 @@ async function openChangePlan(planId: string, index: number) {
 }
 
 function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
-  if (t === 'm' || plan.price_y === plan.price_m)
-    return plan['price_m']
+  if (t === 'm' || plan.price_y === plan.price_m) {
+    return plan.price_m
+  }
   else {
     const p = plan.price_y
-    return + (p / 12).toFixed(0)
+    return +(p / 12).toFixed(0)
   }
 }
 
@@ -93,9 +94,9 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
   return plan.price_y !== plan.price_m && t === 'y'
 }
 
-function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
-  return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
-}
+// function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
+//   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
+// }
 
 async function getUsages() {
   // get aapp_stats
@@ -270,8 +271,8 @@ const hightLights = computed<Stat[]>(() => ([
               </svg>
               {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
-            <p class="mt-8"  v-if="isYearlyPlan(p, segmentVal)">
-              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} €{{ p['price_y']}}</span>
+            <p v-if="isYearlyPlan(p, segmentVal)" class="mt-8">
+              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} €{{ p.price_y }}</span>
             </p>
           </div>
           <div class="px-6 pt-6 pb-8">

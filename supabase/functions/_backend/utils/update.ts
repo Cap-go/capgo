@@ -1,18 +1,12 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
 import type { Context } from 'hono'
-
 import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
-
-// do_not_change
 import { and, eq, or, sql } from 'drizzle-orm'
-
 import { alias as alias_postgres } from 'drizzle-orm/pg-core'
-
-// do_not_change
 import postgres from 'postgres'
 import { getEnv } from './utils.ts'
-import { isAllowedAction, sendDevice, sendStats } from './supabase.ts'
+import { isAllowedAction } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
 import { sendNotif } from './notifications.ts'
@@ -21,8 +15,8 @@ import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
 
 import * as schema_postgres from './postgress_schema.ts'
-
-// do_not_change
+import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
+import { sendStatsAndDevice } from './clickhouse.ts'
 
 let globalPgClient = null as ReturnType<typeof postgres> | null
 
@@ -316,14 +310,18 @@ export async function update(c: Context, body: AppInfos) {
 
     console.log(id, 'vals', platform, app_id, device_id, custom_id, version_build, is_emulator, is_prod, plugin_version, version_name, new Date().toISOString())
 
-    const stat: Database['public']['Tables']['stats']['Insert'] = {
-      created_at: new Date().toISOString(),
-      platform: platform as Database['public']['Enums']['platform_os'],
-      device_id,
-      action: 'get',
+    const device: DeviceWithoutCreatedAt = {
       app_id,
-      version_build,
+      device_id,
+      plugin_version,
       version: 0,
+      custom_id,
+      is_emulator,
+      is_prod,
+      version_build,
+      os_version: version_os,
+      platform: platform as Database['public']['Enums']['platform_os'],
+      updated_at: new Date().toISOString(),
     }
 
     const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, alias, drizzleCient, schema)
@@ -340,17 +338,9 @@ export async function update(c: Context, body: AppInfos) {
 
     if (!channelData && !channelOverride && !devicesOverride) {
       console.log(id, 'Cannot get channel or override', app_id, 'no default channel', new Date().toISOString())
-      if (versionData) {
-        await Promise.all([sendDevice(c, {
-          app_id,
-          device_id,
-          version: versionData.id,
-        }), sendStats(c, [{
-          ...stat,
-          action: 'NoChannelOrOverride',
-          version: versionData.id,
-        }])])
-      }
+      if (versionData)
+        await sendStatsAndDevice(c, device, [{ action: 'NoChannelOrOverride', versionId: versionData.id }])
+
       return c.json({
         message: 'no default channel or override',
         error: 'no_channel',
@@ -379,7 +369,7 @@ export async function update(c: Context, body: AppInfos) {
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
     const planValid = await isAllowedAction(c, appOwner.user_id)
-    stat.version = versionData ? versionData.id : version.id
+    device.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
@@ -416,28 +406,10 @@ export async function update(c: Context, body: AppInfos) {
     //     error: 'invalid_ip',
     //   }, 400)
     // }
-    const device: Database['public']['Tables']['devices']['Insert'] = {
-      created_at: new Date().toISOString(),
-      app_id,
-      device_id,
-      platform: platform as Database['public']['Enums']['platform_os'],
-      plugin_version,
-      version: stat.version,
-      os_version: version_os,
-      is_emulator,
-      is_prod,
-      custom_id,
-      version_build,
-      updated_at: new Date().toISOString(),
-    }
-    await sendDevice(c, device)
 
     if (!planValid) {
       console.log(id, 'Cannot update, upgrade plan to continue to update', app_id)
-      await sendStats(c, [{
-        ...stat,
-        action: 'needPlanUpgrade',
-      }])
+      await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
       return c.json({
         message: 'Cannot update, upgrade plan to continue to update',
         error: 'need_plan_upgrade',
@@ -446,10 +418,7 @@ export async function update(c: Context, body: AppInfos) {
 
     if (!version.bucket_id && !version.external_url) {
       console.log(id, 'Cannot get bundle', app_id, version)
-      await sendStats(c, [{
-        ...stat,
-        action: 'missingBundle',
-      }])
+      await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
         message: 'Cannot get bundle',
         error: 'no_bundle',
@@ -465,10 +434,7 @@ export async function update(c: Context, body: AppInfos) {
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
     if (version_name === version.name) {
       console.log(id, 'No new version available', device_id, version_name, version.name, new Date().toISOString())
-      await sendStats(c, [{
-        ...stat,
-        action: 'noNew',
-      }])
+      await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
       return c.json({
         message: 'No new version available',
       }, 200)
@@ -478,10 +444,7 @@ export async function update(c: Context, body: AppInfos) {
     // console.log('check disableAutoUpdateToMajor', device_id)
       if (!channelData.channels.ios && platform === 'ios') {
         console.log(id, 'Cannot update, ios is disabled', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disablePlatformIos',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disablePlatformIos' }])
         return c.json({
           message: 'Cannot update, ios it\'s disabled',
           error: 'disabled_platform_ios',
@@ -491,10 +454,7 @@ export async function update(c: Context, body: AppInfos) {
       }
       if (!channelData.channels.android && platform === 'android') {
         console.log(id, 'Cannot update, android is disabled', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disablePlatformAndroid',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disablePlatformAndroid' }])
         console.log(id, 'sendStats', new Date().toISOString())
         return c.json({
           message: 'Cannot update, android is disabled',
@@ -505,10 +465,7 @@ export async function update(c: Context, body: AppInfos) {
       }
       if (channelData.channels.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disableAutoUpdateToMajor',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
           major: true,
           message: 'Cannot upgrade major version',
@@ -520,10 +477,7 @@ export async function update(c: Context, body: AppInfos) {
 
       if (channelData.channels.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disableAutoUpdateToMinor',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
           major: true,
           message: 'Cannot upgrade minor version',
@@ -539,10 +493,7 @@ export async function update(c: Context, body: AppInfos) {
         // The channel is misconfigured
         if (minUpdateVersion === null) {
           console.log(id, 'Channel is misconfigured', channelData.channels.name, new Date().toISOString())
-          await sendStats(c, [{
-            ...stat,
-            action: 'channelMisconfigured',
-          }])
+          await sendStatsAndDevice(c, device, [{ action: 'channelMisconfigured' }])
           return c.json({
             message: `Channel ${channelData.channels.name} is misconfigured`,
             error: 'misconfigured_channel',
@@ -554,10 +505,7 @@ export async function update(c: Context, body: AppInfos) {
         // Check if the minVersion is greater then the current version
         if (semver.gt(minUpdateVersion, version_name)) {
           console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name, new Date().toISOString())
-          await sendStats(c, [{
-            ...stat,
-            action: 'disableAutoUpdateMetadata',
-          }])
+          await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata' }])
           return c.json({
             major: true,
             message: 'Cannot upgrade version, min update version > current version',
@@ -571,10 +519,7 @@ export async function update(c: Context, body: AppInfos) {
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
       if (channelData.channels.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
         console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disableAutoUpdateUnderNative',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
         return c.json({
           message: 'Cannot revert under native version',
           error: 'disable_auto_update_under_native',
@@ -585,10 +530,7 @@ export async function update(c: Context, body: AppInfos) {
 
       if (!channelData.channels.allow_dev && !is_prod) {
         console.log(id, 'Cannot update dev build is disabled', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disableDevBuild',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild' }])
         return c.json({
           message: 'Cannot update, dev build is disabled',
           error: 'disable_dev_build',
@@ -598,10 +540,7 @@ export async function update(c: Context, body: AppInfos) {
       }
       if (!channelData.channels.allow_emulator && is_emulator) {
         console.log(id, 'Cannot update emulator is disabled', device_id, new Date().toISOString())
-        await sendStats(c, [{
-          ...stat,
-          action: 'disableEmulator',
-        }])
+        await sendStatsAndDevice(c, device, [{ action: 'disableEmulator' }])
         return c.json({
           message: 'Cannot update, emulator is disabled',
           error: 'disable_emulator',
@@ -613,20 +552,14 @@ export async function update(c: Context, body: AppInfos) {
     //  check signedURL and if it's url
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id, new Date().toISOString())
-      await sendStats(c, [{
-        ...stat,
-        action: 'cannotGetBundle',
-      }])
+      await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
         message: 'Cannot get bundle',
         error: 'no_bundle',
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    await c.json([{
-      ...stat,
-      action: 'get',
-    }])
+    await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
     return c.json(resToVersion(plugin_version, signedURL, version as any), 200)
   }

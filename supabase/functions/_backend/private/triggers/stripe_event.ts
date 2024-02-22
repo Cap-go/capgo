@@ -80,7 +80,7 @@ app.post('/', async (c: Context) => {
           return c.json({ error: JSON.stringify(dbError) }, 500)
 
         const isMonthly = plan.price_m_id === stripeData.price_id
-        const segment = await customerToSegment(c, user.id, customer, plan)
+        const segment = await customerToSegment(c, user.id, stripeData.price_id, plan)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
         await addDataContact(c, user.email, userData, segment)
         await trackEvent(c, user.email, { plan: plan.name }, eventName)
@@ -94,14 +94,14 @@ app.post('/', async (c: Context) => {
         }).catch()
       }
       else {
-        const segment = await customerToSegment(c, user.id, customer)
+        const segment = await customerToSegment(c, user.id, stripeData.price_id)
         await addDataContact(c, user.email, userData, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
-        const segment = await customerToSegment(c, user.id, customer)
+        const segment = await customerToSegment(c, user.id, 'free')
         await addDataContact(c, user.email, userData, segment)
         await trackEvent(c, user.email, {}, 'user:cancel')
         await LogSnag.track({
@@ -123,7 +123,7 @@ app.post('/', async (c: Context) => {
       }
     }
     else {
-      const segment = await customerToSegment(c, user.id, customer)
+      const segment = await customerToSegment(c, user.id, 'free')
       await addDataContact(c, user.email, userData, segment)
     }
 

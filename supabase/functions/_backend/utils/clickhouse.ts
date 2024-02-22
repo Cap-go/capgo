@@ -3,6 +3,8 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 
+export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
+
 export function isClickHouseEnabled(c: Context) {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
   return !!clickHouseURL(c)
@@ -107,30 +109,69 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
     .catch(e => console.log('sendMetaToClickHouse error', e))
 }
 
-export function sendLogToClickHouse(c: Context, logs: Database['public']['Tables']['stats']['Insert'][]) {
+// Function to create the query string for each table
+function createInsertQuery(tableName: string) {
+  return `INSERT INTO ${tableName} FORMAT JSONEachRow SETTINGS async_insert=1, wait_for_async_insert=0`
+}
+
+export interface StatsActions {
+  action: string
+  versionId?: number
+}
+
+export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
 
-  // make log a string with a newline between each log
-  const logReady = logs
-    .map(convertAllDatesToCH)
-    .map(l => JSON.stringify(l)).join('\n')
-  console.log('sending log to Clickhouse', logReady)
+  // Prepare the device data for insertion
+  const deviceData = convertAllDatesToCH({ ...device, updated_at: new Date().toISOString() })
+  const deviceReady = JSON.stringify(deviceData)
+
+  // Prepare the stats data for insertion
+  const statsData = statsActions.map(({ action, versionId }) => {
+    const stat: Database['public']['Tables']['stats']['Insert'] = {
+      created_at: new Date().toISOString(),
+      device_id: device.device_id,
+      action,
+      app_id: device.app_id,
+      version_build: device.version_build,
+      version: versionId || device.version, // Use the provided versionId if available
+      platform: device.platform,
+    }
+    return JSON.stringify(convertAllDatesToCH(stat))
+  }).join('\n')
+
+  // Prepare the daily_device data for insertion
+  const dailyDeviceReady = JSON.stringify({
+    device_id: device.device_id,
+    date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
+  })
+
+  // Combine all data sets into one payload, separated by semicolons and newlines
+  const combinedData = `${deviceReady}\n;\n${statsData}\n;\n${dailyDeviceReady}`
+
+  // Construct the combined query using the createInsertQuery function
+  const combinedQuery = [
+    createInsertQuery('devices'),
+    createInsertQuery('logs'),
+    createInsertQuery('daily_device'),
+  ].join('; ')
+
+  // Perform the fetch with a single request
   return fetch(
-    `${clickHouseURL(c)}/?query=INSERT INTO logs SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
-    {
-      method: 'POST',
-      // add created_at: new Date().toISOString() to each log
-      body: logReady,
-      headers: clickhouseAuthEnabled(c)
-        ? {
-            'Authorization': clickHouseAuth(c),
-            'Content-Type': 'text/plain',
-          }
-        : { 'Content-Type': 'text/plain' },
-    },
+      `${clickHouseURL(c)}/?query=${combinedQuery}`,
+      {
+        method: 'POST',
+        body: combinedData,
+        headers: clickhouseAuthEnabled(c)
+          ? {
+              'Authorization': clickHouseAuth(c),
+              'Content-Type': 'text/plain',
+            }
+          : { 'Content-Type': 'text/plain' },
+      },
   )
     .then(res => res.text())
-    .then(data => console.log('sendLogToClickHouse', data))
-    .catch(e => console.log('sendLogToClickHouse error', e))
+    .then(data => console.log('sendStatsAndDevice', data))
+    .catch(e => console.log('sendStatsAndDevice error', e))
 }

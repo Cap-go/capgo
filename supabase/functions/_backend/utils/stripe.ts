@@ -1,5 +1,4 @@
 import ky from 'ky'
-
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
 
@@ -107,6 +106,14 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   return response.json()
 }
 
+export interface StripeCustomer {
+  id: string
+  email: string
+  name: string
+  metadata: {
+    user_id: string
+  }
+}
 export async function createCustomer(c: Context, email: string, userId: string, name: string) {
   const config = getConfigHeaders(c, true)
   const customerData = {
@@ -116,7 +123,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   const data = new URLSearchParams(customerData as any)
   data.append('metadata[user_id]', userId)
   const response = await ky.post('https://api.stripe.com/v1/customers', { body: data, headers: config })
-  return response.json()
+  return response.json<StripeCustomer>()
 }
 
 export async function setTreshold(c: Context, subscriptionId: string) {

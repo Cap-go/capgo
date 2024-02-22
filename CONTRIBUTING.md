@@ -9,10 +9,7 @@ All types of contributions are encouraged and valued. Please make sure to read t
 
 This project uses a custom test runner located in [tests_backend](https://github.com/Cap-go/capgo/tree/main/tests_backend).
 There exists some requirements to run the tests:
- * Have minio running (see `tests_backend/gh_actions` for referance) For testing the CLI this is not enough, you have to set up the `MINIO_URL` variable. In linux you can use 
- ```sh
- export MINIO_URL=$(docker inspect minio1 | grep 'Gateway' | head -n 1 | sed -e 's/            "Gateway": "//g' | sed -e 's/",//g')
- ```
+ * Have minio running (see `tests_backend/gh_actions` for referance)
  * Having `bun` installed (Only for CLI tests)
  * Having the [supabase cli](https://supabase.com/docs/guides/cli) installed
  * Having a running supabase (`supabase start`)

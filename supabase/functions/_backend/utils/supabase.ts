@@ -7,7 +7,7 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
-import { isClickHouseEnabled, sendDeviceToClickHouse, sendLogToClickHouse } from './clickhouse.ts'
+import { sendStatsAndDevice } from './clickhouse.ts'
 
 // Import Supabase client
 
@@ -281,16 +281,6 @@ export async function updateDeviceCustomId(c: Context, auth: string, appId: stri
   console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
 
   const client = supabaseClient(c, auth)
-  await client
-    .from('devices')
-    .update({ custom_id: customId })
-    .eq('app_id', appId)
-    .eq('device_id', deviceId)
-    // TODO: to remove if we go 100% clickhouse
-  if (!isClickHouseEnabled(c)) {
-    // update the device custom_id
-    return
-  }
   const reqOwner = await client
     .rpc('has_app_right', { appid: appId, right: 'write' })
     .then(res => res.data || false)
@@ -315,10 +305,10 @@ export async function updateDeviceCustomId(c: Context, auth: string, appId: stri
   if (!device)
     return Promise.reject(new Error('device not found'))
     // send the device to clickhouse
-  return sendDeviceToClickHouse(c, [{
+  return sendStatsAndDevice(c, {
     ...device,
     custom_id: customId,
-  }])
+  }, [{ action: 'setCustomId' }])
 }
 
 export async function getSDashboard(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
@@ -344,7 +334,7 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
 
   client = supabaseAdmin(c)
 
-  console.log('tableName', tableName)
+  // console.log('tableName', tableName)
   let req = client
     .from('clickhouse_app_usage_parm')
     .select()
@@ -388,39 +378,35 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
-  let tableName: 'devices' | 'clickhouse_devices' = 'devices'
   let client = supabaseClient(c, auth)
   if (!auth)
     client = supabaseAdmin(c)
 
-  if (isClickHouseEnabled(c)) {
-    tableName = 'clickhouse_devices'
-    const reqOwner = await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then((r) => {
-        console.log(r)
-        return r
-      })
+  const reqOwner = await client
+    .rpc('has_app_right', { appid: appId, right: 'read' })
+    .then((r) => {
+      console.log(r)
+      return r
+    })
+    .then(res => res.data || false)
+  if (!reqOwner) {
+    const reqAdmin = await client
+      .rpc('is_admin')
       .then(res => res.data || false)
-    if (!reqOwner) {
-      const reqAdmin = await client
-        .rpc('is_admin')
-        .then(res => res.data || false)
-      if (!reqAdmin)
-        return Promise.reject(new Error('not allowed'))
-    }
-    client = supabaseAdmin(c)
+    if (!reqAdmin)
+      return Promise.reject(new Error('not allowed'))
   }
+  client = supabaseAdmin(c)
 
   const reqCount = count
     ? client
-      .from(tableName)
+      .from('clickhouse_devices')
       .select('', { count: 'exact', head: true })
       .eq('app_id', appId)
       .then(res => res.count || 0)
     : 0
   let req = client
-    .from(tableName)
+    .from('clickhouse_devices')
     .select()
     .eq('app_id', appId)
 
@@ -477,37 +463,33 @@ export async function getSStats(c: Context, auth: string, appId: string, deviceI
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
-  let tableName: 'stats' | 'clickhouse_logs' = 'stats'
   let client = supabaseClient(c, auth)
   if (!auth)
     client = supabaseAdmin(c)
 
-  if (isClickHouseEnabled(c)) {
-    tableName = 'clickhouse_logs'
-    const reqOwner = auth
-      ? (await client
-          .rpc('has_app_right', { appid: appId, right: 'read' })
-          .then(res => res.data || false))
-      : true
-    if (!reqOwner) {
-      const reqAdmin = await client
-        .rpc('is_admin')
-        .then(res => res.data || false)
-      if (!reqAdmin)
-        return Promise.reject(new Error('not allowed'))
-    }
-    client = supabaseAdmin(c)
+  const reqOwner = auth
+    ? (await client
+        .rpc('has_app_right', { appid: appId, right: 'read' })
+        .then(res => res.data || false))
+    : true
+  if (!reqOwner) {
+    const reqAdmin = await client
+      .rpc('is_admin')
+      .then(res => res.data || false)
+    if (!reqAdmin)
+      return Promise.reject(new Error('not allowed'))
   }
+  client = supabaseAdmin(c)
 
   const reqCount = count
     ? client
-      .from(tableName)
+      .from('clickhouse_logs')
       .select('', { count: 'exact', head: true })
       .eq('app_id', appId)
       .then(res => res.count || 0)
     : 0
   let req = client
-    .from(tableName)
+    .from('clickhouse_logs')
     .select(`
         device_id,
         action,
@@ -558,57 +540,6 @@ export async function getSStats(c: Context, auth: string, appId: string, deviceI
   //   // check the rights of the user
   //   return readLogInTinyBird(appId, deviceId, search, order, rangeStart, rangeEnd)
   // }
-}
-
-export function sendDevice(c: Context, device: Database['public']['Tables']['devices']['Update']) {
-  const deviceComplete: Database['public']['Tables']['devices']['Insert'] = {
-    updated_at: device.updated_at || new Date().toISOString(),
-    platform: device.platform as Database['public']['Enums']['platform_os'],
-    os_version: device.os_version as string,
-    version: device.version as number,
-    version_build: device.version_build as string,
-    device_id: device.device_id as string,
-    app_id: device.app_id as string,
-    plugin_version: device.plugin_version as string,
-    is_emulator: !!device.is_emulator,
-    is_prod: !!device.is_prod,
-    custom_id: device.custom_id as string,
-    created_at: device.created_at || new Date().toISOString(),
-  }
-  const all = []
-  if (isClickHouseEnabled(c))
-    all.push(sendDeviceToClickHouse(c, [deviceComplete]))
-  else
-    all.push(supabaseAdmin(c).from('devices').upsert(deviceComplete, { onConflict: 'device_id', ignoreDuplicates: false }))
-
-  return Promise.all(all)
-    .catch((e) => {
-      console.log('sendDevice error', e)
-    })
-}
-
-export function sendStats(c: Context, stats: Database['public']['Tables']['stats']['Update'][]) {
-  const all = []
-  for (const stat of stats) {
-    const statComplete: Database['public']['Tables']['stats']['Insert'] = {
-      created_at: stat.created_at || new Date().toISOString(),
-      device_id: stat.device_id as string,
-      action: stat.action as string,
-      app_id: stat.app_id as string,
-      version_build: stat.version_build as string,
-      version: stat.version as number,
-      platform: stat.platform as Database['public']['Enums']['platform_os'],
-    }
-    if (isClickHouseEnabled(c))
-      all.push(sendLogToClickHouse(c, [statComplete]))
-    else
-      all.push(supabaseAdmin(c).from('stats').insert(statComplete))
-  }
-
-  return Promise.all(all)
-    .catch((e) => {
-      console.log('sendDevice error', e)
-    })
 }
 
 export async function createApiKey(c: Context, userId: string) {
@@ -700,7 +631,7 @@ export async function saveStoreInfo(c: Context, apps: (Database['public']['Table
     console.error('saveStoreInfo error', error)
 }
 
-export async function customerToSegment(c: Context, userId: string, customer: Database['public']['Tables']['stripe_info']['Row'], plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+export async function customerToSegment(c: Context, userId: string, price_id: string, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
   const segments: Segments = {
     capgo: true,
     onboarded: await isOnboarded(c, userId),
@@ -709,7 +640,7 @@ export async function customerToSegment(c: Context, userId: string, customer: Da
     trial1: false,
     trial0: false,
     paying: false,
-    payingMonthly: plan?.price_m_id === customer.price_id,
+    payingMonthly: plan?.price_m_id === price_id,
     plan: plan?.name ?? '',
     overuse: false,
     canceled: await isCanceled(c, userId),
@@ -793,9 +724,9 @@ export async function createStripeCustomer(c: Context, user: Database['public'][
   const { data: plan } = await supabaseAdmin(c)
     .from('plans')
     .select()
-    .eq('stripe_id', customer.product_id)
+    .eq('stripe_id', customer.id)
     .single()
-  const segment = await customerToSegment(c, user.id, customer, plan)
+  const segment = await customerToSegment(c, user.id, 'free', plan)
   await addDataContact(c, user.email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })

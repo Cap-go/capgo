@@ -85,7 +85,6 @@ All official plugin are install and preconfigured
 ### Dev tools
 
 - [TypeScript](https://www.typescriptlang.org/)
-- [Cypress](https://cypress.io/) - E2E Testing
 - [bun](https://bun.sh/) - fast javascipt runtime, package manager, bundler, test runner an all-in-one toolkit
 - [critters](https://github.com/GoogleChromeLabs/critters) - Critical CSS
 - [Netlify](https://www.netlify.com/) - zero-config deployment
