@@ -1,5 +1,4 @@
 import ky from 'ky'
-
 import type { Context } from 'hono'
 import { getEnv, shallowCleanObject } from './utils.ts'
 
@@ -53,6 +52,7 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
   const url = `${baseUrl()}/v1/track`
   try {
     const res = await ky.post(url, {
+      credentials: undefined,
       json: {
         email,
         event,
@@ -65,6 +65,11 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
     return res
   } catch (e) {
     console.log('trackEvent error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json();
+      console.log('errorJson', errorJson);
+    }
+    return false
   }
 }
 
@@ -80,6 +85,7 @@ export async function addContact(c: Context, email: string, data: any) {
   console.log('addContact', email)
   try {
     const res = await ky.post(url, {
+      credentials: undefined,
       json: payload,
       headers: getConfigHeaders(c),
     })
@@ -88,6 +94,11 @@ export async function addContact(c: Context, email: string, data: any) {
     return res
   } catch (e) {
     console.log('addContact error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json();
+      console.log('errorJson', errorJson);
+    }
+    return false
   }
 }
 
@@ -102,6 +113,7 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
   const url = `${baseUrl()}/v1/send`
   try {
     const res = await ky.post(url, {
+      credentials: undefined,
       json: {
         to,
         subject,
@@ -115,5 +127,10 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
   }
   catch (e) {
     console.log('sendEmail error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json();
+      console.log('errorJson', errorJson);
+    }
+    return false
   }
 }

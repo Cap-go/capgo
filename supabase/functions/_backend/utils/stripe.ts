@@ -24,7 +24,7 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
     customer: customerId,
     return_url: callbackUrl,
   })
-  const response = await ky.post('https://api.stripe.com/v1/billing_portal/sessions', { body: data, headers: config })
+  const response = await ky.post('https://api.stripe.com/v1/billing_portal/sessions', { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
@@ -33,7 +33,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
   let priceId = null
   const meteredIds: string[] = []
   try {
-    const response = await ky.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), { headers: config })
+    const response = await ky.get(encodeURI(`https://api.stripe.com/v1/prices/search?query=product:"${planId}"`), { credentials: undefined, headers: config })
     const data = await response.json<any>()
     const prices = data.data
     console.log('prices stripe', prices)
@@ -103,7 +103,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     data.append(`line_items[${index + 1}][price]`, priceId)
   })
   console.log('data', data.toString())
-  const response = await ky.post('https://api.stripe.com/v1/checkout/sessions', { body: data, headers: config })
+  const response = await ky.post('https://api.stripe.com/v1/checkout/sessions', { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
@@ -115,7 +115,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   }
   const data = new URLSearchParams(customerData as any)
   data.append('metadata[user_id]', userId)
-  const response = await ky.post('https://api.stripe.com/v1/customers', { body: data, headers: config })
+  const response = await ky.post('https://api.stripe.com/v1/customers', { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
@@ -129,7 +129,7 @@ export async function setTreshold(c: Context, subscriptionId: string) {
     },
   }
   const data = new URLSearchParams(checkoutData as any)
-  const response = await ky.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { body: data, headers: config })
+  const response = await ky.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
@@ -140,7 +140,7 @@ export async function setBillingPeriod(c: Context, subscriptionId: string) {
     proration_behavior: 'create_prorations',
   }
   const data = new URLSearchParams(checkoutData as any)
-  const response = await ky.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { body: data, headers: config })
+  const response = await ky.post(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
@@ -153,7 +153,7 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
   const data = new URLSearchParams(customerData as any)
   data.append('metadata[user_id]', userId)
   data.append('metadata[email]', email)
-  const response = await ky.post(`https://api.stripe.com/v1/customers/${customerId}`, { body: data, headers: config })
+  const response = await ky.post(`https://api.stripe.com/v1/customers/${customerId}`, { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
@@ -164,13 +164,13 @@ export async function recordUsage(c: Context, subscriptionId: string, quantity: 
     action: 'set',
   }
   const data = new URLSearchParams(checkoutData as any)
-  const response = await ky.post(`https://api.stripe.com/v1/subscription_items/${subscriptionId}/usage_records`, { body: data, headers: config })
+  const response = await ky.post(`https://api.stripe.com/v1/subscription_items/${subscriptionId}/usage_records`, { credentials: undefined, body: data, headers: config })
   return response.json()
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
   const config = getConfigHeaders(c, true)
   console.log('removeOldSubscription', subscriptionId)
-  const response = await ky.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { headers: config })
+  const response = await ky.delete(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, { credentials: undefined, headers: config })
   return response.json()
 }
