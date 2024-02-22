@@ -14,3 +14,5 @@ INSERT INTO "logs" ("created_at", "platform", "action", "device_id", "version_bu
 INSERT INTO "logs" ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES (now64(6), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
 INSERT INTO "logs" ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES (now64(6), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
 INSERT INTO "logs" ("created_at", "platform", "action", "device_id", "version_build", "version", "app_id") VALUES (now64(6), 'android', 'get', '00009a6b-eefe-490a-9c60-8e965132ae51', '1.223.0', 9654, 'com.demo.app');
+
+INSERT INTO "daily_device" ("device_id", "date") VALUES ('00009a6b-eefe-490a-9c60-8e965132ae51', now()::date);

@@ -1,3 +1,12 @@
+CREATE TABLE IF NOT EXISTS daily_device
+(
+    device_id String,
+    date Date,
+    PRIMARY KEY (device_id, date)
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (device_id, date);
+
 CREATE TABLE IF NOT EXISTS devices
 (
     updated_at DateTime64(6),
