@@ -32,36 +32,42 @@ export function formatDateCH(date: string | undefined) {
 
 function getHeaders(c: Context) {
   return clickhouseAuthEnabled(c)
-  ? {
-      'Authorization': clickHouseAuth(c),
-      'Content-Type': 'text/plain',
-    }
-  : { 'Content-Type': 'text/plain' }
+    ? {
+        'Authorization': clickHouseAuth(c),
+        'Content-Type': 'text/plain',
+      }
+    : { 'Content-Type': 'text/plain' }
+}
+
+// Function to create the query string for each table
+function createInsertQuery(tableName: string) {
+  return `INSERT INTO ${tableName} SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`
 }
 
 async function sendClickHouse(c: Context, body: string, table: string) {
   try {
     console.log('sending to Clickhouse body', body)
     const searchParams = {
-      query: `INSERT INTO ${table} SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
-      http_write_exception_in_output_format: 1
+      query: createInsertQuery(table),
+      http_write_exception_in_output_format: 1,
     }
     console.log('sending to Clickhouse searchParams', searchParams)
-    const response = await ky.post(clickHouseURL(c), { 
-      credentials: undefined, 
+    const response = await ky.post(clickHouseURL(c), {
+      credentials: undefined,
       body,
       searchParams,
-      headers: getHeaders(c)
+      headers: getHeaders(c),
     })
-    .then(res => res.text())
+      .then(res => res.text())
     console.log('sendClickHouse ok', response)
     return response
-  } catch (e) {
+  }
+  catch (e) {
     console.log('sendClickHouse error', e)
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
       console.log('sendClickHouse errorJson', errorJson)
-    } 
+    }
     return e
   }
 }
@@ -114,11 +120,6 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
     .map(l => JSON.stringify(l)).join('\n')
 
   return sendClickHouse(c, metasReady, 'app_versions_meta')
-}
-
-// Function to create the query string for each table
-function createInsertQuery(tableName: string) {
-  return `INSERT INTO ${tableName} FORMAT JSONEachRow SETTINGS async_insert=1, wait_for_async_insert=0`
 }
 
 export interface StatsActions {
