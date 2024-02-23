@@ -175,14 +175,13 @@ function convertDataWithMeta(data: any[], meta: MetaInfo[]) {
   return data.map((d) => {
     const newObj: any = {}
     Object.entries(d)
-    .forEach(([key, value]) => {
-      const index = meta.findIndex((m) => m.name === key)
-      if (meta[index].type === 'UInt64' || meta[index].type === 'Int64' || meta[index].type === 'Int32' || meta[index].type === 'UInt32') {
-        newObj[key] = parseInt(value)
-      } else {
-        newObj[key] = value
-      }
-    })
+      .forEach(([key, value]) => {
+        const index = meta.findIndex(m => m.name === key)
+        if (meta[index].type === 'UInt64' || meta[index].type === 'Int64' || meta[index].type === 'Int32' || meta[index].type === 'UInt32')
+          newObj[key] = Number.parseInt(value)
+        else
+          newObj[key] = value
+      })
     return newObj
   })
 }

@@ -174,21 +174,22 @@ export interface appUsage {
   uninstall: number
 }
 export async function getAllDashboard(userId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
-
   const token = (await useSupabase().auth.getSession()).data.session?.access_token
   const data = await ky
-  .post(`${defaultApiHost}/private/dashboard`, { 
-    json: {
-      userId, startDate, endDate
-    }, 
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    } 
-  })
-  .then(res => res.json<appUsage[]>())
-  .catch(() => {
-    return []
-  })
+    .post(`${defaultApiHost}/private/dashboard`, {
+      json: {
+        userId,
+        startDate,
+        endDate,
+      },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    .then(res => res.json<appUsage[]>())
+    .catch(() => {
+      return []
+    })
   return data
 }
 
