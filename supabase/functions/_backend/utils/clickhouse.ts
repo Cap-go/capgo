@@ -152,6 +152,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   // Prepare the daily_device data for insertion
   const dailyDeviceReady = JSON.stringify({
     device_id: device.device_id,
+    app_id: device.app_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
   return Promise.all([

@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS daily_device
 (
     device_id String,
+    app_id String,
     date Date,
     PRIMARY KEY (device_id, date)
 ) ENGINE = MergeTree()
