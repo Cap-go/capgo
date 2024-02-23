@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import ky from 'ky'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
@@ -29,6 +30,42 @@ export function formatDateCH(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm:ss.000')
 }
 
+function getHeaders(c: Context) {
+  return clickhouseAuthEnabled(c)
+  ? {
+      'Authorization': clickHouseAuth(c),
+      'Content-Type': 'text/plain',
+    }
+  : { 'Content-Type': 'text/plain' }
+}
+
+async function sendClickHouse(c: Context, body: string, table: string) {
+  try {
+    console.log('sending to Clickhouse body', body)
+    const searchParams = {
+      query: `INSERT INTO ${table} SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
+      http_write_exception_in_output_format: 1
+    }
+    console.log('sending to Clickhouse searchParams', searchParams)
+    const response = await ky.post(clickHouseURL(c), { 
+      credentials: undefined, 
+      body,
+      searchParams,
+      headers: getHeaders(c)
+    })
+    .then(res => res.text())
+    console.log('sendClickHouse', response)
+    return response
+  } catch (e) {
+    console.log('sendClickHouse error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.log('sendClickHouse errorJson', errorJson)
+    } 
+    return e
+  }
+}
+
 export function convertAllDatesToCH(obj: any) {
   // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
   const datesFields = ['created_at', 'updated_at']
@@ -57,23 +94,7 @@ export function sendDeviceToClickHouse(c: Context, devices: Database['public']['
     .map(convertAllDatesToCH)
     .map(l => JSON.stringify(l)).join('\n')
   console.log('sending device to Clickhouse', devicesReady)
-  // http://127.0.0.1:8123/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow
-  return fetch(
-    `${clickHouseURL(c)}/?query=INSERT INTO devices SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
-    {
-      method: 'POST',
-      body: devicesReady,
-      headers: clickhouseAuthEnabled(c)
-        ? {
-            'Authorization': clickHouseAuth(c),
-            'Content-Type': 'text/plain',
-          }
-        : { 'Content-Type': 'text/plain' },
-    },
-  )
-    .then(res => res.text())
-    .then(data => console.log('sendDeviceToClickHouse', data))
-    .catch(e => console.log('sendDeviceToClickHouse error', e))
+  return sendClickHouse(c, devicesReady, 'devices')
 }
 
 interface ClickHouseMeta {
@@ -91,22 +112,8 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
   const metasReady = meta
     .map(convertAllDatesToCH)
     .map(l => JSON.stringify(l)).join('\n')
-  return fetch(
-      `${clickHouseURL(c)}/?query=INSERT INTO app_versions_meta SETTINGS async_insert=1, wait_for_async_insert=0 FORMAT JSONEachRow`,
-      {
-        method: 'POST',
-        body: metasReady,
-        headers: clickhouseAuthEnabled(c)
-          ? {
-              'Authorization': clickHouseAuth(c),
-              'Content-Type': 'text/plain',
-            }
-          : { 'Content-Type': 'text/plain' },
-      },
-  )
-    .then(res => res.text())
-    .then(data => console.log('sendMetaToClickHouse', data))
-    .catch(e => console.log('sendMetaToClickHouse error', e))
+
+  return sendClickHouse(c, metasReady, 'app_versions_meta')
 }
 
 // Function to create the query string for each table
@@ -146,32 +153,9 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     device_id: device.device_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
-
-  // Combine all data sets into one payload, separated by semicolons and newlines
-  const combinedData = `${deviceReady}\n;\n${statsData}\n;\n${dailyDeviceReady}`
-
-  // Construct the combined query using the createInsertQuery function
-  const combinedQuery = [
-    createInsertQuery('devices'),
-    createInsertQuery('logs'),
-    createInsertQuery('daily_device'),
-  ].join('; ')
-
-  // Perform the fetch with a single request
-  return fetch(
-      `${clickHouseURL(c)}/?query=${combinedQuery}`,
-      {
-        method: 'POST',
-        body: combinedData,
-        headers: clickhouseAuthEnabled(c)
-          ? {
-              'Authorization': clickHouseAuth(c),
-              'Content-Type': 'text/plain',
-            }
-          : { 'Content-Type': 'text/plain' },
-      },
-  )
-    .then(res => res.text())
-    .then(data => console.log('sendStatsAndDevice', data))
-    .catch(e => console.log('sendStatsAndDevice error', e))
+  return Promise.all([
+    sendClickHouse(c, deviceReady, 'devices'),
+    sendClickHouse(c, statsData, 'logs'),
+    sendClickHouse(c, dailyDeviceReady, 'daily_device'),
+  ])
 }
