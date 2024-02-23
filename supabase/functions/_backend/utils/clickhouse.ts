@@ -103,6 +103,78 @@ export function sendDeviceToClickHouse(c: Context, devices: Database['public']['
   return sendClickHouse(c, devicesReady, 'devices')
 }
 
+export interface AppActivity {
+  app_id: string
+  first_log_date: string // or Date if you prefer to work with Date objects
+  mau: number // The JSON has "mau" as a string, but the meta indicates it's a UInt64, so it should be a number
+}
+
+interface MetaInfo {
+  name: string
+  type: string
+}
+
+interface Statistics {
+  bytes_read: number
+  elapsed: number
+  rows_read: number
+}
+
+interface ApiResponse {
+  data: AppActivity[]
+  meta: MetaInfo[]
+  rows: number
+  statistics: Statistics
+}
+
+export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
+  const query = `WITH 
+  '${startDate}' AS start_period,
+  '${endDate}' AS end_period,
+  [${apps.join(',')}] AS app_id_list
+SELECT 
+  app_id,
+  COUNT(DISTINCT device_id) as mau,
+  first_log_date
+FROM 
+  (SELECT 
+      app_id,
+      device_id,
+      MIN(date) as first_log_date
+  FROM daily_device
+  WHERE 
+      date >= start_period AND 
+      date < end_period AND
+      app_id IN app_id_list
+  GROUP BY app_id, device_id) as first_logs
+GROUP BY app_id, first_log_date
+ORDER BY app_id, first_log_date FORMAT JSON`
+  try {
+    console.log('sending to Clickhouse body', query)
+    const searchParams = {
+      query,
+      http_write_exception_in_output_format: 1,
+    }
+    console.log('sending to Clickhouse searchParams', searchParams)
+    const response = await ky.post(clickHouseURL(c), {
+      credentials: undefined,
+      searchParams,
+      headers: getHeaders(c),
+    })
+      .then(res => res.json<ApiResponse>())
+    console.log('readMauFromClickHouse ok', response)
+    return response
+  }
+  catch (e) {
+    console.log('readMauFromClickHouse error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.log('readMauFromClickHouse errorJson', errorJson)
+    }
+    return { data: null, meta: null, rows: 0, statistics: null }
+  }
+}
+
 interface ClickHouseMeta {
   id: number
   app_id: string
