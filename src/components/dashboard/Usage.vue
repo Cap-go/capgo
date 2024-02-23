@@ -113,14 +113,14 @@ loadData()
     <UsageCard
       v-if="!isLoading && props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau"
-      :accumulated="false"
+      :accumulated="true"
       :title="`${t('montly-active')}`" unit="Users"
     />
     <UsageCard
       v-else-if="!isLoading && !props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
-      :datas="undefined"
-      :accumulated="false"
-      :title="`${t('montly-active')} ${t('tmp-disabled')}`" unit="Users"
+      :datas="datas.mau"
+      :accumulated="true"
+      :title="`${t('montly-active')}`" unit="Users"
     />
     <div
       v-else

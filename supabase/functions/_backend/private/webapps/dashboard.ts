@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { getSDashboard } from '../../utils/supabase.ts'
+import { getSDashboardV2 } from '../../utils/supabase.ts'
 import { useCors } from '../../utils/hono.ts'
 
 interface dataDevice {
@@ -18,7 +18,7 @@ app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<dataDevice>()
     console.log('body', body)
-    return c.json(await getSDashboard(c, c.req.header('authorization') || 'MISSING', body.userId, body.startDate, body.endDate, body.appId))
+    return c.json(await getSDashboardV2(c, c.req.header('authorization') || 'MISSING', body.userId, body.startDate, body.endDate, body.appId))
   }
   catch (e) {
     return c.json({ status: 'Cannot get dashboard', error: JSON.stringify(e) }, 500)

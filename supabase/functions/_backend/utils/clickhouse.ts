@@ -107,6 +107,9 @@ export interface AppActivity {
   app_id: string
   first_log_date: string // or Date if you prefer to work with Date objects
   mau: number // The JSON has "mau" as a string, but the meta indicates it's a UInt64, so it should be a number
+  bandwidth: number
+  storage_added: number
+  storage_deleted: number
 }
 
 interface MetaInfo {
@@ -127,29 +130,66 @@ interface ApiResponse {
   statistics: Statistics
 }
 
-export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
-  const query = `WITH 
-  '${startDate}' AS start_period,
-  '${endDate}' AS end_period,
-  [${apps.join(',')}] AS app_id_list
+function mauQuery(startDate: string, endDate: string, apps: string[]) {
+  const startDateFormatted = new Date(startDate).toISOString().split('T')[0]
+  const endDateFormatted = new Date(endDate).toISOString().split('T')[0]
+  const appsFormatted = apps.map(app => `'${app}'`).join(',')
+  console.log('mauQuery', startDateFormatted, endDateFormatted, appsFormatted)
+  return `WITH 
+  '${startDateFormatted}' AS start_period,
+  '${endDateFormatted}' AS end_period,
+  [${appsFormatted}] AS app_id_list
 SELECT 
-  app_id,
-  COUNT(DISTINCT device_id) as mau,
-  first_log_date
+  first_device_logs.app_id as app_id,
+  first_device_logs.first_log_date AS date,
+  COUNT(*) as mau,
+  SUM(logs_daily.bandwidth) AS bandwidth,
+  SUM(COALESCE(logs_daily.get, 0)) AS get,
+  SUM(COALESCE(logs_daily.fail, 0)) AS fail,
+  SUM(COALESCE(logs_daily.install, 0)) AS install,
+  SUM(COALESCE(logs_daily.uninstall, 0)) AS uninstall,
+  SUM(app_storage_daily.storage_added) AS storage_added,
+  SUM(app_storage_daily.storage_deleted) AS storage_deleted
 FROM 
   (SELECT 
-      app_id,
-      device_id,
-      MIN(date) as first_log_date
+      daily_device.app_id,
+      daily_device.device_id,
+      MIN(daily_device.date) as first_log_date
   FROM daily_device
   WHERE 
-      date >= start_period AND 
-      date < end_period AND
-      app_id IN app_id_list
-  GROUP BY app_id, device_id) as first_logs
-GROUP BY app_id, first_log_date
-ORDER BY app_id, first_log_date FORMAT JSON`
+      daily_device.date >= start_period AND 
+      daily_device.date < end_period AND
+      daily_device.app_id IN app_id_list
+  GROUP BY daily_device.app_id, daily_device.device_id) as first_device_logs
+LEFT JOIN logs_daily ON first_device_logs.app_id = logs_daily.app_id AND first_device_logs.first_log_date = logs_daily.date
+LEFT JOIN app_storage_daily ON first_device_logs.app_id = app_storage_daily.app_id AND first_device_logs.first_log_date = app_storage_daily.date
+GROUP BY 
+  first_device_logs.app_id, 
+  first_device_logs.first_log_date
+ORDER BY 
+  first_device_logs.app_id, 
+  first_device_logs.first_log_date FORMAT JSON`
+}
+
+function convertDataWithMeta(data: any[], meta: MetaInfo[]) {
+  return data.map((d) => {
+    const newObj: any = {}
+    Object.entries(d)
+    .forEach(([key, value]) => {
+      const index = meta.findIndex((m) => m.name === key)
+      if (meta[index].type === 'UInt64' || meta[index].type === 'Int64' || meta[index].type === 'Int32' || meta[index].type === 'UInt32') {
+        newObj[key] = parseInt(value)
+      } else {
+        newObj[key] = value
+      }
+    })
+    return newObj
+  })
+}
+
+export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
   try {
+    const query = mauQuery(startDate, endDate, apps)
     console.log('sending to Clickhouse body', query)
     const searchParams = {
       query,
@@ -163,6 +203,8 @@ ORDER BY app_id, first_log_date FORMAT JSON`
     })
       .then(res => res.json<ApiResponse>())
     console.log('readMauFromClickHouse ok', response)
+    response.data = convertDataWithMeta(response.data, response.meta)
+    console.log('readMauFromClickHouse ok type', response)
     return response
   }
   catch (e) {

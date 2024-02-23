@@ -7,7 +7,7 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
-import { sendStatsAndDevice } from './clickhouse.ts'
+import { sendStatsAndDevice, readMauFromClickHouse } from './clickhouse.ts'
 
 // Import Supabase client
 
@@ -375,7 +375,7 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
 }
 
 export async function getSDashboardV2(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
-  console.log(`getSDashboard userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
+  console.log(`getSDashboardV2 userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let isAdmin = false
   let client = supabaseClient(c, auth)
@@ -386,6 +386,7 @@ export async function getSDashboardV2(c: Context, auth: string, userIdQuery: str
     .rpc('is_admin')
     .then(res => res.data || false)
   isAdmin = reqAdmin
+  console.log('isAdmin', isAdmin)
 
   if (appId) {
     const reqOwner = await client
@@ -395,28 +396,28 @@ export async function getSDashboardV2(c: Context, auth: string, userIdQuery: str
       return Promise.reject(new Error('not allowed'))
   }
 
-  client = supabaseAdmin(c)
-
-  // console.log('tableName', tableName)
+  console.log('appId', appId)
   const appIds: string[] = []
 
   if (appId) {
     appIds.push(appId)
   }
   else {
+    console.log('getSDashboardV2 get apps')
     const userId = isAdmin ? userIdQuery : (await supabaseClient(c, auth).auth.getUser()).data.user?.id
     if (!userId)
       return []
     // get all user apps id
-    const appIds = await supabaseClient(c, auth)
+    console.log('userId', userId)
+    const resAppIds = await supabaseClient(c, auth)
       .from('apps')
       .select('app_id')
-      // .eq('user_id', userId)
+      .eq('user_id', userId)
       .then(res => res.data?.map(app => app.app_id) || [])
-    console.log('appIds', appIds)
-    appIds.push(...appIds)
+    appIds.push(...resAppIds)
   }
 
+  console.log('appIds', appIds)
   const res = await readMauFromClickHouse(c, startDate, endDate, appIds)
   console.log('res', res)
   return res.data || []

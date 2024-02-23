@@ -174,16 +174,22 @@ export interface appUsage {
   uninstall: number
 }
 export async function getAllDashboard(userId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
-  const supabase = useSupabase()
 
-  const req = await supabase.functions.invoke('private/dashboard', {
-    body: {
-      userId,
-      startDate,
-      endDate,
-    },
+  const token = (await useSupabase().auth.getSession()).data.session?.access_token
+  const data = await ky
+  .post(`${defaultApiHost}/private/dashboard`, { 
+    json: {
+      userId, startDate, endDate
+    }, 
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    } 
   })
-  return (req.data || []) as appUsage[]
+  .then(res => res.json<appUsage[]>())
+  .catch(() => {
+    return []
+  })
+  return data
 }
 
 export async function getTotaAppStorage(userid?: string, appid?: string): Promise<number> {
