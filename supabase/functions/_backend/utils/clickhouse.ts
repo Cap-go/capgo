@@ -54,7 +54,7 @@ async function sendClickHouse(c: Context, body: string, table: string) {
       headers: getHeaders(c)
     })
     .then(res => res.text())
-    console.log('sendClickHouse', response)
+    console.log('sendClickHouse ok', response)
     return response
   } catch (e) {
     console.log('sendClickHouse error', e)
