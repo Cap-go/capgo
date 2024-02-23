@@ -181,7 +181,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
 
 app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
-    const body = await c.req.json<DeviceLink>()
+    const body = c.req.query<DeviceLink>()
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)

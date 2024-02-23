@@ -46,7 +46,7 @@ function createInsertQuery(tableName: string) {
 
 async function sendClickHouse(c: Context, body: string, table: string) {
   try {
-    console.log('sending to Clickhouse body', body)
+    console.log('sending to Clickhouse body', table, body)
     const searchParams = {
       query: createInsertQuery(table),
       http_write_exception_in_output_format: 1,

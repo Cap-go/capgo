@@ -37,7 +37,7 @@ export async function getBody<T>(c: Context) {
     body = await c.req.json<T>()
   }
   catch (_e) {
-    body = await c.req.query() as any as T
+    body = c.req.query() as any as T
   }
   if (!body)
     throw new HTTPException(400, { message: 'Cannot find body' })
