@@ -74,7 +74,7 @@ async function guard(next: any, to: string, from: string) {
     isCanceled(main.auth?.id).then((res) => {
       main.canceled = res
     })
-    isAdmin().then((res) => {
+    isAdmin(main.auth?.id).then((res) => {
       main.isAdmin = res
     })
 
