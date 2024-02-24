@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.457.0",
+  "version": "10.459.0",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -134,7 +134,7 @@
     "flowbite": "^2.3.0",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
-    "hono": "4.0.3",
+    "hono": "4.0.5",
     "json2csv": "^5.0.7",
     "konsta": "^3.1.2",
     "ky": "^1.2.0",
