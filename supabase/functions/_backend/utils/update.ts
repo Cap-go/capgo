@@ -87,7 +87,7 @@ async function requestInfosPostgres(
     .limit(1)
     .then(data => data.at(0))
 
-  const channelDevice = drizzleCient
+  let channelDevice = drizzleCient
     .select({
       channel_devices: {
         device_id: schema.channel_devices.device_id,
