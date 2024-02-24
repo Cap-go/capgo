@@ -363,10 +363,6 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
   return res.data || []
 }
 
-const calculateMonthUsage = (usage: number, days: number) => {
-  
-}
-
 export async function getSDashboardV2(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
   console.log(`getSDashboardV2 userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
