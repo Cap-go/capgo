@@ -26,7 +26,7 @@ const stats = ref({
   mau: 0,
   storage: 0,
   bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v3']['Returns'][0])
+} as Database['public']['Functions']['get_total_stats_v4']['Returns'][0])
 const planSuggest = ref('')
 const planCurrrent = ref('')
 const planPercent = ref(0)

@@ -48,9 +48,9 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
   return data || 'Team'
 }
 
-export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
+export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v4']['Returns'][0]> {
   const { data, error } = await supabaseAdmin(c)
-    .rpc('get_total_stats_v3', { userid: userId })
+    .rpc('get_total_stats_v4', { userid: userId })
     .single()
 
   if (error) {

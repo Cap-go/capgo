@@ -842,11 +842,8 @@ export type Database = {
       }
       plans: {
         Row: {
-          abtest: boolean
-          app: number
           bandwidth: number
           bandwidth_unit: number | null
-          channel: number
           created_at: string
           description: string
           id: string
@@ -861,21 +858,14 @@ export type Database = {
           price_m_storage_id: string | null
           price_y: number
           price_y_id: string
-          progressive_deploy: boolean
-          shared: number
           storage: number
           storage_unit: number | null
           stripe_id: string
-          update: number
           updated_at: string
-          version: number
         }
         Insert: {
-          abtest?: boolean
-          app?: number
           bandwidth: number
           bandwidth_unit?: number | null
-          channel?: number
           created_at?: string
           description?: string
           id?: string
@@ -890,21 +880,14 @@ export type Database = {
           price_m_storage_id?: string | null
           price_y?: number
           price_y_id: string
-          progressive_deploy?: boolean
-          shared?: number
           storage: number
           storage_unit?: number | null
           stripe_id?: string
-          update?: number
           updated_at?: string
-          version?: number
         }
         Update: {
-          abtest?: boolean
-          app?: number
           bandwidth?: number
           bandwidth_unit?: number | null
-          channel?: number
           created_at?: string
           description?: string
           id?: string
@@ -919,14 +902,10 @@ export type Database = {
           price_m_storage_id?: string | null
           price_y?: number
           price_y_id?: string
-          progressive_deploy?: boolean
-          shared?: number
           storage?: number
           storage_unit?: number | null
           stripe_id?: string
-          update?: number
           updated_at?: string
-          version?: number
         }
         Relationships: []
       }
@@ -1529,6 +1508,20 @@ export type Database = {
             }
             Returns: number
           }
+      get_total_app_storage_size:
+        | {
+            Args: {
+              appid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
+            }
+            Returns: number
+          }
       get_total_stats_v2:
         | {
             Args: {
@@ -1570,16 +1563,6 @@ export type Database = {
               storage: number
             }[]
           }
-      get_total_stats_v3_old: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
       get_total_stats_v4: {
         Args: {
           userid: string
