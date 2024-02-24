@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto'
+import { timingSafeEqual } from 'hono/utils/buffer'
 import type { Context, MiddlewareHandler, Next } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { cors } from 'hono/cors'
