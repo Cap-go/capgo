@@ -46,6 +46,7 @@ async function requestInfosPostgres(
   app_id: string,
   device_id: string,
   version_name: string,
+  defaultChannel: string,
   alias: typeof alias_postgres,
   drizzleCient: ReturnType<typeof drizzle_postgress>,
   schema: typeof schema_postgres,
@@ -136,7 +137,21 @@ async function requestInfosPostgres(
     .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
+
+    if (defaultChannel) {
+      channelDevice = channelDevice
+        .where(and(
+          eq(schema.channel_devices.app_id, app_id),
+          eq(schema.channels.name, defaultChannel),
+        ))
+    } else {
+      channelDevice = channelDevice
+        .where(and(
+          eq(schema.channel_devices.app_id, app_id),
+          eq(schema.channels.default, true),
+        ))
+    }
+    channelDevice = channelDevice
     .limit(1)
     .then(data => data.at(0))
 
@@ -233,6 +248,7 @@ export async function update(c: Context, body: AppInfos) {
       version_os,
       plugin_version = '2.3.3',
       custom_id,
+      defaultChannel,
       is_emulator = false,
       is_prod = true,
     } = body
@@ -324,7 +340,7 @@ export async function update(c: Context, body: AppInfos) {
       updated_at: new Date().toISOString(),
     }
 
-    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, alias, drizzleCient, schema)
+    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, alias, drizzleCient, schema)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 

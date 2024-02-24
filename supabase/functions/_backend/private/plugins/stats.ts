@@ -62,6 +62,7 @@ export const jsonRequestSchema = z.object({
   action: z.optional(z.string()),
   custom_id: z.optional(z.string()),
   channel: z.optional(z.string()),
+  defaultChannel: z.optional(z.string()),
   plugin_version: z.optional(z.string()),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),

@@ -38,6 +38,7 @@ export const jsonRequestSchema = z.object({
     invalid_type_error: NON_STRING_VERSION_BUILD,
   }),
   is_emulator: z.boolean().default(false),
+  defaultChannel: z.optional(z.string()),
   is_prod: z.boolean().default(true),
   platform: devicePlatformScheme,
 }).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
