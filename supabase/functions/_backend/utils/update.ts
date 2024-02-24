@@ -138,20 +138,21 @@ async function requestInfosPostgres(
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
 
-    if (defaultChannel) {
-      channelDevice = channelDevice
-        .where(and(
-          eq(schema.channel_devices.app_id, app_id),
-          eq(schema.channels.name, defaultChannel),
-        ))
-    } else {
-      channelDevice = channelDevice
-        .where(and(
-          eq(schema.channel_devices.app_id, app_id),
-          eq(schema.channels.default, true),
-        ))
-    }
+  if (defaultChannel) {
     channelDevice = channelDevice
+      .where(and(
+        eq(schema.channel_devices.app_id, app_id),
+        eq(schema.channels.name, defaultChannel),
+      ))
+  }
+  else {
+    channelDevice = channelDevice
+      .where(and(
+        eq(schema.channel_devices.app_id, app_id),
+        eq(schema.channels.default, true),
+      ))
+  }
+  channelDevice = channelDevice
     .limit(1)
     .then(data => data.at(0))
 
