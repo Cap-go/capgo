@@ -55,3 +55,43 @@ BEGIN
   RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
 END;
 $function$
+
+CREATE OR REPLACE FUNCTION public.get_total_stats_v4(userid uuid)
+ RETURNS TABLE(mau bigint, bandwidth double precision, storage double precision)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    anchor_start date;
+    anchor_end date;
+    apps text;
+    total_storage double precision;
+BEGIN
+    SELECT subscription_anchor_start, subscription_anchor_end INTO anchor_start, anchor_end
+    FROM stripe_info
+    WHERE customer_id=(SELECT customer_id from users where id=userid);
+
+    select (SELECT json_agg(app_id) from apps where user_id=userid)::text into apps;
+
+    -- Get the total storage size by calling the get_total_storage_size function
+    SELECT get_total_storage_size(userid) INTO total_storage;
+
+    -- Use the app_ids variable in the query
+    RETURN QUERY 
+    SELECT 
+        COALESCE(SUM(raw_data.mau), 0)::bigint as mau,
+        COALESCE(ROUND(convert_bytes_to_gb(SUM(raw_data.bandwidth))::numeric,2), 0)::float AS bandwidth,
+        -- Use the total_storage variable for the storage column
+        COALESCE(ROUND(convert_bytes_to_gb(total_storage)::numeric,2), 0)::float AS storage
+    FROM (
+    SELECT app_id,
+        COALESCE(MAX(clickhouse_app_usage_parm.mau), 0) as mau,
+        COALESCE(SUM(clickhouse_app_usage_parm.bandwidth), 0) as bandwidth
+        FROM clickhouse_app_usage_parm
+        WHERE _app_list=apps
+        AND _start_date=anchor_start
+        AND _end_date=anchor_end
+        GROUP BY app_id
+    ) AS raw_data;
+END;  
+$function$
