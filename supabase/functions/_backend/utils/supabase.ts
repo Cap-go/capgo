@@ -144,22 +144,10 @@ export async function getPlanUsagePercent(c: Context, userId: string): Promise<n
   return data || 0
 }
 
-export async function getOrgs(c: Context, userId: string) {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_orgs', { userid: userId })
-    .single()
-  if (error) {
-    console.error('getOrgs error', error.message)
-    throw new Error(error.message)
-  }
-
-  return data
-}
-
 export async function isGoodPlan(c: Context, userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_good_plan_v4', { userid: userId })
+      .rpc('is_good_plan_v5', { userid: userId })
       .single()
       .throwOnError()
     return data || false
@@ -373,6 +361,10 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
   const res = await req
   console.log('res', res)
   return res.data || []
+}
+
+const calculateMonthUsage = (usage: number, days: number) => {
+  
 }
 
 export async function getSDashboardV2(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {

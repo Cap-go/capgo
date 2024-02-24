@@ -515,6 +515,21 @@ export type Database = {
         }
         Relationships: []
       }
+      cycle_info: {
+        Row: {
+          subscription_anchor_end: string | null
+          subscription_anchor_start: string | null
+        }
+        Insert: {
+          subscription_anchor_end?: string | null
+          subscription_anchor_start?: string | null
+        }
+        Update: {
+          subscription_anchor_end?: string | null
+          subscription_anchor_start?: string | null
+        }
+        Relationships: []
+      }
       deleted_account: {
         Row: {
           created_at: string | null
@@ -1564,6 +1579,16 @@ export type Database = {
             }[]
           }
       get_total_stats_v4: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }[]
+      }
+      get_total_stats_v5: {
         Args: {
           userid: string
         }

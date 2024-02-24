@@ -223,7 +223,7 @@ export async function isGoodPlan(userid?: string): Promise<boolean> {
   if (!userid)
     return false
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v4', { userid })
+    .rpc('is_good_plan_v5', { userid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -323,7 +323,7 @@ export async function getPlanUsagePercent(userid?: string): Promise<number> {
   return data || 0
 }
 
-export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v4']['Returns'][0]> {
+export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
   if (!userid) {
     return {
       mau: 0,
@@ -332,13 +332,13 @@ export async function getTotalStats(userid?: string): Promise<Database['public']
     }
   }
   const { data, error } = await useSupabase()
-    .rpc('get_total_stats_v4', { userid })
+    .rpc('get_total_stats_v5', { userid })
     .single()
   if (error)
     throw new Error(error.message)
   // console.log('getTotalStats', data, error)
 
-  return data as any as Database['public']['Functions']['get_total_stats_v4']['Returns'][0] || {
+  return data as any as Database['public']['Functions']['get_total_stats_v5']['Returns'][0] || {
     mau: 0,
     bandwidth: 0,
     storage: 0,
