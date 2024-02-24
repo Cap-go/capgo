@@ -8,6 +8,7 @@ import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
 import { readMauFromClickHouse, sendStatsAndDevice } from './clickhouse.ts'
+import type { AppActivity } from './clickhouse.ts'
 
 // Import Supabase client
 
@@ -374,7 +375,7 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
   return res.data || []
 }
 
-export async function getSDashboardV2(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
+export async function getSDashboardV2(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
   console.log(`getSDashboardV2 userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let isAdmin = false
@@ -386,6 +387,8 @@ export async function getSDashboardV2(c: Context, auth: string, userIdQuery: str
     .rpc('is_admin')
     .then(res => res.data || false)
   isAdmin = reqAdmin
+  if (!auth)
+    isAdmin = true
   console.log('isAdmin', isAdmin)
 
   if (appId) {
@@ -404,12 +407,13 @@ export async function getSDashboardV2(c: Context, auth: string, userIdQuery: str
   }
   else {
     console.log('getSDashboardV2 get apps')
-    const userId = isAdmin ? userIdQuery : (await supabaseClient(c, auth).auth.getUser()).data.user?.id
+    const userId = isAdmin ? userIdQuery : (await client.auth.getUser()).data.user?.id
+    console.log('getSDashboardV2 get apps', userId)
     if (!userId)
       return []
     // get all user apps id
     console.log('userId', userId)
-    const resAppIds = await supabaseClient(c, auth)
+    const resAppIds = await client
       .from('apps')
       .select('app_id')
       .eq('user_id', userId)

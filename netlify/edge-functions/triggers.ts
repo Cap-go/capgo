@@ -16,6 +16,7 @@ import { app as on_version_create } from '../../supabase/functions/_backend/priv
 import { app as on_version_update } from '../../supabase/functions/_backend/private/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/private/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/private/triggers/stripe_event.ts'
+import { app as get_total_stats } from '../../supabase/functions/_backend/private/triggers/get_total_stats.ts'
 
 const functionName = 'triggers'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -34,5 +35,6 @@ appGlobal.route('/on_version_create', on_version_create)
 appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/stripe_event', stripe_event)
+appGlobal.route('/get_total_stats', get_total_stats)
 
 export default handle(appGlobal as any)

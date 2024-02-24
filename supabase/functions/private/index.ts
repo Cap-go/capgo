@@ -13,6 +13,7 @@ import { app as stripe_portal } from '../_backend/private/webapps/stripe_portal.
 import { app as upload_link } from '../_backend/private/webapps/upload_link.ts'
 import { app as devices_priv } from '../_backend/private/webapps/devices.ts'
 import { app as stats_priv } from '../_backend/private/webapps/stats.ts'
+import { app as get_total_stats } from '../_backend/private/triggers/get_total_stats.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -31,5 +32,6 @@ appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/upload_link', upload_link)
+appGlobal.route('/get_total_stats', get_total_stats)
 
 Deno.serve(appGlobal.fetch)

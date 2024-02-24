@@ -32,4 +32,5 @@ appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/upload_link', upload_link)
 
+
 export default handle(appGlobal as any)
