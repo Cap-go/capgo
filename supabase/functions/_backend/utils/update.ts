@@ -147,10 +147,7 @@ async function requestInfosPostgres(
   }
   else {
     channelDevice = channelDevice
-      .where(and(
-        eq(schema.channel_devices.app_id, app_id),
-        eq(schema.channels.default, true),
-      ))
+      .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
   }
   channelDevice = channelDevice
     .limit(1)
