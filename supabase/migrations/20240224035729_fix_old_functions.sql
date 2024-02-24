@@ -8,7 +8,7 @@ Begin
     AND plans.storage>=find_best_plan_v3.storage
     AND plans.bandwidth>=find_best_plan_v3.bandwidth
     OR plans.name = 'Pay as you go'
-    ORDER BY mau
+    ORDER BY plans.mau
     LIMIT 1);
 End;  
 $$;
@@ -26,7 +26,7 @@ RETURN QUERY (
     AND plans.storage >= find_fit_plan_v3.storage
     AND plans.bandwidth >= find_fit_plan_v3.bandwidth
     OR plans.name = 'Pay as you go'
-  ORDER BY mau
+  ORDER BY plans.mau
 );
 END;
 $$;
