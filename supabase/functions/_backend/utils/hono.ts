@@ -69,7 +69,7 @@ export const middlewareAPISecret: MiddlewareHandler<{
   const a = encoder.encode(authorizationSecret)
   const b = encoder.encode(API_SECRET)
 
-  if (!authorizationSecret || !API_SECRET || !await timingSafeEqual(a, b))
+  if (!authorizationSecret || !API_SECRET || !timingSafeEqual(a, b))
     throw new HTTPException(400, { message: 'Cannot find authorization' })
   c.set('APISecret', authorizationSecret)
   await next()
