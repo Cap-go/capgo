@@ -82,7 +82,7 @@ BEGIN
     current_plan_total.bandwidth,
     current_plan_total.storage) where find_fit_plan_v3.name = (SELECT get_current_plan_name(userid)));
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_plan_usage_percent(userid uuid)
@@ -108,4 +108,4 @@ BEGIN
 
   RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
 END;
-$function$
+$function$;

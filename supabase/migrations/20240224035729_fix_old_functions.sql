@@ -31,31 +31,6 @@ RETURN QUERY (
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_plan_usage_percent(userid uuid)
- RETURNS double precision
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-    current_plan_max stats_table;
-    total_stats stats_table;
-    percent_mau float;
-    percent_bandwidth float;
-    percent_storage float;
-BEGIN
-  -- Get the maximum values for the user's current plan
-  current_plan_max := public.get_current_plan_max(userid);
-  -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v5(userid);
-  -- Calculate the percentage of usage for each stat and return the average
-  percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
-  percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
-  percent_storage := convert_number_to_percent(convert_bytes_to_gb(get_total_storage_size(userid)), current_plan_max.storage);
-
-  RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
-END;
-$function$
-
 CREATE OR REPLACE FUNCTION public.get_total_stats_v4(userid uuid)
  RETURNS TABLE(mau bigint, bandwidth double precision, storage double precision)
  LANGUAGE plpgsql
@@ -94,4 +69,29 @@ BEGIN
         GROUP BY app_id
     ) AS raw_data;
 END;  
-$function$
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_plan_usage_percent(userid uuid)
+ RETURNS double precision
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    current_plan_max stats_table;
+    total_stats stats_table;
+    percent_mau float;
+    percent_bandwidth float;
+    percent_storage float;
+BEGIN
+  -- Get the maximum values for the user's current plan
+  current_plan_max := public.get_current_plan_max(userid);
+  -- Get the user's maximum usage stats for the current date
+  total_stats := public.get_total_stats_v4(userid);
+  -- Calculate the percentage of usage for each stat and return the average
+  percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
+  percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
+  percent_storage := convert_number_to_percent(convert_bytes_to_gb(get_total_storage_size(userid)), current_plan_max.storage);
+
+  RETURN round(GREATEST(percent_mau, percent_bandwidth, percent_storage)::numeric, 2);
+END;
+$function$;
