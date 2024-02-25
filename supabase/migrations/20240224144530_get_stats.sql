@@ -25,7 +25,7 @@ BEGIN
 
     -- Set up the headers
     req_headers := ARRAY[
-        http_header('apisecret', 'Your_API_Secret_Here') -- Replace with your actual API secret
+        http_header('apisecret', get_apikey()) -- Replace with your actual API secret
     ];
 
     -- Prepare the body with the necessary parameters, using the correct keys and dates from get_cycle_info
