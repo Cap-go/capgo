@@ -144,6 +144,18 @@ begin
 End;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS trigger
+   LANGUAGE plpgsql AS
+$$BEGIN
+  IF NEW."app_id" is distinct from OLD."app_id" AND OLD."app_id" is distinct from NULL THEN
+    RAISE EXCEPTION 'changing the app_id is not allowed';
+  END IF;
+
+  NEW.owner_org = get_user_main_org_id_by_app_id(NEW."app_id");
+
+   RETURN NEW;
+END;$$;
+
 -- Alter table "apps" with new owner system
 
 -- create "owner_org"
@@ -206,6 +218,13 @@ SET owner_org=get_user_main_org_id_by_app_id(app_id);
 ALTER TABLE ONLY "public"."app_versions"
     ADD CONSTRAINT "owner_org_id_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
+CREATE TRIGGER force_valid_owner_org_app_versions
+   BEFORE INSERT OR UPDATE ON "public"."app_versions" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."auto_owner_org_by_app_id"();  
+
+ALTER TABLE app_versions
+ALTER COLUMN owner_org SET NOT NULL;
+
 DROP POLICY "Allow apikey to insert" on "app_versions";
 DROP POLICY "Allow apikey to select" on "app_versions";
 DROP POLICY "Allow org member (write) to update" on "app_versions";
@@ -224,8 +243,8 @@ USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."
 CREATE POLICY "Allow update for api keys (write,all,upload) (upload+)" ON "public"."app_versions"
 AS PERMISSIVE FOR UPDATE
 TO anon, authenticated
-USING ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all}'::"public"."key_mode"[]), owner_org, app_id, NULL))
-WITH CHECK ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all}'::"public"."key_mode"[]), owner_org, app_id, NULL));
+USING ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), owner_org, app_id, NULL))
+WITH CHECK ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), owner_org, app_id, NULL));
 
 CREATE POLICY "Allow update for auth (write+)" ON "public"."app_versions"
 AS PERMISSIVE FOR UPDATE
@@ -237,4 +256,116 @@ ALTER TABLE app_versions DROP COLUMN user_id;
 
 -- App versions done;
 
+-- Alter app_versions_meta
+ALTER TABLE app_versions_meta ADD COLUMN 
+owner_org uuid;
 
+UPDATE app_versions_meta
+SET owner_org=get_user_main_org_id_by_app_id(app_id);
+
+ALTER TABLE ONLY "public"."app_versions_meta"
+    ADD CONSTRAINT "owner_org_id_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+CREATE TRIGGER force_valid_owner_org_app_versions_meta
+   BEFORE INSERT OR UPDATE ON "public"."app_versions_meta" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."auto_owner_org_by_app_id"();  
+
+ALTER TABLE app_versions_meta
+ALTER COLUMN owner_org SET NOT NULL;
+
+DROP POLICY "Allow org members to select" on "app_versions_meta";
+DROP POLICY "Allow user to get they meta" on "app_versions_meta";
+
+CREATE POLICY "Allow read for auth (read+)" ON "public"."app_versions_meta"
+AS PERMISSIVE FOR SELECT
+TO anon, authenticated
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+ALTER TABLE app_versions_meta DROP COLUMN user_id;
+
+-- app_versions_meta done
+
+-- channel_devices start
+ALTER TABLE channel_devices ADD COLUMN 
+owner_org uuid;
+
+UPDATE channel_devices
+SET owner_org=get_user_main_org_id_by_app_id(app_id);
+
+ALTER TABLE ONLY "public"."channel_devices"
+    ADD CONSTRAINT "owner_org_id_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+CREATE TRIGGER force_valid_owner_org_channel_devices
+   BEFORE INSERT OR UPDATE ON "public"."channel_devices" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."auto_owner_org_by_app_id"();  
+
+ALTER TABLE channel_devices
+ALTER COLUMN owner_org SET NOT NULL;
+
+DROP POLICY "Allow all to app owner" on "channel_devices";
+DROP POLICY "Allow org member (write) to delete" on "channel_devices";
+DROP POLICY "Allow org member (write) to insert" on "channel_devices";
+DROP POLICY "Allow org member to read" on "channel_devices";
+
+CREATE POLICY "Allow read for auth (read+)" ON "public"."channel_devices"
+AS PERMISSIVE FOR SELECT
+TO anon, authenticated
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices"
+AS PERMISSIVE FOR UPDATE
+TO anon, authenticated
+USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL))
+WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+CREATE POLICY "Allow delete for auth (write+)" ON "public"."channel_devices"
+AS PERMISSIVE FOR DELETE
+TO anon, authenticated
+USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+ALTER TABLE channel_devices DROP COLUMN created_by;
+
+-- channel_devices end
+
+
+-- devices_override start
+ALTER TABLE devices_override ADD COLUMN 
+owner_org uuid;
+
+UPDATE devices_override
+SET owner_org=get_user_main_org_id_by_app_id(app_id);
+
+ALTER TABLE ONLY "public"."devices_override"
+    ADD CONSTRAINT "owner_org_id_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+CREATE TRIGGER force_valid_owner_org_devices_override
+   BEFORE INSERT OR UPDATE ON "public"."devices_override" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."auto_owner_org_by_app_id"();  
+
+ALTER TABLE devices_override
+ALTER COLUMN owner_org SET NOT NULL;
+
+DROP POLICY "Allow all to app owner" on "devices_override";
+DROP POLICY "Allow org member (write) to delete" on "devices_override";
+DROP POLICY "Allow org member (write) to insert" on "devices_override";
+DROP POLICY "Allow org member to read" on "devices_override";
+
+CREATE POLICY "Allow read for auth (read+)" ON "public"."devices_override"
+AS PERMISSIVE FOR SELECT
+TO anon, authenticated
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+CREATE POLICY "Allow insert for auth (write+)" ON "public"."devices_override"
+AS PERMISSIVE FOR UPDATE
+TO anon, authenticated
+USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL))
+WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+CREATE POLICY "Allow delete for auth (write+)" ON "public"."devices_override"
+AS PERMISSIVE FOR DELETE
+TO anon, authenticated
+USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+ALTER TABLE devices_override DROP COLUMN created_by;
+
+-- devices_override end
