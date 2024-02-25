@@ -92,15 +92,16 @@ CREATE TABLE IF NOT EXISTS logs_daily
 (
     date Date,
     app_id String,
-    version UInt64, -- This column is used to determine the latest record
+    version Int64, -- Using the version from the logs table
     get UInt64,
     fail UInt64,
     install UInt64,
     uninstall UInt64,
-    bandwidth Int64
-) ENGINE = ReplacingMergeTree(version) -- Specify the version column for deduplication
+    bandwidth Int64,
+    record_version DateTime64(6) -- Using the created_at timestamp for deduplication
+) ENGINE = ReplacingMergeTree(record_version)
 PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
+ORDER BY (date, app_id, version);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS logs_daily_mv
 TO logs_daily
@@ -108,17 +109,21 @@ AS
 SELECT
     toDate(l.created_at) AS date,
     l.app_id,
-    -- Use the maximum created_at as the version for each app_id and date
-    max(l.created_at) AS version,
+    l.version, -- Using the version from the logs table
     countIf(l.action = 'get') AS get,
     countIf(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
     countIf(l.action = 'set') AS install,
     countIf(l.action = 'uninstall') AS uninstall,
-    -- Calculate the bandwidth
-    sum(if(l.action = 'get', a.size, 0)) AS bandwidth
+    -- Calculate the bandwidth by summing the size from the app_versions_meta table
+    -- for 'get' actions, where there is a matching version.
+    sumIf(a.size, l.action = 'get' AND a.id = l.version AND a.app_id = l.app_id) AS bandwidth,
+    max(l.created_at) AS record_version -- Using the maximum created_at timestamp as the record version
 FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
-GROUP BY date, l.app_id;
+GROUP BY
+    date,
+    l.app_id,
+    l.version;
 
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
