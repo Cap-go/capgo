@@ -46,7 +46,7 @@ BEGIN
   -- Get the maximum values for the user's current plan
   current_plan_max := public.get_current_plan_max(userid);
   -- Get the user's maximum usage stats for the current date
-  total_stats := public.get_total_stats_v4(userid);
+  total_stats := public.get_total_stats_v5(userid);
   -- Calculate the percentage of usage for each stat and return the average
   percent_mau := convert_number_to_percent(total_stats.mau, current_plan_max.mau);
   percent_bandwidth := convert_number_to_percent(total_stats.bandwidth, current_plan_max.bandwidth);
