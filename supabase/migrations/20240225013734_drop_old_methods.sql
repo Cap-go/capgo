@@ -5,7 +5,7 @@ DROP FUNCTION IF EXISTS public.get_total_stats_v3(userid uuid);
 DROP FUNCTION IF EXISTS public.get_total_stats_v4(userid uuid);
 DROP FUNCTION IF EXISTS public.get_orgs_v2();
 DROP FUNCTION IF EXISTS public.get_orgs(userid uuid);
-DROP FUNCTION IF EXISTS public.exist_app_v2(appid character varying);
+DROP FUNCTION IF EXISTS public.exist_app(appid character varying);
 DROP FUNCTION IF EXISTS public.is_good_plan_v3();
 DROP FUNCTION IF EXISTS public.is_good_plan_v3(userid uuid);
 DROP FUNCTION IF EXISTS public.is_good_plan_v4();
