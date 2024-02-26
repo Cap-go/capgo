@@ -62,6 +62,7 @@ app: App
 app-deleted: App deleted
 app-id-example: App ID example
 app-not-found: App not found
+app-perm: App permission
 app-preview: App preview
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
@@ -408,12 +409,14 @@ to: to
 to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
+top-apps-v2: Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
 undefined: undefined
 undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
+unknown: unknown
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel

@@ -1,6 +1,6 @@
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { ComputedRef, Ref } from 'vue'
+import type { ComputedRef } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
@@ -12,6 +12,18 @@ export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['p
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 // TODO Create user rights in database
 // type Right = Database['public']['Tables']['user_rights']['Row']
+
+const permMap = new Map([
+  ['invite_read', 0],
+  ['invite_upload', 0],
+  ['invite_write', 0],
+  ['invite_admin', 0],
+  ['read', 1],
+  ['upload', 2],
+  ['write', 3],
+  ['admin', 4],
+  ['super_admin', 5],
+])
 
 const supabase = useSupabase()
 
@@ -41,10 +53,12 @@ export const useOrganizationStore = defineStore('organization', () => {
     throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
-  const currentOrganization = ref<Organization>()
+  const currentOrganization = ref<Organization | undefined>(undefined)
   const currentRole = ref<OrganizationRole | null>(null)
 
   watch(currentOrganization, async (currentOrganization) => {
+    console.log('curr', currentOrganization)
+
     if (!currentOrganization) {
       currentRole.value = null
       return
@@ -55,7 +69,11 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   watch(_organizations, async (organizationsMap) => {
     const organizations = Array.from(organizationsMap.values())
-    const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, user_id')
+
+    const a = await supabase.from('org_users').select('*')
+    console.log(organizations, a.data)
+    const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, owner_org')
+
     if (error) {
       console.error('Cannot get app apps for org store', error)
       return
@@ -66,7 +84,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     for (const app of allAppsByOwner) {
       // For each app find the org_id that owns said app
       // This is needed for the "banner"
-      const org = organizations.find(org => org.created_by === app.user_id)
+      const org = organizations.find(org => org.gid === app.owner_org)
       if (!org) {
         console.error(`Cannot find organization for app ${app}`)
         return
@@ -131,6 +149,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const fetchOrganizations = async () => {
+    console.log('fetch orgs')
     const main = useMainStore()
 
     const userId = main.user?.id
@@ -146,7 +165,10 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (error)
       throw error
 
-    const organization = data.find(org => org.role === 'owner')
+    const organization = data.map((org) => {
+      return { permId: permMap.get(org.role) ?? 0, org }
+    }).sort((a, b) => b.permId - a.permId).map(org => org.org)[0]
+
     if (!organization) {
       console.log('user has no main organization')
       return
@@ -159,6 +181,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
     if (!currentOrganization.value)
       currentOrganization.value = organization
+
+    console.log('done', currentOrganization.value)
   }
 
   const dedupFetchOrganizations = async () => {

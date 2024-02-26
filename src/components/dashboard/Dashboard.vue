@@ -47,8 +47,7 @@ watchEffect(async () => {
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->
         <!-- Table (Top Channels) -->
-        <TopApps :apps="props.apps" :header="t('top-apps')" :delete-button="true" @reload="emit('reloadApp')" />
-        <TopApps v-if="sharedApps.length > 0" id="shared" :apps="props.sharedApps" :header="t('shared-apps')" :delete-button="false" @reload="emit('reloadApp')" />
+        <TopApps :apps="props.apps" :header="t('top-apps-v2')" :delete-button="true" @reload="emit('reloadApp')" />
       </div>
     </div>
     <k-fab v-if="!stepsOpen && !isMobile" class="fixed z-20 right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
