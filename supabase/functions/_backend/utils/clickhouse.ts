@@ -53,7 +53,6 @@ async function sendClickHouse(c: Context, body: string, table: string) {
     }
     console.log('sending to Clickhouse searchParams', searchParams)
     const response = await ky.post(clickHouseURL(c), {
-      credentials: undefined,
       body,
       searchParams,
       headers: getHeaders(c),
@@ -196,7 +195,6 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
     }
     console.log('sending to Clickhouse searchParams', searchParams)
     const response = await ky.post(clickHouseURL(c), {
-      credentials: undefined,
       searchParams,
       headers: getHeaders(c),
     })

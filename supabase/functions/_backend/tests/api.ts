@@ -60,7 +60,6 @@ export async function postUpdate(baseUrl: string) {
   const payload = { ...defaultUpdatePayload, version_build: defaultVersionDev }
   const response = await ky.post(url, {
     json: payload,
-    credentials: undefined,
     headers: {
       'x-forwarded-for': '1.1.1.1',
     },
@@ -74,7 +73,7 @@ export const defaultResOk = { status: 'ok', service: 'ok' }
 export const defaultRes = { status: 'ok' }
 export async function getOk(baseUrl: string) {
   const url = `${baseUrl}/ok`
-  const response = await ky.get(url, { credentials: undefined })
+  const response = await ky.get(url)
   return response.json<typeof defaultResOk>()
 }
 
@@ -90,21 +89,21 @@ export async function getDatabase(c: Context) {
 export async function postStats(baseUrl: string) {
   const url = `${baseUrl}/stats`
   const payload = { ...defaultUpdatePayload, action: defaultAction }
-  const response = await ky.post(url, { credentials: undefined, json: payload })
+  const response = await ky.post(url, { json: payload })
   return response.json<typeof defaultRes>()
 }
 
 export async function setChannelSelf(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
   const payload = { ...defaultUpdatePayload, channel: defaultChannel }
-  const response = await ky.post(url, { credentials: undefined, json: payload })
+  const response = await ky.post(url, { json: payload })
   return response.json<typeof defaultRes>()
 }
 
 export const defaultPutChannelRes = { channel: defaultChannel, status: defaultStatus }
 export async function putChannel(baseUrl: string) {
   const url = `${baseUrl}/channel_self`
-  const response = await ky.put(url, { credentials: undefined, json: defaultUpdatePayload })
+  const response = await ky.put(url, { json: defaultUpdatePayload })
   return response.json<typeof defaultPutChannelRes>()
 }
 
@@ -127,7 +126,6 @@ export async function getDevice(c: Context, baseUrl: string) {
   const searchParams = new URLSearchParams()
   searchParams.set('app_id', defaultAppId)
   const response = await ky.get(url, {
-    credentials: undefined,
     body: searchParams,
     headers: headers(c),
   })
@@ -151,7 +149,6 @@ export async function deleteDevice(c: Context, baseUrl: string) {
   const searchParams = new URLSearchParams()
   searchParams.set('app_id', defaultAppId)
   const response = await ky.delete(url, {
-    credentials: undefined,
     body: searchParams,
     headers: headers(c),
   })
@@ -161,7 +158,6 @@ export async function deleteDevice(c: Context, baseUrl: string) {
 export async function postDevice(c: Context, baseUrl: string) {
   const url = `${baseUrl}/device`
   const response = await ky.post(url, {
-    credentials: undefined,
     json: defaultSetDevice,
     headers: headers(c),
   })
@@ -189,7 +185,6 @@ export async function getChannels(c: Context, baseUrl: string) {
   const searchParams = new URLSearchParams()
   searchParams.set('app_id', defaultAppId)
   const response = await ky.get(url, {
-    credentials: undefined,
     body: searchParams,
     headers: headers(c),
   })
@@ -204,7 +199,6 @@ export async function getChannels(c: Context, baseUrl: string) {
 export async function setChannel(c: Context, baseUrl: string) {
   const url = `${baseUrl}/channel`
   const response = await ky.post(url, {
-    credentials: undefined,
     headers: headers(c),
   })
   return response.json<typeof defaultRes>()
@@ -232,7 +226,6 @@ export const defaultGetBundleRes = [
 // export const setBundle = async (baseUrl: string) => {
 //   const url = `${baseUrl}/bundle`
 //   const response = await ky.post<typeof defaultGetBundleRes>(url, defaultSetBundleRes, {
-// credentials: undefined,
 //     params: {
 //       app_id: defaultAppId,
 //     },
@@ -246,7 +239,6 @@ export async function getBundle(c: Context, baseUrl: string) {
   const searchParams = new URLSearchParams()
   searchParams.set('app_id', defaultAppId)
   const response = await ky.get(url, {
-    credentials: undefined,
     body: searchParams,
     headers: headers(c),
   })
@@ -263,7 +255,6 @@ export async function deleteBundle(c: Context, baseUrl: string) {
   const searchParams = new URLSearchParams()
   searchParams.set('app_id', defaultAppId)
   const response = await ky.delete(url, {
-    credentials: undefined,
     body: searchParams,
     headers: headers(c),
   })

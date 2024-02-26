@@ -52,7 +52,6 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
   const url = `${baseUrl()}/v1/track`
   try {
     const res = await ky.post(url, {
-      credentials: undefined,
       json: {
         email,
         event,
@@ -86,7 +85,6 @@ export async function addContact(c: Context, email: string, data: any) {
   console.log('addContact', email)
   try {
     const res = await ky.post(url, {
-      credentials: undefined,
       json: payload,
       headers: getConfigHeaders(c),
     })
@@ -115,7 +113,6 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
   const url = `${baseUrl()}/v1/send`
   try {
     const res = await ky.post(url, {
-      credentials: undefined,
       json: {
         to,
         subject,

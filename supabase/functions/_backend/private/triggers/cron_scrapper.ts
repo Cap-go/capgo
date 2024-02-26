@@ -54,7 +54,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     for (let i = 0; i < categories.length; i++) {
       console.log('category', categories[i])
       all.push(ky.post(`${baseApi}/get_top_apk-background`, {
-        credentials: undefined,
         json: {
           category: categories[i],
         },
@@ -64,7 +63,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       for (let i = 0; i < appsToGetFramework.length; i += pageSizeLittle) {
         const appsBatch = appsToGetFramework.slice(i, i + pageSizeLittle)
         all.push(ky.post(`${baseApi}/get_framework-background`, {
-          credentials: undefined,
           json: {
             appIds: appsBatch.map(app => app.app_id),
           },
@@ -74,7 +72,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (appsToGetInfo?.length) {
       for (let i = 0; i < appsToGetInfo.length; i++) {
         all.push(ky.post(`${baseApi}/get_store_info-background`, {
-          credentials: undefined,
           json: {
             appId: appsToGetInfo[i],
           },
@@ -89,7 +86,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         // }))
         console.log('appsSimilarBatch', appsSimilarBatch.length)
         all.push(ky.post(`${baseApi}/get_similar_app-background`, {
-          credentials: undefined,
           json: {
             appIds: appsSimilarBatch.map(app => app.app_id),
           },
