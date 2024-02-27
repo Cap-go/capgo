@@ -36,8 +36,8 @@ async function submit(form: { email: string, password: string, code: string }) {
       email: form.email,
       password: form.password,
     })
-    isLoading.value = false
     if (error) {
+      isLoading.value = false
       console.error('error', error)
       setErrors('login-account', [error.message], {})
       toast.error(t('invalid-auth'))
@@ -65,6 +65,7 @@ async function submit(form: { email: string, password: string, code: string }) {
         mfaLoginFactor.value = mfaFactor
         const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
         if (errorChallenge) {
+          isLoading.value = false
           setErrors('login-account', ['See browser console'], {})
           console.error('Cannot challange mfa', errorChallenge)
           return
