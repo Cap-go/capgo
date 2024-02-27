@@ -11,6 +11,7 @@ import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/chatwoot'
 import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
+import HeroiconsExclamationTriangleSolid from '~icons/heroicons/exclamation-triangle-solid'
 
 const props = defineProps<{
   onboarding: boolean
@@ -175,7 +176,14 @@ watchEffect(async () => {
         <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
           {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
         </h2>
-        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
+        <div v-if="!main.paying && !main.canUseMore" class="flex flex-row ml-auto mr-auto mx-auto justify-center">
+          <HeroiconsExclamationTriangleSolid class="h-[35px] w-[35px] mt-5 mb-0 pr-2" style="color: #ea590b" />
+          <p class="mt-6 text-lg font-normal font-pj text-orange-600 w-fit">
+            {{ t('warn-expired-trial') }}
+          </p>
+          <HeroiconsExclamationTriangleSolid class="h-[35px] w-[35px] mt-5 mb-0 pl-2" style="color: #ea590b" />
+        </div>
+        <p class="mx-auto mt-2 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
           {{ t('add-your-first-app-t') }}
         </p>
         <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">

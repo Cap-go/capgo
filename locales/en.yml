@@ -445,6 +445,9 @@ version-builtin: Version builtin
 version-linked: Version link
 version-linking: Link to bundle
 versions: Versions
+warn-expired-trial: >-
+  Your trial is expired, you will not be able to create new app. Contact capgo
+  support
 warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
