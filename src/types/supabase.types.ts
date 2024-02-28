@@ -123,7 +123,7 @@ export interface Database {
           minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
-          owner_org: string | null
+          owner_org: string
           session_key: string | null
           storage_provider: string
           updated_at: string | null
@@ -139,7 +139,7 @@ export interface Database {
           minUpdateVersion?: string | null
           name: string
           native_packages?: Json[] | null
-          owner_org?: string | null
+          owner_org: string
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -155,7 +155,7 @@ export interface Database {
           minUpdateVersion?: string | null
           name?: string
           native_packages?: Json[] | null
-          owner_org?: string | null
+          owner_org?: string
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
@@ -186,10 +186,10 @@ export interface Database {
           fails: number | null
           id: number
           installs: number | null
+          owner_org: string
           size: number
           uninstalls: number | null
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           app_id: string
@@ -199,10 +199,10 @@ export interface Database {
           fails?: number | null
           id?: number
           installs?: number | null
+          owner_org: string
           size: number
           uninstalls?: number | null
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           app_id?: string
@@ -212,10 +212,10 @@ export interface Database {
           fails?: number | null
           id?: number
           installs?: number | null
+          owner_org?: string
           size?: number
           uninstalls?: number | null
           updated_at?: string | null
-          user_id?: string
         }
         Relationships: [
           {
@@ -233,10 +233,10 @@ export interface Database {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "app_versions_meta_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           }
         ]
@@ -249,7 +249,7 @@ export interface Database {
           id: number
           last_version: string | null
           name: string | null
-          owner_org: string | null
+          owner_org: string
           retention: number
           tmp_id: string | null
           updated_at: string | null
@@ -261,7 +261,7 @@ export interface Database {
           id?: number
           last_version?: string | null
           name?: string | null
-          owner_org?: string | null
+          owner_org: string
           retention?: number
           tmp_id?: string | null
           updated_at?: string | null
@@ -273,7 +273,7 @@ export interface Database {
           id?: number
           last_version?: string | null
           name?: string | null
-          owner_org?: string | null
+          owner_org?: string
           retention?: number
           tmp_id?: string | null
           updated_at?: string | null
@@ -293,27 +293,27 @@ export interface Database {
           app_id: string
           channel_id: number
           created_at: string | null
-          created_by: string
           device_id: string
           id: number
+          owner_org: string
           updated_at: string
         }
         Insert: {
           app_id: string
           channel_id: number
           created_at?: string | null
-          created_by: string
           device_id: string
           id?: number
+          owner_org: string
           updated_at?: string
         }
         Update: {
           app_id?: string
           channel_id?: number
           created_at?: string | null
-          created_by?: string
           device_id?: string
           id?: number
+          owner_org?: string
           updated_at?: string
         }
         Relationships: [
@@ -332,10 +332,10 @@ export interface Database {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "channel_devices_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           }
         ]
@@ -349,7 +349,6 @@ export interface Database {
           app_id: string
           beta: boolean
           created_at: string
-          created_by: string
           disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative: boolean
           enable_progressive_deploy: boolean
@@ -357,6 +356,7 @@ export interface Database {
           id: number
           ios: boolean
           name: string
+          owner_org: string
           public: boolean
           secondaryVersionPercentage: number
           secondVersion: number | null
@@ -371,7 +371,6 @@ export interface Database {
           app_id: string
           beta?: boolean
           created_at?: string
-          created_by: string
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -379,6 +378,7 @@ export interface Database {
           id?: number
           ios?: boolean
           name: string
+          owner_org: string
           public?: boolean
           secondaryVersionPercentage?: number
           secondVersion?: number | null
@@ -393,7 +393,6 @@ export interface Database {
           app_id?: string
           beta?: boolean
           created_at?: string
-          created_by?: string
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -401,6 +400,7 @@ export interface Database {
           id?: number
           ios?: boolean
           name?: string
+          owner_org?: string
           public?: boolean
           secondaryVersionPercentage?: number
           secondVersion?: number | null
@@ -416,13 +416,6 @@ export interface Database {
             referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: "channels_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "channels_secondVersion_fkey"
             columns: ["secondVersion"]
             isOneToOne: false
@@ -434,6 +427,13 @@ export interface Database {
             columns: ["version"]
             isOneToOne: false
             referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           }
         ]
@@ -505,27 +505,27 @@ export interface Database {
         Row: {
           app_id: string
           created_at: string | null
-          created_by: string | null
           device_id: string
           id: number
+          owner_org: string
           updated_at: string | null
           version: number
         }
         Insert: {
           app_id: string
           created_at?: string | null
-          created_by?: string | null
           device_id: string
           id?: number
+          owner_org: string
           updated_at?: string | null
           version: number
         }
         Update: {
           app_id?: string
           created_at?: string | null
-          created_by?: string | null
           device_id?: string
           id?: number
+          owner_org?: string
           updated_at?: string | null
           version?: number
         }
@@ -538,17 +538,17 @@ export interface Database {
             referencedColumns: ["app_id"]
           },
           {
-            foreignKeyName: "devices_override_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "devices_override_version_fkey"
             columns: ["version"]
             isOneToOne: false
             referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           }
         ]
@@ -1422,6 +1422,23 @@ export interface Database {
           trial_left: number
           can_use_more: boolean
           is_canceled: boolean
+        }[]
+      }
+      get_orgs_v4: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          gid: string
+          created_by: string
+          logo: string
+          name: string
+          role: string
+          paying: boolean
+          trial_left: number
+          can_use_more: boolean
+          is_canceled: boolean
+          app_count: number
         }[]
       }
       get_plan_usage_percent:

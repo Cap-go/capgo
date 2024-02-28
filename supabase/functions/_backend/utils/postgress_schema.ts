@@ -8,7 +8,7 @@ export const apps = pgTable('apps', {
   created_at: timestamp('created_at').notNull().defaultNow(),
   app_id: varchar('app_id').notNull(),
   icon_url: varchar('icon_url').notNull(),
-  user_id: uuid('user_id').notNull(),
+  owner_org: uuid('owner_org').notNull(),
   name: varchar('name').unique(),
   last_version: varchar('last_version'),
   updated_at: timestamp('updated_at'),
@@ -70,6 +70,11 @@ export const channel_devices = pgTable('channel_devices', {
   channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: varchar('app_id').notNull().references(() => apps.name),
   created_by: uuid('created_by'),
+})
+
+export const orgs = pgTable('orgs', {
+  id: uuid('id').notNull(),
+  created_by: uuid('created_by').notNull(),
 })
 
 export type AppVersionsType = typeof app_versions.$inferInsert

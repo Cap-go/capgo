@@ -6,7 +6,7 @@ import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v3']['Returns']>
+export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v4']['Returns']>
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
@@ -158,17 +158,14 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // We have RLS that ensure that we only selct rows where we are member or owner
     const { data, error } = await supabase
-      .rpc('get_orgs_v3', {
+      .rpc('get_orgs_v4', {
         userid: userId,
       })
 
     if (error)
       throw error
 
-    const organization = data.map((org) => {
-      return { permId: permMap.get(org.role) ?? 0, org }
-    }).sort((a, b) => b.permId - a.permId).map(org => org.org)[0]
-
+    const organization = data.sort((a, b) => b.app_count - a.app_count)[0]
     if (!organization) {
       console.log('user has no main organization')
       return

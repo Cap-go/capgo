@@ -15,7 +15,7 @@ import { getEnv } from './utils.ts'
 import { isAllowedAction, sendDevice, sendStats } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
-import { sendNotif } from './notifications.ts'
+import { sendNotif, sendNotifOrg } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
@@ -79,7 +79,7 @@ async function requestInfosPostgres(
         name: versionAlias.name,
         checksum: versionAlias.checksum,
         session_key: versionAlias.session_key,
-        user_id: versionAlias.user_id,
+        // user_id: versionAlias.user_id,
         bucket_id: versionAlias.bucket_id,
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
@@ -103,7 +103,7 @@ async function requestInfosPostgres(
         name: sql<string>`${versionAlias.name}`.as('vname'),
         checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
         session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+        // user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
@@ -114,7 +114,7 @@ async function requestInfosPostgres(
         name: sql<string>`${secondVersionAlias.name}`.as('svname'),
         checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
         session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+        // user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
@@ -123,7 +123,7 @@ async function requestInfosPostgres(
       channels: {
         id: schema.channels.id,
         created_at: schema.channels.created_at,
-        created_by: schema.channels.created_by,
+        // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
         allow_dev: schema.channels.allow_dev,
@@ -155,7 +155,7 @@ async function requestInfosPostgres(
         name: sql<string>`${versionAlias.name}`.as('vname'),
         checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
         session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
+        // user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
@@ -166,7 +166,7 @@ async function requestInfosPostgres(
         name: sql<string>`${secondVersionAlias.name}`.as('svname'),
         checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
         session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
+        // user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
@@ -175,7 +175,7 @@ async function requestInfosPostgres(
       channels: {
         id: schema.channels.id,
         created_at: schema.channels.created_at,
-        created_by: schema.channels.created_by,
+        // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
         allow_dev: schema.channels.allow_dev,
@@ -205,12 +205,23 @@ async function requestInfosPostgres(
   return { versionData, channelData, channelOverride, devicesOverride }
 }
 
-async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeof drizzle_postgress>, schema: typeof schema_postgres): Promise<{ user_id: string } | null> {
+async function getAppOwnerPostgres(
+  appId: string,
+  alias: typeof alias_postgres,
+  drizzleCient: ReturnType<typeof drizzle_postgress>,
+  schema: typeof schema_postgres,
+): Promise<{ owner_org: string, orgs: { created_by: string } } | null> {
   try {
     const appOwner = await drizzleCient
-      .select({ user_id: schema.apps.user_id })
+      .select({
+        owner_org: schema.apps.owner_org,
+        orgs: {
+          created_by: schema.orgs.created_by,
+        },
+      })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))
+      .innerJoin(alias(schema.orgs, 'orgs'), eq(schema.apps.owner_org, schema.orgs.id))
       .limit(1)
       .then(data => data[0])
 
@@ -244,7 +255,7 @@ export async function update(c: Context, body: AppInfos) {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build)
-    const appOwner = await getAppOwnerPostgres(app_id, drizzleCient, schema)
+    const appOwner = await getAppOwnerPostgres(app_id, alias, drizzleCient, schema)
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
@@ -268,18 +279,18 @@ export async function update(c: Context, body: AppInfos) {
     }
     else {
       // get app owner with app_id
-      const sent = await sendNotif(c, 'user:semver_issue', {
+      const sent = await sendNotifOrg(c, 'user:semver_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.user_id, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, '0 0 * * 1', 'red')
       if (sent) {
         await LogSnag.track({
           channel: 'updates',
           event: 'semver issue',
           icon: '⚠️',
-          user_id: appOwner.user_id,
+          user_id: appOwner.owner_org,
           notify: false,
         }).catch()
       }
@@ -295,13 +306,13 @@ export async function update(c: Context, body: AppInfos) {
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.user_id, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, '0 0 * * 1', 'red')
       if (sent) {
         await LogSnag.track({
           channel: 'updates',
           event: 'plugin issue',
           icon: '⚠️',
-          user_id: appOwner.user_id,
+          user_id: appOwner.owner_org,
           notify: false,
         } as any).catch()
       }
@@ -378,7 +389,7 @@ export async function update(c: Context, body: AppInfos) {
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    const planValid = await isAllowedAction(c, appOwner.user_id)
+    const planValid = await isAllowedAction(c, appOwner.orgs.created_by)
     stat.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
@@ -457,7 +468,7 @@ export async function update(c: Context, body: AppInfos) {
     }
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(c, version.storage_provider, `apps/${appOwner.user_id}/${app_id}/versions`, version.bucket_id)
+      const res = await getBundleUrl(c, version.storage_provider, `apps/${appOwner.orgs.created_by}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
     }

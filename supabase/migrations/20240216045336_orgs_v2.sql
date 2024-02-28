@@ -156,7 +156,7 @@ $$BEGIN
    RETURN NEW;
 END;$$;
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v3"("userid" "uuid") RETURNS TABLE(gid uuid, created_by uuid, logo text, name text, role varchar, paying boolean, trial_left integer, can_use_more boolean, is_canceled boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v4"("userid" "uuid") RETURNS TABLE(gid uuid, created_by uuid, logo text, name text, role varchar, paying boolean, trial_left integer, can_use_more boolean, is_canceled boolean, app_count bigint)
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
@@ -169,9 +169,27 @@ BEGIN
   is_paying(o.created_by) as paying, 
   is_trial(o.created_by) as trial_left, 
   is_allowed_action_user(o.created_by) as can_use_more,
-  is_canceled(o.created_by) as is_canceled
+  is_canceled(o.created_by) as is_canceled,
+  (select count(*) from apps where owner_org = o.id) as app_count
   from orgs as o
-  join org_users on (org_users."user_id"=get_orgs_v3.userid and o.id = org_users."org_id");
+  join org_users on (org_users."user_id"=get_orgs_v4.userid and o.id = org_users."org_id");
+END;  
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_total_storage_size_org(org_id uuid)
+RETURNS double precision
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    total_size double precision := 0;
+BEGIN
+    SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
+    FROM app_versions
+    INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
+    WHERE app_versions.owner_org = org_id
+    AND app_versions.deleted = false;
+
+    RETURN total_size;
 END;  
 $$;
 
@@ -434,7 +452,6 @@ WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "pub
 CREATE POLICY "Allow insert for auth, api keys (write, all) (admin+)" ON "public"."channels"
 AS PERMISSIVE FOR INSERT
 TO anon, authenticated
-USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"('{write,all}'::"public"."key_mode"[]), owner_org, app_id, NULL))
 WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"('{write,all}'::"public"."key_mode"[]), owner_org, app_id, NULL));
 
 CREATE POLICY "Allow all for auth (admin+)" ON "public"."channels"

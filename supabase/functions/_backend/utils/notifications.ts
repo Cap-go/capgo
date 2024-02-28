@@ -88,6 +88,11 @@ export async function sendNotif(c: Context, eventName: string, eventData: EventD
   console.log('notif ready to sent', eventName, userId)
   return sendNow(c, eventName, eventData, user.email, userId, color, notif).then(() => true)
 }
+
+export async function sendNotifOrg(_c: Context, _eventName: string, _eventData: EventData, _orgId: string, _cron: string, _color: string) {
+  // TODO
+  return false
+}
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
 // console.log(isSendable(last_send_at, '0 0 1 * *'))
