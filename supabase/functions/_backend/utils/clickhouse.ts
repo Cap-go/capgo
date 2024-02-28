@@ -270,5 +270,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     sendClickHouse(c, deviceReady, 'devices'),
     sendClickHouse(c, statsData, 'logs'),
     sendClickHouse(c, dailyDeviceReady, 'daily_device'),
-  ])
+  ]).catch((error) => {
+    console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
+  })
 }
