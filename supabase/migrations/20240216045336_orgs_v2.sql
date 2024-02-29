@@ -156,23 +156,58 @@ $$BEGIN
    RETURN NEW;
 END;$$;
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v4"("userid" "uuid") RETURNS TABLE(gid uuid, created_by uuid, logo text, name text, role varchar, paying boolean, trial_left integer, can_use_more boolean, is_canceled boolean, app_count bigint)
-    LANGUAGE "plpgsql"
-    AS $$
+CREATE OR REPLACE FUNCTION public.permited_get_cycle_info("userid" "uuid")
+RETURNS TABLE (
+    subscription_anchor_start timestamp with time zone,
+    subscription_anchor_end timestamp with time zone
+) AS $$
+DECLARE
+  cycle record;
 BEGIN
+  IF (select current_setting('magic.permit_get_cycle_6cd87ed8_279e_44d6_971e_e477e4ba6b8a')) IS DISTINCT FROM '1' THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+
+  SELECT * from get_cycle_info(permited_get_cycle_info.userid) into cycle;
+  RETURN query values (cycle.subscription_anchor_start, cycle.subscription_anchor_end);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v4"("userid" "uuid") RETURNS TABLE(
+  gid uuid, 
+  created_by uuid, 
+  logo text, 
+  name text, 
+  role varchar, 
+  paying boolean, 
+  trial_left integer, 
+  can_use_more boolean, 
+  is_canceled boolean, 
+  app_count bigint,
+  subscription_start timestamp with time zone,
+  subscription_end timestamp with time zone
+)
+LANGUAGE "plpgsql"
+  AS $$
+BEGIN
+  SET LOCAL "magic.permit_get_cycle_6cd87ed8_279e_44d6_971e_e477e4ba6b8a" to 1;
   return query select 
-  o.id as gid, 
-  o.created_by, 
-  o.logo, 
-  o.name, 
+  sub.id as gid, 
+  sub.created_by, 
+  sub.logo, 
+  sub.name, 
   org_users.user_right::varchar, 
-  is_paying(o.created_by) as paying, 
-  is_trial(o.created_by) as trial_left, 
-  is_allowed_action_user(o.created_by) as can_use_more,
-  is_canceled(o.created_by) as is_canceled,
-  (select count(*) from apps where owner_org = o.id) as app_count
-  from orgs as o
-  join org_users on (org_users."user_id"=get_orgs_v4.userid and o.id = org_users."org_id");
+  is_paying(sub.created_by) as paying, 
+  is_trial(sub.created_by) as trial_left, 
+  is_allowed_action_user(sub.created_by) as can_use_more,
+  is_canceled(sub.created_by) as is_canceled,
+  (select count(*) from apps where owner_org = sub.id) as app_count,
+  (sub.f).subscription_anchor_start as subscription_start,
+  (sub.f).subscription_anchor_end as subscription_end
+  from (
+    select permited_get_cycle_info(o.created_by) as f, o.* as o from orgs as o
+  ) sub
+  join org_users on (org_users."user_id"=get_orgs_v4.userid and sub.id = org_users."org_id");
 END;  
 $$;
 

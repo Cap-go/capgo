@@ -1,4 +1,4 @@
-import { acceptHMRUpdate, defineStore } from 'pinia'
+import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { useMainStore } from './main'
@@ -13,19 +13,20 @@ export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 // TODO Create user rights in database
 // type Right = Database['public']['Tables']['user_rights']['Row']
 
-const permMap = new Map([
-  ['invite_read', 0],
-  ['invite_upload', 0],
-  ['invite_write', 0],
-  ['invite_admin', 0],
-  ['read', 1],
-  ['upload', 2],
-  ['write', 3],
-  ['admin', 4],
-  ['super_admin', 5],
-])
+// const permMap = new Map([
+//   ['invite_read', 0],
+//   ['invite_upload', 0],
+//   ['invite_write', 0],
+//   ['invite_admin', 0],
+//   ['read', 1],
+//   ['upload', 2],
+//   ['write', 3],
+//   ['admin', 4],
+//   ['super_admin', 5],
+// ])
 
 const supabase = useSupabase()
+const main = useMainStore()
 
 export const useOrganizationStore = defineStore('organization', () => {
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
@@ -56,15 +57,14 @@ export const useOrganizationStore = defineStore('organization', () => {
   const currentOrganization = ref<Organization | undefined>(undefined)
   const currentRole = ref<OrganizationRole | null>(null)
 
-  watch(currentOrganization, async (currentOrganization) => {
-    console.log('curr', currentOrganization)
-
-    if (!currentOrganization) {
+  watch(currentOrganization, async (currentOrganizationRaw) => {
+    if (!currentOrganizationRaw) {
       currentRole.value = null
       return
     }
 
-    currentRole.value = await getCurrentRole(currentOrganization.created_by, undefined, undefined)
+    currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by, undefined, undefined)
+    await main.updateDashboard(currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
   })
 
   watch(_organizations, async (organizationsMap) => {
@@ -165,7 +165,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (error)
       throw error
 
-    const organization = data.sort((a, b) => b.app_count - a.app_count)[0]
+    const organization = data.filter(org => !org.role.includes('invite')).sort((a, b) => b.app_count - a.app_count)[0]
     if (!organization) {
       console.log('user has no main organization')
       return

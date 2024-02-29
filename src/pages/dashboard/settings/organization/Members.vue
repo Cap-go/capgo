@@ -80,7 +80,7 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
 }
 
 async function showInviteModal() {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }
