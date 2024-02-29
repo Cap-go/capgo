@@ -130,7 +130,7 @@
     "dayjs": "1.11.10",
     "dompurify": "^3.0.8",
     "drizzle-orm": "^0.29.3",
-    "firebase": "10.8.0",
+    "firebase": "10.8.1",
     "flowbite": "^2.3.0",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
