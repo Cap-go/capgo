@@ -1118,21 +1118,7 @@ export interface Database {
       }
     }
     Views: {
-      clickhouse_app_usage_view: {
-        Row: {
-          app_id: string | null
-          bandwidth: number | null
-          date: string | null
-          fail: number | null
-          get: number | null
-          install: number | null
-          mau: number | null
-          storage_added: number | null
-          storage_deleted: number | null
-          uninstall: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       accept_invitation_to_org: {
@@ -1400,16 +1386,6 @@ export interface Database {
         }
         Returns: string
       }
-      get_orgs: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          id: string
-          logo: string
-          name: string
-        }[]
-      }
       get_orgs_v2: {
         Args: {
           userid: string
@@ -1482,48 +1458,7 @@ export interface Database {
             }
             Returns: number
           }
-      get_total_stats_v2:
-        | {
-            Args: {
-              dateid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-              dateid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-      get_total_stats_v3:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-      get_total_stats_v4: {
+      get_total_stats_v5: {
         Args: {
           userid: string
         }
@@ -1540,14 +1475,7 @@ export interface Database {
           }
         | {
             Args: {
-              appid: string
               userid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              org_id: string
             }
             Returns: number
           }
@@ -1762,28 +1690,12 @@ export interface Database {
             }
             Returns: boolean
           }
-      is_good_plan_v3:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
-      is_good_plan_v4:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
+      is_good_plan_v5: {
+        Args: {
+          userid: string
+        }
+        Returns: boolean
+      }
       is_member_of_org: {
         Args: {
           user_id: string
@@ -1862,6 +1774,15 @@ export interface Database {
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      permited_get_cycle_info: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          subscription_anchor_start: string
+          subscription_anchor_end: string
+        }[]
       }
       post_replication_sql:
         | {

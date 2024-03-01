@@ -48,9 +48,9 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
   return data || 'Team'
 }
 
-export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v3']['Returns'][0]> {
+export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
   const { data, error } = await supabaseAdmin(c)
-    .rpc('get_total_stats_v3', { userid: userId })
+    .rpc('get_total_stats_v5', { userid: userId })
     .single()
 
   if (error) {
@@ -140,7 +140,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
     const is_free_usage = await isFreeUsage(c, userId)
     const percentUsage = await getPlanUsagePercent(c, userId)
     if (!is_good_plan && is_onboarded && !is_free_usage) {
-      console.log('is_good_plan_v4', userId, is_good_plan)
+      console.log('is_good_plan_v5', userId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
       const get_total_stats = await getTotalStats(c, userId)
       const current_plan = await getCurrentPlanName(c, userId)

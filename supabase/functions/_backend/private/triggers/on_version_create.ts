@@ -88,6 +88,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES) // skip delete s3 and increment size in new upload
   }
   catch (e) {
-    return c.json({ status: 'Cannot process version', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot create version', error: JSON.stringify(e) }, 500)
   }
 })

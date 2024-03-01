@@ -12,12 +12,14 @@ import IconNotification from '~icons/mdi/message-notification'
 import IconAdmin from '~icons/eos-icons/admin'
 import type { Tab } from '~/components/comp_def'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 import { openPortal } from '~/services/stripe'
 import { isSpoofed } from '~/services/supabase'
 
 const { t } = useI18n()
 const main = useMainStore()
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const ActiveTab = ref('')
 
 const tabs = ref<Tab[]>([
@@ -35,11 +37,6 @@ const tabs = ref<Tab[]>([
     label: 'notifications',
     icon: shallowRef(IconNotification),
     key: '/dashboard/settings/notifications',
-  },
-  {
-    label: 'plans',
-    icon: shallowRef(IconPlans),
-    key: '/dashboard/settings/plans',
   },
 ])
 
@@ -70,25 +67,44 @@ watch(type, (val) => {
   router.push(key)
 })
 
-if (!Capacitor.isNativePlatform()) {
-  tabs.value.push({
-    label: 'billing',
-    icon: shallowRef(IconBilling) as any,
-    key: '/billing',
-    onClick: openPortal,
-  })
-}
 watchEffect(() => {
-  if (main.paying && !tabs.value.find(tab => tab.label === 'usage')) {
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+    && !tabs.value.find(tab => tab.label === 'plans')) {
+    organizationTabs.value.push(
+      {
+        label: 'plans',
+        icon: shallowRef(IconPlans),
+        key: '/dashboard/settings/plans',
+      },
+    )
+  }
+  else {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
+  }
+  if (!Capacitor.isNativePlatform()
+    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+    && !organizationTabs.value.find(tab => tab.label === 'billing')) {
+    organizationTabs.value.push({
+      label: 'billing',
+      icon: shallowRef(IconBilling) as any,
+      key: '/billing',
+      onClick: openPortal,
+    })
+  }
+  else {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
+  }
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+    && (main.paying && !organizationTabs.value.find(tab => tab.label === 'usage'))) {
     // push it 2 before the last tab
-    tabs.value.splice(tabs.value.length - 2, 0, {
+    organizationTabs.value.splice(tabs.value.length - 2, 0, {
       label: 'usage',
       icon: shallowRef(IconPlans) as any,
       key: '/dashboard/settings/usage',
     })
   }
-  else if (!main.paying && tabs.value.find(tab => tab.label === 'usage')) {
-    tabs.value = tabs.value.filter(tab => tab.label !== 'usage')
+  else if (!main.paying && organizationTabs.value.find(tab => tab.label === 'usage')) {
+    organizationTabs.value = tabs.value.filter(tab => tab.label !== 'usage')
   }
   if ((main.isAdmin || isSpoofed()) && !tabs.value.find(tab => tab.label === 'admin')) {
     tabs.value.push({

@@ -15,7 +15,7 @@ import { app as on_version_create } from '../_backend/private/triggers/on_versio
 import { app as on_version_update } from '../_backend/private/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../_backend/private/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../_backend/private/triggers/stripe_event.ts'
-import { app as test_consistency } from '../_backend/private/triggers/test_consistency.ts'
+import { app as get_total_stats } from '../_backend/private/triggers/get_total_stats.ts'
 
 const functionName = 'triggers'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -34,6 +34,6 @@ appGlobal.route('/on_version_create', on_version_create)
 appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/stripe_event', stripe_event)
-appGlobal.route('/test_consistency', test_consistency)
+appGlobal.route('/get_total_stats', get_total_stats)
 
 Deno.serve(appGlobal.fetch)

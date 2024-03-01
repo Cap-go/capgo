@@ -38,6 +38,7 @@ export const jsonRequestSchema = z.object({
     invalid_type_error: NON_STRING_VERSION_BUILD,
   }),
   is_emulator: z.boolean().default(false),
+  defaultChannel: z.optional(z.string()),
   is_prod: z.boolean().default(true),
 }).refine(data => reverseDomainRegex.test(data.app_id), {
   message: INVALID_STRING_APP_ID,
@@ -73,6 +74,6 @@ app.post('/', async (c: Context) => {
     return update(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 500)
   }
 })

@@ -133,10 +133,16 @@ watch(dashboard, async (_dashboard) => {
 <template>
   <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard
-      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
+      v-if="!isLoading && props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau"
-      :accumulated="false"
-      :title="t('montly-active')" unit="Users"
+      :accumulated="true"
+      :title="`${t('montly-active')}`" unit="Users"
+    />
+    <UsageCard
+      v-else-if="!isLoading && !props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
+      :datas="datas.mau"
+      :accumulated="true"
+      :title="`${t('montly-active')}`" unit="Users"
     />
     <div
       v-else

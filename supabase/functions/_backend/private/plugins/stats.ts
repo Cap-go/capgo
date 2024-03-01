@@ -21,13 +21,15 @@ import {
   isLimited,
   reverseDomainRegex,
 } from '../../utils/utils.ts'
-import { getSDevice, sendDevice, sendStats, supabaseAdmin } from '../../utils/supabase.ts'
+import { getSDevice, supabaseAdmin } from '../../utils/supabase.ts'
 import type { AppStats } from '../../utils/types.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { sendNotif } from '../../utils/notifications.ts'
 import { logsnag } from '../../utils/logsnag.ts'
 import { appIdToUrl } from '../../utils/conversion.ts'
 import { BRES } from '../../utils/hono.ts'
+import type { DeviceWithoutCreatedAt, StatsActions } from '../../utils/clickhouse.ts'
+import { sendStatsAndDevice } from '../../utils/clickhouse.ts'
 
 const failActions = [
   'set_fail',
@@ -60,6 +62,7 @@ export const jsonRequestSchema = z.object({
   action: z.optional(z.string()),
   custom_id: z.optional(z.string()),
   channel: z.optional(z.string()),
+  defaultChannel: z.optional(z.string()),
   plugin_version: z.optional(z.string()),
   is_emulator: z.boolean().default(false),
   is_prod: z.boolean().default(true),
@@ -136,30 +139,20 @@ async function post(c: Context, body: AppStats) {
       version_build = coerce.version
     console.log(`VERSION NAME: ${version_name}`)
     version_name = !version_name ? version_build : version_name
-    const device: Database['public']['Tables']['devices']['Insert'] = {
+    const device: DeviceWithoutCreatedAt = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       app_id,
       plugin_version,
       os_version: version_os,
-      version: version_name || 'unknown' as any,
+      version: 0,
       is_emulator: is_emulator == null ? false : is_emulator,
       is_prod: is_prod == null ? true : is_prod,
       custom_id,
-      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+    const statsActions: StatsActions[] = []
 
-    const stat: Database['public']['Tables']['stats']['Insert'] = {
-      platform: platform as Database['public']['Enums']['platform_os'],
-      device_id,
-      action,
-      app_id,
-      version_build,
-      version: 0,
-      created_at: new Date().toISOString(),
-    }
-    const rows: Database['public']['Tables']['stats']['Insert'][] = []
     const { data: appVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id, user_id')
@@ -168,21 +161,14 @@ async function post(c: Context, body: AppStats) {
       .single()
     console.log(`appVersion ${JSON.stringify(appVersion)}`)
     if (appVersion) {
-      stat.version = appVersion.id
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
         const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
         if (res && res.data && res.data.length) {
           const oldDevice = res.data[0]
           const oldVersion = oldDevice.version
-          if (oldVersion !== appVersion.id) {
-            const statUninstall: Database['public']['Tables']['stats']['Insert'] = {
-              ...stat,
-              action: 'uninstall',
-              version: oldVersion,
-            }
-            rows.push(statUninstall)
-          }
+          if (oldVersion !== appVersion.id)
+            statsActions.push({ action: 'uninstall', versionId: oldVersion })
         }
       }
       else if (failActions.includes(action)) {
@@ -211,8 +197,8 @@ async function post(c: Context, body: AppStats) {
         error: 'app_not_found',
       }, 200)
     }
-    rows.push(stat)
-    await Promise.all([sendDevice(c, device).then(() => sendStats(c, rows))])
+    statsActions.push({ action })
+    await sendStatsAndDevice(c, device, statsActions)
     return c.json(BRES)
   }
   catch (e) {
@@ -232,6 +218,6 @@ app.post('/', async (c: Context) => {
     return post(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot post stats', error: JSON.stringify(e) }, 500)
   }
 })

@@ -55,6 +55,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
-    return c.json({ status: 'Cannot process user', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot create user', error: JSON.stringify(e) }, 500)
   }
 })

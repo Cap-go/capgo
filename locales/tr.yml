@@ -49,6 +49,7 @@ back-to-login-page: Giriş sayfasına geri dön
 base: Temel
 best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
+billed-annually-at: Yıllık olarak faturalandırılır
 billing: Faturalandırma
 build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
 build-your-code-and-: Kodunuzu Capgo'ya yükleyin
@@ -198,6 +199,7 @@ making-this-channel-: >-
   Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
   veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
 mau: Aylık aktif kullanıcılar
+mo: Ay
 module-heading: Modüller
 monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar

@@ -81,7 +81,7 @@ export const app = new Hono()
 
 app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
-    const body = await c.req.json<GetLatest>()
+    const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey')
     return get(c, body, apikey)
   }

@@ -164,7 +164,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
 
 app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
-    const body = await c.req.json<ChannelSet>()
+    const body = await getBody<ChannelSet>(c)
     const apikey = c.get('apikey')
     return get(c, body, apikey)
   }

@@ -70,6 +70,7 @@ back-to-login-page: Back to login page
 base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
+billed-annually-at: Billed annually at
 billing: Billing
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
@@ -272,6 +273,7 @@ min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured
 misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
+mo: mo
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -405,6 +407,7 @@ thank-you-for-choosi: Thank you for choosing Capgo !
 the: The
 this-page-will-self-: This page will self refresh
 title: title
+tmp-disabled: (Temporary disabled)
 to: to
 to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'

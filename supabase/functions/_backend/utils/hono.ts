@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto'
+import { timingSafeEqual } from 'hono/utils/buffer'
 import type { Context, MiddlewareHandler, Next } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { cors } from 'hono/cors'
@@ -37,7 +37,7 @@ export async function getBody<T>(c: Context) {
     body = await c.req.json<T>()
   }
   catch (_e) {
-    body = await c.req.query() as any as T
+    body = c.req.query() as any as T
   }
   if (!body)
     throw new HTTPException(400, { message: 'Cannot find body' })
@@ -64,13 +64,11 @@ export const middlewareAPISecret: MiddlewareHandler<{
   const authorizationSecret = c.req.header('apisecret')
   const API_SECRET = getEnv(c, 'API_SECRET')
 
-  // Here to prevent a timing attack
-  const encoder = new TextEncoder()
-  const a = encoder.encode(authorizationSecret)
-  const b = encoder.encode(API_SECRET)
-
-  if (!authorizationSecret || !API_SECRET || !timingSafeEqual(a, b))
+  // timingSafeEqual is here to prevent a timing attack
+  if (!authorizationSecret || !API_SECRET)
     throw new HTTPException(400, { message: 'Cannot find authorization' })
+  if (!await timingSafeEqual(authorizationSecret, API_SECRET))
+    throw new HTTPException(400, { message: 'Invalid API secret' })
   c.set('APISecret', authorizationSecret)
   await next()
 }

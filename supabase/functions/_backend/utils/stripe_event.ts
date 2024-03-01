@@ -5,28 +5,21 @@ import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
-export async function parseStripeEvent(c: Context, body: string, signature: string) {
+export function parseStripeEvent(c: Context, body: string, signature: string) {
   const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
   const webhookKey = getEnv(c, 'STRIPE_WEBHOOK_SECRET')
   const stripe = new Stripe(secretKey, {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
   })
-  let receivedEvent
-  try {
-    receivedEvent = await stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      webhookKey,
-      undefined,
-      Stripe.createSubtleCryptoProvider(),
-    )
-  }
-  catch (err) {
-    console.log('Error parsing event', err)
-    return new Response(err.message, { status: 400 })
-  }
-  return receivedEvent
+
+  return stripe.webhooks.constructEventAsync(
+    body,
+    signature,
+    webhookKey,
+    undefined,
+    Stripe.createSubtleCryptoProvider(),
+  )
 }
 
 export function extractDataEvent(event: any): Database['public']['Tables']['stripe_info']['Insert'] {

@@ -13,15 +13,18 @@ export const app = new Hono()
 app.post('/', async (c: Context) => {
   try {
     const LogSnag = logsnag(c)
-    if (!c.req.header('stripe-signature') || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
-      return c.json({ status: 'Webhook Error: no signature or no secret found' }, 400)
+    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+      return c.json({ status: 'Webhook Error: no secret found' }, 400)
 
+    const signature = c.req.raw.headers.get('stripe-signature')
+    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+      return c.json({ status: 'Webhook Error: no signature' }, 400)
     // event.headers
-    const signature = c.req.header('Stripe-Signature') || ''
-    const stripeEvent = parseStripeEvent(c, await c.req.text(), signature)
+    const body = await c.req.text()
+    const stripeEvent = await parseStripeEvent(c, body, signature!)
     const stripeData = await extractDataEvent(stripeEvent)
     if (stripeData.customer_id === '')
-      return c.json('no customer found', 500)
+      return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
 
     // find email from user with customer_id
     const { error: dbError, data: user } = await supabaseAdmin(c)
@@ -77,7 +80,7 @@ app.post('/', async (c: Context) => {
           return c.json({ error: JSON.stringify(dbError) }, 500)
 
         const isMonthly = plan.price_m_id === stripeData.price_id
-        const segment = await customerToSegment(c, user.id, customer, plan)
+        const segment = await customerToSegment(c, user.id, stripeData.price_id, plan)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
         await addDataContact(c, user.email, userData, segment)
         await trackEvent(c, user.email, { plan: plan.name }, eventName)
@@ -91,14 +94,14 @@ app.post('/', async (c: Context) => {
         }).catch()
       }
       else {
-        const segment = await customerToSegment(c, user.id, customer)
+        const segment = await customerToSegment(c, user.id, stripeData.price_id)
         await addDataContact(c, user.email, userData, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
-        const segment = await customerToSegment(c, user.id, customer)
+        const segment = await customerToSegment(c, user.id, 'free')
         await addDataContact(c, user.email, userData, segment)
         await trackEvent(c, user.email, {}, 'user:cancel')
         await LogSnag.track({
@@ -120,7 +123,7 @@ app.post('/', async (c: Context) => {
       }
     }
     else {
-      const segment = await customerToSegment(c, user.id, customer)
+      const segment = await customerToSegment(c, user.id, 'free')
       await addDataContact(c, user.email, userData, segment)
     }
 

@@ -55,3 +55,4 @@ cloudflare_workers_deno/.denoflare
 supabase/functions/_script/import_d1.sh
 src/types/supabase.types.ts
 supabase/functions/_backend/utils/supabase.types.ts
+.env.alpha

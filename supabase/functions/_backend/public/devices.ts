@@ -175,20 +175,20 @@ app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
     return post(c, body, apikey)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot post devices', error: JSON.stringify(e) }, 500)
   }
 })
 
 app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
   try {
-    const body = await c.req.json<DeviceLink>()
+    const body = await getBody<DeviceLink>(c)
     const apikey = c.get('apikey')
     console.log('body', body)
     console.log('apikey', apikey)
     return get(c, body, apikey)
   }
   catch (e) {
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get devices', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -201,6 +201,6 @@ app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
     return deleteOverride(c, body, apikey)
   }
   catch (e) {
-    return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot delete devices', error: JSON.stringify(e) }, 500)
   }
 })

@@ -146,6 +146,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return updateIt(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot process version', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot update version', error: JSON.stringify(e) }, 500)
   }
 })

@@ -1,3 +1,13 @@
+CREATE TABLE IF NOT EXISTS daily_device
+(
+    device_id String,
+    app_id String,
+    date Date,
+    PRIMARY KEY (device_id, date)
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (device_id, date);
+
 CREATE TABLE IF NOT EXISTS devices
 (
     updated_at DateTime64(6),
@@ -82,15 +92,16 @@ CREATE TABLE IF NOT EXISTS logs_daily
 (
     date Date,
     app_id String,
-    version UInt64, -- This column is used to determine the latest record
+    version Int64, -- Using the version from the logs table
     get UInt64,
     fail UInt64,
     install UInt64,
     uninstall UInt64,
-    bandwidth Int64
-) ENGINE = ReplacingMergeTree(version) -- Specify the version column for deduplication
+    bandwidth Int64,
+    record_version DateTime64(6) -- Using the created_at timestamp for deduplication
+) ENGINE = ReplacingMergeTree(record_version)
 PARTITION BY toYYYYMM(date)
-ORDER BY (date, app_id);
+ORDER BY (date, app_id, version);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS logs_daily_mv
 TO logs_daily
@@ -98,17 +109,21 @@ AS
 SELECT
     toDate(l.created_at) AS date,
     l.app_id,
-    -- Use the maximum created_at as the version for each app_id and date
-    max(l.created_at) AS version,
+    l.version, -- Using the version from the logs table
     countIf(l.action = 'get') AS get,
     countIf(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
     countIf(l.action = 'set') AS install,
     countIf(l.action = 'uninstall') AS uninstall,
-    -- Calculate the bandwidth
-    sum(if(l.action = 'get', a.size, 0)) AS bandwidth
+    -- Calculate the bandwidth by summing the size from the app_versions_meta table
+    -- for 'get' actions, where there is a matching version.
+    sumIf(a.size, l.action = 'get' AND a.id = l.version AND a.app_id = l.app_id) AS bandwidth,
+    max(l.created_at) AS record_version -- Using the maximum created_at timestamp as the record version
 FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
-GROUP BY date, l.app_id;
+GROUP BY
+    date,
+    l.app_id,
+    l.version;
 
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
@@ -168,6 +183,40 @@ FROM
     )
 GROUP BY date, app_id;
 
+-- AND date >= {start_date:Date} AND date <= {end_date:Date}
+CREATE VIEW IF NOT EXISTS mau_final_param as
+SELECT DISTINCT ON (m.date,m.app_id) 
+  m.date AS date,
+  m.app_id AS app_id,
+  COALESCE(m.total, 0) AS mau,
+  COALESCE(l.get, 0) AS get,
+  COALESCE(l.fail, 0) AS fail,
+  COALESCE(l.install, 0) AS install,
+  COALESCE(l.uninstall, 0) AS uninstall,
+  COALESCE(l.bandwidth, 0) AS bandwidth,
+  COALESCE(s.storage_added, 0) AS storage_added,
+  COALESCE(s.storage_deleted, 0) AS storage_deleted
+  FROM (SELECT result.1 date, uniqMerge(arrayJoin(result.2)) total, app_id
+    FROM (
+        SELECT 
+            groupArray((date, value)) data,
+            arrayMap(
+                (x, index) -> (x.1, arrayMap(y -> y.2, arraySlice(data, index))), 
+                data, 
+                arrayEnumerate(data)) result_as_array,
+            arrayJoin(result_as_array) result, app_id
+        FROM (        
+            SELECT app_id, date, total value
+            FROM (
+                /* emulate the original data */
+                SELECT app_id, total, date from mau where hasAll(JSONExtract({app_list:String}, 'Array(String)'), [app_id]) AND date >= {start_date:Date} AND date < {end_date:Date} 
+            ORDER BY date desc, app_id)
+        ) group by app_id
+    ) group by app_id, date order by date desc) m
+  LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
+  LEFT JOIN (select * from app_storage_daily final) s ON l.date = s.date AND l.app_id = s.app_id
+  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total;
+
 -- Aggregate table partitioned by version only
 CREATE TABLE IF NOT EXISTS version_aggregate_logs
 (
@@ -221,39 +270,3 @@ SELECT
     total_failures / unique_devices * 100 AS failure_percent
 FROM logs
 GROUP BY version;
-
-CREATE VIEW IF NOT EXISTS mau_tmp_view AS
-SELECT result.1 date, uniqMerge(arrayJoin(result.2)) total, app_id
-FROM (
-    SELECT 
-        groupArray((date, value)) data,
-        arrayMap(
-            (x, index) -> (x.1, arrayMap(y -> y.2, arraySlice(data, index))), 
-            data, 
-            arrayEnumerate(data)) result_as_array,
-        arrayJoin(result_as_array) result, app_id
-    FROM (        
-        SELECT app_id, date, total value
-        FROM (
-            /* emulate the original data */
-            SELECT app_id, total, date from mau
-        ORDER BY date desc, app_id)
-    ) group by app_id
-) group by app_id, date order by date desc;
-
-CREATE VIEW IF NOT EXISTS mau_final as
-SELECT DISTINCT ON (m.date,m.app_id) 
-  m.date AS date,
-  m.app_id AS app_id,
-  COALESCE(m.total, 0) AS mau,
-  COALESCE(l.get, 0) AS get,
-  COALESCE(l.fail, 0) AS fail,
-  COALESCE(l.install, 0) AS install,
-  COALESCE(l.uninstall, 0) AS uninstall,
-  COALESCE(l.bandwidth, 0) AS bandwidth,
-  COALESCE(s.storage_added, 0) AS storage_added,
-  COALESCE(s.storage_deleted, 0) AS storage_deleted
-  FROM mau_tmp_view m
-  LEFT JOIN logs_daily l ON m.date = l.date AND m.app_id = l.app_id
-  LEFT JOIN app_storage_daily s ON l.date = s.date AND l.app_id = s.app_id
-  group by m.app_id, m.date, l.get, l.install, l.uninstall, l.bandwidth, l.fail, s.storage_added, s.storage_deleted, m.total;

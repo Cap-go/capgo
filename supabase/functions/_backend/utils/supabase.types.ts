@@ -476,7 +476,7 @@ export type Database = {
           }
         ]
       }
-      clickhouse_app_usage_tmp: {
+      clickhouse_app_usage: {
         Row: {
           app_id: string | null
           bandwidth: number | null
@@ -512,6 +512,21 @@ export type Database = {
           storage_added?: number | null
           storage_deleted?: number | null
           uninstall?: number | null
+        }
+        Relationships: []
+      }
+      cycle_info: {
+        Row: {
+          subscription_anchor_end: string | null
+          subscription_anchor_start: string | null
+        }
+        Insert: {
+          subscription_anchor_end?: string | null
+          subscription_anchor_start?: string | null
+        }
+        Update: {
+          subscription_anchor_end?: string | null
+          subscription_anchor_start?: string | null
         }
         Relationships: []
       }
@@ -842,11 +857,8 @@ export type Database = {
       }
       plans: {
         Row: {
-          abtest: boolean
-          app: number
           bandwidth: number
           bandwidth_unit: number | null
-          channel: number
           created_at: string
           description: string
           id: string
@@ -861,21 +873,14 @@ export type Database = {
           price_m_storage_id: string | null
           price_y: number
           price_y_id: string
-          progressive_deploy: boolean
-          shared: number
           storage: number
           storage_unit: number | null
           stripe_id: string
-          update: number
           updated_at: string
-          version: number
         }
         Insert: {
-          abtest?: boolean
-          app?: number
           bandwidth: number
           bandwidth_unit?: number | null
-          channel?: number
           created_at?: string
           description?: string
           id?: string
@@ -890,21 +895,14 @@ export type Database = {
           price_m_storage_id?: string | null
           price_y?: number
           price_y_id: string
-          progressive_deploy?: boolean
-          shared?: number
           storage: number
           storage_unit?: number | null
           stripe_id?: string
-          update?: number
           updated_at?: string
-          version?: number
         }
         Update: {
-          abtest?: boolean
-          app?: number
           bandwidth?: number
           bandwidth_unit?: number | null
-          channel?: number
           created_at?: string
           description?: string
           id?: string
@@ -919,14 +917,10 @@ export type Database = {
           price_m_storage_id?: string | null
           price_y?: number
           price_y_id?: string
-          progressive_deploy?: boolean
-          shared?: number
           storage?: number
           storage_unit?: number | null
           stripe_id?: string
-          update?: number
           updated_at?: string
-          version?: number
         }
         Relationships: []
       }
@@ -1502,6 +1496,22 @@ export type Database = {
           role: string
         }[]
       }
+      get_orgs_v3: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          gid: string
+          created_by: string
+          logo: string
+          name: string
+          role: string
+          paying: boolean
+          trial_left: number
+          can_use_more: boolean
+          is_canceled: boolean
+        }[]
+      }
       get_plan_usage_percent:
         | {
             Args: Record<PropertyKey, never>
@@ -1510,6 +1520,20 @@ export type Database = {
         | {
             Args: {
               userid: string
+            }
+            Returns: number
+          }
+      get_total_app_storage_size:
+        | {
+            Args: {
+              appid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
             }
             Returns: number
           }
@@ -1554,7 +1578,7 @@ export type Database = {
               storage: number
             }[]
           }
-      get_total_stats_v3_old: {
+      get_total_stats_v4: {
         Args: {
           userid: string
         }
@@ -1564,7 +1588,7 @@ export type Database = {
           storage: number
         }[]
       }
-      get_total_stats_v4: {
+      get_total_stats_v5: {
         Args: {
           userid: string
         }
@@ -1640,6 +1664,13 @@ export type Database = {
           failed_updates: number
           open_app: number
         }[]
+      }
+      has_app_right: {
+        Args: {
+          appid: string
+          right: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: boolean
       }
       has_min_right: {
         Args: {
@@ -1922,6 +1953,10 @@ export type Database = {
         Returns: number[]
       }
       process_requested_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

@@ -15,13 +15,17 @@ async function guard(next: any, to: string, from: string) {
 
   const main = useMainStore()
 
+  // TOTP means the user was force logged using the "email" tactic
+  // In practice this means the user is beeing spoofed by an admin
+  const isAdminForced = !!auth.user?.factors?.find(f => f.factor_type === 'totp') || false
+
   const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   if (mfaError) {
     console.error('Cannot guard auth', mfaError)
     return
   }
 
-  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2')
+  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2' && !isAdminForced)
     return next('/login')
 
   if (auth.user && !main.auth) {
@@ -69,7 +73,7 @@ async function guard(next: any, to: string, from: string) {
     isCanceled(main.auth?.id).then((res) => {
       main.canceled = res
     })
-    isAdmin().then((res) => {
+    isAdmin(main.auth?.id).then((res) => {
       main.isAdmin = res
     })
 

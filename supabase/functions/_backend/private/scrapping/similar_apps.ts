@@ -110,6 +110,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
-    return c.json({ status: 'Cannot invalidate cache', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot get similar apps', error: JSON.stringify(e) }, 500)
   }
 })

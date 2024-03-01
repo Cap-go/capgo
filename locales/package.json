@@ -1,5 +1,6 @@
 {
   "base": "Base",
+  "billed-annually-at": "Billed annually at",
   "delete-account-0": "Delete account",
   "delete-your-account": "Delete your account",
   "dependencies": {
@@ -12,6 +13,7 @@
   "included-in-plan": "Included in plan",
   "leaving": "Leaving",
   "main": "translate.js",
+  "mo": "mo",
   "name": "locales",
   "no-data": "No Data",
   "price-per-unit-above": "Price per unit above plan",

@@ -49,6 +49,7 @@ back-to-login-page: 返回登录页面
 base: 根据
 best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
+billed-annually-at: 每年计费于
 billing: 计费
 build-your-app-and-s: 构建您的应用程序并同步
 build-your-code-and-: 将您的代码上传到 Capgo
@@ -192,6 +193,7 @@ make-default-ios: 为 iOS 设置默认值
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 mau: 月活跃用户
+mo: 月
 module-heading: 模块
 monthly: 每月
 monthly-active-users: 月活跃用户

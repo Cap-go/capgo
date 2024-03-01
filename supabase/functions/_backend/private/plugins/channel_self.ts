@@ -7,10 +7,12 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import type { Context } from 'hono'
 import { BRES, getBody } from '../../utils/hono.ts'
-import { sendDevice, sendStats, supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import type { AppInfos } from '../../utils/types.ts'
 import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../../utils/utils.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import type { DeviceWithoutCreatedAt } from '../../utils/clickhouse.ts'
+import { sendStatsAndDevice } from '../../utils/clickhouse.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
@@ -36,6 +38,7 @@ export const jsonRequestSchema = z.object({
     invalid_type_error: NON_STRING_VERSION_BUILD,
   }),
   is_emulator: z.boolean().default(false),
+  defaultChannel: z.optional(z.string()),
   is_prod: z.boolean().default(true),
   platform: devicePlatformScheme,
 }).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
@@ -103,7 +106,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   }
   // find device
 
-  await sendDevice(c, {
+  const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
     plugin_version,
@@ -115,7 +118,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     os_version: version_os,
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
-  })
+  }
 
   const { data: dataChannelOverride } = await supabaseAdmin(c)
     .from('channel_devices')
@@ -213,14 +216,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       }
     }
   }
-  await sendStats(c, [{
-    action: 'setChannel',
-    platform: platform as Database['public']['Enums']['platform_os'],
-    device_id,
-    app_id,
-    version_build,
-    version: version.id,
-  }])
+  await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
   return c.json(BRES)
 }
 
@@ -273,7 +269,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
       error: 'version_error',
     }, 400)
   }
-  await sendDevice(c, {
+  const device: DeviceWithoutCreatedAt = {
     app_id,
     device_id,
     plugin_version,
@@ -285,7 +281,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     os_version: version_os,
     platform: platform as Database['public']['Enums']['platform_os'],
     updated_at: new Date().toISOString(),
-  })
+  }
   const { data: dataChannel, error: errorChannel } = await supabaseAdmin(c)
     .from('channels')
     .select()
@@ -318,14 +314,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   if (errorChannel)
     console.error('Cannot find channel default', { errorChannel })
   if (dataChannel) {
-    await sendStats(c, [{
-      action: 'getChannel',
-      platform: platform as Database['public']['Enums']['platform_os'],
-      device_id,
-      app_id,
-      version_build,
-      version: version.id,
-    }])
+    await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
 
     const devicePlatform = devicePlatformScheme.safeParse(platform)
     if (!devicePlatform.success) {
@@ -427,7 +416,7 @@ app.post('/', async (c: Context) => {
     return post(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot post bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -438,7 +427,7 @@ app.put('/', async (c: Context) => {
     return put(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
   }
 })
 
@@ -450,6 +439,6 @@ app.delete('/', async (c: Context) => {
     return deleteOverride(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
   }
 })
