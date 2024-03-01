@@ -19,6 +19,7 @@ const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
 
 const noData = computed(() => false)
+const loadedAlready = ref(false)
 // const noData = computed(() => datas.value.mau.length == 0)
 
 const datas = ref({
@@ -95,6 +96,11 @@ async function getUsages() {
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
+  else {
+    datas.value.mau = []
+    datas.value.storage = []
+    datas.value.bandwidth = []
+  }
   datas.value.mau = datas.value.mau.filter(i => i)
   datas.value.storage = datas.value.storage.filter(i => i)
   datas.value.bandwidth = datas.value.bandwidth.filter(i => i)
@@ -112,10 +118,16 @@ async function loadData() {
 }
 
 watch(dashboard, async (_dashboard) => {
-  await getUsages()
+  if (loadedAlready.value) {
+    await getUsages()
+  }
+  else {
+    loadedAlready.value = true
+    await loadData()
+  }
 })
 
-loadData()
+// loadData()
 </script>
 
 <template>

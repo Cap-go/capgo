@@ -64,7 +64,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by, undefined, undefined)
-    await main.updateDashboard(currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
+    await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
   })
 
   watch(_organizations, async (organizationsMap) => {

@@ -1118,7 +1118,21 @@ export interface Database {
       }
     }
     Views: {
-      [_ in never]: never
+      clickhouse_app_usage_view: {
+        Row: {
+          app_id: string | null
+          bandwidth: number | null
+          date: string | null
+          fail: number | null
+          get: number | null
+          install: number | null
+          mau: number | null
+          storage_added: number | null
+          storage_deleted: number | null
+          uninstall: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation_to_org: {
@@ -1439,6 +1453,8 @@ export interface Database {
           can_use_more: boolean
           is_canceled: boolean
           app_count: number
+          subscription_start: string
+          subscription_end: string
         }[]
       }
       get_plan_usage_percent:
@@ -1524,10 +1540,23 @@ export interface Database {
           }
         | {
             Args: {
+              appid: string
               userid: string
             }
             Returns: number
           }
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: number
+          }
+      get_total_storage_size_org: {
+        Args: {
+          org_id: string
+        }
+        Returns: number
+      }
       get_usage_mode_and_last_saved: {
         Args: Record<PropertyKey, never>
         Returns: {

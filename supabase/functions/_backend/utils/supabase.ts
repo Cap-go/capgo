@@ -321,19 +321,13 @@ export async function updateDeviceCustomId(c: Context, auth: string, appId: stri
   }])
 }
 
-export async function getSDashboard(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string) {
-  console.log(`getSDashboard userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
+export async function getSDashboard(c: Context, auth: string, orgIdQuery: string, startDate: string, endDate: string, appId?: string) {
+  console.log(`getSDashboard orgId ${orgIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
-  let isAdmin = false
   let tableName: 'app_usage' | 'clickhouse_app_usage' = 'app_usage'
   let client = supabaseClient(c, auth)
   if (!auth)
     client = supabaseAdmin(c)
-
-  const reqAdmin = await client
-    .rpc('is_admin')
-    .then(res => res.data || false)
-  isAdmin = reqAdmin
 
   if (isClickHouseEnabled(c)) {
     tableName = 'clickhouse_app_usage'
@@ -346,7 +340,7 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
       const reqOwner = await client
         .rpc('has_app_right', { appid: appId, right: 'read' })
         .then(res => res.data || false)
-      if (!reqOwner && !reqAdmin)
+      if (!reqOwner)
         return Promise.reject(new Error('not allowed'))
     }
     client = supabaseAdmin(c)
@@ -360,15 +354,20 @@ export async function getSDashboard(c: Context, auth: string, userIdQuery: strin
     req = req.eq('app_id', appId)
   }
   else {
-    const userId = isAdmin ? userIdQuery : (await supabaseClient(c, auth).auth.getUser()).data.user?.id
+    const userId = (await supabaseClient(c, auth).auth.getUser()).data.user?.id
     if (!userId)
       return []
     // get all user apps id
-    const appIds = await supabaseClient(c, auth)
+    let appIdsReq = supabaseClient(c, auth)
       .from('apps')
       .select('app_id')
       // .eq('user_id', userId)
-      .then(res => res.data?.map(app => app.app_id) || [])
+
+    if (orgIdQuery)
+      appIdsReq = appIdsReq.eq('owner_org', orgIdQuery)
+
+    const appIds = await appIdsReq.then(res => res.data?.map(app => app.app_id) || [])
+
     console.log('appIds', appIds)
     req = req.in('app_id', appIds)
   }
