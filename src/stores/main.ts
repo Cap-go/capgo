@@ -28,6 +28,7 @@ export const useMainStore = defineStore('main', () => {
   const dashboard = ref<appUsage[]>([])
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
+  const dashboardFetched = ref<boolean>(false)
 
   const totalDownload = ref<number>(0)
 
@@ -55,6 +56,7 @@ export const useMainStore = defineStore('main', () => {
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
     totalStorage.value = await getTotalStorage()
+    dashboardFetched.value = true
   }
 
   const getTotalStats = () => {
@@ -82,6 +84,7 @@ export const useMainStore = defineStore('main', () => {
     totalStorage,
     totalDevices,
     totalDownload,
+    dashboardFetched,
     updateDashboard,
     getTotalStats,
     filterDashboard,

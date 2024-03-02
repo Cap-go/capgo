@@ -68,7 +68,7 @@ watch(type, (val) => {
 })
 
 watchEffect(() => {
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && !tabs.value.find(tab => tab.label === 'plans')) {
     organizationTabs.value.push(
       {
@@ -82,7 +82,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
   }
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && !organizationTabs.value.find(tab => tab.label === 'billing')) {
     organizationTabs.value.push({
       label: 'billing',
@@ -94,7 +94,7 @@ watchEffect(() => {
   else {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && (main.paying && !organizationTabs.value.find(tab => tab.label === 'usage'))) {
     // push it 2 before the last tab
     organizationTabs.value.splice(tabs.value.length - 2, 0, {

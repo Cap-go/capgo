@@ -255,11 +255,11 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
                 <p>{{ 'N/A' }}</p>
               </div>
             </div>
-            <div id="user-email" class="mt-auto mb-auto ml-auto mr-auto text-center">
-              {{ member.email }}
+            <div id="user-email" class="mt-auto mb-auto ml-1/3 mr-1/3 text-center">
+              {{ `${member.email} (${member.role.replace('_', ' ')})` }}
             </div>
             <div class="mt-auto mb-auto mr-4">
-              <button id="wrench-button" :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
+              <button id="wrench-button" :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
               <button id="trash-button" :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">

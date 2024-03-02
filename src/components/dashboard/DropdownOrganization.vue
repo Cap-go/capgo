@@ -22,15 +22,21 @@ const main = useMainStore()
 
 let dropdown: Dropdown
 
+watchEffect(async () => {
+  show.value = (route.path.includes('settings') || route.path.includes('home'))
+})
+
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
 
-  initDropdowns()
+  if (show.value) {
+    initDropdowns()
 
-  dropdown = new Dropdown(
-    document.getElementById('dropdown-org'),
-    document.getElementById('organization-picker'),
-  )
+    dropdown = new Dropdown(
+      document.getElementById('dropdown-org'),
+      document.getElementById('organization-picker'),
+    )
+  }
 })
 
 async function handleOrganizationInvitation(org: Organization) {
@@ -114,10 +120,6 @@ function onOrganizationClick(org: Organization) {
   if (dropdown)
     dropdown.hide()
 }
-
-watchEffect(async () => {
-  show.value = (route.path.includes('settings') || route.path.includes('home'))
-})
 </script>
 
 <template>

@@ -1377,6 +1377,7 @@ export interface Database {
           uid: string
           email: string
           image_url: string
+          role: Database["public"]["Enums"]["user_min_right"]
         }[]
       }
       get_org_perm_for_apikey: {

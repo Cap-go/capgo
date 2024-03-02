@@ -29,7 +29,7 @@ const name = computed({
   },
 })
 async function presentActionSheet() {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -64,7 +64,7 @@ async function presentActionSheet() {
 }
 
 async function saveChanges() {
-  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
   }
@@ -91,7 +91,7 @@ async function saveChanges() {
 }
 
 function onInputClick(event: MouseEvent) {
-  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner']))) {
+  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     event.preventDefault()
   }
@@ -111,7 +111,7 @@ const acronym = computed(() => {
 })
 
 function onInputKeyDown(event: Event) {
-  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])))
+  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])))
     event.preventDefault()
 }
 </script>
@@ -144,7 +144,7 @@ function onInputKeyDown(event: Event) {
         <div>{{ 'You can modify the organization\'s informations here.' }}</div>
         <div class="mb-6">
           <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-name') }}</label>
-          <input id="base-input" v-model="name " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'owner'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
+          <input id="base-input" v-model="name " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
         </div>
       </div>
       <footer style="margin-top: auto">

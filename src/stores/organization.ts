@@ -31,6 +31,7 @@ const main = useMainStore()
 export const useOrganizationStore = defineStore('organization', () => {
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
+  const _initialLoadPromise = ref(Promise.withResolvers())
 
   const organizations: ComputedRef<Organization[]> = computed(
     () => {
@@ -87,6 +88,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       const org = organizations.find(org => org.gid === app.owner_org)
       if (!org) {
         console.error(`Cannot find organization for app`, app)
+        _initialLoadPromise.value.reject(`Cannot find organization for app ${app}`)
         return
       }
 
@@ -94,10 +96,26 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     _organizationsByAppId.value = organizationsByAppId
+    _initialLoadPromise.value.resolve()
   })
 
   const getOrgByAppId = (appId: string) => {
     return _organizationsByAppId.value.get(appId)
+  }
+
+  const awaitInitialLoad = () => {
+    return _initialLoadPromise.value.promise
+  }
+
+  const getCurrentRoleForApp = (appId: string) => {
+    if (_organizationsByAppId.value.size < 1)
+      throw new Error('Organizations by app_id map is empty')
+
+    const org = getOrgByAppId(appId)
+    if (!org)
+      throw new Error(`Cannot find app ${appId} in the app_id -> org map`)
+
+    return org.role as OrganizationRole
   }
 
   const setCurrentOrganization = (id: string) => {
@@ -179,7 +197,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!currentOrganization.value)
       currentOrganization.value = organization
 
-    console.log('done', currentOrganization.value)
+    // console.log('done', currentOrganization.value)
   }
 
   const dedupFetchOrganizations = async () => {
@@ -195,10 +213,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
     getMembers,
-    getCurrentRole,
+    getCurrentRoleForApp,
     hasPermisisonsInRole,
     fetchOrganizations,
     dedupFetchOrganizations,
     getOrgByAppId,
+    awaitInitialLoad,
   }
 })

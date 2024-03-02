@@ -127,7 +127,7 @@ watch(dashboard, async (_dashboard) => {
   }
 })
 
-if (dashboard.value.length > 0)
+if (main.dashboardFetched)
   loadData()
 </script>
 
