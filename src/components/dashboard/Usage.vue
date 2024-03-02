@@ -127,7 +127,8 @@ watch(dashboard, async (_dashboard) => {
   }
 })
 
-// loadData()
+if (dashboard.value.length > 0)
+  loadData()
 </script>
 
 <template>
