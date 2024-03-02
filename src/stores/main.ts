@@ -50,8 +50,8 @@ export const useMainStore = defineStore('main', () => {
       }, 300)
     })
   }
-  const updateDashboard = async (rangeStart?: string, rangeEnd?: string) => {
-    dashboard.value = await getAllDashboard(user.value?.id || '', rangeStart, rangeEnd)
+  const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
+    dashboard.value = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
     totalStorage.value = await getTotalStorage()
@@ -71,9 +71,6 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const filterDashboard = async (appId: string, rangeStart?: string, rangeEnd?: string, refetch = false) => {
-    if (refetch)
-      await updateDashboard(rangeStart, rangeEnd)
-
     return dashboard.value.filter(d => d.app_id === appId)
   }
 
