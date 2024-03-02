@@ -1458,6 +1458,13 @@ export interface Database {
             }
             Returns: number
           }
+      get_total_app_storage_size_orgs: {
+        Args: {
+          org_id: string
+          app_id: string
+        }
+        Returns: number
+      }
       get_total_stats_v5: {
         Args: {
           userid: string
@@ -1471,6 +1478,13 @@ export interface Database {
       get_total_storage_size:
         | {
             Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
+            Args: {
+              appid: string
+              userid: string
+            }
             Returns: number
           }
         | {

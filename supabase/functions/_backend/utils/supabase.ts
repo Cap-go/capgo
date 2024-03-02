@@ -362,27 +362,19 @@ export async function getSDashboard(c: Context, auth: string, orgIdQuery: string
   return res.data || []
 }
 
-export async function getSDashboardV2(c: Context, auth: string, userIdQuery: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
-  console.log(`getSDashboardV2 userId ${userIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
+export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
+  console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
-  let isAdmin = false
   let client = supabaseClient(c, auth)
+  const userId = (await client.auth.getUser()).data.user?.id
   if (!auth)
     client = supabaseAdmin(c)
-
-  const reqAdmin = await client
-    .rpc('is_admin')
-    .then(res => res.data || false)
-  isAdmin = reqAdmin
-  if (!auth)
-    isAdmin = true
-  console.log('isAdmin', isAdmin)
 
   if (appId) {
     const reqOwner = await client
       .rpc('has_app_right', { appid: appId, right: 'read' })
       .then(res => res.data || false)
-    if (!reqOwner && !reqAdmin)
+    if (!reqOwner)
       return Promise.reject(new Error('not allowed'))
   }
 
@@ -393,9 +385,7 @@ export async function getSDashboardV2(c: Context, auth: string, userIdQuery: str
     appIds.push(appId)
   }
   else {
-    console.log('getSDashboardV2 get apps')
-    const userId = isAdmin ? userIdQuery : (await client.auth.getUser()).data.user?.id
-    console.log('getSDashboardV2 get apps', userId)
+    console.log('getSDashboard V2 get apps', userId)
     if (!userId)
       return []
     // get all user apps id
@@ -403,7 +393,7 @@ export async function getSDashboardV2(c: Context, auth: string, userIdQuery: str
     const resAppIds = await client
       .from('apps')
       .select('app_id')
-      .eq('user_id', userId)
+      .eq('owner_org', orgId)
       .then(res => res.data?.map(app => app.app_id) || [])
     appIds.push(...resAppIds)
   }

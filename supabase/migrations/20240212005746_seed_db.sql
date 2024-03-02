@@ -38,9 +38,9 @@ BEGIN
     ('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
     INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
-    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0k8TO6HVln6A', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
-    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0kknt1qWFkZx', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
-    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0f3M6UCQ8g5Q', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
+    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0k8TO6HVln6A', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
+    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0kknt1qWFkZx', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
+    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0f3M6UCQ8g5Q', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days');
 
     INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
     ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Pa0k8TO6HVln6A', NULL),

@@ -228,6 +228,24 @@ BEGIN
 END;  
 $$;
 
+CREATE OR REPLACE FUNCTION public.get_total_app_storage_size_orgs(org_id uuid, app_id character varying)
+RETURNS double precision
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+    total_size double precision := 0;
+BEGIN
+    SELECT COALESCE(SUM(app_versions_meta.size), 0) INTO total_size
+    FROM app_versions
+    INNER JOIN app_versions_meta ON app_versions.id = app_versions_meta.id
+    WHERE app_versions.owner_org = org_id
+    AND app_versions.app_id = get_total_app_storage_size_orgs.app_id
+    AND app_versions.deleted = false;
+
+    RETURN total_size;
+END;  
+$$;
+
 -- Alter table "apps" with new owner system
 
 -- create "owner_org"

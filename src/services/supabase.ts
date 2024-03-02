@@ -199,15 +199,13 @@ export async function getTotaAppStorage(orgId?: string, appid?: string): Promise
   if (!appid)
     return getTotalStorage(orgId)
 
-  console.log('TODO')
-  return 0
-  // const { data, error } = await useSupabase()
-  //   .rpc('get_total_app_storage_size', { userid, appid })
-  //   .single()
-  // if (error)
-  //   throw new Error(error.message)
+  const { data, error } = await useSupabase()
+    .rpc('get_total_app_storage_size_orgs', { org_id: orgId, app_id: appid })
+    .single()
+  if (error)
+    throw new Error(error.message)
 
-  // return data || 0
+  return data || 0
 }
 
 export async function getTotalStorage(orgId?: string): Promise<number> {
