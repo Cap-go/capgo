@@ -232,6 +232,7 @@ key-admin: Admin
 key-all: All
 key-copied: Key copied in your clipboard
 key-read: Read
+key-super-admin: Super admin
 key-upload: Upload
 key-write: Write
 language: Language

@@ -113,9 +113,24 @@ export async function checkAppOwner(c: Context, userId: string | undefined, appI
     return true
   }
   catch (error) {
-    console.log(error)
+    console.error(error)
     return false
   }
+}
+
+export async function hasAppRight(c: Context, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right']) {
+  if (!appId)
+    return false
+
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('has_app_right_userid', { appid: appId, right, userid })
+
+  if (error) {
+    console.error(error)
+    return false
+  }
+
+  return data
 }
 
 export async function getCurrentPlanName(c: Context, userId: string): Promise<string> {

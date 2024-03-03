@@ -249,6 +249,89 @@ BEGIN
    RETURN NEW;
 END;$$;
 
+-- Here to prevent the compatibility from breaking
+CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_id" "text") RETURNS text
+   LANGUAGE plpgsql SECURITY DEFINER AS $$
+<<get_org_perm_for_apikey>>
+Declare  
+  apikey_user_id uuid;
+  org_id uuid;
+  user_perm "public"."user_min_right";
+BEGIN
+  SELECT get_user_id(apikey) into apikey_user_id;
+
+  IF apikey_user_id IS NULL THEN
+    return 'INVALID_APIKEY';
+  END IF;
+
+  SELECT owner_org from apps
+  INTO org_id
+  WHERE apps.app_id=get_org_perm_for_apikey.app_id
+  limit 1;
+
+  IF org_id IS NULL THEN
+    return 'NO_APP';
+  END IF;
+
+  SELECT user_right from org_users
+  INTO user_perm
+  WHERE user_id=apikey_user_id
+  AND org_users.org_id=get_org_perm_for_apikey.org_id;
+
+  IF user_perm IS NULL THEN
+    return 'perm_none';
+  END IF;
+
+  -- For compatibility reasons if you are a super_admin we will return "owner"
+  -- The old cli relies on this behaviour, on get_org_perm_for_apikey_v2 we will change that
+  IF user_perm='super_admin'::"public"."user_min_right" THEN
+    return 'perm_owner';
+  END IF;
+
+  RETURN format('perm_%s', user_perm);
+END;$$;
+
+CREATE OR REPLACE FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  FROM app_versions
+  WHERE app_id=appid
+  AND name=name_version));
+End;  
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."has_app_right_userid"("appid" character varying, "right" user_min_right, "userid" uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE 
+  org_id uuid;
+Begin
+  org_id := get_user_main_org_id_by_app_id(appid);
+
+  RETURN (is_owner_of_org(userid, org_id) OR check_min_rights("right", userid, org_id, "appid", NULL::bigint));
+End;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) FROM public;
+REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) TO postgres;
+GRANT EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) TO service_role;
+
+CREATE OR REPLACE FUNCTION "public"."has_app_right"("appid" character varying, "right" user_min_right)
+ RETURNS boolean
+ LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+Begin
+  RETURN has_app_right_userid("appid", "right", auth.uid());
+End;
+$$;
+
 CREATE OR REPLACE FUNCTION "public"."get_user_main_org_id_by_app_id"("app_id" text) RETURNS uuid
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -276,22 +359,13 @@ $$BEGIN
    RETURN NEW;
 END;$$;
 
-CREATE OR REPLACE FUNCTION public.permited_get_cycle_info("userid" "uuid")
-RETURNS TABLE (
-    subscription_anchor_start timestamp with time zone,
-    subscription_anchor_end timestamp with time zone
-) AS $$
-DECLARE
-  cycle record;
-BEGIN
-  IF (select current_setting('magic.permit_get_cycle_6cd87ed8_279e_44d6_971e_e477e4ba6b8a')) IS DISTINCT FROM '1' THEN
-    RAISE EXCEPTION 'Not allowed';
-  END IF;
+CREATE OR REPLACE FUNCTION "public"."force_valid_user_id_on_app"() RETURNS trigger
+   LANGUAGE plpgsql AS
+$$BEGIN
+  NEW.user_id = (select created_by from orgs where id = (NEW."owner_org"));
 
-  SELECT * from get_cycle_info(permited_get_cycle_info.userid) into cycle;
-  RETURN query values (cycle.subscription_anchor_start, cycle.subscription_anchor_end);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+   RETURN NEW;
+END;$$;
 
 CREATE OR REPLACE FUNCTION "public"."get_orgs_v4"("userid" "uuid") RETURNS TABLE(
   gid uuid, 
@@ -307,10 +381,9 @@ CREATE OR REPLACE FUNCTION "public"."get_orgs_v4"("userid" "uuid") RETURNS TABLE
   subscription_start timestamp with time zone,
   subscription_end timestamp with time zone
 )
-LANGUAGE "plpgsql"
+LANGUAGE "plpgsql" SECURITY DEFINER
   AS $$
 BEGIN
-  SET LOCAL "magic.permit_get_cycle_6cd87ed8_279e_44d6_971e_e477e4ba6b8a" to 1;
   return query select 
   sub.id as gid, 
   sub.created_by, 
@@ -325,11 +398,45 @@ BEGIN
   (sub.f).subscription_anchor_start as subscription_start,
   (sub.f).subscription_anchor_end as subscription_end
   from (
-    select permited_get_cycle_info(o.created_by) as f, o.* as o from orgs as o
+    select get_cycle_info(o.created_by) as f, o.* as o from orgs as o
   ) sub
   join org_users on (org_users."user_id"=get_orgs_v4.userid and sub.id = org_users."org_id");
 END;  
 $$;
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v4"() RETURNS TABLE(
+  gid uuid, 
+  created_by uuid, 
+  logo text, 
+  name text, 
+  role varchar, 
+  paying boolean, 
+  trial_left integer, 
+  can_use_more boolean, 
+  is_canceled boolean, 
+  app_count bigint,
+  subscription_start timestamp with time zone,
+  subscription_end timestamp with time zone
+)
+LANGUAGE "plpgsql" SECURITY DEFINER
+  AS $$
+DECLARE
+  user_id uuid;
+BEGIN
+  SELECT get_identity('{read,upload,write,all}'::"public"."key_mode"[]) into user_id;
+  IF user_id IS NOT DISTINCT FROM NULL THEN
+    RAISE EXCEPTION 'Cannot do that as postgres!';
+  END IF;
+
+  return query select * from get_orgs_v4("user_id");
+END;  
+$$;
+
+REVOKE EXECUTE ON FUNCTION "public"."get_orgs_v4"("userid" "uuid") FROM public;
+REVOKE EXECUTE ON FUNCTION "public"."get_orgs_v4"("userid" "uuid") FROM anon;
+REVOKE EXECUTE ON FUNCTION "public"."get_orgs_v4"("userid" "uuid") FROM authenticated;
+GRANT EXECUTE ON FUNCTION "public"."get_orgs_v4"("userid" "uuid") TO postgres;
+GRANT EXECUTE ON FUNCTION "public"."get_orgs_v4"("userid" "uuid") TO service_role;
 
 CREATE OR REPLACE FUNCTION public.get_total_storage_size_org(org_id uuid)
 RETURNS double precision
@@ -394,7 +501,18 @@ DROP POLICY "Allow org member's API key to select" on "apps";
 DROP POLICY "allow apikey to delete" on "apps";
 DROP POLICY "allow apikey to select" on "apps";
 
-ALTER TABLE apps DROP COLUMN user_id;
+-- TODO: In v3 we will drop this - right now we CANNOT drop this column for compatibility reasons
+-- ALTER TABLE apps DROP COLUMN user_id;
+
+-- We also have to make sure that `user_id` can be nullable and that it is allways the correct one. 
+-- This is what this trigger does.
+
+ALTER TABLE apps
+ALTER COLUMN user_id DROP NOT NULL;
+
+CREATE TRIGGER force_valid_user_id_apps
+   BEFORE INSERT OR UPDATE ON "public"."apps" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."force_valid_user_id_on_app"();  
 
 CREATE POLICY "Allow for auth, api keys (read+)" ON "public"."apps"
 AS PERMISSIVE FOR SELECT
@@ -412,6 +530,11 @@ AS PERMISSIVE FOR ALL
 TO authenticated
 USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL))
 WITH CHECK ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+CREATE POLICY "Allow insert for apikey (write,all) (admin+)" ON "public"."apps"
+AS PERMISSIVE FOR INSERT
+TO anon
+WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all}'::"public"."key_mode"[]), owner_org, NULL, NULL));
 
 -- CHANGE: Org users may update "apps", previously only owner could do that. Required perm: "admin"
 
@@ -459,6 +582,17 @@ TO anon, authenticated
 USING ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), owner_org, app_id, NULL))
 WITH CHECK ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), owner_org, app_id, NULL));
 
+CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions"
+AS PERMISSIVE FOR ALL
+TO authenticated
+USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL))
+WITH CHECK ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+
+CREATE POLICY "Allow insert for api keys (write,all,upload) (upload+)" ON "public"."app_versions"
+AS PERMISSIVE FOR INSERT
+TO anon, authenticated
+WITH CHECK ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), owner_org, app_id, NULL));
+
 CREATE POLICY "Allow update for auth (write+)" ON "public"."app_versions"
 AS PERMISSIVE FOR UPDATE
 TO anon, authenticated
@@ -466,6 +600,11 @@ USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public".
 WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
 
 ALTER TABLE app_versions DROP COLUMN user_id;
+-- For compatibility reasons we will readd the user_id
+-- But this time it will be nulable + no constraint
+-- New cli versions will not set the user_id
+ALTER TABLE app_versions ADD COLUMN 
+user_id uuid;
 
 -- App versions done;
 
@@ -609,7 +748,7 @@ DROP POLICY "Allow org member's api key to update" on "channels";
 DROP POLICY "Allow org members to select" on "channels";
 DROP POLICY "Select if app api" on "channels";
 
-CREATE POLICY "Allow for auth, api keys (read+)" ON "public"."channels"
+CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."channels"
 AS PERMISSIVE FOR SELECT
 TO anon, authenticated
 USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]), owner_org, app_id, NULL));
@@ -633,4 +772,21 @@ WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "pub
 
 ALTER TABLE channels DROP COLUMN created_by;
 
+-- For compatibility reasons we will readd the user_id
+-- But this time it will be nulable + no constraint
+-- New cli versions will not set the user_id
+ALTER TABLE channels ADD COLUMN 
+created_by uuid;
+
 -- channels done
+
+
+-- Alter orgs
+DROP POLICY "Allow member or owner to select" on "orgs";
+DROP POLICY "Allow org admin to update (name and logo)" on "orgs";
+DROP POLICY "Allow owner to all" on "orgs";
+
+CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."orgs"
+AS PERMISSIVE FOR SELECT
+TO anon, authenticated
+USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]), id, NULL, NULL));

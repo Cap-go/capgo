@@ -72,6 +72,11 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
         role: 'admin',
         handler: () => permision = invite ? 'invite_admin' : 'admin',
       },
+      {
+        text: t('key-super-admin'),
+        role: 'super_admin',
+        handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
+      },
     ],
   }
   displayStore.showDialog = true
@@ -216,7 +221,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
 }
 
 async function changeMemberPermission(member: ExtendedOrganizationMember) {
-  const perm = await showPermModal(false)
+  const perm = await showPermModal(member.role.includes('invite'))
 
   if (!perm)
     return
@@ -228,6 +233,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
   }
 
   toast.success(t('permission-changed'))
+  members.value = await organizationStore.getMembers()
 }
 </script>
 
@@ -256,7 +262,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
               </div>
             </div>
             <div id="user-email" class="mt-auto mb-auto ml-1/3 mr-1/3 text-center">
-              {{ `${member.email} (${member.role.replace('_', ' ')})` }}
+              {{ `${member.email} (${member.role.replaceAll('_', ' ')})` }}
             </div>
             <div class="mt-auto mb-auto mr-4">
               <button id="wrench-button" :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
