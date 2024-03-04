@@ -176,9 +176,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // We have RLS that ensure that we only selct rows where we are member or owner
     const { data, error } = await supabase
-      .rpc('get_orgs_v4', {
-        userid: userId,
-      })
+      .rpc('get_orgs_v4')
 
     if (error)
       throw error
